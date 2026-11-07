@@ -71,3 +71,35 @@ TEST (mixer177a_c_assign_and_unassign_audio_tracks)
     CHECK (song.playlistTracks[2].mode == lynx::PlaylistTrackMode::unassigned && song.playlistTracks[2].mixerTrack == -1);
     CHECK (song.playlistTracks[2].name == "Bass"); // name and colour stay
 }
+
+TEST (mixer177a_d_assign_skips_inserts_with_a_track_as_fl)
+{
+    lynx::Song song;
+    song.mixer.resize (6);
+    song.channels.resize (3);
+    song.channels[0].mixerTrack = 1; // the only channel on insert 1, with an instrument track: skipped
+    song.channels[1].mixerTrack = 2; // insert 2 has two channels: not skipped
+    song.channels[2].mixerTrack = 2;
+    song.playlistTracks.resize (3);
+    song.playlistTracks[0].mode = lynx::PlaylistTrackMode::instrument;
+    song.playlistTracks[0].channel = 0;
+    song.playlistTracks[0].mixerTrack = 5; // (its own insert differs) and insert 5 is pointed at: skipped
+    song.playlistTracks[1].mode = lynx::PlaylistTrackMode::instrument;
+    song.playlistTracks[1].channel = 1;
+    song.playlistTracks[1].mixerTrack = 4; // insert 4 pointed at by an instrument track: skipped
+    CHECK (lynx::mixerops::assignNewAudioTracks (song, { 1, 2, 3, 4, 5 }) == 2);
+    CHECK (song.playlistTracks[2].mixerTrack == 2 && song.playlistTracks[2].mode == lynx::PlaylistTrackMode::audio);
+    CHECK (song.playlistTracks.size() == 4 && song.playlistTracks[3].mixerTrack == 3);
+}
+
+TEST (mixer177a_e_a_rail_click_is_one_step_however_long_its_press)
+{
+    using lynx::faderRailStepsForHold;
+    // a click (an injected one holds 50 ms plus jitter; a person's up to ~150 ms) is exactly one step
+    for (int ms : { 0, 50, 64, 80, 130, 200, lynx::faderRailFirstRepeatMs - 1 })
+        CHECK (faderRailStepsForHold (ms) == 1);
+    CHECK (lynx::faderRailFirstRepeatMs > 2 * lynx::faderRailRepeatMs);
+    // held, it then repeats at FL's rate
+    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs) == 2);
+    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs + 10 * lynx::faderRailRepeatMs) == 12);
+}

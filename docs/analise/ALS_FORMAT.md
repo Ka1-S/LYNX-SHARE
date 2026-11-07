@@ -173,7 +173,7 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 |---|---|
 | MidiTrack + instrument | channel (instrument) + mixer insert + Playlist track |
 | MidiClip (arrangement) | its own pattern (the clip's notes) + pattern clip; looped clip = clip longer than the pattern (stretched clips loop) |
-| AudioTrack + AudioClip | audioClip channel per sample + audio clip; `PitchCoarse/Fine` → clip pitch; `SampleVolume` → clip gain; warp → clip `stretch` (constant rate between first and last marker; multi-segment warp = slice N4) |
+| AudioTrack + AudioClip | audioClip channel per sample + audio clip; `PitchCoarse/Fine` → clip pitch; `SampleVolume` → clip gain; warp → clip `stretch` (one rate between first and last marker), or, when the clip is stretched offline (keeps its pitch, file length known), the channel stretches the file to its content beats; markers that bend the tempo stay as the channel's warp markers and each segment is stretched at its own rate in one pass (round 175a, M1; export writes them back) |
 | GroupTrack | mixer insert. Children route to it (`toMaster` off + send) and their Playlist tracks are grouped under a header track |
 | ReturnTrack + sends | mixer insert + `MixerSend` from every track with level > −70 dB |
 | Mixer Volume/Pan/Speaker/Solo | insert volume/pan/mute/solo |
