@@ -1125,7 +1125,7 @@ public:
                         if (file.existsAsFile() && file.loadFileAsData (data))
                         {
                             const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                                 fx = *loaded;
                         }
                         break;
@@ -7705,8 +7705,15 @@ private:
 
             auto maximusPasses = 0; // Maximus has its own page (first pass); the second pass shows Soundgoodizer
             auto ridgePasses = 0;
+            // round 173d3: the parity pictures of one editor — LYNX_PLUGUI_ONLY=<effect name>, LYNX_PLUGUI_PRESET=<.fst>,
+            // LYNX_PLUGUI_PAGES=<page,page,…> (the page numbers as the editor encodes them)
+            const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_ONLY", {});
+            const auto onlyPreset = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PRESET", {});
+            const auto onlyPages = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PAGES", {}), ",", "");
             for (const auto kind : kinds)
             {
+                if (only.isNotEmpty() && only != lynx::effectInfo (kind).name)
+                    continue;
                 auto fx = lynx::makeEffectSlot (kind);
                 juce::String name (lynx::effectInfo (kind).name);
                 for (const auto& plugin : lynx::flPluginsForEffect (kind))
@@ -7716,6 +7723,8 @@ private:
                     if (! file.existsAsFile()) // plugins without presets: their entry of FL's plugin database
                         for (const auto& f : database.findChildFiles (juce::File::findFiles, true, juce::String::fromUTF8 (plugin.c_str()) + ".fst"))
                             file = f;
+                    if (only.isNotEmpty() && onlyPreset.isNotEmpty())
+                        file = juce::File (onlyPreset);
                     if (! file.existsAsFile())
                     {
                         auto files = dir.findChildFiles (juce::File::findFiles, true, "*.fst");
@@ -7726,7 +7735,7 @@ private:
                     if (file.existsAsFile() && file.loadFileAsData (data))
                     {
                         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                             fx = *loaded;
                     }
                     name = juce::String::fromUTF8 (plugin.c_str());
@@ -7814,7 +7823,16 @@ private:
                 }
 
                 const auto pages = name == "Soundgoodizer" ? 1 : juce::jmax (1, (int) lynx::plugui::layoutFor (kind).pages.size());
+                std::vector<int> pageList;
                 for (int page = 0; page < pages; ++page)
+                    pageList.push_back (page);
+                if (only.isNotEmpty() && ! onlyPages.isEmpty())
+                {
+                    pageList.clear();
+                    for (const auto& p : onlyPages)
+                        pageList.push_back (p.getIntValue());
+                }
+                for (const auto page : pageList)
                 {
                     auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, page);
                     juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);

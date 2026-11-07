@@ -5732,7 +5732,7 @@ bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position
         return false;
 
     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-    const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm);
+    const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
 
     if (! fx)
     {
@@ -6040,7 +6040,7 @@ void EffectsPanel::showSlotMenu (int slot)
                     if (! f.loadFileAsData (data))
                         return;
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm))
+                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
                         engine.editSong ([t = track, slot, fx = *fx] (Song& song) {
                             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                             const auto enabled = target.enabled;
