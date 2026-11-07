@@ -829,6 +829,25 @@ public:
             }
 
             case Item::label:
+                if (hasStyle (item, plugui::bigCaption) && item.label != nullptr) // round tp172d (slice 8): a hardware strip's big
+                {                                                                    // caption, or (big) the model name plate
+                    const auto heavy = hasStyle (item, plugui::big);
+                    auto f = juce::Font (font (r.getHeight() * (heavy ? 0.92f : 0.62f), heavy));
+                    if (heavy)
+                    {
+                        f.setHorizontalScale (0.82f); // a condensed, stencil-like plate
+                        f.setExtraKerningFactor (0.04f);
+                        g.setFont (f);
+                        g.setColour (juce::Colours::white.withAlpha (0.35f)); // the engraving's lit lower edge
+                        g.drawText (caps (tr (item.label)), r.translated (0.0f, 1.0f * s), juce::Justification::centred, false);
+                        g.setColour (juce::Colour (0xff2c2d2f).withAlpha (fx.enabled ? 1.0f : 0.6f));
+                        g.drawText (caps (tr (item.label)), r, juce::Justification::centred, false);
+                        break;
+                    }
+                    g.setColour (skin::captionColour().withAlpha (fx.enabled ? 0.92f : 0.5f));
+                    ui::drawFittingText (g, caps (tr (item.label)), r, juce::Justification::centredRight, f, 7.0f);
+                    break;
+                }
                 if (hasStyle (item, plugui::wordmark) && item.label != nullptr) // round tp172d: a wide-spaced title in two tones
                 {
                     const auto text = juce::String (item.label);
@@ -1060,6 +1079,55 @@ public:
                 const auto count = (float) juce::jmax (1, (int) labels.size());
                 const auto w = vertical ? r.getWidth() : r.getWidth() / count;
                 const auto h = vertical ? r.getHeight() / count : r.getHeight();
+                if (hasStyle (item, plugui::batToggle) && texts.size() >= 2) // round tp172d (slice 8): COMPRESS / LIMIT — a bat toggle,
+                {                                                             // option 0 above (lever up), option 1 under; the chosen word lit
+                    const auto line = juce::jmin (13.0f * s, r.getHeight() * 0.2f);
+                    const auto f = font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true);
+                    for (int o = 0; o < 2; ++o)
+                    {
+                        const auto band = o == 0 ? r.withHeight (line) : r.withTop (r.getBottom() - line);
+                        g.setColour (o == chosen && fx.enabled ? accent : skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), band.expanded (14.0f * s, 0.0f), juce::Justification::centred, f, 7.0f);
+                    }
+                    const auto body = r.withTrimmedTop (line).withTrimmedBottom (line);
+                    skin::batToggle (g, juce::Rectangle<float> (body.getHeight() * 0.36f, body.getHeight() * 0.36f).withCentre (body.getCentre()), chosen == 0, hot, fx.enabled);
+                    break;
+                }
+                if (hasStyle (item, plugui::rotarySelector) && ! texts.empty()) // round tp172d (slice 8): VU DISPLAY — a black pointer
+                {                                                                  // knob, its options printed round it, the chosen one lit
+                    const auto line = 12.0f * s;
+                    const auto knobArea = selectorKnobArea (item);
+                    const auto f = font (juce::jmax (8.0f, 10.0f * s * skin::captionScale()), true);
+                    const auto n = (int) texts.size();
+                    for (int o = 0; o < n; ++o)
+                    {
+                        const auto a = selectorAngle (o, n);
+                        const auto q = knobArea.getCentre() + juce::Point<float> { std::sin (a), -std::cos (a) } * (knobArea.getWidth() * 0.5f + 9.0f * s);
+                        auto band = juce::Rectangle<float> (r.getWidth() * 0.5f, line).withCentre (q);
+                        auto j = juce::Justification::centred;
+                        if (std::sin (a) < -0.3f) { band = band.withRightX (q.x + 8.0f * s); j = juce::Justification::centredRight; }
+                        if (std::sin (a) > 0.3f) { band = band.withX (q.x - 8.0f * s); j = juce::Justification::centredLeft; }
+                        band = band.translated (0.0f, std::abs (std::sin (a)) > 0.3f ? -line * 0.9f : -2.0f * s);
+                        g.setColour (o == chosen && fx.enabled ? accent : skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), band, j, f, 7.0f);
+                    }
+                    skin::selectorKnob (g, knobArea, selectorAngle (juce::jmax (0, chosen), n), hot, fx.enabled);
+                    break;
+                }
+                if (skin::goldKeys() && ! vertical) // round tp172d (slice 8): the opto leveler's strip — gold keys side by side
+                {
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto cell = juce::Rectangle<float> (r.getX() + w * (float) o, r.getY(), w, h).reduced (1.5f * s, 0.0f);
+                        const auto lit = o == chosen && fx.enabled;
+                        skin::goldKey (g, cell, lit, hot);
+                        g.setColour (juce::Colour (0xff23211a));
+                        g.setFont (font (juce::jmax (7.0f, juce::jmin (h * 0.58f, 11.0f * s)), false));
+                        g.drawFittedText (texts[(std::size_t) o].toUpperCase() == texts[(std::size_t) o] || texts[(std::size_t) o].containsAnyOf ("0123456789") ? texts[(std::size_t) o] : caps (texts[(std::size_t) o]),
+                                          cell.toNearestInt(), juce::Justification::centred, 1, 0.7f); // ("50Hz" as printed, "OFF" in caps)
+                    }
+                    break;
+                }
                 if (skin::hwKeys() && ! vertical) // round tp172d: a row of square keys joined by a line (or wide keys for words)
                 {
                     bool letters = true; // A / E / N / T / P: square keys; words: wide keys
@@ -1118,6 +1186,18 @@ public:
                         const auto cell = letters ? juce::Rectangle<float> (key, key).withCentre (centre)
                                                   : juce::Rectangle<float> (w - 4.0f * s, h).withCentre (centre);
                         skin::hwKey (g, cell, o == chosen && fx.enabled, hot);
+                        if (hasStyle (item, plugui::compactKeys)) // round tp172d (slice 8): LYNX's extras on a hardware face — small,
+                        {                                          // muted until hovered, the chosen key lit
+                            if (o != chosen && ! hot)
+                            {
+                                g.setColour (juce::Colour (0xffc8cbce).withAlpha (0.55f)); // (a veil of the light faceplate it sits on)
+                                g.fillRoundedRectangle (cell, 2.0f * s);
+                            }
+                            g.setColour (o == chosen && fx.enabled ? juce::Colours::white : juce::Colours::white.withAlpha (hot ? 0.95f : 0.75f));
+                            g.setFont (font (juce::jmax (7.0f, juce::jmin (h * 0.58f, 8.5f * s)), true));
+                            g.drawFittedText (caps (texts[(std::size_t) o]), cell.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                            continue;
+                        }
                         g.setColour (juce::Colours::black.withAlpha (0.5f));
                         g.setFont (font (letters ? juce::jmax (8.0f, key * 0.46f) : juce::jmax (7.0f, juce::jmin (h * 0.5f, 10.0f * s)), true));
                         g.drawText (caps (texts[(std::size_t) o]), cell.translated (0.0f, 1.0f).toNearestInt(), juce::Justification::centred, false);
@@ -1150,6 +1230,23 @@ public:
             case Item::toggle:
             {
                 const auto on = (value >= 0.5f) != hasStyle (item, plugui::inverted) && ! hasStyle (item, plugui::momentary);
+                if (hasStyle (item, plugui::batToggle)) // round tp172d (slice 8): AUTO MAKEUP — a bat toggle, the caption above
+                {                                        // (lit while on, lever up), OFF under it (lit while off)
+                    const auto f = font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true);
+                    const auto line = juce::jmin (13.0f * s, r.getHeight() * 0.16f);
+                    const auto top = r.withHeight (line * 2.0f);
+                    g.setColour (on && fx.enabled ? accent : skin::captionColour());
+                    if (item.label != nullptr)
+                    {
+                        g.setFont (f);
+                        g.drawFittedText (caps (tr (item.label)), top.expanded (14.0f * s, 0.0f).toNearestInt(), juce::Justification::centredBottom, 2, 0.8f);
+                    }
+                    g.setColour (! on && fx.enabled ? accent : skin::captionColour());
+                    ui::drawFittingText (g, caps (tr ("Off")), r.withTop (r.getBottom() - line), juce::Justification::centred, f, 7.0f);
+                    const auto body = r.withTrimmedTop (line * 2.0f).withTrimmedBottom (line);
+                    skin::batToggle (g, juce::Rectangle<float> (body.getHeight() * 0.38f, body.getHeight() * 0.38f).withCentre (body.getCentre()), on, hot, fx.enabled);
+                    break;
+                }
                 if (hasStyle (item, plugui::boxed) || hasStyle (item, plugui::momentary)) // a small lit button with its letter (FL's T / L buttons)
                 {
                     if (on)
@@ -1331,6 +1428,21 @@ public:
                 break;
             }
         }
+    }
+
+    // round tp172d (slice 8): a rotary selector's knob (the lower part of its box, under the top option's word) and the
+    // angle of option k of n (spread over ±75 degrees round the top)
+    juce::Rectangle<float> selectorKnobArea (const LayoutItem& item) const
+    {
+        const auto r = rectOf (item);
+        const auto d = juce::jmin (r.getWidth() * 0.44f, r.getHeight() - 26.0f * scale());
+        return juce::Rectangle<float> (d, d).withCentre ({ r.getCentreX(), r.getBottom() - d * 0.5f - 2.0f * scale() });
+    }
+    static float selectorAngle (int k, int n)
+    {
+        if (n <= 1) return 0.0f;
+        const auto span = juce::degreesToRadians (150.0f);
+        return -span * 0.5f + span * (float) k / (float) (n - 1);
     }
 
     // round tp172d (look slice): a red LED read-out (EchoBoy's time, tempo and style displays): a black window, a faint
@@ -3198,9 +3310,10 @@ public:
             {
                 g.setColour (juce::Colours::black.withAlpha (0.6f));
                 g.fillRoundedRectangle (r.translated (0.0f, 2.0f * s), 10.0f * s);
-                g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe6e8ea), 0.0f, r.getY(), juce::Colour (0xff4a4c50), 0.0f, r.getBottom(), false));
+                const auto dark = skin::vuBezelDark(); // (slice 8: an opto leveler's gunmetal frame)
+                g.setGradientFill (juce::ColourGradient (juce::Colour (dark ? 0xff5a5c60 : 0xffe6e8ea), 0.0f, r.getY(), juce::Colour (dark ? 0xff1c1d1f : 0xff4a4c50), 0.0f, r.getBottom(), false));
                 g.fillRoundedRectangle (r, 10.0f * s);
-                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2e3034), 0.0f, r.getY(), juce::Colour (0xffb8babe), 0.0f, r.getBottom(), false));
+                g.setGradientFill (juce::ColourGradient (juce::Colour (dark ? 0xff202124 : 0xff2e3034), 0.0f, r.getY(), juce::Colour (dark ? 0xff4b4d51 : 0xffb8babe), 0.0f, r.getBottom(), false));
                 g.fillRoundedRectangle (r.reduced (4.0f * s), 8.0f * s);
                 g.setColour (juce::Colour (0xff101010));
                 g.fillRoundedRectangle (r.reduced (6.0f * s), 7.0f * s);
@@ -4532,6 +4645,17 @@ public:
                 const auto n = juce::jmax (1, (int) plugui::optionLabels (item).size());
                 auto o = item.type == Item::radio || isVertical (item) ? (int) ((e.position.y - r.getY()) / r.getHeight() * (float) n)
                                                   : (int) ((e.position.x - r.getX()) / r.getWidth() * (float) n);
+                if (hasStyle (item, plugui::batToggle) && n == 2) // round tp172d (slice 8): a click flips the bat toggle
+                    o = plugui::optionAt (item, valueOf (param)) == 0 ? 1 : 0;
+                if (hasStyle (item, plugui::rotarySelector)) // ... and turns the selector to the printed option nearest the click
+                {
+                    const auto c = selectorKnobArea (item).getCentre();
+                    const auto a = std::atan2 (e.position.x - c.x, c.y - e.position.y);
+                    auto best = 1e9f;
+                    for (int k = 0; k < n; ++k)
+                        if (const auto d = std::abs (a - selectorAngle (k, n)); d < best)
+                            best = d, o = k;
+                }
                 if (item.type == Item::radio && item.columns > 0)
                     for (int k = 0; k < n; ++k)
                         if (gridCell (item, k, n).contains (e.position))

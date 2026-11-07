@@ -2015,46 +2015,56 @@ Layout glowLeveler()
     // round 114: the optical levelers' classic front panel (the role: Waves CLA-2A / LA-2A): GAIN on the left, PEAK
     // REDUCTION on the right, the VU meter between them, the COMPRESS / LIMIT switch under the meter.
     // Round 129 (docs/PARITY.md, the official trial's panel): the VU DISPLAY selector (input / GR / output) top right,
-    // AUTO MAKEUP under it, and the bottom strip of the reference — HF emphasis (its HI FREQ), MIX, TRIM
+    // AUTO MAKEUP under it, and the bottom strip of the reference — HF emphasis (its HI FREQ), MIX, TRIM.
+    // Round tp172d (slice 8): the reference's proportions and hardware — a wide grey faceplate, COMPRESS / LIMIT and
+    // AUTO MAKEUP as metal bat toggles with their words printed above and under them, the VU DISPLAY selector as a black
+    // pointer knob with INPUT / GR / OUTPUT round it, the model name in big type under the meter, and a charcoal strip
+    // with gold keys (50Hz / 60Hz / OFF) and big ANALOG / HI FREQ / MIX / TRIM captions. LYNX's own extras (the voicing,
+    // the classic opto law and release, the make-up reference) stay as small keys where the original has its logo.
     Layout l;
-    l.width = 540;
+    l.width = 660;
     l.height = 312;
     auto& v = l.items;
-    v.push_back (section (4, 4, 532, 304, TR_NOOP ("Optical leveler")));
-    // round tp172d: the reference's dark lower strip under the trims (the theme fills this second section near-black)
-    v.push_back (section (4, 232, 532, 76, ""));
-    // round tp172d (look slice): the reference's printed scales — no value text (the drag tip shows it)
-    v.push_back (knob (86, 124, 92, "Gain", TR_NOOP ("Gain"), 124 + 46 + 24, big));
-    v.push_back (knob (454, 124, 92, "Peak reduction", TR_NOOP ("Peak reduction"), 124 + 46 + 24, big));
-    auto vu = display (170, 40, 200, 136, "vumeter");
+    v.push_back (section (4, 4, 652, 304, "")); // (slice 8: one faceplate, no title, as on the original)
+    // the reference's charcoal lower strip (the theme fills this second section)
+    v.push_back (section (4, 236, 652, 72, ""));
+    // round 123: the voicing — Glow's own engine, or the measured classic opto leveler (substitutes start there);
+    // round 152 / 165w: the classic voicing's opto law and release (Old = a project saved before that round)
+    // (review: one compact group of small muted keys where the original has only its badge)
+    v.push_back (tabs (14, 18, 112, 14, "Voicing", TR_NOOP ("Modern|Opto classic"), {}, compactKeys));
+    v.push_back (when (tabs (14, 36, 112, 14, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (label (14, 54, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
+    v.push_back (when (tabs (14, 64, 112, 14, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    // COMPRESS / LIMIT: a bat toggle (up = compress), its two words above and under it
+    v.push_back (tabs (40, 136, 52, 84, "Limit", TR_NOOP ("Compress|Limit"), {}, batToggle));
+    // the two big knobs, their printed 0 … 100 round them; no value text (the drag tip shows it)
+    v.push_back (knob (180, 119, 88, "Gain", TR_NOOP ("Gain"), 192, big));
+    v.push_back (knob (482, 119, 88, "Peak reduction", TR_NOOP ("Peak reduction"), 192, big));
+    auto vu = display (245, 54, 174, 115, "vumeter");
     vu.steps = 0; // live output 0: gain reduction
     v.push_back (vu);
+    v.push_back (label (262, 176, 140, 34, "GLOW", bigCaption | big)); // the model name under the meter (LYNX's own)
     // round 165x: the VU DISPLAY selector is a parameter (saved with the project, translated from the reference's state)
-    v.push_back (tabs (392, 22, 136, 18, "VU display", TR_NOOP ("Input|GR|Output"), { 0.5f, 0.0f, 1.0f }));
-    v.push_back (tabs (200, 184, 140, 22, "Limit", TR_NOOP ("Compress|Limit")));
-    v.push_back (toggle (404, 206, 120, 20, "Auto makeup", TR_NOOP ("Auto makeup")));
-    // round 123: the voicing — Glow's own engine, or the measured classic opto leveler (substitutes start there)
-    v.push_back (tabs (12, 206, 160, 22, "Voicing", TR_NOOP ("Modern|Opto classic")));
-    // round 152: the reference's ANALOG buttons (hum and noise, measured) bottom left, and the opto law of the classic
-    // voicing (Old = a project saved before round 152: the round-123 Limit, no auto make-up there)
-    v.push_back (label (12, 244, 120, 12, TR_NOOP ("Analog")));
-    v.push_back (tabs (12, 258, 120, 20, "Analog", TR_NOOP ("Off|50 Hz|60 Hz"), { 0.0f, 0.5f, 1.0f }));
-    v.push_back (when (tabs (12, 26, 130, 18, "Opto law", TR_NOOP ("Old|Measured")), "Voicing", 0.5f, 1.0f));
-    // round 165w: the classic voicing's release (Measured = the trial's gain recovery; Old = round 123's slower tail, kept
-    // by a project saved before), right, under the VU selector
-    v.push_back (when (label (392, 46, 136, 10, TR_NOOP ("Attack / release")), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
-    v.push_back (when (tabs (392, 57, 136, 16, "Opto release", TR_NOOP ("Old|Measured")), "Voicing", 0.5f, 1.0f));
-    v.push_back (knob (170, 262, 28, "Emphasis", TR_NOOP ("HF emphasis"), 296));
-    v.push_back (label (170 - 42, 268, 32, 12, TR_NOOP ("Flat"), dim)); // the printed scale beside the small knob
-    v.push_back (label (170 + 10, 268, 32, 12, TR_NOOP ("Max"), dim));
-    v.push_back (knob (270, 262, 28, "Mix", TR_NOOP ("Mix"), 296));
-    v.push_back (label (270 - 42, 268, 32, 12, "0", dim)); // the printed scale beside the small knob
-    v.push_back (label (270 + 10, 268, 32, 12, "100", dim));
-    v.push_back (knob (370, 262, 28, "Trim", TR_NOOP ("Trim"), 296, bipolar));
-    v.push_back (label (370 - 42, 268, 32, 12, "-18", dim)); // the printed scale beside the small knob
-    v.push_back (label (370 + 10, 268, 32, 12, "+18", dim));
-    // round 165x: where Auto makeup was switched on (the reference's make-up follows the dial from there)
-    v.push_back (when (knob (470, 262, 28, "Makeup ref", TR_NOOP ("Makeup ref"), 296), "Voicing", 0.5f, 1.0f));
+    v.push_back (label (540, 26, 100, 12, TR_NOOP ("VU display")));
+    v.push_back (tabs (540, 42, 100, 68, "VU display", TR_NOOP ("Input|GR|Output"), { 0.5f, 0.0f, 1.0f }, rotarySelector));
+    v.push_back (toggle (564, 128, 60, 88, "Auto makeup", TR_NOOP ("Auto makeup"), batToggle));
+    // the strip: round 152's ANALOG keys (hum and noise, measured), HF emphasis (the reference's HI FREQ), MIX, TRIM
+    v.push_back (label (56, 260, 64, 24, TR_NOOP ("Analog"), bigCaption));
+    v.push_back (tabs (124, 263, 112, 20, "Analog", TR_NOOP ("50Hz|60Hz|Off"), { 0.5f, 1.0f, 0.0f }));
+    // (review: the original's sizes — HI FREQ a big cream pointer knob, MIX and TRIM medium knurled knobs)
+    v.push_back (label (244, 260, 68, 24, TR_NOOP ("Hi freq"), bigCaption));
+    v.push_back (knob (336, 272, 42, "Emphasis", TR_NOOP ("HF emphasis"), 0, noCaption));
+    v.push_back (label (362, 266, 46, 12, TR_NOOP ("[ Flat ]")));
+    v.push_back (label (406, 260, 44, 24, TR_NOOP ("Mix"), bigCaption));
+    v.push_back (knob (474, 270, 46, "Mix", TR_NOOP ("Mix"), 0, noCaption));
+    v.push_back (label (438, 294, 24, 10, "0")); // the printed scale under the knob
+    v.push_back (label (486, 294, 28, 10, "100"));
+    v.push_back (label (498, 260, 52, 24, TR_NOOP ("Trim"), bigCaption));
+    v.push_back (knob (574, 270, 46, "Trim", TR_NOOP ("Trim"), 0, (std::uint32_t) (bipolar | noCaption)));
+    v.push_back (label (536, 294, 24, 10, "-18"));
+    v.push_back (label (588, 294, 24, 10, "18"));
+    // round 165x: where Auto makeup was switched on (the reference's make-up follows the dial from there) — LYNX's own
+    v.push_back (when (knob (634, 264, 22, "Makeup ref", TR_NOOP ("Makeup ref"), 290), "Voicing", 0.5f, 1.0f));
     return l;
 }
 
@@ -3492,7 +3502,7 @@ Layout echoformLayout()
     // (Mix, Echo time, Feedback; Low cut, the style's second time, High cut; Prime numbers), the tempo (tap, Groove,
     // Feel, the echo mode) and the saturation (Saturation, Age, Output; the style menus). The Tweak page (EchoBoy hides
     // its Tweak panel the same way): the Tweak strip, the switch rows, Style edit / the rhythm editor
-    l.height = 330;
+    l.height = 360; // (tp172d slice 8: + the name block, was 330)
     l.pages = { TR_NOOP ("Main"), TR_NOOP ("Tweak") };
     const auto mainFrom = v.size();
     // round tp172d (look slice): EchoBoy's face in LYNX's own drawing — captions above the knobs and the printed scale
@@ -3515,7 +3525,7 @@ Layout echoformLayout()
     v.push_back (when (value (172, 146, 108, 22, "Note L", boxed), "Sync L", 0.5f, 1.0f));
     v.push_back (hwKnob (372, 84, 66, "Feedback", TR_NOOP ("Feedback")));
     for (auto& w : rangeWords (372, 118, 66, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
-    v.push_back (hwKnob (80, 222, 56, "Low cut", TR_NOOP ("Low cut")));
+    v.push_back (hwKnob (80, 222, 56, "Low cut", TR_NOOP ("LowCut"))); // (slice 8: printed as on the original)
     for (auto& w : rangeWords (80, 251, 56, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
     // the style's second control (spread, ratio, spacing or the right time) between the filters
     v.push_back (when (hwKnob (226, 212, 40, "Spread", TR_NOOP ("Spread"), bipolar), "Style", 0.0f, 0.2f));
@@ -3526,7 +3536,7 @@ Layout echoformLayout()
     v.push_back (when (menuOf (258, 202, 70, 20, "Sync R", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues), "Style", 0.6f, 1.0f));
     // quad: Repeat / Swell where the right sync menu sits in the two-time styles
     v.push_back (when (tabs (258, 202, 76, 20, "Swell", TR_NOOP ("Repeat|Swell")), "Style", 0.4f, 0.6f));
-    v.push_back (hwKnob (372, 222, 56, "High cut", TR_NOOP ("High cut")));
+    v.push_back (hwKnob (372, 222, 56, "High cut", TR_NOOP ("HighCut")));
     for (auto& w : rangeWords (372, 251, 56, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
     v.push_back (toggle (150, 256, 150, 24, "Prime numbers", TR_NOOP ("Prime numbers")));
     // the tap tempo pod: the TAP key and its LED tempo (sets the left time), Groove / Feel, the echo mode
@@ -3536,7 +3546,7 @@ Layout echoformLayout()
     v.push_back (hwKnob (514, 116, 50, "Groove", TR_NOOP ("Groove"), bipolar));
     for (auto& w : rangeWords (514, 143, 50, TR_NOOP ("Shuffle"), TR_NOOP ("Swing"))) v.push_back (w);
     v.push_back (hwKnob (626, 116, 50, "Feel", TR_NOOP ("Feel"), bipolar));
-    for (auto& w : rangeWords (626, 143, 50, TR_NOOP ("Rushing"), TR_NOOP ("Dragging"))) v.push_back (w);
+    for (auto& w : rangeWords (626, 143, 50, TR_NOOP ("Rushin"), TR_NOOP ("Draggin"))) v.push_back (w);
     // the mode rotary, its five modes printed round it (the knob's five stops: -135, -67.5, 0, 67.5, 135 degrees)
     v.push_back (stepped (knob (570, 226, 44, "Style", TR_NOOP ("Mode"), 226 + 22 + 18), 4));
     v.push_back (label (474, 243, 66, 12, TR_NOOP ("Single"), dim));
@@ -3561,6 +3571,12 @@ Layout echoformLayout()
     v.push_back (label (706, 214, 50, 22, TR_NOOP ("Tape"), alignLeft));
     v.push_back (menuOf (750, 214, 180, 22, "Tape voicing", TR_NOOP ("Tape voicing"), TR_NOOP ("Off|Ping-pong tape|Studio tape|Studio tape hot"),
                          { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f }));
+    // round tp172d (slice 8): the name block top left of the faceplate, over the pods (EchoBoy's place for its name;
+    // LYNX's name and its own subtitle) — the pods move down under it
+    for (auto i = mainFrom; i < v.size(); ++i)
+        v[i].y += 30.0f;
+    v.push_back (label (12, 1, 112, 32, "Echoform", dim | alignLeft));
+    v.push_back (label (130, 12, 260, 14, TR_NOOP ("Character echo machine"), alignLeft));
     for (auto i = mainFrom; i < v.size(); ++i)
         v[i].page = 0;
     // the Tweak page: TWEAK (EchoBoy's Tweak panel) — width, diffusion, the mode's modulation, ducking, accent, the
@@ -3684,7 +3700,7 @@ Layout echoformLayout()
         v[i].page = 1;
     }
     // the page switch, bottom left (EchoBoy's TWEAK key)
-    v.push_back (pageTabs (8, 298, 180, 26, TR_NOOP ("Main|Tweak")));
+    v.push_back (pageTabs (8, 328, 180, 26, TR_NOOP ("Main|Tweak")));
     // the walnut cheeks either side (EchoBoy's): every item moves in by 28
     l.width = 1006;
     for (auto& item : v)

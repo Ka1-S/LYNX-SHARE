@@ -266,6 +266,13 @@ bool lowerCaptions(); // round tp172d: the theme writes captions and plain menus
 bool ledReadouts();   // round tp172d: read-outs and stepped menus as red LED displays
 bool titleRules();    // round tp172d: the big name label between two rules
 bool vuBezel();       // round tp172d: a chrome bezel round the VU
+bool vuBezelDark();   // round tp172d (slice 8): ... in dark gunmetal instead (an opto leveler's meter frame)
+// round tp172d (slice 8): the opto leveler's hardware — gold keys on its charcoal strip, a metal bat toggle on its hex
+// nut (up or down), a black pointer knob (a selector) turned to `angle` (radians, 0 = up)
+bool goldKeys();
+void goldKey (juce::Graphics&, juce::Rectangle<float> area, bool lit, bool hover);
+void batToggle (juce::Graphics&, juce::Rectangle<float> area, bool up, bool hover, bool enabled);
+void selectorKnob (juce::Graphics&, juce::Rectangle<float> area, float angle, bool hover, bool enabled);
 // round tp172d: the hardware themes' square keys (option tabs, switches) and the section being drawn (its own fill)
 bool hwKeys();
 void hwKey (juce::Graphics&, juce::Rectangle<float> area, bool lit, bool hover, juce::Colour litColour = {}); // (litColour: the accent when transparent)

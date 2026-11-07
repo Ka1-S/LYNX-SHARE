@@ -58,6 +58,13 @@ enum : std::uint32_t
     springBack = 1 << 16, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
     rangeEnds = 1 << 17,  // knob: its scale's two ends under it (left / right), the value there only while hovered or
                           // dragged, the caption under that (round tp172b4: the reference reverb's knobs)
+    batToggle = 1 << 18,  // tabs (two options) / toggle: a metal bat-handle toggle switch, the options printed above and
+                          // under it (an opto leveler's COMPRESS / LIMIT and AUTO MAKEUP, round tp172d)
+    rotarySelector = 1 << 19, // tabs: a black pointer knob with its options printed round it (a VU DISPLAY selector, round tp172d)
+    bigCaption = 1 << 20, // label: a large plain caption sized to its box (a hardware strip's ANALOG / MIX / TRIM); with
+                          // `big`, a heavy name plate (the opto leveler's model name under its meter), round tp172d
+    compactKeys = 1 << 21, // tabs: small muted keys (full only while hovered; the chosen one lit) — LYNX's own extras
+                           // tucked into a hardware face (the opto leveler's voicing keys), round tp172d
 };
 
 struct LayoutItem
