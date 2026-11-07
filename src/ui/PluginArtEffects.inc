@@ -1005,6 +1005,8 @@ inline const Theme& glowLevelerTheme()
         x.knobScale = 1.04f;
         x.thumbPointer = true;
         x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.numerals = true;                 // round tp172d (look slice): the reference's printed 0 … 100
+        x.numeralStep = 10;
         x.flatSections = true;             // one faceplate: no cards
         x.rimWidth = 0.0f;
         x.captionCol = Colour (0xff1c1d1f);
@@ -1178,6 +1180,17 @@ inline const Theme& foilTheme()
 
 // === Halo (ValhallaShimmer role): the original's light minimal look — pale grey ground, graphite disc knobs, dark type ===
 
+// round tp172d (look slice): the original's row of flat discs runs from black to a light grey in signal order
+inline Colour haloCapTint (const char* param)
+{
+    static const char* const order[] = { "Mix", "Shift", "Feedback", "Diffusion", "Size", "Low cut", "High cut", "Mod rate", "Mod depth" };
+    if (param != nullptr)
+        for (int i = 0; i < 9; ++i)
+            if (std::strcmp (param, order[i]) == 0)
+                return Colour::greyLevel (0.02f + 0.48f * (float) i / 8.0f);
+    return {};
+}
+
 inline const Theme& haloTheme()
 {
     static const Theme t = []
@@ -1200,6 +1213,15 @@ inline const Theme& haloTheme()
         x.rimWidth = 0.0f;
         x.headerCol = Colour (0xff3a3a3f);
         x.pal.accent2 = Colour (0xff3a3a40);
+        // round tp172d (look slice): big discs shading across the row, no value ring, a short light tick at the edge,
+        // lower-case captions and modes
+        x.capTint = haloCapTint;
+        x.discRing = false;
+        x.pointerFrom = 0.62f;
+        x.pal.pointer = Colour (0xffc4c4c8);
+        x.pal.capBottom = x.pal.capTop;
+        x.lowerCaptions = true;
+        x.captionScale = 1.7f; // the original's legends: captions and values about a quarter of the knob's radius tall
         return x;
     }();
     return t;
@@ -1545,8 +1567,10 @@ inline const Theme& echoformTheme()
     {
         auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
         x.cornerScale = 4.0f; // the original's three rounded pods
+        x.bow = 0.05f;        // round tp172d (look slice): with bowed sides
         x.hwKeys = true;
         x.cheek = 30.0f; // (the layout leaves room for them)
+        x.ledReadouts = true; // round tp172d (look slice): the time, tap tempo and style on red LED read-outs
         return x;
     }();
     return t;
@@ -2006,7 +2030,15 @@ inline const Theme& emberTheme()
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
         x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
         x.cheek = 30.0f;
-        x.captionScale = 1.25f;
+        x.numerals = true; // round tp172d (look slice): the big Drive's printed 0 … 10
+        // round tp172d (look slice): the original's chunky black caps on a ring of dots, no lit arc; bigger spaced
+        // legends; the name between two rules; the VU in a chrome bezel
+        x.cap = Cap::bakelite;
+        x.noValueArc = true;
+        x.dotTicks = true;
+        x.captionScale = 1.45f;
+        x.titleRules = true;
+        x.vuBezel = true;
         return x;
     }();
     return t;
@@ -3896,12 +3928,15 @@ inline const Theme& voiceShiftTheme()
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
         // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
-        x.sectionFills[0] = Colour (0xffc39a1a);
-        x.sectionFills[1] = Colour (0xff1d5a6c);
-        x.sectionFills[2] = Colour (0xffb51d1d);
+        // round tp172d (look slice): the black face that frames them comes first
+        x.sectionFills[0] = Colour (0xff131416);
+        x.sectionFills[1] = Colour (0xffc39a1a);
+        x.sectionFills[2] = Colour (0xff1d5a6c);
+        x.sectionFills[3] = Colour (0xffb51d1d);
         x.hwKeys = true;
         x.cheek = 30.0f;
         x.cornerScale = 0.5f;
+        x.captionScale = 1.45f; // round tp172d (look slice): the original's big legends
         return x;
     }();
     return t;
@@ -4672,8 +4707,9 @@ inline const Theme& autoPanTheme()
     // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xff6a6a6c), 2.0f);
         x.cornerScale = 4.0f;
+        x.bow = 0.05f; // round tp172d (look slice): PanMan's bowed pods, a grey bevel instead of the white outline
         x.hwKeys = true;
         x.cheek = 30.0f;
         return x;

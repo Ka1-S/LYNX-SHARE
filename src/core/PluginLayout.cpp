@@ -33,7 +33,7 @@ namespace
 {
 // --- builders (positions in FL's window pixels, body origin) -----------------------------------------
 
-LayoutItem section (float x, float y, float w, float h, const char* title, std::uint16_t style = 0)
+LayoutItem section (float x, float y, float w, float h, const char* title, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::section;
@@ -44,7 +44,7 @@ LayoutItem section (float x, float y, float w, float h, const char* title, std::
 }
 
 // a knob centred at (cx, cy), `d` wide, its caption centred at `captionY`
-LayoutItem knob (float cx, float cy, float d, const char* param, const char* caption, float captionY, std::uint16_t style = 0, int steps = 0)
+LayoutItem knob (float cx, float cy, float d, const char* param, const char* caption, float captionY, std::uint32_t style = 0, int steps = 0)
 {
     LayoutItem i;
     i.type = Item::knob;
@@ -61,7 +61,7 @@ LayoutItem knob (float cx, float cy, float d, const char* param, const char* cap
     return i;
 }
 
-LayoutItem label (float x, float y, float w, float h, const char* text, std::uint16_t style = 0)
+LayoutItem label (float x, float y, float w, float h, const char* text, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::label;
@@ -71,7 +71,7 @@ LayoutItem label (float x, float y, float w, float h, const char* text, std::uin
     return i;
 }
 
-LayoutItem value (float x, float y, float w, float h, const char* param, std::uint16_t style = alignLeft)
+LayoutItem value (float x, float y, float w, float h, const char* param, std::uint32_t style = alignLeft)
 {
     LayoutItem i;
     i.type = Item::value;
@@ -81,7 +81,7 @@ LayoutItem value (float x, float y, float w, float h, const char* param, std::ui
     return i;
 }
 
-LayoutItem slider (Item type, float x, float y, float w, float h, const char* param, const char* caption = nullptr, std::uint16_t style = 0)
+LayoutItem slider (Item type, float x, float y, float w, float h, const char* param, const char* caption = nullptr, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = type;
@@ -103,7 +103,7 @@ LayoutItem radio (float x, float y, float w, float h, const char* param, const c
     return i;
 }
 
-LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint16_t style = 0)
+LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::tabs;
@@ -121,7 +121,7 @@ LayoutItem pageTabs (float x, float y, float w, float h, const char* options)
     return i;
 }
 
-LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.style = style;
@@ -549,7 +549,7 @@ Layout luxeVerb()
     l.width = 947;
     l.height = 456;
     auto& v = l.items;
-    const auto tile = [&v] (float cx, float cy, const char* param, const char* caption, float captionY, std::uint16_t style = 0) {
+    const auto tile = [&v] (float cx, float cy, const char* param, const char* caption, float captionY, std::uint32_t style = 0) {
         v.push_back (knob (cx, cy, 34, param, caption, captionY, style | valueAbove));
     };
     const auto fader = [&v] (float cx, const char* param, const char* caption) {
@@ -647,7 +647,7 @@ Layout luxeVerb()
     // thickness, distance, the big SPACE with its decay rate beside it, brightness, width, mix; the style above
     // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
     // Values under the captions (and the decay time inside SPACE)
-    const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0, float w = 76.0f) {
+    const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0, float w = 76.0f) {
         auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
         i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
                                                 // bounds it; never wider than tall, so no caption hides under a knob)
@@ -1772,7 +1772,7 @@ Layout vintagePhaser()
     fader (708, "Mix", TR_NOOP ("Mix"));
 
     // second page: the engine's other controls
-    auto adv = [&] (int k, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto adv = [&] (int k, const char* param, const char* caption, std::uint32_t style = 0) {
         const auto cx = 50.0f + 92.0f * (float) (k % 8), cy = 82.0f + 70.0f * (float) (k / 8);
         v.push_back (onPage (knob (cx, cy, 34, param, caption, cy + 26, style | showValue), 1));
     };
@@ -1814,9 +1814,25 @@ Layout soundgoodizer()
 // same conventions (titled sections, knobs with captions and read-outs, the graph on top, switches as tabs). -------
 
 // a knob with its caption and its value under it (`d` wide, centred at cx, cy)
-LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0)
 {
-    return knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, (std::uint16_t) (style | showValue));
+    return knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, (std::uint32_t) (style | showValue));
+}
+
+// round tp172d (look slice): a hardware original's knob — the caption above, no value text (the drag tip shows it);
+// its printed range words go under it as labels
+LayoutItem hwKnob (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0)
+{
+    auto k = knob (cx, cy, d, param, caption, cy + d * 0.5f + 7.0f, (std::uint32_t) (style | captionAbove));
+    k.y -= 14.0f;
+    k.h += 14.0f;
+    return k;
+}
+
+// the two range words under a hardware knob, at its left and right
+std::array<LayoutItem, 2> rangeWords (float cx, float y, float d, const char* low, const char* high)
+{
+    return { label (cx - d * 0.5f - 22.0f, y, 44.0f, 12.0f, low, dim), label (cx + d * 0.5f - 22.0f, y, 44.0f, 12.0f, high, dim) };
 }
 
 // a live meter of the effect's control output `output` (0 = gain reduction, 1 = second gain reduction)
@@ -2007,8 +2023,9 @@ Layout glowLeveler()
     v.push_back (section (4, 4, 532, 304, TR_NOOP ("Optical leveler")));
     // round tp172d: the reference's dark lower strip under the trims (the theme fills this second section near-black)
     v.push_back (section (4, 232, 532, 76, ""));
-    v.push_back (dial (86, 124, 92, "Gain", TR_NOOP ("Gain"), big));
-    v.push_back (dial (454, 124, 92, "Peak reduction", TR_NOOP ("Peak reduction"), big));
+    // round tp172d (look slice): the reference's printed scales — no value text (the drag tip shows it)
+    v.push_back (knob (86, 124, 92, "Gain", TR_NOOP ("Gain"), 124 + 46 + 24, big));
+    v.push_back (knob (454, 124, 92, "Peak reduction", TR_NOOP ("Peak reduction"), 124 + 46 + 24, big));
     auto vu = display (170, 40, 200, 136, "vumeter");
     vu.steps = 0; // live output 0: gain reduction
     v.push_back (vu);
@@ -2027,11 +2044,17 @@ Layout glowLeveler()
     // by a project saved before), right, under the VU selector
     v.push_back (when (label (392, 46, 136, 10, TR_NOOP ("Attack / release")), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
     v.push_back (when (tabs (392, 57, 136, 16, "Opto release", TR_NOOP ("Old|Measured")), "Voicing", 0.5f, 1.0f));
-    v.push_back (dial (170, 262, 28, "Emphasis", TR_NOOP ("HF emphasis")));
-    v.push_back (dial (270, 262, 28, "Mix", TR_NOOP ("Mix")));
-    v.push_back (dial (370, 262, 28, "Trim", TR_NOOP ("Trim"), bipolar));
+    v.push_back (knob (170, 262, 28, "Emphasis", TR_NOOP ("HF emphasis"), 296));
+    v.push_back (label (170 - 42, 268, 32, 12, TR_NOOP ("Flat"), dim)); // the printed scale beside the small knob
+    v.push_back (label (170 + 10, 268, 32, 12, TR_NOOP ("Max"), dim));
+    v.push_back (knob (270, 262, 28, "Mix", TR_NOOP ("Mix"), 296));
+    v.push_back (label (270 - 42, 268, 32, 12, "0", dim)); // the printed scale beside the small knob
+    v.push_back (label (270 + 10, 268, 32, 12, "100", dim));
+    v.push_back (knob (370, 262, 28, "Trim", TR_NOOP ("Trim"), 296, bipolar));
+    v.push_back (label (370 - 42, 268, 32, 12, "-18", dim)); // the printed scale beside the small knob
+    v.push_back (label (370 + 10, 268, 32, 12, "+18", dim));
     // round 165x: where Auto makeup was switched on (the reference's make-up follows the dial from there)
-    v.push_back (when (dial (470, 262, 28, "Makeup ref", TR_NOOP ("Makeup ref")), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (knob (470, 262, 28, "Makeup ref", TR_NOOP ("Makeup ref"), 296), "Voicing", 0.5f, 1.0f));
     return l;
 }
 
@@ -2127,14 +2150,20 @@ Layout withEmberClassic (Layout l)
     auto vu = display (262, 16, 236, 140, "vumeter");
     vu.steps = 0;
     add (vu);
-    add (label (516, 38, 200, 40, "EMBER", dim | alignLeft));
-    add (dial (582, 140, 58, "Classic output", TR_NOOP ("Output")));
-    add (toggle (630, 128, 90, 22, "Classic auto", TR_NOOP ("Auto")));
-    add (dial (118, 214, 118, "Classic drive", TR_NOOP ("Drive"), big));
-    add (dial (300, 244, 62, "Classic low cut", TR_NOOP ("Low cut")));
-    add (dial (424, 244, 62, "Classic tone", TR_NOOP ("Tone"), bipolar));
-    add (dial (548, 244, 62, "Classic high cut", TR_NOOP ("High cut")));
-    add (dial (672, 244, 62, "Classic mix", TR_NOOP ("Mix")));
+    add (label (506, 38, 214, 40, "EMBER", dim | alignLeft)); // (tp172d: the Ember theme sets it between two rules)
+    // round tp172d (look slice): captions above, the printed range words under, no value text (the drag tip shows it)
+    add (hwKnob (582, 132, 54, "Classic output", TR_NOOP ("Output")));
+    for (auto& w : rangeWords (582, 162, 54, "-24 dB", "0 dB")) add (w);
+    add (toggle (630, 120, 90, 22, "Classic auto", TR_NOOP ("Auto")));
+    add (hwKnob (118, 222, 112, "Classic drive", TR_NOOP ("Drive"), big));
+    add (hwKnob (300, 238, 58, "Classic low cut", TR_NOOP ("Low cut")));
+    for (auto& w : rangeWords (300, 270, 58, "20 Hz", "1 kHz")) add (w);
+    add (hwKnob (424, 238, 58, "Classic tone", TR_NOOP ("Tone"), bipolar));
+    for (auto& w : rangeWords (424, 270, 58, TR_NOOP ("Dark"), TR_NOOP ("Bright"))) add (w);
+    add (hwKnob (548, 238, 58, "Classic high cut", TR_NOOP ("High cut")));
+    for (auto& w : rangeWords (548, 270, 58, "1 kHz", "20 kHz")) add (w);
+    add (hwKnob (672, 238, 58, "Classic mix", TR_NOOP ("Mix")));
+    for (auto& w : rangeWords (672, 270, 58, TR_NOOP ("Dry"), TR_NOOP ("Wet"))) add (w);
     add (toggle (264, 302, 80, 22, "Classic thump", TR_NOOP ("Thump")));
     add (toggle (512, 302, 80, 22, "Classic steep", TR_NOOP ("Steep")));
     add (tabs (196, 330, 330, 34, "Classic style", TR_NOOP ("A|E|N|T|P")));
@@ -2184,7 +2213,7 @@ Layout kilnLayout()
         const auto px = cx + rr * std::sin (a), py = cy - rr * std::cos (a);
         const auto w = 66.0f;
         const auto x = std::sin (a) < -0.3f ? px - w + 8.0f : std::sin (a) > 0.3f ? px - 8.0f : px - w * 0.5f;
-        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
+        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint32_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
     }
     v.push_back (dial (166, 488, 50, "Drive", TR_NOOP ("Drive")));
     v.push_back (knob (294, 488, 50, "Group", TR_NOOP ("Group"), 488 + 45.0f, showValue, 9));
@@ -2920,24 +2949,42 @@ Layout withRhythmVoicing (Layout l)
     l.height = 280;
     auto add = [&l] (LayoutItem it) { l.items.push_back (when (it, "Voicing", 0.5f, 1.0f)); };
     const auto rhythmFirst = l.items.size();
-    add (section (4, 4, 330, 242, TR_NOOP ("Pan")));
-    add (dial (60, 76, 52, "Offset", TR_NOOP ("Offset"), bipolar));
-    add (dial (166, 76, 52, "Width", TR_NOOP ("Width")));
-    add (dial (272, 76, 52, "Rhythm smoothing", TR_NOOP ("Smoothing")));
-    add (display (20, 160, 298, 26, "panpos"));
-    add (label (20, 190, 30, 16, TR_NOOP ("L"), alignLeft));
-    add (label (154, 190, 30, 16, TR_NOOP ("C")));
-    add (label (288, 190, 30, 16, TR_NOOP ("R")));
-    add (tabs (20, 216, 298, 20, "Pattern", TR_NOOP ("Left / right|Ramp|8 steps")));
-    add (section (340, 4, 250, 242, TR_NOOP ("Rate")));
-    add (tabs (350, 28, 230, 22, "Sync", TR_NOOP ("Hz|Beats")));
-    add (when (dial (465, 104, 52, "Rhythm rate", TR_NOOP ("Rate"), big), "Sync", 0.0f, 0.5f));
-    add (when (dial (465, 104, 52, "Beats", TR_NOOP ("Beats"), big), "Sync", 0.5f, 1.0f));
-    add (dial (370, 190, 24, "Start phase", TR_NOOP ("Phase")));
-    add (dial (560, 190, 24, "Amount", TR_NOOP ("Amount")));
-    add (section (596, 4, 160, 242, TR_NOOP ("Level")));
-    add (dial (676, 80, 36, "Rhythm output", TR_NOOP ("Output"), bipolar));
-    add (tabs (610, 216, 132, 22, "Rhythm analog", TR_NOOP ("Digital|Analog|Hot"), { 0.0f, 0.5f, 1.0f }));
+    // round tp172d (look slice): PanMan's face — the name top left, then three bowed pods: PAN (Offset / Width /
+    // Smoothing, captions above, scale words under, the red L-C-R strip), RATE (the big Rate with its range, the
+    // pattern keys under it: ◀ ramp right to left, ◀▶ left / right, ▶ ramp left to right, plus LYNX's 8 steps), LEVEL
+    // (Input, Output, the meter, the analog keys); no value text under the knobs (the tip shows it while dragging)
+    add (label (12, 4, 210, 34, "Auto-Pan", dim | alignLeft));
+    add (label (12, 34, 300, 14, TR_NOOP ("Rhythmic automatic panner"), alignLeft));
+    add (section (4, 54, 330, 192, nullptr, boxed));
+    add (hwKnob (62, 104, 46, "Offset", TR_NOOP ("Offset"), bipolar));
+    add (hwKnob (168, 98, 46, "Width", TR_NOOP ("Width")));
+    add (hwKnob (274, 104, 46, "Rhythm smoothing", TR_NOOP ("Smoothing")));
+    add (label (28, 132, 36, 12, TR_NOOP ("Left"), dim));
+    add (label (62, 132, 36, 12, TR_NOOP ("Right"), dim));
+    add (label (134, 126, 36, 12, TR_NOOP ("Min"), dim));
+    add (label (168, 126, 36, 12, TR_NOOP ("Max"), dim));
+    add (label (240, 132, 36, 12, TR_NOOP ("Hard"), dim));
+    add (label (274, 132, 36, 12, TR_NOOP ("Soft"), dim));
+    add (display (24, 166, 290, 24, "panpos"));
+    add (label (24, 196, 30, 16, TR_NOOP ("L"), alignLeft));
+    add (label (154, 196, 30, 16, TR_NOOP ("C")));
+    add (label (284, 196, 30, 16, TR_NOOP ("R")));
+    add (section (340, 54, 250, 192, nullptr, boxed));
+    add (when (hwKnob (465, 104, 50, "Rhythm rate", TR_NOOP ("Rate"), big), "Sync", 0.0f, 0.5f));
+    add (when (hwKnob (465, 104, 50, "Beats", TR_NOOP ("Beats"), big), "Sync", 0.5f, 1.0f));
+    add (when (label (400, 134, 50, 12, "100 sec", dim), "Sync", 0.0f, 0.5f));
+    add (when (label (482, 134, 50, 12, "10 Hz", dim), "Sync", 0.0f, 0.5f));
+    add (tabs (380, 158, 170, 28, "Pattern", "<|<  >|>|8", { 0.5f, 0.0f, 0.75f, 1.0f }));
+    add (hwKnob (372, 218, 22, "Start phase", TR_NOOP ("Phase")));
+    add (tabs (420, 206, 90, 20, "Sync", TR_NOOP ("Hz|Beats")));
+    add (hwKnob (558, 218, 22, "Amount", TR_NOOP ("Amount")));
+    add (section (596, 54, 160, 192, nullptr, boxed));
+    add (hwKnob (636, 104, 40, "Input", TR_NOOP ("Input"), bipolar)); // PanMan's INPUT (round tp172d: the Rhythm voicing reads it too)
+    for (auto& w : rangeWords (636, 128, 40, "-24", "+24")) add (w);
+    add (hwKnob (716, 104, 40, "Rhythm output", TR_NOOP ("Output"), bipolar));
+    for (auto& w : rangeWords (716, 128, 40, "-24", "+24")) add (w);
+    add (display (616, 152, 120, 34, "iometer"));
+    add (tabs (610, 194, 132, 20, "Rhythm analog", TR_NOOP ("Digital|Analog|Hot"), { 0.0f, 0.5f, 1.0f }));
     l.items.push_back (toggle (8, 254, 300, 20, "Voicing", TR_NOOP ("Measured rhythm voicing")));
     // round 150: PanMan's Tweak page role — the input's envelope moves the rate, the offset and the width (its threshold
     // and range), Feel / Groove of the steps, and the angle past the speakers
@@ -2976,8 +3023,7 @@ Layout withRhythmVoicing (Layout l)
     }
     l.height = 290;
     l.pages = { "Main", "Tweak" };
-    l.items.push_back (when (pageTabs (330, 252, 180, 26, TR_NOOP ("Main|Tweak")), "Voicing", 0.5f, 1.0f));
-    l.items.push_back (label (530, 250, 226, 38, "AUTO-PAN", dim));
+    l.items.push_back (when (pageTabs (610, 222, 132, 20, TR_NOOP ("Main|Tweak")), "Voicing", 0.5f, 1.0f)); // PanMan's TWEAK key
     l.width += 56;
     for (auto& item : l.items)
         item.x += 28.0f;
@@ -3067,27 +3113,36 @@ Layout voiceShiftLayout()
 {
     // round 135: the voice manipulators' one-screen panel (the role: a small Soundtoys voice shifter, screenshot of the
     // official trial): PITCH and FORMANT side by side with LINK between them and a read-out under each, the three
-    // MODE buttons in the middle, DRIVE and MIX on the right
+    // MODE buttons in the middle, DRIVE and MIX on the right. Round tp172d (look slice): the original's black face
+    // framing the three printed fields, big legends over the knobs, MIN / MAX and DRY / WET under drive and mix (their
+    // value shows while dragged), the name along the bottom of the face
     Layout l;
     l.width = 640;
-    l.height = 272; // round tp172d: + the name strip along the bottom (the original's)
+    l.height = 272;
     auto& v = l.items;
-    v.push_back (section (4, 4, 300, 222, nullptr, boxed)); // (tp172d: its two captions name it, as on the original)
-    v.push_back (knob (80, 100, 78, "Pitch", TR_NOOP ("Pitch"), 0, (std::uint16_t) (big | bipolar | noCaption)));
-    v.push_back (label (40, 28, 80, 16, TR_NOOP ("Pitch")));
-    v.push_back (value (44, 176, 72, 24, "Pitch", boxed));
-    v.push_back (toggle (124, 84, 56, 22, "Link", TR_NOOP ("Link")));
-    v.push_back (knob (228, 100, 78, "Formant", TR_NOOP ("Formant"), 0, (std::uint16_t) (big | bipolar | noCaption)));
-    v.push_back (label (188, 28, 80, 16, TR_NOOP ("Formant")));
-    v.push_back (value (192, 176, 72, 24, "Formant", boxed));
-    v.push_back (section (310, 4, 130, 222, TR_NOOP ("Mode")));
-    v.push_back (radio (322, 50, 110, 120, "Mode", TR_NOOP ("Transpose|Quantize|Robot")));
+    v.push_back (section (4, 4, 632, 264, nullptr, boxed)); // the face
+    v.push_back (section (14, 14, 292, 204, nullptr, boxed));
+    v.push_back (label (34, 24, 92, 22, TR_NOOP ("Pitch")));
+    v.push_back (knob (80, 102, 74, "Pitch", TR_NOOP ("Pitch"), 0, (std::uint32_t) (big | bipolar | noCaption)));
+    v.push_back (value (44, 172, 72, 26, "Pitch", boxed));
+    v.push_back (toggle (117, 89, 74, 48, "Link", TR_NOOP ("Link"), captionAbove)); // tp172d: a small key on a line between the knobs, LINK under it
+    v.push_back (label (182, 24, 92, 22, TR_NOOP ("Formant")));
+    v.push_back (knob (228, 102, 74, "Formant", TR_NOOP ("Formant"), 0, (std::uint32_t) (big | bipolar | noCaption)));
+    v.push_back (value (192, 172, 72, 26, "Formant", boxed));
+    v.push_back (section (314, 14, 124, 204, TR_NOOP ("Mode")));
+    v.push_back (radio (322, 50, 110, 112, "Mode", TR_NOOP ("Transpose|Quantize|Robot")));
     // round 137: MIDI control (the notes held on a Channel Rack channel set the pitch / the robot's note)
-    v.push_back (stepper (318, 178, 118, 34, "MIDI", TR_NOOP ("MIDI channel"), 129));
-    v.push_back (section (446, 4, 190, 222, nullptr, boxed));
-    v.push_back (dial (494, 100, 60, "Drive", TR_NOOP ("Drive"), big));
-    v.push_back (dial (588, 100, 60, "Mix", TR_NOOP ("Mix"), big));
-    v.push_back (label (16, 232, 320, 34, "VOICE SHIFT", dim | alignLeft));
+    v.push_back (stepper (320, 168, 112, 34, "MIDI", TR_NOOP ("MIDI channel"), 129));
+    v.push_back (section (446, 14, 180, 204, nullptr, boxed));
+    v.push_back (label (458, 24, 76, 22, TR_NOOP ("Drive")));
+    v.push_back (knob (496, 104, 66, "Drive", TR_NOOP ("Drive"), 0, (std::uint32_t) (big | noCaption)));
+    v.push_back (label (460, 140, 36, 14, TR_NOOP ("Min"), dim));
+    v.push_back (label (498, 140, 36, 14, TR_NOOP ("Max"), dim));
+    v.push_back (label (546, 24, 76, 22, TR_NOOP ("Mix")));
+    v.push_back (knob (584, 104, 66, "Mix", TR_NOOP ("Mix"), 0, (std::uint32_t) (big | noCaption)));
+    v.push_back (label (548, 140, 36, 14, TR_NOOP ("Dry"), dim));
+    v.push_back (label (586, 140, 36, 14, TR_NOOP ("Wet"), dim));
+    v.push_back (label (14, 226, 300, 34, "voice|shift", plugui::wordmark));
     return l;
 }
 
@@ -3147,7 +3202,7 @@ Layout captionsAbove (Layout l)
     for (auto& i : l.items)
         if (i.type == Item::knob && (i.style & showValue) != 0 && (i.style & noCaption) == 0)
         {
-            i.style = (std::uint16_t) (i.style | captionAbove);
+            i.style = (std::uint32_t) (i.style | captionAbove);
             i.y -= 14.0f;
         }
     return l;
@@ -3311,28 +3366,35 @@ Layout nebulaLayout()
 
 Layout haloLayout()
 {
-    // one row of nine knobs in signal order (mix, shift, feedback, diffusion, size, low cut, high cut, mod rate, mod
-    // depth), the three mode menus below
+    // round tp172d (look slice), the original's plain face: a wide-spaced two-tone name across the top, one row of nine
+    // big discs in signal order (mix, shift, feedback, diffusion, size, low cut, high cut, mod rate, mod depth) with the
+    // caption above and the value under each, the three modes as "name: value" text along the bottom (a click on the
+    // value opens its menu)
     Layout l;
-    l.width = 680;
-    l.height = 200;
+    l.width = 700;
+    l.height = 262;
     auto& v = l.items;
-    v.push_back (section (8, 8, 664, 140, nullptr, boxed));
+    v.push_back (label (20, 4, 660, 62, "lynx|halo", plugui::wordmark));
     const char* knobs[] = { "Mix", "Shift", "Feedback", "Diffusion", "Size", "Low cut", "High cut", "Mod rate", "Mod depth" };
     const char* captions[] = { TR_NOOP ("Mix"), TR_NOOP ("Shift"), TR_NOOP ("Feedback"), TR_NOOP ("Diffusion"), TR_NOOP ("Size"),
                                TR_NOOP ("Low cut"), TR_NOOP ("High cut"), TR_NOOP ("Mod rate"), TR_NOOP ("Mod depth") };
     for (int i = 0; i < 9; ++i)
-        v.push_back (dial (46.0f + 73.0f * (float) i, 56, 44, knobs[i], captions[i], i == 1 ? bipolar : 0));
-    v.push_back (label (8, 160, 86, 24, TR_NOOP ("Reverb mode"), alignLeft));
-    // round 135: the reference's four modes (mono in, three stereo sizes) first, LYNX's own three after them; ◀ ▶
-    auto mode = choiceMenu (94, 160, 136, 24, "Reverb mode", TR_NOOP ("Reverb mode"),
+        v.push_back (dial (42.0f + 77.0f * (float) i, 134, 66, knobs[i], captions[i], i == 1 ? bipolar : 0));
+    v.push_back (label (16, 216, 104, 28, TR_NOOP ("Reverb mode"), alignLeft));
+    // round 135: the reference's four modes (mono in, three stereo sizes) first, LYNX's own three after them
+    auto mode = choiceMenu (122, 216, 130, 28, "Reverb mode", TR_NOOP ("Reverb mode"),
                             TR_NOOP ("Mono|Small stereo|Medium stereo|Big stereo|Wide|Dense|Bright"));
     mode.values = { 0.125f, 0.25f, 0.375f, 0.625f, 0.0f, 0.5f, 1.0f }; // verbs::haloModeIndex (Wide / Dense / Bright keep 0 / ½ / 1)
+    mode.style = plugui::plainMenu;
     v.push_back (mode);
-    v.push_back (label (240, 160, 82, 24, TR_NOOP ("Pitch mode"), alignLeft));
-    v.push_back (choiceMenu (322, 160, 160, 24, "Shift mode", TR_NOOP ("Pitch mode"), TR_NOOP ("Single|Dual|Single, bright|Dual, bright|No shift")));
-    v.push_back (label (500, 160, 60, 24, TR_NOOP ("Color"), alignLeft));
-    v.push_back (choiceMenu (560, 160, 112, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Dark")));
+    v.push_back (label (270, 216, 92, 28, TR_NOOP ("Pitch mode"), alignLeft));
+    auto pitch = choiceMenu (364, 216, 130, 28, "Shift mode", TR_NOOP ("Pitch mode"), TR_NOOP ("Single|Dual|Single, bright|Dual, bright|No shift"));
+    pitch.style = plugui::plainMenu;
+    v.push_back (pitch);
+    v.push_back (label (540, 216, 52, 28, TR_NOOP ("Color"), alignLeft));
+    auto color = choiceMenu (594, 216, 100, 28, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Dark"));
+    color.style = plugui::plainMenu;
+    v.push_back (color);
     return l;
 }
 
@@ -3433,45 +3495,71 @@ Layout echoformLayout()
     l.height = 330;
     l.pages = { TR_NOOP ("Main"), TR_NOOP ("Tweak") };
     const auto mainFrom = v.size();
+    // round tp172d (look slice): EchoBoy's face in LYNX's own drawing — captions above the knobs and the printed scale
+    // words under them (no value text: the tip shows it while dragging), the time unit as TIME / NOTE / DOT / TRIP keys
+    // over a red LED read-out, a TAP TEMPO pod with its key and LED tempo, the echo mode as a rotary with its modes
+    // printed round it, Input / Saturation / Output and the style on LED read-outs in the third pod
+    const std::vector<float> syncValues { 0.25f, 0.5f, 0.75f, 1.0f };
     // the echo pod
     v.push_back (section (4, 4, 446, 282, nullptr, boxed));
-    v.push_back (dial (80, 80, 70, "Mix", TR_NOOP ("Mix")));
+    v.push_back (label (4, 8, 446, 16, TR_NOOP ("Echo"))); // the pods' spaced small-caps titles
+    v.push_back (hwKnob (80, 84, 66, "Mix", TR_NOOP ("Mix")));
+    for (auto& w : rangeWords (80, 118, 66, TR_NOOP ("Dry"), TR_NOOP ("Wet"))) v.push_back (w);
     // round 129: "Delay L" when the style has a right time (dual, ping-pong), as on the reference
-    v.push_back (when (when (dial (226, 80, 84, "Time L", TR_NOOP ("Echo time"), big), "Sync L", 0.0f, 0.5f), "Style", 0.0f, 0.6f));
-    v.push_back (when (when (stepped (dial (226, 80, 84, "Note L", TR_NOOP ("Echo time"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.0f, 0.6f));
-    v.push_back (when (when (dial (226, 80, 84, "Time L", TR_NOOP ("Delay L"), big), "Sync L", 0.0f, 0.5f), "Style", 0.6f, 1.0f));
-    v.push_back (when (when (stepped (dial (226, 80, 84, "Note L", TR_NOOP ("Delay L"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.6f, 1.0f));
-    v.push_back (dial (372, 80, 70, "Feedback", TR_NOOP ("Feedback")));
-    const std::vector<float> syncValues { 0.25f, 0.5f, 0.75f, 1.0f };
-    v.push_back (menuOf (178, 142, 96, 22, "Sync L", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues));
-    v.push_back (dial (80, 222, 56, "Low cut", TR_NOOP ("Low cut")));
-    v.push_back (when (dial (226, 214, 46, "Spread", TR_NOOP ("Spread"), bipolar), "Style", 0.0f, 0.2f));
-    v.push_back (when (dial (226, 214, 46, "Ratio", TR_NOOP ("Ratio")), "Style", 0.2f, 0.4f));
-    v.push_back (when (dial (226, 214, 46, "Spacing", TR_NOOP ("Spacing"), bipolar), "Style", 0.4f, 0.6f));
-    v.push_back (when (when (dial (226, 214, 46, "Time R", TR_NOOP ("Delay R")), "Style", 0.6f, 1.0f), "Sync R", 0.0f, 0.5f));
-    v.push_back (when (when (stepped (dial (226, 214, 46, "Note R", TR_NOOP ("Delay R")), 9), "Style", 0.6f, 1.0f), "Sync R", 0.5f, 1.0f));
-    v.push_back (when (menuOf (282, 142, 76, 22, "Sync R", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues), "Style", 0.6f, 1.0f));
+    v.push_back (when (when (hwKnob (226, 74, 66, "Time L", TR_NOOP ("Echo time"), big), "Sync L", 0.0f, 0.5f), "Style", 0.0f, 0.6f));
+    v.push_back (when (when (stepped (hwKnob (226, 74, 66, "Note L", TR_NOOP ("Echo time"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.0f, 0.6f));
+    v.push_back (when (when (hwKnob (226, 74, 66, "Time L", TR_NOOP ("Delay L"), big), "Sync L", 0.0f, 0.5f), "Style", 0.6f, 1.0f));
+    v.push_back (when (when (stepped (hwKnob (226, 74, 66, "Note L", TR_NOOP ("Delay L"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.6f, 1.0f));
+    v.push_back (tabs (154, 121, 144, 20, "Sync L", TR_NOOP ("Time|Note|Dot|Trip"), syncValues));
+    v.push_back (when (value (172, 146, 108, 22, "Time L", boxed), "Sync L", 0.0f, 0.5f));
+    v.push_back (when (value (172, 146, 108, 22, "Note L", boxed), "Sync L", 0.5f, 1.0f));
+    v.push_back (hwKnob (372, 84, 66, "Feedback", TR_NOOP ("Feedback")));
+    for (auto& w : rangeWords (372, 118, 66, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
+    v.push_back (hwKnob (80, 222, 56, "Low cut", TR_NOOP ("Low cut")));
+    for (auto& w : rangeWords (80, 251, 56, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
+    // the style's second control (spread, ratio, spacing or the right time) between the filters
+    v.push_back (when (hwKnob (226, 212, 40, "Spread", TR_NOOP ("Spread"), bipolar), "Style", 0.0f, 0.2f));
+    v.push_back (when (hwKnob (226, 212, 40, "Ratio", TR_NOOP ("Ratio")), "Style", 0.2f, 0.4f));
+    v.push_back (when (hwKnob (226, 212, 40, "Spacing", TR_NOOP ("Spacing"), bipolar), "Style", 0.4f, 0.6f));
+    v.push_back (when (when (hwKnob (226, 212, 40, "Time R", TR_NOOP ("Delay R")), "Style", 0.6f, 1.0f), "Sync R", 0.0f, 0.5f));
+    v.push_back (when (when (stepped (hwKnob (226, 212, 40, "Note R", TR_NOOP ("Delay R")), 9), "Style", 0.6f, 1.0f), "Sync R", 0.5f, 1.0f));
+    v.push_back (when (menuOf (258, 202, 70, 20, "Sync R", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues), "Style", 0.6f, 1.0f));
     // quad: Repeat / Swell where the right sync menu sits in the two-time styles
-    v.push_back (when (tabs (282, 142, 76, 22, "Swell", TR_NOOP ("Repeat|Swell")), "Style", 0.4f, 0.6f));
-    v.push_back (dial (372, 222, 56, "High cut", TR_NOOP ("High cut")));
-    v.push_back (toggle (150, 258, 150, 24, "Prime numbers", TR_NOOP ("Prime numbers")));
-    // the tempo pod: a tap-tempo pad (sets the left time), Groove / Feel, the echo mode (single, dual, ping-pong...)
+    v.push_back (when (tabs (258, 202, 76, 20, "Swell", TR_NOOP ("Repeat|Swell")), "Style", 0.4f, 0.6f));
+    v.push_back (hwKnob (372, 222, 56, "High cut", TR_NOOP ("High cut")));
+    for (auto& w : rangeWords (372, 251, 56, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
+    v.push_back (toggle (150, 256, 150, 24, "Prime numbers", TR_NOOP ("Prime numbers")));
+    // the tap tempo pod: the TAP key and its LED tempo (sets the left time), Groove / Feel, the echo mode
     v.push_back (section (454, 4, 232, 282, nullptr, boxed));
-    v.push_back (display (500, 24, 140, 34, "taptempo", "Time L", "Sync L"));
-    v.push_back (dial (514, 128, 56, "Groove", TR_NOOP ("Groove"), bipolar));
-    v.push_back (dial (626, 128, 56, "Feel", TR_NOOP ("Feel"), bipolar));
-    v.push_back (stepped (dial (570, 230, 56, "Style", TR_NOOP ("Mode")), 4));
-    // the saturation pod: Saturation (the drive), Age, Output; the echo style (the engine's mode) and the measured tape loops
+    v.push_back (label (454, 8, 232, 16, TR_NOOP ("Tap tempo")));
+    v.push_back (display (480, 32, 180, 34, "taptempo", "Time L", "Sync L"));
+    v.push_back (hwKnob (514, 116, 50, "Groove", TR_NOOP ("Groove"), bipolar));
+    for (auto& w : rangeWords (514, 143, 50, TR_NOOP ("Shuffle"), TR_NOOP ("Swing"))) v.push_back (w);
+    v.push_back (hwKnob (626, 116, 50, "Feel", TR_NOOP ("Feel"), bipolar));
+    for (auto& w : rangeWords (626, 143, 50, TR_NOOP ("Rushing"), TR_NOOP ("Dragging"))) v.push_back (w);
+    // the mode rotary, its five modes printed round it (the knob's five stops: -135, -67.5, 0, 67.5, 135 degrees)
+    v.push_back (stepped (knob (570, 226, 44, "Style", TR_NOOP ("Mode"), 226 + 22 + 18), 4));
+    v.push_back (label (474, 243, 66, 12, TR_NOOP ("Single"), dim));
+    v.push_back (label (468, 202, 66, 12, TR_NOOP ("Ratio"), dim));
+    v.push_back (label (537, 180, 66, 12, TR_NOOP ("Quad"), dim));
+    v.push_back (label (606, 202, 66, 12, TR_NOOP ("Dual"), dim));
+    v.push_back (label (600, 243, 66, 12, TR_NOOP ("Ping-pong"), dim));
+    // the style pod: Saturation (the drive) over Input / Output, the echo style (the engine's mode) and the measured
+    // tape loops on LED read-outs
     v.push_back (section (690, 4, 256, 282, nullptr, boxed));
-    v.push_back (dial (818, 72, 70, "Drive", TR_NOOP ("Saturation")));
-    v.push_back (dial (744, 168, 50, "Age", TR_NOOP ("Age")));
-    v.push_back (dial (892, 168, 50, "Output", TR_NOOP ("Output"), bipolar)); // round 119
-    v.push_back (label (700, 222, 50, 22, TR_NOOP ("Style"), alignLeft));
-    v.push_back (menuOf (752, 222, 186, 22, "Mode", TR_NOOP ("Style"),
+    v.push_back (label (690, 8, 256, 16, TR_NOOP ("Style")));
+    v.push_back (hwKnob (818, 64, 50, "Drive", TR_NOOP ("Saturation")));
+    for (auto& w : rangeWords (818, 91, 50, TR_NOOP ("Min"), TR_NOOP ("Max"))) v.push_back (w);
+    v.push_back (hwKnob (746, 132, 44, "Input level", TR_NOOP ("Input"), bipolar)); // round 144's input level (±24 dB)
+    for (auto& w : rangeWords (746, 156, 44, "-24", "+24")) v.push_back (w);
+    v.push_back (hwKnob (890, 132, 44, "Output", TR_NOOP ("Output"), bipolar)); // round 119
+    for (auto& w : rangeWords (890, 156, 44, "-24", "+24")) v.push_back (w);
+    v.push_back (hwKnob (818, 140, 30, "Age", TR_NOOP ("Age")));
+    v.push_back (menuOf (706, 184, 224, 24, "Mode", TR_NOOP ("Style"),
                          TR_NOOP ("Tape|Lo-Fi|Hi-Fi tape|Bucket brigade|Analog|Digital|Clean|Phaser|Shifter|Pitch|Reverse|Detune"), stepCentres (12)));
     // round 136: the measured tape-echo loops (EchoBoy's role)
-    v.push_back (label (700, 254, 50, 22, TR_NOOP ("Tape"), alignLeft));
-    v.push_back (menuOf (752, 254, 186, 22, "Tape voicing", TR_NOOP ("Tape voicing"), TR_NOOP ("Off|Ping-pong tape|Studio tape|Studio tape hot"),
+    v.push_back (label (706, 214, 50, 22, TR_NOOP ("Tape"), alignLeft));
+    v.push_back (menuOf (750, 214, 180, 22, "Tape voicing", TR_NOOP ("Tape voicing"), TR_NOOP ("Off|Ping-pong tape|Studio tape|Studio tape hot"),
                          { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f }));
     for (auto i = mainFrom; i < v.size(); ++i)
         v[i].page = 0;
@@ -3634,7 +3722,7 @@ Layout spiralLayout()
     v.push_back (section (4, 4, 522, 202, nullptr, boxed));
     v.push_back (dial (54, 74, 46, "Mix", TR_NOOP ("Mix")));
     v.push_back (dial (134, 74, 46, "Delay", TR_NOOP ("Delay")));
-    v.push_back (dial (232, 82, 82, "Shift", TR_NOOP ("Shift"), (std::uint16_t) (big | bipolar)));
+    v.push_back (dial (232, 82, 82, "Shift", TR_NOOP ("Shift"), (std::uint32_t) (big | bipolar)));
     v.push_back (dial (330, 74, 46, "Feedback", TR_NOOP ("Feedback")));
     v.push_back (dial (402, 74, 46, "Low cut", TR_NOOP ("Low cut")));
     v.push_back (dial (474, 74, 46, "High cut", TR_NOOP ("High cut")));
@@ -4060,7 +4148,7 @@ Layout toxicMain()
             v.push_back (knob (367 + 38 * (float) j, 106 + 25 * (float) i, 21,
                                stored ("FM " + std::to_string (i + 1) + " to " + std::to_string (j + 1)), nullptr, 0, noCaption));
     }
-    struct Row { const char* caption; const char* field; float cy; std::uint16_t style; };
+    struct Row { const char* caption; const char* field; float cy; std::uint32_t style; };
     const Row rows[] = { { TR_NOOP ("Mix"), "mix", 262, 0 }, { TR_NOOP ("Pan"), "pan", 288, bipolar } };
     for (const auto& r : rows)
     {
@@ -4164,7 +4252,7 @@ Layout toxicMain()
     // FILTER
     v.push_back (section (208, 406, 504, 112, TR_NOOP ("Filter")));
     v.push_back (tabs (216, 426, 176, 20, "Filter mode", "Off|LP|BP|HP"));
-    struct K { float cx; const char* param; const char* caption; std::uint16_t style; };
+    struct K { float cx; const char* param; const char* caption; std::uint32_t style; };
     const K filter[] = { { 238, "Cutoff", TR_NOOP ("Cutoff"), big }, { 296, "Resonance", TR_NOOP ("Reso"), 0 },
                          { 350, "Key tracking", TR_NOOP ("Key trk"), 0 }, { 404, "Velocity tracking", TR_NOOP ("Vel trk"), 0 },
                          { 458, "Filter env amount", TR_NOOP ("EG amount"), bipolar }, { 512, "Filter LFO 1 amount", TR_NOOP ("LFO 1"), 0 } };
@@ -4226,7 +4314,7 @@ Layout poizoneMain()
     l.height = 486;
     auto& v = l.items;
     // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
-    auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint32_t style = 0) {
         v.push_back (knob (left + 20, rowTop + 18, 34, param, caption, rowTop + 46, style));
     };
     auto button = [&v] (float left, float rowTop, const char* param, const char* caption) {
@@ -4253,7 +4341,7 @@ Layout poizoneMain()
 
     // row 2: mod wheel, LFO, modulation envelope, amplifier envelope
     const float r2 = 86;
-    auto fader = [&v, r2] (float left, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto fader = [&v, r2] (float left, const char* param, const char* caption, std::uint32_t style = 0) {
         v.push_back (slider (Item::vslider, left, r2 + 22, 25, 86, param, caption, style));
     };
     auto selector = [&v, r2] (float left, float w, const char* param, const char* options) {
