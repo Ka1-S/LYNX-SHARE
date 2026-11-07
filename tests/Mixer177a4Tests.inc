@@ -44,3 +44,30 @@ TEST (mixer177a_b_gradient_colour_runs_from_the_first_to_the_last_selected_track
     // one track: nothing (FL then opens the plain colour picker)
     CHECK (lynx::mixerops::gradientColour (song, { 4 }, 0xff102030u, 0xff405060u) == 0);
 }
+
+// --- Round 177a: Assign to new / Unassign from Audio track(s), as FL's AssignAudiotrackMenuClick (section 6) -------------
+
+TEST (mixer177a_c_assign_and_unassign_audio_tracks)
+{
+    lynx::Song song;
+    song.mixer.resize (6);
+    song.mixer[2].name = "Bass";
+    song.mixer[2].colour = 0xff3060a0u;
+    song.playlistTracks.resize (2);
+    song.playlistTracks[0].name = "Drums"; // touched: skipped
+    lynx::Clip clip;
+    clip.track = 1; // a clip on track 1: skipped
+    song.playlist.push_back (clip);
+
+    CHECK (lynx::mixerops::assignNewAudioTracks (song, { 3, 2, 0 }) == 2); // the Master is never assigned
+    CHECK (song.playlistTracks.size() >= 4);
+    CHECK (song.playlistTracks[2].mode == lynx::PlaylistTrackMode::audio && song.playlistTracks[2].mixerTrack == 2);
+    CHECK (song.playlistTracks[2].name == "Bass" && song.playlistTracks[2].colour == 0xff3060a0u);
+    CHECK (song.playlistTracks[3].mixerTrack == 3 && song.playlistTracks[3].name == "Insert 3");
+    // already linked: nothing new
+    CHECK (lynx::mixerops::assignNewAudioTracks (song, { 2 }) == 0);
+
+    CHECK (lynx::mixerops::unassignAudioTracks (song, { 2, 4 }) == 1);
+    CHECK (song.playlistTracks[2].mode == lynx::PlaylistTrackMode::unassigned && song.playlistTracks[2].mixerTrack == -1);
+    CHECK (song.playlistTracks[2].name == "Bass"); // name and colour stay
+}
