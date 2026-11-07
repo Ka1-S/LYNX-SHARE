@@ -2897,9 +2897,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
     // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
-    ui::addItemHeader (menu, targets.size() > 1 ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) })
-                                                : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
-                       targets.size() > 1 ? juce::String() : trackName,
+    const auto several = targets.size() > 1;
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+                       several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
