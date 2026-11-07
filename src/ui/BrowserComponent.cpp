@@ -336,6 +336,7 @@ public:
     {
         Kind kind = Kind::file;
         juce::File file;
+        juce::Array<juce::File> also; // fsFolder: more folders listed as this one (a merged root and its shared subfolders, round 178a)
         bool folder = false, expanded = false, loaded = false;
         int depth = 0;
         Node* parent = nullptr;
@@ -607,7 +608,7 @@ public:
             for (auto it = n.children.begin(); it != n.children.end();)
             {
                 auto& c = **it;
-                if (c.kind == Kind::fsFolder && drop (c.file))
+                if (c.kind == Kind::fsFolder && drop (c.file) && std::all_of (c.also.begin(), c.also.end(), drop))
                 {
                     for (auto* s = keep; s != nullptr; s = s->parent)
                         lostSelection = lostSelection || s == &c;
@@ -1339,15 +1340,52 @@ private:
             return;
         }
 
-       #if JUCE_MAC
-        // not JUCE's iterator on macOS: one name NSString rejects would end the app as the folder opens (issue #42)
+        auto list = [] (const juce::File& folder, juce::Array<juce::File>& folders, juce::Array<juce::File>& files) {
+           #if JUCE_MAC
+            // not JUCE's iterator on macOS: one name NSString rejects would end the app as the folder opens (issue #42)
+            for (const auto& c : childrenOf (folder))
+                (c.isDirectory() ? folders : files).add (c);
+           #else
+            folders = folder.findChildFiles (juce::File::findDirectories, false, "*", juce::File::FollowSymlinks::noCycles);
+            files = folder.findChildFiles (juce::File::findFiles, false, "*", juce::File::FollowSymlinks::noCycles);
+           #endif
+        };
         juce::Array<juce::File> folders, files;
-        for (const auto& c : childrenOf (n.file))
-            (c.isDirectory() ? folders : files).add (c);
-       #else
-        auto folders = n.file.findChildFiles (juce::File::findDirectories, false, "*", juce::File::FollowSymlinks::noCycles);
-        auto files = n.file.findChildFiles (juce::File::findFiles, false, "*", juce::File::FollowSymlinks::noCycles);
-       #endif
+        std::map<juce::String, juce::Array<juce::File>> alsoOf; // a merged subfolder's other copies (by its path)
+        if (n.also.isEmpty())
+            list (n.file, folders, files);
+        else
+        {
+            // a merged root (FL's Scores, Mixer presets): the union of its folders, the first one's entry on a clash
+            juce::Array<juce::File> sources { n.file };
+            sources.addArray (n.also);
+            std::vector<juce::Array<juce::File>> srcFolders (sources.size()), srcFiles (sources.size());
+            std::vector<browserview::Listing> listings (sources.size());
+            for (int i = 0; i < sources.size(); ++i)
+            {
+                list (sources[i], srcFolders[(std::size_t) i], srcFiles[(std::size_t) i]);
+                for (const auto& f : srcFolders[(std::size_t) i])
+                    listings[(std::size_t) i].folders.push_back (f.getFileName().toStdString());
+                for (const auto& f : srcFiles[(std::size_t) i])
+                    listings[(std::size_t) i].files.push_back (f.getFileName().toStdString());
+            }
+            auto find = [] (const juce::Array<juce::File>& in, const std::string& name) {
+                for (const auto& f : in)
+                    if (f.getFileName().equalsIgnoreCase (juce::String (name)))
+                        return f;
+                return juce::File();
+            };
+            const auto merged = browserview::mergeListings (listings);
+            for (const auto& e : merged.folders)
+            {
+                const auto f = find (srcFolders[(std::size_t) e.from], e.name);
+                folders.add (f);
+                for (const auto a : e.also)
+                    alsoOf[f.getFullPathName()].add (find (srcFolders[(std::size_t) a], e.name));
+            }
+            for (const auto& e : merged.files)
+                files.add (find (srcFiles[(std::size_t) e.from], e.name));
+        }
         auto byName = [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; };
         std::sort (folders.begin(), folders.end(), byName);
         std::sort (files.begin(), files.end(), byName);
@@ -1356,11 +1394,13 @@ private:
         {
             if (f.isHidden() || f.getFileName().startsWithChar ('.'))
                 continue;
-            if (browser.filterHides (f)) // nothing in it is listed under the content filter (round 164)
-                continue;
+            const auto also = alsoOf.count (f.getFullPathName()) ? alsoOf[f.getFullPathName()] : juce::Array<juce::File>();
+            if (browser.filterHides (f) && std::all_of (also.begin(), also.end(), [this] (const juce::File& a) { return browser.filterHides (a); }))
+                continue; // nothing in it is listed under the content filter (round 164)
             auto c = std::make_unique<Node>();
             c->kind = Kind::fsFolder;
             c->file = f;
+            c->also = also;
             c->folder = true;
             c->depth = n.depth + 1;
             c->parent = &n;
@@ -2376,7 +2416,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     searcher->indexChanged.addChangeListener (this);
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<BrowserComponent> (this)] {
         if (safe != nullptr && safe->role == Role::main && ! safe->allRoots.isEmpty())
-            safe->searcher->service->refresh (toPaths (safe->allRoots));
+            safe->searcher->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
     });
     focusWatcher = std::make_unique<FocusWatcher> (*this);
 
@@ -2587,6 +2627,7 @@ void BrowserComponent::setRootShown (const juce::String& id, bool shown)
 void BrowserComponent::showAllRoots()
 {
     view.hidden.clear();
+    view.excluded.clear(); // (and every folder of the merged roots, round 178a)
     saveView();
     rebuildRoots();
 }
@@ -2851,7 +2892,8 @@ std::vector<BrowserComponent::FolderEntry> BrowserComponent::folderEntries() con
         e.name = allRootNames[i];
         e.shown = view.shows (e.id.toStdString());
         e.user = allRootKinds[(std::size_t) i] == browserview::RootKind::user;
-        e.empty = filterHides (allRoots[i]);
+        const auto merged = withMerged ({ allRoots[i] });
+        e.empty = std::all_of (merged.begin(), merged.end(), [this] (const juce::File& f) { return filterHides (f); });
         out.push_back (std::move (e));
     }
     return out;
@@ -2962,6 +3004,7 @@ void BrowserComponent::rebuildRoots()
     allRoots.clear();
     allRootNames.clear();
     allRootKinds.clear();
+    rootAlso.clear();
     using browserview::RootKind;
 
     // FL folders (if installed) and user folders
@@ -2980,20 +3023,34 @@ void BrowserComponent::rebuildRoots()
             allRootKinds.push_back (kind);
         }
     };
+    // one root for several folders, as FL's Browser shows its Scores and Mixer presets (the user's Presets folder and
+    // its own Data\\Patches one, round 178a): the first folder that exists is the root, the others are merged into it
+    auto addMerged = [this, &add] (const juce::String& name, juce::Array<juce::File> folders, RootKind kind) {
+        folders.removeIf ([] (const juce::File& f) { return ! f.isDirectory(); });
+        if (folders.isEmpty())
+            return;
+        const auto root = folders.removeAndReturn (0);
+        add (name, root, kind);
+        if (! folders.isEmpty() && allRoots.contains (root))
+            rootAlso[root.getFullPathName()] = folders;
+    };
 
     const auto data = fl.getChildFile ("Data");
     add (tr ("FL samples (Packs)"), data.getChildFile ("Patches").getChildFile ("Packs"), RootKind::flSamples);
     add (tr ("FL demo projects"), data.getChildFile ("Demo projects"), RootKind::flDemos);
-    add (tr ("FL MIDI"), data.getChildFile ("Patches").getChildFile ("Scores"), RootKind::flMidi);
+    const auto userData = findFlStudio().userData;
+    auto userPresets = [&userData] (const char* folder) {
+        return userData.isDirectory() ? userData.getChildFile ("Presets").getChildFile (folder) : juce::File();
+    };
+    addMerged (tr ("Scores"), { userPresets ("Scores"), data.getChildFile ("Patches").getChildFile ("Scores") }, RootKind::flMidi);
     add (tr ("3x Osc presets (FL)"), data.getChildFile ("Patches").getChildFile ("Channel presets").getChildFile ("3x Osc"), RootKind::flPresets);
     add (tr ("Synth presets (FL)"), data.getChildFile ("Patches").getChildFile ("Plugin presets").getChildFile ("Generators"), RootKind::flPresets);
     add (tr ("Speech (FL)"), data.getChildFile ("Patches").getChildFile ("Speech"), RootKind::speech);
     speechui::userSpeechFolder().createDirectory(); // (the Speech properties save there; round 168b)
     add (tr ("Speech"), speechui::userSpeechFolder(), RootKind::speech);
-    // FL's Browser folder "Mixer presets" (REA round 167q, FUN_009db5b0: the user's and the installation's)
-    if (const auto userData = findFlStudio().userData; userData.isDirectory())
-        add (tr ("Mixer presets"), userData.getChildFile ("Presets").getChildFile ("Mixer presets"), RootKind::flPresets);
-    add (tr ("Mixer presets (FL)"), data.getChildFile ("Patches").getChildFile ("Mixer presets"), RootKind::flPresets);
+    // FL's Browser folder "Mixer presets" (REA round 167q, FUN_009db5b0: the user's and the installation's, one root)
+    addMerged (tr ("Mixer presets"), { userPresets ("Mixer presets"), data.getChildFile ("Patches").getChildFile ("Mixer presets") },
+               RootKind::flPresets);
     pluginpresetui::presetsRoot().createDirectory(); // (the plugin window saves presets there; round 162d)
     add (tr ("Plugin presets"), pluginpresetui::presetsRoot(), RootKind::pluginPresets);
     add (tr ("Documents"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), RootKind::documents);
@@ -3007,6 +3064,11 @@ void BrowserComponent::rebuildRoots()
 
     if (! viewLoaded)
         loadView();
+    bool migrated = false; // (round 178a: the old "FL MIDI" / "Mixer presets (FL)" roots' hidden state)
+    for (const auto& [rootPath, folders] : rootAlso)
+        migrated = browserview::migrateMergedRoot (view, rootPath.toStdString(), toPaths (folders)) || migrated;
+    if (migrated && viewFromFile)
+        saveView();
     for (int i = 0; i < allRoots.size(); ++i)
         if (view.shows (allRoots[i].getFullPathName().toStdString()))
         {
@@ -3061,11 +3123,16 @@ void BrowserComponent::rebuildTree()
         {
             if (! roots.contains (allRoots[i]))
                 continue; // hidden from this Browser (round 163)
-            if (filterHides (allRoots[i]))
+            if (const auto merged = withMerged ({ allRoots[i] });
+                std::all_of (merged.begin(), merged.end(), [this] (const juce::File& f) { return filterHides (f); }))
                 continue; // nothing in it is listed under the content filter (round 164)
             // the FL folders keep their colour by position; the user's own folders share one
             auto colour = rootColour (i < 9 ? i : 99);
-            top.push_back (FileTree::makeFolder (allRoots[i], allRootNames[i], colour));
+            auto n = FileTree::makeFolder (allRoots[i], allRootNames[i], colour);
+            n->also = mergedInto (allRoots[i]);
+            if (allRootKinds[(std::size_t) i] == browserview::RootKind::flMidi)
+                n->icon = Icon::note; // (FL's Scores folder has a note)
+            top.push_back (std::move (n));
         }
 
     tree->setTopLevel (std::move (top));
@@ -3349,6 +3416,30 @@ void BrowserComponent::showFolderMenu (const juce::File& folder, std::function<v
                 if (safe != nullptr)
                     safe->removeUserFolder (folder);
             });
+        if (const auto merged = rootAlso.find (folder.getFullPathName()); merged != rootAlso.end())
+        {
+            // a LYNX extra (FL has no exclusion; round 178a): the folders this root merges, each one ticked in or out;
+            // the root's own folder stays (Hide... hides the root)
+            juce::PopupMenu folders;
+            folders.addItem (folder.getFullPathName(), false, true, nullptr);
+            for (const auto& f : merged->second)
+            {
+                const auto path = f.getFullPathName().toStdString();
+                folders.addItem (f.getFullPathName(), true, view.excluded.count (path) == 0,
+                                 [safe = juce::Component::SafePointer<BrowserComponent> (this), path] {
+                                     if (safe == nullptr)
+                                         return;
+                                     if (safe->view.excluded.erase (path) == 0)
+                                         safe->view.excluded.insert (path);
+                                     safe->saveView();
+                                     safe->rebuildRoots();
+                                     safe->searcher->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
+                                     if (safe->searchBox.getText().trim().isNotEmpty())
+                                         safe->runSearch();
+                                 });
+            }
+            menu.addSubMenu (tr ("Folders"), folders);
+        }
     }
     juce::PopupMenu browserMenu;
     addViewItems (browserMenu);
@@ -3376,7 +3467,7 @@ juce::Array<juce::File> BrowserComponent::searchRoots() const
 {
     // the top-level folder holding the selection; nothing selected there: every folder
     if (const auto root = tree->selectedRoot(); root.isDirectory())
-        return { root };
+        return withMerged ({ root });
     if (tab == starredTab) // the starred folders
     {
         juce::Array<juce::File> folders;
@@ -3385,7 +3476,25 @@ juce::Array<juce::File> BrowserComponent::searchRoots() const
                 folders.add (f);
         return folders;
     }
-    return roots;
+    return withMerged (roots);
+}
+
+juce::Array<juce::File> BrowserComponent::mergedInto (const juce::File& root) const
+{
+    const auto it = rootAlso.find (root.getFullPathName());
+    if (it == rootAlso.end())
+        return {};
+    auto folders = it->second; // (less the folders this view leaves out: a hidden "FL MIDI" before round 178a)
+    folders.removeIf ([this] (const juce::File& f) { return view.excluded.count (f.getFullPathName().toStdString()) > 0; });
+    return folders;
+}
+
+juce::Array<juce::File> BrowserComponent::withMerged (const juce::Array<juce::File>& folders) const
+{
+    auto out = folders;
+    for (const auto& f : folders)
+        out.addArray (mergedInto (f));
+    return out;
 }
 
 void BrowserComponent::setSearchForSnapshot (const juce::String& text)
@@ -3491,7 +3600,8 @@ void BrowserComponent::showPluginDatabase (const juce::String& folder, int gener
 void BrowserComponent::showScores (const juce::String& subfolder)
 {
     // the Piano roll's File › Browse scores (round 168g; FL: FUN_0123a580 opens its browser at the Scores folder): the
-    // "FL MIDI" root (Data/Patches/Scores) shown, opened and selected
+    // "Scores" root shown, opened and selected. With a subfolder (the Event editor's File › Browse automations: FL
+    // opens Scores\\Automation, the user's when there is one; REA round 178a) that folder's row is selected
     for (int i = 0; i < allRoots.size(); ++i)
         if (i < (int) allRootKinds.size() && allRootKinds[(std::size_t) i] == browserview::RootKind::flMidi)
         {
@@ -3501,8 +3611,11 @@ void BrowserComponent::showScores (const juce::String& subfolder)
             setTab (allTab);
             rebuildTree();
             tree->expandTop (folder, 1);
-            // (the Event editor's File › Browse automations: FL opens its Scores\\Automation folder)
-            auto row = subfolder.isNotEmpty() ? tree->rowOfFile (folder.getChildFile (subfolder)) : -1;
+            int row = -1;
+            if (subfolder.isNotEmpty())
+                for (const auto& f : withMerged ({ folder })) // (the merged row is the first folder's that has it)
+                    if (row < 0)
+                        row = tree->rowOfFile (f.getChildFile (subfolder));
             if (row < 0)
                 row = tree->rowLabelled (allRootNames[i]);
             if (row >= 0)
@@ -3707,7 +3820,7 @@ void BrowserComponent::refreshSearchIndex (bool rebuild)
 {
     // the index is shared by every Browser: it covers every folder, hidden ones too
     if (! allRoots.isEmpty())
-        searcher->service->refresh (toPaths (allRoots), rebuild);
+        searcher->service->refresh (toPaths (withMerged (allRoots)), rebuild);
     ui::postHint ({ rebuild ? tr ("Rebuilding the Browser's search index in the background...")
                             : tr ("Checking the Browser's search index in the background (only changed folders are read again)..."),
                     {}, false, false },
