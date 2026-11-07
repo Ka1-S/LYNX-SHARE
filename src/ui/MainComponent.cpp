@@ -6073,7 +6073,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
-        menu.addItem (tr ("Delete unused files and save project"), [this] { deleteUnusedRecordingsAndSave(); });
+        // greyed until the project has a file, as in FL 2026 (seen in an unsaved project, round 181b)
+        menu.addItem (tr ("Delete unused files and save project"), currentFile != juce::File(), false, [this] { deleteUnusedRecordingsAndSave(); });
         {
             juce::PopupMenu declick;
             int mode = 0;
