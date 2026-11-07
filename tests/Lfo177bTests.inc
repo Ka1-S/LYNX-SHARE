@@ -165,6 +165,16 @@ TEST (lfo177b_rate_and_shape_match_fl)
     a.lfo.level = 128;
     CHECK (std::abs (a.playAt (lynx::ppq * 0.75, 0.0) - 0.0f) < 0.01f);
     CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 1.0f) < 0.01f);
+    // the amplitude points are bipolar (FL's renders): 0.5 = no swing, 0 = the swing inverted
+    a.lfo.amp = { { 0, 0.5f, 0.0f } };
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.5f) < 1.0e-4f);
+    a.lfo.amp = { { 0, 0.0f, 0.0f } };
+    a.lfo.add = true;
+    a.lfo.level = 64;
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.25f) < 0.01f);
+    a.lfo.amp = { { 0, 1.0f, 0.0f } };
+    a.lfo.add = false;
+    a.lfo.level = 32;
     // frozen: no movement inside the clip
     a.lfo.flags = 1 | 8;
     CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.5f) < 0.01f);

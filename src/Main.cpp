@@ -9745,11 +9745,11 @@ private:
                 };
                 lfoShot ([] (lynx::AutomationLfo&) {}, "-automation-lfo.png");
                 lfoShot ([] (lynx::AutomationLfo& lfo) {
-                    lfo.speed = lynx::AutomationLfo::speedForBeats (2.0);
-                    lfo.tension = 60;
-                    lfo.skew = 50;
-                    lfo.pulseWidth = 40;
-                    lfo.amp = { { 0, 0.5f, 0.0f }, { lynx::ppq * 16, 1.0f, 0.0f } };
+                    // the state set through FL's own UI for the UI gate (TNS 50 %, SKEW 25 %, PW 25 %, two points), as FL saved it
+                    lfo.tension = 64;
+                    lfo.skew = 32;
+                    lfo.pulseWidth = 28;
+                    lfo.amp = { { 0, 0.6716f, 0.0f }, { (std::int64_t) (lynx::ppq * 1.4128), 0.9204f, 0.0f } };
                 }, "-automation-lfo-shape.png");
                 offline.editSong ([before] (lynx::Song& song) { song.automations[0].lfo = before; }, false);
             }

@@ -190,8 +190,8 @@ public:
             g.drawHorizontalLine ((int) valueToY (v), (float) area.getX(), (float) area.getRight());
         }
 
-        // curve: the clip's points, or in LFO mode (FL-exact) the wave that plays, with the LFO's amplitude points as
-        // handles on a thin line
+        // curve: the clip's points, or in LFO mode (FL-exact) the LFO's wave around the middle, with the LFO's
+        // amplitude points as handles on a thin line
         juce::Path curve, amp;
         const auto& points = editedPoints (*a);
         const auto lfo = a->lfo.on;
@@ -199,7 +199,8 @@ public:
         for (auto x = area.getX(); x <= area.getRight(); x += lfo ? 1 : 2)
         {
             const auto tick = xToTick (x);
-            const auto y = valueToY (lfo ? a->playAt (tick, tick) : curveAt (*a, tick));
+            // FL draws the LFO alone around the middle: 0.5 + the swing (half the waveform × the amplitude) / 2
+            const auto y = valueToY (lfo ? 0.5f + 0.25f * a->lfo.output (tick, tick) : curveAt (*a, tick));
 
             if (x == area.getX())
                 curve.startNewSubPath ((float) x, y);

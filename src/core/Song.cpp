@@ -1304,7 +1304,9 @@ float AutomationLfo::shape (std::uint32_t phase, int tensionKnob, int skewKnob, 
 float AutomationLfo::output (double clipTick, double songTick) const noexcept
 {
     constexpr double full = 4294967296.0;
-    const auto amplitude = automationCurveAt (amp, clipTick);
+    // the amplitude points are bipolar: 0.5 = no swing, 1 = full, 0 = full and inverted (FL's renders, round 177b:
+    // a single point at 0.5 plays no LFO; points 0 → 1 swing, pass through nothing at the middle and swing back)
+    const auto amplitude = 2.0f * automationCurveAt (amp, clipTick) - 1.0f;
     // the start: the middle of the rising ramp (the LFO starts at 0 going up) plus the phase knob (FUN_00ba06a0)
     const auto p = (double) pulseWidth / 128.0, sk = (double) skew / 256.0;
     const auto s7 = p > 0.0 ? std::round ((1.0 - p) * full - 1.0) : 4294967295.0;
