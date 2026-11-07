@@ -4917,6 +4917,24 @@ private:
         run->steps.push_back ({ "after the drag (released)", {}, {}, 600, [drag] { return drag->released(); } });
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
+        // round 177a: only the meters move, so the strips' picture must stay valid, also with a folded group's tab and VCA
+        // strips on screen (their levels are drawn over the picture, like the inserts' meters)
+        run->steps.push_back ({ "mixer meters over the picture, playing", [this, ui] {
+                                   ui->selectTabForSnapshot (3);
+                                   engine->getTransport().songMode = false;
+                                   engine->rewind();
+                                   engine->play();
+                                   ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                               }, {}, 6000, [this, ui, report] {
+                                   const auto [spoiled, refills] = ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                                   if (juce::FileOutputStream out (report.withFileExtension ("png")); out.openedOk())
+                                   {
+                                       out.setPosition (0);
+                                       out.truncate();
+                                       juce::PNGImageFormat().writeImageToStream (mainWindow->createComponentSnapshot (mainWindow->getLocalBounds()), out);
+                                   }
+                                   return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
+                               } });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
@@ -4956,6 +4974,9 @@ private:
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
+        if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
+            run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());
         // let the window draw the project first
         perf = std::move (run);
         juce::Timer::callAfterDelay (1500, [this] { if (perf != nullptr) perf->startTimer (16); });

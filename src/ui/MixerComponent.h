@@ -176,6 +176,8 @@ public:
     void mouseExit (const juce::MouseEvent& e) override;
     // --uiperf (round 173f): where a fader drag starts (the fader's rail, strip coordinates)
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
+    // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
+    std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
 
 private:
     enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab };
@@ -269,6 +271,7 @@ private:
     bool meterCacheOn = false;
     bool meterRepaintOnly = false; // set around the meters' own repaints: the picture stays valid
     bool cachePainting = false;    // paint() is filling the picture: wells without levels
+    int pictureInvalidations = 0, pictureRefills = 0; // what --uiperf reports (see cacheCountersForPerf)
     void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
     void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
     juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)

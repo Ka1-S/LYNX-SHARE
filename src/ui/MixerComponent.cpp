@@ -165,6 +165,7 @@ public:
             for (const auto& r : valid)
                 context.excludeClipRectangle (r);
             context.clipToRectangle (visible);
+            ++owner.pictureRefills;
             owner.cachePainting = true;
             owner.paintEntireComponent (imageGraphics, true);
             owner.cachePainting = false;
@@ -183,13 +184,19 @@ public:
     bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
     {
         if (! owner.meterRepaintOnly)
+        {
+            ++owner.pictureInvalidations;
             valid.clear();
+        }
         return true;
     }
     bool invalidate (const juce::Rectangle<int>& area) override
     {
         if (! owner.meterRepaintOnly)
+        {
+            ++owner.pictureInvalidations;
             valid.subtract (area);
+        }
         return true;
     }
     void releaseResources() override { image = {}; }
