@@ -984,6 +984,44 @@ inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // th
     g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.15f, -r * 0.15f)));
 }
 
+// round tp172d (slice 8): the opto leveler's knob — a black knurled skirt round a polished chrome dome
+inline void glowLevelerCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    g.setGradientFill (ColourGradient (Colour (0xff3a3b3e).brighter (hover * 0.1f), c.x, cap.getY(), Colour (0xff0b0b0c), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx) // the knurling round the skirt: lit ridges, so the black skirt reads on the charcoal strip too
+    {
+        const int n = capR > 30.0f ? 48 : 28;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto a = juce::MathConstants<float>::twoPi * (float) i / (float) n;
+            const Point<float> d { std::sin (a), -std::cos (a) };
+            g.setColour (Colours::white.withAlpha (0.08f + 0.14f * juce::jmax (0.0f, -d.y))); // brighter on the top half
+            g.drawLine ({ c + d * capR * 0.8f, c + d * capR * 0.98f }, 1.0f);
+        }
+    }
+    g.setColour (Colour (0xff76797e)); // the skirt's turned edge
+    g.drawEllipse (cap.reduced (0.6f), 1.2f);
+    // the chrome dome: a dark rim, then rings of light and shade (a spun metal cap) — half the skirt, as on the original
+    const auto dome = capR * 0.5f;
+    g.setColour (Colour (0xff17181a));
+    g.fillEllipse (Rectangle<float> (dome * 2.16f, dome * 2.16f).withCentre (c));
+    g.setGradientFill (ColourGradient (Colour (0xfff4f5f6), c.x - dome * 0.5f, c.y - dome * 0.7f, Colour (0xff6c7075), c.x + dome * 0.6f, c.y + dome * 0.9f, false));
+    g.fillEllipse (Rectangle<float> (dome * 2.0f, dome * 2.0f).withCentre (c));
+    if (fx)
+    {
+        g.setGradientFill (ColourGradient (Colour (0xffa9adb2), c.x - dome * 0.5f, c.y - dome * 0.5f, Colour (0xffeceef0), c.x + dome * 0.5f, c.y + dome * 0.5f, false));
+        g.fillEllipse (Rectangle<float> (dome * 1.3f, dome * 1.3f).withCentre (c));
+        g.setColour (Colours::white.withAlpha (0.55f));
+        g.fillEllipse (Rectangle<float> (dome * 0.7f, dome * 0.4f).withCentre (c.translated (-dome * 0.32f, -dome * 0.5f)));
+    }
+}
+
+inline Colour glowLevelerCapTint (const char* param)
+{
+    return param != nullptr && juce::String (param) == "Emphasis" ? Colour (0xffe9dfc4) : Colour();
+}
+
 inline const Theme& glowLevelerTheme()
 {
     static const Theme t = []
@@ -996,8 +1034,10 @@ inline const Theme& glowLevelerTheme()
                   Colour (0xfff4f4f4), Colour (0xff45484c) };
         x.canvas = canvasGlowLeveler;
         x.titleEmblem = glowLevelerEmblem;
-        x.cap = Cap::bakelite;
-        x.pointerFrom = 0.15f;
+        x.drawCap = glowLevelerCap;        // round tp172d (slice 8): chrome domes in knurled black skirts
+        x.pointerFrom = 0.56f;             // ... the white line on the skirt
+        x.capTint = glowLevelerCapTint;    // ... HI FREQ is a cream chicken-head pointer knob
+        x.pointerKnobTint = Colour (0xffe9dfc4);
         x.ticks = 11;
         x.boldTicks = false;
         x.buttTrack = true;
@@ -1005,6 +1045,8 @@ inline const Theme& glowLevelerTheme()
         x.knobScale = 1.04f;
         x.thumbPointer = true;
         x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.numerals = true;                 // round tp172d (look slice): the reference's printed 0 … 100
+        x.numeralStep = 10;
         x.flatSections = true;             // one faceplate: no cards
         x.rimWidth = 0.0f;
         x.captionCol = Colour (0xff1c1d1f);
@@ -1012,7 +1054,10 @@ inline const Theme& glowLevelerTheme()
         x.offLabelCol = Colour (0xff2e3033);
         x.hwKeys = true;
         x.headerCol = Colour (0xff2b2d30);
-        x.sectionFills[1] = Colour (0xff17181a); // the dark lower strip (Analog, HF emphasis, Mix, Trim)
+        x.sectionFills[1] = Colour (0xff2d2e30); // the charcoal lower strip (Analog, HF emphasis, Mix, Trim)
+        x.goldKeys = true;                 // round tp172d (slice 8): its gold 50Hz / 60Hz / OFF keys
+        x.numeralLit = true;               // ... the number at the pointer printed red
+        x.vuBezelDark = true;              // ... the meter in a gunmetal frame
         return x;
     }();
     return t;
@@ -1178,6 +1223,17 @@ inline const Theme& foilTheme()
 
 // === Halo (ValhallaShimmer role): the original's light minimal look — pale grey ground, graphite disc knobs, dark type ===
 
+// round tp172d (look slice): the original's row of flat discs runs from black to a light grey in signal order
+inline Colour haloCapTint (const char* param)
+{
+    static const char* const order[] = { "Mix", "Shift", "Feedback", "Diffusion", "Size", "Low cut", "High cut", "Mod rate", "Mod depth" };
+    if (param != nullptr)
+        for (int i = 0; i < 9; ++i)
+            if (std::strcmp (param, order[i]) == 0)
+                return Colour::greyLevel (0.02f + 0.48f * (float) i / 8.0f);
+    return {};
+}
+
 inline const Theme& haloTheme()
 {
     static const Theme t = []
@@ -1200,6 +1256,15 @@ inline const Theme& haloTheme()
         x.rimWidth = 0.0f;
         x.headerCol = Colour (0xff3a3a3f);
         x.pal.accent2 = Colour (0xff3a3a40);
+        // round tp172d (look slice): big discs shading across the row, no value ring, a short light tick at the edge,
+        // lower-case captions and modes
+        x.capTint = haloCapTint;
+        x.discRing = false;
+        x.pointerFrom = 0.62f;
+        x.pal.pointer = Colour (0xffc4c4c8);
+        x.pal.capBottom = x.pal.capTop;
+        x.lowerCaptions = true;
+        x.captionScale = 1.7f; // the original's legends: captions and values about a quarter of the knob's radius tall
         return x;
     }();
     return t;
@@ -1543,10 +1608,12 @@ inline const Theme& echoformTheme()
     // round tp172d: EchoBoy's hardware look (its role) — black face, walnut cheeks, bold white rounded outlines, red LEDs
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xfff2f2ef), 3.0f); // (slice 8 review: thicker, whiter pod outlines)
         x.cornerScale = 4.0f; // the original's three rounded pods
+        x.bow = 0.05f;        // round tp172d (look slice): with bowed sides
         x.hwKeys = true;
         x.cheek = 30.0f; // (the layout leaves room for them)
+        x.ledReadouts = true; // round tp172d (look slice): the time, tap tempo and style on red LED read-outs
         return x;
     }();
     return t;
@@ -2006,7 +2073,15 @@ inline const Theme& emberTheme()
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
         x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
         x.cheek = 30.0f;
-        x.captionScale = 1.25f;
+        x.numerals = true; // round tp172d (look slice): the big Drive's printed 0 … 10
+        // round tp172d (look slice): the original's chunky black caps on a ring of dots, no lit arc; bigger spaced
+        // legends; the name between two rules; the VU in a chrome bezel
+        x.cap = Cap::bakelite;
+        x.noValueArc = true;
+        x.dotTicks = true;
+        x.captionScale = 1.45f;
+        x.titleRules = true;
+        x.vuBezel = true;
         return x;
     }();
     return t;
@@ -3896,12 +3971,15 @@ inline const Theme& voiceShiftTheme()
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
         // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
-        x.sectionFills[0] = Colour (0xffc39a1a);
-        x.sectionFills[1] = Colour (0xff1d5a6c);
-        x.sectionFills[2] = Colour (0xffb51d1d);
+        // round tp172d (look slice): the black face that frames them comes first
+        x.sectionFills[0] = Colour (0xff131416);
+        x.sectionFills[1] = Colour (0xffc39a1a);
+        x.sectionFills[2] = Colour (0xff1d5a6c);
+        x.sectionFills[3] = Colour (0xffb51d1d);
         x.hwKeys = true;
         x.cheek = 30.0f;
         x.cornerScale = 0.5f;
+        x.captionScale = 1.45f; // round tp172d (look slice): the original's big legends
         return x;
     }();
     return t;
@@ -4672,8 +4750,9 @@ inline const Theme& autoPanTheme()
     // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xff6a6a6c), 2.0f);
         x.cornerScale = 4.0f;
+        x.bow = 0.05f; // round tp172d (look slice): PanMan's bowed pods, a grey bevel instead of the white outline
         x.hwKeys = true;
         x.cheek = 30.0f;
         return x;

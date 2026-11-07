@@ -178,10 +178,10 @@ Layout fruityDelayBankLayout()
     {
         const auto p = [&] (const char* control) { return stateName (k, stateparams::bankControl (b, control)); };
         const auto add = [&] (LayoutItem i) { v.push_back (onPage (std::move (i), b)); };
-        const auto dial = [&] (float cx, float cy, const char* control, const char* caption, std::uint16_t style = 0) {
+        const auto dial = [&] (float cx, float cy, const char* control, const char* caption, std::uint32_t style = 0) {
             add (knob (cx, cy, 30, p (control), caption, cy + 29, style));
         };
-        const auto fader = [&] (float cx, const char* control, const char* caption, std::uint16_t style = 0) {
+        const auto fader = [&] (float cx, const char* control, const char* caption, std::uint32_t style = 0) {
             add (slider (Item::vslider, cx - 10, 140, 20, 108, p (control), nullptr, noCaption | style));
             add (label (cx - 18, 255, 36, 12, caption));
         };
@@ -355,7 +355,7 @@ Layout pitchShifterLayout()
     auto& v = l.items;
     const auto voice = [&] (LayoutItem i) { v.push_back (when (std::move (i), "Granular", 0.0f, 0.5f)); };
     const auto music = [&] (LayoutItem i) { v.push_back (when (std::move (i), "Granular", 0.5f, 1.0f)); };
-    const auto fader = [&] (float cx, float bottom, const char* param, const char* caption, std::uint16_t style, auto add) {
+    const auto fader = [&] (float cx, float bottom, const char* param, const char* caption, std::uint32_t style, auto add) {
         add (plate (cx - 21, 17, 42, 18, param));
         add (slider (Item::vslider, cx - 10, 46, 20, bottom - 46, param, nullptr, noCaption | style));
         add (label (cx - 30, 250, 60, 12, caption));

@@ -1695,7 +1695,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.sustain = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("sustain", 1.0));
         def.sampler.stretchBeats = juce::jmax (0.0f, (float) (double) s.getProperty ("stretchBeats", 0.0));
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
-        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, 2, (int) s.getProperty ("stretchMethod", 0));
+        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
@@ -2732,14 +2732,27 @@ bool save (const Song& song, const juce::File& file, juce::String& error)
 {
     // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project.
     juce::TemporaryFile temp (file);
+    const auto json = toJson (song);
 
-    if (! temp.getFile().replaceWithText (toJson (song)) || ! temp.overwriteTargetFileWithTemporary())
+    if (! temp.getFile().replaceWithText (json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary())
     {
         error = utf8 ("could not write ") + file.getFullPathName();
         return false;
     }
 
+    // a save that "worked" on a full disk, a sync folder or a failing drive must not look like a save (D#92, round 180a)
+    if (file.loadFileAsString() != json)
+    {
+        error = utf8 ("the saved file could not be read back correctly: ") + file.getFullPathName();
+        return false;
+    }
+
     return true;
+}
+
+juce::File withProjectExtension (const juce::File& file)
+{
+    return file.getSiblingFile (juce::String::fromUTF8 (safety::withProjectExtension (file.getFileName().toStdString(), extension).c_str()));
 }
 
 std::optional<Song> load (const juce::File& file, juce::String& error)
