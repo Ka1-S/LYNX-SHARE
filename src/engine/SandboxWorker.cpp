@@ -9,6 +9,7 @@
 #if JUCE_LINUX
  #include <dlfcn.h>
 #elif JUCE_MAC
+ #include <CoreGraphics/CoreGraphics.h>
  #include <objc/message.h>
  #include <objc/runtime.h>
 #endif
@@ -31,6 +32,29 @@ pid_t frontmostPid()
     const id workspace = send ((id) objc_getClass ("NSWorkspace"), sel_registerName ("sharedWorkspace"));
     const id app = workspace != nil ? send (workspace, sel_registerName ("frontmostApplication")) : nil;
     return app != nil ? ((pid_t (*) (id, SEL)) objc_msgSend) (app, sel_registerName ("processIdentifier")) : 0;
+}
+
+// the window number of LYNX's frontmost normal window on screen (0: none)
+long lynxFrontWindow()
+{
+    long number = 0;
+    if (const auto list = CGWindowListCopyWindowInfo (kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID))
+    {
+        auto get = [] (CFDictionaryRef d, CFStringRef key) {
+            long v = -1;
+            if (const auto n = (CFNumberRef) CFDictionaryGetValue (d, key))
+                CFNumberGetValue (n, kCFNumberLongType, &v);
+            return v;
+        };
+        for (CFIndex i = 0; i < CFArrayGetCount (list) && number == 0; ++i) // front to back
+        {
+            const auto d = (CFDictionaryRef) CFArrayGetValueAtIndex (list, i);
+            if (get (d, kCGWindowOwnerPID) == ::getppid() && get (d, kCGWindowLayer) == 0)
+                number = get (d, kCGWindowNumber);
+        }
+        CFRelease (list);
+    }
+    return number;
 }
 #endif
 
@@ -88,7 +112,14 @@ public:
 private:
     juce::TimedCallback followLynx { [this] {
         const auto front = frontmostPid();
-        setAlwaysOnTop (front == ::getppid() || front == ::getpid());
+        const auto active = front == ::getppid() || front == ::getpid();
+        if (active == isAlwaysOnTop())
+            return;
+        setAlwaysOnTop (active);
+        // dropped to a normal window: macOS would leave it below LYNX's main window, so it goes back just above it
+        if (const auto lynx = lynxFrontWindow(); ! active && lynx != 0 && getWindowHandle() != nullptr)
+            if (const id window = ((id (*) (id, SEL)) objc_msgSend) ((id) getWindowHandle(), sel_registerName ("window")))
+                ((void (*) (id, SEL, long, long)) objc_msgSend) (window, sel_registerName ("orderWindow:relativeTo:"), 1 /* NSWindowAbove */, lynx);
     } };
    #endif
 };
