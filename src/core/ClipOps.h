@@ -118,6 +118,16 @@ inline bool reverseAudioClips (Song& song, const std::vector<int>& clips, FileTi
     return any;
 }
 
+inline void scaleAudioClip (Clip& c, double k) noexcept
+{
+    const auto exact = ((double) c.offset + (double) c.offsetFraction) * k;
+    c.offset = (std::int64_t) std::llround (exact);
+    c.offsetFraction = (float) (exact - (double) c.offset);
+    c.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) c.length * k));
+    c.fadeIn = (std::int64_t) std::llround ((double) c.fadeIn * k);
+    c.fadeOut = (std::int64_t) std::llround ((double) c.fadeOut * k);
+}
+
 // Scales every clip of audio channel `channel` (offset, length, fades) after its file's length in ticks changed from
 // `before` to `after` (a stretch or a resampling pitch), so each keeps showing and playing the same audio.
 inline void rescaleClipsOf (Song& song, int channel, std::int64_t before, std::int64_t after) noexcept
@@ -127,14 +137,20 @@ inline void rescaleClipsOf (Song& song, int channel, std::int64_t before, std::i
     const auto k = (double) after / (double) before;
     for (auto& c : song.playlist)
         if (c.kind == ClipKind::audio && c.channel == channel)
-        {
-            const auto exact = ((double) c.offset + (double) c.offsetFraction) * k;
-            c.offset = (std::int64_t) std::llround (exact);
-            c.offsetFraction = (float) (exact - (double) c.offset);
-            c.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) c.length * k));
-            c.fadeIn = (std::int64_t) std::llround ((double) c.fadeIn * k);
-            c.fadeOut = (std::int64_t) std::llround ((double) c.fadeOut * k);
-        }
+            scaleAudioClip (c, k);
+}
+
+// A tempo change (issue #87): a file that is not fitted to a number of beats keeps its speed, so it spans more or fewer
+// ticks; its clips follow (the waveform already did, and the clip box was left with a gap or cut the audio short)
+inline void followTempo (Song& song, double bpmBefore) noexcept
+{
+    const auto k = std::max (1.0, song.bpm) / std::max (1.0, bpmBefore);
+    if (k == 1.0)
+        return;
+    for (auto& c : song.playlist)
+        if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size()
+            && song.channels[(std::size_t) c.channel].sampler.stretchBeats <= 0.0f)
+            scaleAudioClip (c, k);
 }
 
 // The "Pitch..." command (round 163) on a sample channel or an audio clip's channel: the pitch knob gets `semitones`
