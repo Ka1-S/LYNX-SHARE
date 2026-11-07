@@ -261,6 +261,7 @@ target_sources(lynx_core PRIVATE
     src/core/PlaylistOps.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
+    src/core/AutoWarp.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
     src/core/PatternBlocks.cpp

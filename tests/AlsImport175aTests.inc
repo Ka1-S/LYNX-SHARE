@@ -2,6 +2,7 @@
 // written by the tests (only the elements the importer reads); no file of Live's is used.
 
 #include "core/AlsImport.h"
+#include "core/AutoWarp.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/XmlLite.h"
@@ -979,4 +980,110 @@ TEST (als175a_warp_markers_import_and_export)
     for (const auto& c : back->channels)
         bent += c.sampler.warp.size() >= 3 && std::abs (c.sampler.stretchBeats - 8.0f) < 1e-4;
     CHECK (bent == 1);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Auto-warp (round 175a, M2)
+
+namespace als175a
+{
+// a mono 44.1 kHz performance: a kick on every beat (louder on the bar), a hat between; `beatAt` gives each beat's time
+inline lynx::SampleData performance (const std::vector<double>& beatAt, double seconds, double lead = 0.0)
+{
+    lynx::SampleData s;
+    s.sampleRate = 44100.0;
+    s.left.assign ((std::size_t) std::lround ((seconds + lead) * 44100.0), 0.0f);
+    std::uint32_t noise = 7;
+    for (std::size_t k = 0; k < beatAt.size(); ++k)
+    {
+        const auto at = (long) std::lround ((beatAt[k] + lead) * 44100.0);
+        for (long i = 0; i < 3528 && at + i < (long) s.left.size(); ++i)
+            s.left[(std::size_t) (at + i)] += (float) ((k % 4 == 0 ? 0.8 : 0.45) * std::exp (-(double) i / 530.0)
+                                                       * std::sin (2.0 * 3.141592653589793 * (k % 2 == 0 ? 60.0 : 180.0) * (double) i / 44100.0));
+        if (k + 1 < beatAt.size())
+        {
+            const auto hat = (long) std::lround ((0.5 * (beatAt[k] + beatAt[k + 1]) + lead) * 44100.0);
+            for (long i = 0; i < 882 && hat + i < (long) s.left.size(); ++i)
+            {
+                noise = noise * 1664525u + 1013904223u;
+                s.left[(std::size_t) (hat + i)] += (float) (0.15 * std::exp (-(double) i / 132.0) * ((double) (noise >> 8) / 8388608.0 - 1.0));
+            }
+        }
+    }
+    return s;
+}
+// where the markers put `beat` (piecewise linear, the end segments continued)
+inline double markerTime (const std::vector<lynx::WarpPoint>& m, double beat)
+{
+    lynx::StretchMap map;
+    for (const auto& p : m)
+        map.push_back ({ p.beats, p.seconds });
+    return lynx::stretchMapOutput (map, beat);
+}
+} // namespace als175a
+
+TEST (als175a_auto_warp_tempo_in_names)
+{
+    using lynx::autowarp::bpmInName;
+    CHECK (bpmInName ("Clapping Flamenco 120 bpm.aif") == 120.0);
+    CHECK (bpmInName ("loop_128BPM.wav") == 128.0);
+    CHECK (bpmInName ("Break-87.5-bpm") == 87.5);
+    CHECK (bpmInName ("90bpm groove") == 90.0);
+    CHECK (bpmInName ("Vocal Demo Lead Takes.aif") == 0.0);
+    CHECK (bpmInName ("bpm only") == 0.0);
+    CHECK (bpmInName ("take 2 bpm") == 0.0); // out of range
+}
+
+TEST (als175a_auto_warp_loops)
+{
+    using namespace lynx;
+    // a 4 s loop of 8 beats named 120 bpm: one tempo, from the file's start to its last whole beat
+    std::vector<double> beats;
+    for (int k = 0; k < 8; ++k)
+        beats.push_back (k * 0.5);
+    const auto loop = als175a::performance (beats, 4.0);
+    autowarp::Options named;
+    named.knownBpm = 120.0;
+    const auto a = autowarp::analyse (loop, named);
+    CHECK (a.markers.size() == 2 && ! a.tracked && a.bpm == 120.0);
+    if (a.markers.size() == 2)
+        CHECK (a.markers[0] == (WarpPoint { 0.0, 0.0 }) && std::abs (a.markers[1].seconds - 4.0) < 1e-9 && a.markers[1].beats == 8.0);
+    // no name: a power of two of beats nearest the song's tempo (4.2 s at a 120 bpm song: 8 beats, 114.29 bpm)
+    const auto odd = als175a::performance (beats, 4.2);
+    autowarp::Options unnamed;
+    unnamed.songBpm = 120.0;
+    const auto b = autowarp::analyse (odd, unnamed);
+    CHECK (std::abs (b.bpm - 8.0 * 60.0 / 4.2) < 1e-6);
+    CHECK (b.markers.size() == 2 && b.markers.back().beats == 8.0);
+}
+
+TEST (als175a_auto_warp_follows_a_drifting_performance)
+{
+    // 70 s that speed up from 118 to 124 bpm, after 1 s of silence: the markers start on the first kick and put every
+    // beat within a few ms of where it is played (one tempo for the whole file would be a second off by the end)
+    using namespace lynx;
+    std::vector<double> beats;
+    for (double t = 0.0; t < 70.0;)
+    {
+        beats.push_back (t);
+        t += 60.0 / (118.0 + 6.0 * t / 70.0);
+    }
+    const auto s = als175a::performance (beats, 70.5, 1.0);
+    const auto r = autowarp::analyse (s, {});
+    CHECK (r.tracked && r.markers.size() > 20);
+    CHECK (std::abs (r.firstBeat - 1.0) < 0.01);
+    if (r.markers.size() < 2)
+        return;
+    std::vector<double> err;
+    const auto last = r.markers.back().beats;
+    for (std::size_t k = 0; k < beats.size() && (double) k <= last; ++k)
+        err.push_back (std::abs (als175a::markerTime (r.markers, (double) k) - (beats[k] + 1.0)));
+    std::sort (err.begin(), err.end());
+    CHECK (err.size() > 100);
+    if (err.size() > 100)
+    {
+        CHECK (err[err.size() / 2] < 0.005);
+        CHECK (err[err.size() * 95 / 100] < 0.015);
+        std::printf ("  auto-warp drift: median %.1f ms, 95%% %.1f ms\n", err[err.size() / 2] * 1000.0, err[err.size() * 95 / 100] * 1000.0);
+    }
 }
