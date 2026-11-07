@@ -1989,3 +1989,18 @@ voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8,
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
 
+
+## Audio logger and Chord detection panel (round 181b)
+
+Proof: `docs/analise/REA_rodada181b.md`.
+
+| FL | LYNX | Status | Note |
+|---|---|---|---|
+| Rolling Master buffer, on by default, 1 / 2 / 5 / 10 minutes, pre or post effects, memory shown in the header | same (`RollingAudioLog`, Tools menu) | ✅ | |
+| Writing stops after 8 s of silence | same | ✅ | |
+| Dump to audio editor, "empty" message | same, into LYNX's audio editor | ⚠️ | own folder and date format; WAV written off the UI thread |
+| Chord detection panel on the default toolbar | same | ✅ | |
+| Chord names | `chordread::nameKeys` | ✅ | 0 differences in 19852 measured key sets; own wording for the joke names |
+| Display delay menu | same | ✅ | |
+| Chord style (Roman) | a working item | ➕ | LYNX addition: FL hides the item and its flag does nothing in the detector |
+| Near the hint bar | same menu item | ⚠️ | FL's readout not confirmed at runtime |
