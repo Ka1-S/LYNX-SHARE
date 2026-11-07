@@ -7113,6 +7113,40 @@ private:
             };
             offline.renderOffline (o);
         }
+        // round tp172b5: LYNX_PARITYSHOT_CLICKS drives the editor before the picture (the originals' pictures have their
+        // panels open), tokens in order: "x,y" a click, then the pointer leaves; "h:x,y" the pointer rests there (a hover);
+        // "d:x,y,x2,y2" a drag from there to there, the button still down in the picture
+        for (const auto& token : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_CLICKS", {}), " ", ""))
+        {
+            const auto hover = token.startsWith ("h:"), drag = token.startsWith ("d:");
+            const auto xy = juce::StringArray::fromTokens (hover || drag ? token.substring (2) : token, ",", "");
+            if (xy.size() < (drag ? 4 : 2))
+                continue;
+            const juce::Point<int> at (xy[0].getIntValue(), xy[1].getIntValue());
+            editor->setVisible (true); // (getComponentAt finds nothing in a hidden component; it never goes on screen)
+            auto* target = editor->getComponentAt (at);
+            if (target == nullptr)
+                continue;
+            const auto local = target->getLocalPoint (editor.get(), at).toFloat();
+            const auto now = juce::Time::getCurrentTime();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
+            const auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods, bool dragged) {
+                return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, target, target, now, local, now, 1, dragged);
+            };
+            target->mouseMove (event (local, {}, false));
+            if (hover)
+                continue;
+            target->mouseDown (event (local, left, false));
+            if (drag)
+            {
+                const auto end = target->getLocalPoint (editor.get(), juce::Point<int> (xy[2].getIntValue(), xy[3].getIntValue())).toFloat();
+                target->mouseDrag (event (end, left, true));
+                continue;
+            }
+            target->mouseUp (event (local, {}, false));
+            target->mouseExit (event ({ -1000.0f, -1000.0f }, {}, false));
+        }
         juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
         {
             juce::Graphics g (image);
