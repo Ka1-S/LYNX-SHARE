@@ -162,8 +162,15 @@ Per instance, measured in plugexporttest:
 
 - There is no host sidechain bus, so Facet's sidechain controls are hidden in the plugins.
 - Ableton Live has not been tested, at the user's request.
-- Not yet tested in FL Studio. The plugins are validated with pluginval, clap-validator and the LYNX host on Windows
-  and Linux. FL's quick scan, with verification off, found neither plugin in a custom search path.
+- FL Studio 2026 (Windows) was tested with the CLAP only, found through `CLAP_PATH`:
+  - the quick scan lists both plugins, and both load, play and open their editors;
+  - a saved project reopens with their state;
+  - FL exits cleanly.
+- The VST3s are not yet tested in FL, which finds VST3 only in `Common Files\VST3`. Both formats are validated with
+  pluginval, clap-validator and the LYNX host on Windows and Linux.
+- Fixed in this round: FL hung on exit when the host unloaded the plugin DLL. LYNX's static image caches still held JUCE's
+  Direct2D device, and freeing it under the loader lock deadlocked in the graphics driver. The last plugin instance
+  now empties them (`ui/ImageCaches.h`), and a lint test keeps new static image caches registered.
 - Editors other than Facet EQ and FM10 need to be checked for FL wording before they are exported.
 - The plugins are unsigned.
 - macOS is not built or tested. The app's macOS-only `VideoMediaMac.mm` is not in the shared source list.
