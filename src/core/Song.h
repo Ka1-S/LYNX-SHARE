@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -1341,6 +1342,9 @@ struct Clip
     // per clip, on top of the channel's own pitch and reverse (FL: the playlist item's +0x3C / +0x48 bit 0, round 167k)
     float pitch = 0.0f;
     bool reversed = false;
+    // A slot of the clip grid (Clip-launch workflow, core/ClipLauncher.h): this clip's entry in ClipGrid::slots, −1 for
+    // every clip of the Playlist. It fits the padding after `reversed`: Clip stays the same size.
+    std::int16_t gridSlot = -1;
     // audio clips: FL 2026's per-clip stretch (the playlist item's +0x40 double, REA_rodada167l §2): the clip plays its
     // audio `stretch` times longer (2 = half speed). Its channel's time-stretch mode decides how: Resample changes the
     // speed and the pitch together, the other modes keep the pitch. `length` is already the stretched length.
@@ -1356,6 +1360,8 @@ struct Clip
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
     bool operator== (const Clip&) const = default;
 };
+
+static_assert (offsetof (Clip, gridSlot) + sizeof (std::int16_t) <= offsetof (Clip, stretch)); // (in the padding)
 
 // LYNX extra (issue #25; the user's choice, after round 168k showed FL plays such a clip once and is silent after its
 // pattern): a pattern clip stretched past its pattern loops the pattern until the clip ends. An app setting (Options ›
@@ -1502,6 +1508,71 @@ struct Arrangement
     bool operator== (const Arrangement&) const = default;
 };
 
+// The clip grid of the Clip-launch workflow (round 181a; logic in core/ClipLauncher.h). Absent (Song::clipGrid empty) until
+// the workflow or the grid is first used: a project without one carries nothing but the empty optional.
+// LaunchQuant and LaunchMode follow the order of Live's menus. Mapping to the numbers a Live set stores (docs/ALS_FORMAT.md §5)
+// is seen in Live's GUI only for a set-wide GlobalQuantisation 9 shown as "1/8" (181a), which fits clip number = global + 1.
+// From shipped sets (175a): clip LaunchQuant 0 = global, LaunchMode 0..3. Every other number is INFERRED
+// (docs/analise/REA_rodada181a.md); per-clip reads are a follow-up for the next Live turn, before .als session import.
+enum class LaunchQuant : std::uint8_t
+{
+    global, none, bars8, bars4, bars2, bar, half, halfTriplet, quarter, quarterTriplet, eighth, eighthTriplet, sixteenth,
+    sixteenthTriplet, thirtySecond
+};
+enum class LaunchMode : std::uint8_t { trigger, gate, toggle, repeat };
+// A follow action, in the order of the manual's list; the numbers a set stores for them are INFERRED (docs/analise/REA_rodada181a.md)
+enum class FollowKind : std::uint8_t { none, stop, playAgain, previous, next, first, last, any, other, jump };
+
+struct ClipFollow
+{
+    bool enabled = false;
+    FollowKind a = FollowKind::next, b = FollowKind::none;
+    int chanceA = 100, chanceB = 0;
+    int jumpA = 0, jumpB = 0;       // jump: the target row
+    bool linked = true;             // after `iterations` passes of the clip; off: after `ticks`
+    int iterations = 1;
+    std::int64_t ticks = 4 * 960;
+    bool operator== (const ClipFollow&) const = default;
+};
+
+// What a clip of the grid keeps besides the Clip itself. A Clip finds its entry through Clip::gridSlot.
+struct ClipGridSlot
+{
+    int scene = 0;
+    std::string name;
+    std::uint32_t colour = 0;       // 0xFFRRGGBB, 0 = the source's colour
+    LaunchMode mode = LaunchMode::trigger;
+    LaunchQuant quant = LaunchQuant::global;
+    bool legato = false;            // takes over the position of the clip it replaces
+    bool loop = true;               // off: plays once, then the track stops
+    bool noStop = false;            // an empty slot without its stop button (a scene leaves that track alone): its Clip has length 0
+    ClipFollow follow;
+    bool operator== (const ClipGridSlot&) const = default;
+};
+
+struct ClipGridScene
+{
+    std::string name;
+    std::uint32_t colour = 0;
+    double tempo = 0.0;   // > 0: the song takes this tempo when the scene is launched
+    int beatsPerBar = 0;  // > 0: and this bar length
+    bool operator== (const ClipGridScene&) const = default;
+};
+
+struct ClipGrid
+{
+    // Columns are Playlist tracks (Clip::track), rows are scenes (ClipGridSlot::scene). Every Clip has start 0: it has no
+    // place on a timeline. Song::forEachClipList visits this list, so every reference to a pattern, channel or track
+    // follows edits as the Playlist's clips do.
+    std::vector<Clip> clips;
+    std::vector<ClipGridSlot> slots; // an entry no clip refers to is free
+    std::vector<ClipGridScene> scenes;
+    LaunchQuant globalQuant = LaunchQuant::bar;
+    bool followActions = true; // follow actions on the whole grid (off: edit playing clips with no jumps)
+    bool backOnStop = false; // "Give tracks back to the Playlist when the transport stops" (off: they stay taken until asked)
+    bool operator== (const ClipGrid&) const = default;
+};
+
 // The project's credits (FL's Settings › Info page): shown and edited in Settings › Info, kept in .lynx, imported from .flp.
 struct ProjectInfo
 {
@@ -1626,7 +1697,7 @@ struct Song
     }
     void removeDeadMidiLinks();
 
-    // Applies `fn` to all clip lists (the current one and the stored ones).
+    // Applies `fn` to all clip lists (the current one, the stored ones and the clip grid's).
     template <typename Fn>
     void forEachClipList (Fn&& fn)
     {
@@ -1634,6 +1705,8 @@ struct Song
         for (std::size_t i = 0; i < arrangements.size(); ++i)
             if ((int) i != currentArrangement)
                 fn (arrangements[i].clips);
+        if (clipGrid)
+            fn (clipGrid->clips);
     }
     template <typename Fn>
     void forEachClipList (Fn&& fn) const
@@ -1642,6 +1715,8 @@ struct Song
         for (std::size_t i = 0; i < arrangements.size(); ++i)
             if ((int) i != currentArrangement)
                 fn (arrangements[i].clips);
+        if (clipGrid)
+            fn (clipGrid->clips);
     }
 
     // Applies `fn` to all Pattern Block lists (the current arrangement's and the stored ones).
@@ -1660,6 +1735,7 @@ struct Song
     // "Start" marker (the performance zone) don't play with the song; they are launched live (click, controller pads)
     // and loop on their track by its Performance settings, while the song plays from the Start marker on.
     bool performanceMode = false;
+    std::optional<ClipGrid> clipGrid; // the Clip-launch workflow's grid (round 181a); empty until it is first used
     // The end of the performance zone: the first Start marker's tick, or 0 (no zone) without one / when off.
     std::int64_t performanceZoneEnd() const noexcept;
     bool inPerformanceZone (const Clip& clip) const noexcept { return performanceMode && clip.start < performanceZoneEnd(); }
@@ -1802,7 +1878,7 @@ struct Song
     bool setTargetValue (const AutomationTarget& target, float value) noexcept;
 
     // Value of an automation at a song position (the same one playback uses); NaN without clips.
-    float automationValueAt (int automation, double tick) const;
+    float targetValueAt (const AutomationTarget& target, double tick) const; // the clips of that target, as playback plays them
     // Tempo at `tick`, taking tempo automation into account (in song mode).
     double tempoAt (double tick) const;
     // Duration in seconds of the first `ticks` of the song, integrating the tempo automation.
