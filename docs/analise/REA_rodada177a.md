@@ -261,3 +261,28 @@ VCA.
 - `mixer177a3_vca_scales_its_members_in_the_render`: no VCA leaves the snapshot without chains; a −6 dB VCA lowers
   only its member by 6 dB; a live level store reaches the render without a rebuild; a VCA mute silences only its
   member.
+## 4. Measured in the real windows (2026-11-07)
+
+### 4.1 The mixer picture and folded groups
+
+`--uiperf` with `LYNX_UIPERF_ONLY="mixer meters"`: 6 s playing with the strips' picture on (`/mnt/e/lynx-work/mixer177a/gui/`).
+Machine under load, so the CPU figures are noisy and only the picture counts are compared.
+
+| Project | Picture spoiled | Picture drawn again |
+|---|---|---|
+| Folded tab and bus, VCAs, an automated insert folded away, before the fix | 342 | 313 |
+| The same project, after the fix | 0 | 1 |
+| Folded tab and bus, VCAs, no automation | 0 | 1 |
+| VCAs, unfolded, no automation | 0 | 1 |
+| No VCA, no fold, no automation | 0 | 1 |
+
+A visible automated fader still spoils its own area on purpose: 350 times in the VCA project, 339 without a VCA.
+
+### 4.2 FL's fader rail click [FL Studio 2026, real clicks, measured from screenshots]
+
+A click on the rail away from the cap does **not** jump the fader. Each click moves the cap about 1 screen pixel towards
+the click: below the cap 748 → 749, above it 748 → 747, and ten more clicks below it 750 → 760. A press on the rail
+followed by a 20 px drag moved the cap 7 px, so the drag is relative to the press and doesn't jump either.
+
+LYNX jumps the fader to the click (`MixerStrips::mouseDown`, "clicking the track jumps the fader there"). This differs
+from FL. It is unchanged here and goes to the coordinator. The exact step in fader units isn't measured yet.
