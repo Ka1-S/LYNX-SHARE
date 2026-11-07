@@ -177,6 +177,8 @@ public:
     void mouseExit (const juce::MouseEvent& e) override;
     // --uiperf (round 173f): where a fader drag starts (the fader's rail, strip coordinates)
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
+    // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
+    std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
 
 private:
     enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab };
@@ -224,6 +226,26 @@ private:
     float tabLevel (int track) const noexcept;
     void paintFoldTab (juce::Graphics& g, int track);
     void paintFoldTabLevel (juce::Graphics& g, int track) const;
+    // VCA faders (round 177a): their own block left of the Master. A VCA strip goes by a pseudo track index
+    // (vcaStrip (i) = -2 - i), so the strips' area helpers place its fader, mute and solo. All empty without a VCA.
+    std::vector<int> vcaXs;
+    static constexpr int vcaStrip (int i) noexcept { return -2 - i; }
+    int vcaAt (int x) const noexcept;
+    Part vcaPartAt (int i, juce::Point<int> p) const;
+    float vcaMeter (int i, int channel) const noexcept; // the loudest member's level
+    float vcaShownLevel (int i) const noexcept;         // the VCA's fader (its automation's value while it plays)
+    ui::ValueSpec vcaSpec (int i) const;
+    void setVcaLevel (int i, double value);
+    void paintVcaStrip (juce::Graphics& g, int i);
+    void paintVcaMeter (juce::Graphics& g, int i) const;
+    void vcaMouseDown (const juce::MouseEvent& e, int i);
+    void showVcaMenu (int i);
+    void soloVca (int i);
+    ui::Hint vcaHint (int i, juce::Point<int> p) const;
+    void repaintVca (int i);
+    juce::String vcaNote (int track) const; // a member's fader hint: the VCAs and the level that plays
+    int dragVca = -1;
+    std::vector<float> vcaLevelsShown, vcaMetersShown;
     // the strip's rows for the current layout and height (top to bottom)
     struct Rows
     {
@@ -250,6 +272,7 @@ private:
     bool meterCacheOn = false;
     bool meterRepaintOnly = false; // set around the meters' own repaints: the picture stays valid
     bool cachePainting = false;    // paint() is filling the picture: wells without levels
+    int pictureInvalidations = 0, pictureRefills = 0; // what --uiperf reports (see cacheCountersForPerf)
     void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
     void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
     juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)
