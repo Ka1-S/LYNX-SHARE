@@ -108,6 +108,9 @@ std::vector<ClipPart> punchParts (const std::vector<PunchRange>& ranges, std::in
 // Song mode: makes sure a clip of `pattern` plays at `tick`. If none does, one is placed at the start of
 // that bar, on the first track with nothing from there on (it grows while recording). Returns true when a clip was added.
 bool placePatternClipAt (Song& song, int pattern, std::int64_t tick);
+// The Playlist track such a clip starting at `start` goes to (round 177d: the live display shows the take there before
+// the clip is placed).
+int patternClipTrack (const Song& song, std::int64_t start);
 
 // Length of a count-in of `bars` bars at the song position `tick` (bars follow the time signature there).
 std::int64_t countInLength (const Song& song, int bars, std::int64_t tick = 0);
@@ -247,6 +250,19 @@ public:
     // Notes completed since the last call.
     std::vector<Note> takeFinished();
 
+    // Round 177d (live display while recording; MusicTech's FL 2025 review: "recorded MIDI is not shown while
+    // recording"): the notes still held, as they would be committed if released at transport position `nowTick` (pattern
+    // positions, not quantised), with the take's origin and reach including them (Song mode; -1: none yet). Const: the
+    // take is not changed.
+    struct Preview
+    {
+        std::vector<Note> notes;
+        std::int64_t origin = -1, reach = -1;
+        bool fromClip = false;
+    };
+    Preview preview (const Song& song, double nowTick) const;
+    bool hasHeldNotes() const noexcept { return ! held.empty(); }
+
 private:
     struct Held
     {
@@ -255,6 +271,8 @@ private:
     };
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);
+    Note makeNote (const Song& song, int channel, int key, const Held& h, double endTick, std::int64_t& takeOrigin, bool& takeFromClip,
+                   std::int64_t& takeReach) const;
 
     std::int64_t songTick (const Song& song, double tick) const;
 
