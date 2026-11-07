@@ -8,6 +8,9 @@
 
 #if JUCE_LINUX
  #include <dlfcn.h>
+#elif JUCE_MAC
+ #include <objc/message.h>
+ #include <objc/runtime.h>
 #endif
 
 // The child side of the plugin sandbox (split out of PluginSandbox.cpp in round 176a): the process that hosts one
@@ -20,6 +23,17 @@ using namespace sandboxipc;
 #if JUCE_WINDOWS || LYNX_POSIX_SANDBOX
 namespace
 {
+#if JUCE_MAC
+// the pid of the active app ([NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier, from C++)
+pid_t frontmostPid()
+{
+    const auto send = (id (*) (id, SEL)) objc_msgSend;
+    const id workspace = send ((id) objc_getClass ("NSWorkspace"), sel_registerName ("sharedWorkspace"));
+    const id app = workspace != nil ? send (workspace, sel_registerName ("frontmostApplication")) : nil;
+    return app != nil ? ((pid_t (*) (id, SEL)) objc_msgSend) (app, sel_registerName ("processIdentifier")) : 0;
+}
+#endif
+
 class SandboxWindow final : public juce::DocumentWindow
 {
 public:
@@ -35,6 +49,7 @@ public:
     // the platform can't (then it stays always on top, as before). Windows: not done — an owner in another process
     // attaches the two processes' input queues, so a plugin that hangs its window would freeze LYNX's too; there the
     // window stays on top but is hidden whenever LYNX's stand-in is not on screen (Wrapper settings, minimised, closed).
+    // macOS: no owner across processes either, so the window follows which app is active instead.
     bool setOwner (juce::int64 owner)
     {
         if (owner == 0 || getWindowHandle() == nullptr)
@@ -56,12 +71,26 @@ public:
         setTransient (display, (unsigned long) (juce::pointer_sized_int) getWindowHandle(), (unsigned long) owner);
         flush (display);
         return true;
+       #elif JUCE_MAC
+        // no cross-process owner on macOS: the window floats only while LYNX or this child is the active app, and
+        // drops to a normal window (behind the other app) otherwise
+        // shortcut: polled 4x a second, upgrade to NSWorkspaceDidActivateApplicationNotification in an .mm if it lags
+        followLynx.startTimer (250);
+        return true;
        #else
         return false;
        #endif
     }
 
     void closeButtonPressed() override { setVisible (false); }
+
+   #if JUCE_MAC
+private:
+    juce::TimedCallback followLynx { [this] {
+        const auto front = frontmostPid();
+        setAlwaysOnTop (front == ::getppid() || front == ::getpid());
+    } };
+   #endif
 };
 
 // The bridge's x87 control word before plugin calls (32-bit x86 only: an old plugin's x87 maths follows it; LYNX's own
