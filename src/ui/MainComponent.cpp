@@ -62,6 +62,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
+#include "ui/EventEditor.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
@@ -193,6 +194,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
+    };
+
+    EventEditorHooks::onBrowseAutomations = [this] { // (the Event editor's File › Browse automations: FL's Scores\\Automation)
+        showPanel (Panel::browser);
+        browser.showScores ("Automation");
     };
 
     newButton.setTooltip (tr ("New project") + " (Ctrl+N)");
@@ -5651,6 +5657,41 @@ void MainComponent::showMissingFiles (bool afterOpening)
         });
 }
 
+void MainComponent::confirmPrepareForMidiExport()
+{
+    // FL's text, without its "(no undo)": this edit can be undone in LYNX
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Confirm"))
+                       .withMessage (tr ("All of the channels are about to be turned into MIDI Out channels in order to allow output to a MIDI file."))
+                       .withButton (tr ("OK"))
+                       .withButton (tr ("Cancel"));
+    juce::AlertWindow::showAsync (options, [this] (int result) {
+        if (result == 1)
+            engine.editSongStructural ([] (Song& s) { prepareForMidiExport (s); });
+    });
+}
+
+void MainComponent::changeDeclickOfSelectedClips (int mode)
+{
+    const auto selected = engine.getSelectedChannels();
+    if (audioClipsAmong (engine.getSong(), selected) == 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("No selection"), tr ("There are no audio clip channels selected."));
+        return;
+    }
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Change declicking mode?"))
+                       .withMessage (tr ("Change the declicking mode of all selected audio clip channels?"))
+                       .withButton (tr ("OK"))
+                       .withButton (tr ("Cancel"));
+    juce::AlertWindow::showAsync (options, [this, selected, mode] (int result) {
+        if (result == 1)
+            engine.editSong ([&selected, mode] (Song& s) { setDeclickOfAudioClips (s, selected, mode); });
+    });
+}
+
 void MainComponent::switchSmartDisableForAll()
 {
     // FL's Tools › Macros › "Switch smart disable for all plugins" (FLEngine FUN_0124d430, REA round 139): every
@@ -5946,6 +5987,15 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             browser.focusSearch();
         });
         menu.addItem (tr ("One-click audio recording: arm the selected insert..."), [this] { armSelectedInsertForAudio(); });
+        // FL's Tools menu has these two here; they work on the selected channel's Piano Roll (round 181b)
+        menu.addItem (tr ("Riff machine..."), [this] {
+            openPianoRoll();
+            pianoRoll.runAction ("pianoRoll.riffMachine");
+        });
+        menu.addItem (tr ("Chord progression tool..."), [this] {
+            openPianoRoll();
+            pianoRoll.runAction ("pianoRoll.chordProgression");
+        });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
         addAudioLoggerMenu (menu); // FL's Tools menu has it just above "Last tweaked parameters"
         // FL's "Last tweaked parameters" section (LastTweaked1Menu / LastTweaked2Menu → FUN_0123d1d0, REA round 143):
@@ -5955,19 +6005,31 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSubMenu (tr ("Next to last tweaked"), makeLastTweakedMenu (1), engine.getLastTweaked (1).has_value());
         menu.addSectionHeader (tr ("Macros"));
         menu.addItem (tr ("Stop sound (all notes off)") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
+        menu.addSeparator();
+        // FL's Macros order (round 181b; [DFM] mainmenu, round 168f)
+        menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
+        menu.addItem (tr ("Prepare for MIDI export"), [this] { confirmPrepareForMidiExport(); });
         menu.addItem (tr ("Select unused channels"), [this] {
             showPanel (Panel::channelRack);
             rack.selectUnused();
         });
-        menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
-        menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
-        // FL's Macros order ([DFM] mainmenu): ... Purge unused audio clips ... Lock / Unlock all playlist tracks, Reset
-        // empty playlist tracks (round 168f)
         menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
+        menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
         menu.addItem (tr ("Delete unused recordings and save project..."), [this] { deleteUnusedRecordingsAndSave(); });
+        {
+            juce::PopupMenu declick;
+            int mode = 0;
+            for (const auto* name : { TR_NOOP ("Out only (no bleeding)"), TR_NOOP ("Transient (no bleeding)"), TR_NOOP ("Transient (bleeding)"),
+                                      TR_NOOP ("Generic (bleeding)"), TR_NOOP ("Smooth (bleeding)"), TR_NOOP ("Crossfade (bleeding)") })
+            {
+                declick.addItem (tr (name), [this, mode] { changeDeclickOfSelectedClips (mode); });
+                ++mode;
+            }
+            menu.addSubMenu (tr ("Change declicking for selected channels to"), declick);
+        }
         menu.addItem (tr ("Collect project samples into a folder..."), [this] { collectSamples(); });
         return menu;
     }

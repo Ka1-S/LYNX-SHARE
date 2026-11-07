@@ -1,0 +1,91 @@
+# LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md).
+# Manual only, and nothing here is published: the plugins are not shipped yet (the user decides packaging and names).
+#
+#   build  (ubuntu)   Zig cross build with LYNX_BUILD_PLUGINS=1: the .vst3 bundles, the .clap and plugexporttest.exe
+#   check  (windows)  plugexporttest (scan, null test against the engine, automation, state, editor) on every plugin,
+#                     pluginval (strictness 10, no GUI tests) on the .vst3 and clap-validator on the .clap
+name: Plugins
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ZIG_VERSION: 0.14.1
+  ZIG_SHA256: 24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c
+  JUCE_VERSION: 8.0.4
+  JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
+  PLUGINVAL_VERSION: v1.0.4
+  CLAP_VALIDATOR_URL: https://github.com/free-audio/clap-validator/releases/download/0.4.1/clap-validator-0.4.1-127-g152b982-windows.zip
+
+jobs:
+  build:
+    name: Build the plugins (Windows x64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache toolchain
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ~/opt
+          key: toolchain-zig${{ env.ZIG_VERSION }}-juce${{ env.JUCE_VERSION }}-${{ env.ZIG_SHA256 }}-${{ env.JUCE_SHA256 }}
+
+      - name: Download Zig and JUCE
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p ~/opt && cd ~/opt
+          curl -fsSL -o zig.tar.xz "https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz"
+          echo "$ZIG_SHA256  zig.tar.xz" | sha256sum -c -
+          tar xf zig.tar.xz && rm zig.tar.xz
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+          tar xzf juce.tar.gz && mv "JUCE-$JUCE_VERSION" "juce-$JUCE_VERSION" && rm juce.tar.gz
+
+      - name: Build
+        shell: bash
+        run: |
+          LYNX_BUILD_PLUGINS=1 ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
+            ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
+          mkdir -p out && cp -r build-win/plugins out/ && cp build-win/plugexporttest.exe out/
+          find out -type f -printf '%s %p\n'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-plugins-windows-x64-unsigned
+          path: out/*
+
+  check:
+    name: Check the plugins
+    needs: build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: LYNX-plugins-windows-x64-unsigned
+          path: out
+
+      - name: Host test, pluginval, clap-validator
+        shell: bash
+        env:
+          LYNX_TEST_MODE: '1'
+        run: |
+          set -o pipefail
+          export LYNX_PROFILE_DIR="$RUNNER_TEMP/profile"
+          curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Windows.zip" && unzip -q pv.zip -d pv
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR_URL" && unzip -q cv.zip -d cv
+          fail=0
+          for p in out/plugins/*.vst3 out/plugins/*.clap; do
+            ./out/plugexporttest.exe "$p" "report-$(basename "$p").txt" || fail=1
+          done
+          for p in out/plugins/*.vst3; do
+            ./pv/pluginval.exe --validate "$p" --strictness-level 10 --skip-gui-tests --validate-in-process --timeout-ms 120000 || fail=1
+          done
+          for p in out/plugins/*.clap; do
+            "$(find cv -name clap-validator.exe | head -1)" validate --in-process "$p" || fail=1
+          done
+          exit $fail

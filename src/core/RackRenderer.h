@@ -240,7 +240,7 @@ struct RackState
     using PluginEffectFactory = std::function<std::shared_ptr<Effect> (const PluginRef&, double sampleRate)>;
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
-    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method)>;
+    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method, double semitones)>;
 
     struct Factories
     {
@@ -357,6 +357,14 @@ public:
         playTruncatedOnTransport = playTruncated;
         resetPluginsOnTransport = resetPlugins;
         userJumpSerial = userJumps;
+    }
+    // Round 180b (LYNX's effects as VST3 / CLAP): this slot takes its parameters from `params` instead of the snapshot, so
+    // a host's automation reaches it at every block without a rebuild. nullptr = the snapshot's. Same thread as process().
+    void setSlotParamsOverride (const EffectParams* params, int track, int slot) noexcept
+    {
+        overrideParams = params;
+        overrideTrack = track;
+        overrideSlot = slot;
     }
     void setMetronomeInput (const float* left, const float* right, int track) noexcept
     {
@@ -531,6 +539,8 @@ private:
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;
+    const EffectParams* overrideParams = nullptr;
+    int overrideTrack = -1, overrideSlot = -1;
     int metronomeTarget (const RackState& state) const noexcept;
     void mixMetronome (const RackState& state, int track, int n) noexcept;
     void mixLiveInput (const RackState& state, bool playing, int n) noexcept;
