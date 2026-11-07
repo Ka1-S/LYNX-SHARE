@@ -207,23 +207,38 @@ public:
             else
                 curve.lineTo ((float) x, y);
 
-            if (lfo)
+            // FL draws the amplitude line from the first point to the last one, nothing past it
+            if (lfo && ! points.empty() && tick >= (double) points.front().tick && tick <= (double) points.back().tick)
             {
                 const auto ya = valueToY (curveAt (*a, tick));
-                if (x == area.getX())
+                if (amp.isEmpty())
                     amp.startNewSubPath ((float) x, ya);
                 else
                     amp.lineTo ((float) x, ya);
             }
         }
 
-        // soft fill under the curve, then the line
-        auto fill = curve;
-        fill.lineTo ((float) area.getRight(), (float) area.getBottom());
-        fill.lineTo ((float) area.getX(), (float) area.getBottom());
-        fill.closeSubPath();
-        g.setColour (colour::automation.withAlpha (0.10f));
-        g.fillPath (fill);
+        if (lfo)
+        {
+            // FL's envelope region: a lighter band over the upper half, from the clip start to the last amplitude point
+            const auto x0 = (float) juce::jmax ((double) area.getX(), tickToX (0.0));
+            const auto x1 = (float) juce::jmin ((double) area.getRight(), tickToX (points.empty() ? 0.0 : (double) points.back().tick));
+            if (x1 > x0)
+            {
+                g.setColour (colour::textSecondary.withAlpha (0.07f));
+                g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x0, (float) area.getY(), x1, valueToY (0.5f)));
+            }
+        }
+        else
+        {
+            // soft fill under the curve (not in LFO mode: FL draws the wave alone)
+            auto fill = curve;
+            fill.lineTo ((float) area.getRight(), (float) area.getBottom());
+            fill.lineTo ((float) area.getX(), (float) area.getBottom());
+            fill.closeSubPath();
+            g.setColour (colour::automation.withAlpha (0.10f));
+            g.fillPath (fill);
+        }
         g.setColour (colour::automation);
         g.strokePath (curve, juce::PathStrokeType (lfo ? 1.5f : 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         if (lfo)
