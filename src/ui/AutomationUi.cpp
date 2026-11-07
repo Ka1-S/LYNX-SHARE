@@ -757,6 +757,9 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
         }
 
         case AutomationTargetKind::tempo: return tr ("Tempo");
+        case AutomationTargetKind::vcaLevel: // (round 177a)
+            return t.index >= 0 && t.index < (int) song.vcas.size() ? nameOf (song.vcas[(std::size_t) t.index].name) + " - " + tr ("VCA level")
+                                                                   : tr ("VCA level");
         case AutomationTargetKind::mixerSend: // (issue #12)
         {
             const auto destination = t.slot >= 0 && t.slot < (int) song.mixer.size() ? nameOf (song.mixer[(std::size_t) t.slot].name) : juce::String ("?");
@@ -986,15 +989,13 @@ void addAutomationItem (juce::PopupMenu& menu, AudioEngine& engine, const Automa
 {
     if (headers)
         menu.addSectionHeader (tr ("Automation"));
-    if (target.kind != AutomationTargetKind::tempo)
-    {
-        menu.addItem (tr ("Edit events in the pattern"), [&engine, target] { openEventEditor (engine, target); });
-        if (onEditEventsInPianoRoll)
-            menu.addItem (tr ("Edit events in piano roll"), [target] {
-                if (onEditEventsInPianoRoll)
-                    onEditEventsInPianoRoll (target);
-            });
-    }
+    // (the tempo too, issue #86: "Edit events" as in FL; "Edit events in piano roll" is a LYNX addition, FL greyed it in our tests)
+    menu.addItem (tr ("Edit events in the pattern"), [&engine, target] { openEventEditor (engine, target); });
+    if (onEditEventsInPianoRoll)
+        menu.addItem (tr ("Edit events in piano roll"), [target] {
+            if (onEditEventsInPianoRoll)
+                onEditEventsInPianoRoll (target);
+        });
     // FL's initialized controls (REA round 146): the value the song resets this control to whenever it starts
     const auto initial = engine.getSong().findInitialValue (target);
     menu.addItem (tr ("Init song with this position"), engine.currentTargetValue (target) >= 0.0f, initial >= 0, [&engine, target] {

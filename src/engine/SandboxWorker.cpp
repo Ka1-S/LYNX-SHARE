@@ -8,6 +8,10 @@
 
 #if JUCE_LINUX
  #include <dlfcn.h>
+#elif JUCE_MAC
+ #include <CoreGraphics/CoreGraphics.h>
+ #include <objc/message.h>
+ #include <objc/runtime.h>
 #endif
 
 // The child side of the plugin sandbox (split out of PluginSandbox.cpp in round 176a): the process that hosts one
@@ -20,6 +24,40 @@ using namespace sandboxipc;
 #if JUCE_WINDOWS || LYNX_POSIX_SANDBOX
 namespace
 {
+#if JUCE_MAC
+// the pid of the active app ([NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier, from C++)
+pid_t frontmostPid()
+{
+    const auto send = (id (*) (id, SEL)) objc_msgSend;
+    const id workspace = send ((id) objc_getClass ("NSWorkspace"), sel_registerName ("sharedWorkspace"));
+    const id app = workspace != nil ? send (workspace, sel_registerName ("frontmostApplication")) : nil;
+    return app != nil ? ((pid_t (*) (id, SEL)) objc_msgSend) (app, sel_registerName ("processIdentifier")) : 0;
+}
+
+// the window number of LYNX's frontmost normal window on screen (0: none)
+long lynxFrontWindow()
+{
+    long number = 0;
+    if (const auto list = CGWindowListCopyWindowInfo (kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID))
+    {
+        auto get = [] (CFDictionaryRef d, CFStringRef key) {
+            long v = -1;
+            if (const auto n = (CFNumberRef) CFDictionaryGetValue (d, key))
+                CFNumberGetValue (n, kCFNumberLongType, &v);
+            return v;
+        };
+        for (CFIndex i = 0; i < CFArrayGetCount (list) && number == 0; ++i) // front to back
+        {
+            const auto d = (CFDictionaryRef) CFArrayGetValueAtIndex (list, i);
+            if (get (d, kCGWindowOwnerPID) == ::getppid() && get (d, kCGWindowLayer) == 0)
+                number = get (d, kCGWindowNumber);
+        }
+        CFRelease (list);
+    }
+    return number;
+}
+#endif
+
 class SandboxWindow final : public juce::DocumentWindow
 {
 public:
@@ -35,6 +73,7 @@ public:
     // the platform can't (then it stays always on top, as before). Windows: not done — an owner in another process
     // attaches the two processes' input queues, so a plugin that hangs its window would freeze LYNX's too; there the
     // window stays on top but is hidden whenever LYNX's stand-in is not on screen (Wrapper settings, minimised, closed).
+    // macOS: no owner across processes either, so the window follows which app is active instead.
     bool setOwner (juce::int64 owner)
     {
         if (owner == 0 || getWindowHandle() == nullptr)
@@ -56,12 +95,33 @@ public:
         setTransient (display, (unsigned long) (juce::pointer_sized_int) getWindowHandle(), (unsigned long) owner);
         flush (display);
         return true;
+       #elif JUCE_MAC
+        // no cross-process owner on macOS: the window floats only while LYNX or this child is the active app, and
+        // drops to a normal window (behind the other app) otherwise
+        // shortcut: polled 4x a second, upgrade to NSWorkspaceDidActivateApplicationNotification in an .mm if it lags
+        followLynx.startTimer (250);
+        return true;
        #else
         return false;
        #endif
     }
 
     void closeButtonPressed() override { setVisible (false); }
+
+   #if JUCE_MAC
+private:
+    juce::TimedCallback followLynx { [this] {
+        const auto front = frontmostPid();
+        const auto active = front == ::getppid() || front == ::getpid();
+        if (active == isAlwaysOnTop())
+            return;
+        setAlwaysOnTop (active);
+        // dropped to a normal window: macOS would leave it below LYNX's main window, so it goes back just above it
+        if (const auto lynx = lynxFrontWindow(); ! active && lynx != 0 && getWindowHandle() != nullptr)
+            if (const id window = ((id (*) (id, SEL)) objc_msgSend) ((id) getWindowHandle(), sel_registerName ("window")))
+                ((void (*) (id, SEL, long, long)) objc_msgSend) (window, sel_registerName ("orderWindow:relativeTo:"), 1 /* NSWindowAbove */, lynx);
+    } };
+   #endif
 };
 
 // The bridge's x87 control word before plugin calls (32-bit x86 only: an old plugin's x87 maths follows it; LYNX's own
@@ -320,6 +380,9 @@ bool runPluginSandboxWorker (const juce::String& commandLine)
     if (! commandLine.contains (pluginSandboxId))
         return false;
     trace ("child: " + commandLine);
+   #if JUCE_MAC
+    juce::Process::setDockIconVisible (false); // (one LYNX icon in the Dock, not one more per sandboxed plugin)
+   #endif
     worker() = std::make_unique<SandboxWorker>();
     if (! worker()->initialiseFromCommandLine (commandLine, pluginSandboxId, 10000))
     {

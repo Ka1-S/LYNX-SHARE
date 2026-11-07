@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace lynx::xml
@@ -31,6 +32,8 @@ public:
     // The decoded value of attribute `attr` ("" when missing).
     std::string attr (std::string_view attr) const;
     bool hasAttr (std::string_view attr) const noexcept;
+    // Every attribute, decoded, in document order.
+    std::vector<std::pair<std::string, std::string>> attributes() const;
     // The decoded text directly inside this element (concatenated runs; "" when none).
     std::string text() const;
 

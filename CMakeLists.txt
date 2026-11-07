@@ -21,6 +21,14 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_
     set_source_files_properties(src/core/Slayer.cpp PROPERTIES COMPILE_OPTIONS "-fno-inline")
 endif()
 
+# The plugins are shared libraries: everything they link must be position independent (the option is declared below)
+if(LYNX_BUILD_PLUGINS)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections) # (what the plugins' --gc-sections can drop)
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # JUCE-free core: model, sequencer, built-in instruments and .flp reader
 
@@ -33,6 +41,8 @@ add_library(lynx_core STATIC
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
+    src/core/RollingAudioLog.cpp
+    src/core/ChordReadout.cpp
     src/core/LoadTrace.cpp
     src/core/ModuleWarmup.cpp
     src/core/FlpImport.cpp
@@ -40,6 +50,7 @@ add_library(lynx_core STATIC
     src/core/XmlLite.cpp
     src/core/Gzip.cpp
     src/core/AlsImport.cpp
+    src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
@@ -113,6 +124,10 @@ add_library(lynx_core STATIC
     src/core/Dvs.cpp
     src/core/Transmitter.cpp
     src/core/VideoPlayer.cpp
+    src/core/VideoTime.cpp
+    src/core/VideoTrack.cpp
+    src/core/Adr.cpp
+    src/core/DialogueAlign.cpp
     src/core/FruityDance.cpp
     src/core/Reeverb2.cpp
     src/core/LuxeVerb.cpp
@@ -356,8 +371,8 @@ if(LYNX_BUILD_APP)
         HARDENED_RUNTIME_ENABLED FALSE
         PLIST_TO_MERGE "<plist><dict><key>CFBundleName</key><string>LYNX SHARE</string><key>CFBundleDisplayName</key><string>LYNX SHARE</string><key>LSMinimumSystemVersion</key><string>11.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>")
 
-    target_sources(LYNX PRIVATE
-        src/Main.cpp
+    # (a list: the plugin build, cmake/LynxPlugins.cmake, compiles the same sources without Main.cpp)
+    set(LYNX_APP_SOURCES
         src/platform/FileTypes.cpp
         src/platform/CrashGuard.cpp
         src/platform/Paths.cpp
@@ -417,6 +432,7 @@ if(LYNX_BUILD_APP)
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
+        src/ui/AlsExportDialog.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
@@ -426,6 +442,10 @@ if(LYNX_BUILD_APP)
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/VideoMedia.cpp
+        src/ui/VideoMediaWindows.cpp
+        src/ui/VideoTracks.cpp
+        src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
@@ -444,7 +464,7 @@ if(LYNX_BUILD_APP)
         src/ui/EditorTools.cpp)
 
     # workflow shell: workspace desktop, control contract, dialogs
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
@@ -452,16 +472,16 @@ if(LYNX_BUILD_APP)
         src/ui/Splash.cpp)
 
     # main window chrome: hint bar and toolbar widgets
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/HintBar.cpp
         src/ui/Toolbar.cpp)
 
     # spectral waveforms: background analysis cache and drawing
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/WaveformView.cpp)
 
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
         src/ui/EventEditor.cpp
@@ -488,6 +508,7 @@ if(LYNX_BUILD_APP)
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
         src/ui/StemExtract.cpp)
+    target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
@@ -511,8 +532,13 @@ if(LYNX_BUILD_APP)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
         target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
+        # the system's video decoder (round 174d, ui/VideoMediaMac.mm; manual retain / release)
+        target_sources(LYNX PRIVATE src/ui/VideoMediaMac.mm)
+        set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
@@ -532,6 +558,13 @@ if(LYNX_BUILD_APP)
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags)
+endif()
+
+# LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by
+# default: nothing of it is configured or compiled in the normal build.
+option(LYNX_BUILD_PLUGINS "Build LYNX's own plugins as VST3 and CLAP" OFF)
+if(LYNX_BUILD_APP AND LYNX_BUILD_PLUGINS)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/LynxPlugins.cmake)
 endif()
 
 if(LYNX_BUILD_APP AND UNIX AND NOT APPLE)

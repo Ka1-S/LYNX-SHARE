@@ -208,3 +208,47 @@ The reference renders are in `warp-refs/`: one vocal, 6 warp modes, played at 0.
   - Tones: 0.88–0.92.
   - Beats: 0.76–0.94.
   - The N4 own-DSP modes target these numbers.
+
+## 11. Export (slice N2, 2026-11-06)
+File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`.
+
+**Skeletons.** Each element starts from its kind's skeleton in `src/core/AlsSkeleton.h`, which `tools/als_skeleton.py` generates from sets saved by Live (kept local, never committed):
+- **Live 12:** the 12.4 shipped sets, plus two probe sets saved on this machine.
+- **Live 11:** a public 11.0.12 set (MIT) holds most kinds. GroupTrack, AudioClip and the VST3 PluginDevice come from a public 11.0.12 set (MPL-2.0). Locator comes from a public 11.3.3 set.
+- **Why real Live 11 samples:** the earlier Live 12→11 downgrade (`to11`) differed from the real Live 11 objects. GroupTrack missed 36 members and AudioClip had 7 wrong ones (for example `IsSongTempoMaster`, not `IsSongTempoLeader`). Only Locator matched.
+
+**Rules found while exporting** [LIVE, Live 12.4]. These add to §9:
+8. **Numbers stay numbers.** A member that holds a number never gets an empty value. `ScaleInformation/Name` is the scale index in Live 12 ("Unexpected value for int node" when empty) and a name such as "Major" in Live 11.
+9. **Group slots.** A GroupTrack has one `GroupTrackSlot` per scene in its own `Slots` list, and an *empty* `FreezeSequencer/ClipSlotList`. Live 11.0–12.2 save it that way. With freeze slots present, Live 12.4 refuses the set: "List of group track freeze sequencer slots not empty".
+9b. **List ids.** Items of one list have unique `Id`s ("Non-unique list ids"). The skeletons keep Live's own ids inside an object and reset only the object's own id.
+10. **Note attributes.** Live 11 writes every `MidiNoteEvent` attribute: Time Duration Velocity VelocityDeviation OffVelocity Probability IsEnabled NoteId. Live 12 leaves out the default ones but keeps the same order [DATA].
+11. **Before-the-song event.** An envelope opens with the "before the song" event at −63072000. A point at time 0 *is* that event; it is not written twice [DATA].
+12. **Routings point at this set.** Every routing `Target` is `AudioIn/…`, `AudioOut/…`, `MidiIn/…` or `MidiOut/…`. A track path (`p46251/p41230/p36996`) left over from the set a skeleton came from makes Live 12.4 crash on load with "A serious program error" (`std::out_of_range`, "invalid map<K, T> key" in Log.txt). The Live 11 GroupTrack skeleton carried one in its `AudioInputRouting`; the exporter now writes `AudioIn/External/S0` ("Ext. In", "1/2"), as Live saves groups. Found by bisecting the Live 11 export: ungrouped it loads, one plain group crashes, a real Live 11.3 group transplanted in loads, and the fixed group loads [LIVE, Live 12.4.16].
+13. **Sample formats.** Live reads WAV, AIFF, FLAC, Ogg and MP3. It does not read WavPack (`.wv`) or Ogg-in-WAV (format tags 0x674F–0x6751, logged as "Unknown unsupported format 26447"). The exporter decodes such samples and writes them as 32-bit float `.wav` in `Samples/Imported/`, also with "Refer to them where they are" [LIVE].
+
+**Mapping from LYNX:**
+- **Tracks:**
+  - A channel with notes, or with a plugin, becomes a MIDI track.
+  - A Playlist track with audio clips becomes an audio track. Its gain is the channel gain relative to the unity value 0.78125.
+  - An insert with one track folds into that track.
+  - An insert shared by several tracks becomes a GroupTrack.
+  - An insert with no track that other inserts route into (no Master output, single route) becomes a GroupTrack. Groups nest when they are routed into another bus.
+  - Any other insert with no track that is fed by sends becomes a ReturnTrack.
+- **Plugins:** loaded plugins export through `PluginHost::flWrapperRecord`, giving VST3 class id plus component/controller state, or the VST2 id plus chunk.
+- **Not converted yet:** LYNX's own instruments and effects (N3). They are listed in the export report.
+
+**Offline checks** (scratchpad `schema_check.py` / `loader_check.py`):
+- The export is compared, element by element, with real sets of its version: parent/tag pairs, child layouts, attribute sets and value kinds.
+- The §9 rules are checked on every exported file.
+- References:
+  - Live 11: two 11.0.12 sets (ML-Ableton, MIT), two abletoolz fixtures (11.0.0 and 11.0.12, MPL-2.0), and an 11.3.3 sample set.
+  - Live 12: the 12.4 shipped sets and a 12.2.1 public set.
+
+## 12. Warp modes (slice N4, 2026-11-06)
+Reference: Live 12.4.16 renders of a test voice (`warp-refs/`, 48 kHz, clip warped 0.8×, 1.25×, and +5 st), compared by RMS-envelope correlation and mean spectral deviation (24 log bands).
+- **Live's Beats, measured** (output→source time map by cross-correlation, forward and reversed): the audio is cut at transients only (no cut at every 1/16 on sustained material); each piece starts where the warp map puts its cut and plays at 1× speed. Faster: cut where the next piece begins. Slower: after its end the piece plays backwards, then forwards ("back and forth", `TransientLoopMode` 2), until the next piece. A tone is cut at its very start; a swell at its steepest rise.
+- **LYNX `StretchMethod::beats`** (`TimeStretch.cpp` `beatsStretch`, `stretchdetail::beatsCuts`): LYNX's attack detector, each cut moved to the start of the 10 ms window before the steepest 10 ms RMS rise (−30…+50 ms); 16 ms linear crossfades (1–4 ms: clicks Live has not; 16 ms: 0.2–0.3 dB spectral deviation). Envelope correlation 0.90/0.98 (old transients preset) → 0.967/0.999.
+- **Tones / Texture / Complex** use the spectral stretcher with 40 / 60 / 90 ms blocks, overlap 6, no attack splicing: 0.977 / 0.985 / 0.994 correlation, about 1 dB spectral deviation (2 dB before).
+- Mapping: import WarpMode 0→beats, 1→tones, 2→texture, 4 and 6→complex, 3→Re-Pitch (no pitch keep); export beats/transients→0, tones/mono→1, texture→2, else 4.
+- **Beats transposed** (round 175a, the Beats-transpose slice): Live resamples each piece by the clip's transpose (2^(st/12) faster, so higher and shorter), starts it at its own place on the grid and fills the gap back and forth. LYNX renders the same offline: `timeStretch (…, beats, semitones)` reads each piece with 4-point Hermite interpolation. An imported Beats clip with a transpose stores it in its channel's `sampler.stretchPitch` (saved in .lynx as `stretchPitch`). The stretched-sample cache keys on it, in memory and on disk, and the clip plays untransposed. On export the value is written back as `PitchCoarse`/`PitchFine`. Beats-up5 against Live: envelope correlation 0.754 → 0.944, spectral deviation 1.54 → 0.95 dB (the stretcher alone, outside the app). The other modes still transpose in real time.
+- Open: the `TransientResolution`, `TransientEnvelope` and Texture `FluctuationTexture` parameters are not modelled.

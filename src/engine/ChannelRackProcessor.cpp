@@ -67,7 +67,7 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     }
 
     // tempo automation: the transport advances at the tempo the renderer used
-    if (state != nullptr && state->tempoAutomation >= 0 && transport.externalBpm.load (std::memory_order_relaxed) <= 0.0)
+    if (state != nullptr && state->tempoMap && transport.externalBpm.load (std::memory_order_relaxed) <= 0.0)
         transport.bpm.store (renderer.currentBpm(), std::memory_order_relaxed);
 }
 } // namespace lynx

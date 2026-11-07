@@ -271,6 +271,7 @@ int resolveProjectSamples (Song& song, const std::string& projectFolder, const s
     }
     return moves.empty() ? 0 : applyRelocations (song, moves);
 }
+
 int compareVersions (const std::string& a, const std::string& b)
 {
     const auto numbers = [] (const std::string& v) {
@@ -305,5 +306,60 @@ int compareVersions (const std::string& a, const std::string& b)
             return p < q ? -1 : 1;
     }
     return 0;
+}
+
+std::string withProjectExtension (const std::string& name, const std::string& extension)
+{
+    const auto lower = [] (std::string text) {
+        for (auto& c : text)
+            if (c >= 'A' && c <= 'Z')
+                c = (char) (c - 'A' + 'a');
+        return text;
+    };
+    if (name.size() >= extension.size() && lower (name.substr (name.size() - extension.size())) == lower (extension))
+        return name;
+    return name + extension;
+}
+
+bool isFileArgument (const std::string& argument)
+{
+    return ! argument.empty() && argument.front() != '-';
+}
+
+std::vector<std::string> filesInCommandLine (const std::string& commandLine)
+{
+    std::vector<std::string> files;
+    std::string token;
+    bool quoted = false, inToken = false;
+    const auto finish = [&] {
+        if (inToken && isFileArgument (token))
+            files.push_back (token);
+        token.clear();
+        inToken = false;
+    };
+    for (std::size_t i = 0; i < commandLine.size(); ++i)
+    {
+        const auto c = commandLine[i];
+        if (c == '\\' && i + 1 < commandLine.size() && commandLine[i + 1] == '"')
+        {
+            token += '"';
+            inToken = true;
+            ++i;
+        }
+        else if (c == '"')
+        {
+            quoted = ! quoted;
+            inToken = true;
+        }
+        else if (c == ' ' && ! quoted)
+            finish();
+        else
+        {
+            token += c;
+            inToken = true;
+        }
+    }
+    finish();
+    return files;
 }
 } // namespace lynx::safety

@@ -62,7 +62,15 @@ class AudioEngine final : private juce::AudioIODeviceCallback,
                           private juce::Timer
 {
 public:
-    explicit AudioEngine (bool openAudioDevice = true);
+    // workerThreads: extra audio threads (< 0 = by the CPU's cores). An engine that only serves an editor needs none.
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1);
+    // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
+    // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
+    void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
+    {
+        externalTimes = times;
+        externalEffect = std::move (effect);
+    }
     ~AudioEngine() override;
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
@@ -191,6 +199,10 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // round 174d (ADR): pre / post-roll in seconds instead of bars while ≥ 0 (the ADR window sets them for its
+        // record cycle; not saved)
+        double preRollSeconds = -1.0;
+        double postRollSeconds = -1.0;
         // FL's "Loop record" (toolbar LoopRecordBtn / Options, round 170e3 [DECOMP 0xf1e2a0 toggles a global that
         // FUN_011d4800 reads: off while recording, the play end becomes "never", so playback runs on]): on, Song mode
         // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
@@ -255,6 +267,11 @@ public:
     // The keys held right now on MIDI inputs and the typing piano (as played, before the scale snap), ascending; for
     // the Piano Roll's chord readout (any thread).
     std::vector<int> heldInputKeys() const;
+    // The same for one MIDI channel (0-15; the typing keyboard plays on 0), as two 64-bit masks: the chord panel (round
+    // 181b) counts each channel's keys on its own, as FL does.
+    std::array<std::uint64_t, 2> heldInputKeyBits (int midiChannel) const noexcept;
+    // The Audio logger's memory (Tools › Audio logger, round 181b). The audio thread writes it from the Master.
+    RollingAudioLog& getRollingLog() noexcept;
     // The keys sounding on a channel right now (song / pattern notes, keyboard, MIDI): the Piano roll's keyboard lights
     // them (issue #14). Any thread.
     NoteMask soundingKeys (int channel) const noexcept;
@@ -810,9 +827,9 @@ private:
     LiveEventQueue liveEvents;   // UI -> audio
     LiveEventQueue midiEvents;   // MIDI thread -> audio
     InputHeldNotes midiHeld;     // MIDI thread: what each held MIDI key started
-    std::atomic<std::uint64_t> heldKeyBits[2] {}; // keys held on MIDI inputs / the typing piano (chord readout)
-    std::atomic<std::uint8_t> heldKeyCount[128] {};
-    void markHeldKey (int key, bool on) noexcept;
+    std::atomic<std::uint64_t> heldKeyBits[16][2] {}; // keys held per MIDI channel on inputs / the typing piano (chord readout)
+    std::atomic<std::uint8_t> heldKeyCount[16][128] {};
+    void markHeldKey (int midiChannel, int key, bool on) noexcept;
     KeyLedger playedKeys;        // UI thread: the keys the typing piano started (after the scale snap)
     SpscQueue<RecordedEvent, 1024> midiRecordQueue; // MIDI thread -> UI (recording)
     // a controller's pitch wheel while recording (MIDI thread -> UI): key = its MIDI channel 0…15, velocity = 0..1;
@@ -1052,6 +1069,8 @@ private:
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
     void saveUndoStep();
+    ProcessTimes* externalTimes = nullptr;
+    std::function<std::shared_ptr<Effect>()> externalEffect;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

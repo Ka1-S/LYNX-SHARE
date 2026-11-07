@@ -102,4 +102,16 @@ inline bool savedByNewerVersion (const std::string& savedBy, const std::string& 
 {
     return ! savedBy.empty() && compareVersions (savedBy, running) > 0;
 }
+
+// --- opening files from outside LYNX (D#92, round 180a) ------------------------------------------------------------
+// `name` with `extension` (".lynx") added unless it already ends with it, in any case. A dot inside the name stays:
+// "beat.v2" -> "beat.v2.lynx", never "beat.lynx" (which could be another project).
+std::string withProjectExtension (const std::string& name, const std::string& extension);
+
+// Whether a start-up argument names a file rather than an option ("--lang", macOS's "-psn_0_123").
+bool isFileArgument (const std::string& argument);
+
+// The files in the string the operating system hands to a running application (macOS: one string, a path with spaces
+// in double quotes, a quote inside a path as \"). Options are left out.
+std::vector<std::string> filesInCommandLine (const std::string& commandLine);
 } // namespace lynx::safety

@@ -272,4 +272,13 @@ bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard
 // FL's hint bar over a step shows its song position as bar:step:tick ("1:02:00"): bar from 1, step (a 16th) from 1
 // with two digits, the tick inside the step (in FL's 96-per-quarter units: 24 per step) with two digits.
 std::string stepPositionText (std::int64_t tick, int beatsPerBar);
+
+// FL's Tools › Macros › "Change declicking for selected channels to" (FUN_011f7180, REA round 181b): only audio clip
+// channels change. Returns how many did.
+int audioClipsAmong (const Song& song, const std::vector<int>& channels);
+int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mode);
+// FL's Tools › Macros › "Prepare for MIDI export" (FUN_0122d440, REA round 181b): every channel becomes a MIDI Out and
+// keeps its name; an FPC plays on MIDI channel 10, the others take 1...16 in turn without 10. Controller, Layer,
+// Dashboard and Voltage channels stay as they are.
+void prepareForMidiExport (Song& song);
 } // namespace lynx

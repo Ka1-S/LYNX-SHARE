@@ -21,6 +21,9 @@
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
+#include "ui/VideoTracks.h"
+
+#include <thread>
 
 namespace lynx
 {
@@ -35,6 +38,30 @@ struct JobOnMessageThread : MessageThreadOwned<ExportJob>
     {
     }
 };
+
+// round 174d: "Also write a video with this mix" (remembered for the session)
+bool& exportWithVideo()
+{
+    static bool on = false;
+    return on;
+}
+
+// The exported mix under the project's video, next to the audio file (in the background: a re-encode takes a while)
+void writeVideoWithMix (const Song& song, const exportopts::Options& o, const juce::File& audio)
+{
+    const auto origin = o.range == exportopts::Range::selection && song.hasLoop() ? song.secondsForTicks (song.loopStart) : 0.0;
+    const auto out = videotracks::videoFileFor (song, audio);
+    ui::postHint ({ tr ("Writing the video..."), out.getFileName() }, 4000);
+    std::thread ([song, origin, audio, out] {
+        const auto error = videotracks::muxWithVideo (song, origin, audio, out);
+        juce::MessageManager::callAsync ([error, out] {
+            if (error.isEmpty())
+                ui::postHint ({ tr ("Video written") + ": " + out.getFullPathName(), {} }, 8000);
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not write the video"), error);
+        });
+    }).detach();
+}
 
 class ExportThread final : public juce::ThreadWithProgressWindow
 {
@@ -85,6 +112,8 @@ public:
         else if (! userPressedCancel)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not export"), error);
 
+        if (ok && then)
+            then();
         // the export engine is torn down on the UI thread (plugins require this)
         juce::MessageManager::callAsync ([this] { delete this; });
     }
@@ -95,6 +124,7 @@ private:
     std::function<void (bool)> onDone;
 public:
     bool reveal = false;
+    std::function<void()> then; // after a successful export (round 174d: the video with the mix)
 private:
     juce::String error;
     bool ok = false;
@@ -444,6 +474,14 @@ public:
         loopMarkersToggle.setTooltip (tr ("WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers"));
         playlistMarkersToggle.setButtonText (tr ("Playlist markers"));
         playlistMarkersToggle.setTooltip (tr ("WAV: the Playlist's markers become cue points with their names (cue and labl chunks)"));
+        // round 174d (issue #83): the exported mix muxed back under the project's video (the user's ffmpeg)
+        videoToggle.setButtonText (tr ("Also write a video with this mix"));
+        videoToggle.setTooltip (tr ("Next to the audio file: the first video track's picture with the exported mix as its sound (needs FFmpeg; "
+                                    "the picture is copied as it is when it starts with the song)"));
+        videoToggle.setToggleState (exportWithVideo(), juce::dontSendNotification);
+        videoToggle.onClick = [this] { exportWithVideo() = videoToggle.getToggleState(); };
+        addChildComponent (videoToggle);
+        videoToggle.setVisible (onlyTracks.empty() && videotracks::hasVideo (engine.getSong()));
         // round 165c: only offered when the song has an active hardware insert (outboard gear can't run faster than real time)
         realtimeToggle.setButtonText (tr ("Render through the hardware in real time"));
         realtimeToggle.setTooltip (tr ("The song plays through the audio device while it is recorded, so the hardware inserts' gear is "
@@ -563,6 +601,7 @@ public:
             auto row3 = mix.removeFromTop (24);
             warmUpToggle.setBounds (row3.removeFromLeft (colA));
             insertFxToggle.setBounds (row3.removeFromLeft (colB));
+            videoToggle.setBounds (row3);
         }
         mix.removeFromTop (2);
         {
@@ -980,9 +1019,12 @@ private:
 
                                   auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
                                   job->setExtraData (true);
+                                  const auto withVideo = videoToggle.isVisible() && videoToggle.getToggleState() && o.range != exportopts::Range::pattern;
                                   close(); // deletes this panel: no `this` after this point
                                   auto* thread = new ExportThread (std::move (job), file);
                                   thread->reveal = o.showWhenDone;
+                                  if (withVideo)
+                                      thread->then = [song = engineRef.getSong(), o, file] { writeVideoWithMix (song, o, file); };
                                   thread->launchThread();
                               });
     }
@@ -1015,6 +1057,7 @@ private:
     juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
     juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
     juce::ToggleButton tempoToggle, loopMarkersToggle, playlistMarkersToggle;
+    juce::ToggleButton videoToggle; // round 174d: also a video with the mix (shown when the project has a video clip)
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
     std::array<juce::ToggleButton, 4> alsoToggles;

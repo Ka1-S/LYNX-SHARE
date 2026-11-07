@@ -1141,6 +1141,8 @@ void Leveler::reset() noexcept
             tx[c][k] = ty[c][k] = 0.0;
     }
     sc.reset();
+    sc172.reset();
+    scLow172.reset();
 }
 
 void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
@@ -1149,11 +1151,18 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
     if (scDesignedRate != sr)
     {
         scDesignedRate = sr;
-        const double A = std::pow (10.0, scDb / 40.0), w = 2.0 * pi * std::min (scHz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * scQ), cw = std::cos (w);
-        sc.set (1 + al * A, -2 * cw, 1 - al * A, 1 + al / A, -2 * cw, 1 - al / A);
+        const auto peaking = [this] (Biquad& f, double hz, double q, double db)
+        {
+            const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * q), cw = std::cos (w);
+            f.set (1 + al * A, -2 * cw, 1 - al * A, 1 + al / A, -2 * cw, 1 - al / A);
+        };
+        peaking (sc, scHz, scQ, scDb);
+        peaking (sc172, scHz172, scQ172, scDb172);
+        peaking (scLow172, scLowHz172, scLowQ172, scLowDb172);
     }
     const bool ml = s.limit && s.measured; // round 152: the measured Limit law
-    const double shift = sensitivityDb (s.peakReduction, s.hiFreq) + (s.limit ? (ml ? limitShiftDb152 : limitShiftDb) : 0.0);
+    const bool wideSc = s.measuredRelease && ! s.limit; // round 172d: Compress's refitted side chain
+    const double shift = sensitivityDb (s.peakReduction, s.hiFreq) + (wideSc ? scShift172 : 0.0) + (s.limit ? (ml ? limitShiftDb152 : limitShiftDb) : 0.0);
     const double Y0 = dbToGain (y0Db + shift), Yt = dbToGain (ytDb + shift), gam = s.limit ? (ml ? limitGamma152 : limitGamma) : gamma;
     const double ff = ml ? limitFeedForward : 0.0, gFloor = ml ? dbToGain (-limitFloorDb) : 0.0;
     const double mk = dbToGain (makeupDb (s.gain) + idleMakeupDb + (s.measured && s.autoMakeup ? autoMakeupDb (s.peakReduction) - autoMakeupDb (s.makeupRef) : 0.0));
@@ -1167,7 +1176,12 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
     double maxGr = 0.0;
     for (int i = 0; i < n; ++i)
     {
-        const double e0 = sc.process ((float) (yc[0] + ff * xp[0]), 0), e1 = sc.process ((float) (yc[1] + ff * xp[1]), 1);
+        const auto scSample = [&] (int c)
+        {
+            const auto x = (float) (yc[c] + ff * xp[c]);
+            return (double) (wideSc ? scLow172.process (sc172.process (x, c), c) : sc.process (x, c));
+        };
+        const double e0 = scSample (0), e1 = scSample (1);
         el = std::max (std::abs (e0), std::abs (e1)); // the light follows the drive within the sample (fitted)
         double ct = (el > Yt ? std::pow ((el - Yt) / Y0, gam) : 0.0) * (1.0 + memGain * mem);
         const double ctf = (1.0 - rl.share) * (rl.ctMax > 0.0 ? std::min (ct, rl.ctMax) : ct);

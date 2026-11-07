@@ -568,6 +568,64 @@ void MidiActivityLight::update (std::uint32_t count, const juce::StringArray& ac
         repaint();
 }
 
+void ChordPanel::setText (const juce::String& newText)
+{
+    if (newText != text)
+    {
+        text = newText;
+        repaint();
+    }
+}
+
+void ChordPanel::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds();
+    g.setColour (colour::bg1);
+    g.fillRoundedRectangle (area.toFloat(), radius::md);
+    g.setColour (colour::textPrimary);
+    // past eight characters the name gets smaller, down to what fits (FL: its size minus 1.15 per character)
+    const auto base = juce::jmin (20.0f, (float) area.getHeight() * 0.55f);
+    auto readoutFont = monoFont (juce::jmax (9.0f, base - 1.15f * (float) juce::jmax (0, text.length() - 8)));
+    for (int i = 0; i < 10 && juce::GlyphArrangement::getStringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
+        readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
+    g.setFont (readoutFont);
+    g.drawText (text, area, juce::Justification::centred, false);
+}
+
+void ChordPanel::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu() && onMenu)
+        onMenu();
+}
+
+ui::Hint ChordPanel::hintAt (juce::Point<int>)
+{
+    return { tr ("Detected chord"), {}, false, false };
+}
+
+void ChordHint::setText (const juce::String& newText)
+{
+    if (newText != text)
+    {
+        text = newText;
+        repaint();
+    }
+}
+
+void ChordHint::paint (juce::Graphics& g)
+{
+    juce::GlyphArrangement glyphs;
+    glyphs.addFittedText (theme::font (theme::type::body, true).withHeight (17.0f), text, 2.0f, 0.0f, (float) getWidth() - 4.0f, (float) getHeight(),
+                          juce::Justification::centredLeft, 1, 1.0f);
+    juce::Path outline;
+    glyphs.createPath (outline);
+    g.setColour (juce::Colours::black);
+    g.strokePath (outline, juce::PathStrokeType (2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (juce::Colours::white);
+    g.fillPath (outline);
+}
+
 void MidiActivityLight::paint (juce::Graphics& g)
 {
     const auto size = juce::jmin ((float) getWidth(), (float) getHeight()) * 0.36f;
@@ -1093,6 +1151,7 @@ Icon EditOverlay::groupIcon (toolbarlayout::Group g)
         case Group::file: return Icon::save;
         case Group::meters: return Icon::settings;
         case Group::output: return Icon::listen;
+        case Group::chord: return Icon::pianoRoll;
         case Group::count_: break;
     }
     return Icon::none;

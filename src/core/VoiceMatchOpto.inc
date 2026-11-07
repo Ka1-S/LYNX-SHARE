@@ -9,6 +9,14 @@ constexpr double slowShare = 0.6198693, attackSlowMs = 27033.11, releaseA2 = 16.
 constexpr double h2 = 0.01176161, h3 = 0.02052627;                        // after the make-up
 constexpr double tiltC0 = 0.4374144, tiltC1 = 0.4175737, tiltHz = 6850.834; // H = g (1 + s/wz) / (1 + s g'/wz)
 constexpr double scHz = 8560.034, scQ = 0.3806853, scDb = 8.317298;      // side-chain emphasis (peaking)
+// round 172d [EXEC]: Compress's side chain refitted (optofit, Nelder-Mead on 10 ms gain windows: pink bursts, drums, music
+// and 1 kHz stairs at peak reduction 46 / 70 / 80, plus the trial's sweep at 46 / 56 / 100). The trial reduces more at both
+// ends of the band than at 750 Hz (−18 dBFS sweep, peak reduction 56: 1.9 dB more at 95 Hz, 5.2 dB more at 6 kHz), so anything
+// bass-heavy or broadband sat 2 dB too loud while the 1 kHz stairs matched. rms 1.54 → 1.02 dB; music at the default 2.31 → 1.16.
+// The HF gain is bounded at 12 dB: 14 dB scored the same on fxparity with a larger overshoot on a steady 6 kHz sine (7.7 dB more
+// than 750 Hz against the sweep's 5.2; 12 dB gives 7.1). scShift172 keeps the chain's 1 kHz gain where round 123's was (+0.31 dB
+// through the new filters), so the 1 kHz laws fitted since (rounds 152, 165w, 165x) hold. Limit keeps round 123's emphasis: its law was fitted on it
+constexpr double scHz172 = 8864.214, scQ172 = 0.423723, scDb172 = 11.914248, scLowHz172 = 104.5505, scLowQ172 = 0.588094, scLowDb172 = 4.959689, scShift172 = 0.3107;
 constexpr double memGain = 2.321769, memUpMs = 162.5647, memDownMs = 1.0;
 constexpr double limitGamma = 12.0, limitShiftDb = 0.88;               // Limit: a much steeper cell law [model: only her
                                                                         // peak reduction measured]

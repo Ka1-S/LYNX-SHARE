@@ -55,7 +55,7 @@ there.
 | Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0 |
 | Ridge Strip (4K) | SSL 4K B | 8 | 8 | 5 | 8 | tp172c | tp172c4: its stepped compressor (out / 2 / 4 / 10 : 1 / ds, stepped releases) read as the 4K's near-limiting curve with the measured knee offsets, its threshold-only auto make-up, its gentler mic pre: fxparity 3.5 → 5.2 |
 | Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | tp172c | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; its Pink EQ type still plays as Black |
-| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2 |
+| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2 |
 | Ridge Strip | Harrison MPC Channel Strip | 7 | 6 | 5 | 8 | tp172c | tp172c5: its 8 bands onto Ridge's 4 (shelves on LF / HF, the bells on the free slots), the 12 dB/oct filters on the 32C's laws, its compressor's measured line and knee: fxparity 4.6 → 5.5 (dynamics bank 3.8 → 6.6, EQ bank 1.9 → 3.2: band-pass / notch shapes, Q under 0.5 and ±19 dB gains are outside Ridge's bands; open for this release: no new Ridge bands or plugin) |
 | Kiln Channel (Console E / G / A / N / Y, Tube) | Slate VCC Channel | 7 | 7 | 7 | 8 | tp172c7 | tp172c7: its own plugin (was Ridge's DRIVE section): a compact dark single-channel console like the original (amber VU, console selector with the six models round it, Input / Output, Drive, Group, Noise reduction and Group bypass keys, main In / Out columns with meters), own art and emblem; the same measured drive stages; its noise floor per console (NR off: E / G -113.9, A -110.0, N -109.8, Y -101.6, Tube -101.9 dBFS RMS, uncorrelated L / R) and group bypass shared by the group's channels; state fully translated (console, drive, trims, NR, group, group bypass, main gains): fxparity 6.8 (drive bank 6.8, US A 6.3, group / NR sets 6.7 / 6.9) |
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
@@ -139,6 +139,7 @@ Both numbers are given below.
 | Auto-pan (Rhythm) | PanMan | 3.2 → 4.8 | — | PanMan's default shape is a ramp (fitted within 1° on its 0.25 / 0.63 Hz pan trajectories): right to left over the period, back over 45 ms + Smoothing × a quarter of the period. New Pattern option "Ramp" (Left / right · Ramp · 8 steps; saved 0 / 1 keep their meaning). Harness fix: the original's In/Out "Analog" is the analog stage, not the "hot" one (3.2 → 4.3 of the gain). Per setting: D 2.7 → 4.7, S1 2.7 → 4.7, S2 4.3 → 5.0. |
 | Voice Shift | Little AlterBoy | 2.0 → 2.8 | — | measured on refcap0124's Drive, Pitch and Formant sweeps: Drive adds 1.72 dB per step into an output that falls 1.46 dB per step (a soft clipper with a small bias); the wet sits 2.7 dB under the input; the original's voice gets 0.36 dB louder per semitone of pitch against the formants (ours kept the level). Levels now within ~1 dB (they were up to +5.5 dB). Per setting: D 2.7 → 4.0, S1 2.3 → 2.3, S2 2.0 → 2.3, S3 1.0 → 2.7. Open: the original decorrelates L / R in shifted settings; its tracking of polyphonic music differs. |
 | Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
+| Glow Leveler (slice 9) | CLA-2A (Waves) | 4.3 → 5.2 | — | the Compress side chain refitted (black-box: the trial's renders of 11-04 and refcap0124's sweeps at peak reduction 46 / 56 / 100). The original reduces more at both ends of the band than at 750 Hz (−18 dBFS sweep, peak reduction 56: 1.9 dB more at 95 Hz, 5.2 dB more at 6 kHz), so music, drums and pink noise came out about 2 dB too loud while the 1 kHz stairs matched. A low peak (105 Hz, +5 dB) and a wider, stronger high one (8.9 kHz, +11.9 dB, bounded at 12 dB) replace round 123's emphasis; the chain keeps its 1 kHz gain, so the 1 kHz laws of rounds 152 / 165w / 165x hold. Gain error rms 1.54 → 1.02 dB; per setting D 4.0 → 5.5, S1 4.3 → 5.5, S3 3.5 → 4.3. Limit keeps the old side chain (its law was fitted on it; the new one made it worse). Open: a steady 6 kHz sine reduces 7.1 dB more than 750 Hz, the sweep 5.2 |
 
 **Decapitator captures:** the original's Auto moves its Output knob asynchronously after a Drive change made by host automation. The earlier captures had the trim in some settings only, which made styles E / N / T look 8–11 dB too loud and gave a mean of 3.2. All its captures now set Auto off and pin Output at 0 dB first.
 
@@ -191,9 +192,57 @@ Both numbers are given below.
 - Gemini Doubler already matched Doubler's look.
 - **Pending a licence:** LYNX Tune ← Auto-Tune Pro. The trial has expired. Once a licence is in, sound captures (correction speed, humanize, formant, the artefact character) and the look will be done together.
 
+**Look, fifth slice (round tp172d7: the Soundtoys and Valhalla roles, closer to their originals):**
+- **The rule for every third-party look:** a caption over each knob and the original's printed scale words under it (Min / Max, Dry / Wet, −24 / +24, 20 Hz / 1 kHz…); the value shows only while the knob is hovered or dragged. Halo keeps its values under the knobs because its original prints them there.
+- **Halo ← ValhallaShimmer:**
+  - a thin, wide-spaced, two-tone lower-case "lynx halo" wordmark;
+  - nine big flat discs shading from black to light grey, with no ring;
+  - large lower-case captions and values;
+  - the three modes as large "reverb mode  mono" text along the bottom (a click opens the menu).
+- **Auto-pan ← PanMan (the Rhythm voicing):**
+  - the name block top left;
+  - three bowed pods with scale words;
+  - the direction keys as square keys with drawn arrows (◄ ramp, ◄► left / right, ► ramp the other way, plus 8 steps), lit amber;
+  - Input and Output in the level pod: the Rhythm voicing now reads Auto-pan's Input, ±24 dB, 0 dB by default;
+  - the TWEAK key.
+  - Ramp ► is a new pattern: the measured ramp, left to right.
+- **Voice Shift ← Little AlterBoy:**
+  - a dark face round the three printed fields;
+  - big legends;
+  - LINK as a small key on a line joining Pitch and Formant;
+  - Min / Max and Dry / Wet under Drive and Mix;
+  - a "voice shift" wordmark.
+- **Echoform ← EchoBoy:**
+  - TIME / NOTE / DOT / TRIP keys over a red LED time read-out;
+  - a TAP TEMPO pod with its key and LED tempo;
+  - Groove (Shuffle / Swing) and Feel (Rushing / Dragging);
+  - the echo mode as a rotary with its five modes printed round it;
+  - Input / Saturation / Output;
+  - Style and Tape on red LED displays with step keys;
+  - spaced pod titles.
+- **Ember ← Decapitator:**
+  - chunky black caps on rings of dots, with no lit arc;
+  - the big Drive printed 0 … 10;
+  - bigger spaced legends;
+  - EMBER between two rules;
+  - a chrome bezel round the VU.
+- **Glow Leveler ← CLA-2A:** Gain and Peak reduction printed 0 … 100; the lower strip's scale words beside its knobs.
+- The arrows, LED read-outs, bezel and wordmarks are drawn by LYNX code. No logo, bitmap or font of the originals is used.
+
+**Look, sixth slice (round tp172d8):**
+- **Glow Leveler ← CLA-2A:**
+  - the original's wide proportions (660 × 312) on one untitled faceplate;
+  - Gain and Peak reduction as chrome domes in black knurled skirts, printed 0 … 100, the number at the pointer in red;
+  - COMPRESS / LIMIT and AUTO MAKEUP as metal bat toggles on hex nuts, the active word red (AUTO MAKEUP above, OFF under);
+  - VU DISPLAY as a black pointer knob with INPUT / GR / OUTPUT printed round it (the chosen one red), the VU in a gunmetal frame, "GLOW" in big type under it;
+  - a charcoal strip with gold 50Hz / 60Hz / OFF keys (the lit one cream), HI FREQ as a big cream chicken-head pointer knob, MIX and TRIM as medium knurled knobs, and big ANALOG / HI FREQ / MIX / TRIM captions; [ FLAT ], 0 / 100 and -18 / 18 printed as on the original;
+  - LYNX's extras (Modern / Opto classic, the opto law and release) are one compact group of small muted keys where the original has its badge (full while hovered, the chosen one red); Makeup ref sits at the strip's right end.
+- **Echoform ← EchoBoy:** the name block top left ("Echoform" and LYNX's own subtitle); LOWCUT / HIGHCUT and RUSHIN / DRAGGIN printed as on the original; thicker, whiter pod outlines.
+
 **Design gaps still open:**
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
-- Ember's Drive has no printed 0 … 10 scale, and the VU reads "VU". The original's meter face and logo are not reproduced, as the rules require.
+- Ember's VU reads "VU". The original's meter face and logo are not reproduced, as the rules require (the Drive's printed 0 … 10 came in the fifth look slice).
+- Auto-pan has no LFO key: the Rhythm voicing has no free-LFO switch to put there.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 
@@ -2000,3 +2049,23 @@ These are things LYNX's host does that FL Studio does not. None of them changes 
 | Insert EQ bypass (pain point 6a) | No bypass, and no menu on the EQ title | Right-click the EQ title › "Bypass the EQ (its settings are kept)". A bypassed EQ costs nothing, and FLP export writes the bands flat |
 | Gain-reduction bar on the mixer strip (pain point 6b) | None (each plugin shows its own) | A 3 px bar, only on strips that have a LYNX dynamics effect |
 | Picker panel › "Delete unused patterns", "Merge identical patterns" (pain point 31a) | Not available (FL has "Select unused" and "Sort", and LYNX has those too) | After a separator, below FL's Tools items |
+
+## Audio logger and Chord detection panel (round 181b)
+
+Proof: `docs/analise/REA_rodada181b.md`.
+
+| FL | LYNX | Status | Note |
+|---|---|---|---|
+| Rolling Master buffer, on by default, 1 / 2 / 5 / 10 minutes, pre or post effects, memory shown in the header | same (`RollingAudioLog`, Tools menu) | ✅ | |
+| Writing stops after 8 s of silence | same | ✅ | |
+| Dump to audio editor, "empty" message | same, into LYNX's audio editor | ⚠️ | own folder and date format; WAV written off the UI thread |
+| Chord detection panel on the default toolbar | same | ✅ | |
+| Chord names | `chordread::nameKeys` | ✅ | 0 differences in 19852 measured key sets; own wording for the joke names |
+| Display delay menu | same | ✅ | |
+| Chord style (Roman) | a working item | ➕ | LYNX addition: FL hides the item and its flag does nothing in the detector |
+| Near the hint bar | same menu item, outlined text under the hint bar | ✅ | seen in FL at runtime; the 15 s cap comes from the decompile |
+| Tools › Macros › Change declicking for selected channels to | same six modes, same messages | ✅ | LYNX can undo it, so no "(no undo)" |
+| Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ⚠️ | FL's skip flag is unknown; LYNX keeps Controller / Layer / Dashboard / Voltage channels |
+| Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
+| Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
+| Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
