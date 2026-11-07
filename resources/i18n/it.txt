@@ -7743,3 +7743,7 @@ countries: it ch sm
 "That track is fed by this one: the link would make a loop." = "Quella traccia riceve segnale da questa: il collegamento creerebbe un ciclo."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Ingresso sidechain: l'insert che questo effetto ascolta. Sceglierne uno lo instrada qui a livello 0; mantiene le sue uscite  [LMB] scegli"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Ingresso sidechain: l'insert che l'ingresso laterale di questo plugin ascolta. Sceglierne uno lo instrada qui a livello 0; mantiene le sue uscite"
+"Browse automations" = "Sfoglia automazioni"
+"Export as score sheet..." = "Esporta come spartito..."
+"Which controller to import?" = "Quale controller importare?"
+"Adds the file's time signature to the pattern's markers" = "Aggiunge il tempo del file ai marcatori del pattern"

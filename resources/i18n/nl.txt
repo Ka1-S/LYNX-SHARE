@@ -7743,3 +7743,7 @@ countries: nl be
 "That track is fed by this one: the link would make a loop." = "Dat spoor krijgt signaal van dit spoor: de koppeling zou een lus maken."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Sidechain-ingang: de insert waar dit effect naar luistert. Een keuze routeert die hierheen op niveau 0; die houdt de eigen uitgangen  [LMB] kiezen"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Sidechain-ingang: de insert waar de zij-ingang van deze plugin naar luistert. Een keuze routeert die hierheen op niveau 0; die houdt de eigen uitgangen"
+"Browse automations" = "Automatiseringen bladeren"
+"Export as score sheet..." = "Exporteren als partituur..."
+"Which controller to import?" = "Welke controller importeren?"
+"Adds the file's time signature to the pattern's markers" = "Voegt de maatsoort van het bestand toe aan de markers van het patroon"

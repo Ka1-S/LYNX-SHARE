@@ -7743,3 +7743,7 @@ countries: fr be ch ca lu
 "That track is fed by this one: the link would make a loop." = "Cette piste est alimentée par celle-ci : le lien créerait une boucle."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Entrée sidechain : l'insert que cet effet écoute. En choisir un le route ici au niveau 0 ; il garde ses propres sorties  [LMB] choisir"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Entrée sidechain : l'insert qu'écoute l'entrée latérale de ce plugin. En choisir un le route ici au niveau 0 ; il garde ses propres sorties"
+"Browse automations" = "Parcourir les automations"
+"Export as score sheet..." = "Exporter comme partition..."
+"Which controller to import?" = "Quel contrôleur importer ?"
+"Adds the file's time signature to the pattern's markers" = "Ajoute la signature rythmique du fichier aux marqueurs du pattern"

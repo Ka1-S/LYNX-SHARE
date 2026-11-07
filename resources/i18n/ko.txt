@@ -7743,3 +7743,7 @@ countries: kr
 "That track is fed by this one: the link would make a loop." = "그 트랙은 이 트랙에서 신호를 받습니다: 연결하면 루프가 생깁니다."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "사이드체인 입력: 이 이펙트가 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다  [LMB] 선택"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "사이드체인 입력: 이 플러그인의 사이드 입력이 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다"
+"Browse automations" = "오토메이션 찾아보기"
+"Export as score sheet..." = "악보로 내보내기..."
+"Which controller to import?" = "어떤 컨트롤러를 가져올까요?"
+"Adds the file's time signature to the pattern's markers" = "파일의 박자표를 패턴 마커에 추가합니다"
