@@ -137,6 +137,7 @@ public:
     const std::vector<int>& getSelectedClips() const noexcept { return selection; }
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
+    void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
