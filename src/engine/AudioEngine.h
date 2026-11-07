@@ -143,6 +143,7 @@ public:
     void launcherCommand (const launcher::Command& command);
     // What plays per track, or nullptr while no project has had a grid (never with Pattern workflow).
     const launcher::Runtime* launcherState() const noexcept { return clipLauncher.get(); }
+    launcher::Runtime* launcherStateForSnapshot() noexcept { return clipLauncher.get(); } // --gridshot: a sample of what plays
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
 

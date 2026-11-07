@@ -1438,6 +1438,16 @@ public:
             return;
         }
 
+        if (args.contains ("--gridshot"))
+        {
+            // LYNX.exe --gridshot prefix: the Clip-launch workflow's layout off-screen, with a grid of sample clips, some
+            // playing and waiting, at the size of LYNX_SNAPSHOT_SIZE (round 181a)
+            const auto i = args.indexOf ("--gridshot");
+            runGridShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--typeaheadtest"))
         {
             // LYNX.exe --typeaheadtest out.txt: issue #64 — a real popup menu (headings, a submenu) driven by key presses
@@ -8395,6 +8405,74 @@ private:
                 .replaceWithText ("inserts=" + juce::String ((int) offline.getSong().mixer.size() - 1) + "\nfill_ms=" + juce::String (t1 - t0, 2)
                                   + "\nsnapshot_ms=" + juce::String (t3 - t2, 2) + "\n");
         }
+    }
+
+    void runGridShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui] (const char* name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+        };
+        ui.selectTabForSnapshot (2); // the Playlist panel, maximized
+        write ("pattern"); // Pattern workflow: nothing of the grid exists yet
+        const auto madeBefore = lynx::launcher::Runtime::instances.load();
+
+        offline.editSong ([] (lynx::Song& s) {
+            while (s.patterns.size() < 6)
+                s.patterns.emplace_back();
+            for (int p = 0; p < 6; ++p)
+            {
+                auto& pattern = s.patterns[(std::size_t) p];
+                const char* names[] { "Drums A", "Drums B", "Bass", "Chords", "Lead", "Pad" };
+                pattern.name = names[p];
+                pattern.lengthTicks = 4 * lynx::ppq;
+            }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 6));
+            const char* tracks[] { "Drums", "Bass", "Chords", "Lead", "Vocals", "FX" };
+            for (int t = 0; t < 6; ++t)
+                s.playlistTracks[(std::size_t) t].name = tracks[t];
+            const int placed[][3] { { 0, 0, 0 }, { 0, 1, 1 }, { 0, 2, 0 }, { 0, 3, 1 }, { 1, 0, 2 }, { 1, 2, 2 }, { 2, 1, 3 }, { 2, 2, 3 }, { 3, 2, 4 }, { 3, 3, 4 }, { 4, 3, 5 } };
+            for (const auto& c : placed)
+            {
+                lynx::Clip clip;
+                clip.pattern = c[2];
+                clip.length = 4 * lynx::ppq;
+                lynx::launcher::setClip (s, c[0], c[1], clip);
+            }
+            auto& grid = lynx::launcher::ensureGrid (s);
+            const char* scenes[] { "Intro", "Verse", "Drop", "Break" };
+            grid.scenes.resize (6);
+            for (int r = 0; r < 4; ++r)
+                grid.scenes[(std::size_t) r].name = scenes[r];
+        }, false);
+        ui.setClipLaunchWorkflow (true);
+        offline.dispatchPendingMessages();
+        if (auto* runtime = offline.launcherStateForSnapshot())
+        {
+            runtime->tracks[0].playing.store (2);
+            runtime->tracks[0].progress.store (0.4f);
+            runtime->tracks[0].taken.store (true);
+            runtime->tracks[1].playing.store (2);
+            runtime->tracks[1].progress.store (0.4f);
+            runtime->tracks[1].taken.store (true);
+            runtime->tracks[2].pending.store (2);
+            runtime->tracks[3].taken.store (true);
+        }
+        write ("both");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        write ("grid");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+        write ("song");
+        ui.setClipLaunchWorkflow (false);
+        write ("pattern-after");
+        juce::File (prefix + "-counts.txt").replaceWithText ("runtimes before " + juce::String (madeBefore) + ", after " + juce::String (lynx::launcher::Runtime::instances.load()) + "\n");
     }
 
     void runPerfShot (const juce::String& prefix, const juce::String& projectPath)

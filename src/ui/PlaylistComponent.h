@@ -518,9 +518,39 @@ public:
         resized();
     }
 
+    // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
+    // alone, or hidden while only the Playlist shows. Small windows give the grid at least what it needs to be usable.
+    enum class GridView { beside, grid, song };
+    void setClipGrid (juce::Component* grid, GridView view)
+    {
+        if (clipGrid != nullptr && clipGrid != grid)
+            removeChildComponent (clipGrid);
+        clipGrid = grid;
+        gridView = view;
+        if (clipGrid != nullptr)
+        {
+            addChildComponent (*clipGrid);
+            clipGrid->setVisible (view != GridView::song);
+        }
+        picker.setVisible (clipGrid == nullptr || view != GridView::grid);
+        playlist.setVisible (clipGrid == nullptr || view != GridView::grid);
+        resized();
+    }
+
     void resized() override
     {
         auto area = getLocalBounds();
+        if (clipGrid != nullptr && gridView != GridView::song)
+        {
+            // (under the band the title bar shares with the Playlist's toolbar)
+            const auto top = titleLeft > 0 ? PlaylistComponent::toolbarHeight : 0;
+            if (gridView == GridView::grid)
+            {
+                clipGrid->setBounds (area.withTrimmedTop (top));
+                return;
+            }
+            clipGrid->setBounds (area.removeFromLeft (juce::jmax (juce::jmin (420, area.getWidth()), area.getWidth() * 45 / 100)).withTrimmedTop (top));
+        }
         auto column = area.removeFromLeft (PatternPicker::width);
         picker.setBounds (titleLeft > 0 ? column.withTrimmedTop (PlaylistComponent::toolbarHeight) : column);
         playlist.setBounds (area);
@@ -528,15 +558,19 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::colour::bg3); // the toolbar band above the picker
-        g.fillRect (0, 0, PatternPicker::width, PlaylistComponent::toolbarHeight);
+        // the toolbar band above the picker (and above the grid, when one is beside the Playlist)
+        const auto bandWidth = clipGrid != nullptr ? picker.getRight() : PatternPicker::width;
+        g.setColour (theme::colour::bg3);
+        g.fillRect (0, 0, bandWidth, PlaylistComponent::toolbarHeight);
         g.setColour (theme::colour::border);
-        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, PatternPicker::width, 1);
+        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, bandWidth, 1);
     }
 
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
     int titleLeft = 0;
+    juce::Component* clipGrid = nullptr;
+    GridView gridView = GridView::beside;
 };
 } // namespace lynx

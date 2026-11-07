@@ -58,6 +58,7 @@
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
+#include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
@@ -2357,6 +2358,64 @@ juce::PopupMenu MainComponent::layoutsMenu()
         Workspace::layoutsFolder().startAsProcess();
     });
     return menu;
+}
+
+namespace
+{
+// Both | Grid | Song, in the Playlist's title bar while Clip-launch workflow is on (round 181a)
+class ClipGridSwitch final : public juce::Component
+{
+public:
+    static constexpr int width = 132;
+
+    explicit ClipGridSwitch (std::function<void (PlaylistArea::GridView)> pick)
+    {
+        const std::pair<juce::TextButton*, PlaylistArea::GridView> buttons[] { { &both, PlaylistArea::GridView::beside },
+                                                                               { &grid, PlaylistArea::GridView::grid },
+                                                                               { &song, PlaylistArea::GridView::song } };
+        both.setButtonText (tr ("Both"));
+        grid.setButtonText (tr ("Grid"));
+        song.setButtonText (tr ("Song"));
+        both.setToggleState (true, juce::dontSendNotification);
+        for (const auto& [button, view] : buttons)
+        {
+            addAndMakeVisible (*button);
+            button->setRadioGroupId (1181);
+            button->setClickingTogglesState (true);
+            button->onClick = [pick, view = view] { pick (view); };
+        }
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (0, 4);
+        const auto w = r.getWidth() / 3;
+        both.setBounds (r.removeFromLeft (w));
+        grid.setBounds (r.removeFromLeft (w));
+        song.setBounds (r);
+    }
+
+private:
+    juce::TextButton both, grid, song;
+};
+} // namespace
+
+void MainComponent::setClipLaunchWorkflow (bool on)
+{
+    if (on && clipGridView == nullptr)
+    {
+        clipGridView = makeClipGrid (engine);
+        clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
+    }
+    if (clipGridView == nullptr)
+        return;
+    playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+    workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
+}
+
+void MainComponent::setClipGridView (PlaylistArea::GridView view)
+{
+    if (clipGridView != nullptr)
+        playlistArea.setClipGrid (clipGridView.get(), view);
 }
 
 void MainComponent::selectTabForSnapshot (int tab)
