@@ -50,4 +50,13 @@ TEST (multilink177b_switch_menu_and_toolbar)
     back.orderFromString (shown.orderToString());
     CHECK (back.isShown (Group::multilink) && ! back.isDefault());
     CHECK (matchingPreset (d) == (int) Preset::standard);
+
+    // shown on request, the one-button panel outlasts the file buttons and the meters when room is short
+    std::array<int, groupCount> widths;
+    widths.fill (100);
+    int shownCount = 0;
+    for (const auto& e : shown.entries)
+        shownCount += e.shown ? 1 : 0;
+    const auto v = fit (shown, widths, 10, (shownCount - 1) * 110 + 300, 300);
+    CHECK (v[(std::size_t) Group::multilink] && ! v[(std::size_t) Group::chord]);
 }
