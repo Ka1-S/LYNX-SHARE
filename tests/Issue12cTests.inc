@@ -41,7 +41,7 @@ TEST (issue12c_automated_value_at_the_playhead)
     const auto g0 = shown.getGeneration();
     CHECK (shown.update (song, 1, 4.0 * ppq, true));
     CHECK (shown.getGeneration() != g0);
-    CHECK (shown.valueOf (send) && std::abs (*shown.valueOf (send) - song.automationValueAt (0, 4.0 * ppq)) < 1.0e-5f);
+    CHECK (shown.valueOf (send) && std::abs (*shown.valueOf (send) - song.targetValueAt (song.automations[0].target, 4.0 * ppq)) < 1.0e-5f);
     CHECK (std::abs (*shown.valueOf (send) - 0.25f) < 0.01f);
     CHECK (! shown.valueOf (volume));
     CHECK (shown.shown (volume, 0.7f) == 0.7f);

@@ -38,6 +38,7 @@ add_library(lynx_core STATIC
     src/core/Scheduler.cpp
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
+    src/core/ClipLauncher.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
@@ -501,6 +502,7 @@ if(LYNX_BUILD_APP)
         src/ui/NewProjectDialog.cpp
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
+        src/ui/ClipGridComponent.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp

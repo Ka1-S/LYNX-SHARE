@@ -3,6 +3,7 @@
 // Clip properties and arrangement management (FL's "Clip properties" and "Merge arrangement" windows, interpreted;
 // REA_rodada84). Plain edits on a Song, each run inside AudioEngine::editSong (one undo step). No JUCE.
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -148,3 +149,16 @@ std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& 
 
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
+
+// STUB, round 181a N6: the exact contract of wip/177b-s3 (this namespace). Delete this block when 177b lands; a rebase
+// over it fails to compile until then, on purpose.
+namespace lynx::autolanes
+{
+inline std::atomic<bool>& shownFlag() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+inline bool shown() noexcept { return shownFlag().load (std::memory_order_relaxed); }
+inline void setShown (bool on) noexcept { shownFlag().store (on, std::memory_order_relaxed); }
+} // namespace lynx::autolanes

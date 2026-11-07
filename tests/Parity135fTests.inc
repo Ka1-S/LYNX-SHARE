@@ -242,7 +242,7 @@ TEST (parity135f_prism_six_bands)
     using namespace dyn108;
     namespace m = lynx::dyn::prism;
     // the old parameter block keeps its indices; the new ones are appended
-    CHECK (m::bandLookahead0 == 48 && m::band5 == 52 && m::xover4 == 72 && m::bandCountParam == 76 && m::scExternal == 83 && m::processingMode == 84 && m::panMode == 86 && m::dynamicEngine == 87 && m::bandLink0 == 88 && m::count == 156); // round 144: + processing, oversampling, pan mode
+    CHECK (m::bandLookahead0 == 48 && m::band5 == 52 && m::xover4 == 72 && m::bandCountParam == 76 && m::scExternal == 83 && m::processingMode == 84 && m::panMode == 86 && m::dynamicEngine == 87 && m::bandLink0 == 88 && m::count == 157); // (tp172b6: + Audition) // round 144: + processing, oversampling, pan mode
     CHECK ((int) lynx::effectInfo (EffectKind::prismMultiband).params.size() == m::count);
     auto p = defaults (EffectKind::prismMultiband);
     CHECK (m::bandCount (p) == 4 && m::param (4, m::fEnabled) == 60 && m::param (5, m::fSolo) == 71);
