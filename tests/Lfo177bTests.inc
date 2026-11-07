@@ -182,3 +182,32 @@ TEST (lfo177b_rate_and_shape_match_fl)
     a.lfo.on = false;
     CHECK (a.playAt (lynx::ppq * 0.25, 0.0) == 0.5f);
 }
+
+TEST (lfo177b_tempo_clip_lfo_moves_the_tempo)
+{
+    // round 177b: the tempo map plays a tempo clip's LFO (unverified against FL: the next FL turn renders it)
+    auto song = lynx::Song::makeDefault();
+    song.mode = lynx::PlayMode::song;
+    song.playlist.clear();
+    lynx::Automation a;
+    a.target.kind = lynx::AutomationTargetKind::tempo;
+    a.points = { { 0, 0.5f, 0.0f }, { lynx::ppq * 16, 0.5f, 0.0f } };
+    a.lfo.on = true;
+    a.lfo.add = true;
+    a.lfo.level = 64;
+    song.automations.push_back (a);
+    lynx::Clip c;
+    c.kind = lynx::ClipKind::automation;
+    c.automation = 0;
+    c.start = 0;
+    c.length = lynx::ppq * 16;
+    c.track = 1;
+    song.playlist.push_back (c);
+    const auto flat = lynx::tempoFromValue (0.5f);
+    const auto top = song.tempoAt (lynx::ppq * 0.25), bottom = song.tempoAt (lynx::ppq * 0.75);
+    CHECK (top > flat + 1.0 && bottom < flat - 1.0);                     // a quarter cycle up, three quarters down
+    CHECK (std::abs (song.tempoAt (0.0) - flat) < 0.5);                  // the LFO starts at the middle
+    a.lfo.on = false;
+    song.automations[0] = a;
+    CHECK (std::abs (song.tempoAt (lynx::ppq * 0.25) - flat) < 1.0e-6); // off: the flat curve
+}
