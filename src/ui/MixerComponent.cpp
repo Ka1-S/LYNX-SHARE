@@ -1989,6 +1989,13 @@ float MixerStrips::railTarget (int strip) const
 
 void MixerStrips::stepHeldRail()
 {
+    // (the repeat stops as soon as the button is up, even before the release reaches us: a busy message thread must not
+    // turn one click into several steps)
+    if (railRepeat.isTimerRunning() && ! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+    {
+        railRepeat.stopTimer();
+        return;
+    }
     const auto& song = engine.getSong();
     if (railStrip <= vcaStrip (0))
     {
