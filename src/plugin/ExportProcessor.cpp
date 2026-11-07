@@ -36,6 +36,9 @@ Song makeSong (const Entry& entry)
     song.mixer[0].effects.clear(); // (the default project's limiter)
     song.mixer[1].name = "Insert 1";
     song.mixer[1].effects.clear();
+    for (auto& pattern : song.patterns) // (the default project's demo beat: nothing plays by itself in a plugin)
+        pattern.notes.clear();
+    song.playlist.clear();
     if (entry.instrument)
     {
         if (auto channel = banks::defaultChannel (entry.synth, entry.name))
@@ -65,7 +68,15 @@ public:
     }
 
     float getValue() const override { return value.load (std::memory_order_relaxed); }
-    void setValue (float v) override { value.store (v, std::memory_order_relaxed); }
+    void setValue (float v) override { value.store (snapped (v), std::memory_order_relaxed); }
+    int getNumSteps() const override { return steps > 0 ? steps + 1 : AudioProcessorParameter::getNumSteps(); }
+    bool isDiscrete() const override { return steps > 0; }
+    // a stepped engine parameter takes only its steps: the host reads back what the engine plays (and a state restores it)
+    float snapped (float v) const noexcept
+    {
+        v = v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v;
+        return steps > 0 ? std::round (v * (float) steps) / (float) steps : v;
+    }
     float getDefaultValue() const override { return initial; }
     juce::String getText (float v, int) const override;
     float getValueForText (const juce::String& text) const override;
@@ -73,6 +84,7 @@ public:
     bool isAutomatable() const override { return true; }
 
     ExportProcessor& owner;
+    int steps = 0; // > 0: whole steps over 0..1
     const int engineIndex, slotOrder;
     const float initial;
     std::atomic<float> value;
@@ -96,7 +108,12 @@ public:
         {
             if (const auto* table = modelparams::tableOf (entry.synth); table != nullptr && table->params != nullptr && ! song.channels.empty())
                 for (const auto& p : *table->params)
-                    add (new Parameter (*this, p.index, (int) params.size(), p.name, modelparams::value01 (song.channels[0], p.index).value_or (0.0f)));
+                {
+                    auto* param = new Parameter (*this, p.index, (int) params.size(), p.name, modelparams::value01 (song.channels[0], p.index).value_or (0.0f));
+                    if (p.stepped && p.high > p.low && p.high - p.low <= 4096.0f)
+                        param->steps = (int) std::lround (p.high - p.low);
+                    add (param);
+                }
         }
         else
         {
@@ -339,7 +356,17 @@ private:
 float Parameter::getValueForText (const juce::String& text) const
 {
     if (! owner.entry.instrument)
-        return presets::valueFromText (owner.entry.effect, engineIndex, text.toStdString()).value_or (getValue());
+    {
+        const auto near = presets::valueFromText (owner.entry.effect, engineIndex, text.toStdString()).value_or (getValue());
+        if (getText (near, 64) == text)
+            return near;
+        // the nearest number may sit between two shown values: the value nearby that shows exactly this text
+        for (int i = 1; i <= 2000; ++i)
+            for (const auto v : { near - (float) i * 1.0e-5f, near + (float) i * 1.0e-5f })
+                if (v >= 0.0f && v <= 1.0f && getText (v, 64) == text)
+                    return v;
+        return near;
+    }
     if (const auto* p = modelparams::find (owner.entry.synth, engineIndex); p != nullptr && p->high > p->low)
         return juce::jlimit (0.0f, 1.0f, (text.getFloatValue() - p->low) / (p->high - p->low));
     return juce::jlimit (0.0f, 1.0f, text.getFloatValue());
