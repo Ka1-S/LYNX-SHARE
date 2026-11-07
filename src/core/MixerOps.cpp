@@ -1255,6 +1255,45 @@ int autoColorGroup (Song& song, int track)
     return changed;
 }
 
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept
+{
+    if (n < 2)
+        return from;
+    const auto amount = (k << 8) / (n - 1); // FL: shl 8, idiv
+    std::uint32_t out = 0xff000000u;
+    for (int shift = 0; shift <= 16; shift += 8)
+    {
+        const auto a = (int) ((from >> shift) & 0xffu), b = (int) ((to >> shift) & 0xffu);
+        // FL blends with pmulhw on (b - a) * 16 and amount * 16: the high word, an arithmetic shift (floor)
+        const auto c = a + (((b - a) * 16 * (amount * 16)) >> 16);
+        out |= (std::uint32_t) std::clamp (c, 0, 255) << shift;
+    }
+    return out;
+}
+
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&] (int t) { return t < 0 || t >= (int) song.mixer.size(); }),
+                  tracks.end());
+    const auto n = (int) tracks.size();
+    if (n < 2)
+        return 0;
+    int changed = 0;
+    for (int k = 0; k < n; ++k)
+    {
+        auto& colour = song.mixer[(std::size_t) tracks[(std::size_t) k]].colour;
+        const auto next = gradientColourStep (from, to, k, n);
+        if (colour != next)
+        {
+            colour = next;
+            ++changed;
+        }
+    }
+    return changed;
+}
+
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on)
 {
     for (auto t : tracks)

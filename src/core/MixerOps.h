@@ -138,6 +138,11 @@ std::vector<int> groupOf (const Song& song, int track);
 void createGroup (Song& song, const std::vector<int>& tracks, int current);
 // "Group › Auto color group": the tracks of `track`'s group take its colour. Returns how many changed.
 int autoColorGroup (Song& song, int track);
+// "Gradient color..." (FL's SetGradientColorMenuClick, REA_rodada177a §5): track k of the n selected tracks (in mixer
+// order) takes from + (to - from) * floor (k * 256 / (n - 1)) / 256 on each of R, G and B, so the first gets `from` and the
+// last gets `to`. Fewer than two tracks do nothing. Returns how many tracks changed.
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept;
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to);
 // "Group › Separator" and "Layout › Dock to" for the selected tracks (inserts; the Master can be docked).
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on);
 void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock);
