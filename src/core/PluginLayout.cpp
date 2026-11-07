@@ -648,7 +648,7 @@ Layout luxeVerb()
     // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
     // Values under the captions (and the decay time inside SPACE)
     const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0, float w = 76.0f) {
-        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | hoverValue);
         i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
                                                 // bounds it; never wider than tall, so no caption hides under a knob)
         i.x = cx - i.w * 0.5f;

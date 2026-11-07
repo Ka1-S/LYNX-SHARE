@@ -1859,6 +1859,9 @@ public:
             target->flProc.init (modulation.fl);
             target->initVol = flInitVolume (velocity);
             target->notePan = nextPan;
+            // FL's note → voice levels (REA_rodada76 §1): Mod X / Y byte b (128 = centre) → (b − 128) / 128
+            target->flProc.noteCut = nextModX * 2.0f - 1.0f;
+            target->flProc.noteRes = nextModY * 2.0f - 1.0f;
             const auto spt = sampleRate / modulation.ticksPerSecond;
             target->tickIndex = (std::int64_t) std::nearbyint (songSample / spt);
             target->tickLeft = 0.0;
@@ -1888,6 +1891,7 @@ public:
         else
             startKeyShift (*target, semitones + clipPitch + (clipStretch != 1.0 ? 12.0 * std::log2 (clipStretch) : 0.0), base);
         nextPan = nextCents = 0.0f;
+        nextModX = nextModY = 0.5f;
         nextPorta = false;
     }
 
@@ -2109,6 +2113,13 @@ public:
         nextPan = pan;
         nextCents = cents;
         nextPorta = porta;
+    }
+
+    // issue #63: the note's Mod X / Y (0..1, 0.5 = centre) reach FL's voice filter as the note's Init.FCut / FRes
+    void setNextNoteModulation (float modX, float modY) noexcept override
+    {
+        nextModX = std::isfinite (modX) ? std::clamp (modX, 0.0f, 1.0f) : 0.5f;
+        nextModY = std::isfinite (modY) ? std::clamp (modY, 0.0f, 1.0f) : 0.5f;
     }
 
     void setNextClipFades (float elapsed, float remaining, float in, float out, std::uint8_t shape) noexcept override
@@ -2568,8 +2579,8 @@ public:
         v.pitchMul = pr.pitch != 0.0f ? std::exp2 ((double) pr.pitch / 1200.0) : 1.0;
 
         const auto first = pr.first;
-        const auto cx = ((float) S.modX * 0.00390625f + 0.0f) + pr.cut;
-        const auto cy = ((float) S.modY * 0.00390625f + 0.0f) + pr.res;
+        const auto cx = ((float) S.modX * 0.00390625f + pr.noteCut) + pr.cut; // + the note's Init.FCut (issue #63)
+        const auto cy = ((float) S.modY * 0.00390625f + pr.noteRes) + pr.res;
         if (pr.kind == 0)
         {
             flvp::coefFast (cx, cy, pr.fc, pr.fq, S.rateRatio);
@@ -2934,6 +2945,7 @@ private:
     SettingsMailbox<SliceTable> sliceMailbox;
     SliceTable slices; // audio thread's copy
     float nextPan = 0.0f, nextCents = 0.0f;
+    float nextModX = 0.5f, nextModY = 0.5f; // the next note's Mod X / Y (issue #63)
     float nextGain = 1.0f; // the next note's volume factor (setNextNoteGain)
     bool nextPorta = false;
     std::atomic<bool> reverse { false }, cutSelf { false };

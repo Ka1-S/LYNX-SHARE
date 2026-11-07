@@ -166,6 +166,36 @@ private:
 // The output: a display of what is heard and a peak meter (red after clipping, for a while). Like FL's
 // output panel, the display has modes (right-click menu, or a click steps through them): the oscilloscope,
 // a long scrolling view of the level, and a spectrum (low frequencies on the left).
+// FL's Chord detection panel (round 181b, REA_rodada181b.md): names the chord being played on MIDI and the typing
+// keyboard, and the notes selected in the Piano Roll. Right-click: chord style and display delay.
+class ChordPanel final : public juce::Component,
+                         public ui::HintSource
+{
+public:
+    void setText (const juce::String& newText);
+    const juce::String& getText() const { return text; }
+    std::function<void()> onMenu;
+
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    ui::Hint hintAt (juce::Point<int> position) override;
+
+private:
+    juce::String text { "---" };
+};
+
+// The chord near the hint bar (View › Toolbars): outlined text with no box, over whatever is below the bar, as in FL.
+class ChordHint final : public juce::Component
+{
+public:
+    ChordHint() { setInterceptsMouseClicks (false, false); }
+    void setText (const juce::String& newText);
+    void paint (juce::Graphics& g) override;
+
+private:
+    juce::String text;
+};
+
 class OutputMonitor final : public juce::Component,
                             public ui::HintSource
 {

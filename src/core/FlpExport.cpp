@@ -161,6 +161,7 @@ std::int32_t rawValue (const AutomationTarget& t, float v)
         case AutomationTargetKind::mixerSend: return iround (v * 16000.0);
         case AutomationTargetKind::mixerPan: return iround ((v * 2.0 - 1.0) * 6400.0);
         case AutomationTargetKind::effectMix: return iround (v * 12800.0);
+        case AutomationTargetKind::tempo: return iround (10000.0 + 512000.0 * v); // BPM × 1000 (issue #86, REA_rodada178a §2)
         default: return iround (v * 65536.0);
     }
 }
@@ -1306,8 +1307,12 @@ struct Converter
                 item.kind = flp::PlaylistItem::Kind::channelClip;
                 item.index = found->second;
                 item.gain = 1.0f;
-                // the trim in beats (−1 = none)
-                if (clip.offset > 0)
+                // the trim in beats. −1 = none, and FL then takes the clip's whole content for its end, whatever the
+                // item's length says: a 20-beat clip of a 546-beat automation at beat 284 made Thief 208 bars long
+                // instead of 144 (round 180d). So only a clip that shows all its content goes without a trim, as in
+                // FL's own files.
+                if (clip.offset > 0 || (clip.automation >= 0 && clip.automation < (int) song.automations.size()
+                                        && clip.length != song.automations[(std::size_t) clip.automation].length()))
                 {
                     item.startOffset = (float) ((double) clip.offset / ppq);
                     item.endOffset = (float) ((double) (clip.offset + clip.length) / ppq);

@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "core/ClipOps.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/Theme.h"
@@ -378,7 +379,7 @@ private:
         const auto bpm = g != nullptr ? loopstarter::pickTempo (*g, rng()) : engine.getSong().bpm;
         engine.editSong ([&] (Song& s) {
             s.patterns[(std::size_t) p].loopStarterGenre = genre;
-            s.bpm = bpm;
+            clipops::followTempo (s, bpm); // (issue #87: audio clips follow)
         });
         auto chans = channelsHere();
         chans.push_back (-1);

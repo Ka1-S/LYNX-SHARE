@@ -481,7 +481,10 @@ std::string paramText (int p, float v)
         case 0: std::snprintf (t, sizeof (t), "+%.1f dB", gainDb (v)); break;
         case 1: std::snprintf (t, sizeof (t), "%.1f dB", ceilingDb (v)); break;
         case 2: std::snprintf (t, sizeof (t), "%.2f ms", lookaheadMs (v)); break;
-        case 3: std::snprintf (t, sizeof (t), releaseMs (v) < 100 ? "%.1f ms" : "%.0f ms", releaseMs (v)); break;
+        case 3: // (1 s at the top, never "1000 ms": round tp172b5, the scale's end under the knob reads "1 s")
+            if (releaseMs (v) >= 999.5) std::snprintf (t, sizeof (t), "%.2f s", releaseMs (v) / 1000.0);
+            else std::snprintf (t, sizeof (t), releaseMs (v) < 100 ? "%.1f ms" : "%.0f ms", releaseMs (v));
+            break;
         case 4: return styleName (style (v));
         case 5: case pUnity: case pAudition: case pDcFilter: case pSidechain: case pLoudnessShown: return v >= 0.5f ? "On" : "Off";
         case pOversampling: return oversamplingFactor (v) == 1 ? "Off" : std::to_string (oversamplingFactor (v)) + "x";
