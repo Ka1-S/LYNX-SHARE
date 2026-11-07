@@ -95,7 +95,7 @@ Style styleOf (const EffectParams& p) noexcept; // the style the engine runs: th
 float styleValue (Style s) noexcept;            // the style parameter's value (one of its 11 entries)
 float voicingValue (Style s) noexcept;          // the voicing parameter's value (0 = none for the 11 styles)
 double thresholdDb (float v) noexcept;   // −60 .. 0 dBFS
-double ratioOf (float v) noexcept;       // 1 .. 100 : 1
+double ratioOf (float v) noexcept;       // 1 .. 100 : 1; the exact top is a true limit (round tp172b6)
 float ratioValue (double r) noexcept;
 double kneeDb (float v) noexcept;        // 0 .. 72 dB
 double rangeDb (float v) noexcept;       // 0 .. 60 dB
@@ -166,7 +166,10 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               bandLo0, bandHi0 = bandLo0 + bands, bandLoSlope0 = bandHi0 + bands, bandHiSlope0 = bandLoSlope0 + bands,
               bandScInput0 = bandHiSlope0 + bands, detectorLaw = bandScInput0 + bands,
               rev152 = detectorLaw + 1, // round 152: the measured model's revision (gain-stage attack, narrow bands, 0.8-octave minimum band)
-              count = rev152 + 1 };
+              // round tp172b6 [EXEC] (Pro-MB's Audition, Expert panel): the output becomes what the band's detector hears (0 off,
+              // k / 6 band k): level, range, threshold and mix don't touch it, the Output does, a switched-off band still sounds
+              audition = rev152 + 1,
+              count = audition + 1 };
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
@@ -176,6 +179,11 @@ inline int bandLookaheadParam (int b) noexcept { return b < legacyBands ? bandLo
 inline int bandPanParam (int b) noexcept { return bandPan0 + b; }
 // the live meter of band b (Effect::controlOutput): 0 … 3, then 6 and 7 (4 / 5 are the input / output peaks)
 inline int bandMeter (int b) noexcept { return b < legacyBands ? b : 6 + (b - legacyBands); }
+// round tp172b6: the level band b's detector reads (controlOutput 8 ... 13): levelMeterValue (peak dB), 0 ... 1 over -120 ... 0 dB
+inline int bandLevelMeter (int b) noexcept { return 8 + b; }
+float levelMeterValue (double db) noexcept;
+double levelMeterDb (float v) noexcept;
+int auditionBand (const EffectParams& p) noexcept; // the auditioned band, -1 none
 int bandCount (const EffectParams& p) noexcept;   // 1 … 6
 float bandCountValue (int n) noexcept;
 double panOf (float v) noexcept;                   // −1 (left) … +1 (right): the band's output balance
@@ -185,6 +193,7 @@ std::array<double, bands - 1> crossovers (const EffectParams& p) noexcept;
 double thresholdDb (float v) noexcept;   // −90 .. 0 dBFS (square-root law, finer near 0 dB)
 float thresholdValue (double db) noexcept;
 double ratioOf (float v) noexcept;       // 1 .. 100 : 1 (same law as Crest)
+bool isInfiniteRatio (float v) noexcept; // round tp172b6: the top of the range is a true limit (the reference's infinity : 1)
 double rangeDb (float v) noexcept;       // −30 .. +30 dB (negative = downward, positive = upward)
 double kneeDb (float v) noexcept;        // 0 .. 48 dB
 double attackMs (float v) noexcept;      // detector τ 0.11 .. 89 ms (shown as 0 .. 100 %)

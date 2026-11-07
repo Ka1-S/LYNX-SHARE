@@ -9,6 +9,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "core/PlaylistOps.h"
 #include "core/Performance.h"
 
 #include "core/TransportEdit.h"
@@ -61,6 +62,7 @@
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
+#include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
 #include "ui/EventEditor.h"
 #include "ui/EditorTools.h"
@@ -720,6 +722,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
+    if (startInClipLaunchWorkflow)
+        setClipLaunchWorkflow (true, false); // (the saved workspace layout is already this style's)
     juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
             safe->startLiveFromCommandLine();
@@ -2042,6 +2046,10 @@ void MainComponent::loadUiSettings()
             chordShowNearHint = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
+        else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
+            startInClipLaunchWorkflow = on;
+        else if (key == "lanesBeforeClipLaunch")
+            lanesBeforeClipLaunch = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -2204,6 +2212,8 @@ void MainComponent::saveUiSettings()
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
+                                      + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
+                                      + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -2445,6 +2455,114 @@ juce::PopupMenu MainComponent::layoutsMenu()
         Workspace::layoutsFolder().startAsProcess();
     });
     return menu;
+}
+
+namespace
+{
+// Both | Grid | Song, in the Playlist's title bar while Clip-launch workflow is on (round 181a)
+class ClipGridSwitch final : public juce::Component
+{
+public:
+    static constexpr int width = 132;
+
+    explicit ClipGridSwitch (std::function<void (PlaylistArea::GridView)> pick)
+    {
+        const std::pair<juce::TextButton*, PlaylistArea::GridView> buttons[] { { &both, PlaylistArea::GridView::beside },
+                                                                               { &grid, PlaylistArea::GridView::grid },
+                                                                               { &song, PlaylistArea::GridView::song } };
+        both.setButtonText (tr ("Both"));
+        grid.setButtonText (tr ("Grid"));
+        song.setButtonText (tr ("Song"));
+        both.setToggleState (true, juce::dontSendNotification);
+        for (const auto& [button, view] : buttons)
+        {
+            addAndMakeVisible (*button);
+            button->setRadioGroupId (1181);
+            button->setClickingTogglesState (true);
+            // (the radio group also "clicks" the button it turns off)
+            button->onClick = [pick, view = view, button = button] {
+                if (button->getToggleState())
+                    pick (view);
+            };
+        }
+    }
+    void show (PlaylistArea::GridView view)
+    {
+        (view == PlaylistArea::GridView::beside ? both : view == PlaylistArea::GridView::grid ? grid : song).setToggleState (true, juce::dontSendNotification);
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (0, 4);
+        const auto w = r.getWidth() / 3;
+        both.setBounds (r.removeFromLeft (w));
+        grid.setBounds (r.removeFromLeft (w));
+        song.setBounds (r);
+    }
+
+private:
+    juce::TextButton both, grid, song;
+};
+} // namespace
+
+void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
+{
+    if (on == clipLaunchWorkflow && (! on || clipGridView != nullptr))
+        return;
+    if (on && clipGridView == nullptr)
+    {
+        clipGridView = makeClipGrid (engine);
+        clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
+    }
+    if (clipGridView == nullptr)
+        return;
+
+    // the workspace layout is kept per style, so going back restores the Pattern layout exactly
+    const auto layoutFile = [] (bool clipLaunch) { return platform::settingsFile (clipLaunch ? "workspace-cliplaunch.txt" : "workspace-pattern.txt"); };
+    if (persistent && swapLayout && on != clipLaunchWorkflow)
+    {
+        layoutFile (clipLaunchWorkflow).replaceWithText (workspace.getLayoutText());
+        if (const auto saved = layoutFile (on); saved.existsAsFile())
+            workspace.applyLayoutText (saved.loadFileAsString());
+        else if (on)
+        {
+            workspace.hide (Panel::channelRack); // one click away, on the toolbar
+            workspace.show (Panel::playlist);
+        }
+        refreshPanelButtons();
+        if (isShowing())
+            grabKeyboardFocus(); // (the new layout must not leave the keys in the Browser's search box)
+    }
+
+    // Clip-launch workflow shows the automation lanes; going back restores the user's setting
+    if (on != clipLaunchWorkflow)
+    {
+        if (on && swapLayout) // (at startup, the saved value holds)
+            lanesBeforeClipLaunch = autolanes::shown();
+        autolanes::setShown (on || lanesBeforeClipLaunch);
+        playlist.repaint();
+    }
+
+    clipLaunchWorkflow = on;
+    playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        flip->show (PlaylistArea::GridView::beside);
+    workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
+}
+
+void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
+{
+    juce::PopupMenu styles;
+    styles.addItem (tr ("Pattern workflow (default)"), true, ! clipLaunchWorkflow, [this] { setClipLaunchWorkflow (false); saveUiSettings(); });
+    styles.addItem (tr ("Clip-launch workflow"), true, clipLaunchWorkflow, [this] { setClipLaunchWorkflow (true); saveUiSettings(); });
+    menu.addSubMenu (tr ("Layout style"), styles);
+}
+
+void MainComponent::setClipGridView (PlaylistArea::GridView view)
+{
+    if (clipGridView != nullptr)
+        playlistArea.setClipGrid (clipGridView.get(), view);
+    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        flip->show (view);
 }
 
 void MainComponent::selectTabForSnapshot (int tab)
@@ -5479,6 +5597,7 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
+        o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
         o.autosaveMinutes = safe->autosaveMinutes;
@@ -5556,6 +5675,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
             setStretchedClipsLoop (o.stretchedClipsLoop);
@@ -6276,6 +6396,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
         menu.addSubMenu (tr ("Load layout"), layoutsMenu());
+        addLayoutStyleItems (menu);
         menu.addItem (tr ("Bring back off-screen panels"), [this] { workspace.bringBackOffscreen(); });
         menu.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
         menu.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });

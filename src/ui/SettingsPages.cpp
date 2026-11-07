@@ -101,7 +101,7 @@ public:
         else
             options.language = i18n::current(); // --snapshot: the language of the run
 
-        for (auto* c : std::initializer_list<juce::Component*> { &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
+        for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
@@ -110,6 +110,17 @@ public:
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
+        styleLabel (layoutStyleLabel, tr ("Layout style"));
+        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), 1);
+        layoutStyleBox.addItem (tr ("Clip-launch workflow"), 2);
+        layoutStyleBox.setSelectedId (options.clipLaunchWorkflow ? 2 : 1, juce::dontSendNotification);
+        layoutStyleBox.onChange = [this] {
+            options.clipLaunchWorkflow = layoutStyleBox.getSelectedId() == 2;
+            if (hooks.setGeneral)
+                hooks.setGeneral (options);
+        };
+        styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
+                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away."));
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -310,7 +321,10 @@ private:
     int layout (int width) override
     {
         Rows r (width);
-        r.section (languageTitle, true);
+        r.section (workflowTitle, true);
+        layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
+        layoutStyleNote.setBounds (r.indented (48).translated (0, -3));
+        r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
         languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
         if (translationLink.isVisible())
@@ -433,6 +447,9 @@ private:
     SettingsHooks hooks;
     bool persistent;
     GeneralOptions options;
+    SectionTitle workflowTitle { tr ("Workflow") };
+    juce::Label layoutStyleLabel, layoutStyleNote;
+    juce::ComboBox layoutStyleBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
