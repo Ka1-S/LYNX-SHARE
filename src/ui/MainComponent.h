@@ -40,6 +40,7 @@ class MainComponent final : public juce::Component,
                             private juce::ChangeListener
 {
 public:
+    void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // `restoreUserSettings`: load/save the workspace layout, key map and UI options from the user
     // settings (off for --snapshot, which must look the same on every machine).
     explicit MainComponent (AudioEngine& engine, bool restoreUserSettings = true);
@@ -281,7 +282,6 @@ private:
     void updateTitle();
     bool shouldReclaimKeyboardFocus(); // the main window is active but nothing in it has the keyboard focus
     void autosave();
-    void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
     void revertToLastBackup();
