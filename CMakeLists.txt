@@ -24,6 +24,9 @@ endif()
 # The plugins are shared libraries: everything they link must be position independent (the option is declared below)
 if(LYNX_BUILD_PLUGINS)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections) # (what the plugins' --gc-sections can drop)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

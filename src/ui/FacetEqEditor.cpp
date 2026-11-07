@@ -274,7 +274,8 @@ public:
         out.push_back ({ Ctl::piano, { 8.0f, cy - 10.0f, 26.0f, 20.0f } });
         out.push_back ({ Ctl::phase, { 44.0f, cy - 11.0f, 150.0f, 22.0f }, phaseParam });
         out.push_back ({ Ctl::analyzer, { 202.0f, cy - 11.0f, 170.0f, 22.0f }, analyzerParam });
-        out.push_back ({ Ctl::detector, { 380.0f, cy - 11.0f, 150.0f, 22.0f }, detectorParam });
+        if (! plugui::hostedElsewhere) // (a plugin in another host has no sidechain input yet, round 180b)
+            out.push_back ({ Ctl::detector, { 380.0f, cy - 11.0f, 150.0f, 22.0f }, detectorParam });
         out.push_back ({ Ctl::match, { 536.0f, cy - 11.0f, 48.0f, 22.0f } }); // round 152: EQ match
         out.push_back ({ Ctl::output, { bar.getRight() - 100.0f, cy - 11.0f, 92.0f, 22.0f }, outputParam });
         out.push_back ({ Ctl::scale, { bar.getRight() - 190.0f, cy - 11.0f, 84.0f, 22.0f }, scaleParam });
@@ -542,7 +543,8 @@ public:
         for (int t = 1; t < (int) song.mixer.size(); ++t)
             if (t != track)
                 from.addItem (juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), true, fx->sidechain == t, [assign, t] { assign (t); });
-        menu.addSubMenu (tr ("Target track (sidechain)"), from);
+        if (! plugui::hostedElsewhere) // (no other tracks around a plugin in another host; Capture below still makes a target)
+            menu.addSubMenu (tr ("Target track (sidechain)"), from);
         menu.addItem (tr ("Match the target's level to this track"), true, param01 (targetLevelParam) >= 0.5f,
                       [this] { set ({ { targetLevelParam, param01 (targetLevelParam) >= 0.5f ? 0.0f : 1.0f } }); });
         menu.addItem (tr ("Show the target's spectrum"), hasTarget(), showTarget, [this] { showTarget = ! showTarget; repaint(); });
