@@ -98,6 +98,8 @@ std::string View::toText() const
     out << "bounds=" << x << "," << y << "," << width << "," << height << "\n";
     for (const auto& id : hidden)
         out << "hidden=" << id << "\n";
+    for (const auto& path : excluded)
+        out << "excluded=" << path << "\n";
     return out.str();
 }
 
@@ -126,6 +128,8 @@ View View::fromText (const std::string& text)
             v.open = value == "1";
         else if (key == "hidden" && ! value.empty())
             v.hidden.insert (value);
+        else if (key == "excluded" && ! value.empty())
+            v.excluded.insert (value);
         else if (key == "bounds")
         {
             int n[4] {};
@@ -174,7 +178,7 @@ bool migrateMergedRoot (View& view, const std::string& rootId, const std::vector
     for (const auto& id : formerIds)
         if (id != rootId && view.hidden.erase (id) > 0)
         {
-            view.hidden.insert (rootId);
+            view.excluded.insert (id);
             changed = true;
         }
     return changed;

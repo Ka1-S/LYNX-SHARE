@@ -7733,3 +7733,4 @@ countries: tr
 "Which controller to import?" = "Hangi kontrolcü içe aktarılsın?"
 "Adds the file's time signature to the pattern's markers" = "Dosyanın ölçü birimini desenin işaretçilerine ekler"
 "Scores" = "Skorlar"
+"Folders" = "Klasörler"

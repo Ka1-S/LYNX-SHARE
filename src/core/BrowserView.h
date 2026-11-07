@@ -76,8 +76,9 @@ struct MergedListing
 MergedListing mergeListings (const std::vector<Listing>& listings);
 
 // A merged root's id is its first folder's path; before round 178a its other folders were roots of their own ("FL
-// MIDI" = Data\\Patches\\Scores, "Mixer presets (FL)"). A view that hid one of them hides the merged root, and the
-// old ids are dropped so showing it again sticks. Returns whether the view changed (then it is saved).
+// MIDI" = Data\\Patches\\Scores, "Mixer presets (FL)"). A view that hid one of those keeps the merged root and leaves
+// that folder out of it (View::excluded); one that hid the first folder (the user's own) still hides the root, as
+// its id is the same. Returns whether the view changed (then it is saved).
 struct View;
 bool migrateMergedRoot (View& view, const std::string& rootId, const std::vector<std::string>& formerIds);
 
@@ -90,6 +91,7 @@ bool sampleBrowserShowsByDefault (RootKind kind);
 struct View
 {
     std::set<std::string> hidden; // ids of the hidden roots (a folder's path, or projectRootId / pluginsRootId)
+    std::set<std::string> excluded; // folders left out of a merged root (their paths; round 178a)
     ContentFilter filter = ContentFilter::all;
     bool open = false;            // the Sample browser window was open (unused for the main Browser)
     int x = 0, y = 0, width = 0, height = 0; // the window's last bounds (0 = default)

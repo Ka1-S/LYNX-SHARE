@@ -7733,3 +7733,4 @@ countries: fr be ch ca lu
 "Which controller to import?" = "Quel contrôleur importer ?"
 "Adds the file's time signature to the pattern's markers" = "Ajoute la signature rythmique du fichier aux marqueurs du pattern"
 "Scores" = "Partitions"
+"Folders" = "Dossiers"

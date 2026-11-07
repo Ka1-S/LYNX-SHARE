@@ -7733,3 +7733,4 @@ countries: cn sg
 "Which controller to import?" = "导入哪个控制器?"
 "Adds the file's time signature to the pattern's markers" = "将文件的拍号添加到模式的标记中"
 "Scores" = "乐谱"
+"Folders" = "文件夹"

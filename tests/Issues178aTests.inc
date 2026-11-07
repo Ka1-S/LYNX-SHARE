@@ -498,10 +498,13 @@ TEST (issues178a_event_lane_takes_the_chosen_controller)
     CHECK (midiimport::controllerEvents (midi, o).empty()); // FL then empties the lane
 }
 
+#include "core/BrowserView.h"
+
 // FL's Browser shows one "Scores" root for Data\Patches\Scores and the user's Presets\Scores: a folder in both is one
 // folder (its other copies merged in turn), a file in both takes the first folder's, case doesn't matter.
 TEST (issues178a_merged_roots_list_the_union_of_their_folders)
 {
+    using namespace lynx;
     browserview::Listing user, data;
     user.folders = { "Automation" };
     user.files = { "Mine.fsc", "Randomness.fsc" };
@@ -523,21 +526,26 @@ TEST (issues178a_merged_roots_list_the_union_of_their_folders)
     CHECK (browserview::mergeListings ({}).files.empty());
 }
 
-// Settings from before the merged roots: a user who hid "FL MIDI" (Data\Patches\Scores) or "Mixer presets (FL)"
-// doesn't see the merged root appear; the old id goes, so showing the root again sticks.
+// Settings from before the merged roots. A user who hid "FL MIDI" (Data\Patches\Scores) or "Mixer presets (FL)" keeps
+// the merged root, without that folder (excluded, saved with the view); one who hid their own folder (the merged
+// root's first) still doesn't see the root.
 TEST (issues178a_merged_roots_keep_a_hidden_old_root_hidden)
 {
-    const std::string user = "C:/Users/u/Documents/Image-Line/FL Studio/Presets/Scores";
-    const std::string data = "C:/Program Files/Image-Line/FL Studio 2026/Data/Patches/Scores";
+    using namespace lynx;
+    const std::string user = "C:/Users/u/Documents/Image-Line/FL Studio/Presets/Mixer presets";
+    const std::string data = "C:/Program Files/Image-Line/FL Studio 2026/Data/Patches/Mixer presets";
 
-    browserview::View v;
+    browserview::View v; // hid FL's copy: the root stays, FL's folder is left out
     v.setShown (data, false);
     CHECK (browserview::migrateMergedRoot (v, user, { data }));
-    CHECK (! v.shows (user) && v.hidden.count (data) == 0);
+    CHECK (v.shows (user) && v.hidden.count (data) == 0 && v.excluded.count (data) == 1);
+    CHECK (! browserview::migrateMergedRoot (v, user, { data })); // the next start: nothing more to do
+    CHECK (browserview::View::fromText (v.toText()) == v);        // saved with the view
 
-    v.setShown (user, true); // shown again by the user: the next start keeps it
-    CHECK (! browserview::migrateMergedRoot (v, user, { data }));
-    CHECK (v.shows (user));
+    browserview::View own; // hid their own folder: the merged root (the same id) stays hidden, FL's isn't left out
+    own.setShown (user, false);
+    CHECK (! browserview::migrateMergedRoot (own, user, { data }));
+    CHECK (! own.shows (user) && own.excluded.empty());
 
     browserview::View untouched; // nothing hidden: nothing changes
     CHECK (! browserview::migrateMergedRoot (untouched, user, { data }) && untouched.hidden.empty());

@@ -7816,3 +7816,4 @@ countries: br
 "Which controller to import?" = "Qual controlador importar?"
 "Adds the file's time signature to the pattern's markers" = "Adiciona a fórmula de compasso do arquivo aos marcadores do pattern"
 "Scores" = "Partituras"
+"Folders" = "Pastas"

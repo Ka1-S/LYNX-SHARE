@@ -7733,3 +7733,4 @@ countries: kr
 "Which controller to import?" = "어떤 컨트롤러를 가져올까요?"
 "Adds the file's time signature to the pattern's markers" = "파일의 박자표를 패턴 마커에 추가합니다"
 "Scores" = "스코어"
+"Folders" = "폴더"

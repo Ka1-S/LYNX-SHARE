@@ -7733,3 +7733,4 @@ countries: pl
 "Which controller to import?" = "Który kontroler zaimportować?"
 "Adds the file's time signature to the pattern's markers" = "Dodaje metrum pliku do znaczników patternu"
 "Scores" = "Partytury"
+"Folders" = "Foldery"

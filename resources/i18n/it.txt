@@ -7733,3 +7733,4 @@ countries: it ch sm
 "Which controller to import?" = "Quale controller importare?"
 "Adds the file's time signature to the pattern's markers" = "Aggiunge il tempo del file ai marcatori del pattern"
 "Scores" = "Partiture"
+"Folders" = "Cartelle"

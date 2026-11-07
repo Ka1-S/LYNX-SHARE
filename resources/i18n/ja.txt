@@ -7733,3 +7733,4 @@ countries: jp
 "Which controller to import?" = "どのコントローラーを読み込みますか?"
 "Adds the file's time signature to the pattern's markers" = "ファイルの拍子をパターンのマーカーに追加します"
 "Scores" = "スコア"
+"Folders" = "フォルダー"

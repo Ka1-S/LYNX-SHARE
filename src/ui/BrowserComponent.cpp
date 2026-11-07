@@ -2627,6 +2627,7 @@ void BrowserComponent::setRootShown (const juce::String& id, bool shown)
 void BrowserComponent::showAllRoots()
 {
     view.hidden.clear();
+    view.excluded.clear(); // (and every folder of the merged roots, round 178a)
     saveView();
     rebuildRoots();
 }
@@ -3415,6 +3416,30 @@ void BrowserComponent::showFolderMenu (const juce::File& folder, std::function<v
                 if (safe != nullptr)
                     safe->removeUserFolder (folder);
             });
+        if (const auto merged = rootAlso.find (folder.getFullPathName()); merged != rootAlso.end())
+        {
+            // a LYNX extra (FL has no exclusion; round 178a): the folders this root merges, each one ticked in or out;
+            // the root's own folder stays (Hide... hides the root)
+            juce::PopupMenu folders;
+            folders.addItem (folder.getFullPathName(), false, true, nullptr);
+            for (const auto& f : merged->second)
+            {
+                const auto path = f.getFullPathName().toStdString();
+                folders.addItem (f.getFullPathName(), true, view.excluded.count (path) == 0,
+                                 [safe = juce::Component::SafePointer<BrowserComponent> (this), path] {
+                                     if (safe == nullptr)
+                                         return;
+                                     if (safe->view.excluded.erase (path) == 0)
+                                         safe->view.excluded.insert (path);
+                                     safe->saveView();
+                                     safe->rebuildRoots();
+                                     safe->searcher->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
+                                     if (safe->searchBox.getText().trim().isNotEmpty())
+                                         safe->runSearch();
+                                 });
+            }
+            menu.addSubMenu (tr ("Folders"), folders);
+        }
     }
     juce::PopupMenu browserMenu;
     addViewItems (browserMenu);
@@ -3457,7 +3482,11 @@ juce::Array<juce::File> BrowserComponent::searchRoots() const
 juce::Array<juce::File> BrowserComponent::mergedInto (const juce::File& root) const
 {
     const auto it = rootAlso.find (root.getFullPathName());
-    return it != rootAlso.end() ? it->second : juce::Array<juce::File>();
+    if (it == rootAlso.end())
+        return {};
+    auto folders = it->second; // (less the folders this view leaves out: a hidden "FL MIDI" before round 178a)
+    folders.removeIf ([this] (const juce::File& f) { return view.excluded.count (f.getFullPathName().toStdString()) > 0; });
+    return folders;
 }
 
 juce::Array<juce::File> BrowserComponent::withMerged (const juce::Array<juce::File>& folders) const

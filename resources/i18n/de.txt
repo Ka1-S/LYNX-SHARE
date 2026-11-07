@@ -7733,3 +7733,4 @@ countries: de at ch li lu
 "Which controller to import?" = "Welchen Controller importieren?"
 "Adds the file's time signature to the pattern's markers" = "Fügt die Taktart der Datei zu den Markern des Patterns hinzu"
 "Scores" = "Partituren"
+"Folders" = "Ordner"
