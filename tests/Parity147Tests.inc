@@ -330,7 +330,7 @@ TEST (prism_per_crossover_slopes_round147)
     using namespace lynx;
     namespace m = dyn::prism;
     namespace mp = minphase;
-    CHECK (m::xoverSlope0 == 118 && m::count == 156);
+    CHECK (m::xoverSlope0 == 118 && m::count == 157); // (tp172b6: + Audition)
     // the default follows the global slope (the old sound)
     const auto def = makeEffectSlot (EffectKind::prismMultiband).params;
     for (int k = 0; k < 5; ++k)
