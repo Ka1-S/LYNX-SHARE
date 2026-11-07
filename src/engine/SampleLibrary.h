@@ -26,7 +26,8 @@ public:
     void forget (const juce::String& path);
 
     // The sample time-stretched without changing pitch (core/TimeStretch), cached by (path, ratio, method).
-    std::shared_ptr<const SampleData> loadStretched (const juce::String& path, double ratio, StretchMethod method = StretchMethod::general);
+    std::shared_ptr<const SampleData> loadStretched (const juce::String& path, double ratio, StretchMethod method = StretchMethod::general,
+                                                    double semitones = 0.0); // semitones: Beats only (core/TimeStretch)
 
     // Above this, audio goes to a memory-mapped disk cache instead of staying entirely
     // in RAM ("disk streaming"). The cache is reused across sessions.

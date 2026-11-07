@@ -409,7 +409,7 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 
 int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
-    if (slot.kind == EffectKind::transmitter)
+    if (slot.kind == EffectKind::transmitter || (slot.kind == EffectKind::equo && output == 0)) // (EQUO: its band sends, round 173d3)
         return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
     return output == 0 ? fruitySendTarget (slot) : -1;
 }
@@ -424,7 +424,8 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
         for (int o = 0; o < maxSlotSends; ++o)
             if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
-                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter });
+                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter
+                                                                                       || slots[(std::size_t) s].kind == EffectKind::equo });
     return out;
 }
 
@@ -1035,6 +1036,8 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        ? mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].mix
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
+        case AutomationTargetKind::vcaLevel:
+            return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
@@ -1054,6 +1057,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
+        case AutomationTargetKind::vcaLevel:
+            if (t.index < 0 || t.index >= (int) vcas.size())
+                return false;
+            vcas[(std::size_t) t.index].level = v;
+            return true;
         case AutomationTargetKind::mixerSend:
             if (! validTrack || ! routes (t.index, t.slot))
                 return false;

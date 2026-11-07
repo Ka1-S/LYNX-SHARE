@@ -29,6 +29,7 @@ inline std::string valueText (const Song& song, const AutomationTarget& t, float
         case AutomationTargetKind::effectMix: std::snprintf (text, sizeof (text), "%d%%", (int) std::lround (v * 100.0f)); break;
         case AutomationTargetKind::mixerVolume:
         case AutomationTargetKind::mixerSend:
+        case AutomationTargetKind::vcaLevel:
         {
             const auto gain = faderGain (v);
             if (gain <= 1.0e-5f)

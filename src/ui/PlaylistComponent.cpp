@@ -622,6 +622,48 @@ juce::String PlaylistComponent::cacheSelfTest (const std::function<void()>& wait
     settleZoom();
     check ("zoom out settled", true);
 
+    // a plain wheel moves the view up and down, wherever a zoom left it sideways: at 0, a whole pixel or between two
+    // pixels, the glide must not touch it (between two, it used to flip by a pixel's fraction every frame, and each
+    // frame painted everything). Then a sideways glide into the end of the song has to finish.
+    auto runGlide = [&] {
+        int moves = 0, frames = 0;
+        for (auto last = scrollTicks; gliding && frames < 400; ++frames)
+        {
+            glideFrame();
+            moves += scrollTicks != last ? 1 : 0;
+            last = scrollTicks;
+        }
+        return std::pair { moves, frames };
+    };
+    for (const auto pixels : { 0.0, 130.0, 130.8 })
+    {
+        gliding = false;
+        scrollTicks = pixels / pixelsPerTick;
+        updateScrollBars();
+        const auto before = scrollTicks;
+        glideBy (0.0, 2.0 * defaultRowHeight(), false);
+        const auto [moves, frames] = runGlide();
+        out << "wheel glide, view at " << juce::String (pixels, 1) << " px: " << moves << " sideways moves in " << frames << " frames\n";
+        if (moves != 0 || scrollTicks != before || gliding)
+        {
+            ++failures;
+            out << "FAIL wheel glide moved the view sideways\n";
+        }
+    }
+    gliding = false;
+    scrollY = 0;
+    glideBy (1.0e9, 0.0, false);
+    if (const auto [moves, frames] = runGlide(); gliding)
+    {
+        ++failures;
+        out << "FAIL sideways glide into the end did not finish: " << moves << " moves in " << frames << " frames\n";
+    }
+    gliding = false;
+    scrollTicks = 0.0;
+    updateScrollBars();
+    repaint();
+    check ("after the glides", true);
+
     // scrolls by whole pixels (the picture shifted, the strip painted)
     scrollTicks = juce::jmax (0.0, scrollTicks + 37.0 / pixelsPerTick);
     updateScrollBars();
@@ -6281,15 +6323,22 @@ void PlaylistComponent::glideFrame()
     }
 
     // whole pixels sideways (round 174e2: the cached picture then shifts instead of being painted again), at least one
-    // pixel towards the target each frame
-    const auto fromPixels = scrollTicks * pixelsPerTick;
-    const auto steppedPixels = glideX.step (0.45, 0.5 / pixelsPerTick) * pixelsPerTick;
-    scrollTicks = (glideX.target * pixelsPerTick > fromPixels ? std::ceil (steppedPixels - 1.0e-6) : std::floor (steppedPixels + 1.0e-6)) / pixelsPerTick;
-    if ((glideX.target - scrollTicks) * (glideX.target * pixelsPerTick - fromPixels) < 0.0) // (never past the target)
-        scrollTicks = glideX.target;
+    // pixel towards the target each frame. Only when it is moving sideways: a zoom can leave the view between two pixels,
+    // and a plain wheel there flipped it by that fraction every frame, each frame painting everything (round 174f)
+    if (glideX.isMoving())
+    {
+        const auto fromPixels = scrollTicks * pixelsPerTick;
+        const auto steppedPixels = glideX.step (0.45, 0.5 / pixelsPerTick) * pixelsPerTick;
+        scrollTicks = (glideX.target * pixelsPerTick > fromPixels ? std::ceil (steppedPixels - 1.0e-6) : std::floor (steppedPixels + 1.0e-6)) / pixelsPerTick;
+        if ((glideX.target - scrollTicks) * (glideX.target * pixelsPerTick - fromPixels) < 0.0) // (never past the target)
+            scrollTicks = glideX.target;
+    }
     scrollY = (int) std::round (glideY.step (0.45, 1.0));
     glideY.current = scrollY;
+    const auto wanted = scrollTicks;
     updateScrollBars();
+    if (std::abs (scrollTicks - wanted) > 1.0e-6) // (the scroll bar clamped it: this is as far as it goes)
+        glideX.target = scrollTicks;
     glideX.current = scrollTicks;
     gliding = glideX.isMoving() || glideY.isMoving();
     repaintScrolled();

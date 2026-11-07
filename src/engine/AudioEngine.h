@@ -62,7 +62,15 @@ class AudioEngine final : private juce::AudioIODeviceCallback,
                           private juce::Timer
 {
 public:
-    explicit AudioEngine (bool openAudioDevice = true);
+    // workerThreads: extra audio threads (< 0 = by the CPU's cores). An engine that only serves an editor needs none.
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1);
+    // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
+    // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
+    void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
+    {
+        externalTimes = times;
+        externalEffect = std::move (effect);
+    }
     ~AudioEngine() override;
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
@@ -1066,6 +1074,8 @@ private:
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
     void saveUndoStep();
+    ProcessTimes* externalTimes = nullptr;
+    std::function<std::shared_ptr<Effect>()> externalEffect;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

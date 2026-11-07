@@ -3,10 +3,10 @@
 // FL Studio's Fruity Convolver, rebuilt from the behaviour decoded in docs/analise/REA_rodada60.md (clean-room).
 // The plugin turns an impulse response (a WAV embedded in its state, or a file of the user's FL installation) into a
 // stereo convolution kernel — level normalisation, volume envelope, "self-convolution" blend, speed (resampling),
-// flat EQ level, silence trimming and predelay — and runs input matrix → convolution → dry + wet matrix with FL's
-// per-block gain ramps. The effect's parameters are FL's 4 automatable controls (dry, wet, input and wet stereo
-// separation) stored as (raw − min) / (max − min); the impulse response travels in the slot's `state` blob, so a
-// saved LYNX project keeps working without the FL installation.
+// EQ curve (a flat level or a linear-phase FIR from the drawn curve), silence trimming and predelay — and runs input
+// matrix → convolution → dry + wet matrix with FL's per-block gain ramps. The effect's parameters are FL's 4
+// automatable controls (dry, wet, input and wet stereo separation) stored as (raw − min) / (max − min); the impulse
+// response travels in the slot's `state` blob, so a saved LYNX project keeps working without the FL installation.
 
 #include <array>
 #include <cstdint>
@@ -67,6 +67,7 @@ struct State
     int option = 0;                                  // the int after the flags (version > 14), 0 in every known state
     std::array<int, 5> knobs { 0, 0, 0, 0, 1000 };   // page, predelay, blend, speed, EQ amount (raw)
     std::size_t flagsAt = 0, knobsAt = 0;            // byte offsets of the flags and the knobs in the parsed state (0 = absent)
+    std::size_t eqAt = 0, eqEnd = 0;                 // byte range of the EQ curve's map in the parsed state
     int knobCount = 0;                               // knobs stored (5 from version 11, else 4)
 };
 std::optional<State> parseState (const std::vector<std::uint8_t>& state);
@@ -81,7 +82,8 @@ struct Audio
 std::optional<Audio> decodeAudio (const std::vector<std::uint8_t>& bytes);
 
 // The convolution kernel FL builds at the host rate `fs` (FUN_0087b750): stereo, starting at time 0 (the predelay
-// is part of it). nullopt = a feature that is not decoded (non-flat time envelopes or an active EQ curve).
+// is part of it). nullopt = a feature that is not decoded (non-default first / third / fourth or a shaped volume
+// envelope).
 struct Kernel
 {
     std::vector<float> l, r;
@@ -112,6 +114,16 @@ private:
 // The slot blob: "LXCV" + version 1 + FL state + impulse-response file bytes (empty when embedded)
 std::vector<std::uint8_t> packBlob (const std::vector<std::uint8_t>& flState, const std::vector<std::uint8_t>& irFile);
 bool unpackBlob (const std::vector<std::uint8_t>& blob, std::vector<std::uint8_t>& flState, std::vector<std::uint8_t>& irFile);
+
+// EQ curve for the editor (REA_rodada60 §7 C.7). The curve is a map over x = 0…1 (the frequency axis): points with Δx
+// from the previous point (the first at 0; FL scales the Δx to a sum of 1), level 0…1 (0 = −inf, 0.5 = unchanged,
+// 1 = +12 dB), tension −1…1 and segment mode (0 single curve, 1 double curve, 2 hold, 3 stairs, …, FL's envelope modes).
+std::optional<std::vector<EnvPoint>> readEqCurve (const std::vector<std::uint8_t>& blob); // from a slot blob
+bool writeEqCurve (std::vector<std::uint8_t>& blob, const std::vector<EnvPoint>& points); // replaces the curve in the blob
+std::vector<float> eqCurveLevels (const std::vector<EnvPoint>& points, int count); // the curve at count evenly spaced x (0…1)
+double eqFrequencyToX (double hz) noexcept; // the display's frequency axis: 130.8 Hz … 22 050 Hz → x (log-like, linear below)
+double eqXToFrequency (double x) noexcept;
+float eqLevelGain (double level) noexcept; // (3^(2·level) − 1)/2
 
 void toParams (const std::array<int, 4>& raw, EffectParams& params) noexcept;
 std::array<int, 4> fromParams (const EffectParams& params) noexcept;

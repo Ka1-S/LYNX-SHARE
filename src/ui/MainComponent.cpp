@@ -64,6 +64,7 @@
 #include "ui/ChannelSettings.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
+#include "ui/EventEditor.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
@@ -195,6 +196,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
+    };
+
+    EventEditorHooks::onBrowseAutomations = [this] { // (the Event editor's File › Browse automations: FL's Scores\\Automation)
+        showPanel (Panel::browser);
+        browser.showScores ("Automation");
     };
 
     newButton.setTooltip (tr ("New project") + " (Ctrl+N)");
