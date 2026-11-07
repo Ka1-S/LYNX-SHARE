@@ -9730,19 +9730,27 @@ private:
                 editor->setSize (760, 300);
                 saveWindow (std::move (editor), "-automation.png");
 
-                // round 177b: the same clip in FL's LFO mode (its amplitude points, the played curve, the LFO strip)
+                // round 177b: the same clip in FL's LFO mode: FL's defaults, then one shaped state (the UI gate pairs)
                 const auto before = offline.getSong().automations[0].lfo;
-                offline.editSong ([] (lynx::Song& song) {
-                    auto& lfo = song.automations[0].lfo;
-                    lfo.on = true;
-                    lfo.level = 96;
+                const auto lfoShot = [&offline] (std::function<void (lynx::AutomationLfo&)> set, const char* suffix) {
+                    offline.editSong ([&set] (lynx::Song& song) {
+                        auto& lfo = song.automations[0].lfo;
+                        lfo = lynx::AutomationLfo {};
+                        lfo.on = true;
+                        set (lfo);
+                    }, false);
+                    auto lfoEditor = lynx::makeAutomationEditor (offline, 0);
+                    lfoEditor->setSize (760, 346);
+                    saveWindow (std::move (lfoEditor), suffix);
+                };
+                lfoShot ([] (lynx::AutomationLfo&) {}, "-automation-lfo.png");
+                lfoShot ([] (lynx::AutomationLfo& lfo) {
                     lfo.speed = lynx::AutomationLfo::speedForBeats (2.0);
-                    lfo.tension = 40;
-                    lfo.amp = { { 0, 0.3f, 0.0f }, { lynx::ppq * 8, 1.0f, 0.0f } };
-                }, false);
-                auto lfoEditor = lynx::makeAutomationEditor (offline, 0);
-                lfoEditor->setSize (760, 330);
-                saveWindow (std::move (lfoEditor), "-automation-lfo.png");
+                    lfo.tension = 60;
+                    lfo.skew = 50;
+                    lfo.pulseWidth = 40;
+                    lfo.amp = { { 0, 0.5f, 0.0f }, { lynx::ppq * 16, 1.0f, 0.0f } };
+                }, "-automation-lfo-shape.png");
                 offline.editSong ([before] (lynx::Song& song) { song.automations[0].lfo = before; }, false);
             }
 

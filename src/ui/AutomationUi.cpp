@@ -71,6 +71,26 @@ float midiControlValue (AudioEngine& engine, const AutomationTarget& t)
 //  - Alt+drag over a segment changes the curve (tension)
 //  - Ctrl+wheel zooms at the mouse; wheel scrolls; middle-drag pans
 //  - the cursor and the hint bar show what a click would do
+// FL's small LED check box with its label on the right (the automation editor's "MUL"): a round light, lit when on
+class LedToggle final : public juce::Button
+{
+public:
+    explicit LedToggle (const juce::String& text) : juce::Button (text) { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool) override
+    {
+        const auto led = juce::Rectangle<float> (2.0f, (float) getHeight() * 0.5f - 4.0f, 8.0f, 8.0f);
+        const auto on = getToggleState();
+        g.setColour (on ? theme::colour::accent : theme::colour::bg0);
+        g.fillEllipse (led);
+        g.setColour ((on ? theme::colour::accent.brighter (0.3f) : theme::colour::textSecondary).withAlpha (over ? 1.0f : 0.8f));
+        g.drawEllipse (led, 1.0f);
+        g.setColour (over ? theme::colour::textPrimary : theme::colour::textSecondary);
+        g.setFont (theme::font (10.0f, true));
+        g.drawText (getButtonText(), getLocalBounds().withTrimmedLeft (13), juce::Justification::centredLeft);
+    }
+};
+
 class AutomationEditor final : public juce::Component,
                                public ui::HintSource,
                                private juce::ChangeListener,
@@ -104,6 +124,10 @@ public:
         const auto* a = current();
         const auto on = a != nullptr && a->lfo.on;
         auto bar = getLocalBounds().removeFromBottom (lfoBarHeight()).reduced (8, 2);
+        // FL: the MUL light right of the knobs; the options arrow on the row below, under SPD
+        auto row = bar.removeFromBottom (lfoArrowRow);
+        lfoOptions.setVisible (on);
+        lfoOptions.setBounds (row.removeFromLeft (38).withSizeKeepingCentre (20, 14));
         for (auto* k : lfoKnobs)
         {
             k->setVisible (on);
@@ -111,10 +135,7 @@ public:
         }
         bar.removeFromLeft (4);
         mulButton.setVisible (on);
-        mulButton.setBounds (bar.removeFromLeft (44).withSizeKeepingCentre (44, 20));
-        bar.removeFromLeft (2);
-        lfoOptions.setVisible (on);
-        lfoOptions.setBounds (bar.removeFromLeft (24).withSizeKeepingCentre (24, 20));
+        mulButton.setBounds (bar.removeFromLeft (40).withSizeKeepingCentre (40, 14));
     }
 
     ~AutomationEditor() override { engine.removeChangeListener (this); }
@@ -590,7 +611,7 @@ private:
     int lfoBarHeight() const
     {
         const auto* a = current();
-        return a != nullptr && a->lfo.on ? 44 : 0;
+        return a != nullptr && a->lfo.on ? 44 + lfoArrowRow : 0;
     }
 
     void editLfo (const std::function<void (AutomationLfo&)>& fn)
@@ -644,7 +665,6 @@ private:
                     [] (AutomationLfo& l, double v) { l.level = (int) v; });
 
         mulButton.setButtonText (tr ("MUL"));
-        mulButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::automation.withAlpha (0.55f));
         mulButton.setTooltip (tr ("Multiply with envelope level (off: the LFO is added)"));
         mulButton.onClick = [this] { editLfo ([] (AutomationLfo& l) { l.add = ! l.add; }); };
         addChildComponent (mulButton);
@@ -682,7 +702,9 @@ private:
     }
 
     juce::ToggleButton lfoButton; // FL's "LFO" radio next to "Automation editor"
-    juce::TextButton mulButton, lfoOptions;
+    static constexpr int lfoArrowRow = 16;
+    LedToggle mulButton { "MUL" };
+    juce::TextButton lfoOptions;
     std::vector<std::unique_ptr<ctlui::Knob>> ownedKnobs;
     std::vector<ctlui::Knob*> lfoKnobs;
     bool lfoShown = false;
