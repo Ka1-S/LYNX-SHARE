@@ -2502,7 +2502,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
-            timed (key, [&] { effects[i]->process (l, r, n, slots[i].params, bpm); });
+            const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
+            timed (key, [&] { effects[i]->process (l, r, n, shown, bpm); });
         }
 
         // an effect that output NaN / inf (an unstable setting): this block of it is muted and its state reset, so the
