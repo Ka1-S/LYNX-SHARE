@@ -3,6 +3,7 @@
 
 #include "core/AlsImport.h"
 #include "core/AutoWarp.h"
+#include "core/WarpEdit.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/XmlLite.h"
@@ -1086,4 +1087,65 @@ TEST (als175a_auto_warp_follows_a_drifting_performance)
         CHECK (err[err.size() * 95 / 100] < 0.015);
         std::printf ("  auto-warp drift: median %.1f ms, 95%% %.1f ms\n", err[err.size() / 2] * 1000.0, err[err.size() * 95 / 100] * 1000.0);
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Editing warp markers (round 175a, M3 core)
+
+TEST (als175a_warp_marker_editing)
+{
+    using namespace lynx;
+    SamplerSettings s;
+    CHECK (! warpedit::ensureMarkers (s, 0.0, 120.0));
+    CHECK (warpedit::ensureMarkers (s, 4.0, 120.0)); // a 4 s file at 120 bpm: 8 beats, start and end markers
+    CHECK (s.warp.size() == 2 && s.warp[1] == (WarpPoint { 4.0, 8.0 }) && s.stretchBeats == 8.0f && s.keepPitch);
+
+    // a marker at 1 s plays on beat 2; moved to beat 3 the first second stretches, the rest squeezes
+    const auto i = warpedit::addMarker (s, 1.0);
+    CHECK (i == 1 && s.warp.size() == 3 && std::abs (s.warp[1].beats - 2.0) < 1e-9);
+    CHECK (warpedit::addMarker (s, 1.0005) == -1); // too close to it
+    CHECK (std::abs (warpedit::moveMarker (s, 1, 3.0) - 3.0) < 1e-9);
+    CHECK (std::abs (warpedit::beatAt (s.warp, 0.5) - 1.5) < 1e-9);
+    // kept between its neighbours; the start never moves
+    CHECK (std::abs (warpedit::moveMarker (s, 1, 9.0) - (8.0 - warpedit::minBeatGap)) < 1e-9);
+    CHECK (warpedit::moveMarker (s, 0, 2.0) == 0.0 && s.warp[0].beats == 0.0);
+    // the end marker sets the length in beats
+    warpedit::moveMarker (s, 2, 10.0);
+    CHECK (s.stretchBeats == 10.0f);
+    // the end and the start can't be removed; the middle one can
+    CHECK (! warpedit::removeMarker (s, 0) && ! warpedit::removeMarker (s, 2));
+    CHECK (warpedit::removeMarker (s, 1) && s.warp.size() == 2);
+    // the edited markers bend the render once they bend the tempo
+    warpedit::addMarker (s, 2.0);
+    warpedit::moveMarker (s, 1, 7.0);
+    CHECK (! warpStretchMap (s.warp, 4.0 * 48000.0, 48000.0, 4.0 * 48000.0).empty());
+    warpedit::clearMarkers (s);
+    CHECK (s.warp.size() == 2);
+}
+
+TEST (als175a_warp_edits_one_clip_only)
+{
+    // two clips of one audio channel: editing the first one's markers gives it its own copy of the channel
+    using namespace lynx;
+    Song song;
+    ChannelDef ch;
+    ch.instrument = InstrumentKind::audioClip;
+    ch.name = "Loop";
+    ch.samplePath = "/x/loop.wav";
+    song.channels.push_back (ch);
+    for (int k = 0; k < 2; ++k)
+    {
+        Clip c;
+        c.kind = ClipKind::audio;
+        c.channel = 0;
+        c.start = k * 3840;
+        c.length = 3840;
+        song.playlist.push_back (c);
+    }
+    const auto own = warpedit::channelForClipEdit (song, 0);
+    CHECK (own == 1 && song.channels.size() == 2);
+    CHECK (song.playlist[0].channel == 1 && song.playlist[1].channel == 0);
+    // the second clip is now alone on its channel: edited in place
+    CHECK (warpedit::channelForClipEdit (song, 1) == 0 && song.channels.size() == 2);
+    CHECK (warpedit::channelForClipEdit (song, 5) == -1);
 }
