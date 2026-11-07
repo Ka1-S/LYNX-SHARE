@@ -815,3 +815,22 @@ TEST (grid181a_a_note_longer_than_its_pattern_does_not_hang)
         CHECK (! r.notes.shorten (0, 60, 0.0));
     }
 }
+
+TEST (grid181a_a_stop_shows_until_its_grid_point)
+{
+    using namespace lynx;
+    constexpr auto bar = grid181a::bar;
+    auto s = grid181a::patternSong();
+    launcher::setClip (s, 0, 0, grid181a::patternClip (0, 4 * bar));
+    grid181a::Run r (std::move (s));
+    r.launch (0, 0);
+    r.until (bar + bar / 2);
+    CHECK (! r.runtime.tracks[0].stopping.load());
+    r.command (launcher::Command::Type::stopTrack, 0);
+    r.until (bar + bar * 3 / 4);
+    CHECK (r.runtime.tracks[0].playing.load() == 0);
+    CHECK (r.runtime.tracks[0].stopping.load());
+    r.until (2 * bar + bar / 2);
+    CHECK (r.runtime.tracks[0].playing.load() == -1);
+    CHECK (! r.runtime.tracks[0].stopping.load());
+}

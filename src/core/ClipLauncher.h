@@ -153,6 +153,7 @@ private:
         double anchor = 0.0, from = 0.0, until = never; // the clip's position 0 is at anchor + k·length
         double followAt = never;                        // when its follow action acts
         bool recorded = false;                          // started while recording
+        bool stopping = false;                          // asked to stop, waiting for the grid point
         double songFrom = 0.0;                          // recording: the song position where the current pass began
     };
     struct TrackState
@@ -206,6 +207,7 @@ public:
     {
         std::atomic<int> playing { -1 }, pending { -1 };
         std::atomic<float> progress { 0.0f };
+        std::atomic<bool> stopping { false }; // a stop waits for its grid point
         std::atomic<bool> taken { false }; // its Playlist clips are silent until "back to arrangement"
     };
     std::array<TrackView, maxTracks> tracks;

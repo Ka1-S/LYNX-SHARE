@@ -422,6 +422,7 @@ void Player::stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, d
         return;
     const auto at = nextGrid (now, quantTicks (grid.globalQuant, song.beatsPerBar));
     t.current.until = std::min (t.current.until, std::max (at, t.current.from));
+    t.current.stopping = true;
 }
 
 void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& index, const Command& c, double now) noexcept
@@ -527,6 +528,7 @@ void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
     {
         v.playing.store (-1, std::memory_order_relaxed);
         v.pending.store (-1, std::memory_order_relaxed);
+        v.stopping.store (false, std::memory_order_relaxed);
         if (giveBack)
             v.taken.store (false, std::memory_order_relaxed);
     }
@@ -652,6 +654,7 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             const auto playingNow = t.current.slot >= 0 && t.current.from <= end ? t.current.slot : -1;
             view.playing.store (sceneOf (playingNow), std::memory_order_relaxed);
             view.pending.store (sceneOf (t.next.slot), std::memory_order_relaxed);
+            view.stopping.store (playingNow >= 0 && t.current.stopping && t.next.slot < 0, std::memory_order_relaxed);
             if (const auto* clip = clipOfSlot (grid, index, playingNow))
             {
                 const auto length = (double) std::max<std::int64_t> (1, clip->length);
@@ -664,6 +667,7 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             {
                 runtime->tracks[(std::size_t) t.track].playing.store (-1, std::memory_order_relaxed);
                 runtime->tracks[(std::size_t) t.track].pending.store (-1, std::memory_order_relaxed);
+                runtime->tracks[(std::size_t) t.track].stopping.store (false, std::memory_order_relaxed);
             }
             active[(std::size_t) i] = active[(std::size_t) --numActive];
             continue;

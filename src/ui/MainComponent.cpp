@@ -2392,7 +2392,11 @@ public:
             addAndMakeVisible (*button);
             button->setRadioGroupId (1181);
             button->setClickingTogglesState (true);
-            button->onClick = [pick, view = view] { pick (view); };
+            // (the radio group also "clicks" the button it turns off)
+            button->onClick = [pick, view = view, button = button] {
+                if (button->getToggleState())
+                    pick (view);
+            };
         }
     }
     void show (PlaylistArea::GridView view)
@@ -2438,6 +2442,8 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
             workspace.show (Panel::playlist);
         }
         refreshPanelButtons();
+        if (isShowing())
+            grabKeyboardFocus(); // (the new layout must not leave the keys in the Browser's search box)
     }
 
     // Clip-launch workflow shows the automation lanes; going back restores the user's setting
@@ -2451,6 +2457,8 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
 
     clipLaunchWorkflow = on;
     playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        flip->show (PlaylistArea::GridView::beside);
     workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
 }
 

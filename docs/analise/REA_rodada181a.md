@@ -56,6 +56,9 @@ Read feature/ableton175a-2 (docs/analise/ALS_FORMAT.md, src/core/AlsImport.cpp).
 - `LaunchMode` 0 trigger, 1 gate, 2 toggle, 3 repeat: documented by 175a, matches `LaunchMode` here.
 - `LaunchQuantisation` 0 = global: documented by 175a. [INFERRED] the other values, `GlobalQuantisation`, `FollowActionA/B`: from default sets only, no proof yet. To settle in the Live GUI turn: set each value, save a set, read the file.
 
+## Real window session (Windows build, guarded clicks)
+Exercised in the running window: View > Layout style both ways, grid menu, put pattern, launch (starts the transport), follow of progress, pending blink at 8 bars, Stop all clips (quantised), Back to Playlist, Grid / Song / Both, per-style layout restored, style kept across restarts both ways. Found and fixed there: the switch lit two buttons (JUCE's radio group "clicks" the one it turns off), the switch kept its old view on re-entry, the Browser's search box took the keys after a layout swap, a quantised stop gave no feedback.
+
 ## Not built yet
 Scene follow actions, velocity amount, select next scene on launch, drag and drop into slots, audio slots from the UI (the engine plays them), per-cell screen-reader names, .als mapping of the grid (with round 175a).
 

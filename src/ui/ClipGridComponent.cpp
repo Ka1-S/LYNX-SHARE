@@ -384,13 +384,16 @@ private:
                 g.fillRect (cell.withHeight (3).withY (cell.getBottom() - 3).toFloat().withWidth ((float) cell.getWidth() * progress));
             }
             // the launch triangle: lit while playing, blinking while it waits for its grid point
-            const auto blink = pending && (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
+            const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
+            const auto blink = pending && blinkOn;
+            // (a clip asked to stop blinks until its grid point: with a long quantisation it would seem to ignore the press)
+            const auto stopping = playing && state->tracks[(std::size_t) t].stopping.load (std::memory_order_relaxed);
             juce::Path triangle;
             const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
             triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
             // (a light pattern colour takes dark marks)
             const auto ink = (playing ? fill.brighter (0.25f) : fill.withMultipliedBrightness (0.85f)).getPerceivedBrightness() > 0.62f ? c::bg1 : juce::Colours::white;
-            g.setColour (playing ? c::ledOn : pending ? (blink ? c::ledOn : ink.withAlpha (0.3f)) : ink.withAlpha (0.85f));
+            g.setColour (stopping && ! blinkOn ? ink.withAlpha (0.3f) : playing ? c::ledOn : pending ? (blink ? c::ledOn : ink.withAlpha (0.3f)) : ink.withAlpha (0.85f));
             g.fillPath (triangle);
             if (playing && ink != juce::Colours::white)
             {
