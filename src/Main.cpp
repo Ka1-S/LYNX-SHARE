@@ -9746,6 +9746,9 @@ private:
                 juce::Component frame;
                 frame.setSize (c->getWidth(), c->getHeight());
                 frame.setOpaque (true);
+                // an AlertWindow is built on the desktop: shown there first, it would take the foreground from whoever has it
+                if (c->isOnDesktop())
+                    c->removeFromDesktop();
                 frame.addAndMakeVisible (*c);
                 c->setTopLeftPosition (0, 0);
                 checkTextFit (*c, name.fromFirstOccurrenceOf ("-", false, false).upToLastOccurrenceOf (".", false, false));
