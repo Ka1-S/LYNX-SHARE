@@ -53,6 +53,8 @@ enum : std::uint16_t
     momentary = 1 << 13,  // toggle: a push button (never shown lit); each click flips the value, which the engine reads
                           // as "pressed" (Nebula's Clear, round 129)
     springBack = 1 << 14, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
+    rangeEnds = 1 << 15,  // knob: its scale's two ends under it (left / right), the value there only while hovered or
+                          // dragged, the caption under that (round tp172b4: the reference reverb's knobs)
 };
 
 struct LayoutItem

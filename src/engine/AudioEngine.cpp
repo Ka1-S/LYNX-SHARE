@@ -23,6 +23,7 @@
 #include "ui/I18n.h"
 
 #include "core/FlpImport.h"
+#include "core/AlsImport.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -2664,6 +2665,44 @@ std::string userOf (const Song& song, std::size_t track)
 }
 } // namespace
 
+namespace
+{
+// Where a Live set's library-relative samples live (Core Library, packs, User Library), newest install first; only
+// folders that exist. Read-only: nothing is ever written there.
+std::vector<std::string> liveLibraryRoots()
+{
+    std::vector<std::string> roots;
+    auto add = [&roots] (const juce::File& f) {
+        if (f.isDirectory())
+            roots.push_back (f.getFullPathName().toStdString());
+    };
+   #if JUCE_WINDOWS
+    const juce::File programData ("C:\\ProgramData\\Ableton");
+   #elif JUCE_MAC
+    const juce::File programData ("/Applications");
+   #else
+    const juce::File programData;
+   #endif
+    if (programData.isDirectory())
+    {
+        auto installs = programData.findChildFiles (juce::File::findDirectories, false, "Live*");
+        std::sort (installs.begin(), installs.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName() > b.getFileName(); });
+        for (const auto& install : installs)
+        {
+            add (install.getChildFile ("Resources").getChildFile ("Core Library"));
+            add (install.getChildFile ("Contents").getChildFile ("App-Resources").getChildFile ("Core Library"));
+        }
+    }
+    const auto docs = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Ableton");
+    add (docs.getChildFile ("User Library"));
+    add (docs.getChildFile ("Factory Packs"));
+    const auto music = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("Ableton");
+    add (music.getChildFile ("User Library"));
+    add (music.getChildFile ("Factory Packs"));
+    return roots;
+}
+} // namespace
+
 void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                     PreparedFlp& out)
 {
@@ -2681,7 +2720,12 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
     {
         loadtrace::stage (0.20, 0.30, TR_NOOP ("Reading the project..."));
         const auto started = std::chrono::steady_clock::now();
-        const auto project = flp::parseProject ({ static_cast<const std::uint8_t*> (data.getData()), data.getSize() });
+        const auto* fileBytes = static_cast<const std::uint8_t*> (data.getData());
+        // a Live set (.als, round 175a) takes the same pipeline: samples, plugins, report and Missing files window
+        const auto liveSet = file.hasFileExtension ("als");
+        std::optional<flp::Project> project;
+        if (! liveSet)
+            project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
         FlpImportOptions options;
@@ -2746,7 +2790,24 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         options.relocations = relocations;
         {
             const auto t = std::chrono::steady_clock::now();
-            out.song = importFlp (project, options);
+            if (liveSet)
+            {
+                AlsImportOptions alsOptions;
+                alsOptions.common = options;
+                alsOptions.libraryRoots = liveLibraryRoots();
+                std::string alsError;
+                auto song = importAls (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), alsOptions, &alsError);
+                if (! song)
+                {
+                    out.error = utf8 (alsError.empty() ? "not a readable Live set" : alsError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else
+            {
+                out.song = importFlp (*project, options);
+            }
             loadtrace::add ("import", loadtrace::msSince (t));
         }
         loadtrace::add ("missing_roots", 0.0, (int) roots->missingRoots().size());

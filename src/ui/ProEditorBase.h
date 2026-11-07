@@ -101,6 +101,9 @@ protected:
         juce::String hint;          // what it does (the hint bar)
         bool lit = false;           // buttons: drawn as on
         bool showValue = true;
+        juce::Colour cap {};        // knobs: the cap's own colour (themes that read KnobLook::capTint; transparent = the theme's)
+        int look = 0;               // knobs: 0 = a knob, 1 = a short curved bar (round tp172b4: the compressor reference's
+                                    // KNEE / RANGE bars); menus: 1 = a plain pill button showing the choice (no arrow)
     };
 
     static Ctl knob (juce::Rectangle<float> r, int p, const juce::String& caption, int size = 1, bool bipolar = false)
@@ -616,8 +619,13 @@ protected:
             {
                 const auto d = c.size == 2 ? juce::jmin (c.r.getWidth() - 4.0f, c.r.getHeight() - 36.0f)
                                            : juce::jmin (c.r.getWidth() - 10.0f, c.r.getHeight() - 34.0f);
-                const auto knobR = juce::Rectangle<float> (c.r.getCentreX() - d / 2.0f, c.r.getY() + 2.0f, d, d);
                 const auto active = dragCtl == c.param && c.param >= 0;
+                if (c.look == 1)
+                {
+                    paintArcBar (g, c, hover, active, hot, ac, on);
+                    break;
+                }
+                const auto knobR = juce::Rectangle<float> (c.r.getCentreX() - d / 2.0f, c.r.getY() + 2.0f, d, d);
                 skin::KnobLook look;
                 look.value = v (c.param);
                 look.bipolar = c.bipolar;
@@ -625,7 +633,13 @@ protected:
                 look.hover = hot;
                 look.active = active;
                 look.enabled = on;
+                look.capTint = c.cap;
                 skin::knob (g, knobR, look);
+                if (knobRanges)
+                {
+                    knobLabels (g, c, knobR, hover, active, hot, ac);
+                    break;
+                }
                 g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
                 g.setFont (font (c.size == 2 ? type::small : type::caption, true));
                 g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
@@ -682,6 +696,20 @@ protected:
             }
             case K::menu:
             {
+                if (c.look == 1) // round tp172b4: a plain pill showing the choice (the references' style button)
+                {
+                    skin::button (g, c.r, false, hover, ac);
+                    g.setColour (colour::textPrimary);
+                    g.setFont (font (c.r.getHeight() < 20.0f ? type::small : type::body, false));
+                    g.drawText (tr (c.options[optionIndex (c)]), c.r.reduced (6.0f, 0.0f), juce::Justification::centred, true);
+                    if (c.caption.isNotEmpty())
+                    {
+                        g.setColour (skin::captionColour());
+                        g.setFont (font (type::caption, true));
+                        g.drawText (caps (c.caption), c.r.translated (0.0f, c.r.getHeight() + 1.0f).withHeight (13.0f).expanded (12.0f, 0.0f), juce::Justification::centred, false);
+                    }
+                    break;
+                }
                 skin::selector (g, c.r, hover);
                 g.setColour (colour::textPrimary);
                 g.setFont (font (type::body, true));
@@ -742,6 +770,91 @@ protected:
             }
             case K::custom: paintCustom (g, c); break;
         }
+    }
+
+    // round tp172b4: the references print each knob's scale under it — the parameter's two ends, left and right — and
+    // the caption under that; the value replaces the scale while the knob is hovered or dragged
+    bool knobRanges = false;
+    void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
+    {
+        using namespace theme;
+        if (showValue)
+        {
+            g.setColour (active ? ac.brighter (0.3f) : skin::valueColour (true));
+            g.setFont (font (big ? type::small : type::caption, true));
+            g.drawText (text (param), row.expanded (24.0f, 0.0f), juce::Justification::centred, false);
+            return;
+        }
+        const auto shortText = [] (juce::String t) {
+            // round tp172b4: scale ends as the references print them — "1:1", "-60 dB", "5 s" (no zero decimals, no
+            // spaces round a ratio's colon)
+            t = t.replace (" : ", ":");
+            juce::String out;
+            for (int i = 0; i < t.length(); ++i)
+            {
+                if (t[i] == '.' && i > 0 && juce::CharacterFunctions::isDigit (t[i - 1]))
+                {
+                    int j = i + 1;
+                    while (j < t.length() && t[j] == '0') ++j;
+                    if (j > i + 1 && (j >= t.length() || ! juce::CharacterFunctions::isDigit (t[j]))) { i = j - 1; continue; }
+                }
+                out << juce::String::charToString (t[i]);
+            }
+            return out;
+        };
+        g.setColour (colour::textDisabled);
+        g.setFont (font (type::caption));
+        const auto half = row.getWidth() * 0.5f + 6.0f;
+        g.drawText (shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
+        g.drawText (shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
+    }
+    void knobLabels (juce::Graphics& g, const Ctl& c, juce::Rectangle<float> knobR, bool hover, bool active, float hot, juce::Colour ac)
+    {
+        using namespace theme;
+        rangeRow (g, c.param, knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f), c.showValue && (hover || active), c.size == 2, ac, active);
+        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+        g.setFont (font (c.size == 2 ? type::small : type::caption, true));
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 14.0f, c.r.getWidth() + 28.0f, 14.0f),
+                    juce::Justification::centred, false);
+    }
+    // a short curved bar (a smile) filled in the accent up to the value, the scale and the caption under it
+    void paintArcBar (juce::Graphics& g, const Ctl& c, bool hover, bool active, float hot, juce::Colour ac, bool on)
+    {
+        using namespace theme;
+        const auto bw = juce::jmin (c.r.getWidth() - 8.0f, 72.0f);
+        const auto R = bw * 1.15f;
+        const auto theta = std::asin (juce::jlimit (0.0f, 1.0f, bw * 0.5f / R));
+        const auto cx = c.r.getCentreX();
+        const auto sag = R * (1.0f - std::cos (theta));
+        const auto cy = c.r.getY() + 4.0f + sag - R; // the bar's ends at the top, its middle `sag` lower
+        const auto left = juce::MathConstants<float>::pi + theta, right = juce::MathConstants<float>::pi - theta;
+        const auto value = juce::jlimit (0.0f, 1.0f, v (c.param));
+        const auto at = [&] (float u) { return left + (right - left) * u; };
+        const auto t = 4.0f;
+        juce::Path track;
+        track.addCentredArc (cx, cy, R, R, 0.0f, left, right, true);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (track, juce::PathStrokeType (t + 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colours::white.withAlpha (0.10f + 0.06f * hot));
+        g.strokePath (track, juce::PathStrokeType (t, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const auto from = c.bipolar ? at (0.5f) : left, to = at (value);
+        if (std::abs (to - from) > 0.002f)
+        {
+            juce::Path fill;
+            fill.addCentredArc (cx, cy, R, R, 0.0f, from, to, true);
+            g.setColour (on ? (active ? ac.brighter (0.25f) : ac) : colour::textDisabled);
+            g.strokePath (fill, juce::PathStrokeType (t, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        const auto barBottom = c.r.getY() + 4.0f + sag + t;
+        const auto row = juce::Rectangle<float> (cx - bw * 0.5f, barBottom + 1.0f, bw, 12.0f);
+        if (knobRanges)
+            rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
+        else if (hover || active)
+            rangeRow (g, c.param, row, true, false, ac, active);
+        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+        g.setFont (font (type::caption, true));
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
+                    juce::Justification::centred, false);
     }
 
     // a floating panel (the knob panels over the display)

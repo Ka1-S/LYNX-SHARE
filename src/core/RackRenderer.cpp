@@ -53,7 +53,7 @@ namespace
 bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
 {
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
-           && a.hostMaxBuffer == b.hostMaxBuffer;
+           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize;
 }
 
 // Silent instrument: plugin channel that could not be loaded.

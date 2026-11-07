@@ -34,10 +34,15 @@ float driveCurve (float x, double amount) noexcept
 {
     if (amount <= 0.0)
         return x;
-    const auto pre = (float) std::pow (10.0, 1.75 * amount / 20.0);
-    const auto down = (float) std::pow (10.0, -1.5 * std::max (0.0, amount - 6.0) / 20.0);
+    // round tp172d, measured on the reference's 1 kHz level staircase (refcap0124): the drive adds 1.72 dB of gain per
+    // step (+4.3 / +8.6 / +12.9 / +17.2 dB at 2.5 / 5 / 7.5 / 10) while the output it saturates into falls 1.46 dB per
+    // step (a 0 dBFS sine comes out at about 2.4 − 1.46 × drive dB RMS before the wet trim): louder and squarer as it
+    // goes, never hotter. A soft clipper with a small bias for the tube's even harmonics (its DC is high-passed after)
+    const auto g = (float) std::pow (10.0, 1.72 * amount / 20.0);
+    const auto ceiling = (float) std::pow (10.0, (2.4 - 1.46 * amount) / 20.0);
+    constexpr float bias = 0.15f;
+    const auto shaped = ceiling * (std::tanh (g * x / ceiling + bias) - std::tanh (bias)) / (1.0f - std::tanh (bias) * std::tanh (bias));
     // crossfade from clean over the first step so that 0 → 0.1 does not jump
-    const auto shaped = 0.5f * mixsuite::ember::shape (mixsuite::ember::Style::tubeBiased, 2.0f * pre * x) * down;
     const auto w = (float) std::min (1.0, amount);
     return x + w * (shaped - x);
 }
@@ -186,6 +191,15 @@ public:
 
             float y[2];
             psola.process (xin, y, stereo ? 2 : 1);
+            {
+                // round tp172d, measured on the reference's Pitch and Formant sweeps (refcap0124): its voice gets
+                // 0.36 dB louder per semitone the pitch moves up against the formants (and quieter going down), where
+                // the overlap-add here keeps the level — the tilt is matched before the drive, which hears it too
+                const auto formantTotal = linked ? semis + formantSt : formantSt;
+                const auto tilt = (float) std::exp2 (0.36 / 6.0206 * std::clamp (semis - formantTotal, -36.0, 36.0));
+                y[0] *= tilt;
+                y[1] *= tilt;
+            }
             if (amount > 0.0)
                 for (int c = 0; c < (stereo ? 2 : 1); ++c)
                 {
@@ -202,9 +216,11 @@ public:
             dry[w + dryRing] = xin[1];
             const auto d0 = dry[rd], d1 = dry[rd + dryRing];
             ++dryPos;
-            l[i] = d0 + wet * (y[0] - d0);
+            // round tp172d: the reference's wet voice sits 2.7 dB under its input (measured at every level)
+            constexpr float wetTrim = 0.733f;
+            l[i] = d0 + wet * (wetTrim * y[0] - d0);
             if (stereo)
-                r[i] = d1 + wet * (y[1] - d1);
+                r[i] = d1 + wet * (wetTrim * y[1] - d1);
         }
         meterSung.store ((float) sung, std::memory_order_relaxed);
         meterOut.store (sung > 0.0 ? (float) (sung + shift + pitchSt) : -1.0f, std::memory_order_relaxed);

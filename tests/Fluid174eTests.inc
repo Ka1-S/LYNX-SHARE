@@ -70,3 +70,70 @@ TEST (fluid174e_meter_dirty_rows)
     r = lynx::meters::dirtyRows (a, b, 100, lin);
     CHECK (! r.empty() && r.top >= 28 && r.bottom <= 33);
 }
+
+// Round 174e2: Settings › General › Animation rate. A capped animation runs on evenly spread display frames, the same
+// frames for every animation with that cap.
+#include "core/FramePacing.h"
+
+TEST (fluid174e2_frame_pacing)
+{
+    // one second of vertical blanks at `displayHz` (stamps with a little jitter, from an arbitrary clock), cap `capHz`:
+    // the frames run and the longest gap between two runs, in display frames
+    auto count = [] (double displayHz, double capHz, int frames, double jitterMs = 0.3) {
+        lynx::framepace::Pacer pacer;
+        const auto period = 1000.0 / displayHz;
+        int n = 0, longestGap = 0, gap = 0;
+        for (int i = 0; i < frames + 200; ++i)
+        {
+            const auto stamp = 37'000'000.0 + i * period + ((i * 7919) % 11 - 5) * jitterMs / 5.0;
+            const auto ran = pacer.runs (stamp, period, capHz);
+            CHECK (pacer.runs (stamp, period, capHz) == ran); // (another ticker on the same blank: the same answer)
+            if (i < 200)
+                continue; // (settled)
+            ++gap;
+            if (ran)
+            {
+                ++n;
+                longestGap = std::max (longestGap, gap);
+                gap = 0;
+            }
+        }
+        return std::make_pair (n, longestGap);
+    };
+    CHECK (count (144.0, 144.0, 144).first == 144); // the display's rate
+    CHECK (count (144.0, 170.0, 144).first == 144); // a cap above the refresh: every frame
+    CHECK (count (144.0, 72.0, 144) == std::make_pair (72, 2));
+    const auto at60 = count (144.0, 60.0, 144);
+    CHECK (at60.first >= 59 && at60.first <= 61 && at60.second <= 3); // 60 Hz: every 2nd or 3rd frame
+    const auto at30 = count (144.0, 30.0, 144);
+    CHECK (at30.first >= 29 && at30.first <= 31 && at30.second <= 5);
+    // a 60 Hz display with a 30 Hz cap: every other frame; with the toolbar's 72 Hz cap: every frame
+    CHECK (count (60.0, 30.0, 60) == std::make_pair (30, 2));
+    CHECK (count (60.0, 72.0, 60).first == 60);
+
+    // blanks of a second monitor (60 Hz, another phase) mixed in: still at most the cap, evenly
+    {
+        lynx::framepace::Pacer pacer;
+        int n = 0;
+        for (int i = 0; i < 144 * 3; ++i)
+        {
+            const auto t = 1000.0 * i / 144.0;
+            if (pacer.runs (t, 1000.0 / 144.0, 60.0))
+                ++n;
+            if (i % 12 == 5 && pacer.runs (t + 3.1, 1000.0 / 144.0, 60.0)) // (another monitor's blank between two)
+                ++n;
+        }
+        CHECK (n >= 3 * 60 - 3 && n <= 3 * 60 + 3);
+    }
+    // a stall of half a second: no burst of catch-up frames after it
+    {
+        lynx::framepace::Pacer pacer;
+        const auto period = 1000.0 / 144.0;
+        for (int i = 0; i < 100; ++i)
+            pacer.runs (i * period, period, 60.0);
+        int burst = 0;
+        for (int i = 172; i < 175; ++i)
+            burst += pacer.runs (i * period, period, 60.0) ? 1 : 0;
+        CHECK (burst <= 2);
+    }
+}

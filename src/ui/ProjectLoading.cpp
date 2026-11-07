@@ -6,6 +6,7 @@
 #include "core/FlPluginDb.h"
 #include "core/LoadTrace.h"
 #include "flp/Flp.h"
+#include "core/AlsImport.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -118,7 +119,11 @@ private:
             if (juce::MemoryBlock data; file.loadFileAsData (data))
                 try
                 {
-                    uses = flpForeignPlugins (flp::parseProject ({ static_cast<const std::uint8_t*> (data.getData()), data.getSize() }));
+                    const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                    if (file.hasFileExtension ("als")) // a Live set (round 175a)
+                        uses = alsForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
+                    else
+                        uses = flpForeignPlugins (flp::parseProject ({ bytes, data.getSize() }));
                 }
                 catch (const flp::Error&)
                 {
