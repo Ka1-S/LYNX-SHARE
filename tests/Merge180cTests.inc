@@ -247,3 +247,20 @@ TEST (merge180c_automation_link_answers)
     CHECK (all.automations[3].name == "Cut - merged #2");
     CHECK (all.playlist[0].start == all.playlist[1].start && all.playlist[(std::size_t) index].automation == 2);
 }
+
+TEST (merge180c_ctrl_g_all_clips_with_a_muted_one)
+{
+    // the FL check's project a_merge (FL: one clip at bar 1 on track 4, the muted P3 stays)
+    using namespace lynx;
+    auto song = pl168f::songWithPatterns (3);
+    const std::int64_t bar = ppq * 4;
+    song.playlist.push_back (pl168f::patternClip (0, 5, 0, bar));
+    song.playlist.push_back (pl168f::patternClip (1, 3, bar, bar));
+    song.playlist.push_back (pl168f::patternClip (2, 1, 2 * bar, bar));
+    song.playlist.back().muted = true;
+    int added = -1;
+    CHECK ((pltracks::mergePatternClips (song, pltracks::mergeCandidates (song, {}), &added) == pltracks::MergeResult::merged));
+    CHECK (added >= 0 && song.playlist[(std::size_t) added].track == 3 && song.playlist[(std::size_t) added].start == 0
+           && song.playlist[(std::size_t) added].length == 2 * bar);
+    CHECK (song.playlist.size() == 2);
+}
