@@ -325,8 +325,7 @@ TEST (issues178a_tempo_events_in_song_mode)
     e.track = 4;
     song.playlist.push_back (e);
     CHECK (issues178a::near (song.tempoAt (26 * ppq), 100.0));            // a later event writes over it
-    CHECK (issues178a::near (song.tempoAt (2 * ppq), 120.0));             // before anything: the project's tempo (issue #97: a
-                                                                           // control has its own value before its first clip)
+    CHECK (issues178a::near (song.tempoAt (2 * ppq), 60.0));              // before anything: the first tempo clip's value
 }
 
 // #86: FL's .flp keeps the Tempo events as BPM × 1000 (0x40000005 events) and the initialized tempo in 0xD8; both go

@@ -163,7 +163,8 @@ TEST (issue97_two_tempo_clips)
     }
     issue97::addClip (s, 0, 2, 2, 1);
     issue97::addClip (s, 1, 6, 2, 2);
-    CHECK (s.tempoAt ((double) issue97::bar) == s.bpm); // before: the project's tempo
+    // before the first clip: the first clip's value (178a's rule for the tempo, unverified against FL)
+    CHECK (std::abs (s.tempoAt ((double) issue97::bar) - lynx::tempoFromValue (0.2f)) < 1.0e-3);
     const auto first = s.tempoAt ((double) issue97::bar * 3), second = s.tempoAt ((double) issue97::bar * 7);
     CHECK (first < second);
     CHECK (s.tempoAt ((double) issue97::bar * 5) == first);

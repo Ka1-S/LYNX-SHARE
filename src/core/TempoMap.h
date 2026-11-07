@@ -126,19 +126,25 @@ inline double tempoAt (const Song& song, double tick) noexcept
 
     // the tempo automations (issue #97, the rule of every target, RackRenderer's automationValueAt): inside clips the
     // one that started last wins (same start: the lowest automation); after them, the value the clip that ended last
-    // ended with (written at its end); before the first clip, none (the project's tempo)
+    // ended with (written at its end); before the first clip, the first clip's first value (round 178a, lowest priority;
+    // unverified against FL for the tempo: the other targets have their own value there)
     Write automation;
     if (tempoAutomation (song) >= 0)
     {
         const Clip* inside = nullptr;
         const Clip* ended = nullptr;
+        const Clip* first = nullptr;
         for (const auto& c : song.playlist)
         {
             if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) song.automations.size() || c.length <= 0
-                || c.muted || song.isTrackMuted (c.track) || tick < (double) c.start)
+                || c.muted || song.isTrackMuted (c.track))
                 continue;
             const auto& a = song.automations[(std::size_t) c.automation];
             if (a.target.kind != AutomationTargetKind::tempo || a.isLive())
+                continue;
+            if (first == nullptr || c.start < first->start || (c.start == first->start && c.automation < first->automation))
+                first = &c;
+            if (tick < (double) c.start)
                 continue;
             if (tick < (double) c.end())
             {
@@ -152,6 +158,8 @@ inline double tempoAt (const Song& song, double tick) noexcept
             return tempoFromValue (song.automations[(std::size_t) inside->automation].valueAt (tick - (double) inside->start + (double) inside->offset));
         if (ended != nullptr)
             automation = { (double) ended->end(), song.automations[(std::size_t) ended->automation].valueAt ((double) (ended->length + ended->offset)) };
+        else if (first != nullptr)
+            automation.value = song.automations[(std::size_t) first->automation].valueAt ((double) first->offset);
     }
 
     Write events;
