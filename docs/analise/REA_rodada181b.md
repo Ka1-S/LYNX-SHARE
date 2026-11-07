@@ -32,8 +32,9 @@ fixed format; the variable reads "R$" at its start, the system's currency string
 | Range | 2 to 10 keys held, per MIDI channel, else "---" | [STATIC] 0xd328f0 |
 | Timing | note-on at once; note-off after max(100 ms, delay); Piano Roll selection holds max(2000 ms, delay) | [STATIC] 0xd328f0, 0xd331b0, 0xd32da0 |
 | Menu | "Display delay for played chords": None, 1 second, 3 seconds, 5 seconds, Show forever | [RUN] |
+| Delay on the panel | With 3 seconds, "C" stays after release | [RUN] |
 | Size | 96 x 40, box 89 x 33; font 18, smaller by 1.15 per character past 8 | [STATIC] 0xd32600 |
-| Near hint bar | View ▸ Toolbars ▸ "Show detected MIDI chords near the hint bar", off by default | [RUN] menu, registry `ShowDetectedMIDIChord=0`. **Its readout was not confirmed at runtime** |
+| Near hint bar | View ▸ Toolbars ▸ "Show detected MIDI chords near the hint bar", off by default. White outlined text with no box, just under the hint bar's left end, over the panels below. It leaves with "---". With delay None it was still up about 1 s into a held chord and gone 150 ms after release; with 3 s it was still up over 1 s after release | [RUN] FL session 22:59–23:01, registry `ShowDetectedMIDIChord=0`; [STATIC] 0xd32740: duration min(delay, 15000) ms. Timeout with a held chord and with Show forever not exercised at runtime |
 
 ### Roman has no effect in FL's panel
 

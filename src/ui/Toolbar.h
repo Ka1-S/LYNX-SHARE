@@ -184,6 +184,18 @@ private:
     juce::String text { "---" };
 };
 
+// The chord near the hint bar (View › Toolbars): outlined text with no box, over whatever is below the bar, as in FL.
+class ChordHint final : public juce::Component
+{
+public:
+    ChordHint() { setInterceptsMouseClicks (false, false); }
+    void setText (const juce::String& newText);
+    void paint (juce::Graphics& g) override;
+
+private:
+    juce::String text;
+};
+
 class OutputMonitor final : public juce::Component,
                             public ui::HintSource
 {

@@ -501,7 +501,7 @@ private:
     toolbar::MasterKnob masterPitch { engine, toolbar::MasterKnob::Kind::pitch };
     toolbar::PerformanceMeter perfMeter;
     toolbar::ChordPanel chordPanel;
-    juce::Label chordNearHint; // View › Toolbars: "Show detected MIDI chords near the hint bar"
+    toolbar::ChordHint chordNearHint; // View › Toolbars: "Show detected MIDI chords near the hint bar"
     chordread::Readout chordReadout;
     std::array<std::array<std::uint64_t, 2>, chordread::channels> chordHeld {};
     std::array<std::string, 12> chordNotes;

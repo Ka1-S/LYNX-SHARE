@@ -2003,4 +2003,4 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Chord names | `chordread::nameKeys` | ✅ | 0 differences in 19852 measured key sets; own wording for the joke names |
 | Display delay menu | same | ✅ | |
 | Chord style (Roman) | a working item | ➕ | LYNX addition: FL hides the item and its flag does nothing in the detector |
-| Near the hint bar | same menu item | ⚠️ | FL's readout not confirmed at runtime |
+| Near the hint bar | same menu item, outlined text under the hint bar | ✅ | seen in FL at runtime; the 15 s cap comes from the decompile |

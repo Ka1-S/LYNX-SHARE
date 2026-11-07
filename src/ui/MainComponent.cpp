@@ -627,11 +627,6 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         juce::Desktop::getInstance().setGlobalScaleFactor ((float) toolbarLayout.uiScale / 100.0f);
 
     addChildComponent (chordNearHint);
-    chordNearHint.setFont (theme::font (theme::type::body, true));
-    chordNearHint.setColour (juce::Label::textColourId, theme::colour::textPrimary);
-    chordNearHint.setColour (juce::Label::backgroundColourId, theme::colour::bg1);
-    chordNearHint.setJustificationType (juce::Justification::centred);
-    chordNearHint.setInterceptsMouseClicks (false, false);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
     PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
         if (! chordPanel.isVisible())
@@ -4082,20 +4077,20 @@ void MainComponent::showChordText()
 
     if (chordShowNearHint)
     {
+        // as FL: it follows the panel, leaves with "---", and with a display delay stays that long at most (15 s at most)
         const auto chord = chordReadout.text() != chordread::noChord && text.isNotEmpty();
-        chordNearHint.setText (text, juce::dontSendNotification);
-        const auto width = juce::roundToInt (juce::GlyphArrangement::getStringWidth (chordNearHint.getFont(), text)) + 16;
-        chordNearHint.setBounds (hintBar.getX() + 8, hintBar.getBottom() + 4, width, 22);
+        chordNearHint.setText (text);
+        const auto width = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body, true).withHeight (17.0f), text)) + 8;
+        chordNearHint.setBounds (hintBar.getX() + 8, hintBar.getBottom() + 2, width, 24);
         chordNearHint.setVisible (chord);
         if (chord)
         {
             chordNearHint.toFront (false);
-            chordNearHintUntil = juce::Time::getMillisecondCounter() + juce::jmin<std::uint32_t> (15000, juce::jmax<std::uint32_t> (chordReadout.getDelayMs(), 2000));
+            chordNearHintUntil = juce::Time::getMillisecondCounter() + juce::jmin<std::uint32_t> (15000, chordReadout.getDelayMs());
         }
     }
 }
 
-// Polled from the UI timer: the MIDI thread only sets bits, it never builds a name.
 void MainComponent::updateChordPanel()
 {
     if (! chordPanel.isVisible() && ! chordShowNearHint)
@@ -4127,7 +4122,7 @@ void MainComponent::updateChordPanel()
         changed = true;
     if (changed)
         showChordText();
-    if (chordNearHint.isVisible() && (int) (now - chordNearHintUntil) > 0 && chordReadout.getDelayMs() < 15000u)
+    if (chordNearHint.isVisible() && chordReadout.getDelayMs() > 0 && (int) (now - chordNearHintUntil) > 0)
         chordNearHint.setVisible (false);
 }
 

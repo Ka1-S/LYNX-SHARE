@@ -604,6 +604,28 @@ ui::Hint ChordPanel::hintAt (juce::Point<int>)
     return { tr ("Detected chord"), {}, false, false };
 }
 
+void ChordHint::setText (const juce::String& newText)
+{
+    if (newText != text)
+    {
+        text = newText;
+        repaint();
+    }
+}
+
+void ChordHint::paint (juce::Graphics& g)
+{
+    juce::GlyphArrangement glyphs;
+    glyphs.addFittedText (theme::font (theme::type::body, true).withHeight (17.0f), text, 2.0f, 0.0f, (float) getWidth() - 4.0f, (float) getHeight(),
+                          juce::Justification::centredLeft, 1, 1.0f);
+    juce::Path outline;
+    glyphs.createPath (outline);
+    g.setColour (juce::Colours::black);
+    g.strokePath (outline, juce::PathStrokeType (2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (juce::Colours::white);
+    g.fillPath (outline);
+}
+
 void MidiActivityLight::paint (juce::Graphics& g)
 {
     const auto size = juce::jmin ((float) getWidth(), (float) getHeight()) * 0.36f;
