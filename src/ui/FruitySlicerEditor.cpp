@@ -47,6 +47,7 @@ class Scope final : public juce::Component
 public:
     std::function<const State*()> state;
     std::function<std::shared_ptr<const SampleData>()> sample;
+    std::function<std::vector<std::int32_t>()> starts; // where the slices start in the shown (processed) sample
     std::function<int()> selected;
     std::function<void (int)> select;
     std::function<void (int, std::int32_t)> moveSlice;   // slice, new start
@@ -67,10 +68,11 @@ public:
         }
         const auto frames = (double) data->frames();
         const auto sel = selected ? selected() : -1;
-        const auto lengths = fslicer::sliceLengths (*s, (std::int64_t) frames);
-        if (sel >= 0 && sel < (int) s->slices.size())
+        const auto at = starts();
+        if (sel >= 0 && sel < (int) at.size())
         {
-            const auto x0 = xOf (s->slices[(std::size_t) sel].position, frames), x1 = xOf ((double) s->slices[(std::size_t) sel].position + (double) lengths[(std::size_t) sel], frames);
+            const auto end = sel + 1 < (int) at.size() ? (double) at[(std::size_t) sel + 1] : frames;
+            const auto x0 = xOf (at[(std::size_t) sel], frames), x1 = xOf (end, frames);
             g.setColour (theme::colour::accent.withAlpha (0.18f));
             g.fillRect (juce::Rectangle<float> (x0, r.getY(), std::max (1.0f, x1 - x0), r.getHeight()));
         }
@@ -93,7 +95,7 @@ public:
         g.setFont (theme::font (theme::type::caption));
         for (std::size_t i = 0; i < s->slices.size(); ++i)
         {
-            const auto x = xOf (s->slices[i].position, frames);
+            const auto x = xOf (i < at.size() ? at[i] : 0, frames);
             g.setColour ((int) i == sel ? theme::colour::textPrimary : theme::colour::textSecondary);
             g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
             g.drawText (juce::String ((int) i + 1) + (s->slices[i].reversed() ? " R" : ""), juce::Rectangle<float> (x + 2.0f, r.getY() + 1.0f, 40.0f, 14.0f),
@@ -111,10 +113,11 @@ public:
         const auto frame = (std::int32_t) std::clamp (frames * e.x / std::max (1, getWidth()), 0.0, frames - 1.0);
         dragging = -1;
         // a start line under the mouse (not the first): drag it
-        for (std::size_t i = 1; i < s->slices.size(); ++i)
-            if (std::abs (xOf (s->slices[i].position, frames) - (float) e.x) < 4.0f)
+        const auto at = starts();
+        for (std::size_t i = 1; i < at.size(); ++i)
+            if (std::abs (xOf (at[i], frames) - (float) e.x) < 4.0f)
                 dragging = (int) i;
-        const auto hit = sliceAt (*s, frame);
+        const auto hit = sliceAt (at, frame);
         if (e.mods.isPopupMenu())
         {
             if (menu)
@@ -136,11 +139,11 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override { dragging = -1; }
 
-    static int sliceAt (const State& s, std::int32_t frame)
+    static int sliceAt (const std::vector<std::int32_t>& at, std::int32_t frame)
     {
         int hit = 0;
-        for (std::size_t i = 0; i < s.slices.size(); ++i)
-            if (s.slices[i].position <= frame)
+        for (std::size_t i = 0; i < at.size(); ++i)
+            if (at[i] <= frame)
                 hit = (int) i;
         return hit;
     }
@@ -259,6 +262,7 @@ public:
 
         scope.state = [this] { return &state; };
         scope.sample = [this] { return processed; };
+        scope.starts = [this] { return original != nullptr ? fslicer::playedStarts (state, (std::int64_t) original->frames()) : std::vector<std::int32_t>(); };
         scope.selected = [this] { return selected; };
         scope.select = [this] (int i) {
             selected = i;
@@ -268,6 +272,8 @@ public:
         scope.moveSlice = [this] (int i, std::int32_t at) {
             if (i <= 0 || i >= (int) state.slices.size())
                 return;
+            if (state.stretch != 0 && state.method < 2)
+                at = (std::int32_t) std::nearbyint ((double) at / (double) fslicer::stretchFactor (state.stretch));
             const auto lo = state.slices[(std::size_t) i - 1].position + 1;
             const auto hi = i + 1 < (int) state.slices.size() ? state.slices[(std::size_t) i + 1].position - 1 : at;
             state.slices[(std::size_t) i].position = std::clamp (at, lo, std::max (lo, hi));
@@ -451,9 +457,13 @@ private:
     {
         if (processed == nullptr || slice < 0 || slice >= (int) state.slices.size())
             return;
-        const auto lengths = fslicer::sliceLengths (state, (std::int64_t) processed->frames());
-        const auto from = (std::size_t) state.slices[(std::size_t) slice].position;
-        const auto count = (std::size_t) (state.playToEnd != 0 ? (std::int64_t) processed->frames() - (std::int64_t) from : lengths[(std::size_t) slice]);
+        const auto at = fslicer::playedStarts (state, original != nullptr ? (std::int64_t) original->frames() : 0);
+        if (slice >= (int) at.size())
+            return;
+        const auto total = (std::int64_t) processed->frames();
+        const auto from = (std::size_t) std::clamp<std::int64_t> (at[(std::size_t) slice], 0, total);
+        const auto end = state.playToEnd != 0 || slice + 1 >= (int) at.size() ? total : std::clamp<std::int64_t> (at[(std::size_t) slice + 1], (std::int64_t) from, total);
+        const auto count = (std::size_t) (end - (std::int64_t) from);
         auto part = std::make_shared<SampleData>();
         part->sampleRate = processed->sampleRate;
         part->left.assign (processed->leftData() + from, processed->leftData() + from + count);
@@ -728,7 +738,7 @@ private:
                 else if (r == 2)
                 {
                     fslicer::Slice added;
-                    added.position = frame;
+                    added.position = s.stretch != 0 && s.method < 2 ? (std::int32_t) std::nearbyint ((double) frame / (double) fslicer::stretchFactor (s.stretch)) : frame;
                     s.slices.insert (s.slices.begin() + slice + 1, added);
                 }
             });

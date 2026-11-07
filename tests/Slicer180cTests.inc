@@ -175,3 +175,65 @@ TEST (slicer180c_prepare_reverses_declicks_and_fades)
     CHECK (fd->left[441] == sample.left[441]);
     CHECK (fd->left[4409] < 0.01f);
 }
+
+TEST (slicer180c_fill_gaps_stretch)
+{
+    // FUN_0075b5d0: the slice's start stays, the grown part ping-pongs between the peaks of its second half and fades
+    // out by 2× its length; a slice ending in silence is copied and padded with silence
+    using namespace lynx;
+    const int n = 4410, grown = 6000;
+    std::vector<std::int16_t> tone ((std::size_t) n), out ((std::size_t) grown, 0);
+    for (int i = 0; i < n; ++i)
+        tone[(std::size_t) i] = (std::int16_t) std::lround (8000.0 * std::sin (i * 0.05));
+    fslicer::fillGaps (tone.data(), out.data(), n, grown, 1, 44100, 0);
+    CHECK (std::equal (tone.begin(), tone.begin() + n / 2 - 900, out.begin()));
+    int beyond = 0;
+    for (int i = n; i < grown; ++i)
+        beyond = std::max (beyond, (int) std::abs (out[(std::size_t) i]));
+    CHECK (beyond > 100 && beyond < 8001);
+
+    std::vector<std::int16_t> quiet (tone);
+    std::fill (quiet.begin() + n - 600, quiet.end(), (std::int16_t) 0);
+    std::vector<std::int16_t> padded ((std::size_t) grown, 7);
+    fslicer::fillGaps (quiet.data(), padded.data(), n, grown, 1, 44100, 0);
+    CHECK (std::equal (quiet.begin(), quiet.end(), padded.begin()));
+    CHECK (std::all_of (padded.begin() + n, padded.end(), [] (std::int16_t v) { return v == 0; }));
+
+    // the whole sample: 2^(5000/10000) longer, the slices at their scaled places
+    auto s = slicer180c::threeSlices();
+    s.stretch = 5000;
+    const auto sample = slicer180c::ramp (13230);
+    const auto out2 = fslicer::prepare (sample, s);
+    const auto f = fslicer::stretchFactor (5000);
+    CHECK (std::fabs (f - 1.41421356f) < 1e-5f);
+    CHECK ((std::int64_t) out2->frames() == (std::int64_t) std::nearbyint (13230.0 * (double) f));
+    const auto starts = fslicer::playedStarts (s, 13230);
+    CHECK (starts[1] == (std::int32_t) std::nearbyint (4410.0 * (double) f));
+    s.method = 4; // the licensed engine's modes: LYNX keeps the length
+    CHECK (fslicer::prepare (sample, s)->frames() == 13230);
+}
+
+TEST (slicer180c_dump_modes)
+{
+    using namespace lynx;
+    auto s = slicer180c::threeSlices(); // 0, 4410, 8820 of 13230 frames = 3 beats → 1 beat each at PPQ 96
+    s.lengthBeats = 3.0f;
+    const auto none = [] (int) { return 0; };
+    auto normal = fslicer::dumpNotes (s, 0, 13230, 44100.0, 120.0, 96, none);
+    CHECK (normal.size() == 3 && normal[1].start == 96 && normal[1].length == 96 && normal[2].length == 96 && normal[2].key == 62);
+    auto reversed = fslicer::dumpNotes (s, 1, 13230, 44100.0, 120.0, 96, none);
+    CHECK (reversed[0].key == 62 && reversed[2].key == 60);
+    auto flat = fslicer::dumpNotes (s, 5, 13230, 44100.0, 120.0, 96, none);
+    CHECK (flat[1].key == 60 && flat[2].key == 60);
+    auto up = fslicer::dumpNotes (s, 10, 13230, 44100.0, 120.0, 96, none);
+    CHECK (up[0].key == 62 && up[1].key == 60);
+    auto stereo = fslicer::dumpNotes (s, 8, 13230, 44100.0, 120.0, 96, none);
+    CHECK (stereo[0].pan == -16 && stereo[1].pan == 16);
+    auto stutter = fslicer::dumpNotes (s, 14, 13230, 44100.0, 120.0, 96, none);
+    CHECK (stutter.size() == 12 && stutter[1].start == 24 && stutter[1].length == 24);
+    // Original length: real time at the project's tempo (0.1 s = 19.2 ticks at 120 BPM, PPQ 96)
+    auto real = fslicer::dumpNotes (s, 9, 13230, 44100.0, 120.0, 96, none);
+    CHECK (real[1].start == 19 && real[2].start == 38);
+    auto accent = fslicer::dumpNotes (s, 6, 13230, 44100.0, 120.0, 96, none);
+    CHECK (accent[0].velocity == 0.859375f && accent[1].velocity == 0.859375f);
+}

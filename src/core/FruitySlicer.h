@@ -64,9 +64,16 @@ std::vector<std::uint8_t> write (const State& state);
 // Slice i's length in frames, as FL computes it (FUN_00769900): up to the next slice (at least 1), the last to the end
 std::vector<std::int64_t> sliceLengths (const State& state, std::int64_t frames);
 
-// FL's edits to the loaded sample, in FL's order (FUN_007686d0): reversed slices, declick, fades. The stretch and pitch
-// shift (TS / PS) are not applied: FL runs them through a licensed engine (method ≥ 2) — see the REA doc.
+// FL's edits to the loaded sample, in FL's order (FUN_007686d0): reversed slices, declick, the TS stretch with the
+// Fill gaps methods (0, 1: FUN_0075b5d0), fades. FL runs the other methods and PS through a licensed engine: LYNX
+// leaves the length as it is there (see the REA doc).
 std::shared_ptr<SampleData> prepare (const SampleData& sample, const State& state);
+// Where the slices start in the prepared sample (moved by a Fill gaps stretch)
+std::vector<std::int32_t> playedStarts (const State& state, std::int64_t frames);
+// TS's length factor, FL's Exp(Ln 2 · v / 10000) in single precision (FUN_00766300)
+float stretchFactor (std::int32_t stretch);
+// FUN_0075b5d0 on one slice (16-bit values, interleaved): `from` (oldFrames) grows into `to` (newFrames)
+void fillGaps (const std::int16_t* from, std::int16_t* to, int oldFrames, int newFrames, int channels, int sampleRate, int method);
 
 // The single steps (exposed for the tests)
 void reverseRegion (SampleData& data, std::int64_t first, std::int64_t last);

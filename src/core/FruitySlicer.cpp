@@ -293,29 +293,202 @@ std::shared_ptr<SampleData> prepare (const SampleData& sample, const State& stat
     });
     if (state.declick != 0) // FUN_0076a790
         each ([&] (std::size_t, std::int64_t start, std::int64_t length) { declickEnd (*data, start, start + length - 1); });
+
+    // FUN_0076aa20: TS with Fill gaps / Alternate fill gaps. The sample goes to 16 bits, each slice moves to its scaled
+    // place and grows by FUN_0075b5d0 (or is cut when it shrinks), then back to float
+    if (state.stretch != 0 && state.method < 2)
+    {
+        const auto factor = stretchFactor (state.stretch);
+        const auto channels = data->right.empty() ? 1 : 2;
+        const auto newFrames = (std::int64_t) std::nearbyint ((double) frames * (double) factor);
+        std::vector<std::int16_t> old ((std::size_t) (frames * channels)), fresh ((std::size_t) (std::max<std::int64_t> (0, newFrames) * channels), 0);
+        for (std::int64_t i = 0; i < frames; ++i)
+            for (int c = 0; c < channels; ++c)
+            {
+                const auto v = std::nearbyint ((double) ((c == 0 ? data->left : data->right)[(std::size_t) i] * 32768.0f));
+                old[(std::size_t) (i * channels + c)] = (std::int16_t) std::clamp (v, -32768.0, 32767.0);
+            }
+        const auto starts = playedStarts (state, frames);
+        const auto sr = (int) std::nearbyint (data->sampleRate);
+        for (std::size_t i = 0; i < state.slices.size(); ++i)
+        {
+            const auto oldLength = (int) lengths[i];
+            const auto newLength = (int) (i + 1 < starts.size() ? std::max<std::int64_t> (1, (std::int64_t) starts[i + 1] - starts[i])
+                                                                : newFrames - starts[i]);
+            const auto from = (std::int64_t) state.slices[i].position, to = (std::int64_t) starts[i];
+            if (oldLength <= 0 || newLength <= 0 || from < 0 || to < 0 || from + oldLength > frames || to + newLength > newFrames)
+                continue;
+            if (oldLength < newLength)
+                fillGaps (old.data() + from * channels, fresh.data() + to * channels, oldLength, newLength, channels, sr,
+                          oldLength < 150 ? 0 : state.method);
+            else
+                std::copy (old.begin() + (std::ptrdiff_t) (from * channels), old.begin() + (std::ptrdiff_t) ((from + newLength) * channels),
+                           fresh.begin() + (std::ptrdiff_t) (to * channels));
+        }
+        data->left.assign ((std::size_t) newFrames, 0.0f);
+        if (channels == 2)
+            data->right.assign ((std::size_t) newFrames, 0.0f);
+        for (std::int64_t i = 0; i < newFrames; ++i)
+            for (int c = 0; c < channels; ++c)
+                (c == 0 ? data->left : data->right)[(std::size_t) i] = (float) ((double) fresh[(std::size_t) (i * channels + c)] * 3.0517578125e-05);
+    }
+    const auto playedFrames = (std::int64_t) data->left.size();
+    const auto starts = playedStarts (state, frames);
+    const auto playedLengths = [&] {
+        std::vector<std::int64_t> l;
+        for (std::size_t i = 0; i < starts.size(); ++i)
+            l.push_back (i + 1 < starts.size() ? std::max<std::int64_t> (1, (std::int64_t) starts[i + 1] - starts[i]) : playedFrames - starts[i]);
+        return l;
+    }();
     if (state.fadeInMs != 0 || state.fadeOutMs != 0) // FUN_0076a830
     {
         const auto perMs = (float) (data->sampleRate / 1000.0);
         const auto in = (std::int64_t) std::nearbyint ((double) ((float) state.fadeInMs * perMs));
         const auto out = (std::int64_t) std::nearbyint ((double) ((float) state.fadeOutMs * perMs));
-        each ([&] (std::size_t, std::int64_t start, std::int64_t length) {
+        for (std::size_t i = 0; i < starts.size(); ++i)
+        {
+            const auto start = (std::int64_t) starts[i], length = playedLengths[i];
+            if (length <= 0)
+                continue;
             const auto a = std::min (in, length);
             fadeRegion (*data, start, start + a - 1, true);
             const auto b = std::min (out, length);
             const auto from = start + length - b;
             fadeRegion (*data, from, from + b - 1, false);
-        });
+        }
     }
     return data;
+}
+
+float stretchFactor (std::int32_t stretch)
+{
+    return (float) std::exp (std::log (2.0) * (double) ((float) stretch / 10000.0f));
+}
+
+std::vector<std::int32_t> playedStarts (const State& state, std::int64_t frames)
+{
+    std::vector<std::int32_t> starts;
+    const auto stretched = state.stretch != 0 && state.method < 2 && frames > 0;
+    const auto factor = stretched ? stretchFactor (state.stretch) : 1.0f;
+    for (const auto& slice : state.slices)
+        starts.push_back (stretched ? (std::int32_t) std::nearbyint ((double) slice.position * (double) factor) : slice.position);
+    return starts;
+}
+
+void fillGaps (const std::int16_t* from, std::int16_t* to, int oldFrames, int newFrames, int channels, int sampleRate, int method)
+{
+    // FUN_0075b5d0
+    std::vector<float> src ((std::size_t) (oldFrames * channels)), dst ((std::size_t) (newFrames * channels), 0.0f);
+    for (std::size_t i = 0; i < src.size(); ++i)
+        src[i] = (float) ((double) from[i] * 3.0517578125e-05);
+    const int tail = (sampleRate * 10 + 500) / 1000;
+    // a slice that ends in silence (its last 10 ms under one step): copied, the rest left silent
+    bool silent = true;
+    for (int i = oldFrames * channels - 1; i >= std::max (0, oldFrames - tail) * channels; --i)
+        if ((double) src[(std::size_t) i] > 3.0517578125e-05)
+        {
+            silent = false;
+            break;
+        }
+    auto store = [&] (int count) {
+        for (int i = 0; i < count; ++i)
+        {
+            const auto v = std::nearbyint ((double) (dst[(std::size_t) i] * 32768.0f));
+            to[i] = (std::int16_t) std::clamp (v, -32768.0, 32767.0);
+        }
+    };
+    if (silent)
+    {
+        const auto n = std::min (oldFrames, newFrames) * channels;
+        for (int i = 0; i < n; ++i)
+            dst[(std::size_t) i] = src[(std::size_t) i];
+        store (newFrames * channels);
+        return;
+    }
+    const int twice = oldFrames * 2;
+    for (int c = 0; c < channels; ++c)
+    {
+        auto at = [&] (int frame) { return src[(std::size_t) (frame * channels + c)]; };
+        int first = (oldFrames + 1) >> 1, last = oldFrames - 1;
+        const int back = std::max (1, (sampleRate * 20 + 500) / 1000);
+        bool none = true;
+        for (int k = std::max (0, first - back); k <= oldFrames - 2; ++k)
+            if (k >= 1 && std::fabs ((double) at (k - 1)) < std::fabs ((double) at (k)) && std::fabs ((double) at (k + 1)) <= std::fabs ((double) at (k)))
+            {
+                if (none)
+                {
+                    none = false;
+                    first = k;
+                }
+                last = k;
+            }
+        const int span = std::max (1, last - first);
+        for (int k = 0; k < newFrames; ++k)
+        {
+            float x;
+            if (k < first)
+                x = at (k);
+            else
+            {
+                const auto idx = ((k - first) + span) % (span * 2);
+                x = at (std::abs (idx - span) + first);
+            }
+            if (k < twice)
+            {
+                if (oldFrames <= k && oldFrames < twice)
+                {
+                    const float t = (float) (k - oldFrames) / (float) (twice - oldFrames);
+                    float g = (1.0f - t) * (1.0f - t) * (1.0f - t);
+                    if ((method & 1) == 0)
+                    {
+                        if (0.5f < t)
+                        {
+                            const float u = 1.0f - (t - 0.5f) * 2.0f;
+                            g = g + (0.275f - g) * (1.0f - u * u * u);
+                        }
+                    }
+                    else if (0.5f < t)
+                    {
+                        const float u = 1.0f - (t - 0.5f) * 2.0f, w = (t - 0.5f) * 2.0f;
+                        g = (g + (0.1375f - g) * (1.0f - u * u * u)) * (1.0f - w * w * w);
+                    }
+                    x = x * g;
+                }
+            }
+            else
+                x = 0.0f;
+            dst[(std::size_t) (k * channels + c)] = x;
+        }
+    }
+    if ((method & 1) == 0)
+    {
+        // Fill gaps ends with a short linear fade (2 ms) where the grown part stops
+        const int end = std::min (twice, newFrames);
+        const int fade = std::max (0, std::min ((sampleRate * 2 + 500) / 1000, end - 1));
+        if (fade > 0)
+            for (int c = 0; c < channels; ++c)
+                for (int k = end - fade; k <= end - 1; ++k)
+                {
+                    const double d = std::max (1.0, (double) (fade - 1));
+                    const double r = std::min (1.0, std::max (0.0, (double) (k - (end - fade)) / d));
+                    dst[(std::size_t) (k * channels + c)] *= (float) (1.0 - r);
+                }
+    }
+    store (newFrames * channels);
 }
 
 void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
 {
     def.sampler.slices.clear();
+    // `frames`: the prepared sample's; the starts are FL's scaled ones when Fill gaps stretched it
+    const auto scaled = state.stretch != 0 && state.method < 2;
+    const auto factor = scaled ? stretchFactor (state.stretch) : 1.0f;
+    const auto originalFrames = scaled ? (std::int64_t) std::nearbyint ((double) frames / (double) factor) : frames;
+    const auto starts = playedStarts (state, originalFrames);
     if (frames > 0)
-        for (const auto& slice : state.slices)
-            if (slice.position >= 0 && slice.position < frames)
-                def.sampler.slices.push_back ((float) ((double) slice.position / (double) frames));
+        for (const auto p : starts)
+            if (p >= 0 && p < frames)
+                def.sampler.slices.push_back ((float) ((double) p / (double) frames));
     def.sampler.sliceFirstKey = state.firstNote;
     def.sampler.slicesToEnd = state.playToEnd != 0;
     // PS: FL shifts the pitch and keeps the length through its licensed stretch engine; LYNX resamples (the slice gets
