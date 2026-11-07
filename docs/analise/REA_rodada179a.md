@@ -125,6 +125,8 @@ under the GUI lock, window 1689x950, two runs each (`perf/wslg-*.txt`):
 
 The GL renderer string was not logged, so whether WSLg's GL went through the GPU (d3d12) or llvmpipe is not proven.
 Either way JUCE's GL path is slower here, and an optional GL mode is not worth building on this evidence.
+**Status: not proven for native GPUs.** The result holds for WSLg only (renderer not logged); it says nothing yet about
+a native Linux desktop with Mesa or NVIDIA drivers.
 
 What WSLg proves: the same build is faster on WSLg (a real compositor at the display's rate) than on Xvfb, so part of the
 Xvfb numbers is the test server. What it does not prove: a native Linux desktop with a real GPU driver (Mesa, NVIDIA)
