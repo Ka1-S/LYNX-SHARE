@@ -1145,7 +1145,8 @@ public:
             // of the third-party parity pictures (round tp172b)
             const auto i = args.indexOf ("--parityshot");
             runParityShot (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() ? args[i + 3].unquoted() : juce::String());
-            quit();
+            if (parityShow == nullptr)
+                quit();
             return;
         }
 
@@ -1931,6 +1932,7 @@ public:
 
     void shutdown() override
     {
+        parityShow.reset(); // (LYNX_PARITYSHOT_SHOW's window, before the engine it shows)
         if (relaunched || updateHelper)
             return; // the copy that ran owns the session (its crash notes stay for the next start)
 
@@ -6993,6 +6995,15 @@ private:
         editorCpu->start();
     }
 
+    struct ParityShow
+    {
+        std::unique_ptr<lynx::AudioEngine> engine;
+        std::unique_ptr<juce::Component> editor;
+        std::unique_ptr<juce::DocumentWindow> window;
+        ~ParityShow() { window.reset(); editor.reset(); engine.reset(); }
+    };
+    std::shared_ptr<ParityShow> parityShow;
+
     void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -7012,7 +7023,8 @@ private:
                 if (index >= 0 && index < lynx::maxEffectParams)
                     fx.params[(std::size_t) index] = t[1].getFloatValue();
             }
-        lynx::AudioEngine offline (false);
+        auto offlineOwner = std::make_unique<lynx::AudioEngine> (false); // (kept alive by LYNX_PARITYSHOT_SHOW's window)
+        auto& offline = *offlineOwner;
         auto song = lynx::Song::makeDefault();
         song.mixer.resize (2);
         song.mixer[0].name = "Master";
@@ -7082,6 +7094,26 @@ private:
             }
             target->mouseUp (event (local, {}, false));
             target->mouseExit (event ({ -1000.0f, -1000.0f }, {}, false));
+        }
+        // round tp172b6: LYNX_PARITYSHOT_SHOW=1 puts the same editor in a real window and keeps it open (for a guarded GUI check
+        // of its pop-up menus, which the offscreen picture cannot hold); closing the window quits
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_SHOW", {}) == "1")
+        {
+            struct ShowWindow final : juce::DocumentWindow
+            {
+                ShowWindow() : juce::DocumentWindow ("LYNX parity check", juce::Colours::black, juce::DocumentWindow::closeButton) {}
+                void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
+            };
+            parityShow = std::make_shared<ParityShow>();
+            parityShow->engine = std::move (offlineOwner);
+            parityShow->editor = std::move (editor);
+            auto window = std::make_unique<ShowWindow>();
+            window->setUsingNativeTitleBar (true);
+            window->setContentNonOwned (parityShow->editor.get(), true);
+            window->setTopLeftPosition (80, 80);
+            window->setVisible (true);
+            parityShow->window = std::move (window);
+            return;
         }
         juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
         {
