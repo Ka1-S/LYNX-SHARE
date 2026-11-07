@@ -99,6 +99,7 @@ struct RackState
     ScheduleIndex schedule; // index to schedule the Playlist without scanning every note
     std::vector<int> performanceZone; // Performance mode: the zone's clips (perf::zoneClips), empty when off
     int tempoAutomation = -1; // tempo automation, if any
+    bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
     // PDC: per-edge delays (nullptr = no delay) and the latencies used to build the plan.
     PdcPlan pdc;

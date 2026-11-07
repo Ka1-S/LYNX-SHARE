@@ -1,0 +1,53 @@
+name: Round build
+
+# Windows build of a work tree, so development builds don't wait for a slot on the local machine.
+# tools/ci-round-build.sh pushes the tree to ci/<name>, waits for this run, downloads the artifact and deletes the branch.
+on:
+  push:
+    branches: ['ci/**']
+
+env:
+  JUCE_VERSION: 8.0.4
+  JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
+  ZIG_VERSION: 0.14.1
+  ZIG_SHA256: 24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c
+
+jobs:
+  windows:
+    name: Windows (zig)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Zig and JUCE (checksums verified)
+        run: |
+          curl -fsSL -o zig.tar.xz "https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz"
+          echo "$ZIG_SHA256  zig.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/zig" && tar xJf zig.tar.xz -C "$RUNNER_TEMP/zig" --strip-components 1 && rm zig.tar.xz
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+      # Every run restores the newest cache and saves its own: unchanged sources are copied, not compiled
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lynx-objcache
+          key: round-objcache-${{ github.run_id }}
+          restore-keys: round-objcache-
+
+      - name: Build
+        run: |
+          ulimit -s 1048576 || true
+          ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS="$(nproc)" scripts/build-windows-zig.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-win
+          retention-days: 2
+          compression-level: 6
+          if-no-files-found: error
+          path: |
+            build-win/*.exe
+            build-win/*.dll
+            build-win/*.pdb

@@ -2,6 +2,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
 
+#include "core/ClipOps.h"
 #include "core/MissingFiles.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
@@ -63,7 +64,7 @@ public:
         };
         addAndMakeVisible (timeMode);
 
-        tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { s.bpm = v; }); };
+        tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { clipops::followTempo (s, v); }); };
         beats.onValueChange = [this] { edit ([v = (int) beats.getValue()] (Song& s) { s.beatsPerBar = v; }); };
         swing.onValueChange = [this] { edit ([v = (float) (swing.getValue() / 100.0)] (Song& s) { s.swing = v; }); };
         pitch.onValueChange = [this] { edit ([v = (float) pitch.getValue()] (Song& s) { s.masterPitch = v; }); };
