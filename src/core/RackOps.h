@@ -260,7 +260,6 @@ std::string stepPositionText (std::int64_t tick, int beatsPerBar);
 int audioClipsAmong (const Song& song, const std::vector<int>& channels);
 int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mode);
 // FL's Tools › Macros › "Prepare for MIDI export" (FUN_0122d440, REA round 181b): every channel becomes a MIDI Out and
-// keeps its name; an FPC plays on MIDI channel 10, the others take 1...16 in turn without 10. Controller, Layer,
-// Dashboard and Voltage channels stay as they are.
+// keeps its name; an FPC plays on MIDI channel 10, the others take 1...16 in turn without 10.
 void prepareForMidiExport (Song& song);
 } // namespace lynx
