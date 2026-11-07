@@ -210,7 +210,7 @@ The reference renders are in `warp-refs/`: one vocal, 6 warp modes, played at 0.
   - The N4 own-DSP modes target these numbers.
 
 ## 11. Export (slice N2, 2026-11-06)
-File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`.
+File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`. The other way, `LYNX.exe --export-flp <set.als> <out.flp|zip>` opens a Live set and writes it as an FL Studio project (round 182b).
 
 **Skeletons.** Each element starts from its kind's skeleton in `src/core/AlsSkeleton.h`, which `tools/als_skeleton.py` generates from sets saved by Live (kept local, never committed):
 - **Live 12:** the 12.4 shipped sets, plus two probe sets saved on this machine.

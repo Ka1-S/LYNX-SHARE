@@ -6947,7 +6947,7 @@ private:
         quit();
     }
 
-    // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
+    // LYNX.exe --export-flp project.(lynx|flp|als) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
     // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
     // report goes to output.txt
     void runAlsExport (const juce::String& inputPath, const juce::String& folderPath, bool live11, bool reference)
@@ -7009,7 +7009,8 @@ private:
         {
             lynx::AudioEngine loader (false);
             const juce::File input (inputPath);
-            if (input.hasFileExtension ("flp"))
+            // a Live set opens through the same import as an .flp (as File › Open does, and --export-als accepts an .flp)
+            if (input.hasFileExtension ("flp;als"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {

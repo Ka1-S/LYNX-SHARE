@@ -12,7 +12,7 @@ File › Export › **FL Studio project...** opens a small window: *Save as* `.f
 .flp and every sample, by file name), and *What FL Studio doesn't have*: **render to audio** (option A, default) or
 **the nearest FL plugin** (option B). Then a file dialog, a progress window (option A's renders), and a report window:
 Exported exactly / Rendered to audio / Replaced by an FL plugin / Left out / Worth knowing / Samples not on this PC.
-Command line: `LYNX --export-flp project.(lynx|flp) out.(flp|zip) [--substitute]` (report in `out.<ext>.txt`).
+Command line: `LYNX --export-flp project.(lynx|flp|als) out.(flp|zip) [--substitute]` (report in `out.<ext>.txt`). A Live set (.als) is imported first, as File › Open does (round 182b).
 
 Layers:
 - `src/flp/FlpWrite.{h,cpp}` — `flp::writeProject`, the exact inverse of `flp::parseProject`, events in FL 2026's order.
