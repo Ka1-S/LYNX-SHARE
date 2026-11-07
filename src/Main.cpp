@@ -2534,7 +2534,13 @@ private:
                             && offline.isModified();
 
         // recording from the PC keyboard: a one-beat note lands in the pattern, in a single undo step
+        // (Blend on: this checks that the take joins the pattern's notes; a new install starts with Blend off)
         const auto notesBefore = offline.getSong().patterns[0].notes.size();
+        {
+            auto o = offline.getRecordOptions();
+            o.mode = lynx::RecordMode::overdub;
+            offline.setRecordOptions (o);
+        }
         offline.setRecording (true);
         offline.play();
         offline.getTransport().positionTicks.store (960.0);
@@ -5832,6 +5838,7 @@ private:
         song.mode = songMode ? lynx::PlayMode::song : lynx::PlayMode::pattern;
         engine->setSong (std::move (song));
         auto o = engine->getRecordOptions();
+        o.mode = lynx::RecordMode::overdub;
         o.recordNotes = true;
         o.recordAutomation = true;
         o.countInBars = 0;
@@ -5974,6 +5981,7 @@ private:
         engine->setSong (song);
         engine->getTransport().metronome.store (true);
         auto o = engine->getRecordOptions();
+        o.mode = lynx::RecordMode::overdub;
         o.countInBars = 1;
         o.catchWindow = lynx::ppq / 4;
         o.compensateOutput = true;
@@ -6542,8 +6550,8 @@ private:
             o.preRollBars = mode == 2 ? 1 : 0;
             o.postRollBars = mode == 2 ? 1 : 0;
             // (round 177c: LYNX_RECTEST_BLEND_OFF=1: Blend off; LYNX_RECTEST_LAST_PASS=1: "only the last pass plays")
-            if (juce::SystemStats::getEnvironmentVariable ("LYNX_RECTEST_BLEND_OFF", {}) == "1")
-                o.mode = lynx::RecordMode::replace;
+            o.mode = juce::SystemStats::getEnvironmentVariable ("LYNX_RECTEST_BLEND_OFF", {}) == "1" ? lynx::RecordMode::replace
+                                                                                                     : lynx::RecordMode::overdub;
             o.lastLoopPassPlays = juce::SystemStats::getEnvironmentVariable ("LYNX_RECTEST_LAST_PASS", {}) == "1";
             engine->setRecordOptions (o);
             engine->stop();
