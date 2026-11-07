@@ -48,6 +48,7 @@
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/MixerBasicsCheck.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/VideoMedia.h"
 #include "ui/VideoTracks.h"
@@ -3017,7 +3018,8 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto mixerBasics = lynx::mixerbasics::run();
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK";
@@ -3036,6 +3038,7 @@ private:
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
+               << "mixer_basics=" << mixerBasics << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"

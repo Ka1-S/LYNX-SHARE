@@ -28,6 +28,16 @@ constexpr int maxMixerTracks = 501;   // 0 = Master, 1..500 inserts: FL 2026's d
                                       // round 166d, issue #14). Was 128 (FL's old 125 + Master)
 constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in FL
 
+// A press on a mixer fader's rail, away from the cap (FL, measured, REA_rodada177a section 4.2): the cap steps towards the
+// mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
+constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
+constexpr int faderRailRepeatMs = 64;
+constexpr float faderRailStepTowards (float value, float target) noexcept
+{
+    const auto distance = target - value;
+    return distance > faderRailStep ? value + faderRailStep : distance < -faderRailStep ? value - faderRailStep : target;
+}
+
 // FL mixer fader curve: g = (11^v - 1) / 10 with v = position * 1.25 (0 dB at 0.8;
 // +5.6 dB at maximum). docs/analise/REA_rodada2.md §2.2.
 float faderGain (float position) noexcept;

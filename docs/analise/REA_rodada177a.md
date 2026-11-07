@@ -284,5 +284,24 @@ A click on the rail away from the cap does **not** jump the fader. Each click mo
 the click: below the cap 748 → 749, above it 748 → 747, and ten more clicks below it 750 → 760. A press on the rail
 followed by a 20 px drag moved the cap 7 px, so the drag is relative to the press and doesn't jump either.
 
-LYNX jumps the fader to the click (`MixerStrips::mouseDown`, "clicking the track jumps the fader there"). This differs
-from FL. It is unchanged here and goes to the coordinator. The exact step in fader units isn't measured yet.
+The step, measured in fader units: one click moves the value by 0.0056 of the travel (FL's hint: 0.0 dB → -0.2 dB at
+unity). Held, the press repeats about every 64 ms (about 15.6 steps a second, with no first delay) and stops once the
+cap's centre is under the mouse.
+
+LYNX (slice 177a-4) now does the same by default, as the coordinator decided: a stray click can't jump a mix.
+`faderRailStep = 0.0056` and `faderRailRepeatMs = 64` are in `Song.h`, and Ctrl+click still resets. The VCA faders
+behave the same. In the real LYNX window one click gave -0.2 dB, as FL. Ten quick clicks first gave -2.1 dB against
+FL's -1.6 dB: the repeat timer fired before a late mouse-up reached the message thread. Commit c4229c2b9 stops the
+repeat once no button is down. That fix is covered by the offscreen check (`mixer_basics`), but it has not been
+clicked again in a real window yet.
+
+### 4.3 The mixer track menu against FL's
+
+Added in 177a-4: "Change color..." opens the colour picker at once (mixer only, with a Reset), "Open audio editor and
+record" (Shift+E), "Track routing" as a submenu name, and "Compensate for master latency" in the main menu.
+
+The label stays "Rename and color..." where FL says "Rename, color and icon...". The LYNX dialog sets the name and the
+colour only. The icon is the separate "Change icon..." item, so FL's text would promise something the dialog doesn't do.
+
+Still open, each as its own slice: FL's "Gradient color" and "Assign to new Audio track(s)" / "Unassign from Audio
+track(s)".

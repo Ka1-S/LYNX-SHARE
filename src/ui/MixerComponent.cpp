@@ -754,17 +754,14 @@ void MixerStrips::vcaMouseDown (const juce::MouseEvent& e, int i)
                 setVcaLevel (i, unityFader);
                 return;
             }
-            auto start = song.vcas[(std::size_t) i].level;
-            if (! flmods::ctrl (e.mods)) // clicking the rail jumps the fader there (as an insert's)
+            const auto start = song.vcas[(std::size_t) i].level;
+            if (! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse (as an insert's)
             {
                 const auto rail = faderRail (v);
                 if (std::abs ((float) e.y - ((float) rail.getBottom() - start * (float) rail.getHeight())) > 9.0f)
                 {
-                    start = juce::jlimit (0.0f, 1.0f, (float) (rail.getBottom() - e.y) / (float) rail.getHeight());
-                    engine.editSong ([i, start] (Song& s) {
-                        if (i < (int) s.vcas.size())
-                            s.vcas[(std::size_t) i].level = start;
-                    });
+                    pressRail (v, e.y);
+                    return;
                 }
             }
             dragVca = i;
@@ -1915,19 +1912,6 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             dragTrack = t;
             dragStartValue = part == Part::pan ? track.pan : track.volume;
 
-            if (part == Part::fader && ! flmods::ctrl (e.mods)) // clicking the track jumps the fader there
-            {
-                const auto area = faderRail (t);
-                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
-
-                if (std::abs ((float) e.y - capY) > 9.0f)
-                {
-                    dragStartValue = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - e.y) / (float) area.getHeight());
-                    engine.editSong ([t, v = dragStartValue] (Song& s) { s.mixer[(std::size_t) t].volume = v; });
-                }
-            }
-
-            drag.begin (e, dragStartValue);
             groupStart.clear();
             groupGrab = dragStartValue;
             if (selection.size() > 1) // the selected strips follow, keeping their offsets
@@ -1935,6 +1919,21 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                     if (s != t && s < (int) engine.getSong().mixer.size())
                         groupStart.push_back ({ s, part == Part::pan ? engine.getSong().mixer[(std::size_t) s].pan
                                                                       : engine.getSong().mixer[(std::size_t) s].volume });
+
+            if (part == Part::fader && ! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse
+            {
+                const auto area = faderRail (t);
+                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
+
+                if (std::abs ((float) e.y - capY) > 9.0f)
+                {
+                    pressRail (t, e.y);
+                    showTip (part, t, false);
+                    return;
+                }
+            }
+
+            drag.begin (e, dragStartValue);
             showTip (part, t, false);
             return;
 
@@ -1974,8 +1973,54 @@ void MixerStrips::dragSelectTo (int t)
     setSelection ({ s.begin(), s.end() }, primary);
 }
 
+void MixerStrips::pressRail (int strip, int mouseY)
+{
+    railStrip = strip;
+    railMouseY = mouseY;
+    stepHeldRail();
+    railRepeat.startTimer (faderRailRepeatMs);
+}
+
+float MixerStrips::railTarget (int strip) const
+{
+    const auto rail = faderRail (strip);
+    return juce::jlimit (0.0f, 1.0f, (float) (rail.getBottom() - railMouseY) / (float) rail.getHeight());
+}
+
+void MixerStrips::stepHeldRail()
+{
+    // (the repeat stops as soon as the button is up, even before the release reaches us: a busy message thread must not
+    // turn one click into several steps)
+    if (railRepeat.isTimerRunning() && ! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+    {
+        railRepeat.stopTimer();
+        return;
+    }
+    const auto& song = engine.getSong();
+    if (railStrip <= vcaStrip (0))
+    {
+        const auto i = -2 - railStrip;
+        if (i < (int) song.vcas.size())
+        {
+            setVcaLevel (i, faderRailStepTowards (song.vcas[(std::size_t) i].level, railTarget (railStrip)));
+            ui::showValueTip (*this, faderRail (railStrip), vcaSpec (i).text (vcaShownLevel (i)));
+        }
+    }
+    else if (railStrip >= 0 && railStrip < (int) song.mixer.size())
+    {
+        setValue (Part::fader, railStrip, faderRailStepTowards (song.mixer[(std::size_t) railStrip].volume, railTarget (railStrip)));
+        showTip (Part::fader, railStrip, false);
+    }
+}
+
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (railStrip != railNone) // the cap goes on towards where the mouse is now
+    {
+        railMouseY = e.y;
+        return;
+    }
+
     if (selectAnchor > 0)
     {
         if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
@@ -2340,6 +2385,9 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 
 void MixerStrips::mouseUp (const juce::MouseEvent&)
 {
+    railRepeat.stopTimer();
+    railStrip = railNone;
+
     if (headerDragged)
         setMouseCursor (juce::MouseCursor::NormalCursor);
 
@@ -2840,10 +2888,16 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
 
     // FL's first section: name and colour (REA_rodada115)
     menu.addItem (tr ("Rename and color...") + "\tF2", rename);
-    menu.addSubMenu (tr ("Change color"), ui::colourMenu (song.mixer[(std::size_t) t].colour, [this, t] (std::uint32_t colour) {
-                         if (t < (int) engine.getSong().mixer.size())
-                             engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
-                     }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
+    menu.addItem (tr ("Change color..."), [this, t] { // (FL: the colour selector at once)
+        const auto current = engine.getSong().mixer[(std::size_t) t].colour;
+        const auto mouse = juce::Desktop::getMousePosition();
+        const auto set = [this, t] (std::uint32_t colour) {
+            if (t < (int) engine.getSong().mixer.size())
+                engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+        };
+        ui::showColourPickerPopup ({ mouse.x, mouse.y, 1, 1 }, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
+                                   [set] (juce::Colour c) { set (c.getARGB()); }, {}, [set] { set (0); });
+    });
     menu.addItem (tr ("Random color"), [this, t] {
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
@@ -2912,7 +2966,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                                  : tr ("none");
         menu.addItem (tr ("Audio input: {0}...", { current }), [this, t] { mixerinput::showMenu (engine, t, this); });
     }
-    menu.addItem (tr ("Open audio editor"), [this] { openAudioEditor (engine); });
+    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
+    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
     // --- FL's "Routing" section -----------------------------------------------------------------------
@@ -2932,32 +2987,6 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                               [this, channel, t] { engine.editSong ([channel, t] (Song& s) { s.channels[(std::size_t) channel].mixerTrack = t; }); });
         menu.addSubMenu (tr ("Channel routing"), channels);
     }
-    {
-        juce::PopupMenu select;
-        select.addItem (tr ("Channels routed to this track") + "\tAlt+L", ! mixerops::channelsOn (song, t).empty(), false, [this, t] {
-            setSelection (selection, t);
-            selectLinkedChannels();
-        });
-        select.addSeparator();
-        const auto destinations = mixerops::destinationsOf (song, t);
-        const auto sources = mixerops::sourcesOf (song, t);
-        select.addItem (tr ("Tracks this one is routed to"), ! destinations.empty(), false, [this, t, destinations] { setSelection (destinations, t); });
-        select.addItem (tr ("Tracks routed to this one"), ! sources.empty(), false, [this, t, sources] { setSelection (sources, t); });
-        select.addSeparator();
-        select.addItem (tr ("Group"), t > 0, false, [this, t] {
-            auto group = mixerops::groupOf (engine.getSong(), t);
-            std::sort (group.begin(), group.end());
-            setSelection (group, t);
-        });
-        select.addItem (tr ("All"), [this, t] {
-            std::vector<int> all ((std::size_t) engine.getSong().mixer.size());
-            std::iota (all.begin(), all.end(), 0);
-            setSelection (all, t);
-        });
-        menu.addSubMenu (tr ("Select"), select);
-    }
-    menu.addItem (tr ("Reset selected track(s) routing"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetRouting (s, targets); }); });
-    menu.addItem (tr ("Unroute tracks routed to the selected track(s)"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unrouteInto (s, targets); }); });
     {
         // FL's Routing submenu (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950): selected tracks ⇄ this track
         std::vector<int> others;
@@ -2992,8 +3021,34 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Route this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::routeOnly); });
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
-        menu.addSubMenu (tr ("Selected tracks ⇄ this track"), routing);
+        menu.addSubMenu (tr ("Track routing"), routing, any);
     }
+    {
+        juce::PopupMenu select;
+        select.addItem (tr ("Channels routed to this track") + "\tAlt+L", ! mixerops::channelsOn (song, t).empty(), false, [this, t] {
+            setSelection (selection, t);
+            selectLinkedChannels();
+        });
+        select.addSeparator();
+        const auto destinations = mixerops::destinationsOf (song, t);
+        const auto sources = mixerops::sourcesOf (song, t);
+        select.addItem (tr ("Tracks this one is routed to"), ! destinations.empty(), false, [this, t, destinations] { setSelection (destinations, t); });
+        select.addItem (tr ("Tracks routed to this one"), ! sources.empty(), false, [this, t, sources] { setSelection (sources, t); });
+        select.addSeparator();
+        select.addItem (tr ("Group"), t > 0, false, [this, t] {
+            auto group = mixerops::groupOf (engine.getSong(), t);
+            std::sort (group.begin(), group.end());
+            setSelection (group, t);
+        });
+        select.addItem (tr ("All"), [this, t] {
+            std::vector<int> all ((std::size_t) engine.getSong().mixer.size());
+            std::iota (all.begin(), all.end(), 0);
+            setSelection (all, t);
+        });
+        menu.addSubMenu (tr ("Select"), select);
+    }
+    menu.addItem (tr ("Reset selected track(s) routing"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetRouting (s, targets); }); });
+    menu.addItem (tr ("Unroute tracks routed to the selected track(s)"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unrouteInto (s, targets); }); });
     if (selected > 0 && selected != t && (t == 0 || song.canRoute (selected, t) || song.routes (selected, t)))
         menu.addItem (tr ("Send \"{0}\" only to this track", { juce::String::fromUTF8 (song.mixer[(std::size_t) selected].name.c_str()) }),
                       [this, from = selected, t] {
@@ -3031,6 +3086,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     engine.setInsertArmed (x, false);
         });
     }
+    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
+        engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].compensateMasterLatency = ! s.mixer[(std::size_t) t].compensateMasterLatency; });
+    });
     // FL's track latency (the "Track latency compensation" label's menu, REA round 165f-mixer)
     menu.addSubMenu (tr ("Track latency: {0}", { manualLatencyText (engine, song.mixer[(std::size_t) t]) }), trackLatencyMenu (engine, t));
 
@@ -6597,6 +6655,10 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.audioEditor")
+        return strips.runMenuItem (tr ("Open audio editor"));
+    else if (id == "mixer.audioEditorRecord")
+        return strips.runMenuItem (tr ("Open audio editor and record"));
     else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
         return strips.runMenuItem (tr ("Rename and color..."));
     else if (id == "mixer.soloSelected")

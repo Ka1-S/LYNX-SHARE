@@ -527,7 +527,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | M12 | Partial | Track EQ callout with 9 sliders (`:475-562`) |
 | M13 | No | — |
 | M14 | Partial | "+" adds an insert (`:323-333`); no delete/trim/reorder |
-| M15 | Yes (variant) | Clicking the rail jumps the fader (`:392-402`) |
+| M15 | Yes | A press on the rail steps the fader towards the mouse while held, as FL (REA_rodada177a section 4.2) |
 
 **Browser**
 
