@@ -239,5 +239,12 @@ Both names are right about different things. The file name uses the insert that 
 
 Round 168x chose this routing and noted "FL's routing of such a clip was not measured". Still to do: record through an insert in FL at Post EQ and see which insert the clip plays through, then compare. 177d-1 did not cause this: it only draws the take while it records. Nothing changes until that FL check is done.
 
+### A hidden main window takes the foreground (`--rtstress --no-window`; slice after 0.1.25)
+- **Seen:** on 2026-11-07 at 04:39, a `--rtstress --no-window` run took the foreground from another round's guarded GUI session for about 10 s. A system-wide WinEvent hook (07:14, origin/main 7a78aa552) caught it again: the hidden `LYNX SHARE` window became the foreground 3 times about 4 s after start, without ever being shown. It kept the foreground until the process ended.
+- **Cause (JUCE 8.0.4 source):** `TopLevelWindow::recreateDesktopWindow()` calls `toFront (true)`, which calls `BringWindowToTop`, even on a hidden window. The `MainWindow` constructor triggers it while the window is still hidden, through `setUsingNativeTitleBar (true)` and `setResizable`.
+- **Who it reaches:** `--rtstress --no-window`, and the hidden window behind the splash at a normal start, where the app is about to come to the front anyway. `--render`, `--export` and `--export-flp` never build the window, and the hook saw no foreground change from them.
+- **Planned (coordinator, 2026-11-07):** a slice after 0.1.25 is tagged. It builds `MainWindow` off the desktop, sets the title bar and resizing, then adds it to the desktop once, and checks a normal start. Until then `--rtstress` runs under the GUI lock.
+- **The same day, `--snapshot`:** its dialogs flashed into the foreground through `TopLevelWindow::visibilityChanged`, which also calls `toFront (true)`. Fixed in slice 177d-7: the dialog leaves the desktop before it is shown, and the snapshot keeps the focus ring a real dialog shows.
+
 ### Proposal: undo steps for tweaks made in a plugin's own GUI (pain point 16)
 Plugin parameter moves made in the plugin's own window make no undo step today, and the History labels name the channel or insert, not the parameter. This needs the plugin state captured before and after a gesture (`PluginWindows::onGesture` already reports begin and end) and stored in History. That is a larger change, logged as a later proposal (coordinator, 2026-11-06).
