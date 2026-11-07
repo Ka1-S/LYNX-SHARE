@@ -130,6 +130,12 @@ User decisions (2026-11-06, through the coordinator):
 - **32, nested groups:** declined for now.
 - **31b, auto-unique clips on edit:** declined. Nothing of it is built. 31a, pattern cleanup, is a separate item and goes ahead.
 
+Who builds what now (coordinator, 2026-11-06; this replaces the batch plan above for these items):
+- **Round 181c:** 7, 9, 11, 12, 13, 16, 21, 27.
+- **Round 177a:** the guarantees and tests of 5.
+- **Parked for later, the user was told:** 8.
+- **This round, after slices 2-5:** 177d-6 = 24; then the check of 3; then the recording UX comparison against FL and Ableton (count-in, punch in/out, loop recording into takes, the record-mode dialog), which goes to the coordinator as findings before anything changes. Loop takes are coordinated with 177c, which owns the takes decision.
+
 ## 3. Slice 177d-2: quick fixes (22, 20, 15) and pattern hygiene (31a)
 
 ### 22. Solo the selected channel from any window
