@@ -161,7 +161,7 @@ public:
     {
         int countInBars = 0;            // 0 = off
         bool waitForInput = false;      // playback starts at the first played note
-        RecordMode mode = RecordMode::overdub;
+        RecordMode mode = RecordMode::replace; // "Blend recorded notes" off, FL's factory default (round 177c)
         std::int64_t quantise = 0;      // record quantise in ticks (<= 1: as played); follows the global grid
         bool placeSongClip = true;      // song mode: a take puts a clip of the pattern where recording started
         // recording filter (FL's record button right-click, REA_rodada88): what a take records

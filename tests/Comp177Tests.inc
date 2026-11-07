@@ -540,3 +540,16 @@ TEST (comp177_fl_clip_mute_survives_import_and_export)
         mutedBack += c.muted ? 1 : 0;
     CHECK (back.playlist.size() == 4 && mutedBack == 3);
 }
+
+TEST (comp177_blend_starts_off_only_for_new_installs)
+{
+    using lynx::RecordMode;
+    // a new install: FL's factory default
+    CHECK (lynx::startingRecordMode (false, false, false) == RecordMode::replace);
+    // (the engine's own default, AudioEngine::RecordOptions, is not in the test binary: the guarded GUI session checked it)
+    // settings from before 0.1.25 have no answer, and those sessions always started on: nothing changes for them
+    CHECK (lynx::startingRecordMode (true, false, false) == RecordMode::overdub);
+    // from then on, the saved answer is what counts
+    CHECK (lynx::startingRecordMode (true, true, true) == RecordMode::overdub);
+    CHECK (lynx::startingRecordMode (true, true, false) == RecordMode::replace);
+}

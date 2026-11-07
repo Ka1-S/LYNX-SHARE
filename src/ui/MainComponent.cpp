@@ -1962,6 +1962,15 @@ void MainComponent::loadUiSettings()
     // the sound in FL's order (0.1.20) wins over the old key, wherever each line is
     const auto flMetronomeSound = std::any_of (lines.begin(), lines.end(), [] (const juce::String& l) { return l.trim().startsWith ("metronomeSoundFl"); });
 
+    // "Blend recorded notes" (round 177c): see startingRecordMode() for who starts with what
+    {
+        const auto saved = std::find_if (lines.begin(), lines.end(), [] (const juce::String& l) { return l.trim().startsWith ("recordBlend="); });
+        auto o = engine.getRecordOptions();
+        o.mode = startingRecordMode (uiSettingsFile().existsAsFile(), saved != lines.end(),
+                                     saved != lines.end() && saved->fromFirstOccurrenceOf ("=", false, false).trim() == "1");
+        engine.setRecordOptions (o);
+    }
+
     for (const auto& line : lines)
     {
         const auto key = line.upToFirstOccurrenceOf ("=", false, false).trim();
@@ -2246,6 +2255,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
                                       + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
                                       + "\nrecordLastPassPlays=" + juce::String (engine.getRecordOptions().lastLoopPassPlays ? 1 : 0)
+                                      + "\nrecordBlend=" + juce::String (engine.getRecordOptions().mode == RecordMode::overdub ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)

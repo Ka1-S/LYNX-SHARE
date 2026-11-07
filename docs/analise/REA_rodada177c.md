@@ -279,8 +279,7 @@ Still different from FL, on purpose or left as shipped:
 
 **Best way?** Two things remain worth the user's attention:
 
-- LYNX's Blend default is **on** (`RecordMode::overdub`), so out of the box every pass plays at once after Stop. FL's install
-  showed Blend off when first opened in this round, though FL's factory default was not established.
+- Blend's default: settled in §9. New installs start off, as in FL.
 - A 1-tick pass gets its own track, as in FL. It is exact and a little clumsy.
 
 ### Migration: existing projects do not change
@@ -352,3 +351,25 @@ and Flatten are in the core and have no UI until slice 177c-2.
   "add these takes to the comp" is possible; not built, and not asked for.
 - Live .als take-lane import: `core/AlsImport` landed (round 175a); whether it maps `TakeLanes` to lanes is not part of this
   round (ALS-FORMAT.md documents them).
+
+## 9. Blend recorded notes starts off (slice 177c-blend)
+
+**FL:** off by factory form data (§2.1). See the fresh-setting result below.
+
+**LYNX before:** on (`RecordMode::overdub`), and the switch was not saved at all: every session started on, whatever was
+chosen last time.
+
+**Now:**
+
+| Who | Starts as | Why |
+|---|---|---|
+| New install (no `ui-options.txt`) | **off** | FL's default |
+| Existing install, settings file without `recordBlend` | **on** | That is what every earlier session started with, so nothing changes for them |
+| After any save | what was last chosen (`recordBlend=0/1`) | The switch is remembered now, as FL does (`ToolbarForm\BlendRecordBtn`) |
+
+**Migration note:** an existing user sees no change until they flip the switch; a new user gets FL's behaviour: Blend off
+means a loop recording's passes are all muted after Stop, and a new note take replaces the recorded channel's old notes. Nothing
+in a project changes. Blend isn't a project setting in LYNX or in FL.
+
+**Test evidence:** `comp177_blend_starts_off_only_for_new_installs`. Command-line record runners (`--rectest`,
+`--countinrectest`, `--bendrectest`) now set their mode explicitly, so their reports keep meaning what they did.
