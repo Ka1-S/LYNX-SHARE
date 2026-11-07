@@ -23,11 +23,13 @@ struct MultilinkSession
     std::vector<AutomationTarget> targets; // in the order they were moved
     std::vector<std::pair<int, int>> used; // (cc, channel) already linked in this session
     int linked = 0;
+    bool collecting = true; // false after the switch's "Link to controller" / "Override global links": only controllers now
+    bool global = false;    // "Override global links": the links go to the settings, for every project
 
     // a moved control: queued once (moving it again keeps its place)
     bool add (const AutomationTarget& t)
     {
-        if (t.kind == AutomationTargetKind::none || std::find (targets.begin(), targets.end(), t) != targets.end())
+        if (! collecting || t.kind == AutomationTargetKind::none || std::find (targets.begin(), targets.end(), t) != targets.end())
             return false;
         targets.push_back (t);
         return true;

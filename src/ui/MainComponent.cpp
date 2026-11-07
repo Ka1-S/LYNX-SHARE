@@ -277,6 +277,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     metronomeButton.onRightClick = [this] { showMetronomeMenu(); };
 
+    // FL's MultiLinkBtn (round 177b-4): lit while "Multilink to controllers" is on; [RMB] FL's MultilinkMenu
+    multilinkButton.setFlat (true);
+    multilinkButton.setWantsKeyboardFocus (false);
+    multilinkButton.onClick = [this] { runAction ("options.multilink"); };
+    multilinkButton.onRightClick = [this] {
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (false); });
+        menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (true); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
+    };
+
     typingPianoButton.setOnColour (theme::colour::bg6);
     typingPianoButton.setIconColourWhenOn (theme::colour::accent);
     typingPianoButton.onClick = [this] { toggleTypingPiano(); };
@@ -533,7 +544,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
-                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
+                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
+                                                             &multilinkButton })
     {
         addAndMakeVisible (c);
         c->setMouseClickGrabsKeyboardFocus (false); // the PC keyboard stays with the main window
@@ -571,7 +583,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         recordButton.setOnColour (colour::record.withAlpha (0.2f));
         recordButton.setIconColourWhenOn (colour::record);
         for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton,
-                          &patternModeButton, &songModeButton })
+                          &patternModeButton, &songModeButton, &multilinkButton })
         {
             b->setOnColour (onWash);
             b->setIconColourWhenOn (onIcon);
@@ -901,6 +913,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::meters] = 118;
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
+    widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -1088,6 +1101,7 @@ void MainComponent::resized()
                 case Group::meters: hide ({ &perfMeter }); break;
                 case Group::output: hide ({ &output }); break;
                 case Group::chord: hide ({ &chordPanel }); break;
+                case Group::multilink: hide ({ &multilinkButton }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1188,6 +1202,7 @@ void MainComponent::resized()
             case Group::meters: put (perfMeter, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
+            case Group::multilink: put (multilinkButton, panel.withY (row1).withHeight (h)); break;
             case Group::count_: break;
         }
     }
@@ -3643,6 +3658,7 @@ void MainComponent::refreshModeButton()
     patternModeButton.setToggleState (! songMode, juce::dontSendNotification);
     songModeButton.setToggleState (songMode, juce::dontSendNotification);
     metronomeButton.setToggleState (engine.getTransport().metronome.load(), juce::dontSendNotification);
+    multilinkButton.setToggleState (engine.isMultilinkOn(), juce::dontSendNotification);
 }
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -4008,6 +4024,7 @@ void MainComponent::setQuickTips()
     tip (blendButton, tr ("Blend recorded notes"), "record.blend");
     tip (loopRecordButton, tr ("Loop record"), "record.loop");
     tip (stepEditButton, tr ("Step edit"), "record.stepEdit");
+    tip (multilinkButton, tr ("Multilink to controllers"), "options.multilink"); // (FL's hint: "Ctrl+J Multilink to controllers")
     tip (punchButton, tr ("Punch in/out"), "record.punch");
     tip (tapTempoButton, tr ("Tempo tapper"), "view.tempoTapper");
     tip (typingPianoButton, tr ("Typing keyboard to piano"), "view.typingPiano");

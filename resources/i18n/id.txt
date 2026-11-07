@@ -7825,3 +7825,5 @@ countries: id
 "Multilink to controllers" = "Multilink ke kontroler"
 "Please tweak the controls you want to link..." = "Gerakkan kontrol yang ingin Anda tautkan..."
 "Multilink to controllers on/off" = "Multilink ke kontroler aktif/nonaktif"
+"Link to controller" = "Tautkan ke kontroler"
+"Override global links" = "Timpa tautan global"

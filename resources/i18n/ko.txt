@@ -7825,3 +7825,5 @@ countries: kr
 "Multilink to controllers" = "컨트롤러에 멀티링크"
 "Please tweak the controls you want to link..." = "연결할 컨트롤을 움직이세요..."
 "Multilink to controllers on/off" = "컨트롤러에 멀티링크 켜기/끄기"
+"Link to controller" = "컨트롤러에 연결"
+"Override global links" = "전역 링크 덮어쓰기"

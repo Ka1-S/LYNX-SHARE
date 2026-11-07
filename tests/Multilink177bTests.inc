@@ -23,3 +23,31 @@ TEST (multilink177b_links_in_the_order_moved)
     CHECK (third && third->target == c && m.complete());
     CHECK (! m.controller (8, 0).has_value()); // all linked
 }
+
+TEST (multilink177b_switch_menu_and_toolbar)
+{
+    // the switch's "Link to controller" / "Override global links": no more controls are queued, the controllers link
+    lynx::MultilinkSession m;
+    const lynx::AutomationTarget a { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 };
+    CHECK (m.add (a));
+    m.collecting = false;
+    CHECK (! m.add ({ lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }));
+    const auto link = m.controller (30, 2);
+    CHECK (link && link->target == a && m.complete());
+
+    // FL keeps its MultiLinkBtn off the default toolbar; LYNX's Multilink group is hidden on a new install, after the
+    // window shortcuts, and a toolbar saved by an older version gets it hidden in that place
+    using namespace lynx::toolbarlayout;
+    const auto d = Layout::makeDefault();
+    CHECK (! d.isShown (Group::multilink) && d.isShown (Group::windows));
+    CHECK (d.orderToString().find ("windows,-multilink,file") != std::string::npos);
+    Layout old;
+    old.orderFromString ("transport,master,record,snap,windows,file,chord,meters,output");
+    CHECK (! old.isShown (Group::multilink) && old.isDefault());
+    auto shown = d;
+    shown.setShown (Group::multilink, true);
+    Layout back;
+    back.orderFromString (shown.orderToString());
+    CHECK (back.isShown (Group::multilink) && ! back.isDefault());
+    CHECK (matchingPreset (d) == (int) Preset::standard);
+}

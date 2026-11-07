@@ -7825,3 +7825,5 @@ countries: tr
 "Multilink to controllers" = "Denetleyicilere çoklu bağlantı"
 "Please tweak the controls you want to link..." = "Bağlamak istediğiniz kontrolleri oynatın..."
 "Multilink to controllers on/off" = "Denetleyicilere çoklu bağlantı açık/kapalı"
+"Link to controller" = "Denetleyiciye bağla"
+"Override global links" = "Genel bağlantıları geçersiz kıl"

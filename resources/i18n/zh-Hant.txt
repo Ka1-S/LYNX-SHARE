@@ -7825,3 +7825,5 @@ countries: tw hk mo
 "Multilink to controllers" = "多重連結到控制器"
 "Please tweak the controls you want to link..." = "請調整你要連結的控制項..."
 "Multilink to controllers on/off" = "多重連結到控制器 開/關"
+"Link to controller" = "連結到控制器"
+"Override global links" = "覆寫全域連結"

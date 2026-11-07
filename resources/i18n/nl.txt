@@ -7825,3 +7825,5 @@ countries: nl be
 "Multilink to controllers" = "Multilink naar controllers"
 "Please tweak the controls you want to link..." = "Beweeg de regelaars die je wilt koppelen..."
 "Multilink to controllers on/off" = "Multilink naar controllers aan/uit"
+"Link to controller" = "Koppelen aan controller"
+"Override global links" = "Globale koppelingen overschrijven"

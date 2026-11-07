@@ -7825,3 +7825,5 @@ countries: ru by kz
 "Multilink to controllers" = "Мультипривязка к контроллерам"
 "Please tweak the controls you want to link..." = "Покрутите регуляторы, которые хотите привязать..."
 "Multilink to controllers on/off" = "Мультипривязка к контроллерам вкл/выкл"
+"Link to controller" = "Привязать к контроллеру"
+"Override global links" = "Переопределить глобальные привязки"

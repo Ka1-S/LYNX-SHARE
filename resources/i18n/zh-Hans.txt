@@ -7825,3 +7825,5 @@ countries: cn sg
 "Multilink to controllers" = "多重链接到控制器"
 "Please tweak the controls you want to link..." = "请调整你要链接的控件..."
 "Multilink to controllers on/off" = "多重链接到控制器 开/关"
+"Link to controller" = "链接到控制器"
+"Override global links" = "覆盖全局链接"

@@ -7825,3 +7825,5 @@ countries: es mx ar co cl pe ve
 "Multilink to controllers" = "Multivínculo a controladores"
 "Please tweak the controls you want to link..." = "Mueve los controles que quieres vincular..."
 "Multilink to controllers on/off" = "Multivínculo a controladores activado/desactivado"
+"Link to controller" = "Vincular a controlador"
+"Override global links" = "Sobrescribir vínculos globales"

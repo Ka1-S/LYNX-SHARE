@@ -7825,3 +7825,5 @@ countries: de at ch li lu
 "Multilink to controllers" = "Multilink zu Controllern"
 "Please tweak the controls you want to link..." = "Bitte bewege die Regler, die du verknüpfen möchtest..."
 "Multilink to controllers on/off" = "Multilink zu Controllern ein/aus"
+"Link to controller" = "Mit Controller verknüpfen"
+"Override global links" = "Globale Verknüpfungen überschreiben"

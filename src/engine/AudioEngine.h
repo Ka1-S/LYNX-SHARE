@@ -490,6 +490,9 @@ public:
     void setMultilink (bool on);
     bool isMultilinkOn() const noexcept { return multilink.has_value(); }
     int multilinkQueued() const noexcept { return multilink ? (int) multilink->targets.size() : 0; }
+    // the switch's menu: "Link to controller" (false) / "Override global links" (true): no more controls are queued,
+    // the controllers moved next link to the queued ones (as project links / as global links)
+    void multilinkToControllers (bool global);
     void removeGlobalLink (const AutomationTarget& target);
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
     std::vector<MidiLink> getGlobalLinks() const;

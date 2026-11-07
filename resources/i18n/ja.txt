@@ -7825,3 +7825,5 @@ countries: jp
 "Multilink to controllers" = "コントローラーへのマルチリンク"
 "Please tweak the controls you want to link..." = "リンクしたいコントロールを動かしてください..."
 "Multilink to controllers on/off" = "コントローラーへのマルチリンク オン/オフ"
+"Link to controller" = "コントローラーにリンク"
+"Override global links" = "グローバルリンクを上書き"

@@ -7825,3 +7825,5 @@ countries: it ch sm
 "Multilink to controllers" = "Multilink ai controller"
 "Please tweak the controls you want to link..." = "Muovi i controlli che vuoi collegare..."
 "Multilink to controllers on/off" = "Multilink ai controller attivo/disattivo"
+"Link to controller" = "Collega al controller"
+"Override global links" = "Sovrascrivi i collegamenti globali"
