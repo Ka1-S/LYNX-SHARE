@@ -7823,6 +7823,8 @@ countries: it ch sm
 "Export as score sheet..." = "Esporta come spartito..."
 "Which controller to import?" = "Quale controller importare?"
 "Adds the file's time signature to the pattern's markers" = "Aggiunge il tempo del file ai marcatori del pattern"
+"Scores" = "Partiture"
+"Folders" = "Cartelle"
 
 # round 177a: the mixer menu as FL's
 "Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"

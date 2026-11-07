@@ -7823,6 +7823,8 @@ countries: nl be
 "Export as score sheet..." = "Exporteren als partituur..."
 "Which controller to import?" = "Welke controller importeren?"
 "Adds the file's time signature to the pattern's markers" = "Voegt de maatsoort van het bestand toe aan de markers van het patroon"
+"Scores" = "Partituren"
+"Folders" = "Mappen"
 
 # round 177a: the mixer menu as FL's
 "Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"

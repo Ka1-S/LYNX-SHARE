@@ -7823,6 +7823,8 @@ countries: cn sg
 "Export as score sheet..." = "导出为乐谱..."
 "Which controller to import?" = "导入哪个控制器?"
 "Adds the file's time signature to the pattern's markers" = "将文件的拍号添加到模式的标记中"
+"Scores" = "乐谱"
+"Folders" = "文件夹"
 
 # round 177a: the mixer menu as FL's
 "Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"

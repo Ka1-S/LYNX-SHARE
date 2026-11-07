@@ -7823,6 +7823,8 @@ countries: tr
 "Export as score sheet..." = "Nota kâğıdı olarak dışa aktar..."
 "Which controller to import?" = "Hangi kontrolcü içe aktarılsın?"
 "Adds the file's time signature to the pattern's markers" = "Dosyanın ölçü birimini desenin işaretçilerine ekler"
+"Scores" = "Skorlar"
+"Folders" = "Klasörler"
 
 # round 177a: the mixer menu as FL's
 "Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"

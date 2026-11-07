@@ -7823,6 +7823,8 @@ countries: kr
 "Export as score sheet..." = "악보로 내보내기..."
 "Which controller to import?" = "어떤 컨트롤러를 가져올까요?"
 "Adds the file's time signature to the pattern's markers" = "파일의 박자표를 패턴 마커에 추가합니다"
+"Scores" = "스코어"
+"Folders" = "폴더"
 
 # round 177a: the mixer menu as FL's
 "Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"
