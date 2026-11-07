@@ -18,6 +18,7 @@
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
+#include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/TakeRecording.h"
 #include "core/WorkerPool.h"
@@ -290,6 +291,33 @@ public:
     bool isRecording() const noexcept { return transport.recording.load(); }
     // Pattern mode, a take with Loop record off (round 170e5): the transport tick the pattern plays once from, < 0: none
     double patternLinearOrigin() const noexcept { return liveInput.patternOrigin.load (std::memory_order_relaxed); }
+
+    // Round 177d: the recording in progress as the editors draw it live (core/LiveRecordView.h). UI thread.
+    struct LiveRecording
+    {
+        // the note take: the notes still held (positions in `pattern`, as they would be committed now) and, in Song
+        // mode, the Playlist range the take covers so far: [from, to) on `track` (from = its clip's start or the origin)
+        bool notes = false;
+        int pattern = -1;
+        std::vector<Note> held;
+        int track = -1;
+        std::int64_t from = -1, to = -1;
+        std::int64_t origin = -1; // the song position of the pattern's start for `held`
+        // the audio takes: each on the Playlist track it will land on, its current pass and its waveform
+        struct Audio
+        {
+            int track = -1;
+            liverec::AudioSpan span;
+            std::shared_ptr<const liverec::LivePeaks> peaks;
+            juce::String name;
+        };
+        std::vector<Audio> audio;
+        std::optional<PunchRange> punch; // only this range is kept (pre-roll / punch in-out)
+        bool any() const noexcept { return notes || ! audio.empty(); }
+    };
+    // cheap: a take records (notes held or recorded, or audio)
+    bool isLiveRecording() const noexcept { return recorder.isActive() || takeCount > 0; }
+    LiveRecording liveRecording() const;
 
     // Audio recording from the interface input: with this on, recording (Rec + Play) writes the
     // input to a WAV and, on stop, the take becomes a Playlist clip (latency-compensated).
@@ -922,6 +950,7 @@ private:
         takes::WavTakeWriter writer;
         std::atomic<bool> failed { false };
         std::vector<float> scratch;
+        std::shared_ptr<liverec::LivePeaks> peaks = std::make_shared<liverec::LivePeaks>(); // the live waveform (round 177d)
         juce::CriticalSection drainMutex; // the recording thread vs the UI's final drain
         // recording thread: writes what arrived; false when the file could not be written
         bool drain();
@@ -966,6 +995,7 @@ private:
     std::atomic<double> takeTicks { 0.0 };         // ticks the transport moved while recording (not wrapped)
     std::array<std::atomic<juce::int64>, 256> takeWraps {}; // take frames at which the loop jumped back (loop recording)
     std::atomic<int> takeWrapCount { 0 };
+    mutable std::vector<int> liveTakeTracks;         // the Playlist tracks the open takes will land on (round 177d)
     double takeSampleRate = 44100.0;
     double takeTicksPerSample = 0.0;
     int takeLatency = 0;                           // takes::Latency::total() at the take's start, in samples

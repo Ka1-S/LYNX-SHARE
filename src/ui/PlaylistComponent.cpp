@@ -239,6 +239,7 @@ public:
         const auto imageBounds = bounds * scale;
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         const auto clip = g.getClipBounds();
+        const auto lanes = owner.gridArea();
 
         if (image.isNull() || image.getBounds() != imageBounds)
         {
@@ -247,15 +248,25 @@ public:
             valid.clear();
         }
 
+        // a zoom gesture left scaled lanes in the picture (round 174f): once it is over they are painted exactly
+        if (lanesScaled && ! owner.zoomGesture)
+            valid.subtract (lanes);
+
         // the view moved since the picture was drawn. A scroll by whole pixels (round 174e2): the picture is shifted
-        // and only the columns / rows it uncovered are painted (FL scrolls at ~120 fps). A zoom, a track resize, a
-        // fractional scroll: everything is painted again.
+        // and only the columns / rows it uncovered are painted (FL scrolls at ~120 fps). A step of a zoom gesture
+        // (Ctrl+wheel, round 174f): the lanes are scaled to the new zoom around the same ticks and only the columns a
+        // zoom out uncovers are painted (a whole repaint of the lanes costs 15-30 ms on a large project); exact once
+        // the gesture is over. Anything else (a track resize, both directions at once, the corner tags): everything
+        // is painted again.
         const auto view = owner.cacheView();
         CacheShift shift;
+        Zoom zoom;
         if (view != drawnView)
         {
             shift = owner.cacheShift (drawnView, view, scale);
             if (shift.area.isEmpty())
+                zoom = zoomFrom (drawnView, view, lanes);
+            if (shift.area.isEmpty() && ! zoom.on)
                 valid.clear();
         }
         auto validNow = valid;
@@ -269,17 +280,25 @@ public:
             validNow.subtract (shift.alsoChanged);
             validNow.add (moved);
         }
+        if (zoom.on)
+        {
+            const auto whole = valid.containsRectangle (lanes);
+            validNow.subtract (lanes);
+            validNow.subtract (owner.rulerArea()); // (the ruler follows the zoom: painted exactly)
+            if (whole)
+                validNow.add (zoom.covered);
+        }
 
-        // a repaint of (almost) everything (a zoom, an edit): painted straight to the window (through the picture it costs
-        // a render and a full blit); the picture is rebuilt once the view has been still for a moment, by the next
-        // playhead frame. Not a scroll: it goes through the picture, so the next frame can shift it (painted straight,
-        // every scroll frame found the picture gone and painted everything again)
+        // a repaint of (almost) everything (an edit): painted straight to the window (through the picture it costs a
+        // render and a full blit); the picture is rebuilt once the view has been still for a moment, by the next
+        // playhead frame. Not a scroll or a zoom: they go through the picture, so the next frame can shift or scale it
+        // (painted straight, every scroll frame found the picture gone and painted everything again)
         auto invalid = juce::RectangleList<int> (bounds);
         invalid.subtract (validNow);
         const auto half = 0.5 * bounds.getWidth() * bounds.getHeight();
         if ((double) clip.getWidth() * clip.getHeight() > half && area (invalid) > half)
             lastLargeMs = nowMs;
-        if (nowMs - lastLargeMs < 300.0 && shift.area.isEmpty() && ! validNow.containsRectangle (clip))
+        if (nowMs - lastLargeMs < 300.0 && shift.area.isEmpty() && ! zoom.on && ! validNow.containsRectangle (clip) && ! owner.zoomRecent (nowMs))
         {
             if (view != drawnView)
             {
@@ -290,39 +309,49 @@ public:
             return;
         }
 
-        const auto shifting = ! shift.area.isEmpty();
-        if (shifting || ! invalid.isEmpty())
+        const auto moving = ! shift.area.isEmpty() || zoom.on;
+        if (moving || ! invalid.isEmpty())
         {
-            if (shifting && (spare.isNull() || spare.getBounds() != image.getBounds()))
+            if (moving && (spare.isNull() || spare.getBounds() != image.getBounds()))
                 spare = juce::Image (juce::Image::RGB, image.getWidth(), image.getHeight(), false);
-            auto& target = shifting ? spare : image;
+            auto& target = moving ? spare : image;
             const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
             juce::Graphics imageGraphics (target);
-            if (shifting)
+            if (moving)
             {
-                const auto physical = (shift.area.toFloat() * scale).getSmallestIntegerContainer();
-                {
-                    const juce::Graphics::ScopedSaveState state (imageGraphics);
-                    imageGraphics.excludeClipRegion (physical);
-                    imageGraphics.drawImageAt (image, 0, 0);
-                }
+                // the whole picture, then the moving area over it, shifted or scaled: plain rectangular clips (the
+                // picture with a hole cut out is a clip region the GPU renderer masks with a layer; round 174f)
+                imageGraphics.drawImageAt (image, 0, 0);
                 const juce::Graphics::ScopedSaveState state (imageGraphics);
-                if (imageGraphics.reduceClipRegion (physical))
-                    imageGraphics.drawImageAt (image, juce::roundToInt ((float) shift.dx * scale), juce::roundToInt ((float) shift.dy * scale));
+                if (! shift.area.isEmpty())
+                {
+                    if (imageGraphics.reduceClipRegion ((shift.area.toFloat() * scale).getSmallestIntegerContainer()))
+                        imageGraphics.drawImageAt (image, juce::roundToInt ((float) shift.dx * scale), juce::roundToInt ((float) shift.dy * scale));
+                }
+                else if (! zoom.covered.isEmpty() && imageGraphics.reduceClipRegion ((zoom.covered.toFloat() * scale).getSmallestIntegerContainer()))
+                {
+                    imageGraphics.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
+                    imageGraphics.drawImageTransformed (image, juce::AffineTransform ((float) zoom.a, 0.0f, (float) zoom.b * scale, 0.0f, 1.0f, 0.0f), false);
+                }
             }
             if (! invalid.isEmpty())
             {
-                auto& context = imageGraphics.getInternalContext();
-                context.addTransform (juce::AffineTransform::scale (scale));
-                for (const auto& r : validNow)
-                    context.excludeClipRectangle (r);
-                owner.cachePainting = true; // (the picture without the playhead: drawn over it below)
-                owner.paintEntireComponent (imageGraphics, true);
-                owner.cachePainting = false;
+                imageGraphics.addTransform (juce::AffineTransform::scale (scale));
+                paintExactly (imageGraphics, invalid, validNow); // (the picture without the playhead: drawn over it below)
             }
         }
-        if (shifting)
+        if (moving)
             std::swap (image, spare);
+        if (zoom.on)
+        {
+            lanesScaled = true;
+            ++scaledSteps;
+        }
+        else if (! moving && ! validNow.intersectsRectangle (lanes))
+        {
+            lanesScaled = false; // (the lanes were all painted exactly)
+            scaledSteps = 0;
+        }
         valid = bounds;
         drawnView = view;
 
@@ -346,13 +375,74 @@ public:
             valid.subtract (r);
         return true; // (the window repaints the area either way)
     }
-    void releaseResources() override
+    void releaseResources() override // (the Playlist was hidden: its pictures are freed)
     {
         image = {};
         spare = {};
+        valid.clear();
     }
 
+    // --cachetest: the picture's size in bytes (both images); whether its lanes are scaled (a zoom gesture)
+    std::size_t memoryBytes() const
+    {
+        const auto bytes = [] (const juce::Image& i) { return i.isNull() ? (std::size_t) 0 : (std::size_t) i.getWidth() * (std::size_t) i.getHeight() * 4u; };
+        return bytes (image) + bytes (spare);
+    }
+    bool hasScaledLanes() const { return lanesScaled; }
+
 private:
+    // (each step resamples the last: after 2 (a stretch of at most 1.44x from the last exact picture, at Ctrl+wheel's
+    // 1.2 per notch) the lanes are painted exactly; round 174f, chosen by eye: 8 steps stretched names up to 4x)
+    static constexpr int maxScaledSteps = 2;
+
+    // A zoom step: column x of the picture (drawn at `from`) shows the same tick at a x + b in `to`
+    struct Zoom
+    {
+        bool on = false;
+        double a = 1.0, b = 0.0;
+        juce::Rectangle<int> covered; // the part of the lanes the scaled picture fills
+    };
+    Zoom zoomFrom (const CacheView& from, const CacheView& to, juce::Rectangle<int> lanes) const
+    {
+        Zoom z;
+        if (! owner.zoomGesture || owner.blocksShown || image.isNull() || from.pixelsPerTick <= 0.0 || scaledSteps >= maxScaledSteps
+            || from.scrollY != to.scrollY || from.tracksHeight != to.tracksHeight || from.tracks != to.tracks || from.overlays || to.overlays
+            || from.width != to.width || from.height != to.height || lanes.isEmpty())
+            return z;
+        z.a = to.pixelsPerTick / from.pixelsPerTick;
+        if (z.a < 0.5 || z.a > 2.0)
+            return z;
+        // tickToX: x = headerWidth + (tick - scrollTicks) * pixelsPerTick
+        z.b = owner.headerWidth + (from.scrollTicks - to.scrollTicks) * to.pixelsPerTick - owner.headerWidth * z.a;
+        const auto left = z.a * lanes.getX() + z.b, right = z.a * lanes.getRight() + z.b;
+        z.covered = lanes.getIntersection (juce::Rectangle<int>::leftTopRightBottom ((int) std::ceil (left), lanes.getY(), (int) std::floor (right),
+                                                                                   lanes.getBottom()));
+        z.on = true;
+        return z;
+    }
+
+    // Paints `area` of the component as paint() does, without the playhead. A few rectangles (a scroll's strip, the
+    // ruler, a hover): one plain rectangular clip each, which the GPU renderer clips for free and paint() culls by;
+    // more: the area as one clip region (everything but `exceptFor`)
+    void paintExactly (juce::Graphics& target, const juce::RectangleList<int>& area, const juce::RectangleList<int>& exceptFor)
+    {
+        const juce::ScopedValueSetter<bool> noPlayhead (owner.cachePainting, true);
+        if (area.getNumRectangles() <= 4)
+        {
+            for (const auto& r : area)
+            {
+                const juce::Graphics::ScopedSaveState state (target);
+                if (target.reduceClipRegion (r))
+                    owner.paintEntireComponent (target, true);
+            }
+            return;
+        }
+        const juce::Graphics::ScopedSaveState state (target);
+        for (const auto& r : exceptFor)
+            target.excludeClipRegion (r);
+        owner.paintEntireComponent (target, true);
+    }
+
     static double area (const juce::RectangleList<int>& list)
     {
         double a = 0.0;
@@ -362,9 +452,11 @@ private:
     }
 
     PlaylistComponent& owner;
-    juce::Image image, spare; // spare: the shifted copy is drawn into it, then they swap
+    juce::Image image, spare; // spare: the shifted / scaled copy is drawn into it, then they swap
     juce::RectangleList<int> valid;
     CacheView drawnView;
+    bool lanesScaled = false; // the lanes are a zoom gesture's scaled picture
+    int scaledSteps = 0;
     double lastLargeMs = 0.0;
 };
 
@@ -404,12 +496,190 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
     return shift;
 }
 
+// --cachetest (round 174f): the picture the cache shows against an exact paint of the same view, after the cases that
+// reuse it (a zoom gesture and its settle, scrolls by whole pixels, an edit). Off screen, at scale 1. Every exact case
+// must match to the pixel; the zoom gesture's frames are scaled (their difference is reported, the rest of the view
+// outside the lanes must match).
+juce::String PlaylistComponent::cacheSelfTest (const std::function<void()>& waitForWaveforms, const juce::File& dumpFolder)
+{
+    auto* cache = dynamic_cast<PlayheadCache*> (getCachedComponentImage());
+    if (cache == nullptr)
+        return "cache: off (LYNX_PLAYLIST_CACHE=0)\nresult=SKIPPED\n";
+    const auto w = getWidth(), h = getHeight();
+    auto render = [w, h] (auto&& paintFn) {
+        juce::Image im (juce::Image::RGB, w, h, true);
+        {
+            juce::Graphics g (im);
+            paintFn (g);
+        }
+        return im;
+    };
+    auto exact = [&] { return render ([this] (juce::Graphics& g) { paintEntireComponent (g, true); }); };
+    auto cached = [&] { return render ([cache] (juce::Graphics& g) { cache->paint (g); }); };
+    struct Diff
+    {
+        int pixels = 0, worst = 0;
+        juce::Rectangle<int> box;
+    };
+    auto diff = [] (const juce::Image& a, const juce::Image& b, juce::Rectangle<int> area, juce::Rectangle<int> except) {
+        Diff d;
+        const juce::Image::BitmapData pa (a, juce::Image::BitmapData::readOnly), pb (b, juce::Image::BitmapData::readOnly);
+        for (int y = area.getY(); y < area.getBottom(); ++y)
+            for (int x = area.getX(); x < area.getRight(); ++x)
+            {
+                if (except.contains (x, y))
+                    continue;
+                const auto ca = pa.getPixelColour (x, y), cb = pb.getPixelColour (x, y);
+                const auto m = juce::jmax (std::abs ((int) ca.getRed() - (int) cb.getRed()), std::abs ((int) ca.getGreen() - (int) cb.getGreen()),
+                                           std::abs ((int) ca.getBlue() - (int) cb.getBlue()));
+                if (m > 0)
+                {
+                    ++d.pixels;
+                    d.box = d.box.isEmpty() ? juce::Rectangle<int> (x, y, 1, 1) : d.box.getUnion ({ x, y, 1, 1 });
+                }
+                d.worst = juce::jmax (d.worst, m);
+            }
+        return d;
+    };
+    juce::String out;
+    auto failures = 0;
+    auto dumpedScaled = false;
+    const auto all = getLocalBounds();
+    auto check = [&] (const juce::String& name, bool mustMatch, juce::Rectangle<int> except = {}) {
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        const auto viaCache = cached();
+        const auto cacheMs = juce::Time::getMillisecondCounterHiRes() - t0;
+        const auto t1 = juce::Time::getMillisecondCounterHiRes();
+        const auto reference = exact();
+        const auto exactMs = juce::Time::getMillisecondCounterHiRes() - t1;
+        const auto d = diff (viaCache, reference, all, except);
+        // (one step of 255 is allowed: a view scrolled by a whole number of pixels puts shapes at positions that differ
+        // from the shifted ones by float rounding, ~1e-12 px, which can move an anti-aliased edge's coverage by one step)
+        const auto ok = d.worst <= 1;
+        failures += mustMatch && ! ok ? 1 : 0;
+        out << name << ": " << (mustMatch ? (ok ? (d.pixels == 0 ? "match" : "match (1-step rounding)") : "MISMATCH") : (d.pixels == 0 ? "match" : "scaled")) << ", " << d.pixels << " px differ (max "
+            << d.worst << (ok ? juce::String() : ", in " + d.box.toString()) << "), via cache " << juce::String (cacheMs, 2) << " ms, exact "
+            << juce::String (exactMs, 2) << " ms\n";
+        // (both pictures, to look at: a mismatch, and the first scaled zoom frame)
+        const auto dump = mustMatch ? ! ok : (d.pixels > 0 && ! dumpedScaled);
+        if (! mustMatch && dump)
+            dumpedScaled = true;
+        if (dump && dumpFolder != juce::File())
+            for (const auto& [suffix, im] : { std::pair<const char*, const juce::Image*> { "cache", &viaCache }, { "exact", &reference } })
+            {
+                juce::PNGImageFormat png;
+                juce::FileOutputStream stream (dumpFolder.getChildFile ("cachetest-" + (mustMatch ? juce::String (failures) : juce::String ("zoomframe")) + "-" + suffix + ".png"));
+                if (stream.openedOk())
+                {
+                    stream.setPosition (0);
+                    stream.truncate();
+                    png.writeImageToStream (*im, stream);
+                }
+            }
+    };
+
+    // (the waveforms are analysed in the background: one paint asks for them, then they are waited for)
+    exact();
+    if (waitForWaveforms)
+        waitForWaveforms();
+    repaint();
+    check ("first picture", true);
+    check ("unchanged view (blit only)", true);
+
+    // a zoom gesture: four steps in, two out (scaled, the lanes only), then still
+    const auto anchor = (double) gridArea().getWidth() * 0.4;
+    auto zoomStep = [&] (double factor) {
+        const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+        scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchor);
+        pixelsPerTick = zoomed;
+        updateScrollBars();
+        repaintZoomed();
+    };
+    for (auto f : { 1.2, 1.2, 1.2, 1.0 / 1.2, 1.0 / 1.2 })
+    {
+        zoomStep (f);
+        check ("zoom step x" + juce::String (f, 3) + " (outside the lanes)", true, gridArea());
+        check ("zoom step x" + juce::String (f, 3) + " (lanes scaled)", false);
+    }
+    settleZoom();
+    check ("zoom settled", true);
+    // past 2x in one gesture: the lanes are painted again on the way
+    for (int i = 0; i < 6; ++i)
+    {
+        zoomStep (1.0 / 1.2);
+        check ("zoom out step " + juce::String (i + 1) + " (outside the lanes)", true, gridArea());
+    }
+    settleZoom();
+    check ("zoom out settled", true);
+
+    // scrolls by whole pixels (the picture shifted, the strip painted)
+    scrollTicks = juce::jmax (0.0, scrollTicks + 37.0 / pixelsPerTick);
+    updateScrollBars();
+    repaintScrolled();
+    check ("scroll right 37 px", true);
+    scrollTicks = juce::jmax (0.0, scrollTicks - 11.0 / pixelsPerTick);
+    updateScrollBars();
+    repaintScrolled();
+    check ("scroll left 11 px", true);
+    if (tracksHeight() > gridArea().getHeight() + 30)
+    {
+        scrollY += 23;
+        updateScrollBars();
+        repaintScrolled();
+        check ("scroll down 23 px", true);
+    }
+    // a partial repaint (a hover, an edit): its area painted again
+    repaint (gridArea().withSizeKeepingCentre (200, 80));
+    check ("partial repaint", true);
+    repaint();
+    check ("whole repaint", true);
+    out << "picture memory: " << juce::String ((double) cache->memoryBytes() / (1024.0 * 1024.0), 1) << " MB\n";
+    setVisible (false); // (JUCE releases the cached pictures of a hidden component)
+    out << "hidden: picture memory " << juce::String ((double) cache->memoryBytes() / (1024.0 * 1024.0), 1) << " MB\n";
+    setVisible (true);
+    out << "failures: " << failures << "\nresult=" << (failures == 0 ? "OK" : "FAIL") << "\n";
+    return out;
+}
+
 // A repaint after the view scrolled: the cached picture is shifted instead of painted again (round 174e2)
 void PlaylistComponent::repaintScrolled()
 {
     scrollRepaintOnly = playheadOverlay;
     repaint();
     scrollRepaintOnly = false;
+}
+
+// A repaint after a step of a continuous zoom (Ctrl+wheel, the overview's ends, the zoom keys): the cache shows the
+// lanes scaled from its picture until the zoom has been still for zoomSettleMs, then they are painted exactly (round 174f)
+void PlaylistComponent::repaintZoomed()
+{
+    static const bool scaled = [] { const auto* v = std::getenv ("LYNX_ZOOM_SCALE"); return v == nullptr || juce::String (v) != "0"; }(); // (0: A/B)
+    if (playheadOverlay && scaled)
+    {
+        zoomGesture = true;
+        zoomSettle.startTimer (zoomSettleMs);
+    }
+    repaintScrolled();
+}
+
+void PlaylistComponent::settleZoom()
+{
+    zoomSettle.stopTimer();
+    if (! zoomGesture)
+        return;
+    zoomGesture = false;
+    zoomEndMs = juce::Time::getMillisecondCounterHiRes();
+    repaint (gridArea()); // (the lanes, exactly; the rest of the picture already is)
+}
+
+bool PlaylistComponent::zoomRecent (double nowMs) const
+{
+    return zoomGesture || nowMs - zoomEndMs < 400.0;
+}
+
+juce::Rectangle<int> PlaylistComponent::rulerArea() const
+{
+    return { headerWidth, rulerTop, gridArea().getWidth(), timelineHeight };
 }
 
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
@@ -433,7 +703,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
         pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), width / juce::jmax (1.0, length));
         scrollTicks = juce::jmax (0.0, start);
         updateScrollBars();
-        repaint();
+        repaintZoomed(); // (dragging the overview's window or its ends: a continuous scroll / zoom)
     };
     overview.onShowAll = [this] { zoomAll(); };
     addAndMakeVisible (overview);
@@ -1208,6 +1478,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         if (song.performanceZoneEnd() > 0)
             paintPerformance (g, grid);
 
+        if (engine.isLiveRecording())
+            paintLiveRecording (g);
+
         // the clip under the mouse: outline, the grip of the edge it is on, its menu button
         if (hover.clip >= 0 && hover.clip < (int) song.playlist.size() && drag == Drag::none)
         {
@@ -1835,8 +2108,14 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     juce::Path curve;
     bool started = false;
 
-    for (auto x = std::max (body.getX(), clip.getX()); x <= std::min (body.getRight(), clip.getRight()); x += 2.0f)
+    // (samples every 2 px on the body's own grid, from a little before the repainted area to a little after it: a
+    // repaint of part of the clip draws the same line as a paint of all of it; round 174f)
+    const auto lastX = std::min (body.getRight(), clip.getRight() + 4.0f);
+    for (auto k = (int) std::floor (juce::jmax (0.0f, clip.getX() - 4.0f - body.getX()) / 2.0f);; ++k)
     {
+        const auto x = body.getX() + 2.0f * (float) k;
+        if (x > lastX)
+            break;
         const auto value = automation.valueAt ((double) c.offset + xToTick ((int) x) - (double) c.start);
         const auto y = body.getBottom() - value * body.getHeight();
 
@@ -4809,7 +5088,7 @@ void PlaylistComponent::zoomAroundCentre (double factor)
     pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
     scrollTicks = juce::jmax (0.0, centre - (grid.getCentreX() - headerWidth) / pixelsPerTick);
     updateScrollBars();
-    repaint();
+    repaintZoomed();
 }
 
 void PlaylistComponent::zoomToBars (int bars)
@@ -6075,7 +6354,7 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         pixelsPerTick = zoomed;
         zoomBeforeAll = 0.0;
         updateScrollBars();
-        repaint();
+        repaintZoomed();
         return;
     }
 
@@ -6219,7 +6498,116 @@ bool PlaylistComponent::liveFrame (double nowMs)
                 repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
     }
+    // round 177d: a recording in progress grows on its tracks (its rows, from where it starts to the playhead; 30 Hz)
+    if (engine.isLiveRecording() && isShowing())
+    {
+        if (nowMs - liveRepaintMs >= 1000.0 / 30.0)
+        {
+            liveRepaintMs = nowMs;
+            const auto rec = engine.liveRecording();
+            juce::Rectangle<float> area;
+            for (const auto& a : rec.audio)
+                area = area.getUnion (liveBounds (a.track, a.span.start, a.span.start + a.span.length).expanded (2.0f, 1.0f));
+            if (rec.notes && rec.track >= 0)
+                area = area.getUnion (liveBounds (rec.track, (double) rec.from, (double) rec.to + 16.0 / pixelsPerTick).expanded (2.0f, 1.0f));
+            const auto now = area.getSmallestIntegerContainer();
+            const auto dirty = now.getUnion (liveArea).getIntersection (gridArea());
+            liveArea = now;
+            if (! dirty.isEmpty())
+                repaint (dirty);
+        }
+        return true;
+    }
+    if (! liveArea.isEmpty())
+    {
+        repaint (liveArea);
+        liveArea = {};
+    }
     return playing || moved || live;
+}
+
+// Round 177d: the recording in progress, live (MusicTech's FL 2025 review: recorded MIDI is not shown in the Playlist
+// while recording, audio recording "unintuitive"). Each audio take is a growing clip with its waveform on the track it
+// will land on; a Song-mode note take is a frame over the range it covers so far (its clip, placed with the first
+// released note, and where it will grow to), with the notes still held. At the stop they become the real clips.
+juce::Rectangle<float> PlaylistComponent::liveBounds (int track, double from, double to) const
+{
+    if (track < 0 || track >= numTracks() || to <= from)
+        return {};
+    const auto x0 = (float) tickToX (from), x1 = (float) tickToX (to);
+    return { x0, (float) trackToY (track) + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) heightOf (track) - 3.0f };
+}
+
+void PlaylistComponent::paintLiveRecording (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto live = engine.liveRecording();
+    const auto& song = engine.getSong();
+    const auto visible = g.getClipBounds().toFloat();
+
+    for (const auto& a : live.audio)
+    {
+        auto from = a.span.start, to = a.span.start + a.span.length;
+        if (live.punch.has_value()) // (only the punch range is kept)
+        {
+            from = juce::jmax (from, (double) live.punch->in);
+            to = juce::jmin (to, (double) live.punch->out);
+        }
+        const auto r = liveBounds (a.track, from, to);
+        if (r.isEmpty() || ! r.intersects (visible))
+            continue;
+        const auto body = paintClipFrame (g, r, colour::accent, a.name, ClipGlyph::audio);
+        const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f).getIntersection (visible);
+        if (a.peaks == nullptr || wave.getWidth() < 1.0f || wave.getHeight() < 2.0f || a.span.ticksPerSample <= 0.0)
+            continue;
+        // one value per pixel column, read under one lock
+        const auto columns = (int) std::ceil (wave.getWidth());
+        liveColumns.resize ((std::size_t) columns);
+        const auto framesPerPixel = 1.0 / (pixelsPerTick * a.span.ticksPerSample);
+        const auto firstFrame = a.span.firstFrame + (xToTick ((int) wave.getX()) - a.span.start) / a.span.ticksPerSample;
+        a.peaks->read (firstFrame, framesPerPixel, columns, liveColumns.data());
+        juce::RectangleList<float> bars;
+        const auto mid = wave.getCentreY(), half = wave.getHeight() * 0.5f;
+        for (int k = 0; k < columns; ++k)
+            if (const auto h = juce::jmin (1.0f, liveColumns[(std::size_t) k]) * half; h > 0.0f)
+                bars.addWithoutMerging ({ wave.getX() + (float) k, mid - h, 1.0f, juce::jmax (1.0f, 2.0f * h) });
+        g.setColour (clipContentColour (colour::accent));
+        g.fillRectList (bars);
+        g.fillRect (wave.getX(), mid - 0.5f, wave.getWidth(), 1.0f); // the zero line, as far as the take has come
+    }
+
+    if (live.notes && live.track >= 0 && live.to > live.from)
+    {
+        const auto r = liveBounds (live.track, (double) live.from, (double) live.to);
+        if (r.isEmpty() || ! r.intersects (visible))
+            return;
+        g.setColour (colour::accent.withAlpha (0.10f));
+        g.fillRoundedRectangle (r, radius::sm);
+        g.setColour (colour::accent.withAlpha (0.85f));
+        g.drawRoundedRectangle (r.reduced (0.5f), radius::sm, 1.5f);
+        if (live.held.empty() || live.pattern < 0 || live.pattern >= (int) song.patterns.size())
+            return;
+        // the held notes at their pitch, in the pattern's key range (as the clip draws its notes)
+        int low = 127, high = 0;
+        for (const auto& n : song.patterns[(std::size_t) live.pattern].notes)
+            low = juce::jmin (low, n.key), high = juce::jmax (high, n.key);
+        for (const auto& n : live.held)
+            low = juce::jmin (low, n.key), high = juce::jmax (high, n.key);
+        const auto inner = r.withTrimmedTop (clipHeaderHeight (r)).reduced (0.0f, 3.0f);
+        const auto span = juce::jmax (6, high - low + 2);
+        const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
+        const auto rows = (float) span + 1.0f;
+        const auto noteHeight = juce::jlimit (1.5f, 3.0f, inner.getHeight() / rows);
+        g.setColour (colour::accent.brighter (0.35f));
+        for (const auto& n : live.held)
+        {
+            const auto at = (double) (live.origin + n.start);
+            const auto nx = (float) tickToX (at);
+            const auto nw = juce::jmax (2.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+            const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
+            g.fillRect (nx, ny, nw, noteHeight);
+        }
+    }
 }
 
 // Performance mode (round 165m): the launched clips (a bright frame and, with "Performance clip progress", how far the
