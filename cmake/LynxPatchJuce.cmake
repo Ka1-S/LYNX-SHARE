@@ -73,6 +73,10 @@
 #    the Playlist's and the Mixer's cached pictures (redrawn while scrolling, 1920x1000 px) that readback cost more than
 #    the drawing. A context made while juce::lynxSkipImageReadback is set skips it; LYNX sets it only around images it
 #    never reads back (the picture is only drawn to the window; a new device gets a full repaint anyway).
+# 17. Windows only, juce_gui_basics/native/juce_FileChooser_windows.cpp (round 180a): at the first selection change in a
+#    native file dialog JUCE types Home and End with SendInput (its workaround for a cut-off file name), into whatever
+#    window has the focus at that moment: another program, if the user moved on while the dialog opened. The keys now go
+#    out only when the foreground window is one of LYNX's own. Without them the name may just show cut off.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -187,6 +191,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("dispatch through the hook" "LYNX patch (issue #32): through the hook"
             "                TranslateMessage (&m);|NL|                DispatchMessage (&m);"
             "                TranslateMessage (&m);|NL||NL|                // LYNX patch (issue #32): through the hook when LYNX set one|NL|                if (lynxDispatchMessageHook != nullptr)|NL|                    lynxDispatchMessageHook (&m);|NL|                else|NL|                    DispatchMessage (&m);")
+    elseif(file MATCHES "juce_FileChooser_windows.cpp$")
+        lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
+            "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
+            "                    // LYNX patch (round 180a): only into LYNX, never into a program the user moved on to|NL|                    DWORD foregroundProcess = 0;|NL|                    GetWindowThreadProcessId (GetForegroundWindow(), &foregroundProcess);|NL||NL|                    if (foregroundProcess == GetCurrentProcessId())|NL|                        SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));|NL|")
     elseif(file MATCHES "juce_VST3Common.h$")
         lynx_juce_fix("VST3 note ids" "LYNX patch (issue #70): each note its own noteId"
             "        toEventList (result, midiBuffer, &mapping, callback);|NL|    }"
@@ -214,6 +222,10 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
+    # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
+    if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
+    endif()
 endfunction()
 
 # run as a script: cmake -DJUCE_DIR=<dir> -P cmake/LynxPatchJuce.cmake

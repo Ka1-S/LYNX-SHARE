@@ -28,7 +28,8 @@ struct Settings
     double width = 180.0;      // degrees (0 … 210)
     double offset = 0.0;       // degrees (−105 … 105)
     double smoothing = 0.0;    // 0 … 1 of a step
-    int pattern = 0;           // 0: left / right (2 steps), 1: 8-step ramp, 2: ramp (round tp172d: PanMan's default shape)
+    int pattern = 0;           // 0: left / right (2 steps), 1: 8-step ramp, 2: ramp right to left (round tp172d: PanMan's default
+                               // shape, its ◀ key), 3: the same ramp left to right (its ▶ key)
     double amount = 1.0;       // the pattern's values scaled by this
     double phase = 0.0;        // start phase (cycles) at song position 0
     int analog = 1;            // 0 off, 1 the analog input stage (soft saturation), 2 the "hot" stage (a fast compressor)

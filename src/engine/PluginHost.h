@@ -181,6 +181,14 @@ public:
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
     bool usesFixedBlocks() const noexcept { return fixed != nullptr; }
+    // Round 177b: a plugin with a second input bus (its sidechain input) gets the slot's sidechain there; a slot without
+    // one (or a silent source) feeds it silence, as before.
+    void setSidechain (const float* left, const float* right) noexcept override
+    {
+        sideL = left;
+        sideR = right;
+    }
+    bool hasSideInput() const noexcept { return sideChannel >= 0; }
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
 
 private:
@@ -197,7 +205,17 @@ private:
     std::unique_ptr<FixedBlock> fixed;
     HostedOptions options;
     std::atomic<bool> resetPending { false }; // "Reset plugins on transport": reset before the next block (audio thread)
+    int sideChannel = -1, sideCount = 0;      // the side input bus in the process buffer (round 177b); -1 = none
+    const float* sideL = nullptr;             // this block's sidechain (set before process(), cleared after it)
+    const float* sideR = nullptr;
+    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place)
 };
+
+// Round 177b: the channels of a plugin's second input bus (its sidechain input), 0 when it has none (or it is off).
+int sideInputChannels (const juce::AudioPluginInstance& plugin);
+// --selftest: a stand-in plugin with a stereo sidechain bus (it outputs its side input) inside PluginEffect, plain and
+// with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
+juce::String pluginSidechainSelfTest();
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.
 // UI thread, except the scan functions (any thread; one scan at a time) and the background scan.
@@ -273,6 +291,9 @@ public:
     // list the plugins of each folder under its heading. Saved in %APPDATA%\LYNX\plugin-folders.txt. UI thread.
     const plugincatalog::Folders& databaseFolders() const noexcept { return userFolders; }
     void setDatabaseFolders (const plugincatalog::Folders& folders);
+
+    // How many scan child processes this host has started (--lv2scantest).
+    int scanChildrenStarted() const noexcept { return scanChildren; }
 
     // Scan child mode: describes a file's plugins into `output` (XML). Returns the number found.
     static int scanOneFile (const juce::String& formatName, const juce::String& file, const juce::File& output);
@@ -404,8 +425,9 @@ private:
     std::map<juce::String, bool> existsCache;
     std::mutex existsLock;
     void rememberEmptyScan (const juce::String& file);
+    bool describeLv2 (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     void save();
-    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file);
+    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file, const std::function<bool()>& keepGoing = {});
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
@@ -413,6 +435,7 @@ private:
 
     std::mutex scanLock, saveLock, flDbLock;
     std::atomic<bool> stopScan { false };
+    std::atomic<int> scanChildren { 0 };
     FlPluginDb flDb;
     int flDbFiles = 0;
     bool flDbLoaded = false;

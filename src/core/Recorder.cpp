@@ -153,24 +153,24 @@ bool placePatternClipAt (Song& song, int pattern, std::int64_t tick)
     clip.start = bar.tick;
     clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
 
+    clip.track = patternClipTrack (song, clip.start);
+    song.playlist.push_back (clip);
+    return true;
+}
+
+int patternClipTrack (const Song& song, std::int64_t start)
+{
     // the first track with nothing from the clip's start on, a clip ending right there included: the take's clip grows
     // to the right while recording (FL, round 168k [EXEC] fl2: Pattern 1 on Track 1 up to bar 2, the take's clip from
     // bar 2 went to Track 2; on an empty Playlist to Track 1)
     for (int track = 0;; ++track)
     {
         const auto busy = std::any_of (song.playlist.begin(), song.playlist.end(), [&] (const Clip& c) {
-            return c.track == track && c.end() >= clip.start;
+            return c.track == track && c.end() >= start;
         });
-
         if (! busy)
-        {
-            clip.track = track;
-            break;
-        }
+            return track;
     }
-
-    song.playlist.push_back (clip);
-    return true;
 }
 
 namespace
@@ -665,17 +665,18 @@ void NoteRecorder::end (const Song& song, double tick)
     active = false;
 }
 
-void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h, double endTick)
+Note NoteRecorder::makeNote (const Song& song, int channel, int key, const Held& h, double endTick, std::int64_t& takeOrigin,
+                              bool& takeFromClip, std::int64_t& takeReach) const
 {
     Note n;
     if (song.mode == PlayMode::song)
     {
         const auto at = songTick (song, h.tick);
-        if (origin < 0)
-            origin = takeOriginFor (song, at, &fromClip);
-        n.start = songNotePosition (song, at, origin);
+        if (takeOrigin < 0)
+            takeOrigin = takeOriginFor (song, at, &takeFromClip);
+        n.start = songNotePosition (song, at, takeOrigin);
         if (! inCurrentPatternClip (song, at))
-            reach = std::max (reach, origin + n.start);
+            takeReach = std::max (takeReach, takeOrigin + n.start);
     }
     else
     {
@@ -690,7 +691,30 @@ void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h
     n.channel = channel;
     n.key = std::clamp (key, 0, 127);
     n.velocity = std::clamp (h.velocity, 0.0f, 1.0f);
-    finished.push_back (n);
+    return n;
+}
+
+void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h, double endTick)
+{
+    finished.push_back (makeNote (song, channel, key, h, endTick, origin, fromClip, reach));
+}
+
+NoteRecorder::Preview NoteRecorder::preview (const Song& song, double nowTick) const
+{
+    Preview p;
+    p.origin = origin;
+    p.fromClip = fromClip;
+    p.reach = reach;
+    if (! active)
+        return p;
+    p.notes.reserve (held.size());
+    for (const auto& [id, h] : held)
+    {
+        // (a note-on stamped a hair after the UI's estimate of now: at least its minimum length)
+        const auto n = makeNote (song, id.first, id.second, h, std::max (nowTick, h.tick), p.origin, p.fromClip, p.reach);
+        p.notes.push_back (n);
+    }
+    return p;
 }
 
 std::vector<Note> NoteRecorder::takeFinished()
