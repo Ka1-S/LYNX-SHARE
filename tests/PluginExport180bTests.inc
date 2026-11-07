@@ -9,13 +9,13 @@
 
 namespace
 {
-Song pluginExportSong (EffectKind kind)
+lynx::Song pluginExportSong (lynx::EffectKind kind)
 {
-    auto song = Song::makeDefault();
+    auto song = lynx::Song::makeDefault();
     song.channels.clear();
     song.mixer.resize (2);
     song.mixer[0].effects.clear();
-    auto slot = makeEffectSlot (kind);
+    auto slot = lynx::makeEffectSlot (kind);
     slot.smartDisable = false;
     song.mixer[1].effects = { slot };
     return song;
@@ -35,13 +35,13 @@ TEST (pluginexport180b_rack_path_equals_the_effect_alone)
 {
     constexpr double rate = 48000.0;
     constexpr int size = 256;
-    for (const auto kind : { EffectKind::facetEq, EffectKind::crestCompressor, EffectKind::echoform })
+    for (const auto kind : { lynx::EffectKind::facetEq, lynx::EffectKind::crestCompressor, lynx::EffectKind::echoform })
     {
         const auto song = pluginExportSong (kind);
-        auto state = RackState::build (song, nullptr, rate);
-        auto renderer = std::make_unique<RackRenderer>();
+        auto state = lynx::RackState::build (song, nullptr, rate);
+        auto renderer = std::make_unique<lynx::RackRenderer>();
         renderer->prepare (rate, size);
-        auto direct = makeEffect (kind);
+        auto direct = lynx::makeEffect (kind);
         direct->prepare (rate);
         const auto params = song.mixer[1].effects[0].params;
 
@@ -69,12 +69,12 @@ TEST (pluginexport180b_host_parameters_reach_the_slot_without_a_rebuild)
 {
     constexpr double rate = 48000.0;
     constexpr int size = 256;
-    const auto song = pluginExportSong (EffectKind::utility);
-    auto state = RackState::build (song, nullptr, rate);
-    auto renderer = std::make_unique<RackRenderer>();
+    const auto song = pluginExportSong (lynx::EffectKind::utility);
+    auto state = lynx::RackState::build (song, nullptr, rate);
+    auto renderer = std::make_unique<lynx::RackRenderer>();
     renderer->prepare (rate, size);
     auto params = song.mixer[1].effects[0].params;
-    const auto& info = effectInfo (EffectKind::utility);
+    const auto& info = lynx::effectInfo (lynx::EffectKind::utility);
     CHECK (! info.params.empty());
     std::vector<float> inL (size), inR (size), outL (size), outR (size);
     const auto energy = [&] {
@@ -98,20 +98,20 @@ TEST (pluginexport180b_host_parameters_reach_the_slot_without_a_rebuild)
 TEST (pluginexport180b_catalog_needs_no_fl_data)
 {
     // every exported engine starts from LYNX's own state, on a PC without FL Studio
-    for (const auto& e : plugexport::catalog)
+    for (const auto& e : lynx::plugexport::catalog)
     {
         if (e.instrument)
         {
-            const auto* engine = natives::instrumentEngine (e.synth);
-            CHECK (engine != nullptr && engine->needs == natives::Needs::nothing);
-            const auto channel = banks::defaultChannel (e.synth, e.name);
+            const auto* engine = lynx::natives::instrumentEngine (e.synth);
+            CHECK (engine != nullptr && engine->needs == lynx::natives::Needs::nothing);
+            const auto channel = lynx::banks::defaultChannel (e.synth, e.name);
             CHECK (channel.has_value());
-            CHECK (modelparams::tableOf (e.synth) != nullptr);
+            CHECK (lynx::modelparams::tableOf (e.synth) != nullptr);
         }
         else
         {
-            const auto* engine = natives::effectEngine (e.effect);
-            CHECK (engine == nullptr || engine->needs == natives::Needs::nothing);
+            const auto* engine = lynx::natives::effectEngine (e.effect);
+            CHECK (engine == nullptr || engine->needs == lynx::natives::Needs::nothing);
         }
     }
 }
