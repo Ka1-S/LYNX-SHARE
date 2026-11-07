@@ -27,8 +27,8 @@ public:
     {
         const auto v = juce::jlimit (0.0, 1.0, (getter() - spec.minimum) / juce::jmax (1e-9, spec.maximum - spec.minimum));
         auto area = getLocalBounds().toFloat();
-        const auto label = area.removeFromBottom (14.0f);
-        const auto valueArea = area.removeFromBottom (13.0f);
+        const auto label = compact ? juce::Rectangle<float>() : area.removeFromBottom (14.0f);
+        const auto valueArea = compact ? juce::Rectangle<float>() : area.removeFromBottom (13.0f);
         const auto size = juce::jmin (area.getWidth(), area.getHeight()) - 4.0f;
         const auto box = juce::Rectangle<float> (size, size).withCentre (area.getCentre());
         constexpr float sweep = juce::MathConstants<float>::pi * 1.5f;
@@ -44,6 +44,8 @@ public:
         g.setColour (isMouseOverOrDragging() ? theme::colour::accent : theme::colour::knobArc);
         g.strokePath (arc, juce::PathStrokeType (3.0f));
 
+        if (compact)
+            return; // (just the dial: the value is in the hint)
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::caption));
         g.drawText (spec.text (getter()), valueArea, juce::Justification::centred);
@@ -99,6 +101,7 @@ public:
     }
 
     juce::String shortName;
+    bool compact = false; // only the dial (no value / name rows): FL's small knobs, e.g. the Video Player's volume
 
 private:
     AudioEngine* engine;

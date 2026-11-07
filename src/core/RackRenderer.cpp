@@ -1,5 +1,6 @@
 #include "core/RackRenderer.h"
 #include "core/MixerOps.h"
+#include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
 #include "core/MetronomeVoice.h"
@@ -1332,6 +1333,9 @@ void RackState::buildAutomationTables()
             eventLanes.push_back ({ p, l, slot });
             bind (slot++, lane.target);
         }
+
+    // the tempo can move while playing: tempo automation or FL's pattern Tempo events (issue #86)
+    tempoMap = tempoAutomation >= 0 || tempomap::hasTempoEvents (song);
 }
 
 void RackState::slotsOfTarget (const Song& song, const AutomationTarget& target, std::vector<int>& out)
@@ -2688,14 +2692,13 @@ void RackRenderer::process (const RackState* state,
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
     bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;
 
-    if (tempoOverride <= 0.0 && state->tempoAutomation >= 0 && state->song.mode == PlayMode::song && ! isSlotOverridden (state->tempoAutomation))
+    // and FL's pattern Tempo events (issue #86, core/TempoMap.h): in song mode with the tempo clips, in pattern mode the
+    // current pattern's. A tempo the user is dragging over its automation holds (as before).
+    if (tempoOverride <= 0.0 && state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
     {
+        const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
-        const auto& clips = state->automationClips[(std::size_t) state->tempoAutomation];
-
-        if (! clips.empty())
-            bpm = tempoFromValue (automationValueAt (state->song, state->song.automations[(std::size_t) state->tempoAutomation], clips,
-                                                     std::fmod (std::max (0.0, startTick), length)));
+        bpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
     }
 
     const auto tps = ticksPerSample (bpm, sampleRate);
@@ -3485,12 +3488,16 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
     pullInputs (state, 0, numSamples);
+    if (meters != nullptr)
+        meters->rollingLog.push (RollingAudioLog::Position::preEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     runEffects (state, 0, numSamples);
 
     if (! song.mixer.empty())
     {
         applyTrackEq (song.mixer[0], 0, song.cleanMixer, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     }
+    if (meters != nullptr)
+        meters->rollingLog.push (RollingAudioLog::Position::postEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
 
     MixerMatrix target; // without a mixer: unity
 

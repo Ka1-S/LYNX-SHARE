@@ -15,6 +15,9 @@
 #include <vector>
 #include <utility>
 
+#include "core/Adr.h"
+#include "core/VideoTrack.h"
+
 namespace lynx
 {
 constexpr int ppq = 960;              // ticks per quarter note
@@ -1698,6 +1701,10 @@ struct Song
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
+    // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks
+    std::vector<VideoTrack> videoTracks;
+    VideoSettings video;
+    AdrSession adr; // the ADR cue list, its takes and its settings (round 174d, core/Adr.h)
     std::vector<MidiLink> midiLinks;
     // FL's "initialized controls" (.flp 0xD8; the parameter menu's "Init song with this position", REA round 146):
     // values the targets are reset to whenever the song starts playing in song mode (from any position), before
