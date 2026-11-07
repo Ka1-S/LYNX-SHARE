@@ -18,7 +18,10 @@ constexpr int currentVersion = 1;
 juce::String toJson (const Song& song);
 std::optional<Song> fromJson (const juce::String& json, juce::String& error);
 
+// Atomic (temporary file + rename), then read back: false, with `error`, unless the file on disk is what was written.
 bool save (const Song& song, const juce::File& file, juce::String& error);
+// `file` named as a project: "beat.v2" -> "beat.v2.lynx" (File::withFileExtension would make it "beat.lynx").
+juce::File withProjectExtension (const juce::File& file);
 std::optional<Song> load (const juce::File& file, juce::String& error);
 
 // One mixer track as stored in a project (sends, input and effects included).

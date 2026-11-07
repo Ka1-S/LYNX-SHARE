@@ -115,6 +115,19 @@ Sizes measured on Windows x64, zig, `-O2`, stripped:
 | `LYNX Plugins.clap` (both plugins) | 39.1 MB | 13.8 MB xz |
 | `LYNX.exe` (for comparison) | 41.5 MB | |
 
+Linux x64 (gcc 15, `-O3`): each VST3 `.so` is 37.2 MB and the `.clap` is 37.0 MB, unstripped. Measured on the `.clap`
+with the same objects, all compiled with `-ffunction-sections -fdata-sections`:
+
+| Linking | Stripped size | xz |
+|---|---|---|
+| with `--gc-sections` | 31.4 MB | 10.4 MB |
+| without `--gc-sections` | 46.3 MB | 16.9 MB |
+
+Garbage collection of unused sections makes the plugin 32 % smaller, so it stays on. The Windows plugins reuse the app's
+objects, which are built without section flags. **Follow-up after 0.1.25:** build the Windows plugins from their own
+objects, compiled with section flags. A similar saving is likely (inferred, not measured), at the cost of a second
+compile of the app.
+
 Almost all of a plugin's size is the shared app runtime. A CLAP with N plugins stays at about 39 MB. N separate VST3s
 cost about 39 MB each. The options for the user to decide:
 
@@ -140,3 +153,4 @@ Per instance, measured in plugexporttest:
 - Ableton Live has not been tested, at the user's request.
 - Editors other than Facet EQ and FM10 need to be checked for FL wording before they are exported.
 - The plugins are unsigned.
+- macOS is not built or tested. The app's macOS-only `VideoMediaMac.mm` is not in the shared source list.

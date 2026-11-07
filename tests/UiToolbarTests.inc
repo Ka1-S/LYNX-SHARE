@@ -8,10 +8,10 @@ TEST (toolbar_layout_default_roundtrip)
     auto l = Layout::makeDefault();
     CHECK ((int) l.entries.size() == groupCount);
     CHECK (l.isDefault());
-    CHECK (l.orderToString() == "transport,master,record,snap,windows,file,meters,output");
+    CHECK (l.orderToString() == "transport,master,record,snap,windows,file,chord,meters,output");
 
     l.setShown (Group::meters, false);
-    l.move (Group::output, -7); // to the front
+    l.move (Group::output, -8); // to the front
     CHECK (l.entries.front().group == Group::output);
     CHECK (! l.isDefault());
 
@@ -60,9 +60,9 @@ TEST (toolbar_layout_fit_drops_by_priority)
     std::array<int, groupCount> widths;
     widths.fill (100);
     // room for everything
-    auto v = fit (l, widths, 10, 8 * 110 + 300, 300);
+    auto v = fit (l, widths, 10, 9 * 110 + 300, 300);
     CHECK (std::all_of (v.begin(), v.end(), [] (bool b) { return b; }));
-    // two groups too many: output (50) and meters (55) drop first
+    // three groups too many: chord (45), output (50) and meters (55) drop first
     v = fit (l, widths, 10, 6 * 110 + 300, 300);
     CHECK (! v[(std::size_t) Group::output] && ! v[(std::size_t) Group::meters] && v[(std::size_t) Group::record]);
     // nothing fits: only the transport stays

@@ -41,6 +41,8 @@ add_library(lynx_core STATIC
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
+    src/core/RollingAudioLog.cpp
+    src/core/ChordReadout.cpp
     src/core/LoadTrace.cpp
     src/core/ModuleWarmup.cpp
     src/core/FlpImport.cpp
@@ -122,6 +124,10 @@ add_library(lynx_core STATIC
     src/core/Dvs.cpp
     src/core/Transmitter.cpp
     src/core/VideoPlayer.cpp
+    src/core/VideoTime.cpp
+    src/core/VideoTrack.cpp
+    src/core/Adr.cpp
+    src/core/DialogueAlign.cpp
     src/core/FruityDance.cpp
     src/core/Reeverb2.cpp
     src/core/LuxeVerb.cpp
@@ -436,6 +442,10 @@ if(LYNX_BUILD_APP)
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/VideoMedia.cpp
+        src/ui/VideoMediaWindows.cpp
+        src/ui/VideoTracks.cpp
+        src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
@@ -522,8 +532,13 @@ if(LYNX_BUILD_APP)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
         target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
+        # the system's video decoder (round 174d, ui/VideoMediaMac.mm; manual retain / release)
+        target_sources(LYNX PRIVATE src/ui/VideoMediaMac.mm)
+        set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)

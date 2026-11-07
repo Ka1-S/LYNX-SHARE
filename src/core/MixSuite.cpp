@@ -557,6 +557,7 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
 }
 
 double compGrCapDb (float v) noexcept { return v > 1e-6f ? 60.0 * std::min (1.0f, v) : 1e9; }
+double compAttackFineSeconds (float v) noexcept { return 0.25 * std::clamp (v, 0.0f, 1.0f); }
 
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {
@@ -1063,7 +1064,7 @@ public:
         // compressor
         const auto thr = compThresholdDb (p[compThreshold]), rat = ratio (p[compRatio]);
         const auto grCap = compGrCapDb (p[compGrCap]);
-        const auto compAttack = coef (on (p[compFastAttack]) ? 0.001 : 0.010, sr);
+        const auto compAttack = coef (p[compAttackFine] > 1e-6f ? compAttackFineSeconds (p[compAttackFine]) : (on (p[compFastAttack]) ? 0.001 : 0.010), sr);
         const auto compRel = coef (releaseSeconds (p[ridge::compRelease]), sr);
         const auto cmix = (float) std::clamp (p[compMix], 0.0f, 1.0f);
         const bool compOn = p[compRatio] > 0.0005f;

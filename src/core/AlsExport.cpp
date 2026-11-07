@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <iomanip>
+#include <locale>
 #include <map>
 #include <mutex>
 #include <set>
+#include <sstream>
 
 #include "core/AlsImport.h"
 #include "core/AlsSkeleton.h"
@@ -135,9 +138,25 @@ std::string num (double v)
 {
     if (std::abs (v) < 1e-12)
         return "0";
+   #if defined (__APPLE__)
+    // Floating-point std::to_chars needs macOS 13.3 and LYNX targets 11.0: shortest precision that reads back exactly.
+    for (int precision = 15;; ++precision)
+    {
+        std::ostringstream text;
+        text.imbue (std::locale::classic());
+        text << std::setprecision (precision) << v;
+        std::istringstream back (text.str());
+        back.imbue (std::locale::classic());
+        double read = 0.0;
+        back >> read;
+        if (read == v || precision == 17)
+            return text.str();
+    }
+   #else
     char buf[64];
     const auto r = std::to_chars (buf, buf + sizeof buf, v);
     return std::string (buf, r.ptr);
+   #endif
 }
 std::string num (std::int64_t v) { return std::to_string (v); }
 std::string num (int v) { return std::to_string (v); }
@@ -193,8 +212,11 @@ int warpModeOf (const SamplerSettings& s)
         return 3; // Re-Pitch
     switch (s.stretchMethod)
     {
-        case StretchMethod::transients: return 0; // Beats
-        case StretchMethod::mono: return 1;       // Tones
+        case StretchMethod::transients:
+        case StretchMethod::beats: return 0;      // Beats
+        case StretchMethod::mono:
+        case StretchMethod::tones: return 1;      // Tones
+        case StretchMethod::texture: return 2;    // Texture
         default: return 4;                        // Complex
     }
 }
@@ -494,7 +516,10 @@ struct Exporter
         // content beats ↔ sample seconds: one rate, the clip's stretch [import: stretch = beats per second · 60 / bpm]
         const auto seconds = options.sampleSeconds ? options.sampleSeconds (ch.samplePath) : 0.0;
         const auto spanSeconds = seconds > 0.0 ? seconds : 1.0;
-        const auto beatsPerSecond = clip.stretch * song.bpm / 60.0;
+        // a channel stretched to a length in beats (an imported warped clip, FL's stretch): its beats per file second
+        const auto beatsPerSecond = (ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f && seconds > 0.0 ? (double) ch.sampler.stretchBeats / seconds
+                                                                                                             : song.bpm / 60.0)
+                                    * clip.stretch;
         if (auto* markers = c.child ("WarpMarkers"))
         {
             markers->kids.clear();

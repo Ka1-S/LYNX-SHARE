@@ -2951,6 +2951,12 @@ public:
         stretchMethod.addItem (tr ("General"), 1);
         stretchMethod.addItem (tr ("Drums / transients"), 2);
         stretchMethod.addItem (tr ("Vocal / mono"), 3);
+        // LYNX's warp modes modelled on Ableton Live's (round 175a, N4)
+        stretchMethod.addSeparator();
+        stretchMethod.addItem (tr ("Warp: Beats"), 4);
+        stretchMethod.addItem (tr ("Warp: Tones"), 5);
+        stretchMethod.addItem (tr ("Warp: Texture"), 6);
+        stretchMethod.addItem (tr ("Warp: Complex"), 7);
         stretchMethod.setTooltip (tr ("How the stretch keeping pitch is computed: General for full mixes and chords, Drums for loops and percussive sounds (attacks kept sharp), Vocal for a single voice or instrument"));
         stretchMethod.onChange = [this] { apply(); };
         addAndMakeVisible (stretchMethod);
@@ -3251,7 +3257,7 @@ private:
         if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
             s.stretchBeats = (float) (shownStretch = stretch.getValue());
         s.keepPitch = keepPitch.getToggleState();
-        s.stretchMethod = (StretchMethod) juce::jlimit (0, 2, stretchMethod.getSelectedId() - 1);
+        s.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, stretchMethod.getSelectedId() - 1);
         stretchMethod.setEnabled (s.keepPitch);
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
