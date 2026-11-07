@@ -137,7 +137,13 @@ private:
             if (list.empty() || automation.isLive() || automation.target.kind == AutomationTargetKind::none
                 || automation.target.kind == AutomationTargetKind::tempo)
                 continue;
-            std::sort (list.begin(), list.end(), byStart);
+            // one source per target: its clips play as one (issue #97, the renderer's rule)
+            const auto same = std::find_if (sources.begin(), sources.end(), [&] (const Source& s) { return s.target == automation.target; });
+            if (same != sources.end())
+            {
+                same->clips.insert (same->clips.end(), list.begin(), list.end());
+                continue;
+            }
             Source s;
             s.target = automation.target;
             s.automation = a;
@@ -169,24 +175,32 @@ private:
         constexpr auto none = std::numeric_limits<float>::quiet_NaN();
         if (s.automation >= 0)
         {
-            if (song.mode != PlayMode::song || s.automation >= (int) song.automations.size())
+            if (song.mode != PlayMode::song)
                 return none; // in pattern mode the Playlist does not play (the renderer keeps the last value)
-            const auto& automation = song.automations[(std::size_t) s.automation];
-            const Clip* before = nullptr;
+            const Clip* playing = nullptr;
+            const Clip* ended = nullptr;
             for (const auto i : s.clips)
             {
                 if (i >= (int) song.playlist.size())
                     return none; // (the Song changed without a new stamp)
                 const auto& c = song.playlist[(std::size_t) i];
+                if (c.automation < 0 || c.automation >= (int) song.automations.size())
+                    return none;
                 if (tick < (double) c.start)
-                    break;
+                    continue;
                 if (tick < (double) c.end())
-                    return automation.valueAt (tick - (double) c.start + (double) c.offset);
-                before = &c;
+                {
+                    if (playing == nullptr || c.start > playing->start || (c.start == playing->start && c.automation < playing->automation))
+                        playing = &c;
+                }
+                else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+                    ended = &c;
             }
-            if (before != nullptr)
-                return automation.valueAt ((double) (before->length + before->offset));
-            return s.clips.front() < (int) song.playlist.size() ? automation.valueAt ((double) song.playlist[(std::size_t) s.clips.front()].offset) : none;
+            if (playing != nullptr)
+                return song.automations[(std::size_t) playing->automation].valueAt (tick - (double) playing->start + (double) playing->offset);
+            if (ended != nullptr)
+                return song.automations[(std::size_t) ended->automation].valueAt ((double) (ended->length + ended->offset));
+            return none; // before the first clip: the control's own value
         }
 
         if (s.pattern < 0 || s.pattern >= (int) song.patterns.size())
