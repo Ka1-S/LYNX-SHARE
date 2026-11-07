@@ -1149,3 +1149,27 @@ TEST (als175a_warp_edits_one_clip_only)
     CHECK (warpedit::channelForClipEdit (song, 1) == 0 && song.channels.size() == 2);
     CHECK (warpedit::channelForClipEdit (song, 5) == -1);
 }
+
+TEST (als175a_warp_markers_as_played)
+{
+    // markers 0 → 0, 1 s → 2, 2 s → 8 on a 2 s file: played as they are (8 beats); the inverse finds the file time
+    using namespace lynx;
+    SamplerSettings s;
+    s.keepPitch = true;
+    s.stretchBeats = 8.0f;
+    s.warp = { { 0.0, 0.0 }, { 1.0, 2.0 }, { 2.0, 8.0 } };
+    const auto p = warpedit::playedMarkers (s, 2.0);
+    CHECK (p.size() == 3 && std::abs (p[1].beats - 2.0) < 1e-9);
+    CHECK (std::abs (warpedit::secondsAt (p, 5.0) - 1.5) < 1e-9);
+    // a straight line, or no keep-pitch stretch: nothing to show
+    s.warp[1].beats = 4.0;
+    CHECK (warpedit::playedMarkers (s, 2.0).empty());
+    s.warp[1].beats = 2.0;
+    s.keepPitch = false;
+    CHECK (warpedit::playedMarkers (s, 2.0).empty());
+    // beat 2 of a clip that starts at bar 2 (tick 3840) with its content from beat 1 (offset 960): tick 3840 + 960
+    Clip c;
+    c.start = 3840;
+    c.offset = 960;
+    CHECK (std::abs (warpedit::clipTickOfBeat (c, 2.0) - 4800.0) < 1e-9);
+}

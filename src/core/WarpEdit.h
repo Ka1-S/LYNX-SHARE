@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/ClipOps.h"
+#include "core/TimeStretch.h"
 #include "core/Song.h"
 
 namespace lynx::warpedit
@@ -46,11 +47,11 @@ inline bool ensureMarkers (SamplerSettings& s, double fileSeconds, double bpm)
     return true;
 }
 
-// stretchBeats follows the end marker (the last one)
-inline void syncLength (SamplerSettings& s)
+// stretchBeats follows the markers: the beat at the file's end (`fileSeconds`; 0 = the last marker's beat)
+inline void syncLength (SamplerSettings& s, double fileSeconds = 0.0)
 {
     if (s.warp.size() >= 2)
-        s.stretchBeats = (float) std::max (minBeatGap, s.warp.back().beats);
+        s.stretchBeats = (float) std::max (minBeatGap, fileSeconds > 0.0 ? beatAt (s.warp, fileSeconds) - beatAt (s.warp, 0.0) : s.warp.back().beats);
 }
 
 // A marker at file time `seconds`, on the beat it plays on now. Returns its index, or -1 (too close to another).
@@ -68,7 +69,7 @@ inline int addMarker (SamplerSettings& s, double seconds)
 
 // Marker `index` moved to beat `beats` (the audio around it stretches); kept between its neighbours. The start
 // marker never moves. Returns the beat it got.
-inline double moveMarker (SamplerSettings& s, int index, double beats)
+inline double moveMarker (SamplerSettings& s, int index, double beats, double fileSeconds = 0.0)
 {
     if (index <= 0 || index >= (int) s.warp.size())
         return index == 0 && ! s.warp.empty() ? s.warp.front().beats : 0.0;
@@ -76,7 +77,7 @@ inline double moveMarker (SamplerSettings& s, int index, double beats)
     const auto hi = index + 1 < (int) s.warp.size() ? s.warp[(std::size_t) index + 1].beats - minBeatGap : 1.0e6;
     auto& m = s.warp[(std::size_t) index];
     m.beats = std::clamp (beats, lo, std::max (lo, hi));
-    syncLength (s);
+    syncLength (s, fileSeconds);
     return m.beats;
 }
 
@@ -94,6 +95,42 @@ inline void clearMarkers (SamplerSettings& s)
 {
     if (s.warp.size() > 2)
         s.warp = { s.warp.front(), s.warp.back() };
+}
+
+// The markers as the channel plays them: content beats scaled so the file fills stretchBeats from beat 0 (the same
+// normalisation as the render, core/TimeStretch warpStretchMap). Empty unless they bend the tempo.
+inline std::vector<WarpPoint> playedMarkers (const SamplerSettings& s, double fileSeconds)
+{
+    if (! s.keepPitch || s.stretchBeats <= 0.0f || s.warp.size() < 3 || ! (fileSeconds > 0.0)
+        || warpStretchMap (s.warp, fileSeconds * 1000.0, 1000.0, (double) s.stretchBeats * 1000.0).empty())
+        return {};
+    const auto b0 = beatAt (s.warp, 0.0), b1 = beatAt (s.warp, fileSeconds);
+    if (! (b1 > b0))
+        return {};
+    const auto scale = (double) s.stretchBeats / (b1 - b0);
+    std::vector<WarpPoint> out;
+    for (const auto& p : s.warp)
+        out.push_back ({ p.seconds, (p.beats - b0) * scale });
+    return out;
+}
+
+// The file time played at content beat `beats` (the inverse of beatAt, straight beyond the end markers)
+inline double secondsAt (const std::vector<WarpPoint>& w, double beats)
+{
+    if (w.size() < 2)
+        return beats;
+    std::size_t i = 1;
+    while (i + 1 < w.size() && beats > w[i].beats)
+        ++i;
+    const auto& a = w[i - 1];
+    const auto& b = w[i];
+    return a.seconds + (beats - a.beats) * (b.seconds - a.seconds) / std::max (1.0e-12, b.beats - a.beats);
+}
+
+// The Playlist tick where content beat `beats` of audio clip `c` plays (the clip's own stretch included)
+inline double clipTickOfBeat (const Clip& c, double beats)
+{
+    return (double) c.start - ((double) c.offset + (double) c.offsetFraction) + beats * ppq * std::clamp (c.stretch, 0.01, 100.0);
 }
 
 // The channel to edit for audio clip `clip`: its own, or a copy of it when other clips play that channel too (the
