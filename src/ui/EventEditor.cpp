@@ -10,6 +10,7 @@
 
 #include "core/EventEdit.h"
 #include "core/MidiImport.h"
+#include "engine/FlStudio.h"
 #include "engine/MidiFileIo.h"
 #include "core/PianoRollTools.h"
 #include "ui/FileChoosers.h"
@@ -766,7 +767,10 @@ private:
 
     void chooseMidi()
     {
-        chooser = lynx::ui::makeFileChooser (tr ("Import MIDI file..."), juce::File(), "*.mid;*.midi");
+        // (FL's starts in the user's Presets\\Scores\\Automation; seen round 178a)
+        const auto automationScores = findFlStudio().userData.getChildFile ("Presets").getChildFile ("Scores").getChildFile ("Automation");
+        chooser = lynx::ui::makeFileChooser (tr ("Import MIDI file..."), automationScores.isDirectory() ? automationScores : juce::File(),
+                                             "*.mid;*.midi");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                  [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
                                      if (safe == nullptr || ! fc.getResult().existsAsFile())
@@ -795,9 +799,8 @@ private:
     // pattern's markers; notes aren't imported here.
     void importMidi (const midiimport::ParsedMidi& midi, const juce::String& name)
     {
-        static midiimport::Options remembered;
-        showEventLaneMidiImportDialog (name, midi, remembered, [safe = juce::Component::SafePointer<EventEditor> (this), midi] (const midiimport::Options& o) {
-            remembered = o;
+        // (FL's window starts afresh every time: controller "---", Realign off, time signatures on; seen round 178a)
+        showEventLaneMidiImportDialog (name, midi, midiimport::Options {}, [safe = juce::Component::SafePointer<EventEditor> (this), midi] (const midiimport::Options& o) {
             if (safe == nullptr)
                 return;
             const auto events = midiimport::controllerEvents (midi, o); // (none in the file: FL leaves the lane empty)

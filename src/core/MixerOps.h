@@ -138,6 +138,19 @@ std::vector<int> groupOf (const Song& song, int track);
 void createGroup (Song& song, const std::vector<int>& tracks, int current);
 // "Group › Auto color group": the tracks of `track`'s group take its colour. Returns how many changed.
 int autoColorGroup (Song& song, int track);
+// "Gradient color..." (FL's SetGradientColorMenuClick, REA_rodada177a §5): track k of the n selected tracks (in mixer
+// order) takes from + (to - from) * floor (k * 256 / (n - 1)) / 256 on each of R, G and B, so the first gets `from` and the
+// last gets `to`. Fewer than two tracks do nothing. Returns how many tracks changed.
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept;
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to);
+// "Assign to new Audio track(s)" (FL's AssignAudiotrackMenuClick, Tag 0; REA_rodada177a §6): each selected insert
+// takes the first untouched Playlist track (no name, colour, mode or clip; FL scans tracks 1–500) as its audio track,
+// named and coloured as the insert. An insert that is already linked to an audio track is skipped. Returns how many
+// tracks were assigned.
+int assignNewAudioTracks (Song& song, std::vector<int> inserts);
+// "Unassign from Audio track(s)" (the same handler, Tag 1): the first audio track linked to each selected insert goes
+// back to unassigned. Its name, colour and clips stay. Returns how many tracks changed.
+int unassignAudioTracks (Song& song, std::vector<int> inserts);
 // "Group › Separator" and "Layout › Dock to" for the selected tracks (inserts; the Master can be docked).
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on);
 void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock);

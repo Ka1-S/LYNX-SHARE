@@ -9915,6 +9915,24 @@ private:
                 juce::Component frame;
                 frame.setSize (c->getWidth(), c->getHeight());
                 frame.setOpaque (true);
+                // an AlertWindow is built on the desktop: shown there first, it would take the foreground from whoever has it
+                // (TopLevelWindow::visibilityChanged calls toFront (true)). Off the desktop, its control that showing it would
+                // have focused (what grabKeyboardFocus picks) is marked, so the picture keeps that control's focus ring
+                if (c->isOnDesktop())
+                {
+                    c->removeFromDesktop();
+                    auto* focus = c.get();
+                    for (int depth = 0; focus != nullptr && depth < 32; ++depth)
+                    {
+                        if (focus->getWantsKeyboardFocus() && (focus->isEnabled() || focus == c.get()))
+                        {
+                            focus->getProperties().set ("lynxSnapshotFocus", true);
+                            break;
+                        }
+                        auto traverser = focus->createKeyboardFocusTraverser();
+                        focus = traverser != nullptr ? traverser->getDefaultComponent (focus) : nullptr;
+                    }
+                }
                 frame.addAndMakeVisible (*c);
                 c->setTopLeftPosition (0, 0);
                 checkTextFit (*c, name.fromFirstOccurrenceOf ("-", false, false).upToLastOccurrenceOf (".", false, false));
