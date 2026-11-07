@@ -11,7 +11,7 @@ namespace lynx
 // Optional out-of-process plugins ("sandbox"): each plugin runs in a child LYNX.exe
 // (`--plugin-host`). Audio, MIDI and parameters go through shared memory every block; state and
 // editor window, through messages. If the child hangs or exits, the plugin goes silent and LYNX keeps running.
-// Windows and Linux (round 161); on macOS `createSandboxedPlugin` fails and the plugin runs in-process.
+// Windows, Linux (round 161) and macOS.
 
 constexpr const char* pluginSandboxId = "lynx-plugin-host";
 

@@ -104,3 +104,25 @@ TEST (safety_paths_and_package_plan)
     CHECK (song.channels[2].samplePath == "/x/Beat/Audio/lead.flac");
     CHECK (resolveProjectSamples (song, "/x/Beat", [&] (const std::string& p) { return disk.count (p) > 0; }) == 0);
 }
+
+// D#92, round 180a: a dotted name keeps its dot; the string macOS hands to a running application
+TEST (safety_project_extension_and_open_requests)
+{
+    using namespace lynx::safety;
+    CHECK (withProjectExtension ("beat", ".lynx") == "beat.lynx");
+    CHECK (withProjectExtension ("beat.v2", ".lynx") == "beat.v2.lynx");
+    CHECK (withProjectExtension ("beat.lynx", ".lynx") == "beat.lynx");
+    CHECK (withProjectExtension ("BEAT.LYNX", ".lynx") == "BEAT.LYNX");
+    CHECK (withProjectExtension ("lynx", ".lynx") == "lynx.lynx");
+
+    CHECK (isFileArgument ("beat.lynx") && isFileArgument ("/x/beat.lynx") && isFileArgument ("C:\\x\\beat.lynx"));
+    CHECK (! isFileArgument ("") && ! isFileArgument ("--lang") && ! isFileArgument ("-psn_0_123"));
+
+    using Files = std::vector<std::string>;
+    CHECK (filesInCommandLine ("") == Files {});
+    CHECK (filesInCommandLine ("/x/beat.lynx") == Files { "/x/beat.lynx" });
+    CHECK (filesInCommandLine ("\"/My Beats/a b.lynx\"") == Files { "/My Beats/a b.lynx" });
+    CHECK (filesInCommandLine ("\"/a b/c.lynx\" /d.lynx") == (Files { "/a b/c.lynx", "/d.lynx" }));
+    CHECK (filesInCommandLine ("/say\\\"hi\\\".lynx") == Files { "/say\"hi\".lynx" });
+    CHECK (filesInCommandLine ("-psn_0_123 /x/m\xc3\xbasica.lynx") == Files { "/x/m\xc3\xbasica.lynx" });
+}
