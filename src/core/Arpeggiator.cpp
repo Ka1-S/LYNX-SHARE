@@ -17,8 +17,9 @@ void Arpeggiator::reset() noexcept
     sliding = false;
 }
 
-void Arpeggiator::hold (int key, float velocity) noexcept
+void Arpeggiator::hold (const NoteEvent& on) noexcept
 {
+    const auto key = on.key;
     for (int i = 0; i < heldCount; ++i)
         if (heldKeys[(std::size_t) i] == key)
             return;
@@ -32,11 +33,13 @@ void Arpeggiator::hold (int key, float velocity) noexcept
     {
         heldKeys[(std::size_t) i] = heldKeys[(std::size_t) i - 1];
         heldVelocity[(std::size_t) i] = heldVelocity[(std::size_t) i - 1];
+        heldExpression[(std::size_t) i] = heldExpression[(std::size_t) i - 1];
         --i;
     }
 
     heldKeys[(std::size_t) i] = key;
-    heldVelocity[(std::size_t) i] = velocity;
+    heldVelocity[(std::size_t) i] = on.velocity;
+    heldExpression[(std::size_t) i] = expressionOf (on);
 }
 
 void Arpeggiator::release (int key) noexcept
@@ -48,6 +51,7 @@ void Arpeggiator::release (int key) noexcept
             {
                 heldKeys[(std::size_t) j] = heldKeys[(std::size_t) j + 1];
                 heldVelocity[(std::size_t) j] = heldVelocity[(std::size_t) j + 1];
+                heldExpression[(std::size_t) j] = heldExpression[(std::size_t) j + 1];
             }
 
             --heldCount;
@@ -189,7 +193,7 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
             {
                 if (heldCount == 0 && nextStep < 0.0)
                     boundary = nextStep = startTick + e.sampleOffset * tps; // the first step plays at once
-                hold (e.key, e.velocity);
+                hold (e);
             }
             else if (e.type == NoteEvent::Type::off)
                 release (e.key);
@@ -234,6 +238,7 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
                     const auto base = s.chord.empty() ? heldKeys[(std::size_t) k] : heldKeys[0] + s.chord[(std::size_t) k];
                     e.key = std::clamp (base + 12 * index, 0, 127);
                     e.velocity = heldVelocity[(std::size_t) (s.chord.empty() ? k : 0)];
+                    apply (heldExpression[(std::size_t) (s.chord.empty() ? k : 0)], e);
                     emit (e);
                     soundingKeys[(std::size_t) soundingCount++] = e.key;
                 }
@@ -244,7 +249,8 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
                 continue;
             }
             const auto key = keyAt (s, index);
-            const auto velocity = heldVelocity[(std::size_t) (s.chord.empty() ? index % heldCount : 0)];
+            const auto source = (std::size_t) (s.chord.empty() ? index % heldCount : 0);
+            const auto velocity = heldVelocity[source];
 
             if (s.slide && sliding && sounding >= 0)
             {
@@ -261,6 +267,7 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
                 e.type = NoteEvent::Type::on;
                 e.key = key;
                 e.velocity = velocity;
+                apply (heldExpression[source], e);
                 emit (e);
                 sounding = key;
                 sliding = s.slide;

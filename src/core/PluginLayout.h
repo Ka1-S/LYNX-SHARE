@@ -56,8 +56,8 @@ enum : std::uint32_t
     plainMenu = 1 << 14,  // menu: just its value as text (the originals' "reverb mode: mono"); a click opens the menu
     wordmark = 1 << 15,   // label: the plugin's name as a wide-spaced title; "a|b" = a light first word, a dark second
     springBack = 1 << 16, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
-    rangeEnds = 1 << 17,  // knob: its scale's two ends under it (left / right), the value there only while hovered or
-                          // dragged, the caption under that (round tp172b4: the reference reverb's knobs)
+    hoverValue = 1 << 17, // knob: the caption under it and the value under that only while hovered or dragged
+                          // (round tp172b5: the reference reverb prints captions only)
     batToggle = 1 << 18,  // tabs (two options) / toggle: a metal bat-handle toggle switch, the options printed above and
                           // under it (an opto leveler's COMPRESS / LIMIT and AUTO MAKEUP, round tp172d)
     rotarySelector = 1 << 19, // tabs: a black pointer knob with its options printed round it (a VU DISPLAY selector, round tp172d)
