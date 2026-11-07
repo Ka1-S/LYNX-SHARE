@@ -42,6 +42,7 @@ enum class RootKind
     flPresets,      // FL's channel / plugin presets (3x Osc, synth presets)
     pluginPresets,  // LYNX's own plugin presets folder
     speech,         // speech files (.speech): FL's Data/Patches/Speech and LYNX's own (round 168b)
+    clipboardFiles, // FL's "Clipboard files": what Tools › Clipboard saved (round 181b)
     documents,
     music,
     desktop,

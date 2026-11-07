@@ -515,3 +515,4 @@ TEST (macros181b_prepare_for_midi_export_follows_fl)
     CHECK (kept.channels[1].instrument == lynx::InstrumentKind::layer);
     CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 1);
 }
+

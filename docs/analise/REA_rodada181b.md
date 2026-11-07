@@ -159,5 +159,6 @@ Static read of FL 2026's `FLEngine_x64.dll` (Ghidra, read-only). Except where ma
 - **Save audio / MIDI clipboard to browser** (FUN_00f1cad0 / FUN_00f1cba0 → FUN_0124d070): if the clipboard holds the format (CF_WAVE = 12 for audio, the MIDI format otherwise), FL saves it as "Audio clipboard.wav" / "MIDI clipboard.mid" in Browser folder 0x3f2. FUN_009db5b0 maps that folder to the user data `Presets\Clipboard files` (info `System\Config\Browser\Infos\Clipboard files`).
   - It creates the folder or shows "Error|Unable to create folder:%s%s", then refreshes the Browser at that folder.
   - FUN_00819ca0 is assumed to make the name unique; it was not read.
+  - LYNX (round 181b): saves into `<settings>/Presets/Clipboard files` (Browser root "Clipboard files"), audio from CF_WAVE on Windows and else LYNX's audio editor clipboard, MIDI from the MIDI clipboard; items greyed when empty, as in FL. A taken name gets " (2)", " (3)"... **INFERRED**: FL's naming in FUN_00819ca0 is not read.
 - **Remix a song** (FUN_00f1bd40): posts window message 0x569. The receiver was not read.
-- **Remove all Edison instances:** not added. LYNX has no Edison plugin instances, so the item could do nothing.
+- **Remove all Edison instances:** not added. LYNX's Edison is the audio editor window, not a mixer effect (no `EffectKind`; FLP import drops FL's Edison slots), so the item could do nothing. FL gap: Edison as a mixer effect.

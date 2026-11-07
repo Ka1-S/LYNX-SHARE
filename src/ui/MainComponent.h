@@ -283,6 +283,7 @@ private:
     void exportMidiFile();
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
+    void saveClipboardToBrowser (bool midi);
     void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();

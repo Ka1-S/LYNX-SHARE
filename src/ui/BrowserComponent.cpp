@@ -3,6 +3,8 @@
 #include "ui/QuickPick.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
+
+#include "ui/AudioClipboard.h"
 #include "ui/SpeechDialog.h"
 #include "ui/UiTrace.h"
 
@@ -2988,6 +2990,8 @@ void BrowserComponent::rebuildRoots()
     add (tr ("Mixer presets (FL)"), data.getChildFile ("Patches").getChildFile ("Mixer presets"), RootKind::flPresets);
     pluginpresetui::presetsRoot().createDirectory(); // (the plugin window saves presets there; round 162d)
     add (tr ("Plugin presets"), pluginpresetui::presetsRoot(), RootKind::pluginPresets);
+    audioclipboard::folder().createDirectory(); // (Tools › Clipboard saves there; round 181b)
+    add (tr ("Clipboard files"), audioclipboard::folder(), RootKind::clipboardFiles);
     add (tr ("Documents"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), RootKind::documents);
     add (tr ("Music"), juce::File::getSpecialLocation (juce::File::userMusicDirectory), RootKind::music);
     add (tr ("Desktop"), juce::File::getSpecialLocation (juce::File::userDesktopDirectory), RootKind::desktop);
