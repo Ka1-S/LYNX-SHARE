@@ -153,14 +153,18 @@ TEST (lfo177b_rate_and_shape_match_fl)
     a.points = { { 0, 0.5f, 0.0f } };
     a.lfo.on = true;
     a.lfo.add = true;
-    a.lfo.level = 64; // ± 0.5 · range
+    a.lfo.level = 64; // ± 0.25 · range: FL's renders show the swing at half the waveform (L = ±0.5)
     CHECK (std::abs (a.playAt (0.0, 0.0) - 0.5f) < 0.01f);
-    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 1.0f) < 0.01f);
-    CHECK (std::abs (a.playAt (lynx::ppq * 0.75, 0.0) - 0.0f) < 0.01f);
-    // multiply (FL's usual): value · (1 + 2·L·level/128)
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.75f) < 0.01f);
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.75, 0.0) - 0.25f) < 0.01f);
+    // multiply (FL's usual): value · (1 + 2·L·level/128), L = ±0.5 at most
     a.lfo.add = false;
     a.lfo.level = 32;
-    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.75f) < 0.01f);
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.625f) < 0.01f);
+    // FL's level 128 in multiply mode reaches 0 only at the waveform's very bottom
+    a.lfo.level = 128;
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.75, 0.0) - 0.0f) < 0.01f);
+    CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 1.0f) < 0.01f);
     // frozen: no movement inside the clip
     a.lfo.flags = 1 | 8;
     CHECK (std::abs (a.playAt (lynx::ppq * 0.25, 0.0) - 0.5f) < 0.01f);

@@ -1321,9 +1321,11 @@ float AutomationLfo::output (double clipTick, double songTick) const noexcept
 
 float AutomationLfo::apply (float value, double clipTick, double songTick) const noexcept
 {
-    // TACArticulator.Compute (FUN_00ba1700): add mode out += L·amount; multiply mode out *= 1 + 2·L·amount
+    // TACArticulator.Compute (FUN_00ba1700): add mode out += L·amount; multiply mode out *= 1 + 2·L·amount, with L
+    // at half the waveform: FL's own renders (round 177b, lfo/meas: default, level 128, add and shaped clips) match
+    // only with the LFO's swing at ±0.5 × its amplitude, in both modes
     const auto amount = (float) level / 128.0f * range;
-    const auto l = output (clipTick, songTick);
+    const auto l = 0.5f * output (clipTick, songTick);
     const auto out = add ? value + l * amount : value * (1.0f + 2.0f * l * amount);
     return std::clamp (out, 0.0f, 1.0f);
 }
