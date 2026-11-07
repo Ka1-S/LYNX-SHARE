@@ -1,4 +1,5 @@
 #include "ui/PluginSkin.h"
+#include "ui/ImageCaches.h"
 
 #include "core/Effects.h"
 #include "ui/I18n.h"
@@ -93,7 +94,10 @@ bool motion = true;
 // a deterministic grain tile (white and black specks at a few % alpha) laid over the canvases
 const juce::Image& grainTile()
 {
-    static juce::Image tile = [] {
+    static juce::Image tile;
+    static const bool registered = lynx::ui::registerImageCache ([] { tile = {}; }); (void) registered;
+    if (tile.isNull())
+        tile = [] {
         juce::Image img (juce::Image::ARGB, 128, 128, true);
         juce::Random rnd (126);
         juce::Image::BitmapData px (img, juce::Image::BitmapData::writeOnly);
@@ -106,7 +110,7 @@ const juce::Image& grainTile()
                 px.setPixelColour (x, y, (light ? juce::Colours::white : juce::Colours::black).withAlpha (a));
             }
         return img;
-    }();
+        }();
     return tile;
 }
 
@@ -130,6 +134,7 @@ void cachedLayer (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour acce
     key = key * 11u + (std::uint64_t) currentArt;
     key ^= (std::uint64_t) accent.getARGB() * 0x9e3779b97f4a7c15ull;
     static std::map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     auto it = cache.find (key);
     if (it == cache.end())
     {
@@ -375,6 +380,7 @@ void bloom (juce::Graphics& g, juce::Point<float> c, float radius, juce::Colour 
     const auto level = juce::jlimit (1, 64, (int) std::lround (alpha * 64.0f));
     const auto key = (std::uint64_t) colour.withAlpha ((juce::uint8) 255).getARGB() * 67u + (std::uint64_t) level;
     static std::unordered_map<std::uint64_t, juce::Image> sprites;
+    static const bool registered = lynx::ui::registerImageCache ([] { sprites.clear(); }); (void) registered;
     auto it = sprites.find (key);
     if (it == sprites.end())
     {
@@ -496,6 +502,7 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
     if (d < 6.0f) return;
     // the logo resampled once per size (×2 for high-DPI)
     static std::map<int, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     const auto px = juce::jlimit (8, 128, (int) std::ceil (d * 2.0f));
     auto& img = cache[px];
     if (img.isNull())
@@ -913,6 +920,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
     key ^= (std::uint64_t) k.capTint.getARGB() * 0xc2b2ae3d27d4eb4full;
 
     static std::unordered_map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     auto it = cache.find (key);
     if (it == cache.end())
     {

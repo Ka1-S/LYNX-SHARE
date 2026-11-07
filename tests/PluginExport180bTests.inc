@@ -2,6 +2,8 @@
 // The plugin runs the app's renderer on a one-slot song: its input enters the insert through the metronome input, and
 // the host's parameters reach the slot without a rebuild. That path must sound like the effect run alone.
 
+#include <regex>
+
 #include "core/NativeEngines.h"
 #include "core/LynxBanks.h"
 #include "core/ModelParams.h"
@@ -114,4 +116,39 @@ TEST (pluginexport180b_catalog_needs_no_fl_data)
             CHECK (engine == nullptr || engine->needs == lynx::natives::Needs::nothing);
         }
     }
+}
+
+TEST (pluginexport180b_static_image_caches_are_registered)
+{
+    // A static juce::Image (or a cache of them) must register in ui/ImageCaches.h, so a plugin empties it before the host
+    // unloads the DLL: freed at unload, its Direct2D device deadlocked FL Studio's exit (round 180b, dump of 09:35).
+    // A lint over src/ (the tests run from the repository root): the declaration, then registerImageCache within 2 lines.
+    namespace fs = std::filesystem;
+    CHECK (fs::is_directory ("src/ui"));
+    if (! fs::is_directory ("src/ui"))
+        return;
+    const std::regex declaration (R"(^\s*(?:inline\s+|thread_local\s+)*static\s+(?:inline\s+|thread_local\s+)*(?:const\s+)?[^;=(]*(?:juce::Image\b|juce::Drawable\b|SpriteCache\b)[^;=(]*(?:;|=|\{))");
+    int found = 0;
+    for (const auto& entry : fs::recursive_directory_iterator ("src"))
+    {
+        const auto ext = entry.path().extension().string();
+        if (! entry.is_regular_file() || (ext != ".cpp" && ext != ".h" && ext != ".inc" && ext != ".mm"))
+            continue;
+        std::ifstream in (entry.path());
+        std::vector<std::string> lines;
+        for (std::string line; std::getline (in, line);)
+            lines.push_back (line);
+        for (std::size_t i = 0; i < lines.size(); ++i)
+            if (std::regex_search (lines[i], declaration))
+            {
+                ++found;
+                bool registered = false;
+                for (std::size_t k = i; k < std::min (lines.size(), i + 3); ++k)
+                    registered = registered || lines[k].find ("registerImageCache") != std::string::npos;
+                if (! registered)
+                    std::printf ("  unregistered static image: %s:%zu\n", entry.path().string().c_str(), i + 1);
+                CHECK (registered);
+            }
+    }
+    CHECK (found >= 8); // (the lint still sees the caches it was written for)
 }

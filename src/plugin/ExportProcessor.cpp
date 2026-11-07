@@ -17,6 +17,7 @@
 #include "engine/ProjectFile.h"
 #include "ui/ChannelSettings.h"
 #include "ui/FacetEqEditor.h"
+#include "ui/ImageCaches.h"
 #include "ui/PluginEditors.h"
 #include "ui/ProEditors.h"
 #include "ui/Theme.h"
@@ -104,6 +105,7 @@ public:
           renderer (std::make_unique<RackRenderer>())
     {
         plugui::hostedElsewhere = true;
+        ++liveInstances;
         if (entry.instrument)
         {
             if (const auto* table = modelparams::tableOf (entry.synth); table != nullptr && table->params != nullptr && ! song.channels.empty())
@@ -129,6 +131,7 @@ public:
     }
 
     ~ExportProcessor() override;
+    static inline std::atomic<int> liveInstances { 0 };
 
     const juce::String getName() const override { return entry.name; }
     double getTailLengthSeconds() const override { return entry.instrument ? 0.0 : 10.0; }
@@ -499,7 +502,7 @@ class ExportEditor final : public juce::AudioProcessorEditor, private juce::Time
 {
 public:
     explicit ExportEditor (ExportProcessor& p)
-        : juce::AudioProcessorEditor (p), processor (p), engine (false, 0)
+        : juce::AudioProcessorEditor (p), processor (p), engine (false, 0, false)
     {
         setLookAndFeel (&lookAndFeel);
         engine.setSong (processor.songCopy());
@@ -565,7 +568,13 @@ private:
 
 juce::AudioProcessorEditor* ExportProcessor::createEditor() { return new ExportEditor (*this); }
 
-ExportProcessor::~ExportProcessor() = default;
+ExportProcessor::~ExportProcessor()
+{
+    // the last instance empties the UI's static image caches while JUCE still runs (ui/ImageCaches.h): freed later, at
+    // DLL unload, their Direct2D device deadlocks in the graphics driver (FL Studio hung on exit, round 180b)
+    if (--liveInstances == 0 && juce::MessageManager::existsAndIsCurrentThread())
+        ui::clearImageCaches();
+}
 } // namespace
 
 juce::AudioProcessor* makeProcessor (const Entry& entry) { return new ExportProcessor (entry); }
