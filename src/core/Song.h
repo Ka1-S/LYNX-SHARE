@@ -1288,6 +1288,11 @@ struct Clip
     int channel = -1;         // audio clips: channel (audioClip) that holds the sample
     int automation = -1;      // automation clips: index into Song::automations
     std::int64_t fadeIn = 0, fadeOut = 0; // audio clips: fades (ticks)
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // audio clips: FL's raw fade curve values, kept for the export
+    // audio clips: straight fades instead of FL's S curve, bit 0 the fade-in, bit 1 the fade-out (FL's shape 1, round 180d).
+    // Also every clip of a project saved before that round: a finished mix must not change when it is reopened.
+    std::uint8_t linearFades = 0;
+    std::uint32_t flFadeFlags = 0; // FL's raw fade flags of an imported clip (flp::PlaylistItem::fadeFlags), back in the export
     float gain = 1.0f;        // audio clips: clip volume (linear; FL's gain handle: −96.1 … +36 dB, round 166e)
     float pan = 0.0f;         // audio clips: clip pan -1..1 (FL 2026's clip pan; REA round 153)
     bool muted = false;       // clip-level mute (the Mute tool); independent of the track mute

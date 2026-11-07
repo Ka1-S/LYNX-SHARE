@@ -335,7 +335,12 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.pan = clip.pan;
         e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
         e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
-        e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 ? 1 : 0) | (clip.crossfadeOut > 0 ? 2 : 0) | (clip.reversed ? 4 : 0));
+        e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
+                                      | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
+                                      | (clip.reversed ? 4 : 0));
+        // an automatic crossfade has no tension of its own here
+        e.fadeInTension = clip.crossfadeIn > 0 ? 0.0f : clip.fadeInTension;
+        e.fadeOutTension = clip.crossfadeOut > 0 ? 0.0f : clip.fadeOutTension;
         e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
         e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
 

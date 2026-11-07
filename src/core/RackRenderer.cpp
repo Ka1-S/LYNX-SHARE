@@ -2160,7 +2160,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 if (e.clipStretch != 1.0f)
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
-                    instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape);
+                    instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
                 auto velocity = e.velocity;

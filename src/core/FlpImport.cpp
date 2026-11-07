@@ -3741,6 +3741,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);
                 clip.fadeOut = msToTicks (item.fadeOutMs);
+                clip.fadeInTension = item.fadeInTension;
+                clip.fadeOutTension = item.fadeOutTension;
+                clip.flFadeFlags = item.fadeFlags;
+                clip.linearFades = (std::uint8_t) ((((item.fadeFlags >> 8) & 3) == 1 ? 1 : 0) | (((item.fadeFlags >> 12) & 3) == 1 ? 2 : 0));
 
                 clips.push_back (clip);
                 continue;

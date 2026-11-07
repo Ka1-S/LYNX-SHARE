@@ -288,6 +288,20 @@ inline float crossfadeCurve (float x) noexcept
     return 0.5f - 0.5f * std::cos (3.14159265358979f * x);
 }
 
+// FL's fade tension on a fade's curve y (0..1), as its voices apply it (REA round 180d, FUN_006774b0 / FUN_00977870 / FUN_00677540):
+// the raw value from the file, rounded to 0.01; 0 leaves the curve alone. A 200 ms fade-out at -812.933 reproduces FL's render
+// within 0.012 RMS.
+inline float fadeTensionCurve (float y, float tension) noexcept
+{
+    const auto t = std::round ((double) tension * 100.0) * 0.01;
+    if (t == 0.0)
+        return y;
+    const auto a = std::abs (t);
+    const auto range = std::log (a + 1.0);
+    return t > 0.0 ? (float) (1.0 - (std::exp ((1.0 - (double) y) * range) - 1.0) / a)
+                   : (float) ((std::exp ((double) y * range) - 1.0) / a);
+}
+
 // FL's audio clip gain handle (round 166e §2): −96.1 dB (shown "-INF") … +36 dB, 0.05 dB per pixel of drag.
 constexpr double clipGainMinDb = -96.1, clipGainMaxDb = 36.0, clipGainDbPerPixel = 0.05;
 inline double clipGainToDb (float gain) noexcept

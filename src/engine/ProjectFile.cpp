@@ -1078,7 +1078,7 @@ juce::var clipsToVar (const std::vector<Clip>& list)
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
         const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
-        const int used = c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const int used = c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -1105,6 +1105,16 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 clip.add (stretch);
             if (used >= 10)
                 clip.add (uidVar (c.uid)); // Online Sessions (round 168a)
+            if (used >= 11)
+            {
+                clip.add ((double) c.fadeInTension); // FL's fade curves, for the export (round 180d)
+                clip.add ((double) c.fadeOutTension);
+            }
+            if (used >= 12)
+            {
+                clip.add ((int) c.linearFades); // straight fades: FL's shape 1, or a clip from before round 180d
+                clip.add ((juce::int64) c.flFadeFlags);
+            }
         }
 
         clips.add (clip);
@@ -1143,6 +1153,10 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.reversed = c.size() >= 15 && (bool) c[14];
                 clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
                 clip.uid = c.size() >= 17 ? uidFrom (c[16]) : 0;
+                clip.fadeInTension = c.size() >= 19 ? (float) (double) c[17] : 0.0f;
+                clip.fadeOutTension = c.size() >= 19 ? (float) (double) c[18] : 0.0f;
+                clip.linearFades = c.size() >= 20 ? (std::uint8_t) ((int) c[19] & 3) : (std::uint8_t) 0;
+                clip.flFadeFlags = c.size() >= 21 ? (std::uint32_t) (juce::int64) c[20] : 0u;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -2161,6 +2175,7 @@ juce::String toJson (const Song& song)
     }
 
     root->setProperty ("playlist", clipsToVar (song.playlist));
+    root->setProperty ("clipFadesPerClip", true); // round 180d: a project without it has linear clip fades
     if (song.patternBlocksOn)
         root->setProperty ("patternBlocks", true);
     if (! song.blocks.empty())
@@ -2519,6 +2534,15 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         }
 
     song.playlist = clipsFromVar (root["playlist"], song);
+    // saved before FL's S curve for clip fades (round 180d): those clips keep the straight fades the mix was made with
+    const bool oldClipFades = ! root.hasProperty ("clipFadesPerClip");
+    const auto keepOldClipFades = [oldClipFades] (std::vector<Clip>& clips)
+    {
+        if (oldClipFades)
+            for (auto& clip : clips)
+                clip.linearFades = (std::uint8_t) ((clip.fadeIn > 0 ? 1 : 0) | (clip.fadeOut > 0 ? 2 : 0));
+    };
+    keepOldClipFades (song.playlist);
     song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
     song.blocks = blocksFromVar (root["blocks"], song);
 
@@ -2647,6 +2671,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
             Arrangement arrangement;
             arrangement.name = a["name"].toString().toStdString();
             arrangement.clips = clipsFromVar (a["clips"], song);
+            keepOldClipFades (arrangement.clips);
             arrangement.blocks = blocksFromVar (a["blocks"], song);
 
             if (const auto& loop = a["loop"]; loop.isArray() && loop.size() == 2)

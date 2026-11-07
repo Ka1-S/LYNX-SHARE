@@ -1319,6 +1319,15 @@ struct Converter
                 item.endOffset = (float) ((offset + (double) clip.length / stretch) * msPerTick * factor);
                 item.fadeInMs = (float) ((double) clip.fadeIn * msPerTick);
                 item.fadeOutMs = (float) ((double) clip.fadeOut * msPerTick);
+                item.fadeInTension = clip.fadeIn > 0 ? clip.fadeInTension : 0.0f;
+                item.fadeOutTension = clip.fadeOut > 0 ? clip.fadeOutTension : 0.0f;
+                {
+                    // the shapes follow the clip, the rest of FL's bits stay as they came
+                    const auto shape = [&clip] (int side, std::uint32_t raw) -> std::uint32_t
+                    { return (clip.linearFades & (1 << side)) != 0 ? 1u : raw == 1u ? 0u : raw; };
+                    item.fadeFlags = (clip.flFadeFlags & ~((3u << 8) | (3u << 12)))
+                                     | (shape (0, (clip.flFadeFlags >> 8) & 3) << 8) | (shape (1, (clip.flFadeFlags >> 12) & 3) << 12);
+                }
                 item.gain = clip.gain;
                 item.pitch = clip.pitch;
                 item.reversed = clip.reversed;

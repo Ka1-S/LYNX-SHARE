@@ -425,6 +425,7 @@ TEST (flp_native_88_byte_playlist_items_with_clip_gain_and_fades)
         std::memcpy (&r[0x24], &fadeIn, 4);
         std::memcpy (&r[0x2C], &fadeOut, 4);
         std::memcpy (&r[0x34], &gain, 4);
+        r[0x38] = (std::uint8_t) ((fadeIn > 0.0f ? 1 : 0) | (fadeOut > 0.0f ? 2 : 0)); // manual fades (round 180d)
         const double stretch = 1.0;
         const std::int32_t minusOne = -1;
         std::memcpy (&r[0x40], &stretch, 8);
@@ -17111,4 +17112,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bridge176aTests.inc"
 #include "Mixer177aTests.inc"
 #include "FlExport180dTests.inc"
+#include "FlFades180dTests.inc"
 #include "Sc177bTests.inc"
