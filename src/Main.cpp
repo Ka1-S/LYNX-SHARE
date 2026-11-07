@@ -1060,7 +1060,7 @@ public:
                         if (file.existsAsFile() && file.loadFileAsData (data))
                         {
                             const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                                 fx = *loaded;
                         }
                         break;
@@ -7324,7 +7324,7 @@ private:
                     if (file.existsAsFile() && file.loadFileAsData (data))
                     {
                         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                             fx = *loaded;
                     }
                     name = juce::String::fromUTF8 (plugin.c_str());

@@ -1,6 +1,43 @@
 // Round 173d3 (issue #77, the FL-parity gaps of the control audit): EQUO's band sends reach a mixer insert; Love
 // Philter's whole state can be edited (units, filter types, articulators) and written back in FL's layout.
 
+// Love Philter's preset bar, the --plugui pictures and the stepper test ask this list for FL's preset folder: without
+// it the editor offered no preset and its pictures showed the empty slot (no curve, FL's unit type and mode never read)
+TEST (audit173d3_love_philter_lists_fl_presets)
+{
+    CHECK (lynx::flPluginsForEffect (lynx::EffectKind::lovePhilter) == std::vector<std::string> { "Fruity Love Philter" });
+    CHECK (lynx::effectForFlPlugin ("Fruity Love Philter") == lynx::EffectKind::lovePhilter);
+}
+
+// With FL installed (tests' argument = FL's Data folder): FL's presets come back as the exact engines the editors need.
+// Without the installation's files every Convolver preset that names an impulse file became a generic reverb (the preset
+// bar then ignored it and the editor's EQ page stayed empty)
+TEST (audit173d3_fl_presets_reach_the_editors)
+{
+    if (realFlpDir.empty())
+        return;
+    const auto fl = natives142::flAccess();
+    const auto load = [&fl] (const char* relative) {
+        std::ifstream in (std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Effects" / relative, std::ios::binary);
+        const std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+        return lynx::effectFromFlPreset (bytes, 130.0, lynx::natives::flDataReader (fl));
+    };
+    const auto convolver = load ("Fruity Convolver/Default.fst");
+    CHECK (convolver && convolver->kind == lynx::EffectKind::convolver);
+    if (convolver)
+    {
+        const auto curve = lynx::convolver::readEqCurve (convolver->state);
+        CHECK (curve && curve->size() >= 2);
+    }
+    const auto philter = load ("Fruity Love Philter/Sequence/PC lowpass.fst");
+    CHECK (philter && philter->kind == lynx::EffectKind::lovePhilter);
+    if (philter)
+    {
+        const auto doc = lynx::philter::readDoc (philter->state);
+        CHECK (doc && doc->u[0].type == 1 && doc->u[0].mode == 3 && doc->u[0].art[2].pat[0].pts.size() == 7);
+    }
+}
+
 TEST (audit173d3_equo_send_goes_to_the_insert)
 {
     std::vector<float> inL (4096), inR (4096);

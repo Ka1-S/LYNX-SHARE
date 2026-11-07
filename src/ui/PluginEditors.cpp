@@ -4867,7 +4867,7 @@ private:
         if (! f.loadFileAsData (data))
             return;
         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm);
+        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
         if (! fx || fx->kind != kind)
             return;
         presetName = f.getFileNameWithoutExtension();
