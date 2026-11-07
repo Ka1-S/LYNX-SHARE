@@ -7558,3 +7558,7 @@ countries: id
 "That track is fed by this one: the link would make a loop." = "Track itu menerima sinyal dari track ini: tautannya akan membuat loop."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Input sidechain: insert yang didengar efek ini. Memilih satu akan merutekannya ke sini pada level 0; output-nya sendiri tetap ada  [LMB] pilih"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Input sidechain: insert yang didengar input samping plugin ini. Memilih satu akan merutekannya ke sini pada level 0; output-nya sendiri tetap ada"
+"Browse automations" = "Telusuri otomasi"
+"Export as score sheet..." = "Ekspor sebagai lembar skor..."
+"Which controller to import?" = "Kontroler mana yang diimpor?"
+"Adds the file's time signature to the pattern's markers" = "Menambahkan birama file ke penanda pola"

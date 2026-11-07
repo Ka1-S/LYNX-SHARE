@@ -7558,3 +7558,7 @@ countries: ru by kz
 "That track is fed by this one: the link would make a loop." = "Эта дорожка получает сигнал от этой: связь создала бы петлю."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Вход сайдчейна: инсерт, который слушает этот эффект. Выбор направляет его сюда с уровнем 0; свои выходы сохраняются  [LMB] выбрать"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Вход сайдчейна: инсерт, который слушает боковой вход этого плагина. Выбор направляет его сюда с уровнем 0; свои выходы сохраняются"
+"Browse automations" = "Обзор автоматизаций"
+"Export as score sheet..." = "Экспорт как партитура..."
+"Which controller to import?" = "Какой контроллер импортировать?"
+"Adds the file's time signature to the pattern's markers" = "Добавляет размер из файла в маркеры паттерна"

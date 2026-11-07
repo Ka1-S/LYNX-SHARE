@@ -1226,6 +1226,14 @@ public:
     }
 
     // the first row labelled `label`, or -1
+    int rowOfFile (const juce::File& file) const
+    {
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (rows[(std::size_t) i]->file == file)
+                return i;
+        return -1;
+    }
+
     int rowLabelled (const juce::String& label) const
     {
         for (int i = 0; i < (int) rows.size(); ++i)
@@ -3480,7 +3488,7 @@ void BrowserComponent::showPluginDatabase (const juce::String& folder, int gener
     }
 }
 
-void BrowserComponent::showScores()
+void BrowserComponent::showScores (const juce::String& subfolder)
 {
     // the Piano roll's File › Browse scores (round 168g; FL: FUN_0123a580 opens its browser at the Scores folder): the
     // "FL MIDI" root (Data/Patches/Scores) shown, opened and selected
@@ -3493,7 +3501,11 @@ void BrowserComponent::showScores()
             setTab (allTab);
             rebuildTree();
             tree->expandTop (folder, 1);
-            if (const auto row = tree->rowLabelled (allRootNames[i]); row >= 0)
+            // (the Event editor's File › Browse automations: FL opens its Scores\\Automation folder)
+            auto row = subfolder.isNotEmpty() ? tree->rowOfFile (folder.getChildFile (subfolder)) : -1;
+            if (row < 0)
+                row = tree->rowLabelled (allRootNames[i]);
+            if (row >= 0)
             {
                 tree->select (row, false);
                 tree->grabKeyboardFocus();

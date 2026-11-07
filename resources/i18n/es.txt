@@ -7558,3 +7558,7 @@ countries: es mx ar co cl pe ve
 "That track is fed by this one: the link would make a loop." = "Esa pista recibe señal de esta: el enlace crearía un bucle."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Entrada de sidechain: el insert que escucha este efecto. Al elegir uno se enruta aquí a nivel 0; conserva sus propias salidas  [LMB] elegir"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Entrada de sidechain: el insert que escucha la entrada lateral de este plugin. Al elegir uno se enruta aquí a nivel 0; conserva sus propias salidas"
+"Browse automations" = "Explorar automatizaciones"
+"Export as score sheet..." = "Exportar como partitura..."
+"Which controller to import?" = "¿Qué controlador importar?"
+"Adds the file's time signature to the pattern's markers" = "Añade el compás del archivo a los marcadores del patrón"

@@ -7558,3 +7558,7 @@ countries: cn sg
 "That track is fed by this one: the link would make a loop." = "该轨道由本轨道供给信号：此链接会形成回路。"
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "侧链输入：此效果器监听的插入轨。选择后会以电平 0 路由到这里；它保留自身的输出  [LMB] 选择"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "侧链输入：此插件的侧链输入监听的插入轨。选择后会以电平 0 路由到这里；它保留自身的输出"
+"Browse automations" = "浏览自动化"
+"Export as score sheet..." = "导出为乐谱..."
+"Which controller to import?" = "导入哪个控制器?"
+"Adds the file's time signature to the pattern's markers" = "将文件的拍号添加到模式的标记中"
