@@ -91,3 +91,15 @@ TEST (mixer177a_d_assign_skips_inserts_with_a_track_as_fl)
     CHECK (song.playlistTracks[2].mixerTrack == 2 && song.playlistTracks[2].mode == lynx::PlaylistTrackMode::audio);
     CHECK (song.playlistTracks.size() == 4 && song.playlistTracks[3].mixerTrack == 3);
 }
+
+TEST (mixer177a_e_a_rail_click_is_one_step_however_long_its_press)
+{
+    using lynx::faderRailStepsForHold;
+    // a click (an injected one holds 50 ms plus jitter; a person's up to ~150 ms) is exactly one step
+    for (int ms : { 0, 50, 64, 80, 130, 200, lynx::faderRailFirstRepeatMs - 1 })
+        CHECK (faderRailStepsForHold (ms) == 1);
+    CHECK (lynx::faderRailFirstRepeatMs > 2 * lynx::faderRailRepeatMs);
+    // held, it then repeats at FL's rate
+    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs) == 2);
+    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs + 10 * lynx::faderRailRepeatMs) == 12);
+}
