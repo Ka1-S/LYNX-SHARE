@@ -271,6 +271,20 @@ std::string Element::attr (std::string_view a) const
     return {};
 }
 
+std::vector<std::pair<std::string, std::string>> Element::attributes() const
+{
+    std::vector<std::pair<std::string, std::string>> out;
+    if (doc == nullptr)
+        return out;
+    const auto& nd = doc->nodes[node];
+    for (std::uint32_t k = 0; k < nd.attrCount; ++k)
+    {
+        const auto& at = doc->attrs[nd.firstAttr + k];
+        out.emplace_back (std::string (at.name), Document::decode (at.rawValue));
+    }
+    return out;
+}
+
 std::string Element::text() const
 {
     if (doc == nullptr)

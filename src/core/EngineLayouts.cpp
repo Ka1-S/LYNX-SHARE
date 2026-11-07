@@ -14,7 +14,7 @@ namespace lynx::plugui
 {
 namespace
 {
-LayoutItem item (Item type, float x, float y, float w, float h, const char* param, const char* label, std::uint16_t style = 0)
+LayoutItem item (Item type, float x, float y, float w, float h, const char* param, const char* label, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = type;
@@ -25,37 +25,37 @@ LayoutItem item (Item type, float x, float y, float w, float h, const char* para
     return i;
 }
 
-LayoutItem section (float x, float y, float w, float h, const char* title, std::uint16_t style = 0)
+LayoutItem section (float x, float y, float w, float h, const char* title, std::uint32_t style = 0)
 {
     return item (Item::section, x, y, w, h, nullptr, title, style);
 }
 
-LayoutItem label (float x, float y, float w, float h, const char* text, std::uint16_t style = 0)
+LayoutItem label (float x, float y, float w, float h, const char* text, std::uint32_t style = 0)
 {
     return item (Item::label, x, y, w, h, nullptr, text, style);
 }
 
 // a vertical fader at FL's place (x, y, w, h = the fader itself) with its caption under it
-LayoutItem fader (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem fader (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
 {
-    return item (Item::vslider, x, y, w, h + (caption != nullptr ? 14.0f : 0.0f), param, caption, (std::uint16_t) (style | (caption == nullptr ? noCaption : 0)));
+    return item (Item::vslider, x, y, w, h + (caption != nullptr ? 14.0f : 0.0f), param, caption, (std::uint32_t) (style | (caption == nullptr ? noCaption : 0)));
 }
 
 // a horizontal slider
-LayoutItem hfader (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem hfader (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
 {
-    return item (Item::hslider, x, y, w, h + (caption != nullptr ? 14.0f : 0.0f), param, caption, (std::uint16_t) (style | (caption == nullptr ? noCaption : 0)));
+    return item (Item::hslider, x, y, w, h + (caption != nullptr ? 14.0f : 0.0f), param, caption, (std::uint32_t) (style | (caption == nullptr ? noCaption : 0)));
 }
 
 // a knob centred at (cx, cy), `d` wide, the caption under it
-LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0)
 {
     if (caption == nullptr)
-        style = (std::uint16_t) (style | noCaption);
+        style = (std::uint32_t) (style | noCaption);
     return item (Item::knob, cx - d * 0.5f, cy - d * 0.5f, d, d + (caption != nullptr ? 16.0f : 0.0f), param, caption, style);
 }
 
-LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
 {
     return item (Item::toggle, x, y, w, h, param, caption, style);
 }
@@ -68,7 +68,7 @@ LayoutItem radio (float x, float y, float w, float h, const char* param, const c
     return i;
 }
 
-LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint16_t style = 0)
+LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint32_t style = 0)
 {
     auto i = item (Item::tabs, x, y, w, h, param, nullptr, style);
     i.options = options;
@@ -103,7 +103,7 @@ LayoutItem display (float x, float y, float w, float h, const char* id, const ch
     return i;
 }
 
-LayoutItem value (float x, float y, float w, float h, const char* param, std::uint16_t style = 0)
+LayoutItem value (float x, float y, float w, float h, const char* param, std::uint32_t style = 0)
 {
     return item (Item::value, x, y, w, h, param, nullptr, style);
 }

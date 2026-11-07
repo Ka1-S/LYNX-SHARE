@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 
@@ -855,13 +856,30 @@ juce::FileSearchPath lv2SearchFolders()
 }
 
 // The plugin files (VST2/VST3/CLAP) and LV2 URIs found in these folders, by every format that scans.
-juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, const juce::FileSearchPath& paths)
+juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, const juce::FileSearchPath& paths, bool withLv2 = true)
 {
     juce::StringArray files;
     for (auto* format : formats.getFormats())
-        if (format->canScanForPlugins())
+        if (format->canScanForPlugins() && (withLv2 || format->getName() != "LV2"))
             files.addArray (format->searchPathsForPlugins (format->getName() == "LV2" ? lv2Folders (paths) : paths, true, false));
     return files;
+}
+
+// `--scan-one LV2 <this><folders>`: one child describes every LV2 plugin of these folders
+const juce::String lv2BatchPrefix ("lv2-folders:");
+
+juce::String lv2Stamp (const juce::FileSearchPath& folders)
+{
+    std::vector<std::pair<std::string, long long>> bundles;
+    for (int i = 0; i < folders.getNumPaths(); ++i)
+        for (const auto& bundle : folders[i].findChildFiles (juce::File::findDirectories, false, "*.lv2"))
+        {
+            auto newest = 0LL; // (a plugin's own .ttl can change while manifest.ttl does not)
+            for (const auto& ttl : bundle.findChildFiles (juce::File::findFiles, false, "*.ttl"))
+                newest = juce::jmax (newest, (long long) ttl.getLastModificationTime().toMilliseconds());
+            bundles.emplace_back (bundle.getFullPathName().toStdString(), newest);
+        }
+    return juce::String::fromUTF8 (scanpolicy::lv2Stamp (std::move (bundles)).c_str());
 }
 } // namespace
 
@@ -1098,7 +1116,7 @@ void logScanFailure (const juce::String& file, const juce::String& why, juce::ui
 
 } // namespace
 
-bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& file)
+bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& file, const std::function<bool()>& keepGoing)
 {
     // a result file of our own: several LYNX processes (and scans) may run at once
     const auto result = juce::File::getSpecialLocation (juce::File::tempDirectory)
@@ -1108,18 +1126,21 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
     const auto exe = bits32 ? bridge32Executable() : juce::File::getSpecialLocation (juce::File::currentExecutableFile);
     if (bits32 && ! exe.existsAsFile())
         return false;
+    ++scanChildren;
     juce::ChildProcess child;
     auto ok = child.start (juce::StringArray { exe.getFullPathName(), "--scan-one", format.getName(), file, result.getFullPathName() }, 0);
+    const auto started = juce::Time::getMillisecondCounter();
     if (ok)
     {
         // wait in short steps so a cancelled scan (or LYNX closing) doesn't wait for a slow plugin; a file holding
         // many plugins (Waves shell) gets more time once the child has said how many (core/PluginScanPolicy.h)
-        const auto started = juce::Time::getMillisecondCounter();
         auto timeout = (juce::uint32) scanpolicy::baseTimeoutMs;
         auto classesKnown = false;
         while (child.isRunning() && ! stopScan && juce::Time::getMillisecondCounter() - started < timeout)
         {
             child.waitForProcessToFinish (100);
+            if (keepGoing && ! keepGoing())
+                stopScan = true;
             if (! classesKnown && classCountFile (result).existsAsFile())
             {
                 classesKnown = true;
@@ -1144,7 +1165,8 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
             logScanFailure (file, "exit code " + juce::String ((int) child.getExitCode()), juce::Time::getMillisecondCounter() - started);
     }
     ok = ok && (child.isRunning() || child.getExitCode() == 0 || scanResultComplete (result));
-    if (auto xml = ok ? juce::XmlDocument::parse (result) : nullptr)
+    const auto xml = ok ? juce::XmlDocument::parse (result) : nullptr;
+    if (xml != nullptr)
     {
         auto added = 0;
         for (auto* e : xml->getChildIterator())
@@ -1156,19 +1178,67 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
         if (xml->getNumChildElements() == 0 && added == 0)
             rememberEmptyScan (file); // nothing in it: not described again on every open until it changes
     }
-    else if (! ok)
+    else
+    {
+        if (ok) // on Linux and macOS, JUCE reports exit code 0 for a child killed by a signal: no answer is the only sign
+            logScanFailure (file, "ended without an answer", juce::Time::getMillisecondCounter() - started);
         known.addToBlacklist (file);
+    }
     result.deleteFile();
     classCountFile (result).deleteFile();
-    return true;
+    return xml != nullptr; // a child can also end "well" without an answer
 }
 
 int PluginHost::scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
 {
-    const auto found = scanFiles (listPluginFiles (formats, paths), progress);
+    const auto before = known.getNumTypes();
+    auto lv2Done = false;
+    {
+        const std::scoped_lock lock (scanLock);
+        stopScan = false;
+        lv2Done = describeLv2 (paths, progress);
+    }
+    if (! stopScan)
+        scanFiles (listPluginFiles (formats, paths, ! lv2Done), progress);
     if (! stopScan)
         forgetMisses(); // everything was looked at again: the projects' missing plugins may be findable now
-    return found;
+    return known.getNumTypes() - before;
+}
+
+// LV2 plugins are described from their data files, and JUCE reads all the folders in every process that starts, so a
+// child per plugin repeats the same seconds of work hundreds of times. One child does them all, and only when the
+// folders changed. False if it failed or was cancelled: the scan then asks plugin by plugin, as a bad bundle needs.
+bool PluginHost::describeLv2 (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
+{
+    for (auto* format : formats.getFormats())
+    {
+        if (format->getName() != "LV2")
+            continue;
+        const auto folders = lv2Folders (paths);
+        auto searched = folders;
+        searched.addPath (format->getDefaultLocationsToSearch());
+        const auto stamp = lv2Stamp (searched);
+        // (with how many are listed: a plugin list that was lost is not "nothing changed")
+        const auto listed = [this] {
+            const auto types = known.getTypes();
+            return juce::String ((int) std::count_if (types.begin(), types.end(), [] (const auto& d) { return d.pluginFormatName == "LV2"; }));
+        };
+        const auto saved = settingsFolder().getChildFile ("scan-lv2.txt");
+        if (persistent && saved.loadFileAsString() == stamp + listed())
+            return true;
+        const auto batch = lv2BatchPrefix + folders.toString();
+        if (! scanOne (*format, batch, [&progress] { return ! progress || progress (0.0f, "LV2"); }))
+        {
+            known.removeFromBlacklist (batch);
+            return false;
+        }
+        format->searchPathsForPlugins (folders, true, false); // this process's own list learns the new bundles
+        save(); // before the stamp: the stamp says these plugins are in the list on disk
+        if (persistent)
+            saved.replaceWithText (stamp + listed(), false, false, "\n");
+        return true;
+    }
+    return false;
 }
 
 namespace
@@ -1283,6 +1353,8 @@ void PluginHost::forgetFile (const juce::String& file)
         if (persistent)
             list.replaceWithText (lines.joinIntoString ("\n"));
     }
+    if (persistent && ! juce::File::isAbsolutePath (file)) // an LV2 URI: the next scan describes the LV2 folders again
+        settingsFolder().getChildFile ("scan-lv2.txt").deleteFile();
     save();
 }
 
@@ -1291,7 +1363,10 @@ void PluginHost::forgetAll()
     known.clear();
     known.clearBlacklistedFiles();
     if (persistent)
+    {
         settingsFolder().getChildFile ("scan-empty.txt").deleteFile();
+        settingsFolder().getChildFile ("scan-lv2.txt").deleteFile();
+    }
     forgetMisses();
     save();
 }
@@ -1454,7 +1529,21 @@ int PluginHost::scanOneFile (const juce::String& formatName, const juce::String&
     addPluginFormats (manager);
     juce::OwnedArray<juce::PluginDescription> found;
     for (auto* format : manager.getFormats())
-        if (format->getName() == formatName)
+        if (format->getName() == formatName && formatName == "LV2" && file.startsWith (lv2BatchPrefix))
+        {
+            // (--lv2scantest: a child that dies, and one that a cancel has to stop)
+            const auto fault = juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_CRASH", {});
+            if (fault == "lv2-batch")
+                std::abort();
+            if (fault == "lv2-batch-hang")
+                juce::Thread::sleep (60000);
+            auto ids = format->searchPathsForPlugins (juce::FileSearchPath (file.fromFirstOccurrenceOf (lv2BatchPrefix, false, false)), true, false);
+            ids.removeDuplicates (false); // newer JUCE lists a bundle once per plugin, and describes all of them each time
+            classCountFile (output).replaceWithText (juce::String (ids.size())); // (a large collection gets the time it needs)
+            for (const auto& id : ids)
+                format->findAllTypesForFile (found, id);
+        }
+        else if (format->getName() == formatName)
         {
             // an LV2 URI is looked up in the folders the scan listed it from: JUCE alone knows only ~/.lv2 and one
             // of /usr/lib/lv2 or /usr/lib64/lv2

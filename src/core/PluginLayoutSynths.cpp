@@ -27,7 +27,7 @@ struct Page
         l.height = height;
     }
 
-    void section (float x, float y, float w, float h, const char* title, std::uint16_t style = 0)
+    void section (float x, float y, float w, float h, const char* title, std::uint32_t style = 0)
     {
         LayoutItem i;
         i.type = Item::section;
@@ -37,7 +37,7 @@ struct Page
         v.push_back (i);
     }
 
-    void label (float x, float y, float w, float h, const char* text, std::uint16_t style = 0)
+    void label (float x, float y, float w, float h, const char* text, std::uint32_t style = 0)
     {
         LayoutItem i;
         i.type = Item::label;
@@ -48,7 +48,7 @@ struct Page
     }
 
     // a knob in the square (x, y, d, d), its caption under it
-    void knob (float x, float y, float d, const char* param, const char* caption, std::uint16_t style = 0, int steps = 0)
+    void knob (float x, float y, float d, const char* param, const char* caption, std::uint32_t style = 0, int steps = 0)
     {
         LayoutItem i;
         i.steps = steps;
@@ -57,12 +57,12 @@ struct Page
         i.h = caption != nullptr && (style & noCaption) == 0 ? d + 14.0f : d;
         i.param = param;
         i.label = caption;
-        i.style = caption == nullptr ? (std::uint16_t) (style | noCaption) : style;
+        i.style = caption == nullptr ? (std::uint32_t) (style | noCaption) : style;
         v.push_back (i);
     }
 
     // a vertical fader in (x, y, w, h), its caption under it
-    void fader (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+    void fader (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
     {
         LayoutItem i;
         i.type = Item::vslider;
@@ -70,12 +70,12 @@ struct Page
         i.h = caption != nullptr ? h + 14.0f : h;
         i.param = param;
         i.label = caption;
-        i.style = caption == nullptr ? (std::uint16_t) (style | noCaption) : style;
+        i.style = caption == nullptr ? (std::uint32_t) (style | noCaption) : style;
         v.push_back (i);
     }
 
     // a horizontal slider in (x, y, w, h), its caption under it
-    void hslider (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+    void hslider (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
     {
         LayoutItem i;
         i.type = Item::hslider;
@@ -83,12 +83,12 @@ struct Page
         i.h = caption != nullptr ? h + 13.0f : h;
         i.param = param;
         i.label = caption;
-        i.style = caption == nullptr ? (std::uint16_t) (style | noCaption) : style;
+        i.style = caption == nullptr ? (std::uint32_t) (style | noCaption) : style;
         v.push_back (i);
     }
 
     // an on / off switch: `boxed` = a push button with the caption inside (FL's VEL buttons), else an LED and the caption
-    void toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+    void toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
     {
         LayoutItem i;
         i.type = Item::toggle;
