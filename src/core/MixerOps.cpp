@@ -1,7 +1,14 @@
 #include "core/MixerOps.h"
 #include "core/ClipOps.h"
+#include "core/FlpExport.h"
+#include "core/Transmitter.h"
+#include "core/SoundFont.h"
+#include "core/TransporterFl.h"
+#include "core/VoltageController.h"
 
 #include <algorithm>
+#include <cmath>
+#include <functional>
 #include <numeric>
 
 namespace lynx::mixerops
@@ -51,15 +58,17 @@ bool isInsert (const Song& song, int t) noexcept
     return t > 0 && t < (int) song.mixer.size();
 }
 
+// every effect slot, also inside containers and Patchers (a Fruity Send in a Patcher, a nested Patcher...)
 template <typename Fn>
-void forEachSlot (std::vector<EffectSlot>& slots, Fn&& fn)
+void forEachSlot (EffectSlot& slot, Fn& fn)
 {
-    for (auto& slot : slots)
-    {
-        fn (slot);
-        for (auto& branch : slot.branches)
-            forEachSlot (branch.chain, fn);
-    }
+    fn (slot);
+    for (auto& branch : slot.branches)
+        for (auto& child : branch.chain)
+            forEachSlot (child, fn);
+    for (auto& node : slot.patcher.nodes)
+        if (! node.generator)
+            forEachSlot (node.effect, fn);
 }
 
 bool isTrackTarget (AutomationTargetKind k) noexcept
@@ -67,46 +76,214 @@ bool isTrackTarget (AutomationTargetKind k) noexcept
     return k == AutomationTargetKind::mixerVolume || k == AutomationTargetKind::mixerPan || k == AutomationTargetKind::effectParam
            || k == AutomationTargetKind::effectMix || k == AutomationTargetKind::mixerSend;
 }
+
+// A "send to insert" parameter stored as insert / (maxMixerTracks - 1) (Fruity Send's "Send to", the Transporter's
+// loops send; 0 = none)
+void remapTrackParam (float& value, const std::function<int (int)>& map)
+{
+    const auto track = (int) std::lround (std::clamp ((double) value, 0.0, 1.0) * (maxMixerTracks - 1));
+    if (track <= 0)
+        return;
+    const auto to = map (track);
+    value = to > 0 ? (float) to / (float) (maxMixerTracks - 1) : 0.0f;
+}
+
+// The extra outputs of a generator Patcher (doc.outputTracks: an insert, or -1 = "the k-th insert after the channel's
+// own", FL's relative routing). A chosen insert follows its track; a relative output that would land on another insert
+// after the move is pinned to the one it fed (the logical track), one that still lands right stays relative.
+// `base` = the channel's insert before the move.
+void remapPatcherOutputs (ChannelDef& channel, int base, const std::function<int (int)>& map)
+{
+    auto& doc = channel.patcher;
+    int outputs = (int) doc.outputTracks.size();
+    for (const auto& w : doc.wires)
+        if (w.kind == PatchWire::Kind::audio && w.to == patchToHost)
+            outputs = std::max (outputs, w.toPort);
+    const auto newBase = std::max (0, map (base));
+    for (int k = 1; k <= outputs; ++k)
+    {
+        if (k <= (int) doc.outputTracks.size() && doc.outputTracks[(std::size_t) k - 1] >= 0)
+        {
+            auto& t = doc.outputTracks[(std::size_t) k - 1];
+            if (t > 0)
+                t = std::max (0, map (t)); // (its insert deleted: the Master, as a channel's)
+            continue;
+        }
+        const auto now = std::max (0, map (std::min (base + k, maxMixerTracks - 1)));
+        if (now == std::min (newBase + k, maxMixerTracks - 1))
+            continue;
+        if ((int) doc.outputTracks.size() < k)
+            doc.outputTracks.resize ((std::size_t) k, -1);
+        doc.outputTracks[(std::size_t) k - 1] = now;
+    }
+}
+
+// An effect / instrument imported from FL keeps FL's own state for the export (FlOrigin, exported while its fingerprint
+// matches). The insert numbers that state holds are rewritten with the remap, so a moved track still exports to the
+// track it was linked to and the rest of the state stays byte for byte (round 177a).
+void putI32 (std::vector<std::uint8_t>& d, std::size_t at, int v)
+{
+    if (at + 4 <= d.size())
+        for (int b = 0; b < 4; ++b)
+            d[at + (std::size_t) b] = (std::uint8_t) (((std::uint32_t) v >> (8 * b)) & 0xFF);
+}
+
+void patchOriginTracks (EffectSlot& slot)
+{
+    auto& d = slot.flOrigin.state;
+    if (slot.kind == EffectKind::fruitySend && slot.flOrigin.plugin == "Fruity Send") // pan, vol, dry, insert (REA_rodada105_send §1)
+        putI32 (d, 12, std::max (0, fruitySendTarget (slot)));
+    else if (slot.kind == EffectKind::transmitter && slot.flOrigin.plugin == "Transmitter") // version, 42 controls, the two sends
+    {
+        putI32 (d, 4 + 4 * (std::size_t) transmitter::count, slot.sendTracks[0]);
+        putI32 (d, 8 + 4 * (std::size_t) transmitter::count, slot.sendTracks[1]);
+    }
+    else if (slot.kind == EffectKind::flTransporter && slot.flOrigin.plugin == "Transporter" && d.size() >= 4)
+    {
+        // version, 20 / 22 controls, two flag bytes, source, stereo, send track, input track (REA_rodada167f)
+        const auto version = (int) ((std::uint32_t) d[0] | (std::uint32_t) d[1] << 8 | (std::uint32_t) d[2] << 16 | (std::uint32_t) d[3] << 24);
+        const std::size_t controls = version >= 8 ? 22 : 20;
+        putI32 (d, 4 + 4 * controls + 2 + 8, std::max (0, fruitySendTarget (slot)));
+    }
+}
+
+void patchOriginTracks (ChannelDef& c)
+{
+    // FL's Soundfont Player: version, 13 controls, the font path (length byte, or 0xFF + i32), then the reverb and
+    // chorus "send to" tracks (insert − 1, −1 = none), each followed by a flag byte (REA_rodada158 §1)
+    if (c.instrument != InstrumentKind::soundfont || c.flOrigin.plugin != "Fruity Soundfont Player")
+        return;
+    auto& d = c.flOrigin.state;
+    std::size_t at = 4 + 52;
+    if (at >= d.size())
+        return;
+    std::size_t len = d[at++];
+    if (len == 0xFF)
+    {
+        if (at + 4 > d.size())
+            return;
+        len = (std::size_t) ((std::uint32_t) d[at] | (std::uint32_t) d[at + 1] << 8 | (std::uint32_t) d[at + 2] << 16 | (std::uint32_t) d[at + 3] << 24);
+        at += 4;
+    }
+    at += len;
+    const auto fl = [&c] (int p) {
+        const auto v = (int) std::lround (c.modelParams[(std::size_t) p]);
+        return v > 0 ? v - 1 : -1;
+    };
+    if ((std::size_t) sf::pChorusTrack < c.modelParams.size())
+    {
+        putI32 (d, at, fl (sf::pReverbTrack));
+        putI32 (d, at + 5, fl (sf::pChorusTrack));
+    }
+}
+
+template <typename T>
+bool originMatches (const T& x)
+{
+    return ! x.flOrigin.empty() && x.flOrigin.fingerprint == flpexport::fingerprint (x);
+}
 } // namespace
 
 namespace
 {
-// every reference to an insert (channels, Playlist tracks, sends, side-chains, automation) through `map`
-template <typename Map>
-void remapTrackReferences (Song& song, Map&& map)
+// Every reference to an insert through `map` (old insert -> its new number, or -1 when the insert was deleted), so a
+// move, an insert or a delete never re-wires anything (round 177a): channels, Playlist tracks, sends, side-chains,
+// slot sends (Transmitter, Fruity Send, Transporter, a Patcher's "To LYNX" outputs, also inside containers and
+// Patchers), plugins' own "send to insert" settings (Soundfont reverb / chorus, Voltage Controller outputs),
+// automation, links, initial values, pattern events and controller sources. FL keeps the mixer's own routes,
+// channels, Playlist tracks and automation / links (FUN_012a4030, FUN_012cb6c0) but leaves the plugin-side numbers
+// alone, so its Fruity Send / Patcher outputs end on another track; LYNX keeps those too (REA_rodada177a §1).
+// A reference to a deleted insert is dropped: sends removed, side-chains and slot sends cleared, channels to the
+// Master, automation / links without a target (FL marks them -1 too).
+void remapTrackReferences (Song& song, const std::function<int (int)>& map)
 {
     for (auto& c : song.channels)
-        c.mixerTrack = map (c.mixerTrack);
+    {
+        const auto exportsOrigin = originMatches (c);
+        if (c.instrument == InstrumentKind::patcher)
+            remapPatcherOutputs (c, c.mixerTrack, map);
+        c.mixerTrack = std::max (0, map (c.mixerTrack));
+
+        if (c.instrument == InstrumentKind::soundfont)
+            for (const auto p : { sf::pReverbTrack, sf::pChorusTrack })
+                if ((std::size_t) p < c.modelParams.size() && c.modelParams[(std::size_t) p] > 0.5f)
+                    c.modelParams[(std::size_t) p] = (float) map ((int) std::lround (c.modelParams[(std::size_t) p]));
+        if (c.instrument == InstrumentKind::voltage)
+            if (auto vs = voltage::parse (c.pluginState))
+            {
+                auto changed = false;
+                for (auto& t : vs->tracks)
+                    if (t > 0)
+                    {
+                        const auto to = std::max (0, map (t));
+                        changed = changed || to != t;
+                        t = to;
+                    }
+                if (changed)
+                    c.pluginState = voltage::write (*vs);
+            }
+        if (exportsOrigin && flpexport::fingerprint (c) != c.flOrigin.fingerprint)
+        {
+            patchOriginTracks (c);
+            if (c.instrument == InstrumentKind::voltage) // (its state is FL's own: the export writes it)
+                c.flOrigin.state = c.pluginState;
+            c.flOrigin.fingerprint = flpexport::fingerprint (c);
+        }
+    }
     for (auto& pt : song.playlistTracks) // audio / instrument tracks (round 146a)
         if (pt.mixerTrack > 0)
+        {
             pt.mixerTrack = map (pt.mixerTrack);
+            if (pt.mixerTrack < 0 && pt.mode == PlaylistTrackMode::audio) // its insert deleted: the link goes
+                pt.mode = PlaylistTrackMode::unassigned;
+        }
 
     for (auto& track : song.mixer)
     {
         for (auto& send : track.sends)
             send.target = map (send.target);
+        track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [] (const MixerSend& s) { return s.target <= 0; }),
+                           track.sends.end());
 
-        forEachSlot (track.effects, [&map] (EffectSlot& slot) {
-            if (slot.sidechain > 0)
-                slot.sidechain = map (slot.sidechain);
-            if (slot.sidechain2 > 0)
-                slot.sidechain2 = map (slot.sidechain2);
+        auto fix = [&map] (EffectSlot& slot) {
+            const auto exportsOrigin = originMatches (slot);
+            for (auto* source : { &slot.sidechain, &slot.sidechain2 })
+                if (*source > 0)
+                    *source = std::max (-1, map (*source));
             for (auto& send : slot.sendTracks)
                 if (send > 0)
-                    send = map (send);
-        });
+                    send = std::max (0, map (send));
+            for (auto& t : slot.patcher.outputTracks)
+                if (t > 0)
+                    t = std::max (0, map (t));
+            if (slot.kind == EffectKind::fruitySend)
+                remapTrackParam (slot.params[3], map);
+            else if (slot.kind == EffectKind::flTransporter)
+                remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
+            if (exportsOrigin)
+            {
+                patchOriginTracks (slot); // (unchanged numbers write the same bytes)
+                slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
+            }
+        };
+        for (auto& slot : track.effects)
+            forEachSlot (slot, fix);
     }
 
     song.forEachTarget ([&map] (AutomationTarget& t) {
-        if (isTrackTarget (t.kind))
-            t.index = map (t.index);
+        if (! isTrackTarget (t.kind))
+            return;
+        t.index = map (t.index);
         if (t.kind == AutomationTargetKind::mixerSend && t.slot > 0) // (the route's destination)
             t.slot = map (t.slot);
+        if (t.index < 0 || t.slot < 0)
+            t = AutomationTarget {}; // its insert deleted: no target
     });
+    song.removeDeadMidiLinks();
 
     for (auto& automation : song.automations)
         if (automation.source.track > 0)
-            automation.source.track = map (automation.source.track);
+            automation.source.track = map (automation.source.track); // -1 = no longer live
 }
 } // namespace
 
@@ -193,38 +370,11 @@ bool deleteTrack (Song& song, int t)
     if (t < 1 || t >= count)
         return false;
 
-    for (auto& c : song.channels)
-        if (c.mixerTrack == t)
-            c.mixerTrack = 0;
-    for (auto& pt : song.playlistTracks) // an audio track loses its link (round 146a)
-        if (pt.mixerTrack == t)
-        {
-            pt.mixerTrack = -1;
-            if (pt.mode == PlaylistTrackMode::audio)
-                pt.mode = PlaylistTrackMode::unassigned;
-        }
-
-    for (auto& track : song.mixer)
-    {
-        track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [t] (const MixerSend& s) { return s.target == t; }), track.sends.end());
-        forEachSlot (track.effects, [t] (EffectSlot& slot) {
-            if (slot.sidechain == t)
-                slot.sidechain = 0;
-            if (slot.sidechain2 == t)
-                slot.sidechain2 = 0;
-            for (auto& send : slot.sendTracks)
-                if (send == t)
-                    send = 0;
-        });
-    }
-
-    for (auto& automation : song.automations)
-        if (automation.source.track == t)
-            automation.source.track = -1; // no longer live
-
-    song.mixer[(std::size_t) t] = MixerTrack {};
-    for (int i = t; i + 1 < count; ++i)
-        swapTracks (song, i, i + 1);
+    // one shift of every reference: the deleted insert's links go, the following inserts move one place left and a
+    // blank insert takes the last place (the count stays)
+    remapTrackReferences (song, [t] (int x) { return x == t ? -1 : x > t ? x - 1 : x; });
+    song.mixer.erase (song.mixer.begin() + t);
+    song.mixer.emplace_back();
     renumberDefaultNames (song, t, -1);
     song.mixer.back().name = "Insert " + std::to_string (count - 1);
     return true;
@@ -381,6 +531,47 @@ bool linkAddedSidechain (Song& song, int to, int slot)
         return false;
     fx.sidechain = from;
     return true;
+}
+
+bool acceptsSidechain (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
+        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::facetEq: case EffectKind::apexLimiter:
+        case EffectKind::hushDeEsser: case EffectKind::crestCompressor: case EffectKind::prismMultiband:
+        case EffectKind::sentryGate: case EffectKind::luxeVerb: case EffectKind::patcher: case EffectKind::transmitter:
+        case EffectKind::flTransporter:
+            return true;
+        default:
+            return false;
+    }
+}
+
+SidechainPick sidechainFrom (Song& song, int to, int slot, int from, bool second)
+{
+    if ((to != 0 && ! isInsert (song, to)) || song.mixer.empty() || slot < 0 || slot >= (int) song.mixer[(std::size_t) to].effects.size())
+        return SidechainPick::invalid;
+    if (from < 0)
+    {
+        auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+        (second ? fx.sidechain2 : fx.sidechain) = -1;
+        return SidechainPick::cleared;
+    }
+    if (! isInsert (song, from) || from == to)
+        return SidechainPick::invalid;
+    // (the Master is processed after every insert: it needs no route)
+    if (to != 0 && ! song.routes (from, to))
+    {
+        if (! song.canRoute (from, to))
+            return SidechainPick::cycle;
+        song.setRoute (from, to, true, 0.0f);
+    }
+    auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+    (second ? fx.sidechain2 : fx.sidechain) = from;
+    if (fx.kind == EffectKind::vocoder)
+        fx.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
+    return SidechainPick::linked;
 }
 
 namespace

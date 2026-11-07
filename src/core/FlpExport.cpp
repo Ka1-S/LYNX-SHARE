@@ -11,6 +11,8 @@
 #include "core/FlEffects.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
+#include "core/Transmitter.h"
+#include "core/Vocodex.h"
 
 namespace lynx::flpexport
 {
@@ -1470,7 +1472,84 @@ struct Converter
             }
             out.mixer.push_back (std::move (m));
         }
+        fixSideInputs();
         report.exact.push_back ("Mixer: " + std::to_string (song.mixer.size()) + " tracks (names, colours, routes, sends, levels, EQ)");
+    }
+
+    // FL's plugins name a side input by its place k in the insert's inputs list (itself, then the inserts routing into
+    // it by number; REA_rodada22 §1). An effect exported as its imported FL state still holds the k it was imported
+    // with; when LYNX's side-chain source now sits at another place (an insert moved, round 177a, or a new source), k is
+    // rewritten. A k that still names LYNX's source, or an effect without a LYNX source, keeps its bytes.
+    void fixSideInputs()
+    {
+        std::map<int, std::vector<int>> inputs;
+        for (const auto& m : out.mixer)
+            for (const auto target : m.routes)
+                if (target > 0 && target != m.index)
+                    inputs[target].push_back (m.index);
+        auto sourceAt = [&inputs] (int track, int k) {
+            auto list = inputs[track];
+            std::sort (list.begin(), list.end());
+            list.erase (std::unique (list.begin(), list.end()), list.end());
+            list.insert (list.begin(), track);
+            return std::pair { list, k > 0 && k < (int) list.size() ? list[(std::size_t) k] : -1 };
+        };
+        auto rd = [] (const std::vector<std::uint8_t>& d, std::size_t at) {
+            std::int32_t v = 0;
+            if (at + 4 <= d.size())
+                std::memcpy (&v, d.data() + at, 4);
+            return (int) v;
+        };
+        auto fix = [&] (std::vector<std::uint8_t>& d, std::size_t at, int track, int source) {
+            if (source <= 0 || at + 4 > d.size())
+                return;
+            const auto [list, now] = sourceAt (track, rd (d, at));
+            if (now == source)
+                return;
+            const auto it = std::find (list.begin(), list.end(), source);
+            if (it == list.end())
+                return;
+            const auto k = (std::int32_t) (it - list.begin());
+            std::memcpy (d.data() + at, &k, 4);
+        };
+        for (auto& m : out.mixer)
+        {
+            const auto t = m.index;
+            if (t <= 0 || t >= (int) song.mixer.size())
+                continue;
+            const auto& effects = song.mixer[(std::size_t) t].effects;
+            for (int s = 0; s < (int) effects.size(); ++s)
+            {
+                const auto found = slotMap.find ({ t, s });
+                if (found == slotMap.end())
+                    continue;
+                const auto& fx = effects[(std::size_t) s];
+                if (! originMatches (fx))
+                    continue;
+                auto slot = std::find_if (m.slots.begin(), m.slots.end(), [row = found->second] (const flp::MixerInsert::Slot& x) { return x.index == row; });
+                if (slot == m.slots.end() || slot->plugin != fx.flOrigin.plugin)
+                    continue;
+                auto& d = slot->state;
+                if (slot->plugin == "Fruity Limiter" && rd (d, 0) >= 6)
+                    fix (d, 0xA4, t, fx.sidechain);
+                else if (slot->plugin == "Fruity Compressor" && rd (d, 0) == 3)
+                    fix (d, 0x20, t, fx.sidechain);
+                else if (slot->plugin == "LuxeVerb")
+                    fix (d, 4, t, fx.sidechain);
+                else if (slot->plugin == "Transmitter")
+                    fix (d, 12 + 4 * (std::size_t) transmitter::count, t, fx.sidechain);
+                else if (slot->plugin == "Transporter" && d.size() >= 4)
+                    fix (d, 4 + 4 * (std::size_t) (rd (d, 0) >= 8 ? 22 : 20) + 2 + 12, t, fx.sidechain);
+                else if (slot->plugin == "Vocodex")
+                    if (const auto v = vocodex::parseState (d))
+                    {
+                        if (! v->lrEncoding)
+                            fix (d, v->paramsAt + 80 + 20, t, fx.sidechain);
+                        if (v->carIn >= 0)
+                            fix (d, v->paramsAt + 80 + 24, t, fx.sidechain2);
+                    }
+            }
+        }
     }
 
     void run()

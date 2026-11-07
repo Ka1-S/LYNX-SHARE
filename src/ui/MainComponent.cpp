@@ -64,6 +64,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "ui/AlsExportDialog.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
@@ -5748,6 +5749,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                           currentFile != juce::File() ? currentFile.getParentDirectory()
                                                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                           projectStem (projectName));
+            });
+            // Export to Live 12 / Live 11 (round 175a, N2): "<name> Project/<name>.als" with the samples alongside
+            exports.addItem (tr ("Ableton Live set (.als)..."), [this] {
+                showAlsExportDialog (engine,
+                                     currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                 : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                     projectStem (projectName));
             });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
