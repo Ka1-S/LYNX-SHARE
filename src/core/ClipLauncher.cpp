@@ -698,23 +698,40 @@ void schedulePasses (const Song& song, const Player& player, double clock, int n
 
 namespace
 {
-// The notes of `pattern` sounding at `position` (pattern ticks) end `offsetTicks` into the block, before anything that
-// starts there: a note on the same key must survive.
-void cutPatternNotes (const Song& song, int pattern, double position, double offsetTicks, int sample, const ScheduleIndex* index,
+// The notes of `clip`'s pattern sounding at `position` (ticks into its source, its offset included) end `offsetTicks`
+// into the block, before anything that starts there: a note on the same key must survive. A clip reaching past its
+// pattern loops it (core/Scheduler.cpp), so a note may have started in an earlier pass and be sounding across the
+// pattern's wrap, or for longer than the pattern: what counts is the time since the note's last start. Swing and a
+// channel's shift move a note's end, hence the slack: a note that has ended already is not in `notes`.
+void cutPatternNotes (const Song& song, const Clip& clip, double position, double offsetTicks, int sample, const ScheduleIndex* index,
                       EventBuffer& out, ScheduledNotes& notes) noexcept
 {
-    if (pattern < 0 || pattern >= (int) song.patterns.size())
+    if (clip.pattern < 0 || clip.pattern >= (int) song.patterns.size())
         return;
-    const auto& p = song.patterns[(std::size_t) pattern];
-    const auto period = index != nullptr && (std::size_t) pattern < index->patternLength.size()
-                            ? index->patternLength[(std::size_t) pattern]
-                            : std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar));
-    const auto at = std::fmod (std::max (0.0, position), (double) std::max<std::int64_t> (1, period));
+    const auto& p = song.patterns[(std::size_t) clip.pattern];
+    const auto period = std::max<std::int64_t> (1, index != nullptr && (std::size_t) clip.pattern < index->patternLength.size()
+                                                       ? index->patternLength[(std::size_t) clip.pattern]
+                                                       : p.effectiveLength (song.beatsPerBar));
+    const auto loops = stretchedClipsLoop() && clip.offset + clip.length > period;
+    const auto at = std::max (0.0, position);
+    const auto slack = (double) ticksPerStep + (index != nullptr ? (double) index->maxShift : 0.0);
     for (const auto& n : p.notes)
     {
-        if ((double) n.start >= at)
+        const auto start = (double) n.start;
+        if (! loops && start >= at)
             break; // (a rack state's notes are sorted by start)
-        if (n.muted || (double) (n.start + n.length) <= at)
+        if (n.muted || (loops && n.start >= period))
+            continue;
+        auto since = at - start;
+        if (loops)
+        {
+            since = std::fmod (since, (double) period);
+            if (since <= 0.0)
+                since += (double) period; // (0: it starts just now; the pass before's is the one that may be sounding)
+            if (since > at)
+                continue; // no pass has played it yet
+        }
+        if (since >= (double) n.length + slack)
             continue;
         if (notes.shorten (n.channel, n.key, offsetTicks))
         {
@@ -750,7 +767,7 @@ void cutPlaylistTrack (const Song& song, int track, double songTick, double offs
             out.add (off);
         }
         else if (clip.kind == ClipKind::pattern)
-            cutPatternNotes (song, clip.pattern, at - (double) clip.start + (double) clip.offset, offsetTicks, sample, index, out, notes);
+            cutPatternNotes (song, clip, at - (double) clip.start + (double) clip.offset, offsetTicks, sample, index, out, notes);
     }
 }
 } // namespace
@@ -775,7 +792,7 @@ void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const 
     {
         const auto& cut = player.cut (i);
         if (const auto* clip = clipOfSlot (grid, gridIndex, cut.slot); clip != nullptr && clip->kind == ClipKind::pattern)
-            cutPatternNotes (song, clip->pattern, cut.position, cut.at - clock, sampleOf (cut.at), index, out, notes);
+            cutPatternNotes (song, *clip, cut.position, cut.at - clock, sampleOf (cut.at), index, out, notes);
     }
     scheduleSongAround (song, player.taken(), player.givenBack(), startTick, numSamples, tps, out, resume, index, wrap, chase);
     schedulePasses (song, player, clock, numSamples, tps, out, index);

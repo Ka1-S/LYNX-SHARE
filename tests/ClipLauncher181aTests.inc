@@ -748,3 +748,70 @@ TEST (grid181a_recording_writes_passes_for_the_playlist)
         CHECK (clips[2].start == 2 * bar && std::abs (clips[2].length - r.tick + 2 * bar) < 2.0);
     }
 }
+
+// A note longer than its pattern's period, or crossing the pattern's wrap, is sounding from an earlier pass of the
+// pattern at the moment of a takeover or a stop. It must end there: a hanging note is the first thing one would hear.
+TEST (grid181a_a_note_longer_than_its_pattern_does_not_hang)
+{
+    using namespace lynx;
+    using grid181a::closeTo;
+    constexpr auto bar = grid181a::bar;
+    const auto endsAt = [] (const grid181a::Run& r, int key, double at) {
+        for (const auto t : r.offsOf (key))
+            if (closeTo (t, at, 8.0))
+                return true;
+        return false;
+    };
+    // the Playlist's looping clip, taken over by a slot playing pattern 1 (a short note on another key)
+    const auto takeover = [&] (std::int64_t start, std::int64_t length, LaunchQuant quant, double launchAt, double cutAt) {
+        auto s = grid181a::patternSong();
+        s.patterns[0].notes[0].start = start;
+        s.patterns[0].notes[0].length = length;
+        s.playlist = { grid181a::patternClip (0, 8 * bar) };
+        launcher::setClip (s, 0, 0, grid181a::patternClip (1));
+        s.clipGrid->globalQuant = quant;
+        grid181a::Run r (std::move (s));
+        r.until (launchAt);
+        const auto soundingBefore = r.notes.sounding() > 0;
+        r.launch (0, 0);
+        r.until (cutAt + bar / 2);
+        const auto cut = endsAt (r, 60, cutAt);
+        const auto silent = ! r.notes.shorten (0, 60, 0.0);
+        return soundingBefore && cut && silent;
+    };
+    // held for 3 bars of a one-bar pattern, cut on the pattern's wrap
+    CHECK (takeover (0, 3 * bar, LaunchQuant::bar, bar + bar / 2, 2 * bar));
+    // starts late in the pattern and crosses its wrap: the cut's position is before the note's start
+    CHECK (takeover (3 * bar / 4, 2 * bar, LaunchQuant::bar, bar + bar / 2, 2 * bar));
+    // the same, cut in the middle of a pass by a quarter note quantisation
+    CHECK (takeover (3 * bar / 4, 2 * bar, LaunchQuant::quarter, bar + bar / 8, bar + bar / 4));
+
+    // a slot whose clip loops its pattern, stopped: the note from the pass before ends at the stop
+    {
+        auto s = grid181a::patternSong (3 * bar);
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0, 4 * bar));
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (bar + bar / 2);
+        CHECK (r.notes.sounding() > 0);
+        r.command (launcher::Command::Type::stopTrack, 0);
+        r.until (2 * bar + bar / 2);
+        CHECK (endsAt (r, 60, 2 * bar));
+        CHECK (! r.notes.shorten (0, 60, 0.0));
+    }
+
+    // FL's way, "stretched clips loop" off: the pattern plays once, and the one long note is still cut
+    {
+        setStretchedClipsLoop (false);
+        auto s = grid181a::patternSong (3 * bar);
+        s.playlist = { grid181a::patternClip (0, 8 * bar) };
+        launcher::setClip (s, 0, 0, grid181a::patternClip (1));
+        grid181a::Run r (std::move (s));
+        r.until (bar + bar / 2);
+        r.launch (0, 0);
+        r.until (2 * bar + bar / 2);
+        setStretchedClipsLoop (true);
+        CHECK (endsAt (r, 60, 2 * bar));
+        CHECK (! r.notes.shorten (0, 60, 0.0));
+    }
+}
