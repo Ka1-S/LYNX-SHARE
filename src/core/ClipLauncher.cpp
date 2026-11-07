@@ -23,7 +23,20 @@ int clipIndexAt (const ClipGrid& grid, int track, int scene) noexcept
     for (int i = 0; i < (int) grid.clips.size(); ++i)
     {
         const auto& c = grid.clips[(std::size_t) i];
-        if (c.track == track && c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size()
+        if (c.track == track && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size()
+            && grid.slots[(std::size_t) c.gridSlot].scene == scene)
+            return i;
+    }
+    return -1;
+}
+
+// The hidden entry of an empty slot without a stop button: a Clip of length 0, so that it follows its track too.
+int stopMarkerAt (const ClipGrid& grid, int track, int scene) noexcept
+{
+    for (int i = 0; i < (int) grid.clips.size(); ++i)
+    {
+        const auto& c = grid.clips[(std::size_t) i];
+        if (c.track == track && c.length <= 0 && c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size()
             && grid.slots[(std::size_t) c.gridSlot].scene == scene)
             return i;
     }
@@ -91,6 +104,107 @@ bool clearClip (Song& song, int track, int scene)
         return false;
     grid.clips.erase (grid.clips.begin() + i);
     return true;
+}
+
+bool hasStopButton (const ClipGrid& grid, int track, int scene) noexcept
+{
+    return stopMarkerAt (grid, track, scene) < 0;
+}
+
+void setStopButton (Song& song, int track, int scene, bool on)
+{
+    if (track < 0 || track >= maxTracks || scene < 0 || scene >= maxScenes)
+        return;
+    auto& grid = ensureGrid (song);
+    const auto marker = stopMarkerAt (grid, track, scene);
+    if (on)
+    {
+        if (marker >= 0)
+            grid.clips.erase (grid.clips.begin() + marker);
+        return;
+    }
+    if (marker >= 0 || clipIndexAt (grid, track, scene) >= 0)
+        return; // (a clip's slot has no stop button to remove)
+    const auto id = freeSlot (grid);
+    if (id < 0)
+        return;
+    grid.slots[(std::size_t) id] = ClipGridSlot {};
+    grid.slots[(std::size_t) id].scene = scene;
+    grid.slots[(std::size_t) id].noStop = true;
+    Clip clip;
+    clip.pattern = -1;
+    clip.track = track;
+    clip.length = 0;
+    clip.gridSlot = (std::int16_t) id;
+    grid.clips.push_back (clip);
+}
+
+int followGroup (const ClipGrid& grid, int track, int scene, int* out, int capacity) noexcept
+{
+    if (clipIndexAt (grid, track, scene) < 0)
+        return 0;
+    auto first = scene;
+    while (first > 0 && clipIndexAt (grid, track, first - 1) >= 0)
+        --first;
+    int n = 0;
+    for (int r = first; n < capacity && r < (int) grid.scenes.size() && clipIndexAt (grid, track, r) >= 0; ++r)
+        out[n++] = r;
+    return n;
+}
+
+FollowOutcome followTarget (const ClipGrid& grid, int track, int scene, FollowKind kind, int jump, std::uint32_t random) noexcept
+{
+    FollowOutcome outcome;
+    std::array<int, 256> rows {};
+    const auto n = followGroup (grid, track, scene, rows.data(), (int) rows.size());
+    if (n <= 0)
+        return outcome;
+    auto here = 0;
+    while (here < n && rows[(std::size_t) here] != scene)
+        ++here;
+    switch (kind)
+    {
+        case FollowKind::none: return outcome;
+        case FollowKind::stop: outcome.stops = true; return outcome;
+        case FollowKind::playAgain: outcome.scene = scene; return outcome;
+        case FollowKind::previous: outcome.scene = rows[(std::size_t) ((here + n - 1) % n)]; return outcome;
+        case FollowKind::next: outcome.scene = rows[(std::size_t) ((here + 1) % n)]; return outcome;
+        case FollowKind::first: outcome.scene = rows[0]; return outcome;
+        case FollowKind::last: outcome.scene = rows[(std::size_t) (n - 1)]; return outcome;
+        case FollowKind::any: outcome.scene = rows[(std::size_t) (random % (std::uint32_t) n)]; return outcome;
+        case FollowKind::other:
+            if (n == 1)
+                outcome.scene = scene;
+            else
+            {
+                auto pick = (int) (random % (std::uint32_t) (n - 1));
+                if (pick >= here)
+                    ++pick;
+                outcome.scene = rows[(std::size_t) pick];
+            }
+            return outcome;
+        case FollowKind::jump:
+            if (clipIndexAt (grid, track, jump) >= 0)
+                outcome.scene = jump;
+            return outcome;
+    }
+    return outcome;
+}
+
+bool recordedClip (const ClipGrid& grid, const RecordedPass& pass, Clip& out)
+{
+    for (const auto& c : grid.clips)
+        if (c.gridSlot == pass.slot && c.length > 0 && pass.length >= 1.0)
+        {
+            out = c;
+            out.gridSlot = -1;
+            out.uid = 0;
+            out.start = std::max<std::int64_t> (0, (std::int64_t) std::llround (pass.songTick));
+            out.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (pass.length));
+            out.offset = c.offset + (std::int64_t) std::llround (pass.offset);
+            return true;
+        }
+    return false;
 }
 
 int insertScene (Song& song, int at)
@@ -221,7 +335,84 @@ void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& in
     auto until = never;
     if (! settings.loop) // one pass, from where it starts
         until = anchor + (std::floor ((from - anchor) / length + 1.0e-9) + 1.0) * length;
-    t.next = Play { slot, anchor, from, until };
+    t.next = Play {};
+    t.next.slot = slot;
+    t.next.anchor = anchor;
+    t.next.from = from;
+    t.next.until = until;
+    scheduleFollow (grid, index, t.next);
+}
+
+void Player::scheduleFollow (const ClipGrid& grid, const GridIndex& index, Play& p) noexcept
+{
+    p.followAt = never;
+    if (! grid.followActions || p.slot < 0 || p.slot >= (int) grid.slots.size())
+        return;
+    const auto& follow = grid.slots[(std::size_t) p.slot].follow;
+    if (! follow.enabled)
+        return;
+    const auto* clip = clipOfSlot (grid, index, p.slot);
+    if (clip == nullptr)
+        return;
+    p.followAt = p.from + (follow.linked ? (double) std::max (1, follow.iterations) * (double) std::max<std::int64_t> (1, clip->length)
+                                         : (double) std::max<std::int64_t> (1, follow.ticks));
+}
+
+std::uint32_t Player::nextRandom() noexcept
+{
+    rng ^= rng << 13;
+    rng ^= rng >> 17;
+    rng ^= rng << 5;
+    return rng;
+}
+
+// The time has come: one of the clip's two actions, by their chances. A clip launched by it waits for its own launch
+// quantisation only; the global one does not apply ([MANUAL] 16.7).
+void Player::follow (const Song& song, const ClipGrid& grid, const GridIndex& index, TrackState& t, double at) noexcept
+{
+    t.current.followAt = never;
+    const auto& f = grid.slots[(std::size_t) t.current.slot].follow;
+    const auto a = std::max (0, f.chanceA), b = std::max (0, f.chanceB);
+    if (a + b <= 0)
+        return;
+    const auto useA = (int) (nextRandom() % (std::uint32_t) (a + b)) < a;
+    const auto outcome = followTarget (grid, t.track, grid.slots[(std::size_t) t.current.slot].scene, useA ? f.a : f.b, useA ? f.jumpA : f.jumpB, nextRandom());
+    if (outcome.stops)
+    {
+        t.next = Play {};
+        t.current.until = std::min (t.current.until, at);
+        return;
+    }
+    if (outcome.scene < 0)
+        return;
+    const auto* target = clipAt (grid, t.track, outcome.scene);
+    if (target == nullptr)
+        return;
+    const auto slot = (int) target->gridSlot;
+    const auto own = grid.slots[(std::size_t) slot].quant;
+    const auto from = own == LaunchQuant::global ? at : nextGrid (at, quantTicks (own, song.beatsPerBar));
+    const auto length = (double) std::max<std::int64_t> (1, target->length);
+    t.next = Play {};
+    t.next.slot = slot;
+    t.next.anchor = grid.slots[(std::size_t) slot].legato ? t.current.anchor : from;
+    t.next.from = from;
+    if (! grid.slots[(std::size_t) slot].loop)
+        t.next.until = t.next.anchor + (std::floor ((from - t.next.anchor) / length + 1.0e-9) + 1.0) * length;
+    scheduleFollow (grid, index, t.next);
+}
+
+void Player::recordPartial (const ClipGrid& grid, const GridIndex& index, const Play& p, double at, Runtime* runtime) noexcept
+{
+    if (runtime == nullptr || ! p.recorded || p.slot < 0 || at <= p.from || p.until <= at - 1.0e-6)
+        return; // (a play that ended already was recorded by its passes)
+    const auto* clip = clipOfSlot (grid, index, p.slot);
+    if (clip == nullptr)
+        return;
+    const auto length = (double) std::max<std::int64_t> (1, clip->length);
+    const auto ws = p.anchor + std::floor ((at - 1.0e-6 - p.anchor) / length) * length;
+    const auto vs = std::max (ws, p.from);
+    if (at > vs + 0.5)
+        runtime->recorded.push ({ p.slot, p.songFrom, at - vs, vs - ws });
 }
 
 void Player::stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, double now) noexcept
@@ -242,12 +433,38 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
                 return;
             if (const auto* clip = clipAt (grid, c.track, c.scene))
                 if (auto* t = stateOf (c.track, true))
-                    launch (song, grid, index, *t, clip->gridSlot, now);
+                {
+                    const auto slot = (int) clip->gridSlot;
+                    const auto mode = grid.slots[(std::size_t) slot].mode;
+                    // toggle: the next press stops the clip
+                    if (mode == LaunchMode::toggle && t->current.slot == slot && t->current.until == never && t->next.slot < 0)
+                    {
+                        stopTrack (song, grid, *t, now);
+                        return;
+                    }
+                    t->heldSlot = mode == LaunchMode::gate || mode == LaunchMode::repeat ? slot : -1;
+                    t->repeatEvery = mode == LaunchMode::repeat ? slotQuant (song, grid, slot) : 0.0;
+                    launch (song, grid, index, *t, slot, now);
+                }
+            return;
+        case Command::Type::release:
+            if (auto* t = stateOf (c.track, false); t != nullptr && t->heldSlot >= 0)
+            {
+                const auto* clip = clipAt (grid, c.track, c.scene);
+                if (clip == nullptr || clip->gridSlot != t->heldSlot)
+                    return;
+                const auto gate = grid.slots[(std::size_t) t->heldSlot].mode == LaunchMode::gate;
+                t->heldSlot = -1;
+                t->repeatEvery = 0.0;
+                if (gate) // up stops the clip
+                    stopTrack (song, grid, *t, now);
+            }
             return;
         case Command::Type::launchScene:
-            // a track with no clip in the scene stops
+            // a track with no clip in the scene stops, if its slot has a stop button
             for (int i = 0; i < numActive; ++i)
-                if (clipAt (grid, active[(std::size_t) i].track, c.scene) == nullptr)
+                if (const auto track = active[(std::size_t) i].track;
+                    clipAt (grid, track, c.scene) == nullptr && hasStopButton (grid, track, c.scene))
                     stopTrack (song, grid, active[(std::size_t) i], now);
             for (const auto& clip : grid.clips)
                 if (clip.gridSlot >= 0 && clip.gridSlot < (int) grid.slots.size() && grid.slots[(std::size_t) clip.gridSlot].scene == c.scene
@@ -280,8 +497,6 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             takenTracks.reset();
             backTracks.reset();
             return;
-        case Command::Type::release:
-            return;
     }
 }
 
@@ -292,6 +507,12 @@ void Player::addCut (const ClipGrid& grid, const GridIndex& index, const Play& p
         return;
     const auto length = (double) std::max<std::int64_t> (1, clip->length);
     cuts[(std::size_t) numCuts++] = Cut { p.slot, std::fmod (std::max (0.0, at - p.anchor), length) + (double) clip->offset, at };
+}
+
+void Player::recordStop (const ClipGrid& grid, const GridIndex& index, Runtime* runtime) noexcept
+{
+    for (int i = 0; i < numActive; ++i)
+        recordPartial (grid, index, active[(std::size_t) i].current, lastEnd, runtime);
 }
 
 void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
@@ -313,11 +534,14 @@ void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
 }
 
 void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& index, Runtime* runtime, double clock,
-                      double blockTicks) noexcept
+                      double blockTicks, double songTick) noexcept
 {
     numVirtual = numCuts = numTakeovers = 0;
     backTracks.reset();
     const auto end = clock + blockTicks;
+    lastEnd = end;
+    const auto recording = runtime != nullptr && runtime->recording.load (std::memory_order_relaxed);
+    const auto songAt = [&] (double c) { return songTick + (c - clock); };
 
     if (runtime != nullptr)
     {
@@ -332,9 +556,14 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
         for (int guard = 0; guard < 8; ++guard)
         {
             const auto pending = t.next.slot >= 0 ? t.next.from : never;
-            const auto ev = std::min (pending, t.current.until);
+            const auto ev = std::min ({ pending, t.current.until, t.current.followAt });
             if (ev >= end)
                 break;
+            if (ev == t.current.followAt && ev < pending && ev < t.current.until)
+            {
+                follow (song, grid, index, t, ev);
+                continue;
+            }
             if (ev == pending)
             {
                 if (t.current.slot >= 0)
@@ -345,6 +574,15 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
                 t.previous = t.current;
                 t.current = t.next;
                 t.next = Play {};
+                t.current.recorded = recording;
+                // repeat: while held, it starts over at the quantisation rate
+                if (t.repeatEvery > 0.0 && t.heldSlot == t.current.slot)
+                {
+                    t.next = t.current;
+                    t.next.anchor = t.next.from = t.current.from + t.repeatEvery;
+                    t.next.recorded = false;
+                    scheduleFollow (grid, index, t.next);
+                }
                 if (t.track >= 0 && t.track < maxTracks && ! takenTracks[(std::size_t) t.track])
                 {
                     takenTracks.set ((std::size_t) t.track);
@@ -363,7 +601,7 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
 
     // this block's passes: each play's loop iterations that touch the block (the previous play's last one too, for its
     // ends on the block's first sample)
-    auto addPlay = [&] (const Play& p) {
+    auto addPlay = [&] (Play& p) {
         if (p.slot < 0 || p.until < clock - 1.0 || p.from >= end)
             return;
         const auto* clip = clipOfSlot (grid, index, p.slot);
@@ -379,6 +617,11 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             const auto vs = std::max (ws, p.from), ve = std::min (we, p.until);
             if (ve <= vs || ve < clock - 1.0)
                 continue;
+            // recording: a pass becomes a Playlist clip once it ends (the song position where it began)
+            if (p.recorded && vs >= clock - 1.0e-6 && vs < end)
+                p.songFrom = songAt (vs);
+            if (p.recorded && recording && ve >= clock && ve < end && ve > vs)
+                runtime->recorded.push ({ p.slot, p.songFrom, ve - vs, vs - ws });
             auto& v = virtuals[(std::size_t) numVirtual++];
             v.clip = *clip;
             v.slot = p.slot;
@@ -519,7 +762,7 @@ void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const 
         return;
     auto& player = runtime.player;
     const auto clock = runtime.clock;
-    player.process (song, grid, gridIndex, &runtime, clock, numSamples * tps);
+    player.process (song, grid, gridIndex, &runtime, clock, numSamples * tps, startTick);
 
     const auto sampleOf = [&] (double at) { return std::clamp ((int) std::llround ((at - clock) / tps), 0, numSamples - 1); };
     // the ends first: on a shared sample, the note that ends must not take the one that starts with it

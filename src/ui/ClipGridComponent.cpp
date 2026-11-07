@@ -27,6 +27,14 @@ const std::pair<LaunchQuant, const char*> quantNames[] = {
     { LaunchQuant::sixteenthTriplet, "1/16T" }, { LaunchQuant::thirtySecond, "1/32" }
 };
 
+const std::pair<LaunchMode, const char*> modeNames[] = { { LaunchMode::trigger, TR_NOOP ("Trigger") }, { LaunchMode::gate, TR_NOOP ("Gate") },
+                                                         { LaunchMode::toggle, TR_NOOP ("Toggle") }, { LaunchMode::repeat, TR_NOOP ("Repeat") } };
+const std::pair<FollowKind, const char*> followNames[] = {
+    { FollowKind::none, TR_NOOP ("No action") }, { FollowKind::stop, TR_NOOP ("Stop") }, { FollowKind::playAgain, TR_NOOP ("Play again") },
+    { FollowKind::previous, TR_NOOP ("Previous") }, { FollowKind::next, TR_NOOP ("Next") }, { FollowKind::first, TR_NOOP ("First") },
+    { FollowKind::last, TR_NOOP ("Last") }, { FollowKind::any, TR_NOOP ("Any") }, { FollowKind::other, TR_NOOP ("Other") }
+};
+
 juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
 class ClipGridComponent final : public juce::Component,
@@ -438,21 +446,91 @@ private:
                     editSlot (track, scene, [q] (ClipGridSlot& s) { s.quant = q; });
                 });
             menu.addSubMenu (tr ("Launch quantisation"), quant);
+            juce::PopupMenu modes;
+            for (const auto& [m, name] : modeNames)
+                modes.addItem (tr (name), true, slot->mode == m, [this, track, scene, m = m] { editSlot (track, scene, [m] (ClipGridSlot& s) { s.mode = m; }); });
+            menu.addSubMenu (tr ("Launch mode"), modes);
             menu.addItem (tr ("Legato (keep the position)"), true, slot->legato, [this, track, scene, on = slot->legato] {
                 editSlot (track, scene, [on] (ClipGridSlot& s) { s.legato = ! on; });
             });
             menu.addItem (tr ("Loop"), true, slot->loop, [this, track, scene, on = slot->loop] {
                 editSlot (track, scene, [on] (ClipGridSlot& s) { s.loop = ! on; });
             });
+            menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
             menu.addSeparator();
             menu.addItem (tr ("Delete"), [this, track, scene] {
                 engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
                 repaint();
             });
         }
+        else
+        {
+            const auto has = launcher::hasStopButton (*grid, track, scene);
+            menu.addItem (tr ("Stop button (a scene stops this track here)"), true, has, [this, track, scene, has] {
+                engine.editSong ([=] (Song& s) { launcher::setStopButton (s, track, scene, ! has); });
+                repaint();
+            });
+        }
         menu.addSeparator();
         addGridOptions (menu);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    juce::PopupMenu followMenu (int track, int scene, const ClipFollow& f)
+    {
+        const auto edit = [this, track, scene] (std::function<void (ClipFollow&)> fn) {
+            editSlot (track, scene, [fn] (ClipGridSlot& s) { fn (s.follow); });
+        };
+        juce::PopupMenu menu;
+        menu.addItem (tr ("On"), true, f.enabled, [edit, on = f.enabled] { edit ([on] (ClipFollow& x) { x.enabled = ! on; }); });
+        const auto* grid = gridOf();
+        const auto actions = [&] (bool isA) {
+            juce::PopupMenu sub;
+            const auto current = isA ? f.a : f.b;
+            for (const auto& [k, name] : followNames)
+                sub.addItem (tr (name), true, current == k, [edit, isA, k = k] { edit ([isA, k] (ClipFollow& x) { (isA ? x.a : x.b) = k; }); });
+            // jump: to a row of this column that has a clip
+            for (int r = 0; grid != nullptr && r < (int) grid->scenes.size(); ++r)
+                if (r != scene && launcher::clipAt (*grid, track, r) != nullptr)
+                    sub.addItem (tr ("Jump to scene {0}", { juce::String (r + 1) }), true, current == FollowKind::jump && (isA ? f.jumpA : f.jumpB) == r, [edit, isA, r] {
+                        edit ([isA, r] (ClipFollow& x) {
+                            (isA ? x.a : x.b) = FollowKind::jump;
+                            (isA ? x.jumpA : x.jumpB) = r;
+                        });
+                    });
+            return sub;
+        };
+        menu.addSubMenu (tr ("Action A"), actions (true));
+        menu.addSubMenu (tr ("Action B"), actions (false));
+        juce::PopupMenu chance;
+        for (const auto a : { 100, 75, 50, 25, 0 })
+            chance.addItem (juce::String (a) + " / " + juce::String (100 - a), true, f.chanceA == a && f.chanceB == 100 - a, [edit, a] {
+                edit ([a] (ClipFollow& x) {
+                    x.chanceA = a;
+                    x.chanceB = 100 - a;
+                });
+            });
+        menu.addSubMenu (tr ("Chance A / B"), chance);
+        juce::PopupMenu after;
+        for (const auto n : { 1, 2, 4, 8 })
+            after.addItem (tr ("{0} passes of the clip", { juce::String (n) }), true, f.linked && f.iterations == n, [edit, n] {
+                edit ([n] (ClipFollow& x) {
+                    x.linked = true;
+                    x.iterations = n;
+                });
+            });
+        for (const auto bars : { 1, 2, 4, 8 })
+        {
+            const auto ticks = (std::int64_t) bars * engine.getSong().beatsPerBar * ppq;
+            after.addItem (tr ("{0} bars", { juce::String (bars) }), true, ! f.linked && f.ticks == ticks, [edit, ticks] {
+                edit ([ticks] (ClipFollow& x) {
+                    x.linked = false;
+                    x.ticks = ticks;
+                });
+            });
+        }
+        menu.addSubMenu (tr ("After"), after);
+        return menu;
     }
 
     void showSceneMenu (int scene)
@@ -475,9 +553,48 @@ private:
             clampScroll();
             repaint();
         });
+        if (grid != nullptr && scene < (int) grid->scenes.size())
+        {
+            const auto& info = grid->scenes[(std::size_t) scene];
+            menu.addSeparator();
+            menu.addItem (tr ("Rename scene..."), [this, scene] { renameScene (scene); });
+            const auto tempo = engine.getSong().bpm;
+            menu.addItem (info.tempo > 0.0 ? tr ("Scene tempo: {0} (remove)", { juce::String (info.tempo, 2) })
+                                           : tr ("Scene tempo: take {0} when launched", { juce::String (tempo, 2) }),
+                          [this, scene, tempo, had = info.tempo > 0.0] {
+                              engine.editSong ([=] (Song& s) {
+                                  if (s.clipGrid && scene < (int) s.clipGrid->scenes.size())
+                                      s.clipGrid->scenes[(std::size_t) scene].tempo = had ? 0.0 : tempo;
+                              });
+                          });
+        }
         menu.addSeparator();
         addGridOptions (menu);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    void renameScene (int scene)
+    {
+        const auto* grid = gridOf();
+        if (grid == nullptr || scene >= (int) grid->scenes.size())
+            return;
+        auto* window = new juce::AlertWindow (tr ("Rename scene"), {}, juce::MessageBoxIconType::NoIcon, this);
+        window->addTextEditor ("name", utf8 (grid->scenes[(std::size_t) scene].name));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<ClipGridComponent> self (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, scene] (int result) {
+            const std::unique_ptr<juce::AlertWindow> owned (window);
+            if (result == 1 && self != nullptr)
+            {
+                const auto name = owned->getTextEditorContents ("name").toStdString();
+                self->engine.editSong ([=] (Song& s) {
+                    if (s.clipGrid && scene < (int) s.clipGrid->scenes.size())
+                        s.clipGrid->scenes[(std::size_t) scene].name = name;
+                });
+                self->repaint();
+            }
+        }), false);
     }
 
     void addGridOptions (juce::PopupMenu& menu)
@@ -486,6 +603,10 @@ private:
         const auto on = grid != nullptr && grid->backOnStop;
         menu.addItem (tr ("Give tracks back to the Playlist when the transport stops"), true, on, [this, on] {
             engine.editSong ([on] (Song& s) { launcher::ensureGrid (s).backOnStop = ! on; }, false);
+        });
+        const auto follow = grid == nullptr || grid->followActions;
+        menu.addItem (tr ("Follow actions on the whole grid"), true, follow, [this, follow] {
+            engine.editSong ([follow] (Song& s) { launcher::ensureGrid (s).followActions = ! follow; }, false);
         });
     }
 

@@ -836,6 +836,8 @@ private:
     bool takeHasUndoStep = false;
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
+    void updateLauncherRecording();
+    bool launcherTakeHasUndoStep = false;
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
     std::atomic<bool> waitingForInput { false };

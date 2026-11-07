@@ -525,3 +525,226 @@ TEST (grid181a_renderer_plays_the_grid_only_through_the_runtime)
     (void) render (withGrid, factories, true);
     CHECK (runtime.tracks[1].playing.load() == 0 || runtime.tracks[1].pending.load() == 0);
 }
+
+TEST (grid181a_launch_modes)
+{
+    using namespace lynx;
+    using grid181a::closeTo;
+    constexpr auto bar = grid181a::bar;
+    using T = launcher::Command::Type;
+    {
+        // gate: up stops the clip
+        auto s = grid181a::patternSong();
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+        launcher::settingsAt (*s.clipGrid, 0, 0)->mode = LaunchMode::gate;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (bar / 4);
+        CHECK (r.runtime.player.playingOn (0) >= 0);
+        r.command (T::release, 0, 0);
+        r.until (bar + bar / 4); // (the global 1 bar)
+        CHECK (r.runtime.player.playingOn (0) == -1);
+    }
+    {
+        // toggle: up is ignored, the next down stops it
+        auto s = grid181a::patternSong();
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+        launcher::settingsAt (*s.clipGrid, 0, 0)->mode = LaunchMode::toggle;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.command (T::release, 0, 0);
+        r.until (bar + bar / 4);
+        CHECK (r.runtime.player.playingOn (0) >= 0);
+        r.launch (0, 0);
+        r.until (2 * bar + bar / 4);
+        CHECK (r.runtime.player.playingOn (0) == -1);
+    }
+    {
+        // repeat: while held the clip starts over at its quantisation rate; let go, it plays on
+        auto s = grid181a::patternSong (ppq / 8);
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+        auto* slot = launcher::settingsAt (*s.clipGrid, 0, 0);
+        slot->mode = LaunchMode::repeat;
+        slot->quant = LaunchQuant::quarter;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (2 * ppq + ppq / 2);
+        const auto held = r.onsOf (60);
+        CHECK (held.size() == 3 && closeTo (held[1], ppq) && closeTo (held[2], 2 * ppq));
+        r.command (T::release, 0, 0);
+        r.until (2 * bar + ppq);
+        CHECK (r.runtime.player.playingOn (0) >= 0);
+    }
+    {
+        // trigger: up is ignored
+        auto s = grid181a::patternSong();
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.command (T::release, 0, 0);
+        r.until (2 * bar);
+        CHECK (r.runtime.player.playingOn (0) >= 0);
+    }
+}
+
+TEST (grid181a_follow_actions)
+{
+    using namespace lynx;
+    using grid181a::closeTo;
+    constexpr auto bar = grid181a::bar;
+    auto threeInAColumn = [] {
+        auto s = grid181a::patternSong ();
+        launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+        launcher::setClip (s, 0, 1, grid181a::patternClip (1));
+        launcher::setClip (s, 0, 2, grid181a::patternClip (2));
+        launcher::setClip (s, 0, 4, grid181a::patternClip (3)); // after a gap: another group
+        return s;
+    };
+    {
+        // the groups and what each action leads to
+        auto s = threeInAColumn();
+        const auto& g = *s.clipGrid;
+        int rows[8];
+        CHECK (launcher::followGroup (g, 0, 1, rows, 8) == 3 && rows[0] == 0 && rows[2] == 2);
+        CHECK (launcher::followGroup (g, 0, 4, rows, 8) == 1 && rows[0] == 4);
+        CHECK (launcher::followGroup (g, 0, 3, rows, 8) == 0);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::next, 0, 0).scene == 2);
+        CHECK (launcher::followTarget (g, 0, 2, FollowKind::next, 0, 0).scene == 0);
+        CHECK (launcher::followTarget (g, 0, 0, FollowKind::previous, 0, 0).scene == 2);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::first, 0, 0).scene == 0);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::last, 0, 0).scene == 2);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::playAgain, 0, 0).scene == 1);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::stop, 0, 0).stops);
+        CHECK (launcher::followTarget (g, 0, 1, FollowKind::none, 0, 0).scene == -1);
+        CHECK (launcher::followTarget (g, 0, 0, FollowKind::jump, 4, 0).scene == 4);
+        CHECK (launcher::followTarget (g, 0, 0, FollowKind::jump, 3, 0).scene == -1);
+        for (std::uint32_t k = 0; k < 16; ++k)
+        {
+            CHECK (launcher::followTarget (g, 0, 1, FollowKind::other, 0, k).scene != 1);
+            CHECK (launcher::followTarget (g, 0, 1, FollowKind::any, 0, k).scene >= 0);
+        }
+        CHECK (launcher::followTarget (g, 0, 4, FollowKind::other, 0, 5).scene == 4); // alone in its group
+    }
+    {
+        // next, after the clip's length: at once, not waiting for the global quantisation
+        auto s = threeInAColumn();
+        s.clipGrid->globalQuant = LaunchQuant::bars4;
+        auto* first = launcher::settingsAt (*s.clipGrid, 0, 0);
+        first->follow.enabled = true;
+        first->follow.iterations = 2;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (2 * bar + bar / 2);
+        CHECK (r.onsOf (60).size() == 2);
+        CHECK (r.onsOf (61).size() == 1 && closeTo (r.onsOf (61)[0], 2 * bar));
+    }
+    {
+        // unlinked time; the target's own quantisation still applies
+        auto s = threeInAColumn();
+        auto* first = launcher::settingsAt (*s.clipGrid, 0, 0);
+        first->follow.enabled = true;
+        first->follow.linked = false;
+        first->follow.ticks = ppq + ppq / 2;
+        launcher::settingsAt (*s.clipGrid, 0, 1)->quant = LaunchQuant::half;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (bar - 2 * r.block * r.tps);
+        CHECK (r.onsOf (61).size() == 1 && closeTo (r.onsOf (61)[0], 2 * ppq));
+    }
+    {
+        // stop; chances; the grid-wide switch
+        auto s = threeInAColumn();
+        auto* first = launcher::settingsAt (*s.clipGrid, 0, 0);
+        first->follow.enabled = true;
+        first->follow.a = FollowKind::stop;
+        grid181a::Run r (std::move (s));
+        r.launch (0, 0);
+        r.until (bar + bar / 2);
+        CHECK (r.runtime.player.playingOn (0) == -1);
+
+        auto s2 = threeInAColumn();
+        auto* f2 = launcher::settingsAt (*s2.clipGrid, 0, 0);
+        f2->follow.enabled = true;
+        f2->follow.chanceA = 0;
+        f2->follow.chanceB = 100;
+        f2->follow.b = FollowKind::jump;
+        f2->follow.jumpB = 2;
+        grid181a::Run r2 (std::move (s2));
+        r2.launch (0, 0);
+        r2.until (bar + bar / 2);
+        CHECK (r2.runtime.tracks[0].playing.load() == 2);
+
+        auto s3 = threeInAColumn();
+        launcher::settingsAt (*s3.clipGrid, 0, 0)->follow.enabled = true;
+        s3.clipGrid->followActions = false;
+        grid181a::Run r3 (std::move (s3));
+        r3.launch (0, 0);
+        r3.until (3 * bar);
+        CHECK (r3.runtime.tracks[0].playing.load() == 0);
+        CHECK (r3.onsOf (60).size() == 3);
+    }
+}
+
+TEST (grid181a_stop_buttons_decide_what_a_scene_leaves_alone)
+{
+    using namespace lynx;
+    constexpr auto bar = grid181a::bar;
+    auto s = grid181a::patternSong();
+    launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+    launcher::setClip (s, 1, 0, grid181a::patternClip (1));
+    launcher::setClip (s, 2, 0, grid181a::patternClip (2));
+    launcher::setClip (s, 0, 1, grid181a::patternClip (3));
+    launcher::setStopButton (s, 1, 1, false); // the row leaves track 1 alone
+    CHECK (! launcher::hasStopButton (*s.clipGrid, 1, 1));
+    CHECK (launcher::hasStopButton (*s.clipGrid, 2, 1));
+    CHECK (launcher::clipAt (*s.clipGrid, 1, 1) == nullptr); // it is not a clip
+    launcher::setStopButton (s, 0, 0, false);                // a filled slot has none to remove
+    CHECK (launcher::hasStopButton (*s.clipGrid, 0, 0));
+
+    // the mark follows its track, as clips do, and comes back
+    auto moved = s;
+    noteedit::insertTrack (moved, 0);
+    CHECK (! launcher::hasStopButton (*moved.clipGrid, 2, 1));
+    CHECK (launcher::hasStopButton (*moved.clipGrid, 1, 1));
+    launcher::setStopButton (moved, 2, 1, true);
+    CHECK (launcher::hasStopButton (*moved.clipGrid, 2, 1));
+
+    grid181a::Run r (std::move (s));
+    r.command (launcher::Command::Type::launchScene, 0, 0);
+    r.until (bar / 2);
+    r.command (launcher::Command::Type::launchScene, 0, 1);
+    r.until (bar + bar / 2);
+    CHECK (r.runtime.tracks[0].playing.load() == 1);
+    CHECK (r.runtime.player.playingOn (1) >= 0);  // left alone
+    CHECK (r.runtime.player.playingOn (2) == -1); // stopped
+}
+
+TEST (grid181a_recording_writes_passes_for_the_playlist)
+{
+    using namespace lynx;
+    constexpr auto bar = grid181a::bar;
+    auto s = grid181a::patternSong();
+    launcher::setClip (s, 1, 0, grid181a::patternClip (2));
+    const auto grid = *s.clipGrid;
+    grid181a::Run r (std::move (s));
+    r.runtime.recording.store (true);
+    r.launch (1, 0);
+    r.until (2 * bar + bar / 2);
+    r.runtime.player.recordStop (*r.song.clipGrid, r.index, &r.runtime);
+    r.runtime.player.stopAll (&r.runtime);
+
+    std::vector<Clip> clips;
+    launcher::RecordedPass pass;
+    while (r.runtime.recorded.pop (pass))
+        if (Clip c; launcher::recordedClip (grid, pass, c))
+            clips.push_back (c);
+    // two whole bars, then the part the stop cut
+    CHECK (clips.size() == 3);
+    if (clips.size() == 3)
+    {
+        CHECK (clips[0].start == 0 && clips[0].length == bar && clips[0].track == 1 && clips[0].pattern == 2);
+        CHECK (clips[0].gridSlot == -1); // a Playlist clip now
+        CHECK (clips[1].start == bar && clips[1].length == bar);
+        CHECK (clips[2].start == 2 * bar && std::abs (clips[2].length - r.tick + 2 * bar) < 2.0);
+    }
+}

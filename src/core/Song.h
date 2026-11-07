@@ -1466,6 +1466,20 @@ enum class LaunchQuant : std::uint8_t
     sixteenthTriplet, thirtySecond
 };
 enum class LaunchMode : std::uint8_t { trigger, gate, toggle, repeat };
+// A follow action, in the order of the manual's list (see docs/analise/REA_rodada181a.md for what the numbers in a set are)
+enum class FollowKind : std::uint8_t { none, stop, playAgain, previous, next, first, last, any, other, jump };
+
+struct ClipFollow
+{
+    bool enabled = false;
+    FollowKind a = FollowKind::next, b = FollowKind::none;
+    int chanceA = 100, chanceB = 0;
+    int jumpA = 0, jumpB = 0;       // jump: the target row
+    bool linked = true;             // after `iterations` passes of the clip; off: after `ticks`
+    int iterations = 1;
+    std::int64_t ticks = 4 * 960;
+    bool operator== (const ClipFollow&) const = default;
+};
 
 // What a clip of the grid keeps besides the Clip itself. A Clip finds its entry through Clip::gridSlot.
 struct ClipGridSlot
@@ -1477,6 +1491,8 @@ struct ClipGridSlot
     LaunchQuant quant = LaunchQuant::global;
     bool legato = false;            // takes over the position of the clip it replaces
     bool loop = true;               // off: plays once, then the track stops
+    bool noStop = false;            // an empty slot without its stop button (a scene leaves that track alone): its Clip has length 0
+    ClipFollow follow;
     bool operator== (const ClipGridSlot&) const = default;
 };
 
@@ -1484,6 +1500,8 @@ struct ClipGridScene
 {
     std::string name;
     std::uint32_t colour = 0;
+    double tempo = 0.0;   // > 0: the song takes this tempo when the scene is launched
+    int beatsPerBar = 0;  // > 0: and this bar length
     bool operator== (const ClipGridScene&) const = default;
 };
 
@@ -1496,6 +1514,7 @@ struct ClipGrid
     std::vector<ClipGridSlot> slots; // an entry no clip refers to is free
     std::vector<ClipGridScene> scenes;
     LaunchQuant globalQuant = LaunchQuant::bar;
+    bool followActions = true; // follow actions on the whole grid (off: edit playing clips with no jumps)
     bool backOnStop = false; // "Give tracks back to the Playlist when the transport stops" (off: they stay taken until asked)
     bool operator== (const ClipGrid&) const = default;
 };

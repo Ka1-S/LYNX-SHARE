@@ -3249,6 +3249,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             launchersRunning = false;
             if (runningLauncher != nullptr)
             {
+                if (song.clipGrid)
+                    runningLauncher->player.recordStop (*song.clipGrid, state.gridIndex, runningLauncher);
                 runningLauncher->player.stopAll (runningLauncher, song.clipGrid && song.clipGrid->backOnStop);
                 runningLauncher = nullptr;
             }
