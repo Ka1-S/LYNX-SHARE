@@ -354,7 +354,9 @@ and Flatten are in the core and have no UI until slice 177c-2.
 
 ## 9. Blend recorded notes starts off (slice 177c-blend)
 
-**FL:** off by factory form data (§2.1). See the fresh-setting result below.
+**FL:** off by factory form data (§2.1): the DFM's `OptionsBlendRecordedNotesAction` has no `"Checked"`, while its neighbours have
+`"Checked": true`. This is static evidence. **FL was not run from a fresh state**, because that would need a registry edit, and
+registry edits are not allowed here. Code that sets the switch after the form loads was not ruled out.
 
 **LYNX before:** on (`RecordMode::overdub`), and the switch was not saved at all: every session started on, whatever was
 chosen last time.
