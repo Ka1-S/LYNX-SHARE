@@ -7378,3 +7378,5 @@ countries: fr be ch ca lu
 "{0} crashed in its separate process." = "{0} a planté dans son processus séparé."
 "{0} stopped responding (separate process)." = "{0} ne répond plus (processus séparé)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Seul son processus a été touché : LYNX SHARE et votre projet ont continué de tourner, et le plugin a été coupé. Enregistrez votre projet ; le plugin se recharge à la prochaine ouverture."
+"{0} minutes" = "{0} minutes"
+"Make a backup anyway after this long without one" = "Faire quand même une sauvegarde après cette durée sans aucune"

@@ -27,15 +27,28 @@ int clampAutosaveKeep (int keep); // 1..100
 // "waitForQuiet" on (the default) a due backup also waits while the song plays and until `quietMs` after the last
 // MIDI input, not only while recording (FL postpones it for recording only).
 constexpr double backupQuietMs = 5000.0;
-// `maxWaitMs` > 0 ends the wait once the backup is that overdue (never during a recording); 0 = no limit, the current
-// behaviour (backupMaxWaitMs).
-constexpr double backupMaxWaitMs = 0.0;
-inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet, double msOverdue = 0.0,
-                          double maxWaitMs = backupMaxWaitMs) noexcept
+// The user's decision: after `longestWaitMs` without a backup one is written anyway, playing or not (Settings › General,
+// 10 minutes by default). Never during a recording.
+constexpr int defaultBackupLongestWaitMinutes = 10;
+constexpr int backupLongestWaitChoices[] = { 5, 10, 15, 20, 30, 60 };
+constexpr int clampBackupLongestWait (int minutes) noexcept
+{
+    auto best = defaultBackupLongestWaitMinutes;
+    auto bestGap = 1 << 30;
+    for (const auto c : backupLongestWaitChoices)
+        if (const auto gap = c > minutes ? c - minutes : minutes - c; gap < bestGap)
+        {
+            best = c;
+            bestGap = gap;
+        }
+    return best;
+}
+inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet, double msSinceBackup,
+                          double longestWaitMs) noexcept
 {
     if (recording)
         return false;
-    if (maxWaitMs > 0.0 && msOverdue >= maxWaitMs)
+    if (msSinceBackup >= longestWaitMs)
         return true;
     return ! waitForQuiet || (! playing && msSinceMidi >= backupQuietMs);
 }

@@ -2001,6 +2001,8 @@ void MainComponent::loadUiSettings()
             askUnusedRecordings = on;
         else if (key == "backupWaitsForQuiet")
             backupWaitsForQuiet = on;
+        else if (key == "backupLongestWait")
+            backupLongestWaitMinutes = prefs::clampBackupLongestWait (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "hoverValues")
             hoverValues = on;
         else if (key == "autosaveKeep")
@@ -2141,6 +2143,7 @@ void MainComponent::saveUiSettings()
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
                                       + "\nbackupWaitsForQuiet=" + juce::String (backupWaitsForQuiet ? 1 : 0)
+                                      + "\nbackupLongestWait=" + juce::String (backupLongestWaitMinutes)
                                       + "\nhoverValues=" + juce::String (hoverValues ? 1 : 0)
                                       + "\nundoLevels=" + juce::String (engine.getUndoLevels())
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
@@ -4039,7 +4042,7 @@ void MainComponent::timerCallback()
     // a backup copy every few minutes (Settings › General) when there are changes
     // (not in the middle of a recording: FL also postpones the timed backup until the transport is free; round 177d:
     // with "Wait with backups..." on, also while playing and for a few seconds after MIDI input, so writing the plugin
-    // states never stutters the sound)
+    // states never stutters the sound, up to the longest wait set there)
     if (const auto midi = engine.getMidiPlayed(); midi != backupMidiSeen)
     {
         backupMidiSeen = midi;
@@ -4049,7 +4052,7 @@ void MainComponent::timerCallback()
     if (autosaveMinutes > 0 && ++autosaveTicks >= backupDueTicks
         && prefs::backupMayRun (engine.isRecording(), engine.getTransport().playing.load(),
                                 juce::Time::getMillisecondCounterHiRes() - backupMidiMs, backupWaitsForQuiet,
-                                (autosaveTicks - backupDueTicks) * 1000.0 / 30.0))
+                                autosaveTicks * 1000.0 / 30.0, backupLongestWaitMinutes * 60000.0))
     {
         autosaveTicks = 0;
 
@@ -5139,7 +5142,7 @@ void MainComponent::openLynxProject (const juce::File& file)
     playlist.showSongAfterOpen();
 
     // pain point 37 (round 177d): a project from a newer LYNX SHARE opens, but saving it here would drop what that
-    // version added, so say so once (FL only warns when a project needs a newer FL to open at all)
+    // version added, so say so once (FL warns about a project from a more recent version too)
     if (safety::savedByNewerVersion (savedBy.toStdString(), JUCE_APPLICATION_VERSION_STRING))
     {
         platform::testModeLog ("project saved by newer version " + savedBy);
@@ -5202,6 +5205,7 @@ void MainComponent::openSettings (int page)
         o.autosaveKeep = safe->autosaveKeep;
         o.askUnusedRecordings = safe->askUnusedRecordings;
         o.backupWaitsForQuiet = safe->backupWaitsForQuiet;
+        o.backupLongestWaitMinutes = safe->backupLongestWaitMinutes;
         o.hoverValues = safe->hoverValues;
         o.crossfadesInNewProjects = newProjectDefaults().autoCrossfades;
         o.pluginSandbox = pluginSandboxEnabled();
@@ -5285,6 +5289,7 @@ void MainComponent::openSettings (int page)
         self.autosaveKeep = prefs::clampAutosaveKeep (o.autosaveKeep);
         self.askUnusedRecordings = o.askUnusedRecordings;
         self.backupWaitsForQuiet = o.backupWaitsForQuiet;
+        self.backupLongestWaitMinutes = prefs::clampBackupLongestWait (o.backupLongestWaitMinutes);
         if (self.hoverValues && ! o.hoverValues && self.hoverTipShown)
             ui::hideValueTip();
         self.hoverValues = o.hoverValues;

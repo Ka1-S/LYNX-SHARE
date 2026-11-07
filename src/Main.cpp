@@ -4963,6 +4963,71 @@ private:
 
     // --rtstress: opens the project in the normal window with the saved audio device, plays it from the start for
     // `seconds` and writes the real-time statistics (deadline misses, late device calls, load histogram, heaviest units)
+    // --rtstress --backuptest N (round 177d): while the project plays, a device's MIDI clock (10/s) and active sensing
+    // (3/s) arrive, and the project counts as changed. N > 0 also forces a backup every N seconds on top of the timed ones.
+    // The report tells how many backups were written, when, and what the MIDI counters did.
+    struct BackupTest final : juce::Timer
+    {
+        lynx::AudioEngine* engine = nullptr;
+        lynx::MainComponent* ui = nullptr;
+        double everyMs = 0.0, startMs = 0.0, lastForcedMs = 0.0, longestCallMs = 0.0;
+        int ticks = 0, forced = 0;
+
+        void timerCallback() override
+        {
+            engine->injectMidiInput (juce::MidiMessage (0xf8));
+            if (++ticks % 3 == 0)
+                engine->injectMidiInput (juce::MidiMessage (0xfe));
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            if (everyMs > 0.0 && now - lastForcedMs >= everyMs)
+            {
+                lastForcedMs = now;
+                ++forced;
+                ui->backupNowForTest();
+                longestCallMs = juce::jmax (longestCallMs, juce::Time::getMillisecondCounterHiRes() - now);
+            }
+        }
+    };
+    std::unique_ptr<BackupTest> backupTest;
+
+    void startBackupTest()
+    {
+        const auto& cli = juce::JUCEApplication::getCommandLineParameterArray();
+        const auto at = cli.indexOf ("--backuptest");
+        auto* ui = mainWindow != nullptr ? dynamic_cast<lynx::MainComponent*> (mainWindow->getContentComponent()) : nullptr;
+        if (at < 0 || ui == nullptr)
+            return;
+        backupTest = std::make_unique<BackupTest>();
+        backupTest->engine = engine.get();
+        backupTest->ui = ui;
+        backupTest->everyMs = cli[at + 1].getDoubleValue() * 1000.0;
+        backupTest->startMs = backupTest->lastForcedMs = juce::Time::getMillisecondCounterHiRes();
+        engine->editSong ([] (lynx::Song&) {}); // (the project counts as changed: a backup has something to write)
+        backupTest->startTimer (100);
+    }
+
+    juce::String finishBackupTest()
+    {
+        if (backupTest == nullptr)
+            return {};
+        backupTest->stopTimer();
+        juce::String text;
+        const auto played = engine->getMidiPlayed();
+        text << "  backup test: MIDI light count " << (int) engine->getMidiActivity() << ", played count " << (int) played << " (clock and active sensing only)\n";
+        text << "  backup test: " << backupTest->forced << " forced, longest forced call on the message thread "
+             << juce::String (backupTest->longestCallMs, 1) << " ms\n";
+        auto files = lynx::autosaveFolder().findChildFiles (juce::File::findFiles, false, "*.lynx");
+        text << "  backup test: " << files.size() << " file(s) in the backup folder:\n";
+        for (const auto& f : files)
+            text << "    " << juce::String ((f.getLastModificationTime().toMilliseconds() - juce::Time::getCurrentTime().toMilliseconds()) / 1000) << " s before the end: "
+                 << f.getFileName() << " (" << f.getSize() << " bytes)\n";
+        engine->injectMidiInput (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 1));
+        engine->injectMidiInput (juce::MidiMessage::noteOff (1, 60));
+        text << "  backup test: after a played note, played count " << (int) engine->getMidiPlayed() << "\n";
+        backupTest.reset();
+        return text;
+    }
+
     void runRealtimeStress (const juce::File& project, const juce::File& report, double seconds, int bufferSize,
                             const juce::String& deviceType, const juce::String& deviceName, const juce::String& recordTo = {})
     {
@@ -5032,9 +5097,11 @@ private:
                 engine->getAudioLogger().start (juce::File (cli[at + 1].unquoted()), engine->getDeviceManager().getCurrentAudioDevice() != nullptr
                                                                                      ? engine->getDeviceManager().getCurrentAudioDevice()->getCurrentSampleRate() : 44100.0);
             engine->play();
+            startBackupTest();
             juce::Timer::callAfterDelay ((int) (seconds * 1000.0), [this, project, report, seconds, loadMs, recordTo] {
                 if (engine == nullptr)
                     return;
+                const auto backupReport = finishBackupTest();
                 engine->stop();
                 juce::String recording;
                 if (engine->getAudioLogger().isLogging())
@@ -5061,7 +5128,7 @@ private:
                     if (s.histogram[b] > 0)
                         text << " " << (int) (b * 10) << (b + 1 == s.histogram.size() ? juce::String ("+") : "-" + juce::String ((int) (b * 10 + 10))) << "%:" << (juce::int64) s.histogram[b];
                 text << "\n";
-                text << recording;
+                text << recording << backupReport;
                 // --settingsshot file.png (round 161): Options > Audio settings of this run's device, as a picture
                 if (const auto at = cli.indexOf ("--settingsshot"); at >= 0 && at + 1 < cli.size())
                 {

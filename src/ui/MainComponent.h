@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Preferences.h"
 #include <atomic>
 #include <map>
 #include <memory>
@@ -280,6 +281,7 @@ private:
     void updateTitle();
     bool shouldReclaimKeyboardFocus(); // the main window is active but nothing in it has the keyboard focus
     void autosave();
+    void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
     void revertToLastBackup();
@@ -307,6 +309,7 @@ private:
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written
     int autosaveMinutes = 2, autosaveKeep = 10; // Settings › General › Backup
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
+    int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
     bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
     bool hoverTipShown = false;                   // ...and it is showing now
     juce::String hoverTipText;

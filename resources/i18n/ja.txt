@@ -7378,3 +7378,5 @@ countries: jp
 "{0} crashed in its separate process." = "{0} が別プロセス内でクラッシュしました。"
 "{0} stopped responding (separate process)." = "{0} が応答しなくなりました（別プロセス）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。次に開いたときにプラグインは再び読み込まれます。"
+"{0} minutes" = "{0} 分"
+"Make a backup anyway after this long without one" = "この時間バックアップがなければ必ず作成する"

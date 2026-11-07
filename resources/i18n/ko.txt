@@ -7378,3 +7378,5 @@ countries: kr
 "{0} crashed in its separate process." = "{0}이(가) 별도 프로세스에서 충돌했습니다."
 "{0} stopped responding (separate process)." = "{0}이(가) 응답하지 않습니다(별도 프로세스)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "해당 프로세스만 영향을 받았습니다. LYNX SHARE와 프로젝트는 계속 실행되었고 플러그인은 음소거되었습니다. 프로젝트를 저장하세요. 다음에 열 때 플러그인이 다시 로드됩니다."
+"{0} minutes" = "{0}분"
+"Make a backup anyway after this long without one" = "이 시간 동안 백업이 없으면 그래도 백업 만들기"

@@ -42,6 +42,7 @@ struct GeneralOptions
     int autosaveKeep = prefs::defaultAutosaveKeep;
     bool askUnusedRecordings = true; // offer to delete takes a project no longer uses when it closes
     bool backupWaitsForQuiet = true; // round 177d: a backup waits while playing and right after MIDI input too
+    int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...and is written anyway after this long
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
     bool pluginSandbox = false;
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
