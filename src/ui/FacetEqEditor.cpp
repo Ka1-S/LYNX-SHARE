@@ -1,5 +1,6 @@
 #include "ui/SlotWatch.h"
 #include "ui/FacetEqEditor.h"
+#include "core/MixerOps.h"
 #include "core/ShownEffectSlot.h"
 
 #include <juce_dsp/juce_dsp.h>
@@ -474,8 +475,10 @@ public:
         juce::PopupMenu from;
         const auto assign = [this] (int source) {
             engine.editSong ([tk = track, sl = slot, source] (Song& s) {
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
                 auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source;
                 if (source >= 0) target.params[(std::size_t) detectorParam] = 1.0f;
             });
         };
@@ -525,8 +528,10 @@ public:
         juce::PopupMenu from;
         const auto assign = [this, thenListen] (int source) {
             engine.editSong ([tk = track, sl = slot, source, thenListen] (Song& s) {
-                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source; // (the same input the dynamic bands' sidechain detector hears)
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
+                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl]; // (the same input the dynamic bands' sidechain detector hears)
                 if (source < 0 && listen (target.params[(std::size_t) listenParam]) == Listen::target) target.params[(std::size_t) listenParam] = listenValue (Listen::eq);
                 if (source >= 0 && thenListen) target.params[(std::size_t) listenParam] = listenValue (Listen::target);
             }, false);

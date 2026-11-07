@@ -112,5 +112,21 @@ juce::String modeLine (EffectKind kind, const EffectParams& params, double bpm);
 // The mix lock ("Keep the Mix when loading presets"), also toggled by a click on a LYNX engine's MIX caption (round 135).
 bool isMixLocked (EffectKind kind);
 void toggleMixLock (EffectKind kind);
+
+// --- One-click sidechain (round 177b) ------------------------------------------------------------------------------
+// FL hides its sidechain behind the route arrow's menu ("Sidechain to this track"); every effect that has a side input
+// also gets a picker of its own: its window header and its slot menu list the inserts, and picking one makes the link
+// (mixerops::sidechainFrom: a level-0 send when there is no route, the source keeps its Master send). FL's way still
+// works as before.
+// Does slot `slot` of insert `track` read a side input? (LYNX / FL engines: mixerops::acceptsSidechain; a hosted plugin:
+// when it has a second input bus.)
+bool takesSidechain (AudioEngine& engine, int track, int slot);
+// The insert the slot listens to, as the header shows it ("3 Kick"), or "" when none.
+juce::String sidechainSourceText (const Song& song, const EffectSlot& fx, bool second = false);
+// The picker's items (None, then every other insert; a source that would make a loop is greyed out), added to `menu`.
+void addSidechainPicker (juce::PopupMenu& menu, AudioEngine& engine, int track, int slot, bool second = false);
+// The picker as a menu of its own under `target` (a header button).
+void showSidechainPicker (AudioEngine& engine, int track, int slot, juce::Component* target, juce::Rectangle<int> area = {},
+                          bool second = false);
 } // namespace pluginheader
 } // namespace lynx

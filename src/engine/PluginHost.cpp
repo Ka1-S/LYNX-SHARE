@@ -575,8 +575,21 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
+    if (const auto side = sideInputChannels (*plugin); side > 0)
+    {
+        const auto first = plugin->getChannelIndexInProcessBlockBuffer (true, 1, 0);
+        if (first >= 2 && first + side <= buffer.getNumChannels())
+        {
+            sideChannel = first;
+            sideCount = juce::jmin (2, side);
+        }
+    }
     if (fixedBlock > 0)
-        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), 2);
+    {
+        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), sideChannel >= 0 ? 4 : 2);
+        if (sideChannel >= 0)
+            sideScratch.assign ((std::size_t) blockSize * 2, 0.0f);
+    }
     options = o;
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
 }
@@ -640,8 +653,105 @@ void PluginEffect::setParameter (int index, float value) noexcept
         failed (code);
 }
 
+int sideInputChannels (const juce::AudioPluginInstance& plugin)
+{
+    if (plugin.getBusCount (true) < 2)
+        return 0;
+    const auto* bus = plugin.getBus (true, 1);
+    return bus != nullptr && bus->isEnabled() ? bus->getNumberOfChannels() : 0;
+}
+
+namespace
+{
+// a plugin that plays its side input (bus 1) and drops its main input: what reaches the bus is what comes out
+class SideEchoPlugin final : public juce::AudioPluginInstance
+{
+public:
+    SideEchoPlugin()
+        : AudioPluginInstance (BusesProperties()
+                                   .withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                   .withInput ("Sidechain", juce::AudioChannelSet::stereo(), true)
+                                   .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+    {
+    }
+    void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = "LYNX side echo"; d.pluginFormatName = "Internal"; }
+    const juce::String getName() const override { return "LYNX side echo"; }
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    bool isBusesLayoutSupported (const BusesLayout&) const override { return true; }
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+    {
+        auto side = getBusBuffer (buffer, true, 1);
+        for (int c = 0; c < 2; ++c)
+            buffer.copyFrom (c, 0, side, c, 0, buffer.getNumSamples());
+    }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+};
+} // namespace
+
+juce::String pluginSidechainSelfTest()
+{
+    constexpr int block = 256;
+    for (const auto fixedBlock : { 0, 64 })
+    {
+        auto instance = std::make_unique<SideEchoPlugin>();
+        preparePlugin (*instance, 48000.0, block);
+        if (sideInputChannels (*instance) != 2)
+            return "ERROR no side bus";
+        PluginEffect fx (std::move (instance), block, fixedBlock);
+        if (! fx.hasSideInput())
+            return "ERROR side bus not found";
+        std::vector<float> l (block, 0.25f), r (block, 0.25f), sl (block), sr (block);
+        for (int i = 0; i < block; ++i)
+        {
+            sl[(std::size_t) i] = 0.5f;
+            sr[(std::size_t) i] = -0.5f;
+        }
+        EffectParams params {};
+        // fixed blocks delay by one block: two passes, the second one carries the first's side input
+        for (int pass = 0; pass < (fixedBlock > 0 ? 2 : 1); ++pass)
+        {
+            std::fill (l.begin(), l.end(), 0.25f);
+            std::fill (r.begin(), r.end(), 0.25f);
+            fx.setSidechain (sl.data(), sr.data());
+            fx.process (l.data(), r.data(), block, params, 120.0);
+        }
+        if (std::abs (l[block - 1] - 0.5f) > 1.0e-6f || std::abs (r[block - 1] + 0.5f) > 1.0e-6f)
+            return "ERROR side input not heard (fixed " + juce::String (fixedBlock) + ")";
+        // the slot's sidechain removed: silence on the bus (two more passes for the fixed blocks' delay)
+        for (int pass = 0; pass < (fixedBlock > 0 ? 2 : 1); ++pass)
+            fx.process (l.data(), r.data(), block, params, 120.0);
+        if (std::abs (l[block - 1]) > 1.0e-6f || std::abs (r[block - 1]) > 1.0e-6f)
+            return "ERROR stale side input (fixed " + juce::String (fixedBlock) + ")";
+    }
+    return "OK";
+}
+
 void PluginEffect::process (float* left, float* right, int n, const EffectParams&, double) noexcept
 {
+    // this block's sidechain (null = silence); cleared so a slot whose side input is removed hears silence again
+    const auto* scL = sideL;
+    const auto* scR = sideR != nullptr ? sideR : sideL;
+    sideL = sideR = nullptr;
+    // copies the sidechain into the side bus channels of `view` from sample `from` of the block (silence without one)
+    auto feedSide = [this, scL, scR] (juce::AudioBuffer<float>& view, int from, int count) noexcept {
+        if (sideChannel < 0 || scL == nullptr)
+            return; // (the view was cleared)
+        view.copyFrom (sideChannel, 0, scL + from, count);
+        if (sideCount > 1)
+            view.copyFrom (sideChannel + 1, 0, scR + from, count);
+    };
     if (crashed.load (std::memory_order_relaxed))
         return; // bypassed: the input plays through
     if (resetPending.exchange (false, std::memory_order_relaxed))
@@ -654,7 +764,21 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
 
     if (fixed != nullptr)
     {
-        float* io[2] = { left, right };
+        // the sidechain rides along as channels 2 and 3 of the fixed blocks (copies: FixedBlock writes them back)
+        const auto sideRun = sideChannel >= 0 && n <= blockSize;
+        float* io[4] = { left, right, sideScratch.data(), sideScratch.data() + blockSize };
+        if (sideChannel >= 0)
+        {
+            const auto m = juce::jmin (n, blockSize);
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto* src = c == 0 ? scL : scR;
+                if (src != nullptr && sideRun)
+                    std::memcpy (io[2 + c], src, sizeof (float) * (size_t) m);
+                else
+                    std::fill (io[2 + c], io[2 + c] + m, 0.0f);
+            }
+        }
         fixed->run (io, n, true, [this] (float* const* ch, int count) {
             if (crashed.load (std::memory_order_relaxed))
                 return; // (crashed in an earlier block of this call: the input passes through)
@@ -662,6 +786,12 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             view.clear();
             view.copyFrom (0, 0, ch[0], count);
             view.copyFrom (1, 0, ch[1], count);
+            if (sideChannel >= 0)
+            {
+                view.copyFrom (sideChannel, 0, ch[2], count);
+                if (sideCount > 1)
+                    view.copyFrom (sideChannel + 1, 0, ch[3], count);
+            }
             if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
             {
                 midi.clear();
@@ -682,6 +812,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
         view.clear();
         view.copyFrom (0, 0, left + done, count);
         view.copyFrom (1, 0, right + done, count);
+        feedSide (view, done, count);
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
         {
             midi.clear();
