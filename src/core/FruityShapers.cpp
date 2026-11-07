@@ -764,19 +764,23 @@ std::optional<WaveShaperState> parseWaveShaper (const std::vector<std::uint8_t>&
     const auto mapVersion = i32At (d, o + 4);
     const auto n = i32At (d, o + 8);
     o += 12;
-    if (mapVersion != 3 || n < 0 || n > 100000 || d.size() < o + 24 * (std::size_t) n + 20)
+    // round 173d3b: FL's map versions (the shared envelope editor, as Love Philter's, REA_rodada66): 0 = f32 Δt, level,
+    // tension (12 bytes); 1 = the same + mode and 3 bytes (16); 2…3 = f64 Δt, level, f32 tension, mode, 3 bytes (24).
+    // 33 of FL's 34 WaveShaper presets are state version 1 with map version 0…2 (FUN_00831040 reads the same fields)
+    const std::size_t size = mapVersion >= 2 ? 24 : mapVersion == 1 ? 16 : 12;
+    if (mapVersion < 0 || mapVersion > 3 || n < 0 || n > 100000 || d.size() < o + size * (std::size_t) n + 20)
         return std::nullopt;
     float prev = 0.0f;
-    for (int i = 0; i < n; ++i, o += 24)
+    for (int i = 0; i < n; ++i, o += size)
     {
         WsPoint p;
-        p.dt = (float) f64At (d, o);
-        p.y = (float) f64At (d, o + 8);
+        p.dt = mapVersion >= 2 ? (float) f64At (d, o) : f32At (d, o);
+        p.y = mapVersion >= 2 ? (float) f64At (d, o + 8) : f32At (d, o + 4);
         if (std::isnan (p.y))
             p.y = prev;
         prev = p.y;
-        p.tension = f32At (d, o + 16);
-        p.mode = d[o + 20];
+        p.tension = f32At (d, o + (mapVersion >= 2 ? 16 : 8));
+        p.mode = mapVersion >= 2 ? d[o + 20] : mapVersion == 1 ? d[o + 12] : 0;
         s.points.push_back (p);
     }
     o += 20;
@@ -945,7 +949,8 @@ std::vector<std::uint8_t> writeWaveShaper (const WaveShaperState& s, const std::
     {
         const std::size_t o = 22;
         const auto n = (std::size_t) i32At (base, o + 8);
-        const auto end = o + 12 + 24 * n;
+        const auto mapVersion = i32At (base, o + 4); // (older maps: smaller points, as parseWaveShaper reads them)
+        const auto end = o + 12 + (mapVersion >= 2 ? 24 : mapVersion == 1 ? 16 : 12) * n;
         mapKind = i32At (base, o);
         std::memcpy (header.data(), base.data() + end, header.size());
         if (old->version > 1 && base.size() >= end + 24)
