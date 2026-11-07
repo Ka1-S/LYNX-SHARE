@@ -7329,6 +7329,12 @@ countries: ru by kz
 "Choose the folder for the Live set" = "Выберите папку для сета Live"
 "Ableton Live set (.als)..." = "Сет Ableton Live (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Сет сохраняется как «<имя> Project/<имя>.als». Переносятся дорожки, клипы, ноты, уровни микшера, посылы, VST-плагины с их состоянием, маркеры и темп; остальное перечислено в отчёте."
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "Варп: биты"
+"Warp: Tones" = "Варп: тона"
+"Warp: Texture" = "Варп: текстура"
+"Warp: Complex" = "Варп: комплексный"
 "Animation rate" = "Частота анимации"
 "Display (default)" = "Дисплей (по умолчанию)"
 "60 Hz" = "60 Гц"

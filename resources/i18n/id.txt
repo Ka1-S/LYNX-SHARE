@@ -7329,6 +7329,12 @@ countries: id
 "Choose the folder for the Live set" = "Pilih folder untuk set Live"
 "Ableton Live set (.als)..." = "Set Ableton Live (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Set disimpan sebagai \"<nama> Project/<nama>.als\". Track, klip, not, level mixer, send, plugin VST beserta statusnya, marker, dan tempo ikut dipindahkan; laporan mencantumkan sisanya."
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "Warp: Ketukan"
+"Warp: Tones" = "Warp: Nada"
+"Warp: Texture" = "Warp: Tekstur"
+"Warp: Complex" = "Warp: Kompleks"
 "Animation rate" = "Laju animasi"
 "Display (default)" = "Layar (default)"
 "60 Hz" = "60 Hz"

@@ -7329,6 +7329,12 @@ countries: jp
 "Choose the folder for the Live set" = "Live セットのフォルダーを選択"
 "Ableton Live set (.als)..." = "Ableton Live セット (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "セットは「<名前> Project/<名前>.als」として保存されます。トラック、クリップ、ノート、ミキサーのレベル、センド、状態を含む VST プラグイン、マーカー、テンポが移されます。残りはレポートに記載されます。"
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "ワープ: ビート"
+"Warp: Tones" = "ワープ: トーン"
+"Warp: Texture" = "ワープ: テクスチャ"
+"Warp: Complex" = "ワープ: コンプレックス"
 "Animation rate" = "アニメーションレート"
 "Display (default)" = "ディスプレイ（既定）"
 "60 Hz" = "60 Hz"

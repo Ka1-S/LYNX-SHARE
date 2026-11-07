@@ -7329,6 +7329,12 @@ countries: de at ch li lu
 "Choose the folder for the Live set" = "Ordner für das Live-Set wählen"
 "Ableton Live set (.als)..." = "Ableton-Live-Set (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Das Set wird als \"<Name> Project/<Name>.als\" gespeichert. Spuren, Clips, Noten, Mixerpegel, Sends, VST-Plugins mit ihrem Zustand, Marker und Tempo werden übernommen; ein Bericht listet den Rest."
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "Warp: Beats"
+"Warp: Tones" = "Warp: Töne"
+"Warp: Texture" = "Warp: Textur"
+"Warp: Complex" = "Warp: Komplex"
 "Animation rate" = "Animationsrate"
 "Display (default)" = "Bildschirm (Standard)"
 "60 Hz" = "60 Hz"
