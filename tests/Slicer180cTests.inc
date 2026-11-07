@@ -111,7 +111,9 @@ TEST (slicer180c_slice_lengths_and_sampler_table)
     t.playToEnd = 1;
     fslicer::configureSampler (def, t, 20000);
     CHECK (def.sampler.slices.size() == 3 && def.sampler.slices[1] == (float) (4410.0 / 20000.0));
-    CHECK (def.sampler.sliceFirstKey == 48 && def.sampler.slicesToEnd);
+    CHECK (def.sampler.sliceFirstKey == 60 && def.sampler.slicesToEnd); // FL ignores the saved first note
+    t.slices.resize (100);
+    CHECK (fslicer::firstNote (t) == 24); // 60 − 3 octaves: 24 − 1 + 100 < 125
 }
 
 TEST (slicer180c_fades_follow_fl)

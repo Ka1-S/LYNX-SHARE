@@ -109,5 +109,8 @@ std::vector<std::int32_t> gridSlices (const State& state, std::int64_t frames, d
 std::vector<std::int32_t> zeroCrossSlices (const std::vector<std::int32_t>& starts, const SampleData& sample);
 // The key of slice i (its own key, else the first note + i)
 int sliceKey (const State& state, int index);
+// The first note FL plays from: FUN_00769900 sets it to 60 whenever it measures the slices (every load), an octave
+// lower while the last slice would pass key 124 — the saved one is not used (FL render, round 180c)
+int firstNote (const State& state);
 } // namespace fslicer
 } // namespace lynx

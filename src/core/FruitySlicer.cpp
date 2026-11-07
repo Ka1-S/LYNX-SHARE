@@ -489,7 +489,7 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
         for (const auto p : starts)
             if (p >= 0 && p < frames)
                 def.sampler.slices.push_back ((float) ((double) p / (double) frames));
-    def.sampler.sliceFirstKey = state.firstNote;
+    def.sampler.sliceFirstKey = firstNote (state);
     def.sampler.slicesToEnd = state.playToEnd != 0;
     // PS: FL shifts the pitch and keeps the length through its licensed stretch engine; LYNX resamples (the slice gets
     // shorter or longer with the pitch)
@@ -504,12 +504,21 @@ State fresh (const std::string& path, int sampleRate)
     s.slices.push_back ({});
     return s;
 }
+int firstNote (const State& state)
+{
+    int note = 60;
+    const auto n = (int) state.slices.size();
+    while (! (note - 1 + n < 125 || note < 12))
+        note -= 12;
+    return note;
+}
+
 int sliceKey (const State& state, int index)
 {
     // FUN_0076b4f0
     auto key = index >= 0 && index < (int) state.slices.size() ? state.slices[(std::size_t) index].key : -1;
     if (key < 0)
-        key = state.firstNote + index;
+        key = firstNote (state) + index;
     return std::clamp (key, 0, 124);
 }
 
