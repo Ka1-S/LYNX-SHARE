@@ -986,7 +986,7 @@ void addAutomationItem (juce::PopupMenu& menu, AudioEngine& engine, const Automa
 {
     if (headers)
         menu.addSectionHeader (tr ("Automation"));
-    // (the tempo too, as in FL: its menu's "Edit events" / "Edit events in piano roll" write pattern Tempo events, issue #86)
+    // (the tempo too, issue #86: "Edit events" as in FL; "Edit events in piano roll" is a LYNX addition, FL greyed it in our tests)
     menu.addItem (tr ("Edit events in the pattern"), [&engine, target] { openEventEditor (engine, target); });
     if (onEditEventsInPianoRoll)
         menu.addItem (tr ("Edit events in piano roll"), [target] {

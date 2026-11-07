@@ -184,4 +184,6 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
   "Tempo - 66.651 BPM"; the .fsc's last value 0.110646 is the same tempo on the 10..522 BPM scale. This confirms §2.
 - **Tempo menu:** "Edit events" is enabled and gets a check mark once events exist. "Edit events in new window" and "Edit events in
   piano roll" were greyed in both projects, before and after drawing events (t87b) and on the empty template. What enables them
-  was not tested. LYNX enables its piano roll item for the tempo: a difference for the user to decide on.
+  was not tested.
+- **Deliberate difference from FL (coordinator's decision, 2026-11-06):** LYNX keeps "Edit events in piano roll" enabled for the
+  tempo, as a LYNX addition, because issue #86 asks for that route. This item is not FL-exact.
