@@ -110,4 +110,12 @@ void stopHangWatch() noexcept;
 std::string symbolizeOwnFrames (const std::string& text);
 // Test: the last hang file written by this process ("" when none)
 std::string lastHangFile();
+
+// Message-thread sampling profiler (round 174f; LYNX_PROFILE_MAIN=<file>). Called on the message thread: a thread samples
+// it every `intervalUs` (Windows x64: suspended for a moment and unwound, as the hang watch does) and only counts the
+// samples where the thread ran since the last one (its cycle counter moved), so waiting in the message loop does not
+// count. Every `windowS` seconds it appends that window's functions by self and by total samples to the file (LYNX.exe
+// named with LYNX.pdb next to it; system DLLs by their nearest export or module). Other platforms: nothing.
+void startMainProfiler (const std::string& fileUtf8, int intervalUs = 1000, int windowS = 5) noexcept;
+void stopMainProfiler() noexcept;
 } // namespace lynx::crashguard

@@ -135,8 +135,13 @@ enum Param
     // (before the output trim in Ridge's own engine, after the voicings' own output): a static curve per model and
     // drive position (fitted on the trials' stairs, 4x oversampled), its tone, an input gain into it, a trim and a mix
     driveOn, driveModel, driveAmount, driveInput, driveTrim, driveMix,
-    count
+    count,
+    // round tp172c10, hidden (not in the info, saved only while non-zero): the compressor's largest gain reduction
+    // (0 = none, else 60 dB x the value), set by the Harrison 32Classic translation (that console caps it at 27.5 dB;
+    // the original has no control for it)
+    compGrCap = count
 };
+double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 // round tp172c6: the drive models (DRIVE section), in the Model selector's order
 enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
                   driveGuitarAmp, driveBassAmp, driveModels };
@@ -314,6 +319,86 @@ const char* consoleName (int step) noexcept;
 // The edits one control change makes on this channel (Link I/O: an input change moves the output the other way)
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
 } // namespace kiln
+
+// ---- Fret Channel (round tp172c8: a guitar / bass channel strip) ----
+// The guitar / bass channel role (SSL Guitarstrip, measured black-box on its trial: GS_bank / GS_x / GS_y). Every control
+// has the reference's own range and law, so a value reads the same on both: input / output ±24 dB, the output mix; the
+// phase correction (a delay of ±20 ms around a fixed 20 ms, polarity, a first- or second-order all-pass; Align to: the
+// side chain = both channels move, Left / Right = only the other channel moves); the EQ (first-order low / high shelves
+// ±12 dB, a Q 0.5 mid bell 0.5 .. 7 kHz, a 24 dB/oct high-pass 20 .. 300 Hz, a steep low-pass 3 .. 20 kHz, before or
+// after the compressor) on Ridge's engine; the compressor (threshold -36 .. 0 dB, Fastest .. Slowest, mix, auto gain);
+// the amp (guitar / bass on the DRIVE section's measured models, the guitar pre-amp, Boost / Punch / Edge, the bass
+// Punch / Shape, the drive mix); Mono listen and Side-chain listen. Latency: 20 ms + the amp's oversampler, always
+namespace fret
+{
+enum Param { input, output, outputMix, phaseCorrection, alignMode, delayIn, delay, phaseInvert, allPassIn, allPassFreq,
+             allPassQ, allPassOrder, hpf, eqIn, eqPrePost, lpf, lowGain, midFreq, midGain, highGain, compIn, compThreshold,
+             compMix, compAutoGain, compMode, driveIn, driveModel, preAmp, guitarDrive, guitarBoost, guitarPunch, guitarEdge,
+             bassDrive, bassPunch, bassShape, driveMix, monoListen, scListen, autoListen, count,
+             // hidden (not in the info, saved only while non-zero): the EQ band Auto listen solos while its knob moves,
+             // set by the editor during the drag (0 none, 1 low, 2 mid, 3 high, stored / 3)
+             listenBand = count };
+double gainDb (float v) noexcept;        // input / output -24 .. +24 dB
+double delayMs (float v) noexcept;       // -20 .. +20 ms
+double allPassHz (float v) noexcept;     // 20 .. 20000 Hz (log)
+double allPassQOf (float v) noexcept;    // 0.10 .. 6.00 (log)
+double hpfHz (float v) noexcept;         // 0 = off, else 20 .. 300 Hz (log)
+double lpfKHz (float v) noexcept;        // 1 = off, else 3 .. 20 kHz (log)
+double shelfDb (float v) noexcept;       // the low / mid / high gains -12 .. +12 dB
+double midKHz (float v) noexcept;        // 0.5 .. 1 kHz on the lower half, 1 .. 7 kHz on the upper (log)
+double thresholdDb (float v) noexcept;   // -36 .. 0 dB
+double preAmpDb (float v) noexcept;      // -6 .. +30 dB
+double ampDrive (float v) noexcept;      // 0 .. 11
+double voicePct (float v) noexcept;      // Boost / Punch / bass Punch -100 .. +100 %
+double voiceSteps (float v) noexcept;    // Edge / bass Shape 0 .. 10
+int alignOf (float v) noexcept;          // 0 side chain, 1 left, 2 right
+int modeOf (float v) noexcept;           // 0 Fastest .. 4 Slowest
+float modeValue (int mode) noexcept;
+const char* modeName (int mode) noexcept;
+const char* alignName (int align) noexcept;
+// float values of the reference's own units (the translator and the tests)
+float midValue (double kHz) noexcept;
+float hpfValue (double hz) noexcept;
+float lpfValue (double kHz) noexcept;
+// Ridge's engine settings for this strip's EQ and compressor (the editor draws the EQ curve with ridge::responseDb)
+EffectParams ridgeParams (const EffectParams& p);
+double autoGainDb (const EffectParams& p) noexcept; // the auto gain's make-up for the threshold and mode
+int baseDelaySamples (double sampleRate) noexcept;  // the fixed 20 ms the delay moves around
+} // namespace fret
+
+// ---- Shell Channel (round tp172c8: a drum channel strip) ----
+// The drum channel role (SSL Native Drumstrip, measured black-box on its trial: DS_bank / DS_y): input / output ±20 dB, a
+// gate (open / close thresholds, range, attack, hold, release), a transient shaper (gain, speed, amount, invert, listen),
+// the low- and high-frequency enhancers (frequency, drive, amount: a steep resonant low lift and a third-order high lift
+// added to the signal), the listen-mic compressor (comp, narrow band, make-up, dry / wet), the output dry / wet and the
+// order of the five modules (120 orders). Latency: 4.1 ms, always
+namespace shell
+{
+enum Param { input, gateOn, gateAttack, gateHold, gateRelease, gateOpen, gateClose, gateRange, tsGain, tsSpeed, tsAmount,
+             tsOn, tsInvert, tsListen, hfOn, hfFreq, hfDrive, hfAmount, lfOn, lfFreq, lfDrive, lfAmount, lmcOn, lmcNarrow,
+             lmcComp, lmcMakeup, lmcMix, output, outputMix, processOrder, count };
+enum Module { gate, shaper, lowEnhancer, highEnhancer, listenMic, modules };
+double gainDb (float v) noexcept;        // input / output / shaper gain / LMC make-up -20 .. +20 dB
+double attackS (float v) noexcept;       // 0 .. 0.1 s
+double holdMs (float v) noexcept;        // 0 .. 4000 ms
+double releaseS (float v) noexcept;      // 0.01 .. 1 s
+double thresholdDb (float v) noexcept;   // open / close -30 .. 0 dB
+double rangeDb (float v) noexcept;       // 0 .. 80 dB
+double hfHz (float v) noexcept;          // 2 .. 20 kHz (log)
+double lfHz (float v) noexcept;          // 20 .. 250 Hz (log)
+double driveSteps (float v) noexcept;    // 0 .. 10
+int orderIndex (float v) noexcept;       // 0 .. 119
+float orderValue (int index) noexcept;
+std::array<int, modules> orderOf (int index) noexcept;  // the modules in processing order
+int indexOf (const std::array<int, modules>& order) noexcept;
+const char* moduleName (int module) noexcept;
+std::string orderText (int index);
+float thresholdValue (double db) noexcept;
+float releaseValue (double s) noexcept;
+float hfValue (double hz) noexcept;
+float lfValue (double hz) noexcept;
+int latencySamples (double sampleRate) noexcept;
+} // namespace shell
 
 // ---- Ember (saturator) ----
 namespace ember
@@ -511,6 +596,8 @@ const EffectInfo& hushInfo();
 const EffectInfo& aetherInfo();
 const EffectInfo& emberInfo();
 const EffectInfo& kilnInfo();
+const EffectInfo& fretInfo();
+const EffectInfo& shellInfo();
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

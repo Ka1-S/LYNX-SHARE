@@ -53,10 +53,10 @@ juce::Colour accentFor (EffectKind kind)
             return colour::teal;
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
-        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor:
+        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel:
         case EffectKind::maximus: case EffectKind::peakController:
             return colour::amber;
-        case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel:
+        case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
         case EffectKind::lofi: case EffectKind::squeeze:
             return colour::ember;
@@ -278,7 +278,7 @@ Style plainStyleFor (int key)
             return G;
         // analogue / vintage-modelled roles: Hardware
         case K::glowLeveler: case K::ridgeStrip: case K::foilPlate: case K::echoform: case K::vintageChorus: case K::vintagePhaser: case K::maximus:
-        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel:
+        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel: case K::fretChannel: case K::shellChannel:
             return H;
         // creative, pitch and fun: Vivid
         case K::geminiDoubler: case K::voiceShift: case K::ember: case K::grossBeat: case K::flPitchShifter: case K::fruityFastDist: case K::effector:
