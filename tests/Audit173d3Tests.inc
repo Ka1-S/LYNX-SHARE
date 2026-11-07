@@ -226,3 +226,42 @@ TEST (audit173d3b_old_preset_spellings_reach_the_exact_engines)
     const auto fx = lynx::effectFromFlPreset (bytes, 130.0);
     CHECK (fx && fx->kind == lynx::EffectKind::fruityFastDist);
 }
+
+// Round 173d3b: Fruity WaveShaper states of version 1 with an older map (map version 0: f32 Δt / level / tension,
+// 12 bytes; 1: + mode, 16 bytes) — 33 of FL's 34 presets — are read, and an edit writes the current layout back
+TEST (audit173d3b_waveshaper_old_maps)
+{
+    for (const int mapVersion : { 0, 1, 2 })
+    {
+        std::vector<std::uint8_t> d;
+        auto i32 = [&d] (std::int32_t v) { for (int k = 0; k < 4; ++k) d.push_back ((std::uint8_t) ((std::uint32_t) v >> (8 * k))); };
+        auto f32 = [&d] (float v) { std::uint32_t u; std::memcpy (&u, &v, 4); for (int k = 0; k < 4; ++k) d.push_back ((std::uint8_t) (u >> (8 * k))); };
+        auto f64 = [&d] (double v) { std::uint64_t u; std::memcpy (&u, &v, 8); for (int k = 0; k < 8; ++k) d.push_back ((std::uint8_t) (u >> (8 * k))); };
+        i32 (1), i32 (128), i32 (100), i32 (90);
+        d.push_back (0), d.push_back (1);
+        i32 (2);
+        i32 (3), i32 (mapVersion), i32 (3);
+        const float pts[3][3] = { { 0.0f, 0.0f, 0.0f }, { 0.5f, 0.75f, 0.25f }, { 0.5f, 1.0f, -0.5f } };
+        for (const auto& p : pts)
+        {
+            if (mapVersion >= 2)
+                f64 (p[0]), f64 (p[1]);
+            else
+                f32 (p[0]), f32 (p[1]);
+            f32 (p[2]);
+            if (mapVersion >= 1)
+                d.push_back (1), d.push_back (0), d.push_back (0), d.push_back (0);
+        }
+        for (const std::int32_t h : { 0, 1, -1, -1, -1 })
+            i32 (h);
+        const auto s = lynx::flshape::parseWaveShaper (d);
+        CHECK (s.has_value());
+        if (! s)
+            continue;
+        CHECK (s->pre == 128 && s->mix == 100 && s->post == 90 && s->center && s->oversampling == 2);
+        CHECK (s->points.size() == 3 && std::abs (s->points[1].y - 0.75f) < 1e-6f && std::abs (s->points[2].tension + 0.5f) < 1e-6f);
+        CHECK (s->points[1].mode == (mapVersion >= 1 ? 1 : 0));
+        const auto back = lynx::flshape::parseWaveShaper (lynx::flshape::writeWaveShaper (*s, d));
+        CHECK (back && back->points.size() == 3 && std::abs (back->points[1].y - 0.75f) < 1e-6f && back->oversampling == 2);
+    }
+}
