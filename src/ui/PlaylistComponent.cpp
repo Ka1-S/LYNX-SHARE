@@ -69,7 +69,13 @@ juce::Colour clipTitleText (juce::Colour band)
 // the header keeps a hint of the clip colour, greyed so the names read and the bodies carry the colour
 juce::Colour clipHeaderColour (juce::Colour base) { return base.interpolatedWith (juce::Colour (0xff4b525a), 0.5f); }
 juce::Colour clipBodyColour (juce::Colour base) { return base.interpolatedWith (theme::colour::bg1, 0.72f); }
-juce::Colour clipContentColour (juce::Colour base) { return base.interpolatedWith (juce::Colours::white, 0.7f); }
+// the waveform, note marks and automation line: a light tint on a dark body, a dark shade on a light one (issue #95:
+// with a white theme background the body was near white too, and the waveform vanished)
+juce::Colour clipContentColour (juce::Colour base)
+{
+    const auto lightBody = clipBodyColour (base).getPerceivedBrightness() > 0.62f;
+    return base.interpolatedWith (lightBody ? juce::Colours::black : juce::Colours::white, lightBody ? 0.55f : 0.7f);
+}
 
 float clipHeaderHeight (juce::Rectangle<float> r) { return juce::jmin (clipTitleHeight, juce::jmax (0.0f, r.getHeight() - 8.0f)); }
 
