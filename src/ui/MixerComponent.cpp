@@ -1978,7 +1978,7 @@ void MixerStrips::pressRail (int strip, int mouseY)
     railStrip = strip;
     railMouseY = mouseY;
     stepHeldRail();
-    railRepeat.startTimer (faderRailRepeatMs);
+    railRepeat.startTimer (faderRailFirstRepeatMs); // (then faderRailRepeatMs, in stepHeldRail)
 }
 
 float MixerStrips::railTarget (int strip) const
@@ -1996,6 +1996,8 @@ void MixerStrips::stepHeldRail()
         railRepeat.stopTimer();
         return;
     }
+    if (railRepeat.isTimerRunning() && railRepeat.getTimerInterval() != faderRailRepeatMs)
+        railRepeat.startTimer (faderRailRepeatMs);
     const auto& song = engine.getSong();
     if (railStrip <= vcaStrip (0))
     {

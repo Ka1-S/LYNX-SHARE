@@ -16,6 +16,7 @@
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/Icons.h"
+#include "ui/ImageCaches.h"
 #include "ui/PluginSkin.h"
 
 namespace lynx::theme
@@ -196,6 +197,7 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
     }
 
     static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const auto s = (float) scale;
     const auto rad = juce::jmin (corner, r.getWidth() * 0.5f, r.getHeight() * 0.5f) * s; // (the path clamps it the same way)
     const auto xl = r.getX() * s, xr = r.getRight() * s, yt = r.getY() * s, yb = r.getBottom() * s;
@@ -310,6 +312,7 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
     }
 
     static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const SpritePlace at (bounds, scale);
     const auto value = juce::roundToInt (juce::jlimit (0.0f, 1.0f, value01) * 1440.0f); // (a sixteenth of a degree of the ring)
     auto key = mix (mix (0x84222325cbf29ce4ull, (std::uint64_t) eighth (bounds.getWidth() * (float) scale)), (std::uint64_t) eighth (bounds.getHeight() * (float) scale));

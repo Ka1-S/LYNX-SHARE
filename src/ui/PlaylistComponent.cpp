@@ -9,6 +9,9 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+
+#include "core/EventEdit.h"
+#include "ui/EventEditor.h"
 #include "ui/PatternBlocksView.h"
 #include "ui/VideoTracks.h"
 #include "core/PatternBlocks.h"
@@ -5240,6 +5243,8 @@ bool PlaylistComponent::runAction (const std::string& id)
         engine.editSong ([chosen = selection, mute = is ("playlist.muteClips"), from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
     }
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
+    else if (is ("playlist.mergeSimilarClips")) mergeSimilarClipsByKey();
+    else if (is ("playlist.mergeAutomationClips")) mergeAutomationClipsByKey();
     else if (is ("playlist.cloneTracks")) cloneTracksWithDialog (! selectedTracks.empty() ? selectedTracks : std::vector<int> { juce::jmax (0, currentTrack) });
     else if (is ("playlist.makeUnique")) makeSelectionUnique();
     else if (is ("playlist.stretchMode")) setStretchOnResize (! EditorGlobals::get().stretchOnResize);
@@ -5373,6 +5378,14 @@ void PlaylistComponent::mergePatternClipsByKey()
 {
     const auto& song = engine.getSong();
     const auto clips = pltracks::mergeCandidates (song, selection);
+    // FUN_01302d30: a selection of nothing but automation clips goes to FL's automation merge
+    if (! selection.empty() && std::all_of (selection.begin(), selection.end(), [&song] (int i) {
+            return i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::automation;
+        }))
+    {
+        mergeAutomationClipsByKey();
+        return;
+    }
     // FL merges only pattern clips; a selection of other kinds is refused, an unselected playlist uses its pattern clips
     std::vector<int> patterns;
     for (const auto i : clips)
@@ -5394,6 +5407,111 @@ void PlaylistComponent::mergePatternClipsByKey()
     setSelection ({});
     engine.editSong ([patterns, &added] (Song& s) { pltracks::mergePatternClips (s, patterns, &added); });
     sortClips();
+}
+
+void PlaylistComponent::mergeSimilarClipsByKey()
+{
+    const auto clips = pltracks::mergeCandidates (engine.getSong(), selection);
+    {
+        // the same refusal as FUN_012dc060's: fewer than two unmuted pattern clips
+        const auto& song = engine.getSong();
+        const auto usable = std::count_if (clips.begin(), clips.end(), [&song] (int i) {
+            return i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::pattern
+                   && ! song.playlist[(std::size_t) i].muted;
+        });
+        if (usable < 2)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                    tr ("Could not find enough valid pattern clips or instances to merge."));
+            return;
+        }
+    }
+    setSelection ({});
+    engine.editSong ([clips] (Song& s) { pltracks::mergeSimilarPatternClips (s, clips); });
+    sortClips();
+}
+
+void PlaylistComponent::mergeAutomationClipsByKey()
+{
+    const auto chosen = selection;
+    const auto check = pltracks::checkAutomationMerge (engine.getSong(), chosen);
+    if (check == pltracks::AutomationMergeCheck::tooFew || check == pltracks::AutomationMergeCheck::notAutomation)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't merge"),
+                                                check == pltracks::AutomationMergeCheck::tooFew ? tr ("Please select at least two automation clips.")
+                                                                                                : tr ("The selection may only contain automation clips."));
+        return;
+    }
+
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    const auto lossy = check != pltracks::AutomationMergeCheck::ok;
+    // the clips as they are now: the tool window isn't modal, so a later edit cancels the merge
+    std::vector<Clip> before;
+    for (const auto i : chosen)
+        before.push_back (engine.getSong().playlist[(std::size_t) i]);
+    const auto unchanged = [chosen, before] (const Song& song) {
+        for (std::size_t k = 0; k < chosen.size(); ++k)
+            if (chosen[k] >= (int) song.playlist.size() || ! (song.playlist[(std::size_t) chosen[k]] == before[k]))
+                return false;
+        return true;
+    };
+    const auto merge = [safe, chosen, lossy, unchanged] (pltracks::AutomationLinks links) {
+        if (safe == nullptr)
+            return;
+        if (! lossy)
+        {
+            safe->setSelection ({});
+            safe->engine.editSong ([chosen, links] (Song& s) { pltracks::mergeAutomationClips (s, chosen, links); });
+            safe->sortClips();
+            return;
+        }
+        // FUN_012ff0d0: FL's events-to-automation tool comes after the questions; Cancel there leaves everything as it was
+        auto samples = std::make_shared<PatternEvents> (pltracks::automationMergeSamples (safe->engine.getSong(), chosen));
+        openConvertToAutomationPanel ((int) samples->events.size(), 99.8,
+                                      [samples] (float sensitivity) { return (int) eventedit::toAutomationPoints (*samples, sensitivity).size(); },
+                                      [safe, chosen, links, unchanged] (float sensitivity) {
+                                          if (safe == nullptr || ! unchanged (safe->engine.getSong()))
+                                              return;
+                                          safe->setSelection ({});
+                                          safe->engine.editSong ([chosen, links, sensitivity] (Song& s) { pltracks::mergeAutomationClipsLossy (s, chosen, links, sensitivity); });
+                                          safe->sortClips();
+                                      });
+    };
+    // FL asks about the links last, and only about a real conflict
+    const auto askLinks = [safe, chosen, merge] {
+        if (safe == nullptr)
+            return;
+        if (! pltracks::automationLinksConflict (safe->engine.getSong(), chosen))
+        {
+            merge (pltracks::AutomationLinks::keepFirst);
+            return;
+        }
+        auto* window = new juce::AlertWindow (tr ("Target links conflict"),
+                                              tr ("The clips in the selection aren't all linked to the same parameters, what do you want to do?"),
+                                              juce::MessageBoxIconType::QuestionIcon);
+        window->addButton (tr ("Keep links of the first selected clip"), 1);
+        window->addButton (tr ("Merge all links"), 2);
+        window->addButton (tr ("Delete all links"), 3, juce::KeyPress (juce::KeyPress::returnKey)); // FL's default button
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([merge] (int result) {
+                                     if (result == 1) merge (pltracks::AutomationLinks::keepFirst);
+                                     else if (result == 2) merge (pltracks::AutomationLinks::mergeAll);
+                                     else if (result == 3) merge (pltracks::AutomationLinks::deleteAll);
+                                 }),
+                                 true);
+    };
+    if (! lossy)
+    {
+        askLinks();
+        return;
+    }
+    juce::AlertWindow::showYesNoCancelBox (
+        juce::MessageBoxIconType::QuestionIcon, tr ("Can't perform lossless merge"),
+        check == pltracks::AutomationMergeCheck::overlapping
+            ? tr ("The selection contains overlapping clips. Perform lossy merge?")
+            : tr ("The selection contains at least one clip that doesn't have control points at both the start and end of its region. Perform lossy merge?"),
+        tr ("Yes"), tr ("No"), {}, nullptr,
+        juce::ModalCallbackFunction::create ([askLinks] (int result) { if (result == 1) askLinks(); }));
 }
 
 void PlaylistComponent::makeSelectionUnique()
