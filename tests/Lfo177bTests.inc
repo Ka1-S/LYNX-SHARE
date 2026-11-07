@@ -23,13 +23,16 @@ std::vector<std::uint8_t> automationEvent (const std::vector<std::uint8_t>& file
     return {};
 }
 
-flp::Project projectWith (const flp::AutomationLfo& lfo)
+flp::Project projectWith (const flp::AutomationLfo& lfo, int minLevel = 0, int maxLevel = 12800)
 {
     flp::Project p;
     flp::Channel c;
     c.index = 0;
     c.type = flp::ChannelType::automationClip;
     c.name = "Cutoff";
+    c.hasLevels = true; // a clip's channel levels are its range (pan = minimum, volume = maximum)
+    c.pan = minLevel;
+    c.volume = maxLevel;
     c.automation = { { 0.0, 0.25, 0.0f, 0 }, { 4.0, 0.75, 0.0f, 0 } };
     c.automationLfo = lfo;
     p.channels.push_back (c);
@@ -107,6 +110,21 @@ TEST (lfo177b_flp_round_trip_is_byte_exact)
     for (const auto& c : edited.channels)
         if (c.type == flp::ChannelType::automationClip)
             CHECK (c.automationLfo.points.size() == 2 && c.automationLfo.points[0].value == 0.25 && c.automationLfo.rawPoints[21 + 24] == 0);
+}
+
+TEST (lfo177b_export_scales_the_level_by_a_partial_range)
+{
+    // FL scales the LFO by the clip's range (amt = level/128 * range); the export always writes the whole range, so
+    // the range moves into the level. The played amount stays the same, the header byte does not.
+    using namespace lynx;
+    const auto file = flp::writeProject (lfo177b::projectWith (lfo177b::lifeLfo(), 6400, 10000));
+    const auto song = importFlp (flp::parseProject (file), fx171e::importOptions());
+    CHECK (song.automations.size() == 1);
+    CHECK (std::abs (song.automations[0].lfo.range - 0.28125f) < 1e-6f);
+    flpexport::Options options;
+    flpexport::Report report;
+    const auto again = lfo177b::automationEvent (flpexport::exportFlp (song, options, report));
+    CHECK (again.size() > 8 && again[4] == 36 && again[8] == 1); // 128 * 3600 / 12800, still "add"
 }
 
 TEST (lfo177b_rate_and_shape_match_fl)

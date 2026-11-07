@@ -233,6 +233,8 @@ keeps them as passthrough values (read, played, written back).
 | Editor (FL 2026's layout): "Automation editor \| LFO" row (the LFO toggle edits the LFO's points while on); bottom-left SPD (shown in beats), TNS, SKEW, PW, AMNT knobs, MUL, options (Bipolar LFO tension, Frozen LFO); the played wave is the main line, the amplitude points small on a thin line; Playlist clips draw the played curve | `ui/AutomationUi`, `ui/PlaylistComponent` |
 | Tests: `lfo177b_untouched_clip_writes_fls_tail`, `lfo177b_flp_round_trip_is_byte_exact` (FL's Astes clip: 136-byte trailer, unknown bytes kept), `lfo177b_rate_and_shape_match_fl` | `tests/Lfo177bTests.inc` |
 
+Export: LYNX always writes a clip at the whole range, so a clip with a partial range gets `level × range` in the header (the played amount is the same; header byte +4 and the points differ from FL's file). Byte-exact holds for whole-range clips. Tests: `lfo177b_flp_round_trip_is_byte_exact`, `lfo177b_export_scales_the_level_by_a_partial_range`.
+
 Open: FL's knobs 0x600–0x604 are automatable channel parameters (not automatable in LYNX yet); FL's rate cap per tick
 (805306368) is not applied (it is above the fastest speed at FL's PPQ); the playlist call site and FL's final clamp
 were not traced (LYNX clamps to 0…1); "Global / retriggered LFO" handler not traced (LYNX: phase from the song start);
