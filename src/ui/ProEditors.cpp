@@ -1710,8 +1710,10 @@ public:
         knobRanges = true; // round tp172b4: each knob's scale under it (as the reference's band panel), the value on hover
         referenceLabels = true;
         specArea = plot();
-        specMinHz = 20.0;
-        specMaxHz = 20000.0;
+        // round tp172b6 [EXEC, the reference's grid on its picture: 30 Hz at 16 px, 280 px a decade, 30 kHz at the right
+        // edge]: about 26 Hz ... 30 kHz, so a band can reach 30 kHz in view
+        specMinHz = 30.0 * std::pow (10.0, -16.0 / 280.0);
+        specMaxHz = 30000.0;
         fillDemo();
     }
 
@@ -2080,7 +2082,7 @@ private:
                 const auto x0 = a.getX() + panelW - 14.0f;
                 const auto* fxNow = current();
                 const auto auditionNow = fxNow != nullptr ? auditionBand (fxNow->params) : -1;
-                const auto pill = [&] (juce::Rectangle<float> r, int prm, const juce::String& options) { auto t = tabs (r, prm, options); t.look = 1; out.push_back (t); };
+                const auto pill = [&] (juce::Rectangle<float> r, int prm, const juce::String& options) { auto t = tabs (r, prm, options); t.look = 1; t.keepCase = true; out.push_back (t); };
                 // SIDE CHAIN, as the reference stacks it: band or free range, the input, Audition; the free range's two
                 // knobs have a column of their own (the reference sets them on its own side-chain curve)
                 pill ({ x0 + 12.0f, a.getY() + 16.0f, 90.0f, 20.0f }, bandScFree0 + b, "Band|Free");
@@ -2089,10 +2091,12 @@ private:
                     // pressed; the three-way choice and the global switch are in the band menu)
                     auto input = tabs ({ x0 + 12.0f, a.getY() + 42.0f, 90.0f, 20.0f }, bandScInput0 + b, "In|Ext", { 0.5f, 1.0f });
                     input.look = 1;
+                    input.keepCase = true;
                     out.push_back (input);
                 }
                 out.push_back (button ({ x0 + 12.0f, a.getY() + 68.0f, 90.0f, 20.0f }, idAudition, tr ("Audition"), auditionNow == b,
                                        tr ("Audition: hear what this band's detector hears")));
+                out.back().bare = true; // (a raised grey key: paintOverlay)
                 auto link = hslider ({ x0 + 8.0f, a.getY() + 114.0f, 98.0f, 44.0f }, bandLink0 + b, tr ("Stereo link"));
                 link.rowTrim = 28.0f;
                 out.push_back (link);
@@ -2525,6 +2529,23 @@ private:
             mark.addTriangle (m.x - 5.0f, m.y - 2.5f, m.x + 5.0f, m.y - 2.5f, m.x, m.y + 2.5f);
             g.setColour (juce::Colour (0xffb4b4b4));
             g.fillPath (mark);
+            if (expert) // Audition, a raised grey key as the reference's (an accent marker while it plays this band)
+            {
+                const auto key = juce::Rectangle<float> (a.getX() + panelW - 14.0f + 12.0f, a.getY() + 68.0f, 90.0f, 20.0f);
+                const auto playing = current() != nullptr && auditionBand (current()->params) == selected;
+                g.setColour (juce::Colours::black.withAlpha (0.55f));
+                g.fillRoundedRectangle (key, 4.0f);
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff5d5d5d).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getY(), juce::Colour (0xff444343).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getBottom(), false));
+                g.fillRoundedRectangle (key.reduced (1.0f), 3.0f);
+                if (playing)
+                {
+                    g.setColour (juce::Colour (0xffdca103));
+                    g.fillRect (key.reduced (1.0f).withWidth (4.0f));
+                }
+                g.setColour (juce::Colour (0xffd2d2d2));
+                g.setFont (font (type::small));
+                g.drawText (tr ("Audition"), key, juce::Justification::centred, false);
+            }
             const auto tab = expertTab();
             juce::Path tabShape;
             tabShape.addRoundedRectangle (tab.getX(), tab.getY(), tab.getWidth(), tab.getHeight(), 6.0f, 6.0f, true, false, true, false);
@@ -2572,7 +2593,7 @@ private:
         // round tp172b4: the reference's full log grid (every 1 … 9 of each decade, faint)
         for (double dec = 10.0; dec <= 10000.0; dec *= 10.0)
             for (int k = 2; k <= 9; ++k)
-                if (const auto hz = dec * k; hz > 20.0 && hz < 20000.0 && k != 2 && k != 5)
+                if (const auto hz = dec * k; hz > specMinHz && hz < specMaxHz && k != 2 && k != 5)
                 {
                     g.setColour (juce::Colours::white.withAlpha (0.045f));
                     g.drawVerticalLine ((int) xForHz (hz, p), p.getY(), p.getBottom());

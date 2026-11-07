@@ -111,6 +111,7 @@ protected:
                                     // menus: 1 = a plain pill button showing the choice (no arrow);
                                     // tabs: 1 = a raised pill with a marker at the chosen end
         float rowTrim = 0.0f;         // sliders: room kept at the scale row's right end (round tp172b6: the stereo link's MID key)
+        bool keepCase = false;        // tabs look 1 (round tp172b6): the options as written (the reference's Band / Free, In / Ext)
         bool bare = false;            // buttons (round tp172b6): no face of their own (the editor paints them in its overlay)
         float levelArc = -1.0f;       // look 2: a level on the knob's own scale, drawn along its ring (0 ... 1; below 0: none)
         juce::Rectangle<float> outer; // look 3: the whole knob, ring included (the labels sit under it)
@@ -836,7 +837,7 @@ protected:
                         }
                         g.setColour (juce::Colour (on ? 0xffd2d2d2u : 0xff8a8a8au)); // (the reference prints both options alike: the marker tells)
                         g.setFont (font (type::small));
-                        g.drawText (caps (tr (c.options[i])), cell, juce::Justification::centred, true);
+                        g.drawText (c.keepCase ? tr (c.options[i]) : caps (tr (c.options[i])), cell, juce::Justification::centred, true);
                     }
                     const auto mx = sel <= 0 ? pill.getX() : pill.getRight() - marker;
                     g.setColour (on ? juce::Colour (0xffdca103) : colour::textDisabled);
@@ -1381,6 +1382,7 @@ protected:
         g.setFont (font (type::caption));
         for (const auto hz : { 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 })
         {
+            if (hz < specMinHz * 0.999 || hz > specMaxHz * 1.001) continue; // (outside the display: no label pinned to its edge)
             const auto x = xForHz (hz, a);
             g.setColour (colour::gridBeat);
             g.drawVerticalLine ((int) x, a.getY(), a.getBottom());
