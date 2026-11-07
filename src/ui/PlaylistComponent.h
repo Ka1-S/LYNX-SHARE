@@ -79,6 +79,14 @@ public:
     void paintOverChildren (juce::Graphics& g) override;
     void resized() override;
     void setTitleBarInsets (int left, int right) override;
+    void setToolbarFitsNarrow (bool on)
+    {
+        if (on != toolbarFitsNarrow)
+        {
+            toolbarFitsNarrow = on;
+            resized();
+        }
+    }
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
@@ -347,6 +355,7 @@ private:
     void pitchSelectedAudioClips (int semitones);
     void reverseSelectedAudioClips();
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
+    bool toolbarFitsNarrow = false; // (round 181a; beside the clip grid only)
 
     double pixelsPerTick = 96.0 / (4 * ppq); // 96 px per 4-beat bar
     double scrollTicks = 0.0;
@@ -548,6 +557,7 @@ public:
             clipGrid->setVisible (view != GridView::song);
         }
         picker.setVisible (clipGrid == nullptr || view != GridView::grid);
+        playlist.setToolbarFitsNarrow (clipGrid != nullptr && view == GridView::beside);
         playlist.setVisible (clipGrid == nullptr || view != GridView::grid);
         resized();
     }
