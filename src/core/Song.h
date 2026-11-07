@@ -287,6 +287,14 @@ struct SamplePrecompute
     bool operator== (const SamplePrecompute&) const = default;
 };
 
+// A warp marker (round 175a, M1; Ableton Live's WarpMarker SecTime / BeatTime): a time in the sample file and the
+// content beat it plays on. Between markers the sample is stretched evenly.
+struct WarpPoint
+{
+    double seconds = 0.0, beats = 0.0;
+    bool operator== (const WarpPoint&) const = default;
+};
+
 struct SamplerSettings
 {
     float pitch = 0.0f;   // semitones, -24..24
@@ -300,6 +308,10 @@ struct SamplerSettings
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // with keepPitch and stretchBeats: the file's warp markers (seconds → beats, increasing). The file still lasts
+    // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
+    // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
+    std::vector<WarpPoint> warp;
     // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept
