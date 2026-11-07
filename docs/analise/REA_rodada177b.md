@@ -100,8 +100,11 @@ the renderer, cleared after use); no allocation on the audio thread (the fixed-b
 
 **Behaviour change beyond the report:** before the first clip LYNX used to play the clip's first point. It now keeps the control's own value, as in ra and rb. REA_rodada83 already recorded this rule for pattern events.
 
-**Not explained or not checked:**
-- Flat clips that overlap (c, g in `py/mk97.py`) are erratic in FL: the earlier clip comes back about a second after the later one starts (c at about 13.1 s, g at about 13.7 s). LYNX follows the ramp rule there.
-- `rk_three` (A 4–6, B 5–8, A 6–9): FL plays A's second clip for t = 12–14 s, then B until B ends at 16 s, where the rule predicts A until 18 s. LYNX plays A. FL's evaluator was not traced with REA.
-- FL was measured on channel volume only, not on a plugin's CC or on tempo. LYNX applies the same rule to them.
-- The report's "removing the last clip does not bring the first back": in the engine the first automation takes the slot again (`issue97_one_target_shares_a_slot`). Not run in the GUI with sforzando.
+**Other target kinds [EXEC]:** the Master fader (`y_mv_ra`, `y_mv_rc`, `y_mv_re`) and a plugin parameter, Emphasizer's input gain on the Master, slot 9, id `0x8000` (`pa`–`pk`, `py/mk97p2.py`), follow the same main rule: own value before the first clip, the later start wins, a clip still playing resumes, the end value holds. Renders in `/mnt/e/lynx-work/177b/issue97/out/`, launched with `render180d/flrun.ps1` (not activated). In these renders the slot marker 0x62 comes after the slot's plugin events, so the plugin before `0x62 = 9` is slot 9. A MIDI CC target itself was not measured.
+
+**Known differences (FL's evaluator not traced):** REA was time-boxed. It reached the clip's range setup (`FUN_00fe9b90`), but `TACArticulator.Compute` (FUN_00ba1700) has only virtual-table references and the per-tick loop was not found. LYNX keeps the simple rule in these cases:
+- `rk_three` and `pk` (A 4–6, B 5–8, A 6–9): FL plays A's second clip for t = 12–14 s, then B until B ends at 16 s, then A. The rule predicts A from 12 s to 18 s. FL does the same on channel volume and on the plugin parameter, so this is not noise.
+- Overlapping flat clips (`c`, `g` in `py/mk97.py`): the earlier clip comes back about a second after the later one starts (c at about 13.1 s, g at about 13.7 s).
+- The same start: on channel volume A, the lower channel, wins whatever the track or file order (`rg`, `rh`, `ri`). On the plugin parameter, `pg` stays on B and `ph` plays B for 4 s and then A. LYNX uses the lowest automation on every target.
+
+**Not checked:** the report's "removing the last clip does not bring the first back". In the engine the first automation takes the slot again (`issue97_one_target_shares_a_slot`). Not run in the GUI with sforzando.
