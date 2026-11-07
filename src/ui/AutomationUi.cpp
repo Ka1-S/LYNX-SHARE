@@ -193,6 +193,7 @@ public:
         // curve: the clip's points, or in LFO mode (FL-exact) the LFO's wave around the middle, with the LFO's
         // amplitude points as handles on a thin line
         juce::Path curve, amp;
+        bool ampStarted = false; // (Path::isEmpty stays true after a lone startNewSubPath)
         const auto& points = editedPoints (*a);
         const auto lfo = a->lfo.on;
 
@@ -211,8 +212,8 @@ public:
             if (lfo && ! points.empty() && tick >= (double) points.front().tick && tick <= (double) points.back().tick)
             {
                 const auto ya = valueToY (curveAt (*a, tick));
-                if (amp.isEmpty())
-                    amp.startNewSubPath ((float) x, ya);
+                if (! ampStarted)
+                    amp.startNewSubPath ((float) x, ya), ampStarted = true;
                 else
                     amp.lineTo ((float) x, ya);
             }
