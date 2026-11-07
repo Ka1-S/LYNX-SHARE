@@ -556,6 +556,8 @@ public:
             g.setColour (c.getPerceivedBrightness() > 0.6f ? juce::Colours::black : juce::Colours::white);
             g.setFont (theme::font (theme::type::small));
             g.drawText (label, r, juce::Justification::centred);
+            if (on) // (FL ticks the swatch being edited; the outline alone vanishes on a red swatch)
+                g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), r.reduced (6), juce::Justification::bottomRight);
         };
         swatch (firstArea(), first, tr ("First"), editingFirst);
         swatch (lastArea(), last, tr ("Last"), ! editingFirst);
