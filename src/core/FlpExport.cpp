@@ -977,7 +977,7 @@ struct Converter
         {
             c.stretchTime = s.stretchBeats * 192.0f;
             c.stretchMul = 0;
-            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -2;
+            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono || s.stretchMethod == StretchMethod::tones ? 2 : s.stretchMethod == StretchMethod::transients || s.stretchMethod == StretchMethod::beats ? 7 : -2;
         }
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)
             c.cutGroup = c.cutBy = freeCutGroup++; // "cut itself"
@@ -1314,8 +1314,12 @@ struct Converter
                 item.kind = flp::PlaylistItem::Kind::channelClip;
                 item.index = found->second;
                 item.gain = 1.0f;
-                // the trim in beats (−1 = none)
-                if (clip.offset > 0)
+                // the trim in beats. −1 = none, and FL then takes the clip's whole content for its end, whatever the
+                // item's length says: a 20-beat clip of a 546-beat automation at beat 284 made Thief 208 bars long
+                // instead of 144 (round 180d). So only a clip that shows all its content goes without a trim, as in
+                // FL's own files.
+                if (clip.offset > 0 || (clip.automation >= 0 && clip.automation < (int) song.automations.size()
+                                        && clip.length != song.automations[(std::size_t) clip.automation].length()))
                 {
                     item.startOffset = (float) ((double) clip.offset / ppq);
                     item.endOffset = (float) ((double) (clip.offset + clip.length) / ppq);

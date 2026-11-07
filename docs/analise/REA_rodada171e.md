@@ -143,9 +143,37 @@ Also fixed: **side-chain inputs** (a route at level 0) were dropped, so FL's com
 their kick ducking; the export now writes a level-0 route for every side-chain source LYNX keeps (thief's routes
 are again FL's own: KICK → 0, 11, 12, 14, 21). With that, FL thief vs export: env_corr 0.84 → 0.92.
 
-Open: FL renders the re-exported thief to 492 s (music ends at 240 s, then silence). Not in the globals or the mixer
-section (swaps), so in the patterns / channels / Playlist part; the patterns are renumbered (FL keeps an empty
-pattern 5 "BELL", LYNX writes the patterns in order) — next suspect.
+FL rendered the re-exported thief to 492 s (music ends at 240 s, then silence). The pattern renumbering suspected here
+was **wrong**; see §5.5.
+
+### 5.5 Round 180d: the 492 s was an automation clip's missing trim [FL]
+
+FL `/R` renders of FL's thief with one part of LYNX's export (`E:\lynx-work\render180d\hyb`, indices remapped by name):
+
+| what comes from LYNX | length |
+|---|---|
+| nothing (FL's own, 171e session 1) | 239.9 s |
+| channels + pattern meta | 240.0 s |
+| pattern notes + links | 239.94 s |
+| arrangement section | 491.92 s |
+| 0x67, 0xF2, 0xEE only | 239.94 s |
+| Playlist items' start / end offsets only (+24..+31) | 491.92 s |
+| every other Playlist item field | 239.94 s |
+| the whole export (control) | 491.92 s |
+
+FL's render window for that file showed "Length: 208 bars", against 144 bars of Playlist. The arrangement swap keeps FL's
+pattern numbers (BELL stays #5) and still gives 491.92 s, so the numbering is not the cause.
+
+Read from the files, not tested on its own in FL: LYNX wrote −1, −1 for every automation clip with no start offset; FL's
+files write the clip's span unless it shows the whole content. "MELODICS #2" at beat 284.5 is a 20.26-beat clip of a 546.3-beat
+automation: 284.5 + 546.3 = 830.8 beats = 207.7 bars, FL's 208. So −1 seems to mean "the whole content". That model gives
+about 254.8 beats past the song's end; the render measures about 252 (at the ramp's 60 BPM), a gap not explained.
+
+Fix: `playlistItem` writes the span unless the clip shows the whole automation.
+
+Also seen, not fixed here: audio clips' offsets differ from FL's where FL's ratio of span to length isn't 1 (SAX starts at
+3048 ms instead of 2690 ms, "VOCAL PITCHED #2" at 3193 ms instead of 1008 ms). FL's ratio varies per clip, so LYNX can't
+recompute it from the channel. Effect on FL's playback not measured.
 
 ## 6. Decisions for the user
 

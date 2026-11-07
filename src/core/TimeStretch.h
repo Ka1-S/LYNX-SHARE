@@ -56,6 +56,8 @@ namespace stretchdetail
 {
 // Exposed for the tests: attack positions (frames) found in a mono signal, strongest-first filtering already applied.
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb);
+// Where LYNX's Beats warp mode cuts the audio (round 175a, N4): the attacks, each moved to where it rises fastest.
+std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate);
 // The ratio band that is resampled instead of stretched.
 constexpr double resampleTolerance = 0.001;
 

@@ -302,7 +302,7 @@ TEST (als175a_imports_a_set)
         CHECK (std::abs (take->pitch - 2.0f) < 1e-6 && std::abs (take->gain - 0.5f) < 1e-6);
         const auto& ch = s.channels[(std::size_t) take->channel];
         CHECK (ch.instrument == InstrumentKind::audioClip && ch.samplePath == "E:/sets/Song Project/Samples/Imported/vocal.wav");
-        CHECK (ch.mixerTrack == 3 && ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::general);
+        CHECK (ch.mixerTrack == 3 && ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::complex);
         CHECK (std::abs (ch.volume - 10000.0f / 12800.0f) < 1e-6); // unity for a Playlist audio clip
     }
     CHECK (report.missingSamples == 0);
@@ -607,4 +607,107 @@ TEST (als175a_flp_to_als)
     std::sort (before.begin(), before.end());
     std::sort (after.begin(), after.end());
     CHECK (before.size() == 4 && before == after);
+}
+
+// --- slice N4: LYNX's Beats warp mode (Live's Beats, measured) --------------------------------------------------------
+
+TEST (als175a_beats_warp_mode)
+{
+    // four 0.5 s pieces, each a 330 Hz tone that starts loud (an attack) and decays
+    constexpr double rate = 44100.0;
+    constexpr long piece = 22050, lead = 4410;
+    lynx::SampleData in;
+    in.sampleRate = rate;
+    in.left.assign ((std::size_t) (lead + 4 * piece), 0.0f);
+    for (long k = 0; k < 4; ++k)
+        for (long i = 0; i < piece; ++i)
+            in.left[(std::size_t) (lead + k * piece + i)] = (float) (0.8 * std::exp (-3.0 * (double) i / piece)
+                                                                    * std::sin (2.0 * 3.141592653589793 * 330.0 * (double) i / rate));
+    in.right = in.left;
+    // the cuts: one per piece, at most 12 ms before its attack (the 10 ms before the steepest rise)
+    const auto attacks = lynx::stretchdetail::beatsCuts (in.left.data(), (long) in.frames(), rate);
+    CHECK (attacks.size() == 4);
+    for (std::size_t k = 0; k < attacks.size() && k < 4; ++k)
+        CHECK (attacks[k] <= lead + (long) k * piece && attacks[k] >= lead + (long) k * piece - (long) (rate * 0.012));
+
+    // slower (1.25×): each piece plays at its own speed from where the time map puts its attack, then backwards
+    const auto slow = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats);
+    CHECK (std::abs ((double) slow->frames() - (double) in.frames() * 1.25) < 1.5);
+    int exactForward = 0, exactBackward = 0;
+    for (std::size_t k = 0; k + 1 < attacks.size(); ++k)
+    {
+        const auto a = attacks[k], length = attacks[k + 1] - a;
+        const auto o0 = (long) std::llround ((double) a * 1.25);
+        const auto fade = (long) std::lround (rate * 0.016);
+        double fwd = 0.0, back = 0.0;
+        for (long i = fade; i < length - fade; ++i)
+            fwd = std::max (fwd, (double) std::abs (slow->left[(std::size_t) (o0 + i)] - in.left[(std::size_t) (a + i)]));
+        for (long j = 0; j < length / 4 - fade; ++j)
+            back = std::max (back, (double) std::abs (slow->left[(std::size_t) (o0 + length + j)] - in.left[(std::size_t) (a + length - 1 - j)]));
+        exactForward += fwd < 1e-6;
+        exactBackward += back < 1e-6;
+    }
+    CHECK (exactForward == 3);  // no stretching inside a piece: the original samples
+    CHECK (exactBackward == 3); // the gap: the piece's end played backwards
+
+    // faster (0.8×): each piece is cut where the next begins, still unstretched
+    const auto fast = lynx::timeStretch (in, 0.8, lynx::StretchMethod::beats);
+    CHECK (std::abs ((double) fast->frames() - (double) in.frames() * 0.8) < 1.5);
+    int exactCut = 0;
+    for (std::size_t k = 1; k + 1 < attacks.size(); ++k)
+    {
+        const auto a = attacks[k];
+        const auto o0 = (long) std::llround ((double) a * 0.8);
+        const auto d = (long) std::llround ((double) attacks[k + 1] * 0.8) - o0;
+        double err = 0.0;
+        for (long i = std::lround (rate * 0.016); i < d; ++i)
+            err = std::max (err, (double) std::abs (fast->left[(std::size_t) (o0 + i)] - in.left[(std::size_t) (a + i)]));
+        exactCut += err < 1e-6;
+    }
+    CHECK (exactCut == 2);
+
+    // Tones, Texture, Complex: the spectral stretcher with their own presets, right length, level kept
+    for (auto method : { lynx::StretchMethod::tones, lynx::StretchMethod::texture, lynx::StretchMethod::complex })
+    {
+        const auto out = lynx::timeStretch (in, 1.25, method);
+        CHECK (std::abs ((double) out->frames() - (double) in.frames() * 1.25) < 1.5);
+        double ein = 0.0, eout = 0.0;
+        for (auto v : in.left)
+            ein += (double) v * v;
+        for (auto v : out->left)
+            eout += (double) v * v;
+        CHECK (std::abs (10.0 * std::log10 (eout / (ein * 1.25))) < 1.5);
+    }
+}
+
+TEST (als175a_warped_clip_stretches_offline)
+{
+    // the same set with the file length recorded (Live always writes it): 96000 frames at 48 kHz = 2 s = 8 content beats.
+    // The channel stretches the whole file to 8 beats with the clip's warp mode (Complex); the clip plays it unstretched
+    using namespace lynx;
+    auto xml = als175a::richSet();
+    const std::string from = "</FileRef></SampleRef></AudioClip>";
+    const auto at = xml.find (from);
+    CHECK (at != std::string::npos);
+    if (at == std::string::npos)
+        return;
+    xml.replace (at, from.size(), "</FileRef><DefaultDuration Value=\"96000\" /><DefaultSampleRate Value=\"48000\" /></SampleRef></AudioClip>");
+    FlpImportReport report;
+    const auto bytes = als175a::bytesOf (xml);
+    const auto packed = gzip::compressStored (bytes.data(), bytes.size());
+    const auto song = importAls (packed, als175a::options (&report), nullptr);
+    CHECK (song.has_value());
+    if (! song)
+        return;
+    const Clip* take = nullptr;
+    for (const auto& c : song->playlist)
+        if (c.kind == ClipKind::audio)
+            take = &c;
+    CHECK (take != nullptr);
+    if (take == nullptr)
+        return;
+    CHECK (take->stretch == 1.0 && std::abs (take->pitch - 2.0f) < 1e-6 && take->offset == 0);
+    const auto& ch = song->channels[(std::size_t) take->channel];
+    CHECK (ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::complex);
+    CHECK (std::abs (ch.sampler.stretchBeats - 8.0f) < 1e-5);
 }

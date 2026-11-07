@@ -102,6 +102,9 @@ protected:
         bool lit = false;           // buttons: drawn as on
         bool showValue = true;
         juce::Colour cap {};        // knobs: the cap's own colour (themes that read KnobLook::capTint; transparent = the theme's)
+        juce::String endLow, endHigh; // sliders (round tp172b5): words printed at the scale's ends (HARD / SOFT) instead of its values
+        int autoParam = -1;         // knobs (round tp172b5): a toggle shown as an AUTO prefix word in the caption, clicked
+                                    // there; dim when off, the accent when on (the compressor reference's AUTO THRESHOLD)
         int look = 0;               // knobs: 0 = a knob, 1 = a short curved bar (round tp172b4: the compressor reference's
                                     // KNEE / RANGE bars); menus: 1 = a plain pill button showing the choice (no arrow)
     };
@@ -121,6 +124,14 @@ protected:
     {
         Ctl c = knob (r, p, caption, 0, bipolar);
         c.type = K::fader;
+        return c;
+    }
+    // round tp172b5: a horizontal slider (the reference multiband's RATIO / KNEE / LOOKAHEAD): the bar, its scale's
+    // ends under it (the value there while hovered or dragged), the caption under that; dragged left / right
+    static Ctl hslider (juce::Rectangle<float> r, int p, const juce::String& caption, bool bipolar = false)
+    {
+        Ctl c = fader (r, p, caption, bipolar);
+        c.look = 1;
         return c;
     }
     static Ctl toggle (juce::Rectangle<float> r, int p, const juce::String& caption)
@@ -382,6 +393,11 @@ protected:
         if (controlAt (e.position, c))
         {
             pressed = c;
+            if (c.type == K::knob && c.autoParam >= 0 && autoPrefixAt (c).contains (e.position) && ! e.mods.isPopupMenu())
+            {
+                set ({ { c.autoParam, v (c.autoParam) >= 0.5f ? 0.0f : 1.0f } }); // the AUTO word: its toggle
+                return;
+            }
             if (c.type == K::custom)
             {
                 customDown (c, e);
@@ -419,6 +435,9 @@ protected:
                         return;
                     }
                     dragCtl = c.param;
+                    hDragStart = v (c.param);
+                    hDragAnchorX = e.position.x;
+                    hDragFine = e.mods.isCtrlDown();
                     valueDrag.begin (e, v (c.param));
                     return;
                 default: return;
@@ -432,7 +451,18 @@ protected:
         if (dragCtl >= 0)
         {
             const auto spec = specFor (dragCtl);
-            const auto x = valueDrag.update (e, spec);
+            auto x = valueDrag.update (e, spec);
+            if (pressed.type == K::fader && pressed.look == 1) // a horizontal slider follows the pointer left / right
+            {
+                const auto fine = e.mods.isCtrlDown();
+                if (fine != hDragFine) // (Ctrl pressed or released mid-drag: carries on from here, no jump)
+                {
+                    hDragStart = v (dragCtl);
+                    hDragAnchorX = e.position.x;
+                    hDragFine = fine;
+                }
+                x = juce::jlimit (0.0, 1.0, (double) (hDragStart + (fine ? 0.2f : 1.0f) * (e.position.x - hDragAnchorX) / juce::jmax (1.0f, pressed.r.getWidth() - 8.0f)));
+            }
             set ({ { dragCtl, (float) x } });
             ui::showValueTip (*this, pressed.r.toNearestInt(), spec.text (x));
             return;
@@ -640,6 +670,36 @@ protected:
                     knobLabels (g, c, knobR, hover, active, hot, ac);
                     break;
                 }
+                if (hoverValues) // round tp172b5: the caption only; the value under it while hovered or dragged
+                {
+                    const auto capR = juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f);
+                    const auto captionColour = active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f);
+                    g.setColour (captionColour);
+                    g.setFont (font (c.size == 2 ? type::small : type::caption, true));
+                    if (c.autoParam >= 0) // "AUTO" (dim / lit) then the caption, centred together
+                    {
+                        const auto prefix = autoPrefixRect (c, capR);
+                        const auto f = g.getCurrentFont();
+                        const auto lit = v (c.autoParam) >= 0.5f;
+                        const auto prefixHot = prefix.contains (mouse);
+                        g.setColour (lit ? ac.brighter (prefixHot ? 0.3f : 0.0f)
+                                         : colour::textDisabled.interpolatedWith (colour::textSecondary, prefixHot ? 0.7f : 0.0f));
+                        g.drawText ("AUTO", prefix, juce::Justification::centredLeft, false);
+                        g.setColour (captionColour);
+                        g.drawText (caps (c.caption), capR.withLeft (prefix.getRight() + juce::GlyphArrangement::getStringWidth (f, " ")),
+                                    juce::Justification::centredLeft, false);
+                    }
+                    else
+                        g.drawText (caps (c.caption), capR, juce::Justification::centred, false);
+                    if (c.showValue && (hover || active))
+                    {
+                        g.setColour (active ? ac.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (c.size == 2 ? type::body : type::small, c.size == 2));
+                        g.drawText (text (c.param), juce::Rectangle<float> (c.r.getX() - 24.0f, knobR.getBottom() + 17.0f, c.r.getWidth() + 48.0f, 14.0f),
+                                    juce::Justification::centred, false);
+                    }
+                    break;
+                }
                 g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
                 g.setFont (font (c.size == 2 ? type::small : type::caption, true));
                 g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
@@ -655,6 +715,11 @@ protected:
             }
             case K::fader:
             {
+                if (c.look == 1)
+                {
+                    paintHSlider (g, c, hover, dragCtl == c.param && c.param >= 0, hot, ac, on);
+                    break;
+                }
                 const auto track = juce::Rectangle<float> (c.r.getCentreX() - 2.0f, c.r.getY() + 6.0f, 4.0f, c.r.getHeight() - 42.0f);
                 const auto active = dragCtl == c.param && c.param >= 0;
                 skin::slider (g, track, v (c.param), true, c.bipolar, ac, active || hot > 0.5f, on, 26.0f, 12.0f);
@@ -775,7 +840,27 @@ protected:
     // round tp172b4: the references print each knob's scale under it — the parameter's two ends, left and right — and
     // the caption under that; the value replaces the scale while the knob is hovered or dragged
     bool knobRanges = false;
-    void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
+    // round tp172b5: the references that print captions only (the compressor; the reverb uses the layout flag): no scale,
+    // the value under the caption only while the knob is hovered or dragged
+    bool hoverValues = false;
+    // the AUTO prefix of a knob's caption (Ctl::autoParam): where it is drawn and clicked, within the caption's row
+    juce::Rectangle<float> autoPrefixRect (const Ctl& c, juce::Rectangle<float> captionRow) const
+    {
+        using namespace theme;
+        const auto f = font (c.size == 2 ? type::small : type::caption, true);
+        const auto prefixW = juce::GlyphArrangement::getStringWidth (f, "AUTO");
+        const auto total = juce::GlyphArrangement::getStringWidth (f, "AUTO " + caps (c.caption));
+        return { captionRow.getCentreX() - total * 0.5f, captionRow.getY(), prefixW, captionRow.getHeight() };
+    }
+    juce::Rectangle<float> autoPrefixAt (const Ctl& c) const // (the same row paintControl uses for a hoverValues knob)
+    {
+        const auto d = c.size == 2 ? juce::jmin (c.r.getWidth() - 4.0f, c.r.getHeight() - 36.0f) : juce::jmin (c.r.getWidth() - 10.0f, c.r.getHeight() - 34.0f);
+        return autoPrefixRect (c, { c.r.getX() - 14.0f, c.r.getY() + 2.0f + d + 3.0f, c.r.getWidth() + 28.0f, 14.0f }).expanded (3.0f, 2.0f);
+    }
+    // round tp172b5: the reference limiter's panel prints each knob's name ABOVE it (its scale still under it)
+    bool captionAbove = false;
+    void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active,
+                   const juce::String& endLow = {}, const juce::String& endHigh = {})
     {
         using namespace theme;
         if (showValue)
@@ -800,13 +885,15 @@ protected:
                 }
                 out << juce::String::charToString (t[i]);
             }
+            if (out.startsWithChar ('-') && out.length() > 1 && out[1] == '0' && ! juce::CharacterFunctions::isDigit (out[2]) && out[2] != '.')
+                out = out.substring (1); // "-0 dB": a scale's end reads "0 dB"
             return out;
         };
         g.setColour (colour::textDisabled);
         g.setFont (font (type::caption));
         const auto half = row.getWidth() * 0.5f + 6.0f;
-        g.drawText (shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
-        g.drawText (shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
+        g.drawText (endLow.isNotEmpty() ? endLow : shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
+        g.drawText (endHigh.isNotEmpty() ? endHigh : shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
     }
     void knobLabels (juce::Graphics& g, const Ctl& c, juce::Rectangle<float> knobR, bool hover, bool active, float hot, juce::Colour ac)
     {
@@ -814,7 +901,37 @@ protected:
         rangeRow (g, c.param, knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f), c.showValue && (hover || active), c.size == 2, ac, active);
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (c.size == 2 ? type::small : type::caption, true));
-        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 14.0f, c.r.getWidth() + 28.0f, 14.0f),
+        const auto captionY = captionAbove ? c.r.getY() - 14.0f : knobR.getBottom() + 14.0f;
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, captionY, c.r.getWidth() + 28.0f, 14.0f),
+                    juce::Justification::centred, false);
+    }
+    void paintHSlider (juce::Graphics& g, const Ctl& c, bool hover, bool active, float hot, juce::Colour ac, bool on)
+    {
+        using namespace theme;
+        const auto bar = juce::Rectangle<float> (c.r.getX() + 4.0f, c.r.getY() + 2.0f, c.r.getWidth() - 8.0f, 16.0f);
+        const auto value = juce::jlimit (0.0f, 1.0f, v (c.param));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (bar.expanded (1.0f), 3.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.06f + 0.04f * hot));
+        g.fillRoundedRectangle (bar, 2.5f);
+        const auto from = c.bipolar ? 0.5f : 0.0f;
+        const auto x0 = bar.getX() + bar.getWidth() * juce::jmin (from, value), x1 = bar.getX() + bar.getWidth() * juce::jmax (from, value);
+        if (x1 - x0 > 0.5f)
+        {
+            const auto fill = juce::Rectangle<float> (x0, bar.getY(), x1 - x0, bar.getHeight());
+            const auto base = on ? juce::Colours::white.withAlpha (active ? 0.42f : 0.30f + 0.06f * hot) : colour::textDisabled.withAlpha (0.4f);
+            g.setGradientFill (juce::ColourGradient (base.brighter (0.2f), 0.0f, fill.getY(), base.darker (0.3f), 0.0f, fill.getBottom(), false));
+            g.fillRoundedRectangle (fill, 2.5f);
+        }
+        const auto hx = bar.getX() + bar.getWidth() * value;
+        g.setColour (on ? (active ? ac.brighter (0.25f) : colour::textPrimary.withAlpha (0.85f)) : colour::textDisabled);
+        g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
+        // (rangeRow pushes the ends 6 px past the row: the slider keeps them within its own bar, clear of its neighbours)
+        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f, 12.0f);
+        rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active, c.endLow, c.endHigh);
+        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+        g.setFont (font (type::caption, true));
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
     }
     // a short curved bar (a smile) filled in the accent up to the value, the scale and the caption under it
@@ -848,13 +965,21 @@ protected:
         const auto barBottom = c.r.getY() + 4.0f + sag + t;
         const auto row = juce::Rectangle<float> (cx - bw * 0.5f, barBottom + 1.0f, bw, 12.0f);
         if (knobRanges)
+        {
             rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
-        else if (hover || active)
-            rangeRow (g, c.param, row, true, false, ac, active);
+            g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+            g.setFont (font (type::caption, true));
+            g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
+                        juce::Justification::centred, false);
+            return;
+        }
+        // round tp172b5: the caption right under the bar (the reference's), the value under it while hovered or dragged
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (type::caption, true));
-        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getY(), c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
+        if (c.showValue && (hover || active))
+            rangeRow (g, c.param, row.translated (0.0f, 14.0f), true, false, ac, active);
     }
 
     // a floating panel (the knob panels over the display)
@@ -1085,6 +1210,8 @@ protected:
     juce::Point<float> mouse { -1.0f, -1.0f };
     int dragCtl = -1;
     Ctl pressed;
+    float hDragStart = 0.0f, hDragAnchorX = 0.0f; // a horizontal slider's drag: the value and the pointer where it began
+    bool hDragFine = false;
     ui::ValueDrag valueDrag;
 
 private:

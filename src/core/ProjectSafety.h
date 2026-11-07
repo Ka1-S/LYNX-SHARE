@@ -91,4 +91,16 @@ std::map<std::string, std::string> packagePlan (const Song& song, const std::str
 // that are missing where the project saved them are looked for next to the project (the folder itself, then its
 // "samples", "Samples", "Audio" and "Audio/Recorded" subfolders) by file name. Returns how many references changed.
 int resolveProjectSamples (Song& song, const std::string& projectFolder, const std::function<bool (const std::string&)>& fileExists);
+
+// --- opening files from outside LYNX (D#92, round 180a) ------------------------------------------------------------
+// `name` with `extension` (".lynx") added unless it already ends with it, in any case. A dot inside the name stays:
+// "beat.v2" -> "beat.v2.lynx", never "beat.lynx" (which could be another project).
+std::string withProjectExtension (const std::string& name, const std::string& extension);
+
+// Whether a start-up argument names a file rather than an option ("--lang", macOS's "-psn_0_123").
+bool isFileArgument (const std::string& argument);
+
+// The files in the string the operating system hands to a running application (macOS: one string, a path with spaces
+// in double quotes, a quote inside a path as \"). Options are left out.
+std::vector<std::string> filesInCommandLine (const std::string& commandLine);
 } // namespace lynx::safety

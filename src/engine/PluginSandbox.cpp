@@ -228,7 +228,7 @@ public:
         killWorkerProcess();
     }
 
-    // Linux (round 161): the moment the child process ends (a crash, abort, kill), the plugin is marked dead; before,
+    // Linux (round 161) and macOS: the moment the child process ends (a crash, abort, kill), the plugin is marked dead; before,
     // a crash was noticed only by the audio block's 0.5 s timeout or the connection's own ping
     void watchChild (int pid)
     {
@@ -255,6 +255,33 @@ public:
                 markDead (true);
             }
             ::close (fd);
+        });
+       #elif JUCE_MAC
+        // macOS: the same, through a kqueue watching the pid's exit (EVFILT_USER wakes it to stop)
+        if (pid <= 0 || watcher.joinable())
+            return;
+        stopFd = ::kqueue();
+        if (stopFd < 0)
+            return;
+        struct kevent changes[2];
+        EV_SET (&changes[0], (uintptr_t) pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
+        EV_SET (&changes[1], 1, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+        if (::kevent (stopFd, changes, 2, nullptr, 0, nullptr) != 0)
+        {
+            ::close (stopFd);
+            stopFd = -1;
+            return;
+        }
+        watcher = std::thread ([this] {
+            struct kevent event {};
+            while (::kevent (stopFd, nullptr, 0, &event, 1, nullptr) < 0 && errno == EINTR)
+            {
+            }
+            if (event.filter == EVFILT_PROC)
+            {
+                trace ("parent: child process ended");
+                markDead (true);
+            }
         });
        #else
         juce::ignoreUnused (pid);
@@ -367,6 +394,17 @@ private:
         if (stopFd >= 0)
             ::close (stopFd);
         stopFd = -1;
+       #elif JUCE_MAC
+        if (watcher.joinable())
+        {
+            struct kevent stop;
+            EV_SET (&stop, 1, EVFILT_USER, 0, NOTE_TRIGGER, 0, nullptr);
+            ::kevent (stopFd, &stop, 1, nullptr, 0, nullptr);
+            watcher.join();
+        }
+        if (stopFd >= 0)
+            ::close (stopFd);
+        stopFd = -1;
        #endif
     }
 
@@ -375,7 +413,7 @@ private:
     bool bits32 = false;
     SandboxChannel channel;
     bool created = false;
-   #if JUCE_LINUX
+   #if JUCE_LINUX || JUCE_MAC
     std::thread watcher;
     int stopFd = -1;
    #endif
@@ -721,11 +759,11 @@ int sandboxedPluginProcessId (const juce::AudioPluginInstance& plugin)
     return remote != nullptr ? remote->pid : 0;
 }
 
-#else // macOS: not yet
+#else // other platforms: not yet
 
 std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription&, double, int, const std::string&, juce::String& error)
 {
-    error = juce::String::fromUTF8 ("out-of-process plugins: Windows and Linux only");
+    error = juce::String::fromUTF8 ("out-of-process plugins: Windows, macOS and Linux only");
     return nullptr;
 }
 
