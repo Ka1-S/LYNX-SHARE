@@ -83,6 +83,19 @@ struct AuditionedTrack
 AuditionedTrack auditionedTrack (const Song& song);
 void checkAudition (Song& song, const AuditionedTrack& before);
 
+// How a take lane is comped (user decision 2026-11-07: both). A drag on a lane clip's body swipes (Logic's Quick Swipe,
+// and Live's Draw mode); a time selection on a lane goes to the comp by "Send the time selection to the comp" (Live's
+// select + Enter; no default key, Enter stays FL's "Maximize or restore the Playlist").
+enum class SwipeStyle { quickSwipe, liveSelectEnter, both };
+inline constexpr SwipeStyle swipeStyle = SwipeStyle::both;
+// whether a drag swipes with this tool (`drawTool`: the brush, Live's Draw mode; else the pencil)
+constexpr bool dragSwipes (SwipeStyle style, bool drawTool) noexcept { return style != SwipeStyle::liveSelectEnter || drawTool; }
+constexpr bool selectionSwipes (SwipeStyle style) noexcept { return style != SwipeStyle::quickSwipe; }
+
+// The song's time selection (loopStart..loopEnd) of take lane `lane` goes to its comp (a swipe). False when there is no
+// time selection or `lane` is not a lane of a comp.
+bool swipeSelection (Song& song, int lane);
+
 // Flatten: the comp track's clips stay as they are, the lanes (and their clips) are removed, in every arrangement.
 bool flatten (Song& song, int compTrack);
 

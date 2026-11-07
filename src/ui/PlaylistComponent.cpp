@@ -2048,15 +2048,15 @@ void PlaylistComponent::paintPlayhead (juce::Graphics& g)
     }
 }
 
-// Live's select + Enter (round 177c, prepared behind swipeStyle): the time selection of a take lane goes to its comp.
+// Live's select + Enter (round 177c, comp::swipeStyle): the time selection of a take lane goes to its comp.
 void PlaylistComponent::swipeTimeSelectionToComp (int lane)
 {
     const auto& song = engine.getSong();
     const auto g = comp::groupOf (song, lane);
-    if (swipeStyle == SwipeStyle::quickSwipe || ! g.isLane (lane) || ! comp::isComp (song, g.comp) || ! exportopts::hasSelection (song))
+    if (! comp::selectionSwipes (comp::swipeStyle) || ! g.isLane (lane) || ! comp::isComp (song, g.comp) || ! exportopts::hasSelection (song))
         return;
     setSelection ({});
-    engine.editSong ([lane, from = song.loopStart, to = song.loopEnd] (Song& s) { comp::swipe (s, lane, from, to); });
+    engine.editSong ([lane] (Song& s) { comp::swipeSelection (s, lane); });
     sortClips();
 }
 
@@ -3819,9 +3819,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
     // a take lane's clip (round 177c): a drag on its body swipes that range to the comp, Logic's Quick Swipe with the normal
     // tool; its title still moves it and its edges still resize. Never on an ordinary group: only lanes of a comp track.
-    // (swipeStyle, PlaylistComponent.h: in Live's style only the brush, Live's Draw mode, swipes on a drag)
-    if (hit >= 0 && ! rightEdge && ! leftEdge && ! flmods::ctrl (e.mods)
-        && (swipeStyle != SwipeStyle::liveSelectEnter || tool == EditTool::brush))
+    // (comp::swipeStyle: which tools swipe on a drag)
+    if (hit >= 0 && ! rightEdge && ! leftEdge && ! flmods::ctrl (e.mods) && comp::dragSwipes (comp::swipeStyle, tool == EditTool::brush))
     {
         const auto& song = engine.getSong();
         const auto& c = song.playlist[(std::size_t) hit];
@@ -4932,7 +4931,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             engine.editSong ([track, folded] (Song& s) { noteedit::setGroupCollapsed (s, track, ! folded); });
         });
         // round 177c: comping starts here, recording never moves tracks
-        if (swipeStyle != SwipeStyle::quickSwipe && comp::groupOf (song, track).isLane (track) && comp::isComp (song, comp::groupOf (song, track).comp))
+        if (comp::selectionSwipes (comp::swipeStyle) && comp::groupOf (song, track).isLane (track) && comp::isComp (song, comp::groupOf (song, track).comp))
             menu.addItem (tr ("Send the time selection to the comp"), exportopts::hasSelection (song), false,
                           [this, track] { swipeTimeSelectionToComp (track); });
         menu.addItem (tr ("Comp these takes"), comp::canComp (song, track), false, [this, track] {

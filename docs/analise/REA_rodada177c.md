@@ -464,6 +464,11 @@ Live session notes: Live's plug-in scan raised Antares PACE "Subscription Licens
 restored scan), each closed with Quit only. Live's VST3 system folders were turned off for the session in Live's Settings and
 turned back on the same way; `Preferences.cfg` then differed from the backup in the recent-files list and browser rows.
 
+**User decision (2026-11-07): (c), both.** `comp::swipeStyle = both` (core/Comping.h): a drag on a lane clip's body swipes with
+the pencil (plain drag) or the brush (Draw mode), and "Send the time selection to the comp" (lane track menu; shortcut editor
+`playlist.swipeSelectionToComp`, no default key) sends a time selection, as Live's Enter does. Enter stays FL's Maximize
+Playlist. Test: `comp177_three_ways_to_swipe`.
+
 ## 14. Living with round 180d's FL fades (merge of 2026-11-08)
 
 Round 180d (FL's fade tension, straight fades, FL's fade flags) landed first and owns the clip array's indices 17-20. The comp

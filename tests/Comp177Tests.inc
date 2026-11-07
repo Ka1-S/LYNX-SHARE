@@ -644,3 +644,51 @@ TEST (comp177_undo_labels_for_the_comp_steps)
     edited.playlist[1].length = 480;
     CHECK (std::string (describeChange (before, edited).text) == "Edit clips");
 }
+
+TEST (comp177_three_ways_to_swipe)
+{
+    using namespace lynx;
+    // the user's choice (2026-11-07): every way works
+    CHECK (comp::swipeStyle == comp::SwipeStyle::both);
+    // 1. a plain drag (the pencil) and 2. a Draw-mode drag (the brush) both swipe
+    CHECK (comp::dragSwipes (comp::swipeStyle, false) && comp::dragSwipes (comp::swipeStyle, true));
+    // (Live's own way would leave the pencil alone)
+    CHECK (! comp::dragSwipes (comp::SwipeStyle::liveSelectEnter, false) && comp::dragSwipes (comp::SwipeStyle::liveSelectEnter, true));
+    // 3. a time selection sent to the comp, the same edit as a swipe of that range
+    CHECK (comp::selectionSwipes (comp::swipeStyle) && ! comp::selectionSwipes (comp::SwipeStyle::quickSwipe));
+    auto song = comp177::loopTakes(); // comp track 0, lanes 1..3
+    const auto c = 0;
+    CHECK (comp::isComp (song, c));
+    const auto g = comp::groupOf (song, c);
+    auto bySelection = song, bySwipe = song;
+    bySelection.loopStart = 1200;
+    bySelection.loopEnd = 1500;
+    bySwipe.loopStart = 1200;
+    bySwipe.loopEnd = 1500;
+    CHECK (comp::swipeSelection (bySelection, g.first));
+    CHECK (comp::swipe (bySwipe, g.first, 1200, 1500));
+    CHECK (bySelection.playlist.size() == bySwipe.playlist.size());
+    for (std::size_t i = 0; i < bySwipe.playlist.size() && i < bySelection.playlist.size(); ++i)
+        CHECK (bySelection.playlist[i].track == bySwipe.playlist[i].track && bySelection.playlist[i].start == bySwipe.playlist[i].start
+               && bySelection.playlist[i].length == bySwipe.playlist[i].length && bySelection.playlist[i].offset == bySwipe.playlist[i].offset);
+    // no time selection, the comp track itself, an ordinary group: nothing happens
+    auto none = song;
+    none.loopStart = none.loopEnd = 0;
+    CHECK (! comp::swipeSelection (none, g.first));
+    auto onComp = song;
+    onComp.loopStart = 1200;
+    onComp.loopEnd = 1500;
+    CHECK (! comp::swipeSelection (onComp, c));
+    auto plain = song; // the same rows as an ordinary group: no comp mark
+    plain.playlistTracks[0].compTrack = false;
+    plain.loopStart = 1200;
+    plain.loopEnd = 1500;
+    const auto before = plain.playlist.size();
+    CHECK (! comp::swipeSelection (plain, 1) && plain.playlist.size() == before);
+
+    // the command: in the shortcut editor, no default key; Enter stays FL's "Maximize or restore the Playlist"
+    const auto* action = keys::findAction ("playlist.swipeSelectionToComp");
+    CHECK (action != nullptr && action->defaults.empty());
+    keys::KeyMap map;
+    CHECK (map.find ({ keys::enter, keys::none }, keys::Context::global, false) == "panel.maximisePlaylist");
+}

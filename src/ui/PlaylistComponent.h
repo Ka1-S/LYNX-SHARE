@@ -181,13 +181,6 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe };
-    // How a take lane is comped (round 177c; the user's choice is pending, docs/analise/REA_rodada177c.md §13):
-    //   quickSwipe      - a drag on a lane clip's body swipes (Logic's Quick Swipe);            (a)
-    //   liveSelectEnter - Live's way: only the brush (Live's Draw mode) swipes on a drag, and a
-    //                     time selection goes to the comp by the "swipe selection" command;      (b)
-    //   both            - a drag swipes, and the command works too.                              (c)
-    enum class SwipeStyle { quickSwipe, liveSelectEnter, both };
-    static constexpr SwipeStyle swipeStyle = SwipeStyle::quickSwipe;
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;

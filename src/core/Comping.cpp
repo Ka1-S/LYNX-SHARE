@@ -313,6 +313,14 @@ void checkAudition (Song& song, const AuditionedTrack& before)
         setAudition (song, -1);
 }
 
+bool swipeSelection (Song& song, int lane)
+{
+    const auto g = groupOf (song, lane);
+    if (! g.isLane (lane) || ! isComp (song, g.comp) || song.loopEnd <= song.loopStart || song.loopStart < 0)
+        return false;
+    return swipe (song, lane, song.loopStart, song.loopEnd);
+}
+
 bool flatten (Song& song, int compTrack)
 {
     const auto g = groupOf (song, compTrack);
