@@ -282,6 +282,8 @@ private:
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
     void exportMidiFile();
     void switchSmartDisableForAll();
+    void confirmPrepareForMidiExport();
+    void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();
     void updateTitle();
