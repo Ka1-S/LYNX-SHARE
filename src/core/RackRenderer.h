@@ -105,6 +105,7 @@ struct RackState
     launcher::GridIndex gridIndex;
     bool launchers = false;
     int tempoAutomation = -1; // tempo automation, if any
+    bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
     // PDC: per-edge delays (nullptr = no delay) and the latencies used to build the plan.
     PdcPlan pdc;

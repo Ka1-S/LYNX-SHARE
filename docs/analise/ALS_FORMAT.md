@@ -243,3 +243,11 @@ File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in>
 - References:
   - Live 11: two 11.0.12 sets (ML-Ableton, MIT), two abletoolz fixtures (11.0.0 and 11.0.12, MPL-2.0), and an 11.3.3 sample set.
   - Live 12: the 12.4 shipped sets and a 12.2.1 public set.
+
+## 12. Warp modes (slice N4, 2026-11-06)
+Reference: Live 12.4.16 renders of a test voice (`warp-refs/`, 48 kHz, clip warped 0.8×, 1.25×, and +5 st), compared by RMS-envelope correlation and mean spectral deviation (24 log bands).
+- **Live's Beats, measured** (output→source time map by cross-correlation, forward and reversed): the audio is cut at transients only (no cut at every 1/16 on sustained material); each piece starts where the warp map puts its cut and plays at 1× speed. Faster: cut where the next piece begins. Slower: after its end the piece plays backwards, then forwards ("back and forth", `TransientLoopMode` 2), until the next piece. A tone is cut at its very start; a swell at its steepest rise.
+- **LYNX `StretchMethod::beats`** (`TimeStretch.cpp` `beatsStretch`, `stretchdetail::beatsCuts`): LYNX's attack detector, each cut moved to the start of the 10 ms window before the steepest 10 ms RMS rise (−30…+50 ms); 16 ms linear crossfades (1–4 ms: clicks Live has not; 16 ms: 0.2–0.3 dB spectral deviation). Envelope correlation 0.90/0.98 (old transients preset) → 0.967/0.999.
+- **Tones / Texture / Complex** use the spectral stretcher with 40 / 60 / 90 ms blocks, overlap 6, no attack splicing: 0.977 / 0.985 / 0.994 correlation, about 1 dB spectral deviation (2 dB before).
+- Mapping: import WarpMode 0→beats, 1→tones, 2→texture, 4 and 6→complex, 3→Re-Pitch (no pitch keep); export beats/transients→0, tones/mono→1, texture→2, else 4.
+- Open: Live's Beats transposes by resampling each piece (then fills the gap); LYNX still transposes with the voice pitch shifter. The `TransientResolution`, `TransientEnvelope` and Texture `FluctuationTexture` parameters are not modelled.

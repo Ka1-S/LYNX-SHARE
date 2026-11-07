@@ -572,6 +572,9 @@ struct Proc
     bool gainsSet = false, released = false;
     float gL = 0, gR = 0;
     float pan = 0, vol = 1, cut = 0, res = 0, pitch = 0;
+    // the note's Init.FCut / Init.FRes (REA_rodada76 §1: the note's Mod X / Mod Y byte b → (b − 128) / 128), added to
+    // the channel's filter X / Y (issue #63, round 178a; 0 = a note at Mod X / Y centre)
+    float noteCut = 0, noteRes = 0;
     int kind = 0, stage2 = 0;
     bool active = false;
     float fc = 0, fq = 0;
@@ -588,6 +591,7 @@ struct Proc
         gainsSet = false, released = false;
         gL = gR = 0.0f;
         pan = cut = res = pitch = 0.0f, vol = 1.0f;
+        noteCut = noteRes = 0.0f;
         const auto t = S.type >= 0 && S.type < 8 ? S.type : 0;
         kind = filterKind[t][0], stage2 = filterKind[t][1];
         active = kind > 0;
@@ -641,8 +645,8 @@ struct Proc
 inline bool filter (const Settings& S, Proc& pr, const float* x, float* y, int n, float& tL, float& tR) noexcept
 {
     const auto old = pr.fc;
-    const auto cx = ((float) S.modX * 0.00390625f + 0.0f) + pr.cut; // + Final.FCut (0)
-    const auto cy = ((float) S.modY * 0.00390625f + 0.0f) + pr.res;
+    const auto cx = ((float) S.modX * 0.00390625f + pr.noteCut) + pr.cut; // + Final.FCut (the note's Init.FCut)
+    const auto cy = ((float) S.modY * 0.00390625f + pr.noteRes) + pr.res;
     if (pr.kind == 0)
     {
         coefFast (cx, cy, pr.fc, pr.fq, S.rateRatio);
