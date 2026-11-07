@@ -149,6 +149,18 @@ showed about 17–145). Cause not found. Unverified candidate: `cacheShift` only
   button released afterwards. In that run the foreground passed to **WindowsTerminal** when LYNX died: an app dying under a scripted session
   hands the foreground to the terminal.
 
+### 3.8 How FL draws its Playlist zoom [STATIC REA, no timings] (FLEngine_x64.dll, base 0x400000)
+
+Read from FL's own binary, not run. The working files are in `/mnt/e/lynx-work/fluid174f/rea-fl/`. Items marked inferred were not seen directly.
+
+- **No scaled picture.** A zoom change invalidates the whole panel (`0xe4a6c0`, `0xe4f410`, `0xe4b4d0`) and every frame is painted exactly; a zoom change skips the bitmap shift that plain scrolls use (`ScrollWindowEx`, `0xe4a2d0`).
+- **Software rendering into one pooled 32-bit DIB**, then one blit (`0x823090`, `0x6cefb0`). FLEngine has no static import of D2D, D3D or DWrite. Waveform columns and clip fills are direct pixel writes (`0x6bf180`).
+- **Almost nothing is cached as a picture.** No clip bitmap was found (direct calls to depth 4; virtual calls not fully covered). Audio has one fixed 96-sample min/max table per sample (`0x699e00`, `0x772f54`), queried per visible column (`0x773990`). Labels are rebuilt each paint, drawn from a glyph table straight into the DIB (`0x6c99c0`, `0x580b40`).
+- **Smoothing.** The zoom can animate through the time scroller (`SmoothingTime = 300`; `0x6edc40`, `0x6ed4a0`) on a `DwmFlush`-paced tick (`0x5864f0`); a follow-while-playing branch applies it at once (inferred). So FL's frame count under our 25-notches-a-second test may include smoothing frames. Which branch our runs hit is not known.
+- **Coalescing.** One guarded post (`0xe4b030`), one guarded tick (`0x585b70`), a non-forced `RedrawWindow` (`0x820f10`): input cannot queue redraws (the merging itself is inferred).
+
+Not settled: FL's paint cost in ms. 174e measured FL's main thread at 54–61 % just watching playback, so it may not be cheap overall: it may be spending more CPU than LYNX to stay sharp. LYNX's exact paint goes through Direct2D path geometry, which the code read here has no counterpart for in its waveform and clip drawing. Options follow once measured.
+
 ### 3.7 Disabled scripts: do not re-enable (2026-11-06)
 
 They send injected input with no window check and at fixed coordinates, so they were renamed to `*.disabled` (rename only, nothing deleted). Use `E:\lynx-work\fluid174f\session4.sh` and `dupmon3.exe` instead.
