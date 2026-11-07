@@ -141,7 +141,7 @@ public:
         addAndMakeVisible (fileButton);
 
         rebuildTargets();
-        setSize (900, 400);
+        setSize (980, 400);
         setWantsKeyboardFocus (true);
         startTimerHz (30);
     }
@@ -310,6 +310,8 @@ public:
             titleWidth += taken;
             boxWidth -= taken;
         }
+        // (issue #86: the File button got no room at the default width) the target box gives way down to 150 px
+        boxWidth = juce::jmax (150, boxWidth - juce::jmax (0, titleWidth + boxWidth + fixedTop - 240 - top.getWidth()));
         title.setBounds (top.removeFromLeft (titleWidth));
         targetBox.setBounds (top.removeFromLeft (boxWidth).reduced (0, 2));
         top.removeFromLeft (12);

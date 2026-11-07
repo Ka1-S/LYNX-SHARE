@@ -161,7 +161,7 @@ own files, **[FL]** seen in a running FL, **[CODE]** LYNX source, **[model]** ou
 - **Cause:** `clipContentColour` (src/ui/PlaylistComponent.cpp) always tinted the clip colour 70% toward white, while the
   body mixes it 72% toward the theme background. On a white background both come out pale.
 - **LYNX now:** when the body's perceived brightness is above 0.6, the content is the body mixed 65% toward black. Darker
-  bodies keep the old colour. The same function draws pattern-clip notes and automation curves, so they follow.
+  bodies keep the old colour. The same function draws pattern-clip notes and the fade curves on audio clips, so they follow. Automation clips' curves use another colour and do not change (before/after shots, 2026-11-07).
 
 ## 9. Triage: #94 and #93 (nothing built)
 
@@ -187,3 +187,5 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
   was not tested.
 - **Deliberate difference from FL (coordinator's decision, 2026-11-06):** LYNX keeps "Edit events in piano roll" enabled for the
   tempo, as a LYNX addition, because issue #86 asks for that route. This item is not FL-exact.
+- **Lane view, open difference:** FL's Tempo lane has a vertical scrollbar and opened zoomed in: 66.651 BPM sat about 77% up the lane. LYNX's
+  lane always shows 10..522 BPM, so usual tempos stay near the bottom. FL's rule for the zoom was not read in the code.
