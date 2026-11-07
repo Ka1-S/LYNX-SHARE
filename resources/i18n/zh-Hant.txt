@@ -7735,7 +7735,7 @@ countries: tw hk mo
 "{0} stopped responding (separate process)." = "{0} 停止回應（獨立處理程序）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已靜音。請儲存專案；下次開啟時外掛會重新載入。"
 "{0} minutes" = "{0} 分鐘"
-"Make a backup anyway after this long without one" = "超過這麼久沒有備份時仍然建立備份"
+"Longest wait between backups" = "備份之間的最長間隔"
 "Open or save the events of this control as a .fsc file" = "將此控制項的事件作為 .fsc 檔案開啟或儲存"
 "Open automation..." = "開啟自動化..."
 "Open automation" = "開啟自動化"

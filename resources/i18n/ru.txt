@@ -7735,7 +7735,7 @@ countries: ru by kz
 "{0} stopped responding (separate process)." = "{0} не отвечает (отдельный процесс)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Затронут только его процесс: LYNX SHARE и проект продолжили работу, а плагин заглушён. Сохраните проект; плагин снова загрузится при следующем открытии."
 "{0} minutes" = "{0} мин"
-"Make a backup anyway after this long without one" = "Всё равно создать резервную копию, если её не было столько времени"
+"Longest wait between backups" = "Наибольший интервал между копиями"
 "Open or save the events of this control as a .fsc file" = "Открыть или сохранить события этого регулятора как файл .fsc"
 "Open automation..." = "Открыть автоматизацию..."
 "Open automation" = "Открыть автоматизацию"

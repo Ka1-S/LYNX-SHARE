@@ -7735,7 +7735,7 @@ countries: nl be
 "{0} stopped responding (separate process)." = "{0} reageert niet meer (apart proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Alleen het proces van de plugin werd getroffen: LYNX SHARE en je project bleven draaien en de plugin is gedempt. Sla je project op; de plugin laadt opnieuw als je het weer opent."
 "{0} minutes" = "{0} minuten"
-"Make a backup anyway after this long without one" = "Toch een back-up maken na zo lang zonder back-up"
+"Longest wait between backups" = "Langste wachttijd tussen back-ups"
 "Open or save the events of this control as a .fsc file" = "Open of bewaar de events van deze regelaar als .fsc-bestand"
 "Open automation..." = "Automatisering openen..."
 "Open automation" = "Automatisering openen"

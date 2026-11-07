@@ -7735,7 +7735,7 @@ countries: jp
 "{0} stopped responding (separate process)." = "{0} が応答しなくなりました（別プロセス）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。次に開いたときにプラグインは再び読み込まれます。"
 "{0} minutes" = "{0} 分"
-"Make a backup anyway after this long without one" = "この時間バックアップがなければ必ず作成する"
+"Longest wait between backups" = "バックアップ間の最長待ち時間"
 "Open or save the events of this control as a .fsc file" = "このコントロールのイベントを .fsc ファイルとして開く/保存する"
 "Open automation..." = "オートメーションを開く..."
 "Open automation" = "オートメーションを開く"

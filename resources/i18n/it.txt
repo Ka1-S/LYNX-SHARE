@@ -7735,7 +7735,7 @@ countries: it ch sm
 "{0} stopped responding (separate process)." = "{0} ha smesso di rispondere (processo separato)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "È stato colpito solo il suo processo: LYNX SHARE e il progetto hanno continuato a funzionare e il plugin è stato silenziato. Salva il progetto; il plugin si ricarica alla prossima apertura."
 "{0} minutes" = "{0} minuti"
-"Make a backup anyway after this long without one" = "Crea comunque un backup dopo questo tempo senza backup"
+"Longest wait between backups" = "Attesa massima tra i backup"
 "Open or save the events of this control as a .fsc file" = "Apri o salva gli eventi di questo controllo come file .fsc"
 "Open automation..." = "Apri automazione..."
 "Open automation" = "Apri automazione"

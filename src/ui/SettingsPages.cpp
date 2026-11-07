@@ -258,7 +258,7 @@ public:
                     options.backupWaitsForQuiet = on;
                     longestWaitBox.setEnabled (on);
                 });
-        styleLabel (longestWaitLabel, tr ("Make a backup anyway after this long without one"));
+        styleLabel (longestWaitLabel, tr ("Longest wait between backups") /* (fits the label column, as the other rows) */);
         for (const auto minutes : prefs::backupLongestWaitChoices)
             longestWaitBox.addItem (tr ("{0} minutes", { juce::String (minutes) }), minutes);
         selectNearest (longestWaitBox, options.backupLongestWaitMinutes);

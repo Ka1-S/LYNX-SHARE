@@ -7735,7 +7735,7 @@ countries: id
 "{0} stopped responding (separate process)." = "{0} berhenti merespons (proses terpisah)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda; plugin dimuat lagi saat Anda membukanya berikutnya."
 "{0} minutes" = "{0} menit"
-"Make a backup anyway after this long without one" = "Tetap buat cadangan setelah selama ini tanpa cadangan"
+"Longest wait between backups" = "Jeda terlama antar cadangan"
 "Open or save the events of this control as a .fsc file" = "Buka atau simpan event kontrol ini sebagai berkas .fsc"
 "Open automation..." = "Buka otomasi..."
 "Open automation" = "Buka otomasi"
