@@ -35,6 +35,7 @@ inline juce::String run()
     MixerStrips strips (engine);
     juce::Viewport view;
     view.setViewedComponent (&strips, false);
+    view.setScrollBarsShown (false, true); // (as MixerComponent)
     strips.setVisibleHeight (700);
     view.setBounds (0, 0, 300, 700);
 
