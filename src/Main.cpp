@@ -10046,6 +10046,14 @@ private:
                         break;
                     }
 
+            // round 180c: Fruity Slicer's editor
+            for (int c = 0; c < (int) offline.getSong().channels.size(); ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fruityslicer)
+                {
+                    saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fruityslicer.png");
+                    break;
+                }
+
             // parametric EQ: the one with the most pronounced curve (in an imported .flp, with FL's settings)
             {
                 int bestTrack = -1, bestSlot = -1;
