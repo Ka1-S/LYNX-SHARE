@@ -112,8 +112,10 @@ enum class InstrumentKind : std::uint8_t
                 // pluginState; plays the video's sound in sync with the song, the video is shown by its editor
     keplerExo,  // FL 2026's Kepler Exo (REA_rodada167d): Kepler's engine with the "Kepler-2" state in pluginState, the user's
                 // Kepler Exo engine_x64.dll in samplePath
-    wavetraveller // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
-                  // the channel's sample in samplePath
+    wavetraveller, // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
+                   // the channel's sample in samplePath
+    fruityslicer   // FL's Fruity Slicer (round 180c, core/FruitySlicer.h): FL's state (slices, fades, declick...) in pluginState,
+                   // the sample in samplePath; the sampler's voices play the slices
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
@@ -284,6 +286,10 @@ struct SamplerSettings
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
                                // the precompute crops it, REA_rodada167h §4)
     std::vector<float> slices; // slices (starts as fractions): key 60 + i plays slice i, at the original pitch
+    // Fruity Slicer (round 180c, set from its state when the rack is built, not saved): the key of slice 1, and "play to
+    // end" (a slice plays on to the sample's end instead of stopping at the next slice)
+    int sliceFirstKey = 60;
+    bool slicesToEnd = false;
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats
     float cutoff = 20000.0f;   // channel filter (Hz); low-pass at 20 kHz with no resonance = off
