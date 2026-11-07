@@ -9,9 +9,14 @@
 #include <optional>
 
 #include "core/EventEdit.h"
+#include "core/MidiImport.h"
+#include "engine/FlStudio.h"
+#include "engine/MidiFileIo.h"
 #include "core/PianoRollTools.h"
 #include "ui/FileChoosers.h"
 #include "ui/AutomationUi.h"
+#include "ui/Dialogs.h"
+#include "ui/MidiClipboard.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -511,6 +516,19 @@ public:
             return true;
         }
 
+        if (target.kind != AutomationTargetKind::none && key == juce::KeyPress ('m', juce::ModifierKeys::commandModifier, 0))
+        {
+            chooseMidi();
+            return true;
+        }
+
+        if (target.kind != AutomationTargetKind::none && midiclipboard::hasMidi()
+            && key == juce::KeyPress ('v', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0))
+        {
+            pasteMidi();
+            return true;
+        }
+
         if (key == juce::KeyPress ('a', juce::ModifierKeys::commandModifier, 0))
         {
             selectionStart = 0;
@@ -694,14 +712,24 @@ private:
         const auto* lane = eventedit::findLane (currentPattern(), target);
         const auto hasEvents = lane != nullptr && ! lane->events.empty();
         juce::PopupMenu menu;
-        menu.addItem (theme::mnemonic (tr ("Open automation..."), 'O'), target.kind != AutomationTargetKind::none, false, [this] { openScore(); });
+        const auto canEdit = target.kind != AutomationTargetKind::none;
+        menu.addItem (theme::mnemonic (tr ("Open automation..."), 'O'), canEdit, false, [this] { openScore(); });
+        menu.addItem (theme::mnemonic (tr ("Browse automations"), 'B'), EventEditorHooks::onBrowseAutomations != nullptr, false,
+                      [] { EventEditorHooks::onBrowseAutomations(); });
         menu.addItem (theme::mnemonic (tr ("Save automation as..."), 'S'), hasEvents, false, [this] { saveScore(); });
+        menu.addSeparator();
+        menu.addItem (theme::mnemonic (tr ("Import MIDI file..."), 'I') + "\tCtrl+M", canEdit, false, [this] { chooseMidi(); });
+        menu.addItem (theme::mnemonic (tr ("Paste from MIDI clipboard..."), 'P') + "\tShift+Ctrl+V", canEdit && midiclipboard::hasMidi(), false,
+                      [this] { pasteMidi(); });
+        menu.addSeparator();
+        // FL's item writes the same .fsc as Save automation as here: same dialog, byte-identical file (REA_rodada178a §11)
+        menu.addItem (theme::mnemonic (tr ("Export as score sheet..."), 'E'), hasEvents, false, [this] { saveScore(); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&fileButton));
     }
 
     void openScore()
     {
-        chooser = lynx::ui::makeFileChooser (tr ("Open automation"), juce::File(), "*.fsc");
+        chooser = lynx::ui::makeFileChooser (tr ("Open automation"), juce::File(), "*.fsc;*.mid;*.midi");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                  [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
                                      if (safe != nullptr && fc.getResult().existsAsFile())
@@ -712,6 +740,16 @@ private:
     bool loadScore (const juce::File& file)
     {
         juce::MemoryBlock data;
+        if (target.kind != AutomationTargetKind::none && (file.hasFileExtension ("mid") || file.hasFileExtension ("midi")))
+        {
+            // FL's Open automation takes a MIDI file too: the same "Import MIDI data" window (REA_rodada178a §11)
+            juce::String error;
+            if (const auto midi = MidiFileIo::parseFile (file, error))
+                importMidi (*midi, file.getFileName());
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", error);
+            return true;
+        }
         if (target.kind == AutomationTargetKind::none || ! file.loadFileAsData (data))
             return false;
         const auto events = prtools::parseEventScore (std::span<const std::uint8_t> ((const std::uint8_t*) data.getData(), data.getSize()));
@@ -725,6 +763,63 @@ private:
         previewGesture ([&] (PatternEvents& l) { l.events = *events; });
         commitGesture();
         return true;
+    }
+
+    void chooseMidi()
+    {
+        // (FL's starts in the user's Presets\\Scores\\Automation; seen round 178a)
+        const auto automationScores = findFlStudio().userData.getChildFile ("Presets").getChildFile ("Scores").getChildFile ("Automation");
+        chooser = lynx::ui::makeFileChooser (tr ("Import MIDI file..."), automationScores.isDirectory() ? automationScores : juce::File(),
+                                             "*.mid;*.midi");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     if (safe == nullptr || ! fc.getResult().existsAsFile())
+                                         return;
+                                     juce::String error;
+                                     if (const auto midi = MidiFileIo::parseFile (fc.getResult(), error))
+                                         safe->importMidi (*midi, fc.getResult().getFileName());
+                                     else
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", error);
+                                 });
+    }
+
+    void pasteMidi()
+    {
+        const auto smf = midiclipboard::get();
+        if (! smf)
+            return;
+        juce::String error;
+        if (const auto midi = MidiFileIo::parseBytes (smf->getData(), smf->getSize(), error))
+            importMidi (*midi, tr ("MIDI from clipboard"));
+        else
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", tr ("Error parsing the MIDI data..."));
+    }
+
+    // FL replaces the shown lane with the chosen controller, value / 127 (REA_rodada178a §11), and adds the time signature to the
+    // pattern's markers; notes aren't imported here.
+    void importMidi (const midiimport::ParsedMidi& midi, const juce::String& name)
+    {
+        // (FL's window starts afresh every time: controller "---", Realign off, time signatures on; seen round 178a)
+        showEventLaneMidiImportDialog (name, midi, midiimport::Options {}, [safe = juce::Component::SafePointer<EventEditor> (this), midi] (const midiimport::Options& o) {
+            if (safe == nullptr)
+                return;
+            const auto events = midiimport::controllerEvents (midi, o); // (none in the file: FL leaves the lane empty)
+            safe->beginGesture();
+            safe->previewGesture ([&] (PatternEvents& l) { l.events = events; });
+            safe->commitGesture();
+            if (o.timeSignatures)
+                safe->engine.editSong ([&] (Song& s) {
+                    auto& markers = currentPattern (s).markers;
+                    if (std::none_of (markers.begin(), markers.end(), [] (const Marker& m) { return m.tick == 0 && m.numerator > 0; }))
+                    {
+                        Marker m;
+                        m.numerator = midi.numerator > 0 ? midi.numerator : 4;
+                        m.denominator = midi.numerator > 0 ? midi.denominator : 4;
+                        m.action = Marker::timeSignature;
+                        markers.push_back (m);
+                    }
+                });
+        });
     }
 
     void saveScore()
@@ -1018,6 +1113,11 @@ void openConvertToAutomationPanel (int events, double initialPercent, std::funct
         juce::TextButton accept, cancel;
     };
     openToolWindow (std::make_unique<Panel> (events, initialPercent, std::move (pointsFor), std::move (onAccept)), tr ("Convert to automation"), "eventeditor-toauto");
+}
+
+namespace EventEditorHooks
+{
+std::function<void()> onBrowseAutomations;
 }
 
 void openEventEditor (AudioEngine& engine, const AutomationTarget& target)

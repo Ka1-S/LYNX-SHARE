@@ -226,8 +226,9 @@ struct Engine::Impl
     }();
     double samplesPerTick = 0, tickLeft = 0, smoothCoef = 0;
     bool smoothOn = false;
-    std::vector<std::array<double, 24>> up, down;
-    std::vector<float> io, x, up2, acc, tmp;
+    std::vector<std::array<double, 24>> up, down, sendDown;
+    std::vector<float> io, x, up2, acc, tmp, sendAcc, sendIo;
+    float* sendOut = nullptr; // the interleaved buffer the send goes to this block (null = not routed)
 
     void configure() noexcept
     {
@@ -237,8 +238,10 @@ struct Engine::Impl
         maxStep = (float) (44100.0 / (double) r * 0.001);
         up.assign ((std::size_t) order, {});
         down.assign ((std::size_t) order, {});
+        sendDown.assign ((std::size_t) order, {});
         const auto cap = (std::size_t) (maxBlock * (1 << std::max (order, 1)) * 4);
         x.assign (cap, 0.0f), up2.assign (cap, 0.0f), acc.assign (cap, 0.0f), tmp.assign (cap, 0.0f), io.assign (maxBlock * 2, 0.0f);
+        sendAcc.assign (cap, 0.0f), sendIo.assign (maxBlock * 2, 0.0f);
         design();
         computeValues();
         computeVolume();
@@ -387,6 +390,8 @@ struct Engine::Impl
             s.fill (0.0);
         for (auto& s : down)
             s.fill (0.0);
+        for (auto& s : sendDown)
+            s.fill (0.0);
         volumeNow = 0.0f;
         snap = false;
         silence = 0;
@@ -461,6 +466,15 @@ struct Engine::Impl
             }
             in = const_cast<float*> (src);
         }
+        // the send (§2.1 step 6): a second sum, started like the main one, for the mixer track the state names
+        const bool sendOn = st.sendTrack >= 0;
+        if (sendOn)
+        {
+            if (st.addMode)
+                std::copy (in, in + 2 * m, sendAcc.begin());
+            else
+                std::fill (sendAcc.begin(), sendAcc.begin() + 2 * m, 0.0f);
+        }
         if (st.addMode)
             std::copy (in, in + 2 * m, acc.begin());
         else
@@ -471,8 +485,8 @@ struct Engine::Impl
             auto& f = band[(std::size_t) b];
             const auto& tv = st.target[(std::size_t) b];
             const bool mainOn = tv[0].mode != 1 || tv[1].mode != 1;
-            if (f.off || ! mainOn)
-                continue; // no send routing in LYNX, so the send target alone never activates a band
+            if (f.off || ! (mainOn || (sendOn && tv[2].mode != 1)))
+                continue; // (a band whose only active target is the send runs while a send track is set)
             if (! f.doubled)
                 runFilter (f, in, tmp.data(), m);
             else
@@ -506,6 +520,39 @@ struct Engine::Impl
                     f.vol[0] = l, f.vol[1] = r;
                 addGained (tmp.data(), acc.data(), m, l, r, f.vol);
             }
+            if (sendOn && tv[2].mode != 1)
+            {
+                // the send's gain stage: the band's pan with its send level (the same law as the volume's)
+                const float pan = now[(std::size_t) b][1];
+                const float level = now[(std::size_t) b][2] * norm;
+                float l, r;
+                if ((bitsOf (pan) & 0x80000000u) == 0)
+                    r = level, l = (float) ((1.0 - (double) pan) * (double) level);
+                else
+                    l = level, r = (float) (((double) pan + 1.0) * (double) level);
+                if (st.addMode)
+                    l = l - norm, r = r - norm;
+                if (snap)
+                    f.send[0] = l, f.send[1] = r;
+                addGained (tmp.data(), sendAcc.data(), m, l, r, f.send);
+            }
+        }
+
+        if (sendOn)
+        {
+            // down to the host rate with the send's own resampler, then handed to the track (copied; the tap is ours)
+            float* src = sendAcc.data();
+            if (resample)
+            {
+                int k = m;
+                for (int s = order - 1; s >= 0; --s)
+                {
+                    k /= 2;
+                    downsample (sendDown[(std::size_t) s].data(), src, src, k);
+                }
+            }
+            if (sendOut != nullptr)
+                std::copy (src, src + 2 * n, sendOut);
         }
 
         if (st.sendOnly)
@@ -571,6 +618,7 @@ void Engine::setKnobs (const State& s) noexcept
     d->st.knob = s.knob;
     d->st.bandwidth = s.bandwidth, d->st.oversample = s.oversample;
     d->st.addMode = s.addMode, d->st.sendOnly = s.sendOnly;
+    d->st.sendTrack = s.sendTrack;
     if (layout)
     {
         const auto upKeep = d->up, downKeep = d->down;
@@ -629,7 +677,7 @@ void Engine::startFromConstruction() noexcept
         g = { 1.0, 0.0, 1.0 };
 }
 
-void Engine::process (float* left, float* right, int n) noexcept
+void Engine::process (float* left, float* right, int n, float* sendLeft, float* sendRight) noexcept
 {
     ScopedFlushDenormals ftz;
     for (int i0 = 0; i0 < n;)
@@ -648,11 +696,38 @@ void Engine::process (float* left, float* right, int n) noexcept
         }
         for (int i = 0; i < m; ++i)
             d->io[(std::size_t) (2 * i)] = left[i0 + i], d->io[(std::size_t) (2 * i + 1)] = right[i0 + i];
+        const bool sending = sendLeft != nullptr && sendRight != nullptr;
+        d->sendOut = sending ? d->sendIo.data() : nullptr;
+        if (sending)
+            std::fill (d->sendIo.begin(), d->sendIo.begin() + 2 * m, 0.0f); // (a silent block sends nothing)
         d->block (d->io.data(), m);
         for (int i = 0; i < m; ++i)
             left[i0 + i] = d->io[(std::size_t) (2 * i)], right[i0 + i] = d->io[(std::size_t) (2 * i + 1)];
+        if (sending)
+            for (int i = 0; i < m; ++i)
+                sendLeft[i0 + i] += d->sendIo[(std::size_t) (2 * i)], sendRight[i0 + i] += d->sendIo[(std::size_t) (2 * i + 1)];
         i0 += m;
     }
+}
+
+namespace
+{
+constexpr std::size_t sendTrackAt = 4 + numBands * numTargets * 8 + numBanks * numBands * numTargets * 4 + 5 * 4 + 8;
+}
+
+int sendInsert (const std::vector<std::uint8_t>& state) noexcept
+{
+    const auto s = parse (state);
+    return s && s->sendTrack >= 0 ? s->sendTrack + 1 : 0;
+}
+
+bool setSendInsert (std::vector<std::uint8_t>& state, int insert) noexcept
+{
+    if (! parse (state))
+        return false;
+    const std::int32_t v = insert > 0 ? insert - 1 : -1;
+    std::memcpy (state.data() + sendTrackAt, &v, 4);
+    return true;
 }
 
 std::optional<State> parse (const std::vector<std::uint8_t>& b)
@@ -801,6 +876,11 @@ public:
             state.table = next.table;
             state.target = next.target;
             engine.setBands (state);
+            if (next.sendTrack != state.sendTrack)
+            {
+                state.sendTrack = next.sendTrack; // the editor's send track (kept with EffectSlot::sendTracks[0])
+                engine.setKnobs (state);
+            }
         }
         if (hqRender() != rendering)
         {
@@ -822,14 +902,18 @@ public:
         }
         if (bpm > 0)
             engine.setSamplesPerTick (rate * 60.0 / (bpm * 96.0)); // FL's default 96 ticks per beat (not confirmed)
-        engine.process (left, right, n);
+        engine.process (left, right, n, sendLeft, sendRight);
     }
+
+    // the send's destination insert (EffectSlot::sendTracks[0]), or null = not routed this block
+    void setSendOutput (float* l, float* r) noexcept override { sendLeft = l, sendRight = r; }
 
 private:
     State state, next;
     StateHandoff<State> incoming;
     bool valid = false, rendering = false, haveParams = false;
     double rate = 44100.0;
+    float *sendLeft = nullptr, *sendRight = nullptr;
     EffectParams lastParams {};
     Engine engine;
 };

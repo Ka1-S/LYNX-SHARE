@@ -83,6 +83,12 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& options, con
 // notes in the pattern are deleted first. Returns the indices of the imported notes in the pattern.
 std::vector<int> importIntoChannel (Song& song, int channel, const ParsedMidi& midi, const Options& options, std::string& error);
 
+// The Event editor's File › Import MIDI file / Paste from MIDI clipboard (seen in FL 2026, REA_rodada178a §11): the chosen
+// controller of the selected tracks and MIDI channels as one lane, value = data / 127, at the file's ticks; with no controller
+// chosen (FL's "---"), every controller merged in time order. With `realign`, moved earlier by the selection's first note (its
+// first event without notes). Empty when the file has none: FL then empties the lane.
+std::vector<PatternEvent> controllerEvents (const ParsedMidi& midi, const Options& options);
+
 // The automation target for controller `cc` of `channel` (7 / 11 volume, 10 pan); kind none for the others.
 AutomationTarget controllerTarget (int cc, int channel) noexcept;
 } // namespace lynx::midiimport

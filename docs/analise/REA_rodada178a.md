@@ -199,3 +199,21 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
 - **Title and hint:** "Events - Tempo", 3 decimals in the hint (Event editor and piano roll event lane), as in FL.
 - **Tempo followers (#87):** tempo display, tap tempo, Detect tempo, Settings, Loop Starter's genre change and setTweakedValue. MIDI import changes the tempo only for a new project, so there is nothing to follow. Left out: a linked controller (AudioEngine's per-move edit): rounding would drift on every move.
 - **Toolbar:** below the width of one row it wraps (a second or third row), so File, To automation and Clear stay reachable down to the window's 400 px limit.
+
+## 11. Event editor File menu: the other items (FL 2026 driven, its Tempo event editor, t87b.flp)
+
+Seen, not decompiled. The test files were removed from FL's folder afterwards.
+
+- **Browse automations** opens the Browser at `Presets\Scores\Automation`. LYNX: the Browser's FL MIDI root, the `Automation` row of FL's `Data/Patches/Scores` selected.
+- **Import MIDI file...** (Ctrl+M, filter `*.mid;*.midi`) opens "Import MIDI data": tracks, channels, *Which controller to import?* (`---`, then 0..127), Realign events, Import time signatures (on), Import zero velocity notes, Accept. No Blend.
+- Accept with controller 1 on a test file (CC 1 = 5, 21, ... 117, one per beat, plus notes) replaced the shown lane: the saved .fsc reads ticks 0, 96, ... 672 at 96 PPQ and values 0.03937, 0.16535, ... 0.92126, so value = data / 127, control 5 as usual. The notes did not go into the lane.
+- With Import time signatures on, a 4/4 marker appeared, though the file has no time signature. LYNX adds the file's signature at tick 0, or 4/4 without one, unless the pattern already has one there.
+- **Paste from MIDI clipboard...** (Shift+Ctrl+V) was greyed with no MIDI in the clipboard. Assumed to work like Import, as the piano roll's does (FUN_00e1d090); not seen.
+- **Export as score sheet...** in this editor opened a Save As for `.fsc`, and the file was byte-identical to one from Save automation as (211 bytes each). LYNX does the same. It is not the piano roll's PDF path (TExportScoreForm).
+
+- Accept with `---` merged every controller: a file with CC 11 = 12 and CC 7 = 5 on alternating beats gave the lane alternating in time. With 7 chosen, only CC 7's events. With 7 on a file that has none, the lane was left empty. LYNX does all three.
+- **Open automation...** lists `*.fsc` and MIDI ("Supported score files"). Opening a `.mid` there showed the same Import MIDI data window. LYNX does the same.
+
+Not seen in FL: Realign on a lane (LYNX moves by the selection's first note, or the first event without notes).
+
+Difference left as it is: LYNX's Event editor doesn't draw the pattern's markers, so the added time signature shows in the piano roll, not here.

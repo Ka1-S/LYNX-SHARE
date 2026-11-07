@@ -314,7 +314,11 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
 // next one starts, it plays on backwards from its end, then forwards again ("back and forth"), until the next piece.
 // Faster: the piece is cut where the next one begins. The pieces meet in 16 ms linear crossfades (the length that
 // matched Live's spectrum best: 0.2–0.3 dB mean deviation; 1–4 ms left clicks Live does not have).
-Planar beatsStretch (const Planar& in, long outFrames, double sampleRate)
+// Transposed (`semitones` ≠ 0: Live's clip transpose in Beats mode), each piece is resampled — read 2^(st/12) times
+// faster from its start, so it is shorter and higher — and still starts at its own place on the grid; the gap up to the
+// next piece is filled back and forth as when slower. Rendered offline per clip pitch (round 175a, the coordinator's
+// "match Live by resampling each piece").
+Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones = 0.0)
 {
     const auto n = in.frames();
     const auto ratio = (double) outFrames / (double) n;
@@ -323,6 +327,22 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate)
     cuts.insert (cuts.begin(), 0L);
     cuts.push_back (n);
     const auto fade = std::max (16L, (long) std::lround (sampleRate * 0.016));
+    const auto speed = semitones == 0.0 ? 1.0 : std::pow (2.0, semitones / 12.0);
+    const auto weight = [&] (std::size_t k, long i, long own) {
+        float w = 1.0f;
+        if (k > 0 && i < fade)
+            w = (float) i / (float) fade;
+        if (i >= own)
+            w *= 1.0f - (float) (i - own) / (float) fade;
+        return w;
+    };
+    // 4-point Hermite inside the piece [a, a + length): sample `at` + `f` of it, its edges held
+    const auto cubicAt = [] (const std::vector<float>& x, long a, long length, long at, float f) {
+        const auto get = [&] (long j) { return x[(std::size_t) (a + std::clamp (j, 0L, length - 1))]; };
+        const auto y0 = get (at - 1), y1 = get (at), y2 = get (at + 1), y3 = get (at + 2);
+        const auto c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3, c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
+        return ((c3 * f + c2) * f + c1) * f + y1;
+    };
 
     Planar out;
     out.ch.assign (in.ch.size(), std::vector<float> ((std::size_t) outFrames, 0.0f));
@@ -335,18 +355,31 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate)
         const auto span = std::min (outFrames - o0, (o1 - o0) + (last ? 0L : fade));
         if (length <= 0 || span <= 0)
             continue;
-        const auto period = 2 * length;
+        if (speed == 1.0)
+        {
+            const auto period = 2 * length;
+            for (long i = 0; i < span; ++i)
+            {
+                const auto m = i % period;
+                const auto src = a + (m < length ? m : period - 1 - m);
+                const auto w = weight (k, i, o1 - o0);
+                for (std::size_t c = 0; c < in.ch.size(); ++c)
+                    out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
+            }
+            continue;
+        }
+        // the piece resampled: `played` output frames read it from a to its end, `speed` source frames per output frame
+        const auto played = std::max (1L, (long) std::floor ((double) (length - 1) / speed) + 1);
+        const auto period = 2 * played;
         for (long i = 0; i < span; ++i)
         {
             const auto m = i % period;
-            const auto src = a + (m < length ? m : period - 1 - m);
-            float w = 1.0f;
-            if (k > 0 && i < fade)
-                w = (float) i / (float) fade;
-            if (i >= o1 - o0)
-                w *= 1.0f - (float) (i - (o1 - o0)) / (float) fade;
+            const auto t = (double) (m < played ? m : period - 1 - m) * speed;
+            const auto w = weight (k, i, o1 - o0);
+            const auto at = (long) t;
+            const auto f = (float) (t - (double) at);
             for (std::size_t c = 0; c < in.ch.size(); ++c)
-                out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
+                out.ch[c][(std::size_t) (o0 + i)] += w * cubicAt (in.ch[c], a, length, at, f);
         }
     }
     return out;
@@ -576,9 +609,17 @@ StretchMethod stretchMethodForFlMode (int flMode) noexcept
     }
 }
 
-std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method)
+std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones)
 {
     const auto frames = (long) in.frames();
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+
+    if (frames >= 4 && ratio > 0.0 && semitones != 0.0)
+    {
+        const auto outFrames = std::max (1L, (long) std::llround ((double) frames * std::clamp (ratio, 0.05, 20.0)));
+        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0)), in);
+    }
 
     if (frames < 4 || ! (ratio > 0.0) || std::abs (ratio - 1.0) < 1e-9)
     {
