@@ -11088,7 +11088,7 @@ TEST (love_philter_engine)
     CHECK (lynx::philter::flIndexOf (6) == 6 && lynx::philter::flIndexOf (8) == 9 && lynx::philter::flIndexOf (8 + 5 * 7 + 4) == 8 + 44 * 7 + 9);
     for (int i = 0; i < lynx::philter::paramCount; ++i)
         CHECK (lynx::philter::paramOfFlIndex (lynx::philter::flIndexOf (i)) == i);
-    CHECK (lynx::philter::paramOfFlIndex (8 + 3) == -1 && lynx::philter::paramOfFlIndex (8 + 12) == -1);
+    CHECK (lynx::philter::paramOfFlIndex (8 + 3) == 48 && lynx::philter::paramOfFlIndex (8 + 12) == -1 && lynx::philter::paramOfFlIndex (8 + 44 * 7 + 11) == -1);
     CHECK (lynx::philter::parse ({ 3, 0, 12, 0, 1, 2, 3, 4 }) == nullptr);
     CHECK (lynx::effectInfo (lynx::EffectKind::lovePhilter).params.size() == (std::size_t) lynx::philter::paramCount);
     CHECK (lynx::philter::paramText (5, 0.0f) == "pattern 1" && lynx::philter::paramText (8 + 3, 0.5f) == "centred");
@@ -16947,6 +16947,7 @@ TEST (fl_low_lifter_matches_fl_engine)
     CHECK (lynx::formatEffectParam (lynx::EffectKind::flLowLifter, 3, 0.721f, 120.0) == "-6.0 dB");
 }
 #include "Rea153Tests.inc"
+#include "Logger181bTests.inc"
 #include "Render155Tests.inc"
 #include "Tune157Tests.inc"
 #include "Tune165Tests.inc"
@@ -16994,6 +16995,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlScratch165Tests.inc"
 #include "FlTrans165Tests.inc"
 #include "VideoPlayer165Tests.inc"
+#include "Video174dTests.inc"
 #include "Dash165Tests.inc"
 #include "LinuxMouse165Tests.inc"
 #include "Fl165Tests.inc"
@@ -17106,9 +17108,17 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Layout172aTests.inc"
 #include "Issues173aTests.inc"
 #include "FxAudit173dTests.inc"
+#include "Audit173d3Tests.inc"
+#include "Vocodex173d3Tests.inc"
 #include "Fluid174eTests.inc"
 #include "AlsImport175aTests.inc"
 #include "Bridge176aTests.inc"
+#include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
+#include "PluginExport180bTests.inc"
+#include "FlExport180dTests.inc"
+#include "Mixer177a2Tests.inc"
+#include "Mixer177a3Tests.inc"
+#include "Mixer177a4Tests.inc"
 #include "Sc177bTests.inc"
 #include "Issue97Tests.inc"

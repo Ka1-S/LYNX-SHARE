@@ -648,7 +648,7 @@ Layout luxeVerb()
     // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
     // Values under the captions (and the decay time inside SPACE)
     const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0, float w = 76.0f) {
-        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | hoverValue);
         i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
                                                 // bounds it; never wider than tall, so no caption hides under a knob)
         i.x = cx - i.w * 0.5f;
@@ -4509,7 +4509,7 @@ bool displayTakesMouse (const char* display)
     if (display == nullptr)
         return false;
     static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
-                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve" };
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve", "equosend", "lpcurve", "cvcurve", "vxcurve", "vxmapsel" };
     for (const auto* id : ids)
         if (std::strcmp (id, display) == 0)
             return true;
@@ -4626,7 +4626,7 @@ int optionAt (const LayoutItem& item, float value)
 
 bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectParams& params, const std::vector<std::uint8_t>* state)
 {
-    if (item.page >= 0 && item.page != page)
+    if (item.page >= 0 && (item.pageModulo > 0 ? (page / std::max (1, item.pageStride)) % item.pageModulo : page) != item.page)
         return false;
     const auto inRange = [&] (const char* param, float lo, float hi) {
         if (param == nullptr)

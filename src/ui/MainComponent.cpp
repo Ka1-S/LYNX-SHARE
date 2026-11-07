@@ -1,5 +1,8 @@
+#include "ui/VideoTracks.h"
+#include "ui/AdrWindow.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/ClipOps.h"
 #include "core/NoteNames.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
@@ -59,6 +62,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
+#include "ui/EventEditor.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
@@ -148,6 +152,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     if (persistent)
     {
+        engine.getRollingLog().setEnabled (true); // on by default, as in FL (Tools › Audio logger)
         loadUiSettings();
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
         engine.setSong (makeNewProject());
@@ -189,6 +194,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
+    };
+
+    EventEditorHooks::onBrowseAutomations = [this] { // (the Event editor's File › Browse automations: FL's Scores\\Automation)
+        showPanel (Panel::browser);
+        browser.showScores ("Automation");
     };
 
     newButton.setTooltip (tr ("New project") + " (Ctrl+N)");
@@ -521,7 +531,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
-                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
+                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
     {
         addAndMakeVisible (c);
         c->setMouseClickGrabsKeyboardFocus (false); // the PC keyboard stays with the main window
@@ -626,6 +636,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     if (persistent && toolbarLayout.uiScale != 100)
         juce::Desktop::getInstance().setGlobalScaleFactor ((float) toolbarLayout.uiScale / 100.0f);
 
+    addChildComponent (chordNearHint);
+    chordPanel.onMenu = [this] { showChordPanelMenu(); };
+    PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
+        if (! chordPanel.isVisible())
+            return;
+        refreshChordOptions();
+        chordReadout.selection (keys, juce::Time::getMillisecondCounter());
+        auto text = juce::String::fromUTF8 (chordReadout.text().c_str());
+        chordPanel.setText (chordReadout.lastWasNovelty() ? tr (text) : text);
+    };
+
     setControlHints();
     fittedChannelCount = (int) engine.getSong().channels.size();
     hintBar.setHint ({ idleHint(), {}, false, false });
@@ -713,6 +734,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     engine.onSessionUndoSkipped = nullptr;
+    PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
@@ -876,12 +898,30 @@ void MainComponent::resized()
     widths[(std::size_t) Group::file] = 3 * h + 4;
     widths[(std::size_t) Group::meters] = 118;
     widths[(std::size_t) Group::output] = 116 + grow * 2;
+    widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
     auto minHint = juce::jmax (menuWidth + 8, 320);
     const auto maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+    // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 90 px:
+    // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay
+    if (toolbarLayout.visible && toolbarLayout.isShown (Group::chord) && ! visible[(std::size_t) Group::chord] && visible[(std::size_t) Group::record])
+    {
+        auto tighter = widths;
+        tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
+        tighter[(std::size_t) Group::snap] -= 16;
+        tighter[(std::size_t) Group::chord] = 88;
+        if (const auto fits = toolbarlayout::fit (toolbarLayout, tighter, 13, room, minHint); fits[(std::size_t) Group::chord])
+        {
+            widths = tighter;
+            tempoWidth -= 12;
+            timeWidth -= 36;
+            gap = 13;
+            visible = fits;
+        }
+    }
     // round 170e3: rather than dropping the recording switches on a narrow window (1280-1440 px), the panels get
     // tighter: four switches per row (the typing piano and the MIDI light go; Ctrl+T and the View menu keep the piano),
     // a narrower snap box and displays
@@ -1045,6 +1085,7 @@ void MainComponent::resized()
                 case Group::file: hide ({ &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton }); break;
                 case Group::meters: hide ({ &perfMeter }); break;
                 case Group::output: hide ({ &output }); break;
+                case Group::chord: hide ({ &chordPanel }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1144,6 +1185,7 @@ void MainComponent::resized()
                 break;
             case Group::meters: put (perfMeter, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
+            case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::count_: break;
         }
     }
@@ -1260,6 +1302,12 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
         });
     }
 
+    menu.addSeparator();
+    menu.addItem (tr ("Show detected MIDI chords near the hint bar"), true, chordShowNearHint, [this] {
+        chordShowNearHint = ! chordShowNearHint;
+        chordNearHint.setVisible (false);
+        saveUiSettings();
+    });
     menu.addSeparator();
     juce::PopupMenu sizes;
     const char* sizeNames[] = { TR_NOOP ("Small icons"), TR_NOOP ("Medium icons"), TR_NOOP ("Large icons") };
@@ -1969,6 +2017,26 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
+        else if (key == "audioLogEnabled")
+            engine.getRollingLog().setEnabled (on);
+        else if (key == "audioLogSeconds")
+        {
+            const auto seconds = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
+            if (seconds == 60 || seconds == 120 || seconds == 300 || seconds == 600)
+                engine.getRollingLog().setLengthSeconds (seconds);
+        }
+        else if (key == "audioLogPreEffects")
+            engine.getRollingLog().setPosition (on ? RollingAudioLog::Position::preEffects : RollingAudioLog::Position::postEffects);
+        else if (key == "chordDelayMs")
+            chordReadout.setDelayMs ((std::uint32_t) line.fromFirstOccurrenceOf ("=", false, false).trim().getLargeIntValue());
+        else if (key == "chordRoman")
+        {
+            auto o = chordReadout.getOptions();
+            o.roman = on;
+            chordReadout.setOptions (o);
+        }
+        else if (key == "chordNearHint")
+            chordShowNearHint = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -2119,6 +2187,12 @@ void MainComponent::saveUiSettings()
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
+                                      + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
+                                      + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
+                                      + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
+                                      + "\nchordDelayMs=" + juce::String ((std::int64_t) chordReadout.getDelayMs())
+                                      + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
+                                      + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
@@ -3647,7 +3721,7 @@ void MainComponent::TempoDisplay::setBpm (double bpm)
     bpm = controls::clampTempo (bpm);
 
     if (std::abs (bpm - engine.getSong().bpm) > 1e-9)
-        engine.editSong ([bpm] (Song& s) { s.bpm = bpm; });
+        engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
 
     repaint();
 }
@@ -3934,6 +4008,7 @@ void MainComponent::setQuickTips()
     tip (newPatternButton, tr ("New pattern"));
     tip (patternMenuButton, tr ("Pattern options"));
     tip (perfMeter, tr ("CPU, memory and polyphony"));
+    tip (chordPanel, tr ("Detected chord"));
     tip (output, tr ("Output monitor"));
     tip (swingSlider, tr ("Swing"));
     tip (rackFilterBox, tr ("Channel filter group"));
@@ -3997,6 +4072,195 @@ bool MainComponent::toolbarFrame (double nowMs)
     timeDisplay.update();
     songPosition.update();
     return moved || engine.getTransport().playing.load (std::memory_order_relaxed);
+}
+
+void MainComponent::refreshChordOptions()
+{
+    auto options = chordReadout.getOptions();
+    options.sharps = ! notenames::flats();
+    for (int pc = 0; pc < 12; ++pc)
+    {
+        // the chosen note names, with FL's accidentals ("C♯", "B♭", "Sol♯")
+        auto name = juce::String (notenames::pitchName (pc));
+        if (name.endsWithChar ('#'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266F);
+        else if (name.length() > 1 && name.endsWithChar ('b'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266D);
+        chordNotes[(std::size_t) pc] = name.toStdString();
+    }
+    options.notes = &chordNotes;
+    // Roman (a LYNX choice, FL's item changes nothing): against the Piano Roll's scale, when one is set
+    const auto& highlight = engine.getSong().scaleHighlight;
+    options.tonic = pianoRoll.scaleTonic() >= 0 ? pianoRoll.scaleTonic() : highlight.scale >= 0 ? highlight.root : -1;
+    chordReadout.setOptions (options);
+}
+
+void MainComponent::showChordText()
+{
+    auto text = juce::String::fromUTF8 (chordReadout.text().c_str());
+    if (chordReadout.lastWasNovelty())
+        text = tr (text);
+    chordPanel.setText (text);
+
+    if (chordShowNearHint)
+    {
+        // as FL: it follows the panel, leaves with "---", and with a display delay stays that long at most (15 s at most)
+        const auto chord = chordReadout.text() != chordread::noChord && text.isNotEmpty();
+        chordNearHint.setText (text);
+        const auto width = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body, true).withHeight (17.0f), text)) + 8;
+        chordNearHint.setBounds (hintBar.getX() + 8, hintBar.getBottom() + 2, width, 24);
+        chordNearHint.setVisible (chord);
+        if (chord)
+        {
+            chordNearHint.toFront (false);
+            chordNearHintUntil = juce::Time::getMillisecondCounter() + juce::jmin<std::uint32_t> (15000, chordReadout.getDelayMs());
+        }
+    }
+}
+
+void MainComponent::updateChordPanel()
+{
+    if (! chordPanel.isVisible() && ! chordShowNearHint)
+        return;
+
+    const auto now = juce::Time::getMillisecondCounter();
+    auto changed = false;
+    for (int channel = 0; channel < chordread::channels; ++channel)
+    {
+        const auto bits = engine.heldInputKeyBits (channel);
+        auto& before = chordHeld[(std::size_t) channel];
+        if (bits == before)
+            continue;
+        if (! changed)
+            refreshChordOptions();
+        changed = true;
+        // what ended first: a chord changed between two ticks reads as the new chord, not as both
+        for (const auto on : { false, true })
+            for (int word = 0; word < 2; ++word)
+            {
+                auto diff = (on ? bits[(std::size_t) word] & ~before[(std::size_t) word] : before[(std::size_t) word] & ~bits[(std::size_t) word]);
+                for (int b = 0; diff != 0; ++b, diff >>= 1)
+                    if ((diff & 1u) != 0)
+                        chordReadout.note (channel, word * 64 + b, on, now);
+            }
+        before = bits;
+    }
+    if (chordReadout.tick (now))
+        changed = true;
+    if (changed)
+        showChordText();
+    if (chordNearHint.isVisible() && chordReadout.getDelayMs() > 0 && (int) (now - chordNearHintUntil) > 0)
+        chordNearHint.setVisible (false);
+}
+
+void MainComponent::showChordPanelMenu()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Chord style"));
+    const auto roman = chordReadout.getOptions().roman;
+    auto setRoman = [this] (bool on) {
+        auto o = chordReadout.getOptions();
+        o.roman = on;
+        chordReadout.setOptions (o);
+        saveUiSettings();
+    };
+    menu.addItem (tr ("Standard"), true, ! roman, [setRoman] { setRoman (false); });
+    menu.addItem (tr ("Roman"), true, roman, [setRoman] { setRoman (true); });
+    menu.addSectionHeader (tr ("Display delay for played chords"));
+    const auto delay = chordReadout.getDelayMs();
+    auto delayItem = [&] (const juce::String& name, std::uint32_t seconds) {
+        menu.addItem (name, true, delay == seconds * 1000u, [this, seconds] {
+            chordReadout.setDelayMs (seconds * 1000u);
+            saveUiSettings();
+        });
+    };
+    delayItem (tr ("None"), 0);
+    delayItem (tr ("1 second"), 1);
+    delayItem (tr ("3 seconds"), 3);
+    delayItem (tr ("5 seconds"), 5);
+    delayItem (tr ("Show forever"), chordread::foreverSeconds);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&chordPanel));
+}
+
+void MainComponent::addAudioLoggerMenu (juce::PopupMenu& menu)
+{
+    // FL 2026's Tools › Audio logger, item for item (REA_rodada181b.md)
+    auto& log = engine.getRollingLog();
+    const auto on = log.isEnabled();
+    auto title = tr ("Audio logger");
+    if (on)
+        title << " (" << tr ("memory used: {0}MB", { juce::String (juce::roundToInt ((double) log.bytesInUse() / 1048576.0)) }) << ")";
+    menu.addSectionHeader (title);
+    menu.addItem (tr ("Enabled"), true, on, [this, on] {
+        engine.getRollingLog().setEnabled (! on);
+        saveUiSettings();
+    });
+
+    juce::PopupMenu settings;
+    settings.addSectionHeader (tr ("Maximum length"));
+    const auto seconds = log.lengthSeconds();
+    auto lengthItem = [&] (const juce::String& name, int minutes) {
+        settings.addItem (name, true, seconds == minutes * 60, [this, minutes] {
+            engine.getRollingLog().setLengthSeconds (minutes * 60);
+            saveUiSettings();
+        });
+    };
+    lengthItem (tr ("1 minute"), 1);
+    lengthItem (tr ("2 minutes"), 2);
+    lengthItem (tr ("5 minutes"), 5);
+    lengthItem (tr ("10 minutes"), 10);
+    settings.addSectionHeader (tr ("Recording position"));
+    const auto pre = log.getPosition() == RollingAudioLog::Position::preEffects;
+    auto positionItem = [&] (const juce::String& name, RollingAudioLog::Position p, bool ticked) {
+        settings.addItem (name, true, ticked, [this, p] {
+            engine.getRollingLog().setPosition (p);
+            saveUiSettings();
+        });
+    };
+    positionItem (tr ("Pre effects"), RollingAudioLog::Position::preEffects, pre);
+    positionItem (tr ("Post effects, pre fader"), RollingAudioLog::Position::postEffects, ! pre);
+    menu.addSubMenu (tr ("Settings"), settings);
+    menu.addItem (tr ("Dump to audio editor"), on, false, [this] { dumpAudioLog(); });
+}
+
+void MainComponent::dumpAudioLog()
+{
+    auto dump = std::make_shared<RollingAudioLog::Dump>();
+    if (! engine.getRollingLog().dump (*dump))
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Audio logger is empty"),
+                                                tr ("The audio logger doesn't contain any audio at the moment"));
+        return;
+    }
+
+    const auto folder = AudioLogger::defaultFolder();
+    folder.createDirectory();
+    const auto target = folder.getNonexistentChildFile ("Audiolog-" + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S"), ".wav", false);
+    juce::Component::SafePointer<MainComponent> self (this);
+    // (a long log takes a moment to write: not on the UI thread)
+    juce::Thread::launch ([self, dump, target] {
+        auto saved = false;
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> stream (target.createOutputStream().release());
+            if (stream != nullptr)
+                if (std::unique_ptr<juce::AudioFormatWriter> writer { wav.createWriterFor (stream.get(), dump->rate, 2, 32, {}, 0) }; writer != nullptr)
+                {
+                    stream.release(); // owned by the writer now
+                    const float* channels[] = { dump->left.data(), dump->right.data() };
+                    saved = writer->writeFromFloatArrays (channels, 2, (int) dump->left.size());
+                }
+        }
+        juce::MessageManager::callAsync ([self, target, saved] {
+            if (self == nullptr)
+                return;
+            if (saved)
+                openAudioEditor (self->engine, target);
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Audio logger"),
+                                                        tr ("Could not create a file in {0}", { target.getParentDirectory().getFullPathName() }));
+        });
+    });
 }
 
 void MainComponent::timerCallback()
@@ -4146,6 +4410,8 @@ void MainComponent::timerCallback()
     const auto playing = transport.playing.load();
     playButton.setToggleState (playing, juce::dontSendNotification);
 
+    updateChordPanel();
+
     // CPU / memory / polyphony, a few times a second
     if (++meterTicks >= 8 && perfMeter.isVisible() && ! hintsFrozen)
     {
@@ -4249,11 +4515,7 @@ void MainComponent::confirmDiscard (std::function<void()> then)
     auto* window = makeConfirmDiscardWindow().release();
     window->enterModalState (true, juce::ModalCallbackFunction::create ([this, then] (int result) {
                                  if (result == 1)
-                                 {
-                                     save (false);
-                                     if (! engine.isModified()) // saved (did not cancel "save as")
-                                         offerToDeleteUnusedRecordings (true, then);
-                                 }
+                                     save (false, [this, then] { offerToDeleteUnusedRecordings (true, then); }); // (not after a cancelled "save as")
                                  else if (result == 2)
                                      offerToDeleteUnusedRecordings (false, then);
                              }),
@@ -4978,6 +5240,23 @@ void MainComponent::chooseFileToOpenNow()
                               });
 }
 
+void MainComponent::openFileRequest (const juce::File& file)
+{
+    const juce::Component::SafePointer<MainComponent> safe (this);
+    if (projectLoadRunning())
+    {
+        juce::Timer::callAfterDelay (500, [safe, file] {
+            if (safe != nullptr)
+                safe->openFileRequest (file);
+        });
+        return;
+    }
+    confirmDiscard ([safe, file] {
+        if (safe != nullptr)
+            safe->openFile (file);
+    });
+}
+
 void MainComponent::openFile (const juce::File& file)
 {
     juce::String error;
@@ -5475,12 +5754,9 @@ void MainComponent::exportMidiFile()
                               });
 }
 
-void MainComponent::save (bool askForFile)
+void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
 {
-    auto write = [this] (juce::File file) {
-        if (! file.hasFileExtension (ProjectFile::extension))
-            file = file.withFileExtension (ProjectFile::extension);
-
+    auto write = [this, afterSaved] (const juce::File& file) {
         juce::String error;
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
@@ -5493,6 +5769,8 @@ void MainComponent::save (bool askForFile)
             projectName = file.getFileNameWithoutExtension();
             importedSuffix = {};
             updateTitle();
+            if (afterSaved)
+                afterSaved();
         }
         else
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -5501,7 +5779,7 @@ void MainComponent::save (bool askForFile)
     // a project opened from the backup folder is saved somewhere else (old backups there are deleted)
     if (! askForFile && currentFile != juce::File() && ! currentFile.isAChildOf (autosaveFolder()))
     {
-        write (currentFile);
+        write (ProjectFile::withProjectExtension (currentFile));
         return;
     }
 
@@ -5510,10 +5788,18 @@ void MainComponent::save (bool askForFile)
     fileChooser = lynx::ui::makeFileChooser (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension);
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [write] (const juce::FileChooser& chooser) {
-                                  const auto file = chooser.getResult();
-                                  if (file == juce::File())
+                              [this, write] (const juce::FileChooser& chooser) {
+                                  const auto chosen = chooser.getResult();
+                                  if (chosen == juce::File())
                                       return;
+                                  const auto file = ProjectFile::withProjectExtension (chosen);
+                                  // the dialog's overwrite warning was about the name typed, without the extension
+                                  if (file != chosen && file != currentFile && file.existsAsFile())
+                                  {
+                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                                              tr ("{0} already exists. Choose another name or folder.", { file.getFullPathName() }));
+                                      return;
+                                  }
                                   if (! file.isAChildOf (autosaveFolder()))
                                   {
                                       write (file);
@@ -5608,7 +5894,12 @@ void MainComponent::setTweakedValue (const AutomationTarget& target, float value
 {
     value = juce::jlimit (0.0f, 1.0f, value);
     auto plugin = false;
-    engine.editSong ([&] (Song& s) { plugin = ! s.setTargetValue (target, value); });
+    engine.editSong ([&] (Song& s) {
+        if (target.kind == AutomationTargetKind::tempo)
+            clipops::followTempo (s, tempoFromValue (value)); // (issue #87: audio clips follow)
+        else
+            plugin = ! s.setTargetValue (target, value);
+    });
     if (plugin)
     {
         if (target.kind == AutomationTargetKind::channelParam)
@@ -5662,6 +5953,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("One-click audio recording: arm the selected insert..."), [this] { armSelectedInsertForAudio(); });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
+        addAudioLoggerMenu (menu); // FL's Tools menu has it just above "Last tweaked parameters"
         // FL's "Last tweaked parameters" section (LastTweaked1Menu / LastTweaked2Menu → FUN_0123d1d0, REA round 143):
         // the parameter's own menu for the last two moved controls
         menu.addSectionHeader (tr ("Last tweaked parameters"));
@@ -5721,6 +6013,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's File › Import (ImportMenu › ImportMIDIMenu → FileImportMIDIFileAction, REA round 143)
             juce::PopupMenu imports;
             imports.addItem (tr ("MIDI file..."), [this] { importMidiFile(); });
+            imports.addItem (tr ("Video file..."), [this] { videotracks::chooseAndImport (engine, this); }); // round 174d
             menu.addSubMenu (tr ("Import"), imports);
         }
         {
@@ -5937,25 +6230,27 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             addRecordOptions (recording);
             menu.addSubMenu (tr ("Recording"), recording);
         }
+        // LYNX's own ADR (round 174d, issue #83): cues, the record cycle with streamers and beeps, takes, comp, Align
+        menu.addItem (tr ("ADR (dialogue replacement)..."), [this] { adrwindow::show (engine); });
         {
-            // FL 2026's Audio Logger (REA round 153): everything the Master plays goes to a WAV in the background
+            // LYNX's own (REA round 153): everything the Master plays, after the fader, goes to a WAV in the background
             auto& logger = engine.getAudioLogger();
-            menu.addItem (tr ("Audio logger (record everything the Master plays)"), true, logger.isLogging(), [this] {
+            menu.addItem (tr ("Record the Master to a file"), true, logger.isLogging(), [this] {
                 auto& log = engine.getAudioLogger();
                 if (log.isLogging())
                 {
                     const auto file = log.currentFile();
                     const auto seconds = log.secondsWritten();
                     log.stop();
-                    ui::postHint ({ tr ("Audio logger: saved {0} ({1} s)", { file.getFileName(), juce::String (seconds, 1) }), {}, false, false }, 5000);
+                    ui::postHint ({ tr ("Recording of the Master saved: {0} ({1} s)", { file.getFileName(), juce::String (seconds, 1) }), {}, false, false }, 5000);
                 }
                 else if (! log.start (AudioLogger::defaultFolder(), engine.getTransport().sampleRate.load()))
-                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Audio logger"),
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Record the Master to a file"),
                                                             tr ("Could not create a file in {0}", { AudioLogger::defaultFolder().getFullPathName() }));
                 else
-                    ui::postHint ({ tr ("Audio logger: recording the Master to {0}", { log.currentFile().getFileName() }), {}, false, false }, 5000);
+                    ui::postHint ({ tr ("Recording the Master to {0}", { log.currentFile().getFileName() }), {}, false, false }, 5000);
             });
-            menu.addItem (tr ("Show the audio logger's files"), [] {
+            menu.addItem (tr ("Show the recordings of the Master"), [] {
                 const auto folder = AudioLogger::defaultFolder();
                 folder.createDirectory();
                 folder.startAsProcess();

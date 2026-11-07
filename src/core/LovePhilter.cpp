@@ -2616,8 +2616,18 @@ void Engine::render (const float* in, float* out, int n) noexcept
 }
 
 // ----------------------------------------------------------------------------------------- slot parameters
+namespace
+{
+constexpr int extraField[unitExtraFields] = { 3, 4, 5, 6, 7, 10, 11 }; // L, B, H, WS pre, WS mix, IN, NEXT
+}
+
 int flIndexOf (int param) noexcept
 {
+    if (param >= 48)
+    {
+        const int e = param - 48, u = e / unitExtraFields;
+        return 8 + 44 * u + extraField[e % unitExtraFields];
+    }
     if (param < 8)
         return param;
     const int u = (param - 8) / 5, k = (param - 8) % 5;
@@ -2634,9 +2644,12 @@ int paramOfFlIndex (int k) noexcept
     if (u > 7)
         return -1;
     static const int slot[12] = { 2, 0, 1, -1, -1, -1, -1, -1, 3, 4, -1, -1 };
-    if (i >= 12 || slot[i] < 0)
+    static const int extra[12] = { -1, -1, -1, 0, 1, 2, 3, 4, -1, -1, 5, 6 };
+    if (i >= 12 || (u == 7 && i == 11))
         return -1;
-    return 8 + 5 * u + slot[i];
+    if (slot[i] >= 0)
+        return 8 + 5 * u + slot[i];
+    return 48 + unitExtraFields * u + extra[i];
 }
 void rawRange (int k, int& lo, int& hi) noexcept
 {
@@ -2790,6 +2803,7 @@ private:
 };
 
 const char* const kUnitFields[5] = { "cutoff", "resonance", "envelope amount", "pan", "volume" };
+const char* const kUnitExtra[unitExtraFields] = { "low", "band", "high", "shaper pre amp", "shaper mix", "input", "to next" };
 } // namespace
 
 const EffectInfo& info()
@@ -2799,15 +2813,17 @@ const EffectInfo& info()
         static const char* const globals[8] = { "Master level", "Master LFO", "Follower level", "Follower attack",
                                                 "Follower release", "Pattern", "Mod X", "Mod Y" };
         for (int i = 0; i < paramCount; ++i)
-            names.push_back (i < 8 ? std::string (globals[i])
-                                   : "Unit " + std::to_string ((i - 8) / 5 + 1) + " " + kUnitFields[(i - 8) % 5]);
+            names.push_back (i < 8    ? std::string (globals[i])
+                             : i < 48 ? "Unit " + std::to_string ((i - 8) / 5 + 1) + " " + kUnitFields[(i - 8) % 5]
+                                      : "Unit " + std::to_string ((i - 48) / unitExtraFields + 1) + " " + kUnitExtra[(i - 48) % unitExtraFields]);
         EffectInfo e { "Fruity Love Philter", {} };
         static const int defaults[8] = { 128, 128, 128, 4096, 8192, 1, 512, 512 };
         static const int unitDefaults[5] = { 128, 128, 128, 0, 128 };
         for (int i = 0; i < paramCount; ++i)
         {
             const int k = flIndexOf (i);
-            const int def = i < 8 ? defaults[i] : unitDefaults[(i - 8) % 5];
+            static const int extraDefaults[unitExtraFields] = { 128, 0, 0, 128, 128, 128, 0 };
+            const int def = i < 8 ? defaults[i] : i < 48 ? unitDefaults[(i - 8) % 5] : extraDefaults[(i - 48) % unitExtraFields];
             e.params.push_back ({ names[(std::size_t) i].c_str(), valueFromRaw (k, def) });
         }
         return e;
@@ -2832,6 +2848,24 @@ std::string paramText (int param, float value01)
             std::snprintf (t, sizeof t, "pattern %d", v);
         else
             std::snprintf (t, sizeof t, "%.0f%%", 100.0 * v / 1024.0);
+        return t;
+    }
+    if (param >= 48)
+    {
+        const int f = (param - 48) % unitExtraFields;
+        if (f == 5 || f == 6) // IN, NEXT: the signed level law
+        {
+            if (v == 0)
+                return "-inf dB";
+            std::snprintf (t, sizeof t, "%s%.1f dB", v < 0 ? "-" : "", 20.0 * std::log10 (std::max (1e-6, (double) std::abs (scurve11 (v)))));
+            return t;
+        }
+        if (f == 3)
+        {
+            std::snprintf (t, sizeof t, "%.0f%%", 100.0 * v / 128.0);
+            return t;
+        }
+        std::snprintf (t, sizeof t, "%.0f%%", 100.0 * v / 128.0);
         return t;
     }
     switch ((param - 8) % 5)
@@ -2862,4 +2896,331 @@ std::optional<EffectSlot> slotFromFl (const std::vector<std::uint8_t>& flState)
 }
 
 std::unique_ptr<Effect> make (const EffectSlot& slot) { return std::make_unique<PhilterEffect> (slot); }
+
+// ------------------------------------------------------------------------------------------- the editable state
+namespace
+{
+struct DocReader
+{
+    const std::vector<std::uint8_t>& b;
+    std::size_t pos = 0;
+    bool failed = false;
+    bool take (void* out, std::size_t n)
+    {
+        if (failed || n > b.size() - pos)
+            return ! (failed = true);
+        std::memcpy (out, b.data() + pos, n);
+        pos += n;
+        return true;
+    }
+    template <typename T>
+    T get()
+    {
+        T v {};
+        take (&v, sizeof (T));
+        return v;
+    }
+    std::vector<std::uint8_t> bytes (std::size_t n)
+    {
+        std::vector<std::uint8_t> v;
+        if (failed || n > b.size() - pos)
+        {
+            failed = true;
+            return v;
+        }
+        v.assign (b.begin() + (std::ptrdiff_t) pos, b.begin() + (std::ptrdiff_t) (pos + n));
+        pos += n;
+        return v;
+    }
+};
+
+struct DocWriter
+{
+    std::vector<std::uint8_t> b;
+    void put (const void* p, std::size_t n) { b.insert (b.end(), (const std::uint8_t*) p, (const std::uint8_t*) p + n); }
+    template <typename T>
+    void add (T v) { put (&v, sizeof (T)); }
+};
+
+bool readDocEnv (DocReader& r, DocEnv& e)
+{
+    e.kind = r.get<std::int32_t>();
+    e.ver = r.get<std::int32_t>();
+    const auto n = r.get<std::int32_t>();
+    if (r.failed || n < 0 || n > 100000)
+        return false;
+    e.pts.assign ((std::size_t) n, DocPoint {});
+    for (auto& p : e.pts)
+    {
+        if (e.ver < 2)
+        {
+            p.dt = e.kind == 6 ? r.get<double>() : (double) r.get<float>();
+            p.y = (double) r.get<float>();
+        }
+        else
+        {
+            p.dt = r.get<double>();
+            p.y = r.get<double>();
+        }
+        p.tension = r.get<float>();
+        if (e.ver >= 1)
+        {
+            p.mode = r.get<std::uint8_t>();
+            r.take (p.pad.data(), 3);
+        }
+    }
+    e.flags = r.get<std::int32_t>();
+    e.on = r.get<std::int32_t>();
+    e.decay = r.get<std::int32_t>();
+    e.loop = r.get<std::int32_t>();
+    e.sus = r.get<std::int32_t>();
+    return ! r.failed;
+}
+
+void writeDocEnv (DocWriter& w, const DocEnv& e)
+{
+    w.add<std::int32_t> (e.kind);
+    w.add<std::int32_t> (e.ver);
+    w.add<std::int32_t> ((std::int32_t) e.pts.size());
+    for (const auto& p : e.pts)
+    {
+        if (e.ver < 2)
+        {
+            if (e.kind == 6)
+                w.add<double> (p.dt);
+            else
+                w.add<float> ((float) p.dt);
+            w.add<float> ((float) p.y);
+        }
+        else
+        {
+            w.add<double> (p.dt);
+            w.add<double> (p.y);
+        }
+        w.add<float> (p.tension);
+        if (e.ver >= 1)
+        {
+            w.add<std::uint8_t> (p.mode);
+            w.put (p.pad.data(), 3);
+        }
+    }
+    for (const auto v : { e.flags, e.on, e.decay, e.loop, e.sus })
+        w.add<std::int32_t> (v);
+}
+
+// the options block's size by version (parse()) and where USE1 sits in `head`
+std::size_t optionsSize (int v) noexcept { return v >= 11 ? 0x21 : v == 10 ? 0x20 : 0x1f; }
+constexpr std::size_t optionsAt = 24;
+} // namespace
+
+int Doc::global (int i) const noexcept
+{
+    std::int32_t v = 0;
+    if (i >= 0 && i < 6 && head.size() >= 24)
+        std::memcpy (&v, head.data() + 4 * i, 4);
+    return v;
+}
+void Doc::setGlobal (int i, int raw) noexcept
+{
+    const std::int32_t v = raw;
+    if (i >= 0 && i < 6 && head.size() >= 24)
+        std::memcpy (head.data() + 4 * i, &v, 4);
+}
+int Doc::option (int i) const noexcept
+{
+    std::int32_t v = 0;
+    if (i >= 0 && optionsAt + 4 * (std::size_t) i + 4 <= std::min (head.size(), optionsAt + 28))
+        std::memcpy (&v, head.data() + optionsAt + 4 * (std::size_t) i, 4);
+    return v;
+}
+void Doc::setOption (int i, int raw) noexcept
+{
+    const std::int32_t v = raw;
+    if (i >= 0 && optionsAt + 4 * (std::size_t) i + 4 <= std::min (head.size(), optionsAt + 28))
+        std::memcpy (head.data() + optionsAt + 4 * (std::size_t) i, &v, 4);
+}
+int Doc::optionByte (int offset) const noexcept
+{
+    const auto at = optionsAt + (std::size_t) offset;
+    return offset >= 28 && (std::size_t) offset < optionsSize (version) && at < head.size() ? head[at] : 0;
+}
+void Doc::setOptionByte (int offset, int value) noexcept
+{
+    const auto at = optionsAt + (std::size_t) offset;
+    if (offset >= 28 && (std::size_t) offset < optionsSize (version) && at < head.size())
+        head[at] = (std::uint8_t) value;
+}
+int Doc::use1() const noexcept
+{
+    const auto at = optionsAt + optionsSize (version);
+    return version >= 2 && at < head.size() ? head[at] : 0;
+}
+void Doc::setUse1 (int v) noexcept
+{
+    const auto at = optionsAt + optionsSize (version);
+    if (version >= 2 && at < head.size())
+        head[at] = (std::uint8_t) (v != 0);
+}
+
+const char* typeShortName (int type) noexcept
+{
+    static const char* const names[12] = { "SVF", "LP", "HP", "LP2", "BP", "BS", "HP2", "AP", "LS", "PK", "HS", "LP3" };
+    return names[std::clamp (type, 0, 11)];
+}
+
+std::optional<Doc> readDoc (const std::vector<std::uint8_t>& blob)
+{
+    if (parse (blob) == nullptr) // (the same acceptance as the engine's)
+        return std::nullopt;
+    Doc d;
+    std::memcpy (&d.versionWord, blob.data(), 4);
+    d.version = (int) (d.versionWord > 0xffffu ? d.versionWord >> 16 : d.versionWord);
+    const auto body = inflateZlib (blob.data() + 4, blob.size() - 4, false, 16u << 20);
+    if (! body)
+        return std::nullopt;
+    DocReader r { *body };
+    // head: 6 globals, the options block, USE1 + an int (v ≥ 2), the name (v < 6: int n + n bytes; else a length byte
+    // or 255 + int, then UTF-16)
+    std::size_t n = optionsAt + optionsSize (d.version);
+    r.pos = n;
+    if (d.version >= 2)
+        r.pos += 5;
+    if (d.version < 6)
+    {
+        const auto k = r.get<std::int32_t>();
+        if (k < 0)
+            return std::nullopt;
+        r.pos += (std::size_t) k;
+    }
+    else
+    {
+        std::size_t k = r.get<std::uint8_t>();
+        if (k == 255)
+        {
+            const auto big = r.get<std::int32_t>();
+            if (big < 0)
+                return std::nullopt;
+            k = (std::size_t) big;
+        }
+        r.pos += 2 * k;
+    }
+    if (r.failed || r.pos > body->size())
+        return std::nullopt;
+    d.head.assign (body->begin(), body->begin() + (std::ptrdiff_t) r.pos);
+    for (auto& u : d.u)
+    {
+        for (auto& p : u.p)
+            p = r.get<std::int32_t>();
+        u.mode = r.get<std::int32_t>();
+        u.type = r.get<std::int32_t>();
+        u.flat = r.get<std::uint8_t>();
+        u.enabled = r.get<std::uint8_t>();
+        u.wsOn = r.get<std::uint8_t>();
+        if (! readDocEnv (r, u.ws))
+            return std::nullopt;
+        u.wsBip = r.get<std::uint8_t>();
+        for (auto& a : u.art)
+        {
+            a.lead = r.get<std::int32_t>();
+            a.base = r.get<float>();
+            a.envDepth = r.get<float>();
+            a.lfoDepth = r.get<float>();
+            for (int e = 0; e < 10; ++e)
+            {
+                if (! readDocEnv (r, a.pat[(std::size_t) e]))
+                    return std::nullopt;
+                r.take (a.patKnobs[(std::size_t) e].data(), 16);
+            }
+            if (! readDocEnv (r, a.lfo))
+                return std::nullopt;
+            a.lfoKnobs.resize (a.lfo.ver >= 3 ? 5 : 4);
+            for (auto& k : a.lfoKnobs)
+                k = r.get<std::int32_t>();
+            for (auto& m : a.maps)
+                if (! readDocEnv (r, m))
+                    return std::nullopt;
+        }
+    }
+    if (r.failed)
+        return std::nullopt;
+    d.tail.assign (body->begin() + (std::ptrdiff_t) r.pos, body->end());
+    return d;
+}
+
+std::vector<std::uint8_t> writeDoc (const Doc& d)
+{
+    DocWriter w;
+    w.put (d.head.data(), d.head.size());
+    for (const auto& u : d.u)
+    {
+        for (const auto p : u.p)
+            w.add<std::int32_t> (p);
+        w.add<std::int32_t> (u.mode);
+        w.add<std::int32_t> (u.type);
+        w.add<std::uint8_t> (u.flat);
+        w.add<std::uint8_t> (u.enabled);
+        w.add<std::uint8_t> (u.wsOn);
+        writeDocEnv (w, u.ws);
+        w.add<std::uint8_t> (u.wsBip);
+        for (const auto& a : u.art)
+        {
+            w.add<std::int32_t> (a.lead);
+            w.add<float> (a.base);
+            w.add<float> (a.envDepth);
+            w.add<float> (a.lfoDepth);
+            for (int e = 0; e < 10; ++e)
+            {
+                writeDocEnv (w, a.pat[(std::size_t) e]);
+                w.put (a.patKnobs[(std::size_t) e].data(), 16);
+            }
+            writeDocEnv (w, a.lfo);
+            for (const auto k : a.lfoKnobs)
+                w.add<std::int32_t> (k);
+            for (const auto& m : a.maps)
+                writeDocEnv (w, m);
+        }
+    }
+    w.put (d.tail.data(), d.tail.size());
+    std::vector<std::uint8_t> out (4);
+    std::memcpy (out.data(), &d.versionWord, 4);
+    const auto z = zlibStored (w.b);
+    out.insert (out.end(), z.begin(), z.end());
+    return out;
+}
+
+std::vector<float> curveShape (const DocEnv& e, bool map, int count, double span)
+{
+    std::vector<float> out ((std::size_t) std::max (count, 2), 0.0f);
+    Env env;
+    env.kind = e.kind, env.ver = e.ver, env.flags = e.flags, env.on = e.on, env.decay = e.decay, env.loop = e.loop, env.sus = e.sus;
+    float prevY = 0.0f;
+    for (const auto& q : e.pts)
+    {
+        Pt p;
+        p.dt = (float) q.dt;
+        p.y = std::isnan (q.y) ? prevY : (float) q.y;
+        prevY = p.y;
+        p.t = q.tension;
+        p.mode = q.mode;
+        env.pts.push_back (p);
+    }
+    Curve c;
+    c.build (env, 0.0, map);
+    c.scale = 1.0;
+    const auto n = (int) out.size();
+    c.table (out.data(), n, map ? 1.0 / (double) (n - 1) : std::max (1.0e-9, span / (double) (n - 1)));
+    return out;
+}
+
+void upgradeParams (EffectSlot& slot, std::size_t savedCount) noexcept
+{
+    if (savedCount > 48)
+        return;
+    const auto s = parse (slot.state);
+    for (int i = 48; i < paramCount; ++i)
+    {
+        const int k = flIndexOf (i);
+        slot.params[(std::size_t) i] = s ? valueFromRaw (k, rawParam (*s, k)) : info().params[(std::size_t) i].defaultValue;
+    }
+}
 } // namespace lynx::philter

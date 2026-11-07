@@ -72,9 +72,26 @@ TEST (convolver_engine)
         for (int k = 0; k < 4; ++k)
             putI (b, -1);
     };
+    // the EQ curve's map with points of our own: Δx, level, tension, mode (the sign byte as FL writes it)
+    using EqPts = std::vector<lynx::convolver::EnvPoint>;
+    auto eqMap = [&] (std::vector<std::uint8_t>& b, const EqPts& pts) {
+        putI (b, 3);
+        putI (b, 3);
+        putI (b, (std::int32_t) pts.size());
+        for (std::size_t i = 0; i < pts.size(); ++i)
+        {
+            const auto& p = pts[i];
+            putD (b, p.dt), putD (b, p.y), putF (b, p.tension);
+            const std::uint8_t sign = i == 0 ? 0 : (p.tension == 0.0f ? 2 : (p.tension > 0.0f ? 1 : 0xff));
+            b.push_back (p.mode), b.push_back (0), b.push_back (0), b.push_back (sign);
+        }
+        putI (b, 0);
+        for (int k = 0; k < 4; ++k)
+            putI (b, -1);
+    };
     // version-15 state with an embedded WAV
     auto state = [&] (const std::vector<std::uint8_t>& w, int frames, int rate, std::array<int, 4> params, std::array<int, 5> knobs,
-                      bool normalise, double eq0, double eq1) {
+                      bool normalise, double eq0, double eq1, const EqPts& curve = {}) {
         std::vector<std::uint8_t> b;
         putI (b, 0xf0003);
         for (int v : params)
@@ -86,7 +103,10 @@ TEST (convolver_engine)
         putD (b, -1.0), putD (b, -1.0), putD (b, 0.0), putD (b, secs), putF (b, 0.02f);
         for (int k = 0; k < 4; ++k)
             env (b, 6, secs, 0.5, 0.5);
-        env (b, 3, 1.0, eq0, eq1);
+        if (curve.empty())
+            env (b, 3, 1.0, eq0, eq1);
+        else
+            eqMap (b, curve);
         b.push_back (0), b.push_back (0), b.push_back (1), b.push_back (normalise ? 1 : 0);
         putI (b, 0);
         for (int v : knobs)
@@ -145,10 +165,61 @@ TEST (convolver_engine)
          { { 1500, 0.0f, 0.0f }, { 3100, -0.96503818f, -0.408105195f }, { 4444, 0.308390796f, 0.269355118f },
            { 8999, 1.28672683f, 0.538172305f }, { 9500, -0.755565524f, -0.313999802f }, { 11999, -0.00642539468f, -0.00267019751f } });
 
-    // what is not decoded falls back to the approximation: a shaped EQ curve with the EQ amount up, an installation
-    // file without a reader, a truncated or unknown state
-    CHECK (! lynx::convolverFromFl (state (irA, 2000, 44100, { 0, 1000, 0, 0 }, { 0, 0, 0, 0, 500 }, true, 0.2, 0.8)).has_value());
-    CHECK (lynx::convolverFromFl (state (irA, 2000, 44100, { 0, 1000, 0, 0 }, { 0, 0, 0, 0, 0 }, true, 0.2, 0.8)).has_value());
+    // shaped EQ curves (REA_rodada60 §7 C.7): a linear-phase FIR from the curve, mixed by the EQ amount. Curve of our
+    // own with single-curve, double-curve, hold and smooth segments; 16-bit stereo IR, EQ amount 600
+    const EqPts curveC { { 0.0, 0.3, 0.0f, 0 },   { 0.1, 0.7, 0.4f, 0 },   { 0.2, 0.25, -0.3f, 1 }, { 0.15, 0.6, 0.0f, 0 },
+                         { 0.15, 0.85, 0.2f, 10 }, { 0.1, 0.5, 0.0f, 2 },   { 0.3, 0.4, -0.5f, 0 } };
+    const auto irC = wav (irPcm16 (2500, 2, 21, 0), 2, 44100, false);
+    const auto stC = state (irC, 2500, 44100, { 500, 1000, 0, 0 }, { 0, 0, 0, 0, 600 }, false, 0.5, 0.5, curveC);
+    run (stC, 44100.0,
+         { { 1500, -0.959381282f, 0.295649499f }, { 3100, 1.69355786f, 0.29091081f }, { 4444, -0.879927754f, 1.65361476f },
+           { 8999, -0.462104529f, 0.386536717f }, { 9500, 2.71528888f, 0.0113559086f }, { 11999, 0.0f, 0.0f } });
+    run (stC, 48000.0,
+         { { 1500, -0.936118662f, -0.0532133915f }, { 3100, 0.351017892f, 0.319867849f }, { 4444, 0.0732205659f, -0.149969548f },
+           { 8999, 1.69761217f, -0.415878028f }, { 9500, 0.303037286f, 0.440511107f }, { 11999, 2.73808833e-08f, 1.06956577e-08f } });
+    // mono float IR at 48 kHz played at 44.1 kHz: EQ amount 1000 after speed +150 and before predelay 60 (the curve's
+    // Δx sum to 2: FL scales them to 1)
+    const EqPts curveD { { 0.0, 0.5, 0.0f, 0 }, { 0.3, 0.2, -0.25f, 0 }, { 0.6, 0.95, 0.35f, 0 }, { 0.5, 0.45, 0.0f, 0 }, { 0.6, 0.65, 0.1f, 1 } };
+    const auto irD = wav (irPcm16 (3000, 1, 5, 12), 1, 48000, true);
+    const auto stD = state (irD, 3000, 48000, { 0, 1000, 0, 0 }, { 0, 60, 0, 150, 1000 }, false, 0.5, 0.5, curveD);
+    run (stD, 44100.0,
+         { { 1500, -0.0890971571f, -0.0445485786f }, { 3100, 0.956276f, 0.478138f }, { 4444, -7.81696129f, -4.04534912f },
+           { 8999, -1.6380682f, -0.8190341f }, { 9500, 0.876178622f, 0.438089311f }, { 11999, 0.063020736f, 0.031510368f } });
+    // with the EQ amount at 0 a shaped curve does nothing (not even the flat curve's gain)
+    {
+        const auto plain = lynx::convolver::parseState (stC);
+        auto off = *plain;
+        off.knobs[4] = 0;
+        const auto ir = lynx::convolver::decodeAudio (irC);
+        const auto k0 = lynx::convolver::buildKernel (off, *ir, 44100);
+        CHECK (k0.has_value() && k0->l.size() == 2500 && k0->l[100] == ir->l[100] && k0->r[2000] == ir->r[2000]);
+    }
+
+    // the editor's API: the curve read from and written back into a slot blob, its levels, the frequency axis and the
+    // level law
+    {
+        const auto slot = lynx::convolverFromFl (stC);
+        CHECK (slot.has_value());
+        auto blob = slot->state;
+        const auto got = lynx::convolver::readEqCurve (blob);
+        CHECK (got.has_value() && got->size() == curveC.size() && (*got)[4].mode == 10 && (*got)[2].tension == -0.3f && (*got)[1].y == 0.7);
+        CHECK (lynx::convolver::writeEqCurve (blob, curveD));
+        std::vector<std::uint8_t> fl, file;
+        CHECK (lynx::convolver::unpackBlob (blob, fl, file));
+        // the same bytes as a state written with that curve, and the rest of the state unchanged
+        CHECK (fl == state (irC, 2500, 44100, { 500, 1000, 0, 0 }, { 0, 0, 0, 0, 600 }, false, 0.5, 0.5, curveD));
+        const auto back = lynx::convolver::readEqCurve (blob);
+        CHECK (back.has_value() && back->size() == curveD.size() && (*back)[2].y == 0.95);
+        const auto lv = lynx::convolver::eqCurveLevels (curveC, 11);
+        CHECK (lv.size() == 11 && std::abs (lv[0] - 0.3f) < 1e-6f && std::abs (lv[10] - 0.4f) < 1e-6f && std::abs (lv[1] - 0.7f) < 1e-6f);
+        CHECK (std::abs (lynx::convolver::eqFrequencyToX (22050.0) - 1.0) < 1e-12 && lynx::convolver::eqFrequencyToX (0.0) == 0.0);
+        CHECK (std::abs (lynx::convolver::eqXToFrequency (lynx::convolver::eqFrequencyToX (1000.0)) - 1000.0) < 1e-9);
+        CHECK (std::abs (lynx::convolver::eqXToFrequency (lynx::convolver::eqFrequencyToX (60.0)) - 60.0) < 1e-9);
+        CHECK (lynx::convolver::eqLevelGain (0.5) == 1.0f && lynx::convolver::eqLevelGain (1.0) == 4.0f && lynx::convolver::eqLevelGain (0.0) == 0.0f);
+    }
+
+    // what is not decoded falls back to the approximation: an installation file without a reader, a truncated or
+    // unknown state
     {
         std::vector<std::uint8_t> f;
         putI (f, 0xf0003);

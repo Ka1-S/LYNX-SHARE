@@ -1,0 +1,3 @@
+// LYNX's plugins (round 180b). JUCE imports TaskDialogIndirect, which only Common Controls v6 has: without this manifest the
+// plugin does not load in a host whose own manifest doesn't ask for v6 (LoadLibrary error 127). 2 = the DLL's own manifest.
+2 24 "LynxPlugin.manifest"

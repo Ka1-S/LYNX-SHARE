@@ -1691,8 +1691,15 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
         const auto lift = compIn ? std::clamp (-40.0 - ridgeThr, 0.0, std::max (0.0, 20.0 - inDb)) : 0.0;
         p[r::compRatio] = ratioV (ratio);
         p[r::compThreshold] = linNorm (ridgeThr + lift, -40.0, 0.0);
-        p[r::compRelease] = logNorm (at ("compressor_release", 50.0) / 1000.0, 0.1, 4.0);
+        // tp172c11 (H32_dyn stairs and bursts, grid-scored): the reduction's release time constant is far longer than the
+        // dial (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, log-log between them), half that in Limiter mode; the attack
+        // is the dial itself, Limiter mode ~2.5 ms
+        const auto relDial = std::clamp (at ("compressor_release", 50.0), 1.0, 5000.0);
+        const auto relTau = relDial < 104.0 ? 0.25 * std::pow (0.35 / 0.25, std::log (relDial / 50.0) / std::log (104.0 / 50.0))
+                                            : 0.35 * std::pow (1.6 / 0.35, std::log (relDial / 104.0) / std::log (351.5 / 104.0));
+        p[r::compRelease] = logNorm (mode == 2 ? 0.5 * relTau : relTau, 0.1, 4.0);
         p[r::compFastAttack] = at ("compressor_attack", 20.0) < 3.0 ? 1.0f : 0.0f;
+        p[r::compAttackFine] = compIn ? (float) (std::clamp (mode == 2 ? 2.5 : at ("compressor_attack", 20.0), 0.1, 250.0) / 250.0) : 0.0f;
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
         // tp172c10: its reduction stops at exactly 27.5 dB (H32_dyn stairs, Compressor and Limiter at low thresholds)
         p[r::compGrCap] = compIn ? (float) (27.5 / 60.0) : 0.0f;

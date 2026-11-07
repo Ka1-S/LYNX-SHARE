@@ -1,4 +1,5 @@
 #include "core/Song.h"
+#include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
@@ -83,7 +84,12 @@ std::int64_t Song::songLength() const noexcept
     // Pattern Blocks (round 170f) play with the clips
     const auto blocksEnd = patternblocks::end (*this);
     end = std::max (end, blocksEnd);
-    const bool arranged = ! playlist.empty() || blocksEnd > 0;
+    // video clips (round 174d): a project with only its picture so far plays to the picture's end, not one bar
+    std::int64_t videoEndTicks = 0;
+    if (const auto videoSeconds = videotrack::videoEnd (videoTracks); videoSeconds > 0.0)
+        videoEndTicks = (std::int64_t) std::ceil (videotrack::ticksForSeconds (*this, videoSeconds) - 1e-6);
+    end = std::max (end, videoEndTicks);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0 || videoEndTicks > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
@@ -403,7 +409,7 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 
 int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
-    if (slot.kind == EffectKind::transmitter)
+    if (slot.kind == EffectKind::transmitter || (slot.kind == EffectKind::equo && output == 0)) // (EQUO: its band sends, round 173d3)
         return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
     return output == 0 ? fruitySendTarget (slot) : -1;
 }
@@ -418,7 +424,8 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
         for (int o = 0; o < maxSlotSends; ++o)
             if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
-                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter });
+                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter
+                                                                                       || slots[(std::size_t) s].kind == EffectKind::equo });
     return out;
 }
 
@@ -1029,6 +1036,8 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        ? mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].mix
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
+        case AutomationTargetKind::vcaLevel:
+            return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
@@ -1048,6 +1057,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
+        case AutomationTargetKind::vcaLevel:
+            if (t.index < 0 || t.index >= (int) vcas.size())
+                return false;
+            vcas[(std::size_t) t.index].level = v;
+            return true;
         case AutomationTargetKind::mixerSend:
             if (! validTrack || ! routes (t.index, t.slot))
                 return false;
@@ -1148,24 +1162,13 @@ float Song::targetValueAt (const AutomationTarget& target, double tick) const
 
 double Song::tempoAt (double tick) const
 {
-    if (mode != PlayMode::song)
-        return bpm;
-
-    AutomationTarget tempo;
-    tempo.kind = AutomationTargetKind::tempo;
-    if (const auto v = targetValueAt (tempo, tick); ! std::isnan (v))
-        return tempoFromValue (v);
-
-    return bpm;
+    // tempo automation and FL's pattern Tempo events (issue #86, core/TempoMap.h)
+    return tempomap::tempoAt (*this, tick);
 }
 
 double Song::secondsForTicks (std::int64_t ticks) const
 {
-    const auto hasTempo = mode == PlayMode::song
-                          && std::any_of (automations.begin(), automations.end(),
-                                          [] (const Automation& a) { return a.target.kind == AutomationTargetKind::tempo; });
-
-    if (! hasTempo)
+    if (! tempomap::active (*this))
         return (double) ticks * 60.0 / (std::max (1.0, bpm) * ppq);
 
     // integrate in 1/16 steps (playback changes tempo block by block; the difference is minimal)

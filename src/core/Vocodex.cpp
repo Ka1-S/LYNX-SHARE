@@ -1,10 +1,12 @@
 #include "core/Vocodex.h"
 
 #include <algorithm>
+#include <atomic>
 #include <climits>
 #include <cmath>
 #include <cstring>
 
+#include "core/DelphiMath.h"
 #include "core/FlEffects.h"
 #include "core/Instruments.h"
 #include "core/SytrusEngine.h"
@@ -60,23 +62,409 @@ const FreqScale& freqScale()
 // maps 1 (pan), 2 (gain offset) and 10 (pitch) are read centred (y − 0.5)
 constexpr std::array<double, 13> mapCentre { 0, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0 };
 
-// straight segments between the points (curved segments, tension ≠ 0, are not decoded; no demo uses them)
-double mapAt (const Map& m, double x) noexcept
+// --- the maps: FL's envelope library (REA_rodada35 §12; the same code as Love Philter's maps, REA_rodada66 §3.2) -------
+// "phase ≥ 1" as the library tests it: the high word of the double compared unsigned (a negative phase passes too)
+bool phaseWrap (double x) noexcept
 {
-    const auto n = m.x.size();
-    if (n == 0)
-        return 0.0;
-    if (n == 1 || x <= m.x[0])
-        return m.y[0];
-    for (std::size_t i = 1; i < n; ++i)
-        if (x <= m.x[i])
-        {
-            const double dx = m.x[i] - m.x[i - 1];
-            const double t = dx > 0 ? (x - m.x[i - 1]) / dx : 1.0;
-            return m.y[i - 1] + t * (m.y[i] - m.y[i - 1]);
-        }
-    return m.y[n - 1];
+    std::uint64_t b;
+    std::memcpy (&b, &x, 8);
+    return (std::uint32_t) (b >> 32) > 0x3fefffffu;
 }
+bool belowHalf (double x) noexcept
+{
+    std::uint64_t b;
+    std::memcpy (&b, &x, 8);
+    return (std::uint32_t) (b >> 32) < 0x3fe00000u;
+}
+std::uint32_t bitsOf (float f) noexcept
+{
+    std::uint32_t b;
+    std::memcpy (&b, &f, 4);
+    return b;
+}
+long long roundEven (double x) noexcept { return (long long) std::nearbyint (x); }
+
+// A map prepared for reading: Δx in double, levels in float (as FL keeps them), and per point the curve constants
+class MapReader
+{
+public:
+    MapReader() { pts.push_back ({}); }
+
+    MapReader (const Map& m, double centre)
+    {
+        const auto n = m.x.size();
+        float prevY = 0.0f;
+        double prevX = 0.0;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            Pt p;
+            p.dx = m.x[i] - prevX;
+            prevX = m.x[i];
+            p.y = (float) (i < m.y.size() ? m.y[i] : 0.0);
+            if (std::isnan (p.y))
+                p.y = prevY; // a NaN level takes the previous point's
+            prevY = p.y;
+            p.t = i < m.tension.size() ? m.tension[i] : 0.0f;
+            p.mode = i < m.mode.size() ? m.mode[i] : 0;
+            pts.push_back (p);
+        }
+        if (pts.empty())
+            pts.push_back ({});
+        offset = centre;
+        normalise();
+        prepare();
+    }
+
+    // FL's envelope cursor: the segment it is in, its phase and rate, the segment's start level and step, the value
+    struct Cursor
+    {
+        int idx = 0;
+        double phase = 0.0, rate = 0.0, start = 0.0, delta = 0.0, value = 0.0;
+    };
+
+    Cursor begin() const noexcept
+    {
+        Cursor c;
+        if (pts[0].dx == 0.0)
+            c.rate = 1.0, c.phase = 1.0;
+        else
+            c.rate = 1.0 / pts[0].dx;
+        c.start = c.value = level (0);
+        return c;
+    }
+
+    void advance (Cursor& c, double by) const noexcept
+    {
+        const int n = (int) pts.size();
+        c.phase += by * c.rate;
+        while (phaseWrap (c.phase))
+        {
+            const int prev = c.idx;
+            c.phase = c.rate == 0.0 ? by : (c.phase - 1.0) / c.rate;
+            c.start = level (c.idx);
+            if (c.idx < n - 1)
+                ++c.idx;
+            c.delta = level (c.idx) - c.start;
+            if (prev == c.idx)
+                c.phase = c.rate = 0.0;
+            else
+            {
+                const double dx = pts[(std::size_t) c.idx].dx;
+                if (dx <= 0.0)
+                    c.rate = 1.0, c.phase += 1.0;
+                else
+                    c.rate = 1.0 / dx, c.phase *= c.rate;
+            }
+        }
+        c.value = c.start + shape (c.idx, c.phase) * c.delta;
+    }
+
+    // FL's map read: a cursor set at the start, then advanced by x
+    double at (double x) const noexcept
+    {
+        auto c = begin();
+        advance (c, x);
+        return c.value;
+    }
+
+    // the sign byte FL computes for each point (saved with it): 0, ±1 = sign of the tension, 2 = a straight segment
+    std::int8_t signOf (std::size_t i) const noexcept { return i < pts.size() ? pts[i].sign : 0; }
+
+private:
+    struct Pt
+    {
+        double dx = 0.0;
+        float y = 0.0f, t = 0.0f;
+        std::uint8_t mode = 0;
+        std::int8_t sign = 0;
+        float p4 = 0.0f, p5 = 0.0f, p6 = 0.0f; // the curve constants (mode 0/1: k, 1/|k|, ln(|k| + 1))
+    };
+    std::vector<Pt> pts;
+    double offset = 0.0;
+
+    double level (int i) const noexcept { return (double) pts[(std::size_t) i].y - offset; }
+
+    // a point at x = 0 when the first Δx is positive, then every Δx scaled so the map spans 0…1
+    void normalise()
+    {
+        if (pts[0].dx > 0.0)
+        {
+            Pt p0;
+            p0.y = pts[0].y;
+            pts.insert (pts.begin(), p0);
+        }
+        double total = 0.0;
+        for (const auto& p : pts)
+            total += p.dx;
+        if (0.0 < total)
+        {
+            const double f = 1.0 / total;
+            if (f != 1.0)
+                for (auto& p : pts)
+                    p.dx = p.dx * f;
+        }
+        else
+        {
+            Pt end;
+            end.dx = 1.0 - total;
+            end.y = pts.back().y;
+            pts.push_back (end);
+        }
+    }
+
+    static int stepCount (const Pt& p) noexcept
+    {
+        if (p.mode > 7 || ((0x78u >> p.mode) & 1u) == 0) // stairs, smooth stairs, pulse, wave
+            return -1;
+        const auto a = (double) (float) (1.0 - (double) std::abs (p.t) * 0.6);
+        auto n = (int) roundEven ((double) (float) (dmath::exp (a * dmath::ln (1000001.0)) - 1.0) * 0.001);
+        if (p.mode == curveStairs && p.t >= 0.0f)
+            ++n;
+        return n;
+    }
+
+    void prepare()
+    {
+        constexpr float eps = 5.960464477539063e-08f;
+        const int n = (int) pts.size();
+        for (int i = 0; i < n; ++i)
+        {
+            auto& p = pts[(std::size_t) i];
+            if (p.dx < 0.0)
+                p.dx = 0.0;
+            if (i == 0)
+                continue;
+            const float t = p.t;
+            p.sign = (bitsOf (t) & 0x7fffffffu) == 0 ? 0 : (std::signbit (t) ? -1 : 1);
+            const int cnt = stepCount (p);
+            switch (p.mode)
+            {
+                case curveSingle:
+                case curveDouble:
+                {
+                    const auto e = (float) (dmath::exp ((double) std::abs (t) * dmath::ln (1000001.0)) - 1.0);
+                    const float k = e * (t > 0.0f ? 1.0f : (t < 0.0f ? -1.0f : 0.0f));
+                    p.p4 = k;
+                    if (k != 0.0f)
+                    {
+                        p.p5 = (float) (1.0 / std::abs ((double) k));
+                        p.p6 = (float) dmath::ln (std::abs ((double) k) + 1.0);
+                    }
+                    break;
+                }
+                case curveStairs:
+                {
+                    const int sg = t < 0.0f ? -1 : 1;
+                    p.p6 = (float) sg * 0.5f;
+                    p.p4 = (float) (cnt + 1);
+                    p.p5 = 1.0f / (p.p4 - (float) sg);
+                    break;
+                }
+                case curveSmoothStairs:
+                    p.p4 = (float) (cnt + 1);
+                    p.p5 = 1.0f / p.p4;
+                    break;
+                case curvePulse:
+                {
+                    const int sg = t < 0.0f ? -1 : 1;
+                    p.p6 = (float) sg * 0.5f;
+                    p.p4 = (float) ((cnt + 1) * 2);
+                    p.p5 = 6.2831855f;
+                    break;
+                }
+                case curveWave:
+                    p.p4 = (float) ((double) cnt + 0.5);
+                    p.p5 = 6.2831855f;
+                    if (cnt == 0 && p.sign > 0)
+                        p.sign = 2;
+                    break;
+                case curveSingle2:
+                case curveDouble2: p.p4 = t; break;
+                case curveHalfSine: p.p4 = (float) std::abs ((double) t); break;
+                case curveSmooth: prepareSmooth (i, eps); break;
+                case curveSingle3:
+                case curveDouble3:
+                {
+                    double d = std::abs ((double) t) * 0.9;
+                    if (d <= 1.52587890625e-05)
+                        d = 1.52587890625e-05;
+                    const double u = 1.0 - d;
+                    p.p4 = (float) (1.0 - u * u * u);
+                    p.p5 = (1.0f - p.p4) / p.p4;
+                    p.p6 = p.p5;
+                    if (p.sign > 0)
+                    {
+                        p.p5 = -p.p5;
+                        p.p6 = p.p5 - 1.0f;
+                    }
+                    if (p.mode == curveDouble3)
+                    {
+                        p.p5 = (float) ((double) p.p5 * 0.5);
+                        p.p6 = (float) ((double) p.p6 * 0.5);
+                    }
+                    break;
+                }
+                default: break;
+            }
+            // straight when the tension is 0: single/double curve (all three), half sine, smooth
+            if (p.mode < 16 && ((0x1b83u >> p.mode) & 1u) != 0 && t == 0.0f)
+                p.sign = 2;
+        }
+    }
+
+    // mode 10: slopes from the neighbouring points (those that are "smooth" too)
+    void prepareSmooth (int i, float eps) noexcept
+    {
+        auto& p = pts[(std::size_t) i];
+        const int n = (int) pts.size();
+        const double h = (double) eps < p.dx ? p.dx : (double) eps;
+        const double y1 = p.y;
+        double y0 = y1, ypp = y1, rp = 1.0;
+        if (i - 1 >= 0)
+        {
+            y0 = ypp = pts[(std::size_t) (i - 1)].y;
+            if (pts[(std::size_t) (i - 1)].mode == curveSmooth)
+            {
+                rp = pts[(std::size_t) (i - 1)].dx / h;
+                if (i - 2 >= 0)
+                    ypp = pts[(std::size_t) (i - 2)].y;
+            }
+        }
+        double rn = 1.0, yn = y1;
+        if (i + 1 < n && pts[(std::size_t) (i + 1)].mode == curveSmooth)
+        {
+            rn = pts[(std::size_t) (i + 1)].dx / h;
+            yn = pts[(std::size_t) (i + 1)].y;
+        }
+        const double d = y1 - y0;
+        if (! ((double) eps <= std::abs (d)))
+        {
+            p.sign = 2;
+            return;
+        }
+        const double a = (ypp - y0) / d, b = (yn - y0) / d;
+        rp = rp > (double) eps ? rp : (double) eps;
+        rn = rn > (double) eps ? rn : (double) eps;
+        const double sr = (b - 1.0) / rn, sl = -a / rp;
+        const double one = 1.0 / 1.0;
+        p.p4 = 0.0f;
+        if (0.0f < (float) sr * (float) one)
+        {
+            const float w1 = (float) rn * 2.0f + 1.0f, w2 = (float) rn + 2.0f;
+            p.p4 = ((float) sr * (float) one * (w1 + w2)) / (w1 * (float) sr + w2 * (float) one);
+        }
+        p.p5 = 0.0f;
+        if (0.0f < (float) one * (float) sl)
+        {
+            const float w1 = 1.0f * 2.0f + (float) rp, w2 = 1.0f + (float) rp * 2.0f;
+            p.p5 = ((float) one * (float) sl * (w1 + w2)) / (w1 * (float) one + w2 * (float) sl);
+        }
+        p.p6 = (float) (1.0 - (double) std::abs (p.t));
+    }
+
+    static double singleK (const Pt& p, double x) noexcept
+    {
+        const auto kb = bitsOf (p.p4);
+        if (kb == 0)
+            return x;
+        if ((kb & 0x80000000u) == 0)
+            return 1.0 - (dmath::exp ((1.0 - x) * (double) p.p6) - 1.0) * (double) p.p5;
+        return (dmath::exp (x * (double) p.p6) - 1.0) * (double) p.p5;
+    }
+
+    // the fraction (0…1) of the segment ending at point i, at phase ph (double precision throughout, as Vocodex runs it)
+    double shape (int i, double ph) const noexcept
+    {
+        if (i < 0 || i >= (int) pts.size())
+            return 0.0;
+        const auto& p = pts[(std::size_t) i];
+        if (p.sign == 2)
+            return ph;
+        const double p4 = p.p4, p5 = p.p5, p6 = p.p6;
+        switch (p.mode)
+        {
+            case curveSingle: return singleK (p, ph);
+            case curveDouble:
+                if (belowHalf (ph))
+                    return singleK (p, ph * 2.0) * 0.5;
+                return 1.0 - singleK (p, (1.0 - ph) * 2.0) * 0.5;
+            case curveStairs: return (double) ((float) (int) roundEven (ph * p4 - p6) * p.p5);
+            case curveSmoothStairs:
+            {
+                const double v = ph * p4 - 0.5;
+                const auto k = (int) roundEven (v - 0.5);
+                double d = (v - (double) k) * 2.0 - 1.0;
+                if (p.sign < 0)
+                {
+                    const double z = 1.0 - std::abs (d);
+                    d = (1.0 - z * z * z) * (std::signbit (d) ? -1.0 : 1.0);
+                }
+                else
+                    d = d * d * d;
+                return ((double) k + d * 0.5 + 1.0) * p5;
+            }
+            case curvePulse: return (double) (roundEven (ph * p4 - p6) & 1);
+            case curveWave:
+            {
+                if (p.sign < 0)
+                    return (dmath::sin ((ph * p4 + 0.75) * p5) + 1.0) * 0.5;
+                const double v = ph * p4 - 0.5;
+                const auto k = (int) roundEven (v - 0.5);
+                return std::abs ((v - (double) k) * 2.0 - 1.0);
+            }
+            case curveSingle2:
+            {
+                const double d = p.sign > 0 ? 1.0 - ph : ph;
+                const double d3 = d * d * d;
+                return ph - (d3 * d3 - d) * p4;
+            }
+            case curveDouble2:
+            {
+                if (belowHalf (ph))
+                {
+                    const double x = ph * 2.0;
+                    const double d = p.sign > 0 ? 1.0 - x : x;
+                    const double d3 = d * d * d;
+                    return (x - (d3 * d3 - d) * p4) * 0.5;
+                }
+                const double x = (1.0 - ph) * 2.0;
+                const double d = p.sign > 0 ? 1.0 - x : x;
+                const double d3 = d * d * d;
+                return 1.0 - (x - (d3 * d3 - d) * p4) * 0.5;
+            }
+            case curveHalfSine:
+            {
+                const double q = (double) 1.5707963705062866; // π/2 in float
+                const double d = p.sign < 1 ? 1.0 - dmath::cos (ph * q) : dmath::sin (ph * q);
+                return ph - (ph - d) * p4;
+            }
+            case curveSmooth:
+            {
+                const double x2 = ph * ph, x1 = ph - 1.0;
+                return ph + ((((x2 * 3.0 - x2 * 2.0 * ph) + x2 * x1 * p4) + ph * x1 * x1 * p5) - ph) * p6;
+            }
+            case curveSingle3:
+                if (p.sign < 1)
+                    return p5 / (1.0 - p4 * ph) - p6;
+                return p5 / (1.0 - p4 * (1.0 - ph)) - p6;
+            case curveDouble3:
+                if (belowHalf (ph))
+                {
+                    if (p.sign < 1)
+                        return p5 / (1.0 - p4 * ph * 2.0) - p6;
+                    return p5 / (1.0 - p4 * (1.0 - ph * 2.0)) - p6;
+                }
+                else
+                {
+                    const double x = (1.0 - ph) * 2.0;
+                    if (p.sign < 1)
+                        return (1.0 - p5 / (1.0 - p4 * x)) + p6;
+                    return (1.0 - p5 / (1.0 - p4 * (1.0 - x))) + p6;
+                }
+            default: return 0.0; // hold (and unknown modes): the level stays until the point
+        }
+    }
+};
 
 // 2^x for the float exponents of the engine: integer exponents by repeated products, others through exp
 float powFloat (float base, float x) noexcept
@@ -132,6 +520,27 @@ double flushToFloat (double v) noexcept
         f = 0.0f;
     return (double) f;
 }
+
+// the x87 in extended precision for one of FL's x87 kernels (a no-op where long double is not the x87 format)
+#if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
+struct X87Extended
+{
+    unsigned short saved = 0;
+    X87Extended() noexcept
+    {
+        asm volatile ("fnstcw %0" : "=m"(saved) : : "memory");
+        const auto cw = (unsigned short) ((saved & ~0x0F00u) | 0x0300u); // 64-bit mantissa, round to nearest
+        asm volatile ("fldcw %0" : : "m"(cw) : "memory");
+    }
+    ~X87Extended() { asm volatile ("fldcw %0" : : "m"(saved) : "memory"); }
+    X87Extended (const X87Extended&) = delete;
+    X87Extended& operator= (const X87Extended&) = delete;
+};
+#else
+struct X87Extended
+{
+};
+#endif
 
 // --- biquads ---------------------------------------------------------------------------------------------------------
 struct Biquad
@@ -621,6 +1030,10 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
             x += f64 (o);
             m.x.push_back (x);
             m.y.push_back (f64 (o + 8));
+            float t = 0.0f;
+            std::memcpy (&t, d.data() + o + 16, 4);
+            m.tension.push_back (t);
+            m.mode.push_back (d[o + 20]);
         }
         o += 20;
     }
@@ -663,6 +1076,173 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
         }
     }
     return s;
+}
+
+// --- map editing -----------------------------------------------------------------------------------------------------
+namespace
+{
+// byte offset and length of each of the 13 map records in FL's state
+std::optional<std::array<std::pair<std::size_t, std::size_t>, 13>> mapRecords (const std::vector<std::uint8_t>& d)
+{
+    if (! parseState (d))
+        return std::nullopt;
+    std::array<std::pair<std::size_t, std::size_t>, 13> out {};
+    std::size_t o = 4;
+    for (auto& r : out)
+    {
+        std::int32_t n = 0;
+        std::memcpy (&n, d.data() + o + 8, 4);
+        r = { o, 12 + 24 * (std::size_t) n + 20 };
+        o += r.second;
+    }
+    return out;
+}
+
+// FL's state and LYNX's install-data trailer that follows it
+std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>> splitTrailer (const std::vector<std::uint8_t>& slotState)
+{
+    auto fl = splitInstallData (slotState).first;
+    std::vector<std::uint8_t> trailer (slotState.begin() + (std::ptrdiff_t) fl.size(), slotState.end());
+    return { std::move (fl), std::move (trailer) };
+}
+
+Map toMap (const std::vector<MapPoint>& points)
+{
+    Map m;
+    for (const auto& p : points)
+    {
+        m.x.push_back (p.x);
+        m.y.push_back (p.y);
+        m.tension.push_back (p.tension);
+        m.mode.push_back (p.mode);
+    }
+    return m;
+}
+} // namespace
+
+const MapInfo& mapInfo (int map) noexcept
+{
+    static const std::array<MapInfo, 13> infos { {
+        { "Band gain multiplier", "Equalizer", false, 0.5 },
+        { "Band panning", "Equalizer", true, 0.5 },
+        { "Band gain offset", "Equalizer", true, 0.5 },
+        { "Modulator noise level", "Equalizer", false, 0.0 },
+        { "Modulator pass-through", "Equalizer", false, 0.0 },
+        { "Hold", "Envelope follower", false, 0.5 },
+        { "Envelope attack", "Envelope follower", false, 0.5 },
+        { "Envelope release", "Envelope follower", false, 0.5 },
+        { "Band distribution", "Spectral distribution", false, 0.0 },
+        { "Band width", "Spectral distribution", false, 0.5 },
+        { "Modulator pitch shift", "Spectral distribution", true, 0.5 },
+        { "Saturation mix", "Envelope saturation", false, 0.0 },
+        { "Saturation curve", "Envelope saturation", false, 0.0 },
+    } };
+    return infos[(std::size_t) std::clamp (map, 0, 12)];
+}
+
+std::vector<MapPoint> defaultMap (int map)
+{
+    map = std::clamp (map, 0, 12);
+    if (map == 8) // E2 (440·2^(−29/12) Hz) … 20 kHz on FL's frequency scale
+    {
+        const auto& scale = freqScale();
+        const double low = std::exp (0.057762265046662105 * -29.0) * 440.0;
+        return { { 0.0, (double) (float) scale.toY (low) }, { 1.0, (double) (float) scale.toY (20000.0) } };
+    }
+    if (map == 12) // the identity curve
+        return { { 0.0, 0.0 }, { 1.0, 1.0 } };
+    const double y = mapInfo (map).defaultLevel;
+    return { { 0.0, y }, { 1.0, y } };
+}
+
+std::vector<MapPoint> mapPoints (const Map& map)
+{
+    std::vector<MapPoint> out;
+    for (std::size_t i = 0; i < map.x.size(); ++i)
+        out.push_back ({ map.x[i], i < map.y.size() ? map.y[i] : 0.0, i < map.tension.size() ? map.tension[i] : 0.0f,
+                         i < map.mode.size() ? map.mode[i] : (std::uint8_t) curveSingle });
+    return out;
+}
+
+std::optional<std::array<std::vector<MapPoint>, 13>> readMaps (const std::vector<std::uint8_t>& slotState)
+{
+    const auto s = parseState (splitInstallData (slotState).first);
+    if (! s)
+        return std::nullopt;
+    std::array<std::vector<MapPoint>, 13> out;
+    for (std::size_t m = 0; m < out.size(); ++m)
+        out[m] = mapPoints (s->maps[m]);
+    return out;
+}
+
+std::vector<std::uint8_t> withMap (const std::vector<std::uint8_t>& slotState, int map, const std::vector<MapPoint>& points)
+{
+    auto [fl, trailer] = splitTrailer (slotState);
+    const auto records = mapRecords (fl);
+    if (! records || map < 0 || map > 12 || points.empty())
+        return slotState;
+
+    // FL's editor keeps the ends at 0 and 1, levels in 0…1
+    auto pts = points;
+    std::stable_sort (pts.begin(), pts.end(), [] (const MapPoint& a, const MapPoint& b) { return a.x < b.x; });
+    if (pts.size() == 1)
+        pts.push_back (pts[0]);
+    for (auto& p : pts)
+    {
+        p.x = std::isfinite (p.x) ? std::clamp (p.x, 0.0, 1.0) : 0.0;
+        p.y = std::isfinite (p.y) ? (double) (float) std::clamp (p.y, 0.0, 1.0) : 0.0;
+        p.tension = std::isfinite (p.tension) ? std::clamp (p.tension, -1.0f, 1.0f) : 0.0f;
+        p.mode = std::min<std::uint8_t> (p.mode, curveDouble3);
+    }
+    pts.front().x = 0.0;
+    pts.back().x = 1.0;
+    pts.front().tension = 0.0f, pts.front().mode = curveSingle;
+
+    // the sign byte FL saves with each point is the one its loader computes (2 = a straight segment)
+    const MapReader reader (toMap (pts), 0.0);
+    const auto [at, length] = (*records)[(std::size_t) map];
+    std::vector<std::uint8_t> rec (fl.begin() + (std::ptrdiff_t) at, fl.begin() + (std::ptrdiff_t) (at + 12));
+    const auto n = (std::int32_t) pts.size();
+    std::memcpy (rec.data() + 8, &n, 4);
+    double prevX = 0.0;
+    for (std::size_t i = 0; i < pts.size(); ++i)
+    {
+        std::uint8_t p[24] {};
+        const double dx = pts[i].x - prevX, y = pts[i].y;
+        prevX = pts[i].x;
+        std::memcpy (p, &dx, 8);
+        std::memcpy (p + 8, &y, 8);
+        std::memcpy (p + 16, &pts[i].tension, 4);
+        p[20] = pts[i].mode;
+        p[23] = i == 0 ? 0 : (std::uint8_t) reader.signOf (i);
+        rec.insert (rec.end(), p, p + 24);
+    }
+    rec.insert (rec.end(), fl.begin() + (std::ptrdiff_t) (at + length - 20), fl.begin() + (std::ptrdiff_t) (at + length));
+
+    std::vector<std::uint8_t> out (fl.begin(), fl.begin() + (std::ptrdiff_t) at);
+    out.insert (out.end(), rec.begin(), rec.end());
+    out.insert (out.end(), fl.begin() + (std::ptrdiff_t) (at + length), fl.end());
+    if (! parseState (out))
+        return slotState;
+    out.insert (out.end(), trailer.begin(), trailer.end());
+    return out;
+}
+
+std::vector<std::uint8_t> withMapFollowsPitch (const std::vector<std::uint8_t>& slotState, int map, bool follows)
+{
+    const auto fl = splitInstallData (slotState).first;
+    const auto s = parseState (fl);
+    const auto at = s ? s->paramsAt + 80 + 0x24 + (std::size_t) map : 0;
+    if (! s || map < 0 || map > 12 || at >= fl.size())
+        return slotState;
+    auto out = slotState;
+    out[at] = follows ? 1 : 0;
+    return out;
+}
+
+double mapValue (const Map& map, double x, bool centred)
+{
+    return MapReader (map, centred ? 0.5 : 0.0).at (x);
 }
 
 // --- engine ----------------------------------------------------------------------------------------------------------
@@ -710,12 +1290,14 @@ struct Engine::Impl
     std::vector<double> tmp64a, tmp64b;
     std::vector<float> tmp32, env, envSum, x32a, x32b, voc, outBuf, modPassBuf, carPassBuf, noise, contourBuf, mono, carBuf, modBuf, gains;
 
-    double map (int m, double x) const noexcept { return mapAt (st.maps[(std::size_t) m], x) - mapCentre[(std::size_t) m]; }
+    std::array<MapReader, 13> maps;
+    double map (int m, double x) const noexcept { return maps[(std::size_t) m].at (x); }
 
     void setupBands();
     void setupPassFilters();
     void setupSaturation();
     void clear() noexcept;
+    bool takeOver (const Impl& o) noexcept;
     void filterBand (Voice& u, int sig, int lvl, int n, double* out) noexcept;
     void accumulate (int lv, const double* a, const double* b, double scale, int n2) noexcept;
     void saturate (float* e, int n, float dry, float wetGain, float sc) const noexcept;
@@ -1002,43 +1584,44 @@ void Engine::Impl::setupSaturation()
     auto* t = satTable.data() + 1;
     const double step = 4.0 / (double) n;
     double x = 0.0;
+    auto cursor = maps[12].begin(); // one cursor stepped along the table, as FL builds it
     for (int i = 0; i <= n; ++i)
     {
-        const double m = curve3 (mapAt (st.maps[12], x));
+        const double m = curve3 (cursor.value);
         const double v = std::clamp (std::nearbyint (m * 8191.75), -32768.0, 32767.0);
         t[i] = (std::int16_t) v;
-        const double l = std::log ((double) ((float) ((double) (i + 1) * step) * 2.0f + 1.0f));
-        x = (double) (float) (l * (double) 0.91023922f) * 0.5;
+        const double l = dmath::ln ((double) ((float) ((double) (i + 1) * step) * 2.0f + 1.0f));
+        const double next = (double) (float) (l * (double) 0.91023922f) * 0.5;
+        maps[12].advance (cursor, next - x);
+        x = next;
     }
     t[-1] = t[0];
     t[n + 1] = t[n];
 }
 
+// FL's kernel (FUN_0062bc80) runs on the x87 in extended precision with truncating conversions: the index is the
+// truncated x·(sc·size) and the interpolation and the final sum stay in extended precision until the float store
 void Engine::Impl::saturate (float* e, int n, float dry, float wetGain, float sc) const noexcept
 {
     const auto* t = satTable.data() + 1;
     const int size = satSize;
-    wetGain = wetGain * 3.0517578125e-05f;
+    const X87Extended precision;
+    const long double scale = (long double) sc * (long double) size;
+    const long double wet = (long double) wetGain * (long double) 3.0517578125e-05f, dryGain = dry;
     for (int k = 0; k < n; ++k)
     {
-        const float x = e[k];
-        const float f = x * sc * (float) size;
-        int i = (int) std::rint (f);
-        const float fr = f - (float) i;
-        float y;
-        if (i >= 0)
+        const long double x = e[k];
+        const long double f = x * scale;
+        long double y = 0.0L;
+        if (std::fabs (f) < 2147483648.0L) // (out of range, FL's conversion gives the "indefinite" integer: 0)
         {
-            i = std::min (i, size);
-            const float a = (float) t[i];
-            y = ((float) t[i + 1] - a) * fr + a;
+            const auto i = (long long) f; // truncation
+            const long double fr = f - (long double) i;
+            const auto j = (int) std::min<long long> (i < 0 ? -i : i, size);
+            const long double a = t[j], b = t[j + 1];
+            y = i >= 0 ? a + (b - a) * fr : -(a - (b - a) * fr);
         }
-        else
-        {
-            const int j = std::min (-i, size);
-            const float a = (float) t[j];
-            y = -(a - ((float) t[j + 1] - a) * fr);
-        }
-        e[k] = y * wetGain + x * dry;
+        e[k] = (float) (x * dryGain + y * wet);
     }
 }
 
@@ -1076,6 +1659,63 @@ void Engine::Impl::clear() noexcept
     fifoOut.pos = fifoFrames; // 16 zero frames queued: the Draft latency
     seed = 0;
     tailCount = 0;
+}
+
+bool Engine::Impl::takeOver (const Impl& o) noexcept
+{
+    if (o.fs != fs || o.draft != draft || o.bandCount != bandCount || o.order != order || o.unison != unison
+        || o.st.holdMode != st.holdMode || o.maxBlock != maxBlock || o.bands.size() != bands.size())
+        return false;
+    auto copyRing = [] (auto& to, const auto& from) {
+        if (to.size() == from.size())
+            std::copy (from.begin(), from.end(), to.begin());
+        return to.size() == from.size();
+    };
+    for (std::size_t b = 0; b < bands.size(); ++b)
+    {
+        auto& B = bands[b];
+        const auto& OB = o.bands[b];
+        if (B.level != OB.level)
+            continue; // (filtered at another octave level: that band starts afresh)
+        for (int v = -unison; v < 2; ++v)
+        {
+            auto& u = B.voices[(std::size_t) (v + 4)];
+            const auto& ou = OB.voices[(std::size_t) (v + 4)];
+            if (u.oversample == ou.oversample)
+                for (int i = 0; i < order; ++i)
+                    u.filters[(std::size_t) i].s = ou.filters[(std::size_t) i].s;
+            if (u.peak.window == ou.peak.window && copyRing (u.peak.value, ou.peak.value) && copyRing (u.peak.when, ou.peak.when))
+                u.peak.head = ou.peak.head, u.peak.count = ou.peak.count, u.peak.clock = ou.peak.clock;
+            if (u.rms.window == ou.rms.window && copyRing (u.rms.ring, ou.rms.ring))
+                u.rms.pos = ou.rms.pos, u.rms.sum = ou.rms.sum;
+            for (std::size_t k = 0; k < u.smoother.size(); ++k)
+                u.smoother[k].y = ou.smoother[k].y;
+            u.last = ou.last;
+        }
+    }
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        modHpFilters[i].s = o.modHpFilters[i].s;
+        carLpFilters[i].s = o.carLpFilters[i].s;
+        noiseHpFilters[i].s = o.noiseHpFilters[i].s;
+    }
+    analysis = o.analysis;
+    synthesis = o.synthesis;
+    if (contour && o.contour && contourPeak.window == o.contourPeak.window && copyRing (contourPeak.value, o.contourPeak.value)
+        && copyRing (contourPeak.when, o.contourPeak.when) && copyRing (zcRing, o.zcRing))
+    {
+        contourPeak.head = o.contourPeak.head, contourPeak.count = o.contourPeak.count, contourPeak.clock = o.contourPeak.clock;
+        contourSmoother = o.contourSmoother;
+        consonantHp.s = o.consonantHp.s;
+        zcPos = o.zcPos, zcCount = o.zcCount, zcPrev = o.zcPrev;
+    }
+    fifoIn = o.fifoIn;
+    fifoOut = o.fifoOut;
+    seed = o.seed;
+    tailCount = o.tailCount;
+    wetNow = o.wetNow, carPassNow = o.carPassNow, modPassNow = o.modPassNow; // the gains glide to the new targets
+    snap = o.snap;
+    return true;
 }
 
 void Engine::Impl::filterBand (Voice& u, int sig, int lvl, int n, double* out) noexcept
@@ -1528,6 +2168,8 @@ void Engine::prepare (const State& state, double sampleRate, int maxBlockFrames,
     if (s.toNoise && s.fromCar)
         p.noiseAmp *= 4.0f;
 
+    for (std::size_t m = 0; m < p.maps.size(); ++m)
+        p.maps[m] = MapReader (s.maps[m], mapCentre[m]);
     p.setupBands();
     p.setupPassFilters();
     p.setupSaturation();
@@ -1568,6 +2210,11 @@ void Engine::flush() noexcept
 {
     impl->clear();
     impl->snap = true;
+}
+
+bool Engine::takeOver (const Engine& old) noexcept
+{
+    return impl->takeOver (*old.impl);
 }
 
 void Engine::process (const float* own, const float* mod, const float* car, float* out, int n) noexcept
@@ -1723,7 +2370,14 @@ public:
     explicit VocodexEffect (const std::vector<std::uint8_t>& slotState)
     {
         auto [raw, data] = splitInstallData (slotState);
-        state = parseState (raw);
+        if (auto parsed = parseState (raw))
+        {
+            cur = std::make_unique<Running>();
+            cur->st = *parsed;
+            accepted = *parsed;
+            trailer.assign (slotState.begin() + (std::ptrdiff_t) raw.size(), slotState.end());
+        }
+        const State* state = cur != nullptr ? &cur->st : nullptr;
         if (state && state->internalCarrier())
             carrier = makeInternalCarrier (*state, data.carrierState);
         if (state && state->params[sg] > 0)
@@ -1742,14 +2396,23 @@ public:
             v->assign (2 * chunk, 0.0f);
     }
 
+    ~VocodexEffect() override
+    {
+        delete pending.exchange (nullptr);
+        delete retired.exchange (nullptr);
+    }
+
     void prepare (double sr) noexcept override
     {
+        delete pending.exchange (nullptr); // (set up for the previous rate)
+        delete retired.exchange (nullptr);
+        rate = sr;
         if (runsEngine())
-            engine.prepare (*state, sr, chunk, state->draft());
+            cur->engine.prepare (cur->st, sr, chunk, cur->st.draft());
         if (carrier != nullptr)
             carrier->prepare (sr);
         if (sgPreset != nullptr)
-            sgEngine.prepare (sgPreset, sr, state->params[sg]);
+            sgEngine.prepare (sgPreset, sr, cur->st.params[sg]);
         for (auto& e : sgEffects)
             e->prepare (sr);
     }
@@ -1757,7 +2420,7 @@ public:
     void reset() noexcept override
     {
         if (runsEngine())
-            engine.flush();
+            cur->engine.flush();
         sgEngine.reset();
         for (auto& e : sgEffects)
             e->reset();
@@ -1767,7 +2430,7 @@ public:
     {
         if (! runsEngine())
             return 0;
-        auto latency = engine.latencySamples() + sgEngine.latencySamples();
+        auto latency = cur->engine.latencySamples() + sgEngine.latencySamples();
         for (const auto& e : sgEffects)
             latency += e->latencySamples(); // the Soundgoodizer approximation's limiter look-ahead
         return latency;
@@ -1789,8 +2452,17 @@ public:
         const auto sides = side;
         const auto used = useSide;
         useSide = { false, false };
-        if (! state)
+        if (cur == nullptr)
             return;
+        // an edited state (maps, options, controls) set up off the audio thread: it continues the running signal
+        if (retired.load (std::memory_order_acquire) == nullptr)
+            if (auto* next = pending.exchange (nullptr, std::memory_order_acq_rel))
+            {
+                next->engine.takeOver (cur->engine);
+                retired.store (cur.release(), std::memory_order_release);
+                cur.reset (next);
+            }
+        const State* state = &cur->st;
         if (auto* s = dynamic_cast<SytrusCarrier*> (carrier.get()))
             s->setTempo (bpm);
 
@@ -1844,7 +2516,7 @@ public:
                 else
                     car = input (state->carIn, 1, carBuf);
             }
-            engine.process (ownBuf.data(), mod, car, outBuf.data(), len);
+            cur->engine.process (ownBuf.data(), mod, car, outBuf.data(), len);
             for (int k = 0; k < len; ++k)
                 L[k] = outBuf[(std::size_t) (2 * k)], R[k] = outBuf[(std::size_t) (2 * k + 1)];
         }
@@ -1856,11 +2528,53 @@ public:
         }
     }
 
-private:
-    bool runsEngine() const noexcept { return state && (! state->internalCarrier() || carrier != nullptr); }
+    // Off the audio thread: a state that differs only in what FL's band set-up reads (maps, option bytes, controls,
+    // switches) is set up here and handed over; a new layout, carrier or Soundgoodizer setting builds a new effect.
+    bool acceptState (const std::vector<std::uint8_t>& slotState) noexcept override
+    {
+        if (cur == nullptr || rate <= 0.0 || ! runsEngine())
+            return false;
+        delete retired.exchange (nullptr, std::memory_order_acq_rel);
+        if (pending.load (std::memory_order_acquire) != nullptr)
+            return false;
+        try
+        {
+            const auto raw = splitInstallData (slotState).first;
+            const auto s = parseState (raw);
+            if (! s || ! std::equal (trailer.begin(), trailer.end(), slotState.begin() + (std::ptrdiff_t) raw.size(), slotState.end()))
+                return false;
+            const auto& a = accepted;
+            if (s->draft() != a.draft() || s->bands != a.bands || s->order != a.order || s->unison != a.unison
+                || s->holdMode != a.holdMode || s->internalCarrier() != a.internalCarrier() || s->params[sg] != a.params[sg]
+                || (s->internalCarrier() && (s->tone != a.tone || s->notes != a.notes)))
+                return false;
+            auto next = std::make_unique<Running>();
+            next->st = *s;
+            next->engine.prepare (next->st, rate, chunk, next->st.draft());
+            pending.store (next.release(), std::memory_order_release);
+            accepted = *s;
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
 
-    std::optional<State> state;
-    Engine engine;
+private:
+    bool runsEngine() const noexcept { return cur != nullptr && (! cur->st.internalCarrier() || carrier != nullptr); }
+
+    struct Running
+    {
+        State st;
+        Engine engine;
+    };
+    std::unique_ptr<Running> cur;                 // the audio thread's
+    std::atomic<Running*> pending { nullptr };    // set up by acceptState, taken by process
+    std::atomic<Running*> retired { nullptr };    // replaced by process, freed by acceptState / prepare / the destructor
+    State accepted;                               // the last state taken (acceptState's thread)
+    std::vector<std::uint8_t> trailer;            // the install data the carrier / SG stage were built from
+    double rate = 0.0;
     std::unique_ptr<Carrier> carrier;
     std::shared_ptr<const hlfx::MaximusPreset> sgPreset;
     hlfx::MaximusProcessor sgEngine;

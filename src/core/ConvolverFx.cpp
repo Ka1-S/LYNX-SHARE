@@ -69,13 +69,8 @@ public:
         int bits = 0;
         while ((1 << bits) < n)
             ++bits;
-        for (int i = 0; i < n; ++i)
-        {
-            int r = 0;
-            for (int b = 0; b < bits; ++b)
-                r |= ((i >> b) & 1) << (bits - 1 - b);
-            rev[(std::size_t) i] = r;
-        }
+        for (int i = 1; i < n; ++i)
+            rev[(std::size_t) i] = (rev[(std::size_t) (i >> 1)] >> 1) | ((i & 1) << (bits - 1));
     }
     int size() const noexcept { return n; }
     // in place; the inverse is unscaled
@@ -273,6 +268,540 @@ bool flat (const std::vector<EnvPoint>& e, double& level) noexcept
         if (p.y != level)
             return false;
     return true;
+}
+
+// ------------------------------------------------------------------------------------------------ EQ curve
+// The EQ curve is an FL map over 0…1 (the frequency axis) drawn with FL's shared envelope-curve law (the segment
+// modes of REA round 66 §3.2, here evaluated in double precision as this plugin's map iterator does). Steps of
+// REA_rodada60 §7 C.7: the curve is sampled on M + 1 frequency bins, each level becomes a gain, the response is smoothed
+// along the frequency axis, turned into a centred 2M-tap FIR and the impulse response is filtered by it; the EQ amount
+// mixes the filtered and the original impulse response.
+class EqCurve
+{
+public:
+    explicit EqCurve (const std::vector<EnvPoint>& src)
+    {
+        for (const auto& s : src)
+            pts.push_back ({ s.dt, s.y, s.tension, s.mode });
+        normalise();
+        prepare();
+        begin();
+    }
+
+    // advances the iterator by `adv` (x units) and returns the level there
+    double eval (double adv) noexcept
+    {
+        const int n = (int) pts.size();
+        if (! (idx >= 0 && idx <= n - 1))
+            return out;
+        phase += adv * rate;
+        while (phaseWrap (phase))
+        {
+            const int prev = idx;
+            phase = rate == 0.0 ? adv : (phase - 1.0) / rate;
+            start = pts[(std::size_t) idx].y;
+            if (idx < n - 1)
+                ++idx;
+            delta = pts[(std::size_t) idx].y - start;
+            if (prev == idx)
+                phase = rate = 0.0;
+            else
+            {
+                const double dt = pts[(std::size_t) idx].dt;
+                if (dt <= 0.0)
+                    rate = 1.0, phase += 1.0;
+                else
+                    rate = 1.0 / dt, phase *= rate;
+            }
+        }
+        out = start + shape (idx, phase) * delta;
+        return out;
+    }
+
+    // the sign byte FL stores with each point (0 for the first point, 2 = straight segment, ±1 = tension's sign)
+    static std::uint8_t signByte (const EnvPoint& p, bool first) noexcept
+    {
+        if (first)
+            return 0;
+        if (p.tension == 0.0f)
+            return p.mode < 16 && ((0x1b83u >> p.mode) & 1u) != 0 ? 2 : 0;
+        return p.tension > 0.0f ? 1 : 0xff;
+    }
+
+private:
+    struct P
+    {
+        double dt = 0, y = 0;
+        float t = 0;
+        std::uint8_t mode = 0;
+        int sign = 0;
+        float k = 0, ilk = 0, L = 0, p4 = 0, p5 = 0, p6 = 0;
+    };
+    std::vector<P> pts;
+    int idx = 0;
+    double phase = 0, rate = 0, start = 0, delta = 0, out = 0;
+
+    static bool phaseWrap (double x) noexcept // "x ≥ 1" tested on the high word (a negative phase also passes)
+    {
+        std::uint64_t b;
+        std::memcpy (&b, &x, 8);
+        return (std::uint32_t) (b >> 32) > 0x3fefffffu;
+    }
+    static bool belowHalf (double x) noexcept
+    {
+        std::uint64_t b;
+        std::memcpy (&b, &x, 8);
+        return (std::uint32_t) (b >> 32) < 0x3fe00000u;
+    }
+    static long long rnd (double x) noexcept { return (long long) std::nearbyint (x); }
+
+    // a map's x axis has length 1: a point at 0 is added when the first one starts later, the Δx are scaled to a sum of 1
+    void normalise()
+    {
+        if (pts.empty())
+        {
+            pts.push_back ({ 0.0, 0.5 });
+            pts.push_back ({ 1.0, 0.5 });
+            return;
+        }
+        if (pts[0].dt > 0.0)
+            pts.insert (pts.begin(), P { 0.0, pts[0].y });
+        double total = 0.0;
+        for (const auto& p : pts)
+            total += std::max (p.dt, 0.0);
+        if (total > 0.0)
+        {
+            const double f = 1.0 / total;
+            if (f != 1.0)
+                for (auto& p : pts)
+                    p.dt = p.dt * f;
+        }
+        else
+            pts.push_back ({ 1.0, pts.back().y });
+    }
+
+    static int stepCount (const P& p) noexcept
+    {
+        if (p.mode > 7 || ((0x78u >> p.mode) & 1u) == 0)
+            return -1;
+        const double a = (double) f32 (1.0 - std::abs ((double) p.t) * 0.6);
+        auto n = (int) rnd ((double) f32 (std::exp (a * std::log (1000001.0)) - 1.0) * 0.001);
+        if (p.mode == 3 && p.t >= 0.0f)
+            ++n;
+        return n;
+    }
+
+    void prepareSmooth (int i) noexcept
+    {
+        constexpr double eps = 5.960464477539063e-08;
+        auto& p = pts[(std::size_t) i];
+        const int n = (int) pts.size();
+        const double h = p.dt > eps ? p.dt : eps;
+        const double y1 = p.y;
+        const int j = i - 1;
+        const double y0 = j >= 0 ? pts[(std::size_t) j].y : y1;
+        double rp = 1.0, ypp = y0;
+        if (j >= 0 && pts[(std::size_t) j].mode == 10)
+        {
+            rp = pts[(std::size_t) j].dt / h;
+            if (i - 2 >= 0)
+                ypp = pts[(std::size_t) (i - 2)].y;
+        }
+        double rn = 1.0, yn = y1;
+        if (i + 1 < n && pts[(std::size_t) (i + 1)].mode == 10)
+        {
+            rn = pts[(std::size_t) (i + 1)].dt / h;
+            yn = pts[(std::size_t) (i + 1)].y;
+        }
+        const double d = y1 - y0;
+        if (std::abs (d) < eps)
+        {
+            p.sign = 2;
+            return;
+        }
+        const double a = (ypp - y0) / d, b = (yn - y0) / d;
+        rp = rp > eps ? rp : eps;
+        rn = rn > eps ? rn : eps;
+        const double sr = (b - 1.0) / rn, sl = -a / rp;
+        if (! (f32 (sr) > 0.0f))
+            p.p4 = 0.0f;
+        else
+        {
+            const float w1 = f32 (rn) * 2.0f + 1.0f, w2 = f32 (rn) + 2.0f;
+            p.p4 = (f32 (sr) * (w1 + w2)) / (w1 * f32 (sr) + w2);
+        }
+        if (! (f32 (sl) > 0.0f))
+            p.p5 = 0.0f;
+        else
+        {
+            const float w1 = 2.0f + f32 (rp), w2 = 1.0f + f32 (rp) * 2.0f;
+            p.p5 = (f32 (sl) * (w1 + w2)) / (w1 + w2 * f32 (sl));
+        }
+        p.p6 = f32 (1.0 - std::abs ((double) p.t));
+    }
+
+    void prepare()
+    {
+        const int n = (int) pts.size();
+        for (int i = 0; i < n; ++i)
+        {
+            auto& p = pts[(std::size_t) i];
+            if (p.dt <= 0.0)
+                p.dt = 0.0;
+            if (i == 0)
+                continue;
+            const float t = p.t;
+            p.sign = t == 0.0f ? 0 : (std::signbit (t) ? -1 : 1);
+            const int cnt = stepCount (p);
+            const int m = p.mode;
+            if (m == 6)
+            {
+                p.p4 = f32 ((double) cnt + 0.5);
+                p.p5 = 6.2831855f;
+                if (cnt == 0 && p.sign > 0)
+                    p.sign = 2;
+            }
+            else if (m < 2)
+            {
+                const auto e1 = f32 (std::exp ((double) std::abs (t) * std::log (1000001.0)) - 1.0);
+                p.k = e1 * (t > 0.0f ? 1.0f : (t < 0.0f ? -1.0f : 0.0f));
+                if (p.k != 0.0f)
+                {
+                    p.ilk = f32 (1.0 / std::abs ((double) p.k));
+                    p.L = f32 (std::log (std::abs ((double) p.k) + 1.0));
+                }
+            }
+            else if (m == 3)
+            {
+                const int sg = t < 0.0f ? -1 : 1;
+                p.p6 = (float) sg * 0.5f;
+                p.p4 = (float) (cnt + 1);
+                p.p5 = 1.0f / (p.p4 - (float) sg);
+            }
+            else if (m == 4)
+            {
+                p.p4 = (float) (cnt + 1);
+                p.p5 = 1.0f / p.p4;
+            }
+            else if (m == 5)
+            {
+                const int sg = t < 0.0f ? -1 : 1;
+                p.p6 = (float) sg * 0.5f;
+                p.p4 = (float) ((cnt + 1) * 2);
+                p.p5 = 6.2831855f;
+            }
+            else if (m == 7 || m == 8)
+                p.p4 = t;
+            else if (m == 9)
+                p.p4 = std::abs (t);
+            else if (m == 10)
+                prepareSmooth (i);
+            else if (m == 11 || m == 12)
+            {
+                auto dd = std::abs ((double) t) * 0.9;
+                if (dd <= 1.52587890625e-05)
+                    dd = 1.52587890625e-05;
+                const auto uu = 1.0 - dd;
+                p.p4 = f32 (1.0 - uu * uu * uu);
+                p.p5 = (1.0f - p.p4) / p.p4;
+                p.p6 = p.p5;
+                if (p.sign > 0)
+                {
+                    p.p5 = -p.p5;
+                    p.p6 = p.p5 - 1.0f;
+                }
+                if (m == 12)
+                {
+                    p.p5 = f32 ((double) p.p5 * 0.5);
+                    p.p6 = f32 ((double) p.p6 * 0.5);
+                }
+            }
+            if (m < 16 && ((0x1b83u >> m) & 1u) != 0 && t == 0.0f)
+                p.sign = 2;
+        }
+    }
+
+    void begin() noexcept
+    {
+        idx = 0;
+        if (pts[0].dt == 0.0)
+            rate = 1.0, phase = 1.0;
+        else
+            rate = 1.0 / pts[0].dt, phase = 0.0;
+        start = out = pts[0].y;
+        delta = 0.0;
+    }
+
+    static double curveK (const P& p, double x) noexcept
+    {
+        if (p.k == 0.0f)
+            return x;
+        if (p.k > 0.0f)
+            return 1.0 - (std::exp ((1.0 - x) * (double) p.L) - 1.0) * (double) p.ilk;
+        return (std::exp (x * (double) p.L) - 1.0) * (double) p.ilk;
+    }
+
+    // fraction (0…1) of the segment ending at point i at phase ph
+    double shape (int i, double ph) const noexcept
+    {
+        const auto& p = pts[(std::size_t) i];
+        if (p.sign == 2)
+            return ph;
+        const double p4 = p.p4, p5 = p.p5, p6 = p.p6;
+        switch (p.mode)
+        {
+            case 0: return curveK (p, ph);
+            case 1:
+                if (belowHalf (ph))
+                    return curveK (p, ph * 2.0) * 0.5;
+                return 1.0 - curveK (p, (1.0 - ph) * 2.0) * 0.5;
+            case 3: return (double) rnd (ph * p4 - p6) * p5;
+            case 4:
+            {
+                const auto v = ph * p4 - 0.5;
+                const auto i2 = (int) rnd (v - 0.5);
+                auto dd = (v - (double) i2) * 2.0 - 1.0;
+                if (p.sign < 0)
+                {
+                    const auto z = 1.0 - std::abs (dd);
+                    dd = (1.0 - z * z * z) * (std::signbit (dd) ? -1.0 : 1.0);
+                }
+                else
+                    dd = dd * dd * dd;
+                return ((double) i2 + dd * 0.5 + 1.0) * p5;
+            }
+            case 5: return (double) (rnd (ph * p4 - p6) & 1);
+            case 6:
+            {
+                if (p.sign < 0)
+                    return (std::sin ((ph * p4 + 0.75) * p5) + 1.0) * 0.5;
+                const auto v = ph * p4 - 0.5;
+                const auto i2 = (int) rnd (v - 0.5);
+                return std::abs ((v - (double) i2) * 2.0 - 1.0);
+            }
+            case 7:
+            {
+                const auto dd = p.sign > 0 ? 1.0 - ph : ph;
+                const auto d3 = dd * dd * dd;
+                return ph - (d3 * d3 - dd) * p4;
+            }
+            case 8:
+            {
+                if (belowHalf (ph))
+                {
+                    const auto x = ph * 2.0;
+                    const auto dd = p.sign > 0 ? 1.0 - x : x;
+                    const auto d3 = dd * dd * dd;
+                    return (x - (d3 * d3 - dd) * p4) * 0.5;
+                }
+                const auto x = (1.0 - ph) * 2.0;
+                const auto dd = p.sign > 0 ? 1.0 - x : x;
+                const auto d3 = dd * dd * dd;
+                return 1.0 - (x - (d3 * d3 - dd) * p4) * 0.5;
+            }
+            case 9:
+            {
+                const auto hp = (double) 1.5707963705062866;
+                const auto dd = p.sign > 0 ? std::sin (ph * hp) : 1.0 - std::cos (ph * hp);
+                return ph - (ph - dd) * p4;
+            }
+            case 10:
+            {
+                const auto x2 = ph * ph, x1 = ph - 1.0;
+                return ph + ((((x2 * 3.0 - x2 * 2.0 * ph) + x2 * x1 * p4) + ph * x1 * x1 * p5) - ph) * p6;
+            }
+            case 11:
+                if (p.sign < 1)
+                    return p5 / (1.0 - p4 * ph) - p6;
+                return p5 / (1.0 - p4 * (1.0 - ph)) - p6;
+            case 12:
+                if (belowHalf (ph))
+                {
+                    if (p.sign < 1)
+                        return p5 / (1.0 - p4 * ph * 2.0) - p6;
+                    return p5 / (1.0 - p4 * (1.0 - ph * 2.0)) - p6;
+                }
+                else
+                {
+                    const auto x = (1.0 - ph) * 2.0;
+                    if (p.sign < 1)
+                        return (1.0 - p5 / (1.0 - p4 * x)) + p6;
+                    return (1.0 - p5 / (1.0 - p4 * (1.0 - x))) + p6;
+                }
+            default: return 0.0; // 2 (hold) and unknown modes
+        }
+    }
+};
+
+// The editor's frequency axis (the plugin's display mapping, a log-like scale from 130.8 Hz = 440·2^(−21/12) to
+// 22 050 Hz with a linear stretch below): Hz → x in 0…1 and back
+struct FreqAxis
+{
+    double fmin, fmax, p1, p4, p5, p6, p7;
+    FreqAxis()
+    {
+        fmin = std::exp (0.057762265046662105 * -21.0) * 440.0;
+        fmax = 22050.0;
+        const double c = fmax / fmin;
+        p1 = std::log (2.0) / std::log (fmax * 2.0 / fmin);
+        const double p3 = std::log (c + 1.0);
+        p4 = 1.0 / p3;
+        p5 = 1.0 / (1.0 - p1) * p3;
+        p6 = c / (fmax - fmin);
+        p7 = 1.0 / c;
+    }
+    double toX (double hz) const noexcept
+    {
+        if (fmin <= hz)
+            return p1 + std::log ((hz - fmin) * p6 + 1.0) * p4 * (1.0 - p1);
+        return hz * p1 / fmin;
+    }
+    double toHz (double x) const noexcept
+    {
+        if (p1 <= x)
+            return (std::exp ((x - p1) * p5) - 1.0) * (fmax - fmin) * p7 + fmin;
+        return x * fmin / p1;
+    }
+};
+const FreqAxis& freqAxis()
+{
+    static const FreqAxis a;
+    return a;
+}
+
+// a curve level as a gain: (3^(2v) − 1)/2 — 0 = silence, 0.5 = unity, 1 = ×4 (+12 dB)
+float levelGain (double v) noexcept
+{
+    const float x = f32 (v * 2.0);
+    if (x == 1.0f)
+        return 1.0f;
+    return f32 ((std::exp ((double) (x * 1.09861231f)) - 1.0) * (double) 0.5f);
+}
+
+// a real, zero-phase response on M + 1 bins (0 … Nyquist) → the centred FIR of 2M taps: inverse FFT (÷ 2M), the
+// response's time 0 moved to tap M, a Hann window of 2M + 2 points without its two end points
+std::vector<float> centredFir (const std::vector<float>& mag)
+{
+    const int M = (int) mag.size() - 1, N = 2 * M;
+    std::vector<cd> z ((std::size_t) N);
+    for (int k = 0; k <= M; ++k)
+        z[(std::size_t) k] = cd (mag[(std::size_t) k], 0.0);
+    for (int k = 1; k < M; ++k)
+        z[(std::size_t) (N - k)] = z[(std::size_t) k];
+    Fft (N).run (z.data(), true);
+    std::vector<float> h ((std::size_t) N);
+    const double step = 2.0 * pi / (double) (N + 1);
+    for (int j = 0; j < N; ++j)
+    {
+        const auto w = f32 (0.5 - std::cos (step * (double) (j + 1)) * 0.5);
+        h[(std::size_t) j] = f32 (z[(std::size_t) ((j + M) % N)].real() / (double) N * (double) w);
+    }
+    return h;
+}
+
+// y[t] = Σ h[m]·x[t + M − m] for t = from … from + count − 1 (M = taps / 2; zeros outside x), two real signals at once
+void centredConvolve (const std::vector<float>& h, const float* a, const float* b, std::size_t n, std::size_t from, std::size_t count,
+                      float* outA, float* outB)
+{
+    const std::size_t K = h.size(), M = K / 2;
+    const int size = pow2AtLeast (n + K - 1);
+    Fft fft (size);
+    std::vector<cd> z ((std::size_t) size), hz ((std::size_t) size);
+    for (std::size_t i = 0; i < n; ++i)
+        z[i] = cd (a[i], b != nullptr ? b[i] : 0.0f);
+    for (std::size_t i = 0; i < K; ++i)
+        hz[i] = cd (h[i], 0.0);
+    fft.run (z.data(), false);
+    fft.run (hz.data(), false);
+    for (int k = 0; k < size; ++k)
+        z[(std::size_t) k] = mul (z[(std::size_t) k], hz[(std::size_t) k]);
+    fft.run (z.data(), true);
+    const double inv = 1.0 / (double) size;
+    for (std::size_t t = 0; t < count; ++t)
+    {
+        const cd v = z[from + t + M];
+        outA[t] = f32 (v.real() * inv);
+        if (outB != nullptr)
+            outB[t] = f32 (v.imag() * inv);
+    }
+}
+
+// the response smoother: a Gaussian exp(−½(k/128)²) on 65 537 bins made into its centred FIR (131 072 taps)
+const std::vector<float>& smoothingFir()
+{
+    static const std::vector<float> h = [] {
+        constexpr int n = 65537;
+        const auto slope = f32 (1.0 / ((double) n * 0.0078125 * 0.25));
+        std::vector<float> g ((std::size_t) n);
+        for (int k = 0; k < n; ++k)
+        {
+            const float r = (float) k * slope;
+            g[(std::size_t) k] = f32 (std::exp ((double) ((r * r) * -0.5f)));
+        }
+        return centredFir (g);
+    }();
+    return h;
+}
+
+// the response smoothed along the frequency axis: the plugin extends each end by its own value over one response
+// length (zeros beyond) and keeps the middle. The constant ends are added here from running sums of the smoother.
+std::vector<float> smoothResponse (const std::vector<float>& g)
+{
+    const auto& h = smoothingFir();
+    const long long L = (long long) g.size(), K = (long long) h.size(), s = K / 2;
+    std::vector<double> sum ((std::size_t) K + 1, 0.0); // sum[m] = h[0] + … + h[m − 1]
+    for (long long m = 0; m < K; ++m)
+        sum[(std::size_t) (m + 1)] = sum[(std::size_t) m] + (double) h[(std::size_t) m];
+    auto range = [&] (long long lo, long long hi) { // h[lo] + … + h[hi], clipped to the taps
+        lo = std::max (lo, 0LL), hi = std::min (hi, K - 1);
+        return hi < lo ? 0.0 : sum[(std::size_t) (hi + 1)] - sum[(std::size_t) lo];
+    };
+    std::vector<float> mid ((std::size_t) L);
+    centredConvolve (h, g.data(), nullptr, (std::size_t) L, 0, (std::size_t) L, mid.data(), nullptr);
+    std::vector<float> out ((std::size_t) L);
+    const double first = g.front(), last = g.back();
+    for (long long t = 0; t < L; ++t)
+    {
+        // padded index L + t + s − m: below L = the first value (down to index 0), from 2L = the last (up to 3L − 1)
+        const double ends = first * range (t + s + 1, L + t + s) + last * range (t + s - 2 * L + 1, t + s - L);
+        out[(std::size_t) t] = f32 ((double) mid[(std::size_t) t] + ends);
+    }
+    return out;
+}
+
+// the shaped EQ curve on the impulse response at `rate` (= host rate × speed): FUN_0087b2b0
+void applyEqCurve (std::vector<float>& l, std::vector<float>& r, const std::vector<EnvPoint>& curve, double rate, float speed, float amount)
+{
+    const std::size_t n = l.size();
+    if (n == 0)
+        return;
+    int bits = 1;
+    const long long want = (long long) std::nearbyint (rate * 2.0);
+    while ((1LL << bits) < want)
+        ++bits;
+    bits = std::clamp (bits, 4, 20);
+    const int M = 1 << bits;
+    const auto& ax = freqAxis();
+    const double q = rate / ((double) M * ax.fmax * (double) speed * 2.0);
+    EqCurve c (curve);
+    std::vector<float> g ((std::size_t) M + 1);
+    double prev = 0.0;
+    for (int k = 0; k <= M; ++k)
+    {
+        const auto x = f32 ((double) k * q);
+        const auto pos = (double) f32 (ax.toX ((double) x * ax.fmax));
+        g[(std::size_t) k] = levelGain (c.eval (pos - prev));
+        prev = pos;
+    }
+    const auto h = centredFir (smoothResponse (g));
+    std::vector<float> fl (n), fr (n);
+    centredConvolve (h, l.data(), r.data(), n, 0, n, fl.data(), fr.data());
+    const float dry = 1.0f - amount;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        l[i] = fl[i] * amount + l[i] * dry;
+        r[i] = fr[i] * amount + r[i] * dry;
+    }
 }
 
 // ------------------------------------------------------------------------------- partitioned convolution
@@ -738,6 +1267,8 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
     o += 0x24; // editor header (selection/view): no effect on the sound
     for (int e = 0; e < 5; ++e)
     {
+        if (e == 4)
+            s.eqAt = o;
         if (d.size() < o + 12)
             return std::nullopt;
         const auto n = i32 (d, o + 8);
@@ -755,6 +1286,7 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
         }
         o += 20;
     }
+    s.eqEnd = o;
     if (d.size() < o + 4)
         return std::nullopt;
     s.flagsAt = o;
@@ -874,13 +1406,11 @@ std::optional<Audio> decodeAudio (const std::vector<std::uint8_t>& b)
 bool kernelSupported (const State& s) noexcept
 {
     // envelopes that are not decoded must sit at their defaults: the first and third at 0.5, the fourth flat; the
-    // volume envelope must be flat; a shaped EQ curve is supported only with the EQ amount at 0 (then unused)
+    // volume envelope must be flat (the EQ curve is decoded in every form, REA_rodada60 §7 C.7)
     double lev = 0.5;
     if (! flat (s.envelopes[0], lev) || lev != 0.5 || ! flat (s.envelopes[2], lev) || lev != 0.5 || ! flat (s.envelopes[3], lev))
         return false;
-    if (! flat (s.envelopes[1], lev))
-        return false;
-    return flat (s.envelopes[4], lev) || ! ((float) s.knobs[4] * 0.001f > 0.0f);
+    return flat (s.envelopes[1], lev);
 }
 
 std::optional<Kernel> buildKernel (const State& s, const Audio& ir, int fs)
@@ -912,16 +1442,15 @@ std::optional<Kernel> buildKernel (const State& s, const Audio& ir, int fs)
     const double target = (double) ((float) fs * speed);
     if (target != ir.rate && ! l.empty())
         resample (l, r, target / ir.rate);
-    // flat EQ curve: its level v gives (3^(2v) − 1)/2
+    // EQ curve: a flat one at level v multiplies by (3^(2v) − 1)/2 whatever the EQ amount; a shaped one filters the
+    // impulse response when the amount is above 0, mixed by the amount (C.7)
     if (eqFlat)
     {
-        const float x = (float) eq * 2.0f;
-        float g = 1.0f;
-        if (x != 1.0f)
-            g = f32 ((std::exp ((double) (x * 1.09861231f)) - 1.0) * (double) 0.5f);
-        if ((double) g != 1.0)
+        if (const float g = levelGain (eq); (double) g != 1.0)
             scale (l, g), scale (r, g);
     }
+    else if (const float amount = (float) s.knobs[4] * 0.001f; amount > 0.0f)
+        applyEqCurve (l, r, s.envelopes[4], (double) ((float) fs * speed), speed, amount);
     // trailing silence
     long n = (long) l.size();
     {
@@ -1139,6 +1668,73 @@ bool unpackBlob (const std::vector<std::uint8_t>& b, std::vector<std::uint8_t>& 
     irFile.assign (b.begin() + (std::ptrdiff_t) (16 + n1), b.begin() + (std::ptrdiff_t) (16 + n1 + n2));
     return true;
 }
+
+// ------------------------------------------------------------------------------------------- EQ curve (editor)
+
+std::optional<std::vector<EnvPoint>> readEqCurve (const std::vector<std::uint8_t>& blob)
+{
+    std::vector<std::uint8_t> fl, file;
+    if (! unpackBlob (blob, fl, file))
+        return std::nullopt;
+    const auto s = parseState (fl);
+    if (! s)
+        return std::nullopt;
+    return s->envelopes[4];
+}
+
+bool writeEqCurve (std::vector<std::uint8_t>& blob, const std::vector<EnvPoint>& points)
+{
+    std::vector<std::uint8_t> fl, file;
+    if (points.empty() || ! unpackBlob (blob, fl, file))
+        return false;
+    const auto s = parseState (fl);
+    if (! s || s->eqAt == 0 || s->eqEnd < s->eqAt + 12 + 20)
+        return false;
+    // the map: kind and version (kept), the point count, 24-byte points (Δx, level, tension, mode, 0, 0, sign), then
+    // the map's 20-byte trailer (kept)
+    std::vector<std::uint8_t> m (fl.begin() + (std::ptrdiff_t) s->eqAt, fl.begin() + (std::ptrdiff_t) (s->eqAt + 8));
+    auto put = [&m] (const void* p, std::size_t n) {
+        const auto* q = (const std::uint8_t*) p;
+        m.insert (m.end(), q, q + n);
+    };
+    const auto count = (std::int32_t) points.size();
+    put (&count, 4);
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        const auto& p = points[i];
+        put (&p.dt, 8);
+        put (&p.y, 8);
+        put (&p.tension, 4);
+        const std::uint8_t tail[4] = { p.mode, 0, 0, EqCurve::signByte (p, i == 0) };
+        put (tail, 4);
+    }
+    m.insert (m.end(), fl.begin() + (std::ptrdiff_t) (s->eqEnd - 20), fl.begin() + (std::ptrdiff_t) s->eqEnd);
+    std::vector<std::uint8_t> out (fl.begin(), fl.begin() + (std::ptrdiff_t) s->eqAt);
+    out.insert (out.end(), m.begin(), m.end());
+    out.insert (out.end(), fl.begin() + (std::ptrdiff_t) s->eqEnd, fl.end());
+    blob = packBlob (out, file);
+    return true;
+}
+
+std::vector<float> eqCurveLevels (const std::vector<EnvPoint>& points, int count)
+{
+    std::vector<float> out ((std::size_t) std::max (count, 0));
+    if (count <= 0)
+        return out;
+    EqCurve c (points);
+    double prev = 0.0;
+    for (int i = 0; i < count; ++i)
+    {
+        const double x = count > 1 ? (double) i / (double) (count - 1) : 0.0;
+        out[(std::size_t) i] = (float) c.eval (x - prev);
+        prev = x;
+    }
+    return out;
+}
+
+double eqFrequencyToX (double hz) noexcept { return freqAxis().toX (hz); }
+double eqXToFrequency (double x) noexcept { return freqAxis().toHz (x); }
+float eqLevelGain (double level) noexcept { return levelGain (level); }
 
 void toParams (const std::array<int, 4>& raw, EffectParams& params) noexcept
 {
