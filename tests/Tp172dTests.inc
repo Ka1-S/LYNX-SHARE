@@ -96,3 +96,34 @@ TEST (autopan_rhythm_input_tp172d)
     CHECK (std::abs ((up - at0) - 12.0) < 0.5);
     CHECK (std::abs ((down - at0) + 12.0) < 0.5);
 }
+
+// Glow Leveler (classic, Compress, measured release): the side chain reduces more at both ends of the band than at 750 Hz,
+// as the original does (round 172d), and the 1 kHz law the earlier rounds fitted stays where it was
+TEST (glow_opto_side_chain_tp172d)
+{
+    using namespace lynx;
+    auto level = [] (double hz)
+    {
+        vmatch::opto::Settings s;
+        s.peakReduction = 56.16; s.gain = 40.0; s.hiFreq = 50.0;
+        s.measured = s.measuredRelease = true; s.makeupRef = s.peakReduction;
+        vmatch::opto::Leveler v;
+        v.prepare (48000.0);
+        const int n = 96000;
+        std::vector<float> a ((std::size_t) n), b;
+        for (int i = 0; i < n; ++i)
+            a[(std::size_t) i] = (float) (0.125 * std::sin (2.0 * 3.14159265358979 * hz * i / 48000.0));
+        b = a;
+        for (int i = 0; i < n; i += 1024)
+            v.process (a.data() + i, b.data() + i, std::min (1024, n - i), s);
+        double e = 0.0;
+        for (int i = n / 2; i < n; ++i)
+            e += (double) a[(std::size_t) i] * a[(std::size_t) i];
+        return 10.0 * std::log10 (e / (n / 2));
+    };
+    const auto lo = level (95.0), mid = level (750.0), k1 = level (1000.0), hi = level (6000.0);
+    std::printf ("  Glow side chain: 95 Hz %.2f, 750 Hz %.2f, 1 kHz %.2f, 6 kHz %.2f dB\n", lo, mid, k1, hi);
+    CHECK (mid - lo > 1.0);
+    CHECK (mid - hi > 3.0);
+    CHECK (std::abs (k1 - (-18.03)) < 0.5); // round 123's law at 1 kHz
+}

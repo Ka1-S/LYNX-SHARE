@@ -1600,6 +1600,11 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
 }
 std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& bytes, double bpm)
 {
+    return effectFromFlPreset (bytes, bpm, FlDataReader {});
+}
+
+std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& bytes, double bpm, const FlDataReader& data)
+{
     try
     {
         // the effect preset has the same format as the channel one: plugin name (0xC9) and state (0xD5)
@@ -1608,7 +1613,8 @@ std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& b
         if (project.channels.empty() || project.channels.front().pluginState.empty())
             return std::nullopt;
 
-        return effectFromFl (project.channels.front().pluginName, project.channels.front().pluginState, bpm);
+        return data ? effectFromFl (project.channels.front().pluginName, project.channels.front().pluginState, bpm, data)
+                    : effectFromFl (project.channels.front().pluginName, project.channels.front().pluginState, bpm);
     }
     catch (const flp::Error&)
     {
@@ -1697,6 +1703,7 @@ std::vector<std::string> flPluginsForEffect (EffectKind kind)
         case EffectKind::multibandDelay: return { "Multiband Delay" };
         case EffectKind::vocoder: return { "Fruity Vocoder" };
         case EffectKind::vocodex: return { "Vocodex" };
+        case EffectKind::lovePhilter: return { "Fruity Love Philter" }; // round 173d3: FL's presets in its preset bar and pictures
         case EffectKind::effector: return { "Effector" };
         case EffectKind::frequencySplitter: return { "Frequency Splitter" };
         default: return {};

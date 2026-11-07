@@ -71,6 +71,34 @@ std::vector<ParsedNote> notesOf (const ParsedMidi& midi, const Options& o)
 }
 } // namespace
 
+std::vector<PatternEvent> controllerEvents (const ParsedMidi& midi, const Options& o)
+{
+    std::vector<PatternEvent> out;
+    auto selected = [&o] (const RawEvent& e) { return (o.track < 0 || e.track == o.track) && (o.channels >> (e.status & 0x0F) & 1) != 0; };
+    auto shift = std::numeric_limits<std::int64_t>::max();
+    for (const auto& e : midi.events)
+        if (selected (e) && (e.status & 0xF0) == 0x90 && (e.data2 > 0 || o.zeroVelocityNotes))
+            shift = std::min (shift, e.tick);
+    for (const auto& e : midi.events)
+        if (selected (e) && (e.status & 0xF0) == 0xB0 && (o.controller < 0 || e.data1 == o.controller))
+        {
+            PatternEvent ev;
+            ev.tick = e.tick;
+            ev.value = e.data2 / 127.0f;
+            out.push_back (ev);
+        }
+    if (out.empty())
+        return out;
+    std::stable_sort (out.begin(), out.end(), [] (const PatternEvent& a, const PatternEvent& b) { return a.tick < b.tick; });
+    if (o.realign)
+    {
+        shift = std::min (shift, out.front().tick);
+        for (auto& ev : out)
+            ev.tick -= shift;
+    }
+    return out;
+}
+
 AutomationTarget controllerTarget (int cc, int channel) noexcept
 {
     if (cc == 7 || cc == 11)

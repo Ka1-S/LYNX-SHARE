@@ -138,6 +138,19 @@ std::vector<int> groupOf (const Song& song, int track);
 void createGroup (Song& song, const std::vector<int>& tracks, int current);
 // "Group › Auto color group": the tracks of `track`'s group take its colour. Returns how many changed.
 int autoColorGroup (Song& song, int track);
+// "Gradient color..." (FL's SetGradientColorMenuClick, REA_rodada177a §5): track k of the n selected tracks (in mixer
+// order) takes from + (to - from) * floor (k * 256 / (n - 1)) / 256 on each of R, G and B, so the first gets `from` and the
+// last gets `to`. Fewer than two tracks do nothing. Returns how many tracks changed.
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept;
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to);
+// "Assign to new Audio track(s)" (FL's AssignAudiotrackMenuClick, Tag 0; REA_rodada177a §6): each selected insert
+// takes the first untouched Playlist track (no name, colour, mode or clip; FL scans tracks 1–500) as its audio track,
+// named and coloured as the insert. An insert that is already linked to an audio track is skipped. Returns how many
+// tracks were assigned.
+int assignNewAudioTracks (Song& song, std::vector<int> inserts);
+// "Unassign from Audio track(s)" (the same handler, Tag 1): the first audio track linked to each selected insert goes
+// back to unassigned. Its name, colour and clips stay. Returns how many tracks changed.
+int unassignAudioTracks (Song& song, std::vector<int> inserts);
 // "Group › Separator" and "Layout › Dock to" for the selected tracks (inserts; the Master can be docked).
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on);
 void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock);
@@ -157,6 +170,26 @@ bool toggleFold (Song& song, int track);
 bool isFolded (const Song& song, int track);
 // Folds (or unfolds) every group that can fold. Returns how many changed.
 int foldAll (Song& song, bool fold);
+
+// --- VCA faders (round 177a slice 3, LYNX's addition; REA_rodada177a §3) ---------------------------------------------
+// The VCAs that act on `track`: those it is a member of and their parents, each once (indices into Song::vcas).
+std::vector<int> vcasOf (const Song& song, int track);
+// The VCAs' linear gain on `track` (1 when it is in none), from their fader positions.
+float vcaGain (const Song& song, int track);
+// True when a VCA acting on `track` is muted.
+bool vcaMuted (const Song& song, int track);
+// "New VCA from selected": a VCA (at unity) whose members are the selected inserts. Returns its index (-1: none).
+int createVca (Song& song, const std::vector<int>& tracks, const std::string& name);
+// Adds / removes inserts to / from VCA `vca`. Returns how many changed.
+int assignToVca (Song& song, const std::vector<int>& tracks, int vca);
+int removeFromVca (Song& song, const std::vector<int>& tracks, int vca);
+// Deletes VCA `vca`: its members keep their faders; its children lose their parent; its automation loses its target.
+bool deleteVca (Song& song, int vca);
+// "Merge VCA into members" (undoable through the song edit): each member's fader (and its volume automation, when it
+// has one) takes the VCA's gain, then the VCA goes back to unity. The sound does not change (within the faders' range).
+bool mergeVcaIntoMembers (Song& song, int vca);
+// Solo on a VCA: its members (and the inserts its child VCAs reach) are soloed with FL's solo rules (soloSelected).
+std::vector<int> vcaReach (const Song& song, int vca);
 
 // --- FL's mixer track menu › Routing (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950) ------------------------------
 enum class RouteKind

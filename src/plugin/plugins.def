@@ -1,0 +1,13 @@
+// LYNX's plugins for other hosts: THE one table (round 180b). A rename is one edit here: plugin/ExportCatalog.h, the VST3
+// wrapper, cmake/LynxPlugins.cmake and scripts/build-windows-zig.sh all read this file (one entry per line, keep the format).
+// Exported names only: inside LYNX the engines keep their names. Names were checked by a web search only, with no
+// trademark registry check. Once released, the clap id and the code never change: hosts store them in their projects.
+//
+// name, instrument, effect kind, instrument kind, clap id, VST3 code, VST3 category, built (1 = compiled now)
+LYNX_PLUGIN ("LYNX Facet EQ", 0, facetEq, dx10, "com.ka1-s.lynx.facet-eq", 0x4c6e7846, "Fx|EQ", 1)
+LYNX_PLUGIN ("LYNX FM10", 1, eq, dx10, "com.ka1-s.lynx.fm10", 0x4c6e7831, "Instrument|Synth", 1)
+LYNX_PLUGIN ("LYNX Osc Trio", 1, eq, threeosc, "com.ka1-s.lynx.osc-trio", 0x4c6e7832, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX SimOsc", 1, eq, simsynth, "com.ka1-s.lynx.simosc", 0x4c6e7833, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX Harmlite", 1, eq, harmless, "com.ka1-s.lynx.harmlite", 0x4c6e7834, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX Plucker", 1, eq, plucked, "com.ka1-s.lynx.plucker", 0x4c6e7835, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX Wave Wanderer", 1, eq, wavetraveller, "com.ka1-s.lynx.wave-wanderer", 0x4c6e7836, "Instrument|Synth", 0)

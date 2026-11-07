@@ -268,9 +268,21 @@ class PickerPopup final : public juce::Component
 {
 public:
     PickerPopup (const juce::String& titleText, juce::Colour initial, std::function<void (juce::Colour)> preview, std::function<void (juce::Colour)> done,
-                 std::function<void()> cancelled)
-        : picker (initial), onPreview (std::move (preview)), onDone (std::move (done)), onCancel (std::move (cancelled))
+                 std::function<void()> cancelled, std::function<void()> resetTo)
+        : picker (initial), onPreview (std::move (preview)), onDone (std::move (done)), onCancel (std::move (cancelled)), onReset (std::move (resetTo))
     {
+        if (onReset)
+        {
+            reset.onClick = [this] {
+                if (finished)
+                    return;
+                finished = true;
+                onReset();
+                if (auto* box = findParentComponentOfClass<juce::CallOutBox>())
+                    box->dismiss();
+            };
+            addAndMakeVisible (reset);
+        }
         title.setText (titleText, juce::dontSendNotification);
         title.setFont (theme::font (theme::type::body, true));
         addAndMakeVisible (title);
@@ -321,6 +333,7 @@ public:
         cancel.setBounds (buttons.removeFromRight (90));
         buttons.removeFromRight (8);
         ok.setBounds (buttons.removeFromRight (90));
+        reset.setBounds (buttons.removeFromLeft (80));
     }
 
 private:
@@ -339,17 +352,17 @@ private:
 
     juce::Label title;
     ColourPicker picker;
-    juce::TextButton ok { tr ("OK") }, cancel { tr ("Cancel") };
+    juce::TextButton ok { tr ("OK") }, cancel { tr ("Cancel") }, reset { tr ("Reset") };
     std::function<void (juce::Colour)> onPreview, onDone;
-    std::function<void()> onCancel;
+    std::function<void()> onCancel, onReset;
     bool finished = false;
 };
 } // namespace
 
 void showColourPickerPopup (juce::Rectangle<int> screenArea, const juce::String& title, juce::Colour initial, std::function<void (juce::Colour)> onPreview,
-                            std::function<void (juce::Colour)> onDone, std::function<void()> onCancel)
+                            std::function<void (juce::Colour)> onDone, std::function<void()> onCancel, std::function<void()> onReset)
 {
-    auto content = std::make_unique<PickerPopup> (title, initial, std::move (onPreview), std::move (onDone), std::move (onCancel));
+    auto content = std::make_unique<PickerPopup> (title, initial, std::move (onPreview), std::move (onDone), std::move (onCancel), std::move (onReset));
     juce::CallOutBox::launchAsynchronously (std::move (content), screenArea, nullptr);
 }
 

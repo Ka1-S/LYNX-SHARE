@@ -159,7 +159,7 @@ struct Page
     }
 
     // the plugin's name, big and quiet
-    void name (float x, float y, float w, float h, const char* text) { label (x, y, w, h, text, dim); }
+    void name (float x, float y, float w, float h, const char* text) { label (x, y, w, h, text, dim | enginePlate); }
 };
 
 // --- Harmless (Harmless_x64.dll TSynthEditorForm, 848 × 569; the keyboard strip under y = 500 left out) -------------
