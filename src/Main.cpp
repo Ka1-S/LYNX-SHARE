@@ -44,6 +44,8 @@
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
+#include "core/AlsImport.h"
+#include "ui/AlsExportDialog.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/PatcherEditor.h"
@@ -1541,6 +1543,14 @@ public:
             juce::File (args[i + 2].unquoted() + ".txt").replaceWithText (report);
             setApplicationReturnValue (written > 0 ? 0 : 1);
             quit();
+            return;
+        }
+
+        // --export-als <in.lynx|.flp|.als> <folder> [--live11] [--reference] [--scan]: "<folder>/<name> Project/<name>.als" (round 175a)
+        if (args.contains ("--export-als"))
+        {
+            const auto i = args.indexOf ("--export-als");
+            runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
             return;
         }
 
@@ -6650,6 +6660,57 @@ private:
     // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
     // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
     // report goes to output.txt
+    void runAlsExport (const juce::String& inputPath, const juce::String& folderPath, bool live11, bool reference)
+    {
+        juce::String error;
+        juce::StringArray notes;
+        juce::File als;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            bool ok = false;
+            // --scan: the targeted plugin scan an open runs first (child processes), so the set's plugins load
+            if (juce::JUCEApplication::getCommandLineParameterArray().contains ("--scan") && input.hasFileExtension ("flp;als"))
+            {
+                juce::MemoryBlock data;
+                if (input.loadFileAsData (data))
+                {
+                    const std::vector<std::uint8_t> bytes (static_cast<const std::uint8_t*> (data.getData()),
+                                                           static_cast<const std::uint8_t*> (data.getData()) + data.getSize());
+                    try
+                    {
+                        const auto uses = input.hasFileExtension ("als") ? lynx::alsForeignPlugins (bytes)
+                                                                         : lynx::flpForeignPlugins (flp::parseProject ({ bytes.data(), bytes.size() }));
+                        loader.getPluginHost().scanFiles (loader.getPluginHost().filesToScanFor (uses), {});
+                    }
+                    catch (const std::exception&)
+                    {
+                    }
+                }
+            }
+            if (input.hasFileExtension ("flp;als"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                loader.capturePluginStates();
+                const juce::File folder (folderPath);
+                folder.createDirectory();
+                als = lynx::writeAlsProject (loader.getSong(), &loader.getPluginHost(), live11 ? lynx::AlsVersion::live11 : lynx::AlsVersion::live12, ! reference, folder,
+                                             input.getFileNameWithoutExtension(), notes, error);
+            }
+        }
+        juce::String report;
+        report << (als != juce::File() ? "ok " + als.getFullPathName() : "error=" + error) << "\n" << notes.joinIntoString ("\n") << "\n";
+        juce::File (folderPath).getChildFile ("export-als.txt").replaceWithText (report);
+        setApplicationReturnValue (als != juce::File() ? 0 : 1);
+        quit();
+    }
+
     void runFlExport (const juce::String& inputPath, const juce::String& outputPath, bool substitute)
     {
         juce::String error;
