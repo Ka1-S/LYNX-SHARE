@@ -21,6 +21,14 @@ Without LYNX_TEST_MODE, the relative path was blank on 0.1.24 and opened on this
 A relative path as first instance opens the file. "beat.v2" writes "beat.v2.lynx". Save as "My Beat" over an existing file shows "already exists" and leaves that file alone. Recent lists the project. Through `--open-event-test`: at start, and later with a clean project, the file opens. With unsaved changes it asks, and Save on an untitled project saves it and then opens the waiting file.
 Not tested: a real Explorer double-click, the native dialog on 0.1.24, Recent and Save as on Windows (the File menu needs the foreground), .flp export and reopen, OneDrive, MSIX.
 
+### Built-in Save dialog listed no files
+Observed on 0.1.24 and this round's build, Linux: the list stayed empty after a wait and a mouse wheel, while the Open dialog listed the same files. juce_FileChooser.cpp:49 empties the file filter without `canSelectFiles`, and LYNX passed `saveMode` alone.
+`chooserFlags` adds it for every save dialog. Tested after the change:
+- Built-in, Linux: the list fills, and an existing file gives one warning, then Overwrite writes it.
+- Native, Windows: a new name saves. Overwriting, with and without the extension typed, gives one "Confirm Save As" and no LYNX alert.
+- zenity 4.2.1: a new name saves, and its arguments are the same as on 0.1.24. Overwriting was inconclusive under Xvfb with no window manager.
+Not tested: kdialog, the macOS save panel. Whether this relates to Discussion #92 is unknown.
+
 ### Read, not run
 macOS delivers Finder double-click, Open With and Dock drop through `application:openFile:` -> `anotherInstanceStarted` (juce_MessageManager_mac.mm). LYNX did not override it and JUCE's default is empty, so the file was dropped. This is a candidate for the reporter if they use a Mac.
 
