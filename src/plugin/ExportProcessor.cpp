@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 
+#include "core/EffectPresets.h"
 #include "core/Effects.h"
 #include "core/Instruments.h"
 #include "core/LynxBanks.h"
@@ -67,7 +68,7 @@ public:
     void setValue (float v) override { value.store (v, std::memory_order_relaxed); }
     float getDefaultValue() const override { return initial; }
     juce::String getText (float v, int) const override;
-    float getValueForText (const juce::String& text) const override { return juce::jlimit (0.0f, 1.0f, text.getFloatValue()); }
+    float getValueForText (const juce::String& text) const override;
     juce::String getLabel() const override { return {}; }
     bool isAutomatable() const override { return true; }
 
@@ -155,12 +156,17 @@ public:
         out.replaceAll (json.data(), json.size());
     }
 
-    void setStateInformation (const void* data, int size) override
+    void setStateInformation (const void* data, int size) override { loadState (data, size); }
+
+    // false: not a state of this plugin, nothing changed
+    bool loadState (const void* data, int size)
     {
+        if (data == nullptr || size <= 0)
+            return false;
         juce::String error;
         auto loaded = ProjectFile::fromJson (juce::String::createStringFromData (data, size), error);
         if (! loaded || ! matches (*loaded))
-            return;
+            return false;
         const juce::ScopedLock sl (songLock);
         song = std::move (*loaded);
         if (entry.instrument)
@@ -171,6 +177,7 @@ public:
         if (rate > 0.0)
             publish();
         editorDirty.store (true, std::memory_order_relaxed);
+        return true;
     }
 
     // ---- the editor's side (message thread)
@@ -328,6 +335,15 @@ private:
     juce::AudioBuffer<float> inputs;
     std::atomic<bool> resetWanted { false }, editorDirty { false };
 };
+
+float Parameter::getValueForText (const juce::String& text) const
+{
+    if (! owner.entry.instrument)
+        return presets::valueFromText (owner.entry.effect, engineIndex, text.toStdString()).value_or (getValue());
+    if (const auto* p = modelparams::find (owner.entry.synth, engineIndex); p != nullptr && p->high > p->low)
+        return juce::jlimit (0.0f, 1.0f, (text.getFloatValue() - p->low) / (p->high - p->low));
+    return juce::jlimit (0.0f, 1.0f, text.getFloatValue());
+}
 
 juce::String Parameter::getText (float v, int) const
 {
@@ -524,4 +540,10 @@ ExportProcessor::~ExportProcessor() = default;
 } // namespace
 
 juce::AudioProcessor* makeProcessor (const Entry& entry) { return new ExportProcessor (entry); }
+
+bool loadState (juce::AudioProcessor& processor, const void* data, int size)
+{
+    auto* p = dynamic_cast<ExportProcessor*> (&processor);
+    return p != nullptr && p->loadState (data, size);
+}
 } // namespace lynx::plugexport

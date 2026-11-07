@@ -313,7 +313,11 @@ private:
                         break;
                     all.write (chunk, (std::size_t) n);
                 }
-                self (p)->processor->setStateInformation (all.getData(), (int) all.getDataSize());
+                auto* s = self (p);
+                if (! loadState (*s->processor, all.getData(), (int) all.getDataSize()))
+                    return false;
+                if (s->hostParams != nullptr) // (CLAP: the values changed, the host must read them again)
+                    s->hostParams->rescan (s->host, CLAP_PARAM_RESCAN_VALUES);
                 return true;
             }
         };
