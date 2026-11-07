@@ -23,6 +23,9 @@ namespace videoview
 void install (AudioEngine& engine);
 // ffmpeg's report of a video (cached per path; empty when ffmpeg or the file is missing)
 juce::String report (const juce::String& path);
+// Opens the in-place type-in of a time (0 start, 1 end, 2 current) on an editor from makeVideoPlayerEditor, as a right
+// click on it does (the --videoshot harness)
+void openTypeIn (juce::Component& editor, int which);
 } // namespace videoview
 
 // `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)

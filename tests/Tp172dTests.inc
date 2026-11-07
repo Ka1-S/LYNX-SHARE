@@ -3,7 +3,7 @@
 namespace tp172d
 {
 // the pan angle (0 = left, 90 = right) of a steady 1 kHz tone through the Rhythm voicing, read over 50 ms at `at` (s)
-inline std::vector<double> rampAngles (float smoothing, const std::vector<double>& at)
+inline std::vector<double> rampAngles (float smoothing, const std::vector<double>& at, float pattern = 0.5f)
 {
     using namespace lynx;
     auto p = makeEffectSlot (EffectKind::autoPan).params;
@@ -14,7 +14,7 @@ inline std::vector<double> rampAngles (float smoothing, const std::vector<double
     p[rb + 4] = 180.0f / 210.0f;     // full width
     p[rb + 5] = 0.5f;                // centred
     p[rb + 6] = smoothing;
-    p[rb + 7] = 0.5f;                // the ramp
+    p[rb + 7] = pattern;             // the ramp (◀; 0.75 = ▶)
     p[rb + 9] = 0.0f;                // start phase
     p[rb + 10] = 0.0f;               // digital
     auto fx = makeEffect (EffectKind::autoPan);
@@ -48,6 +48,12 @@ TEST (autopan_ramp_pattern_tp172d)
     CHECK (formatEffectParam (EffectKind::autoPan, rb + 7, 0.0f, 120.0) == "left / right");
     CHECK (formatEffectParam (EffectKind::autoPan, rb + 7, 0.5f, 120.0) == "ramp");
     CHECK (formatEffectParam (EffectKind::autoPan, rb + 7, 1.0f, 120.0) == "8 steps");
+    CHECK (formatEffectParam (EffectKind::autoPan, rb + 7, 0.75f, 120.0) == "ramp right");
+    // the ▶ key: the same ramp, left to right
+    {
+        auto r = tp172d::rampAngles (0.0f, { 1.0, 2.0, 3.0 }, 0.75f);
+        CHECK (std::abs (r[0] - 21.7) < 1.5 && std::abs (r[1] - 44.7) < 1.5 && std::abs (r[2] - 67.2) < 1.5);
+    }
     // Smoothing 0: a straight line from the right to the left over the 4 s period, then a quick return
     const auto a = tp172d::rampAngles (0.0f, { 1.0, 2.0, 3.0, 4.1 });
     std::printf ("  Auto-pan ramp: %.1f %.1f %.1f %.1f deg\n", a[0], a[1], a[2], a[3]);
@@ -57,4 +63,36 @@ TEST (autopan_ramp_pattern_tp172d)
     const auto s = tp172d::rampAngles (0.5f, { 0.25, 1.0 });
     CHECK (s[0] > 30.0 && s[0] < 52.0);
     CHECK (s[1] > 60.0);
+}
+
+// round tp172d (look slice): PanMan's INPUT knob on the Rhythm voicing's level pod — the voicing now reads Auto-pan's
+// Input (-24 … +24 dB; the default 0 dB leaves it as it was)
+TEST (autopan_rhythm_input_tp172d)
+{
+    using namespace lynx;
+    auto level = [] (float input)
+    {
+        auto p = makeEffectSlot (EffectKind::autoPan).params;
+        constexpr int rb = autopan::count;
+        p[rb] = 1.0f;          // the Rhythm voicing
+        p[rb + 10] = 0.0f;     // digital
+        p[autopan::inputGain] = input;
+        auto fx = makeEffect (EffectKind::autoPan);
+        fx->prepare (48000.0);
+        const int n = 24000;
+        std::vector<float> a ((std::size_t) n), b;
+        for (int i = 0; i < n; ++i)
+            a[(std::size_t) i] = (float) (0.01 * std::sin (2.0 * 3.14159265358979 * 1000.0 * i / 48000.0));
+        b = a;
+        for (int i = 0; i < n; i += 256)
+            fx->process (a.data() + i, b.data() + i, std::min (256, n - i), p, 120.0);
+        double e = 0.0;
+        for (int i = n / 2; i < n; ++i)
+            e += (double) a[(std::size_t) i] * a[(std::size_t) i] + (double) b[(std::size_t) i] * b[(std::size_t) i];
+        return 10.0 * std::log10 (e + 1.0e-30);
+    };
+    const auto at0 = level (0.5f), up = level (0.75f), down = level (0.25f);
+    std::printf ("  Auto-pan rhythm input: +12 dB -> %+.2f dB, -12 dB -> %+.2f dB\n", up - at0, down - at0);
+    CHECK (std::abs ((up - at0) - 12.0) < 0.5);
+    CHECK (std::abs ((down - at0) + 12.0) < 0.5);
 }
