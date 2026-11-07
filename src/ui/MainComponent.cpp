@@ -2394,6 +2394,10 @@ public:
             button->onClick = [pick, view = view] { pick (view); };
         }
     }
+    void show (PlaylistArea::GridView view)
+    {
+        (view == PlaylistArea::GridView::beside ? both : view == PlaylistArea::GridView::grid ? grid : song).setToggleState (true, juce::dontSendNotification);
+    }
     void resized() override
     {
         auto r = getLocalBounds().reduced (0, 4);
@@ -2461,6 +2465,8 @@ void MainComponent::setClipGridView (PlaylistArea::GridView view)
 {
     if (clipGridView != nullptr)
         playlistArea.setClipGrid (clipGridView.get(), view);
+    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        flip->show (view);
 }
 
 void MainComponent::selectTabForSnapshot (int tab)

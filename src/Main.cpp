@@ -8452,6 +8452,8 @@ private:
             for (int r = 0; r < 4; ++r)
                 grid.scenes[(std::size_t) r].name = scenes[r];
         }, false);
+        offline.dispatchPendingMessages();
+        write ("pattern-edited"); // the same song as -pattern-after: the workflow must leave no trace
         ui.setClipLaunchWorkflow (true);
         offline.dispatchPendingMessages();
         if (auto* runtime = offline.launcherStateForSnapshot())

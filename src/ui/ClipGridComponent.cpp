@@ -1,4 +1,5 @@
 #include "ui/ClipGridComponent.h"
+#include "ui/PlaylistComponent.h"
 
 #include <algorithm>
 #include <cmath>
@@ -84,6 +85,7 @@ public:
         foot.removeFromLeft (6);
         backToPlaylist.setBounds (foot.removeFromLeft (small ? 104 : 124));
         clampScroll();
+        syncControls();
     }
 
     void paint (juce::Graphics& g) override
@@ -369,7 +371,10 @@ private:
         else
         {
             const auto& slot = grid.slots[(std::size_t) clip->gridSlot];
-            auto fill = slot.colour != 0 ? juce::Colour (slot.colour) : clip->kind == ClipKind::audio ? c::audioClip : c::noteSoft;
+            // (a clip looks as it does in the Playlist: the pattern's colour tells the clips apart)
+            auto fill = slot.colour != 0 ? juce::Colour (slot.colour)
+                        : clip->kind == ClipKind::audio ? c::audioClip
+                                                        : theme::tame (PlaylistComponent::patternColour (song, clip->pattern));
             g.setColour (playing ? fill.brighter (0.25f) : fill.withMultipliedBrightness (0.85f));
             g.fillRect (cell);
             if (playing)
@@ -383,9 +388,16 @@ private:
             juce::Path triangle;
             const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
             triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
-            g.setColour (playing ? c::ledOn : pending ? (blink ? c::ledOn : juce::Colours::white.withAlpha (0.3f)) : juce::Colours::white.withAlpha (0.85f));
+            // (a light pattern colour takes dark marks)
+            const auto ink = (playing ? fill.brighter (0.25f) : fill.withMultipliedBrightness (0.85f)).getPerceivedBrightness() > 0.62f ? c::bg1 : juce::Colours::white;
+            g.setColour (playing ? c::ledOn : pending ? (blink ? c::ledOn : ink.withAlpha (0.3f)) : ink.withAlpha (0.85f));
             g.fillPath (triangle);
-            g.setColour (juce::Colours::white);
+            if (playing && ink != juce::Colours::white)
+            {
+                g.setColour (ink);
+                g.strokePath (triangle, juce::PathStrokeType (1.0f));
+            }
+            g.setColour (ink);
             g.setFont (theme::font (theme::type::small));
             g.drawText (clipName (song, grid, *clip), cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
         }

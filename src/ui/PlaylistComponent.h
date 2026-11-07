@@ -550,6 +550,15 @@ public:
                 return;
             }
             clipGrid->setBounds (area.removeFromLeft (juce::jmax (juce::jmin (420, area.getWidth()), area.getWidth() * 45 / 100)).withTrimmedTop (top));
+            // a small window: the Playlist's room goes to its tracks; the toolbar's pattern box still picks a pattern
+            const auto pickerFits = area.getWidth() >= PatternPicker::width + 480;
+            picker.setVisible (pickerFits);
+            if (! pickerFits)
+            {
+                picker.setBounds (area.withWidth (0));
+                playlist.setBounds (area);
+                return;
+            }
         }
         auto column = area.removeFromLeft (PatternPicker::width);
         picker.setBounds (titleLeft > 0 ? column.withTrimmedTop (PlaylistComponent::toolbarHeight) : column);

@@ -901,6 +901,12 @@ void PlaylistComponent::resized()
     snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
     followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
     stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
+    // a narrow Playlist: what does not fit goes, rather than running under the panel's title buttons
+    const auto toolbarEnd = getWidth() - titleInsetRight;
+    if (tools.getRight() > toolbarEnd)
+        tools.setSize (juce::jmax (0, toolbarEnd - tools.getX()), h);
+    for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
+        c->setVisible (c->getRight() <= toolbarEnd);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
     const auto blocks = blocksSectionHeight();
     blocksShown = blocks > 0;
