@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/ChordReadout.h"
+
 #include <atomic>
 #include <map>
 #include <memory>
@@ -498,6 +500,19 @@ private:
     toolbar::MasterKnob masterVolume { engine, toolbar::MasterKnob::Kind::volume };
     toolbar::MasterKnob masterPitch { engine, toolbar::MasterKnob::Kind::pitch };
     toolbar::PerformanceMeter perfMeter;
+    toolbar::ChordPanel chordPanel;
+    juce::Label chordNearHint; // View › Toolbars: "Show detected MIDI chords near the hint bar"
+    chordread::Readout chordReadout;
+    std::array<std::array<std::uint64_t, 2>, chordread::channels> chordHeld {};
+    std::array<std::string, 12> chordNotes;
+    bool chordShowNearHint = false;
+    std::uint32_t chordNearHintUntil = 0;
+    void updateChordPanel();
+    void showChordPanelMenu();
+    void showChordText();
+    void addAudioLoggerMenu (juce::PopupMenu& menu);
+    void dumpAudioLog();
+    void refreshChordOptions();
     uitrace::Monitor uiTraceMonitor; // LYNX_TRACE_UI: message-thread stalls to ui.log (round 151)
     toolbar::MidiActivityLight midiLight;
     juce::StringArray midiLightInputs; // the open MIDI inputs (refreshed once a second)

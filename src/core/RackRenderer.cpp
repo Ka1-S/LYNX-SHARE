@@ -3458,12 +3458,16 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
     pullInputs (state, 0, numSamples);
+    if (meters != nullptr)
+        meters->rollingLog.push (RollingAudioLog::Position::preEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     runEffects (state, 0, numSamples);
 
     if (! song.mixer.empty())
     {
         applyTrackEq (song.mixer[0], 0, song.cleanMixer, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     }
+    if (meters != nullptr)
+        meters->rollingLog.push (RollingAudioLog::Position::postEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
 
     MixerMatrix target; // without a mixer: unity
 
