@@ -8366,7 +8366,13 @@ private:
                 last = std::max (last, c.end());
             const auto bars = juce::jmax (1, (int) (last / (4 * lynx::ppq)) + 1);
             playlist.setViewForSnapshot (juce::jmax (60.0, (ui.getWidth() - 300.0) / bars), 0, 0);
-            offline.dispatchPendingMessages();
+            // (a clip's waveform loads on a worker thread)
+            for (int wait = 0; wait < 30; ++wait)
+            {
+                juce::Thread::sleep (100);
+                offline.dispatchPendingMessages();
+                juce::MessageManager::getInstance()->runDispatchLoopUntil (1);
+            }
             saveSnapshot (ui, prefix + "-opened.png");
 
             juce::String report;
