@@ -192,7 +192,7 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
   factor: drawing at the lane's y=250 and y=926 showed 82.714 and 10.321 BPM, so 0.10709 BPM per pixel, 10 BPM at y=929 and 83.1 BPM at the lane's
   top (y=246): 512 / 7 = 73.14 BPM of range from the bottom. Same scrollbar position at project tempos 86 and 130, so it does not follow the
   project tempo (and 130 BPM starts out of view). [DECOMP + measured] UNPROVEN: that +0x7c8 is the zoom control by name.
-- **LYNX now:** the Tempo lane opens on 10..83.14 BPM with a scrollbar for the rest. Other lanes keep their full range, including channel pitch (FL's 20x is not matched).
+- **LYNX now:** the Tempo lane opens on 10..83.14 BPM with a scrollbar for the rest. Other lanes keep their full range. FL's 20x is read from the decompile only and not matched: LYNX has no channel pitch target (FL's param 4); its nearest lane, a plugin channel's MIDI pitch bend, is a different control.
   The piano roll's event lane is unchanged.
 - **Held value:** FL fills a Tempo lane's last value to the visible edge, past the pattern end (t87b at 86 BPM and the Default template at 130 BPM). LYNX
   now does so for Tempo only; other FL lanes were not observed.
