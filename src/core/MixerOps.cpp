@@ -230,6 +230,13 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
             c.flOrigin.fingerprint = flpexport::fingerprint (c);
         }
     }
+    for (auto& vca : song.vcas) // VCA members (round 177a slice 3)
+    {
+        for (auto& m : vca.members)
+            m = map (m);
+        vca.members.erase (std::remove_if (vca.members.begin(), vca.members.end(), [] (int m) { return m <= 0; }), vca.members.end());
+        std::sort (vca.members.begin(), vca.members.end());
+    }
     for (auto& pt : song.playlistTracks) // audio / instrument tracks (round 146a)
         if (pt.mixerTrack > 0)
         {
@@ -1086,6 +1093,125 @@ int foldAll (Song& song, bool fold)
         ++changed;
     }
     return changed;
+}
+
+std::vector<int> vcasOf (const Song& song, int track)
+{
+    std::vector<int> out;
+    const auto n = (int) song.vcas.size();
+    for (int v = 0; v < n; ++v)
+        if (std::binary_search (song.vcas[(std::size_t) v].members.begin(), song.vcas[(std::size_t) v].members.end(), track))
+            for (int p = v, guard = 0; p >= 0 && p < n && guard <= n; p = song.vcas[(std::size_t) p].parent, ++guard) // (a cycle stops)
+                if (std::find (out.begin(), out.end(), p) == out.end())
+                    out.push_back (p);
+    return out;
+}
+
+float vcaGain (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return 1.0f;
+    auto g = 1.0f;
+    for (const auto v : vcasOf (song, track))
+        g *= faderGain (song.vcas[(std::size_t) v].level);
+    return g;
+}
+
+bool vcaMuted (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return false;
+    const auto list = vcasOf (song, track);
+    return std::any_of (list.begin(), list.end(), [&song] (int v) { return song.vcas[(std::size_t) v].muted; });
+}
+
+int assignToVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    int changed = 0;
+    for (const auto t : tracks)
+        if (isInsert (song, t) && ! std::binary_search (members.begin(), members.end(), t))
+        {
+            members.insert (std::lower_bound (members.begin(), members.end(), t), t);
+            ++changed;
+        }
+    return changed;
+}
+
+int removeFromVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    const auto before = members.size();
+    members.erase (std::remove_if (members.begin(), members.end(),
+                                   [&tracks] (int m) { return std::find (tracks.begin(), tracks.end(), m) != tracks.end(); }),
+                   members.end());
+    return (int) (before - members.size());
+}
+
+int createVca (Song& song, const std::vector<int>& tracks, const std::string& name)
+{
+    Vca vca;
+    vca.name = name.empty() ? "VCA " + std::to_string (song.vcas.size() + 1) : name;
+    song.vcas.push_back (vca);
+    const auto index = (int) song.vcas.size() - 1;
+    assignToVca (song, tracks, index);
+    return index;
+}
+
+bool deleteVca (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    song.vcas.erase (song.vcas.begin() + vca);
+    for (auto& v : song.vcas)
+        v.parent = v.parent == vca ? -1 : v.parent > vca ? v.parent - 1 : v.parent;
+    song.forEachTarget ([vca] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::vcaLevel)
+            return;
+        if (t.index == vca)
+            t = AutomationTarget {};
+        else if (t.index > vca)
+            --t.index;
+    });
+    song.removeDeadMidiLinks();
+    return true;
+}
+
+std::vector<int> vcaReach (const Song& song, int vca)
+{
+    std::vector<int> out;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto list = vcasOf (song, t);
+        if (std::find (list.begin(), list.end(), vca) != list.end())
+            out.push_back (t);
+    }
+    return out;
+}
+
+bool mergeVcaIntoMembers (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    const auto gain = faderGain (song.vcas[(std::size_t) vca].level);
+    if (gain == 1.0f)
+        return false;
+    auto scaled = [gain] (float position) { return std::clamp (faderPosition (faderGain (position) * gain), 0.0f, 1.0f); };
+    for (const auto t : vcaReach (song, vca))
+    {
+        auto& m = song.mixer[(std::size_t) t];
+        m.volume = scaled (m.volume);
+        for (auto& a : song.automations) // the member's own volume automation carries the gain too
+            if (a.target.kind == AutomationTargetKind::mixerVolume && a.target.index == t)
+                for (auto& p : a.points)
+                    p.value = scaled (p.value);
+    }
+    song.vcas[(std::size_t) vca].level = unityFader;
+    return true;
 }
 
 void createGroup (Song& song, const std::vector<int>& tracks, int current)

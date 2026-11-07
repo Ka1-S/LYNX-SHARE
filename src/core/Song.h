@@ -4,6 +4,7 @@
 // The UI edits a copy and publishes an immutable snapshot to the audio thread
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -26,6 +27,16 @@ constexpr int ticksPerStep = ppq / stepsPerBeat;
 constexpr int maxMixerTracks = 501;   // 0 = Master, 1..500 inserts: FL 2026's dynamic mixer ("You can add a maximum of N tracks" up to 500;
                                       // round 166d, issue #14). Was 128 (FL's old 125 + Master)
 constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in FL
+
+// A press on a mixer fader's rail, away from the cap (FL, measured, REA_rodada177a section 4.2): the cap steps towards the
+// mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
+constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
+constexpr int faderRailRepeatMs = 64;
+constexpr float faderRailStepTowards (float value, float target) noexcept
+{
+    const auto distance = target - value;
+    return distance > faderRailStep ? value + faderRailStep : distance < -faderRailStep ? value - faderRailStep : target;
+}
 
 // FL mixer fader curve: g = (11^v - 1) / 10 with v = position * 1.25 (0 dB at 0.8;
 // +5.6 dB at maximum). docs/analise/REA_rodada2.md §2.2.
@@ -279,6 +290,17 @@ struct SamplerSettings
     float stretchBeats = 0.0f; // > 0: the whole sample lasts this long (in beats), following the BPM
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
+    float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
+    // pitch. True if it moved.
+    bool moveBakedPitchToKnob() noexcept
+    {
+        if (stretchPitch == 0.0f || (stretchMethod == StretchMethod::beats && keepPitch))
+            return false;
+        pitch = std::clamp (pitch + stretchPitch, -24.0f, 24.0f);
+        stretchPitch = 0.0f;
+        return true;
+    }
     float regionStart = 0.0f;  // played region of the sample (fractions 0..1)
     float regionEnd = 1.0f;
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
@@ -1097,6 +1119,21 @@ struct MixerTrack
 
 constexpr float maxTrackLatencyMs = 5000.0f; // FL's clamp (FUN_012a7230)
 
+// A VCA fader (round 177a slice 3, REA_rodada177a §3; LYNX's addition, FL Studio has none). It carries no audio: its
+// level multiplies the fader gain of each member insert (the levels add in dB), so post-fader sends follow and pre-fader
+// ones don't. An insert can be in several VCAs, and a VCA can follow a parent VCA. Muting a VCA mutes its members.
+// The members keep their own fader values and automation.
+struct Vca
+{
+    std::string name;
+    std::uint32_t colour = 0;     // 0xFFRRGGBB; 0 = theme default
+    float level = unityFader;     // fader position (unityFader = 0 dB)
+    bool muted = false;
+    std::vector<int> members;     // mixer inserts (1…), sorted; kept by mixerops' remap
+    int parent = -1;              // the VCA this one follows (index into Song::vcas), -1 = none
+    bool operator== (const Vca&) const = default;
+};
+
 struct Note
 {
     std::int64_t start = 0;   // ticks
@@ -1134,7 +1171,8 @@ enum class AutomationTargetKind : std::uint8_t
     effectParam,   // index = track, slot, param (built-in effect or plugin)
     tempo,         // song tempo: 0..1 = minTempo..maxTempo BPM
     effectMix,     // index = track, slot: slot dry/wet (0..1)
-    mixerSend      // index = source insert, slot = destination (0 = Master): the route's level knob (fader curve; issue #12)
+    mixerSend,     // index = source insert, slot = destination (0 = Master): the route's level knob (fader curve; issue #12)
+    vcaLevel       // index = VCA (Song::vcas): its fader (round 177a; LYNX's own, FL has no VCA)
 };
 
 constexpr double minTempo = 10.0, maxTempo = 522.0; // FL's range
@@ -1644,6 +1682,7 @@ struct Song
     Bar barAt (std::int64_t tick) const;
 
     std::vector<MixerTrack> mixer; // [0] = Master; empty = everything straight to the output
+    std::vector<Vca> vcas;         // VCA faders (round 177a); empty = none (no cost anywhere)
     // A/B of the LYNX substitutes (round 113): when set, every substitute slot plays as bypassed (the project's own
     // effects and the hosted plugins still play). Saved with the project.
     bool substitutesBypassed = false;

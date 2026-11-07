@@ -980,6 +980,7 @@ const char* targetKindName (AutomationTargetKind k)
         case AutomationTargetKind::tempo: return "tempo";
         case AutomationTargetKind::effectMix: return "effectMix";
         case AutomationTargetKind::mixerSend: return "mixerSend";
+        case AutomationTargetKind::vcaLevel: return "vcaLevel";
         case AutomationTargetKind::none: break;
     }
     return "none";
@@ -989,7 +990,8 @@ AutomationTargetKind targetKindFromName (const juce::String& name)
 {
     for (auto k : { AutomationTargetKind::channelVolume, AutomationTargetKind::channelPan, AutomationTargetKind::channelParam,
                     AutomationTargetKind::mixerVolume, AutomationTargetKind::mixerPan, AutomationTargetKind::effectParam,
-                    AutomationTargetKind::tempo, AutomationTargetKind::effectMix, AutomationTargetKind::mixerSend })
+                    AutomationTargetKind::tempo, AutomationTargetKind::effectMix, AutomationTargetKind::mixerSend,
+                    AutomationTargetKind::vcaLevel })
         if (name == targetKindName (k))
             return k;
 
@@ -1375,6 +1377,8 @@ juce::var channelToVar (const ChannelDef& c)
         sampler->setProperty ("keepPitch", c.sampler.keepPitch);
         if (c.sampler.stretchMethod != StretchMethod::general)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
+        if (c.sampler.stretchPitch != 0.0f)
+            sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
         if (c.sampler.startOffset > 0.0f)
             sampler->setProperty ("startOffset", c.sampler.startOffset);
@@ -1699,6 +1703,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.stretchBeats = juce::jmax (0.0f, (float) (double) s.getProperty ("stretchBeats", 0.0));
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
         def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
+        def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
@@ -2140,6 +2145,29 @@ juce::String toJson (const Song& song)
 
     if (! automations.isEmpty())
         root->setProperty ("automations", automations);
+
+    if (! song.vcas.empty()) // VCA faders (round 177a)
+    {
+        juce::Array<juce::var> vcas;
+        for (const auto& v : song.vcas)
+        {
+            auto o = std::make_unique<juce::DynamicObject>();
+            o->setProperty ("name", juce::String::fromUTF8 (v.name.c_str()));
+            if (v.colour != 0)
+                o->setProperty ("colour", juce::String::toHexString ((juce::int64) (v.colour & 0xFFFFFF)).paddedLeft ('0', 6));
+            o->setProperty ("level", (double) v.level);
+            if (v.muted)
+                o->setProperty ("muted", true);
+            juce::Array<juce::var> members;
+            for (const auto m : v.members)
+                members.add (m);
+            o->setProperty ("members", members);
+            if (v.parent >= 0)
+                o->setProperty ("parent", v.parent);
+            vcas.add (juce::var (o.release()));
+        }
+        root->setProperty ("vcas", vcas);
+    }
 
     if (! song.midiLinks.empty())
     {
@@ -2630,6 +2658,28 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.playlist = clipsFromVar (root["playlist"], song);
     song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
     song.blocks = blocksFromVar (root["blocks"], song);
+
+    if (auto* vcas = root["vcas"].getArray())
+        for (const auto& v : *vcas)
+        {
+            Vca vca;
+            vca.name = v["name"].toString().toStdString();
+            if (v.hasProperty ("colour"))
+                vca.colour = 0xFF000000u | (std::uint32_t) v["colour"].toString().getHexValue32();
+            vca.level = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("level", (double) unityFader));
+            vca.muted = (bool) v.getProperty ("muted", false);
+            if (auto* members = v["members"].getArray())
+                for (const auto& m : *members)
+                    if ((int) m > 0 && (int) m < maxMixerTracks)
+                        vca.members.push_back ((int) m);
+            std::sort (vca.members.begin(), vca.members.end());
+            vca.members.erase (std::unique (vca.members.begin(), vca.members.end()), vca.members.end());
+            vca.parent = (int) v.getProperty ("parent", -1);
+            song.vcas.push_back (std::move (vca));
+        }
+    for (auto& v : song.vcas)
+        if (v.parent < -1 || v.parent >= (int) song.vcas.size() || &song.vcas[(std::size_t) std::max (0, v.parent)] == &v)
+            v.parent = -1;
 
     if (auto* links = root["midiLinks"].getArray())
         for (const auto& l : *links)

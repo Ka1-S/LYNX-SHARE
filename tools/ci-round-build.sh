@@ -27,7 +27,8 @@ tree="$(git write-tree)"
 unset GIT_INDEX_FILE
 sha="$(git commit-tree "$tree" -p HEAD -m "Round build of $(git rev-parse --short HEAD)")"
 
-if git grep -qIi -e "${LYNX_CI_FORBIDDEN:-ligmuh2219}" "$sha" --; then
+# LYNX_CI_FORBIDDEN (optional, set on the machine): a text that must never leave it. Never put its value in this file.
+if [[ -n "${LYNX_CI_FORBIDDEN:-}" ]] && git grep -qIi -e "$LYNX_CI_FORBIDDEN" "$sha" --; then
     echo "round build: the tree holds a forbidden string, not pushing" >&2
     exit 4
 fi
@@ -40,7 +41,15 @@ running_builds() {
 until [[ "$(running_builds 2>/dev/null || echo "$limit")" -lt "$limit" ]]; do sleep 60; done
 
 trap 'rm -f "$index"; git push -q origin --delete "$branch" 2>/dev/null || true' EXIT
-git push -q origin "$sha:refs/heads/$branch" 2>/dev/null
+# large or busy pushes can time out (HTTP 408): retry, and say so plainly if it never goes through
+pushed=""
+for attempt in 1 2 3 4 5; do
+    if git -c http.postBuffer=524288000 push -q origin "$sha:refs/heads/$branch" 2>"$index.err"; then pushed=1; break; fi
+    tail -2 "$index.err" >&2
+    sleep $((attempt * 30))
+done
+rm -f "$index.err"
+[[ -n "$pushed" ]] || { echo "round build: push failed, NOTHING WAS BUILT, $out is unchanged" >&2; exit 5; }
 
 run=""
 for _ in $(seq 60); do

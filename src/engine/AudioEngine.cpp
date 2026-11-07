@@ -226,8 +226,8 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice)
-    : workers (std::make_unique<WorkerPool> (workerCount(), raiseAudioThreadPriority)),
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -656,6 +656,8 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
 
 ProcessTimes* AudioEngine::getProcessTimes() noexcept
 {
+    if (externalTimes != nullptr)
+        return externalTimes;
     return rackProcessor != nullptr ? &rackProcessor->processTimes() : nullptr;
 }
 
@@ -3002,6 +3004,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::string path;
             double ratio;
             StretchMethod method;
+            double semitones;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3012,8 +3015,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
                     const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
-                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) { return x.path == c.samplePath && x.ratio == ratio && x.method == method; }))
-                        stretches.push_back ({ c.samplePath, ratio, method });
+                    const auto semitones = (double) c.sampler.stretchPitch;
+                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
+                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones });
                 }
         if (! stretches.empty())
         {
@@ -3021,7 +3026,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method))
+                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3295,9 +3300,9 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
@@ -4171,6 +4176,9 @@ std::shared_ptr<Instrument> AudioEngine::getChannelInstrument (int channel) cons
 
 std::shared_ptr<Effect> AudioEngine::getEffect (int track, int slot) const
 {
+    if (externalEffect)
+        return externalEffect();
+
     const auto& effects = lastPublishedShape.effects;
 
     if (track < 0 || track >= (int) effects.size() || slot < 0 || slot >= (int) effects[(std::size_t) track].size())
