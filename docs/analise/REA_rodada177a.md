@@ -166,3 +166,65 @@ can change that order. FL itself then keeps the old *k*, which is the IL complai
   side-chain sources. Unmoved, it exports byte for byte. After the two sources swap places it exports `k = 1`, which
   still names the same source; FL itself would keep 2. Nothing else in the state changes.
 - `UiFl115Tests`: a deleted side-chain source is now −1 (none), no longer 0 (which the renderer reads as the Master).
+
+## 2. Mixer groups fold (slice 177a-2)
+
+### 2.1 FL and the others
+
+- **FL Studio 2026:** a mixer "group" is a run of inserts set off by separators (Group › Separator / Create group /
+  Auto color group; REA_rodada146a). FL draws the separator line and tints the strips. It has no way to fold a group:
+  a large mixer is only scrolled, docked, or narrowed with the Mixer layouts.
+- **Ableton Live 12:** a group track folds its members into one strip; the group strip is a real bus (its own
+  devices, fader and sends).
+- **Logic (summing stacks), Studio One (folder tracks), Cubase (folder and group channels), Reaper (folder tracks):**
+  a folder hides its members; a summing folder shows its bus strip.
+- **Users:** IL wishlists ask for mixer groups or folders ([IL mixer wishlist, Jun 2025](https://forum.image-line.com/viewtopic.php?p=2008787)†, [IL wishlist 2026](https://forum.image-line.com/viewtopic.php?t=338528)†). Live's simple group tracks get praise (research row 4). The request is "fold a big mixer like Live's groups, without changing the routing".
+- **Verdict:** FL's separator groups stay the default and nothing changes until a group is folded. Folding is an addition (coordinator's decision 2026-11-06: flat v1 on FL's groups, a non-bus group folds to a slim tab).
+
+### 2.2 What LYNX does
+
+LYNX folds FL's own separator groups. No new group object is added and the routing never changes:
+
+- A group can fold when a separator sets it off and it has two or more inserts (`mixerops::canFold`). Its first strip
+  shows a chevron after the number. A click folds or unfolds it; **Alt+click** does every group. The insert menu's
+  Group section has *Fold group* / *Unfold group*, *Fold all groups* and *Unfold all groups*.
+- **A summing group** (a member every other member sends only to, as *Create submix* makes it; `groupBus`) folds to
+  its bus strip. The bus carries the chevron, to unfold.
+- **Any other group** folds to a slim tab (20 px) in the group's colour. It shows the chevron, the number of inserts
+  and one bar with the loudest member's level. A click unfolds it. The members are never hidden without a trace.
+- The fold flag is saved with the project (`folded` on the group's first insert). FL projects don't carry it; the .flp
+  export leaves it out.
+- **Cost:** nothing is computed while no group is folded. The fold view is built only at layout time.
+
+### 2.3 Tests
+
+`tests/Mixer177a2Tests.inc` (`mixer177a2_groups_fold_to_their_bus_or_a_tab`): which groups can fold, the bus of a
+summing group, the fold view of a summing group (only the bus shows) and of a group without a bus (a tab), a member
+with a second output (the group then folds to a tab), Fold all / Unfold all, and the fold following its group when the
+inserts move.
+
+## 4. Measured in the real windows (2026-11-07)
+
+### 4.1 The mixer picture and folded groups
+
+`--uiperf` with `LYNX_UIPERF_ONLY="mixer meters"`: 6 s playing with the strips' picture on (`/mnt/e/lynx-work/mixer177a/gui/`).
+Machine under load, so the CPU figures are noisy and only the picture counts are compared.
+
+| Project | Picture spoiled | Picture drawn again |
+|---|---|---|
+| Folded tab and bus, VCAs, an automated insert folded away, before the fix | 342 | 313 |
+| The same project, after the fix | 0 | 1 |
+| Folded tab and bus, VCAs, no automation | 0 | 1 |
+| VCAs, unfolded, no automation | 0 | 1 |
+| No VCA, no fold, no automation | 0 | 1 |
+
+A visible automated fader still spoils its own area on purpose: 350 times in the VCA project, 339 without a VCA.
+
+### 4.2 FL's fader rail click [FL Studio 2026, real clicks, measured from screenshots]
+
+A click on the rail away from the cap does **not** jump the fader. Each click moves the cap about 1 screen pixel towards
+the click: below the cap 748 → 749, above it 748 → 747, and ten more clicks below it 750 → 760. A press on the rail
+followed by a 20 px drag moved the cap 7 px, so the drag is relative to the press and doesn't jump either.
+
+LYNX jumps the fader to the click (`MixerStrips::mouseDown`, "clicking the track jumps the fader there"). This differs
+from FL. It is unchanged here and goes to the coordinator. The exact step in fader units isn't measured yet.
