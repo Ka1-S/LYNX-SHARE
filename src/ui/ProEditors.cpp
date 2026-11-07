@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/MixerOps.h"
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
@@ -783,8 +784,10 @@ private:
         const auto assign = [this] (int source) {
             const auto p = P ("External SC");
             engine.editSong ([tk = track, sl = slot, source, p] (Song& s) {
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
                 auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source;
                 target.params[(std::size_t) p] = source >= 0 ? 1.0f : 0.0f;
             });
         };
@@ -3253,6 +3256,14 @@ private:
     }
 
     int dragParam = -1;
+    bool powerPending = false;
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (powerPending && ! e.mouseWasDraggedSinceMouseDown())
+            toggleEnabled();
+        powerPending = false;
+        ProEditor::mouseUp (e);
+    }
     bool dragging (int p) const { return dragParam == p && isMouseButtonDown(); }
     void customDown (const Ctl& c, const juce::MouseEvent& e) override
     {
@@ -3275,13 +3286,12 @@ private:
             edit (p, v (p) >= 0.5f ? 0.0f : 1.0f);
             return;
         }
-        if (p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f)
-        {
-            toggleEnabled(); // the power symbol on the OUT knob: the plugin on / bypassed
-            return;
-        }
+        // the power symbol on the OUT knob (measured on the original, tp172c8): a click on it (no drag) switches the
+        // plugin on / bypassed; a drag, from the symbol or the ring, moves the main output gain
+        powerPending = p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f;
         if (ui::isResetClick (e))
         {
+            powerPending = false;
             edit (p, (float) specFor (p).defaultValue);
             return;
         }
@@ -3726,6 +3736,8 @@ private:
     }
 };
 
+#include "ui/ProEditorsStrips.inc"
+
 // --- windows -------------------------------------------------------------------------------------------------
 std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool demo)
 {
@@ -3742,6 +3754,8 @@ std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool 
         case EffectKind::ember: return std::make_unique<EmberEditor> (engine, track, slot, demo);
         case EffectKind::aether: return std::make_unique<AetherEditor> (engine, track, slot, demo);
         case EffectKind::kilnChannel: return std::make_unique<KilnEditor> (engine, track, slot, demo);
+        case EffectKind::fretChannel: return std::make_unique<FretEditor> (engine, track, slot, demo);
+        case EffectKind::shellChannel: return std::make_unique<ShellEditor> (engine, track, slot, demo);
         default: return nullptr;
     }
 }
@@ -3822,7 +3836,8 @@ bool handles (EffectKind kind) noexcept
 {
     return kind == EffectKind::apexLimiter || kind == EffectKind::hushDeEsser || kind == EffectKind::crestCompressor
            || kind == EffectKind::sentryGate || kind == EffectKind::prismMultiband || kind == EffectKind::ember
-           || kind == EffectKind::aether || kind == EffectKind::kilnChannel;
+           || kind == EffectKind::aether || kind == EffectKind::kilnChannel || kind == EffectKind::fretChannel
+           || kind == EffectKind::shellChannel;
 }
 
 void open (AudioEngine& engine, int track, int slot)

@@ -62,6 +62,7 @@ public:
     int knownCurrentPattern = -1;
 
     explicit PlaylistComponent (AudioEngine& engine);
+    juce::String cacheSelfTest (const std::function<void()>& waitForWaveforms, const juce::File& dumpFolder = {}); // --cachetest (round 174f)
     ~PlaylistComponent() override;
     void visibilityChanged() override;
 
@@ -167,6 +168,11 @@ private:
     std::int64_t perfClip = -1;
     std::array<std::int64_t, 64> perfShown {}; // the zone's playing / pending state last painted, to repaint on change
     void paintPerformance (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLiveRecording (juce::Graphics& g); // round 177d
+    juce::Rectangle<float> liveBounds (int track, double from, double to) const;
+    juce::Rectangle<int> liveArea;
+    double liveRepaintMs = 0.0;
+    std::vector<float> liveColumns;
     void togglePerformanceMode();
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
@@ -210,6 +216,15 @@ private:
     CacheView cacheView() const;
     CacheShift cacheShift (const CacheView& from, const CacheView& to, float scale) const;
     void repaintScrolled();
+    // a continuous zoom (round 174f): its frames scale the cached picture's lanes; exact once still for zoomSettleMs
+    void repaintZoomed();
+    void settleZoom();
+    bool zoomRecent (double nowMs) const;
+    juce::Rectangle<int> rulerArea() const;
+    static constexpr int zoomSettleMs = 120;
+    bool zoomGesture = false;
+    double zoomEndMs = -1.0e9;
+    juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
