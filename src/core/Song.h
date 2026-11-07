@@ -271,6 +271,8 @@ struct SamplerSettings
     float stretchBeats = 0.0f; // > 0: the whole sample lasts this long (in beats), following the BPM
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
+    int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
+    int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
     float regionStart = 0.0f;  // played region of the sample (fractions 0..1)
     float regionEnd = 1.0f;
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
@@ -700,6 +702,7 @@ struct ChannelDef
     std::vector<StandIn> standIns;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
+    int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")

@@ -11,6 +11,7 @@
 #include "core/FlEffects.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
+#include "core/TimeStretch.h"
 #include "core/Transmitter.h"
 #include "core/Vocodex.h"
 
@@ -20,6 +21,18 @@ namespace
 {
 // ---- small helpers ----
 int iround (double v) noexcept { return (int) std::lround (v); }
+
+// FL's time-stretching mode. Each one is a different algorithm in FL (Thief with −2 instead of its −1 renders at xcorr
+// 0.869 against FL's own, round 180d), so an imported channel goes back with its own mode, as long as that still is the
+// method it plays; otherwise FL's Stretch for General. Every mode but Resample (0) keeps the length, also without a TIME.
+int flStretchMode (const SamplerSettings& s) noexcept
+{
+    if (! s.keepPitch)
+        return 0;
+    if (s.flStretchMode != 0 && stretchMethodForFlMode (s.flStretchMode) == s.stretchMethod)
+        return s.flStretchMode;
+    return s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -1;
+}
 
 std::uint32_t rgb (std::uint32_t argb) noexcept { return argb & 0xFFFFFFu; }
 
@@ -774,6 +787,9 @@ struct Converter
         c.name = def.name;
         c.colour = def.colour != 0 ? rgb (def.colour) : 0;
         c.icon = def.icon;
+        // FL keeps a Smart disabled generator from running through silence, so it changes the phase of what it plays
+        // (Thief without FL's own flags: xcorr 0.891, same spectrum; round 180d)
+        c.wrapperFlags = def.flWrapperFlags;
         c.enabled = ! def.muted;
         c.soloLock = def.soloLock;
         c.ghostShown = ! def.ghostHidden;
@@ -793,7 +809,10 @@ struct Converter
         c.volume = std::clamp (iround (volume * 12800.0), 0, 12800);
         c.pan = std::clamp (iround (6400.0 + def.pan * 6400.0), 0, 12800);
         const auto root = std::clamp (def.misc.rootNote, 0, 127);
-        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0);
+        // FL's stretch PITCH knob and the header pitch add up, but do not sound the same in FL's stretcher (Thief with all
+        // of it in the header: xcorr 0.934 against FL's own, round 180d), so what came from the knob goes back to the knob
+        c.stretchPitch = def.sampler.keepPitch ? def.sampler.flStretchPitch : 0;
+        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0) - c.stretchPitch;
         c.pitchCents = cents;
         c.rootNote = root;
         c.fineTune = iround (def.misc.fineTune);
@@ -976,8 +995,8 @@ struct Converter
         {
             c.stretchTime = s.stretchBeats * 192.0f;
             c.stretchMul = 0;
-            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -2;
         }
+        c.stretchMode = flStretchMode (s);
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)
             c.cutGroup = c.cutBy = freeCutGroup++; // "cut itself"
     }

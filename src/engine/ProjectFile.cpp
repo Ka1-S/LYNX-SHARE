@@ -1271,6 +1271,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
     if (c.icon != 0) // FL's channel icon index (round 168j)
         o->setProperty ("icon", c.icon);
+        if (c.flWrapperFlags >= 0)
+            o->setProperty ("flWrapperFlags", c.flWrapperFlags);
     if (! c.flOrigin.empty()) // the FL generator it was imported from (round 171e)
         o->setProperty ("flOrigin", flOriginToVar (c.flOrigin));
     if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
@@ -1372,6 +1374,10 @@ juce::var channelToVar (const ChannelDef& c)
         sampler->setProperty ("keepPitch", c.sampler.keepPitch);
         if (c.sampler.stretchMethod != StretchMethod::general)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
+        if (c.sampler.flStretchMode != 0)
+            sampler->setProperty ("flStretchMode", c.sampler.flStretchMode);
+        if (c.sampler.flStretchPitch != 0)
+            sampler->setProperty ("flStretchPitch", c.sampler.flStretchPitch);
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
         if (c.sampler.startOffset > 0.0f)
             sampler->setProperty ("startOffset", c.sampler.startOffset);
@@ -1540,6 +1546,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         }
     }
     def.icon = juce::jlimit (0, 0xFFFF, (int) c.getProperty ("icon", 0));
+    def.flWrapperFlags = (int) c.getProperty ("flWrapperFlags", -1);
     if (c.hasProperty ("flOrigin"))
         def.flOrigin = flOriginFromVar (c["flOrigin"]);
     if (const auto& from = c["receiveFrom"]; from.isArray() && from.size() >= 2)
@@ -1696,6 +1703,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.stretchBeats = juce::jmax (0.0f, (float) (double) s.getProperty ("stretchBeats", 0.0));
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
         def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, 2, (int) s.getProperty ("stretchMethod", 0));
+        def.sampler.flStretchMode = (int) s.getProperty ("flStretchMode", 0);
+        def.sampler.flStretchPitch = (int) s.getProperty ("flStretchPitch", 0);
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
