@@ -5937,8 +5937,6 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 2)
     {
-        addLayoutStyleItems (menu);
-        menu.addSeparator();
         for (auto panel : panelOrder)
             menu.addItem (panelName (panel) + shortcutText (panelAction (panel)), true, workspace.isPanelVisible (panel), [this, panel] { togglePanel (panel); });
 
@@ -5963,6 +5961,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
         menu.addSubMenu (tr ("Load layout"), layoutsMenu());
+        addLayoutStyleItems (menu);
         menu.addItem (tr ("Bring back off-screen panels"), [this] { workspace.bringBackOffscreen(); });
         menu.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
         menu.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });
