@@ -225,8 +225,8 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice)
-    : workers (std::make_unique<WorkerPool> (workerCount(), raiseAudioThreadPriority)),
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -655,6 +655,8 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
 
 ProcessTimes* AudioEngine::getProcessTimes() noexcept
 {
+    if (externalTimes != nullptr)
+        return externalTimes;
     return rackProcessor != nullptr ? &rackProcessor->processTimes() : nullptr;
 }
 
@@ -4064,6 +4066,9 @@ std::shared_ptr<Instrument> AudioEngine::getChannelInstrument (int channel) cons
 
 std::shared_ptr<Effect> AudioEngine::getEffect (int track, int slot) const
 {
+    if (externalEffect)
+        return externalEffect();
+
     const auto& effects = lastPublishedShape.effects;
 
     if (track < 0 || track >= (int) effects.size() || slot < 0 || slot >= (int) effects[(std::size_t) track].size())

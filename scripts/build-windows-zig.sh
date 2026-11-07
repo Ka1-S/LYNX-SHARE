@@ -338,3 +338,36 @@ OUT="$OUT" ZIG="$ZIG" scripts/build-lynx-asio.sh
 
 # the 32-bit plugin bridge (round 176a), shipped next to LYNX.exe; it reuses the patched JUCE copies and the object cache
 OUT="$OUT" ZIG="$ZIG" JUCE_DIR="$JUCE_DIR" JOBS="$JOBS" scripts/build-bridge32.sh
+
+# LYNX's own plugins as VST3 / CLAP (round 180b, docs/PLUGIN_EXPORT.md): only with LYNX_BUILD_PLUGINS=1; the normal build stops above
+if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
+    PLUGIN_OBJECTS=()
+    for src in "${APP_SOURCES[@]}"; do [[ "$src" == src/Main.cpp ]] || PLUGIN_OBJECTS+=("$OUT/app/$(echo "$src" | tr / _).o"); done
+    mkdir -p "$OUT/plugin" "$OUT/plugins"
+    PLUGIN_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32
+                 -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi
+                 -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfuuid -lksuser -lavrt -lwinhttp -lpsapi)
+    plugin_cxx() { # <obj> <source> [flags...]
+        local obj="$1" source="$2"; shift 2
+        cached_pp "$obj" -- $ZIG c++ $COMMON_STR -Isrc -DLYNX_EXPORT_VERSION="\"$VERSION\"" -DJUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1 "$@" -c "$source" -o "$obj"
+    }
+    plugin_link() { # <output> <objects...>
+        local output="$1"; shift
+        "$ZIG" c++ -target "$TARGET" -O2 -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+    }
+    plugin_cxx "$OUT/plugin/ExportProcessor.o" src/plugin/ExportProcessor.cpp -Wall -Wextra
+    plugin_cxx "$OUT/plugin/ClapEntry.o" src/plugin/ClapEntry.cpp -Wall -Wextra
+    plugin_link "$OUT/plugins/LYNX Plugins.clap" "$OUT/plugin/ClapEntry.o"
+    index=0
+    for name in "LYNX Facet EQ" "LYNX FM10"; do
+        dir="$OUT/plugins/$name.vst3/Contents/x86_64-win"
+        mkdir -p "$dir"
+        plugin_cxx "$OUT/plugin/Vst3Entry$index.o" src/plugin/Vst3Entry.cpp -w -DLYNX_EXPORT_INDEX=$index
+        plugin_link "$dir/$name.vst3" "$OUT/plugin/Vst3Entry$index.o"
+        index=$((index + 1))
+    done
+    plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
+    plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
+    "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
+    ls -la "$OUT"/plugins/*.clap "$OUT"/plugins/*/Contents/x86_64-win/*
+fi
