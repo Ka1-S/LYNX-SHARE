@@ -65,6 +65,24 @@ int soleSidechainSender (const Song& song, int to);
 // Returns whether it was linked.
 bool linkAddedSidechain (Song& song, int to, int slot);
 
+// --- One-click sidechain (round 177b) -------------------------------------------------------------------
+// The effects that read a side input (Effect::setSidechain): the compressors, limiters, gates, de-esser, vocoders,
+// Facet EQ, LuxeVerb, Transmitter, Transporter and Patcher. A hosted plugin listens when it has a second input bus
+// (asked of the instance, outside core: pluginhost::sideInputChannels).
+bool acceptsSidechain (EffectKind kind) noexcept;
+enum class SidechainPick
+{
+    linked,     // slot `slot` of `to` now listens to `from` (a level-0 send was added when there was no route)
+    cleared,    // from < 0: the slot listens to nothing (the routing is left as it is, as FL leaves its sends)
+    cycle,      // `from` is fed by `to`: a sidechain would make a loop, nothing changed
+    invalid     // no such insert / slot
+};
+// The wrapper's "Sidechain from" picker: slot `slot` of insert `to` listens to insert `from` (`second`: the second side
+// input, a vocoder's carrier). Like FL's "Sidechain to this track", a missing route becomes a level-0 send, so `from`
+// is processed first and still goes to the Master and its other sends; an existing route keeps its level. On the
+// Master (`to` = 0) no route is needed (every insert plays before it).
+SidechainPick sidechainFrom (Song& song, int to, int slot, int from, bool second = false);
+
 // Moves effect slot `from` to position `to` of the same insert (the others shift); automations follow. The rows the
 // effects showed in stay in use (the moved effect takes the row of the one it lands on).
 bool moveEffectSlot (Song& song, int track, int from, int to);

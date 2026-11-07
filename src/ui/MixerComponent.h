@@ -14,6 +14,7 @@
 #include "core/MixerLayout.h"
 #include "core/MixerOps.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 
@@ -442,6 +443,11 @@ private:
     void openEditor (int slot);
     void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
+    // Round 177b: the selected effect's "Sidechain from" picker (effects with a side input; empty bounds = none)
+    juce::Rectangle<int> sidechainButtonBounds() const;
+    int titleRowY() const;
+    void paintSidechainButton (juce::Graphics& g, const EffectSlot& slot);
+    bool hoverSidechain = false;
     void openPluginWindow (int slot);
     juce::Rectangle<int> fxSwitchBounds() const; // all effects on/off; right-click opens/closes their windows
     void toggleAllWindows();
@@ -465,6 +471,7 @@ private:
     ui::ValueDrag drag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EffectsPanel)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 
 // FL's "Mixer layout" drop-down in the Mixer's title bar (issue #52, REA round 168h): the current layout's name and a

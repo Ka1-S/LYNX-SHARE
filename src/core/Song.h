@@ -228,7 +228,12 @@ enum LfoTarget { lfoPan, lfoVolume, lfoCutoff, lfoPitch, lfoTargets };
 // How a pitch-preserving stretch is computed (core/TimeStretch, REA_rodada160): general = polyphonic material and full
 // mixes (FL's élastique Pro / E3 generic / Auto), transients = drums and loops (FL's E2 transient, slice modes), mono =
 // a single voice or instrument (FL's E3 mono, E2 mono / speech).
-enum class StretchMethod : int { general = 0, transients = 1, mono = 2 };
+// Round 175a (N4) adds LYNX's warp modes modelled on Ableton Live's (measured against Live 12 renders, see
+// docs/analise/ALS_FORMAT.md §12): beats = the audio cut at its attacks, each piece played at its own speed and its
+// gap filled by playing it back and forth (Live's Beats); tones = a single pitched voice (Live's Tones); texture =
+// dense material without a clear pitch (Live's Texture); complex = full mixes (Live's Complex / Complex Pro).
+enum class StretchMethod : int { general = 0, transients = 1, mono = 2, beats = 3, tones = 4, texture = 5, complex = 6 };
+constexpr int stretchMethodCount = 7;
 
 // FL's Sampler › "Precomputed effects" (REA_rodada167h §1–§2): computed once on the sample, in FL's order, before it
 // plays (core/SamplePrecompute.h). Raw FL values: fadeIn / fadeOut 0…1024 (256 = a ramp over the whole sample),
@@ -831,10 +836,12 @@ enum class EffectKind : std::uint8_t
     transmitter,     // FL's Transmitter (REA_rodada165g-fltrans165, core/Transmitter.h): transient / sustain splitter, a section effect on each part
     flEmphasis,      // FL's Emphasis, exact (REA_rodada167f, core/EmphasisFx.h): FL's 13 controls + 3 options, (raw − min) / range
     flTransporter,   // FL's Transporter, exact (REA_rodada167f-transporter, core/TransporterFl.h): FL's 22 controls (raw − min) / range + source, stereo, send
-    kilnChannel      // LYNX's console channel (round tp172c7, core/MixSuite.h kiln): six measured console models, drive, noise, group bypass
+    kilnChannel,     // LYNX's console channel (round tp172c7, core/MixSuite.h kiln): six measured console models, drive, noise, group bypass
+    fretChannel,     // LYNX's guitar / bass channel strip (round tp172c8, core/MixSuite.h fret): phase correction, EQ, compressor, amp
+    shellChannel     // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::kilnChannel;
+constexpr EffectKind lastEffectKind = EffectKind::shellChannel;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

@@ -84,8 +84,8 @@ void Engine::reset() noexcept
 void Engine::set (const Settings& settings) noexcept
 {
     s = settings;
-    const int p = std::clamp (s.pattern, 0, 2) == 1 ? 1 : 0;
-    steps = s.pattern == 2 ? 1 : patternSteps[p]; // the ramp: one "step" a period (Feel moves it by a quarter of it)
+    const int p = s.pattern == 1 ? 1 : 0;
+    steps = s.pattern >= 2 ? 1 : patternSteps[p]; // the ramp: one "step" a period (Feel moves it by a quarter of it)
     for (int i = 0; i < maxSteps; ++i)
         values[(size_t) i] = patternValues[p][i] * s.amount;
     outGain = std::pow (10.0, s.outputDb / 20.0);
@@ -238,11 +238,11 @@ void Engine::process (float* left, float* right, int n, double beatPos, double b
             prev = s.amount * stepRandom (stepNo - 1);
         }
         double v = s.trigger != 0 ? trigValue : prev + (cur - prev) * fr;
-        if (s.pattern == 2 && s.trigger == 0) // round tp172d: the ramp — right to left, then back over the return glide
+        if (s.pattern >= 2 && s.trigger == 0) // round tp172d: the ramp — right to left (▶: left to right), then back over the return glide
         {
             const double back = std::min (0.5, rampReturnSec * cyclesPerSample * sr + 0.25 * s.smoothing);
             const double u = std::clamp (pos, 0.0, 1.0);
-            v = s.amount * (u < back ? -1.0 + 2.0 * u / back : 1.0 - 2.0 * (u - back) / (1.0 - back));
+            v = s.amount * (u < back ? -1.0 + 2.0 * u / back : 1.0 - 2.0 * (u - back) / (1.0 - back)) * (s.pattern == 3 ? -1.0 : 1.0);
         }
         // round 150 [EXEC]: past the speakers (offset + width / 2 beyond ±90°) the angle folds back with the far side's
         // polarity inverted (offset 45° + OffsetMod 90° → the left at tan 7.5° of the right, inverted); else clipped

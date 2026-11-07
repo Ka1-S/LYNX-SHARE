@@ -5,6 +5,7 @@
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
+#include "core/ProjectSafety.h"
 #include "core/Patcher.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
@@ -44,6 +45,9 @@
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
+#include "core/AlsImport.h"
+#include "ui/AlsExportDialog.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
@@ -431,6 +435,28 @@ public:
     // the plugin scan runs copies of LYNX as child processes
     bool moreThanOneInstanceAllowed() override { return true; }
 
+    // A file handed to the running application. macOS does this for every Finder double-click, "Open With" and Dock drop,
+    // also the one that starts LYNX (its argv has no file). On Windows and Linux a second start is a second process
+    // (moreThanOneInstanceAllowed) with the file as an argument, so this is not called there. Only the first file of a
+    // multiple selection opens: a project replaces the one before it. (D#92, round 180a)
+    void anotherInstanceStarted (const juce::String& commandLine) override
+    {
+        const auto files = lynx::safety::filesInCommandLine (commandLine.toStdString());
+        if (files.empty())
+            return;
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (juce::String::fromUTF8 (files.front().c_str()));
+        if (! startupFileHandled) // still starting: openStartupFile takes it, nothing to ask about yet
+        {
+            fileToOpen = file;
+            return;
+        }
+        if (mainWindow != nullptr)
+        {
+            mainWindow->toFront (true);
+            mainWindow->getContent().openFileRequest (file);
+        }
+    }
+
     void initialise (const juce::String& commandLine) override
     {
         // round 166b: the copy of LYNX.exe that installs an update (ui/Updater.h) waits, installs, starts LYNX again
@@ -606,6 +632,23 @@ public:
             const auto i = args.indexOf ("--uiperf");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             runUiPerf (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--cachetest"))
+        {
+            // LYNX --cachetest project.(flp|lynx) report.txt (round 174f): the Playlist's cached picture against exact
+            // paints after zooms, scrolls and repaints, off screen (no window)
+            const auto i = args.indexOf ("--cachetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runCacheTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--timertest"))
+        {
+            // LYNX --timertest report.txt (round 174f): ui::TimerWhileShowing through hide / show / minimise (opens a small window)
+            runTimerTest (juce::File (args[args.indexOf ("--timertest") + 1].unquoted()));
             return;
         }
 
@@ -942,6 +985,12 @@ public:
         {
             const auto i = args.indexOf ("--vst2test");
             runVst2Test (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--lv2scantest"))
+        {
+            runLv2ScanTest (args[args.indexOf ("--lv2scantest") + 1].unquoted());
             return;
         }
 
@@ -1520,6 +1569,14 @@ public:
             return;
         }
 
+        // --export-als <in.lynx|.flp|.als> <folder> [--live11] [--reference] [--scan]: "<folder>/<name> Project/<name>.als" (round 175a)
+        if (args.contains ("--export-als"))
+        {
+            const auto i = args.indexOf ("--export-als");
+            runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
         if (args.contains ("--export-flp"))
         {
             const auto i = args.indexOf ("--export-flp");
@@ -1551,6 +1608,9 @@ public:
              + "\nstart=" + juce::String ((juce::int64) lynx::crashguard::processStartTime())
              + "\nstarted=" + juce::Time::getCurrentTime().toISO8601 (true) + "\n").toStdString());
         startHangWatch();
+        // LYNX_PROFILE_MAIN=<file> (round 174f): the message thread sampled every millisecond, 5-second windows
+        if (const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {}); profile.isNotEmpty())
+            lynx::crashguard::startMainProfiler (profile.toStdString());
 
         startupTrace.mark ("initialise (normal start)");
         if (startupTrace.on)
@@ -1560,9 +1620,20 @@ public:
         startupOptions = lynx::StartupOptions::load();
         lynx::registerFileTypes();
         startupTrace.mark ("options + file types");
-        // Double-clicking a .lynx/.flp opens LYNX with the file as an argument.
-        if (args.size() > 0 && juce::File::isAbsolutePath (args[0].unquoted()))
-            fileToOpen = juce::File (args[0].unquoted());
+        // Double-clicking a .lynx/.flp opens LYNX with the file as an argument; a path typed in a terminal may be relative
+        // (D#92, round 180a: it was ignored, leaving the blank project with no message). A missing file gets "Could not open".
+        if (args.size() > 0 && lynx::safety::isFileArgument (args[0].unquoted().toStdString()))
+            fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[0].unquoted());
+        // LYNX_TEST_MODE=1 LYNX --open-event-test <ms> <file>: the file arrives the way macOS's Finder delivers it (a Linux
+        // or Windows run can exercise that path): 0 ms = at once, before the window exists
+        if (lynx::platform::testMode() && args[0] == "--open-event-test" && args.size() > 2)
+        {
+            const auto file = args[2].unquoted().quoted();
+            if (args[1].getIntValue() == 0)
+                anotherInstanceStarted (file);
+            else
+                juce::Timer::callAfterDelay (args[1].getIntValue(), [this, file] { anotherInstanceStarted (file); });
+        }
         // LYNX --opentime project.(flp|lynx)|- report.txt [idle seconds] (round 165i): the normal start-up (splash, audio
         // device, window) opens the project, waits until it is loaded and LYNX has gone quiet, measures the idle CPU and
         // memory, writes the times and quits normally (a benchmark that killed LYNX left "closed unexpectedly" behind)
@@ -1888,6 +1959,7 @@ public:
 
     void openStartupFile()
     {
+        startupFileHandled = true;
         if (fileToOpen != juce::File() && mainWindow != nullptr)
             mainWindow->openFile (fileToOpen);
     }
@@ -1911,6 +1983,7 @@ public:
         heartbeat.stopTimer();
         lynx::crashreporter::shutdown(); // (an upload in flight gets a moment, never long)
         lynx::crashguard::stopHangWatch();
+        lynx::crashguard::stopMainProfiler();
         lynx::crashguard::endSession(); // a clean exit: no breadcrumb left behind
 
         // everything is saved and closed: a process that loaded third-party plugins ends here, before the DLLs' own
@@ -1952,6 +2025,90 @@ private:
     bool relaunched = false; // relaunchFromAsciiPath ran LYNX from its short path: this process only waited
     bool updateHelper = false; // --apply-update (round 166b)
     juce::String uncleanLastStep; // last step of a previous run that ended without closing
+
+    // LYNX_PROFILE_DIR=<folder> LYNX --lv2scantest report.txt (Linux, issue #85): the LV2 scan's promise, with real child
+    // processes. A new PluginHost per step, as every start of LYNX has. The LV2 folders of the machine are read too.
+    void runLv2ScanTest (const juce::String& reportPath)
+    {
+        juce::String report;
+        auto ok = lynx::platform::profileOverride() != juce::File();
+       #if JUCE_LINUX
+        const auto folder = lynx::platform::profileOverride().getChildFile ("lv2-test");
+        const juce::FileSearchPath paths (folder.getFullPathName());
+        const auto check = [&] (const juce::String& name, bool passed) {
+            report << name << "=" << (passed ? "ok" : "FAILED") << "\n";
+            ok = ok && passed;
+        };
+        const auto install = [&] (const juce::String& name) {
+            const auto bundle = folder.getChildFile (name + ".lv2");
+            bundle.createDirectory();
+            bundle.getChildFile ("manifest.ttl").replaceWithText ("@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                                                                  "<urn:lynx-test:" + name + "> a lv2:Plugin ; lv2:binary <" + name + ".so> ; rdfs:seeAlso <plugin.ttl> .\n");
+            bundle.getChildFile ("plugin.ttl").replaceWithText ("@prefix doap: <http://usefulinc.com/ns/doap#> .\n<urn:lynx-test:" + name + "> doap:name \"" + name + "\" .\n");
+        };
+        auto date = juce::Time::getCurrentTime();
+        const auto touch = [&] { // the next date, whatever the file system's date resolution
+            date += juce::RelativeTime::seconds (2.0);
+            folder.getChildFile ("a.lv2/plugin.ttl").setLastModificationTime (date);
+        };
+        const auto listed = [] (lynx::PluginHost& host, const juce::String& name) {
+            for (const auto& d : host.getKnownPlugins().getTypes())
+                if (d.fileOrIdentifier == "urn:lynx-test:" + name)
+                    return true;
+            return false;
+        };
+        const auto step = [&] (const juce::String& name, int children, const std::function<void (lynx::PluginHost&)>& prepare = {}) {
+            lynx::PluginHost host (true);
+            if (prepare)
+                prepare (host);
+            host.scan (paths, {});
+            check (name, host.scanChildrenStarted() == children && listed (host, "a"));
+        };
+
+        install ("a");
+        step ("first_scan_one_child", 1);
+        step ("nothing_changed_no_child", 0);
+        touch();
+        step ("ttl_updated", 1);
+        install ("b");
+        step ("bundle_installed", 1);
+        step ("forget_file", 1, [] (lynx::PluginHost& host) { host.forgetFile ("urn:lynx-test:a"); });
+        step ("forget_all", 1, [] (lynx::PluginHost& host) { host.forgetAll(); });
+        lynx::platform::settingsFile ("plugins.xml").deleteFile();
+        step ("list_lost", 1);
+        step ("nothing_changed_again", 0);
+
+        // cancelled while the child works: stopped at once, and nothing is taken for done
+        touch();
+        setenv ("LYNX_TEST_CRASH", "lv2-batch-hang", 1);
+        {
+            lynx::PluginHost host (true);
+            const auto started = juce::Time::getMillisecondCounter();
+            host.scan (paths, [] (float, const juce::String&) { return false; });
+            check ("cancel_stops_the_child", host.scanChildrenStarted() == 1 && juce::Time::getMillisecondCounter() - started < 20000);
+        }
+        unsetenv ("LYNX_TEST_CRASH");
+        step ("described_after_cancel", 1);
+
+        // the child dies: plugin by plugin takes over (stopped after two of them: a machine may have hundreds)
+        touch();
+        setenv ("LYNX_TEST_CRASH", "lv2-batch", 1);
+        {
+            lynx::PluginHost host (true);
+            host.scan (paths, [&host] (float, const juce::String&) { return host.scanChildrenStarted() < 3; });
+            check ("crash_falls_back_plugin_by_plugin", host.scanChildrenStarted() == 3);
+            auto blamed = false;
+            for (const auto& file : host.getKnownPlugins().getBlacklistedFiles())
+                blamed = blamed || file.startsWith ("lv2-folders:");
+            check ("crash_blacklists_nothing", ! blamed);
+        }
+        unsetenv ("LYNX_TEST_CRASH");
+        step ("described_after_crash", 1);
+       #endif
+        juce::File (reportPath).replaceWithText (report + "result=" + (ok ? "OK" : "FAILED") + "\n");
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
 
     // LYNX.exe --selftest report.txt: renders 2 s without a sound card and writes the result.
     // Exit code 0 = audio came out, 1 = silence.
@@ -2298,6 +2455,34 @@ private:
                     packageOk = back.existsAsFile() && back.isAChildOf (project.getParentDirectory()) && back.getSize() == wav.getSize();
                 }
             }
+            dir.deleteRecursively();
+        }
+
+        // D#92, round 180a: a non-ASCII folder and a dotted name save and load back; an unwritable place says so, and a
+        // relative path resolves as the start-up argument does
+        bool projectSaveOk = false;
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-save180a");
+            dir.deleteRecursively();
+            const auto folder = dir.getChildFile (juce::String::fromUTF8 ("M\xc3\xbasica nova"));
+            folder.createDirectory();
+            const auto named = lynx::ProjectFile::withProjectExtension (folder.getChildFile (juce::String::fromUTF8 ("Can\xc3\xa7\xc3\xa3o.v2")));
+            auto song = lynx::Song::makeDefault();
+            lynx::Note note;
+            note.length = 240;
+            note.key = 64;
+            song.patterns[0].notes.push_back (note);
+            juce::String error, blockedError;
+            const auto again = lynx::ProjectFile::save (song, named, error) ? lynx::ProjectFile::load (named, error) : std::nullopt;
+            const auto blocker = dir.getChildFile ("a file");
+            blocker.replaceWithText ("x");
+            const auto cwd = juce::File::getCurrentWorkingDirectory();
+            folder.setAsCurrentWorkingDirectory();
+            const auto relative = juce::File::getCurrentWorkingDirectory().getChildFile (named.getFileName());
+            cwd.setAsCurrentWorkingDirectory();
+            projectSaveOk = named.getFileName().endsWith (".v2.lynx") && again && again->patterns[0].notes.size() == song.patterns[0].notes.size()
+                            && relative == named && ! lynx::ProjectFile::save (song, blocker.getChildFile ("x.lynx"), blockedError)
+                            && blockedError.isNotEmpty() && lynx::ProjectFile::withProjectExtension (named) == named;
             dir.deleteRecursively();
         }
 
@@ -2815,9 +3000,13 @@ private:
         // round 170j: the Themed plugin style (its resolution with and without art; every art draws)
         const auto artResult = lynx::skin::artSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
+        const auto sidechainResult = lynx::pluginSidechainSelfTest();
+
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK";
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && sidechainResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -2836,6 +3025,7 @@ private:
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
+               << "projectSave=" << (projectSaveOk ? "OK" : "ERROR") << "\n"
                << "online_session=" << sessionResult << "\n"
                << "live_session=" << liveResult << "\n"
                << "wavpack=" << wavpack << "\n"
@@ -2843,6 +3033,7 @@ private:
                << "effect_params_saved=" << effectParamsResult << "\n"
                << "driver_panel=" << driverPanel << "\n"
                << "plugin_art=" << artResult << "\n"
+               << "plugin_sidechain=" << sidechainResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n"
                << "result=" << (ok ? "OK" : "FAILED") << "\n";
@@ -4707,6 +4898,82 @@ private:
         quit();
     }
 
+    // --timertest (round 174f): a view's polling timer follows the view and its parents, and survives a minimised window
+    void runTimerTest (const juce::File& report)
+    {
+        struct Ticks final : juce::Timer
+        {
+            void timerCallback() override {}
+        } timer;
+        juce::Component top, parent, view;
+        parent.addChildComponent (view);
+        top.addChildComponent (parent);
+        top.setSize (320, 200);
+        lynx::ui::TimerWhileShowing watch (view, timer, 30);
+        juce::String text;
+        auto failures = 0;
+        auto expect = [&] (const char* step, bool running) {
+            const auto ok = timer.isTimerRunning() == running;
+            failures += ok ? 0 : 1;
+            text << step << ": timer " << (timer.isTimerRunning() ? "running" : "stopped") << (ok ? "" : "  FAIL") << "\n";
+        };
+        expect ("never shown", false);
+        view.setVisible (true);
+        parent.setVisible (true);
+        expect ("view and parent visible, not on the desktop", false);
+        top.addToDesktop (juce::ComponentPeer::windowHasTitleBar);
+        top.setVisible (true);
+        expect ("window shown", true);
+        parent.setVisible (false);
+        expect ("parent hidden", false);
+        parent.setVisible (true);
+        expect ("parent shown", true);
+        view.setVisible (false);
+        expect ("view hidden", false);
+        top.getPeer()->setMinimised (true);
+        view.setVisible (true);
+        expect ("view shown while minimised", true);
+        top.getPeer()->setMinimised (false);
+        expect ("window restored", true);
+        top.setVisible (false);
+        expect ("window hidden", false);
+        top.setVisible (true);
+        expect ("window shown again", true);
+        top.removeFromDesktop();
+        text << "failures: " << failures << "\nresult=" << (failures == 0 ? "OK" : "FAIL") << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
+        quit();
+    }
+
+    // --cachetest (round 174f): PlaylistComponent::cacheSelfTest on the project, the Playlist off screen at 1466 x 930
+    void runCacheTest (const juce::File& project, const juce::File& report)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        juce::String error;
+        auto ok = false;
+        if (project.hasFileExtension ("flp"))
+            ok = engine->importFlpFile (project, error);
+        else if (auto song = lynx::ProjectFile::load (project, error))
+        {
+            engine->setSong (std::move (*song));
+            ok = true;
+        }
+        juce::String text = "project: " + project.getFullPathName() + "\n";
+        if (ok)
+        {
+            auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
+            playlist->setBounds (0, 0, 1466, 930);
+            playlist->setVisible (true);
+            text << playlist->cacheSelfTest ([] { lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000); }, report.getParentDirectory());
+        }
+        else
+            text << "result=ERROR " << error << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (ok && text.contains ("result=OK") ? 0 : 1);
+        quit();
+    }
+
     // --uiperf (round 161): opens the project in the normal window, plays it, and drives the heavy UI cases of round 151
     // through the window's own event path — the default layout, the Mixer maximised (meters while playing, then
     // scrolled), the Playlist maximised (scroll down, scroll sideways, zoom in and out) and the Channel rack scrolled.
@@ -4715,6 +4982,8 @@ private:
     // process CPU. The same on every OS, so Linux (X11, XWayland) and Windows numbers can be put side by side.
     void runUiPerf (const juce::File& project, const juce::File& report)
     {
+        if (const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {}); profile.isNotEmpty())
+            lynx::crashguard::startMainProfiler (profile.toStdString()); // (stopped in shutdown)
         startupOptions = lynx::StartupOptions::load();
         engine = std::make_unique<lynx::AudioEngine>();
         lynx::videoview::install (*engine); // (Fruity Video Player channels: their sound tracks)
@@ -4953,6 +5222,13 @@ private:
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
         run->steps.push_back ({ "playlist scroll sideways", {},
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), f < 40 ? -0.15f : 0.15f, 0.0f, none); }, 80 });
+        // round 174f: Ctrl+wheel zoom, a notch every third frame (~20 a second), three in then three out, as dupmon drives it
+        run->steps.push_back ({ "playlist zoom (Ctrl+wheel)", {},
+                                 [wheelAt, ui] (int f) {
+                                     if (f % 3 == 0)
+                                         wheelAt (ui->getPlaylistForSnapshot(), 0.0f, (f / 9) % 2 == 0 ? 0.15f : -0.15f, juce::ModifierKeys (juce::ModifierKeys::ctrlModifier));
+                                 }, 120 });
+        run->steps.push_back ({ "playlist after the zoom (settles)", {}, {}, 500 });
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
@@ -6448,6 +6724,57 @@ private:
     // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
     // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
     // report goes to output.txt
+    void runAlsExport (const juce::String& inputPath, const juce::String& folderPath, bool live11, bool reference)
+    {
+        juce::String error;
+        juce::StringArray notes;
+        juce::File als;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            bool ok = false;
+            // --scan: the targeted plugin scan an open runs first (child processes), so the set's plugins load
+            if (juce::JUCEApplication::getCommandLineParameterArray().contains ("--scan") && input.hasFileExtension ("flp;als"))
+            {
+                juce::MemoryBlock data;
+                if (input.loadFileAsData (data))
+                {
+                    const std::vector<std::uint8_t> bytes (static_cast<const std::uint8_t*> (data.getData()),
+                                                           static_cast<const std::uint8_t*> (data.getData()) + data.getSize());
+                    try
+                    {
+                        const auto uses = input.hasFileExtension ("als") ? lynx::alsForeignPlugins (bytes)
+                                                                         : lynx::flpForeignPlugins (flp::parseProject ({ bytes.data(), bytes.size() }));
+                        loader.getPluginHost().scanFiles (loader.getPluginHost().filesToScanFor (uses), {});
+                    }
+                    catch (const std::exception&)
+                    {
+                    }
+                }
+            }
+            if (input.hasFileExtension ("flp;als"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                loader.capturePluginStates();
+                const juce::File folder (folderPath);
+                folder.createDirectory();
+                als = lynx::writeAlsProject (loader.getSong(), &loader.getPluginHost(), live11 ? lynx::AlsVersion::live11 : lynx::AlsVersion::live12, ! reference, folder,
+                                             input.getFileNameWithoutExtension(), notes, error);
+            }
+        }
+        juce::String report;
+        report << (als != juce::File() ? "ok " + als.getFullPathName() : "error=" + error) << "\n" << notes.joinIntoString ("\n") << "\n";
+        juce::File (folderPath).getChildFile ("export-als.txt").replaceWithText (report);
+        setApplicationReturnValue (als != juce::File() ? 0 : 1);
+        quit();
+    }
+
     void runFlExport (const juce::String& inputPath, const juce::String& outputPath, bool substitute)
     {
         juce::String error;
@@ -10441,6 +10768,7 @@ private:
     double splashDuration = lynx::SplashScreen::minimumDuration; // seconds of its clock (round 121: from the process start)
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;
+    bool startupFileHandled = false;
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };
