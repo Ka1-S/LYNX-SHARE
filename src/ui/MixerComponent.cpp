@@ -2793,7 +2793,7 @@ void MixerStrips::repaintAutomatedStrips()
     automatedShown.resize (mixer.size(), { -1.0f, -1.0f });
     for (const auto t : all)
     {
-        if (t < 0 || t >= count)
+        if (t < 0 || t >= count || isHidden (t) || isFoldTab (t)) // (a folded member has no control on screen to move)
             continue;
         const std::array<float, 2> now { shownVolume (t),
                                          shown.shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (mixer[(std::size_t) t].pan + 1.0f) * 0.5f) };
