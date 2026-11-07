@@ -956,6 +956,15 @@ public:
             return;
         }
 
+        if (args.contains ("--wrappermiditest"))
+        {
+            // LYNX.exe --wrappermiditest plugin.dll report.txt (round 181c), with LYNX_TEST_VST2_MIDILOG set: what a
+            // hosted plugin receives after a wrapper MIDI option changes while it runs
+            const auto i = args.indexOf ("--wrappermiditest");
+            runWrapperMidiTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--vst2test"))
         {
             const auto i = args.indexOf ("--vst2test");
@@ -4290,6 +4299,124 @@ private:
             }
         }
 
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // Round 181c: a wrapper MIDI option changed on a running plugin must act like the same option on a new one. For each
+    // option: a control engine whose plugin is created with the option set (proves the test can see it), then an engine
+    // whose plugin is already running when the option changes through editSong, as the wrapper page does it. What the
+    // plugin received comes from the test plugin's own log. The running instance must also stay the same one.
+    void runWrapperMidiTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        juce::String report;
+        auto ok = true;
+        const juce::File logFile (juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_VST2_MIDILOG", {}));
+        struct Event { juce::String instance; int status, data1, data2; };
+        auto take = [&] {
+            std::vector<Event> out;
+            juce::StringArray lines;
+            logFile.readLines (lines);
+            for (const auto& line : lines)
+            {
+                const auto p = juce::StringArray::fromTokens (line, " ", {});
+                if (p.size() == 4)
+                    out.push_back ({ p[0], p[1].getIntValue(), p[2].getIntValue(), p[3].getIntValue() });
+            }
+            logFile.deleteFile();
+            return out;
+        };
+        auto count = [] (const std::vector<Event>& events, int status, int data1, int data2) {
+            int n = 0;
+            for (const auto& e : events)
+                n += (e.status & 0xF0) == status && (data1 < 0 || e.data1 == data1) && (data2 < 0 || e.data2 == data2) ? 1 : 0;
+            return n;
+        };
+        struct Option
+        {
+            const char* name;
+            std::function<void (lynx::PluginRef&)> before, change;
+            std::function<juce::String (const std::vector<Event>&)> seen;
+        };
+        const Option options[] = {
+            { "Send note release velocity off", {}, [] (lynx::PluginRef& r) { r.releaseVelocity = false; },
+              [&] (const std::vector<Event>& e) { return "offs_with_release_32=" + juce::String (count (e, 0x80, 69, 32)) + " offs_at_0=" + juce::String (count (e, 0x80, 69, 0)); } },
+            { "Send pitch bend range on", {}, [] (lynx::PluginRef& r) { r.sendBendRange = true; },
+              [&] (const std::vector<Event>& e) { return "rpn_range_12=" + juce::String (count (e, 0xB0, 6, 12)); } },
+            { "Pitch bend range 24", [] (lynx::PluginRef& r) { r.sendBendRange = true; }, [] (lynx::PluginRef& r) { r.bendRange = 24; },
+              [&] (const std::vector<Event>& e) { return "rpn_range_24=" + juce::String (count (e, 0xB0, 6, 24)); } },
+            { "Send MOD X as polyphonic aftertouch on", {}, [] (lynx::PluginRef& r) { r.modXAftertouch = true; },
+              [&] (const std::vector<Event>& e) { return "aftertouch=" + juce::String (count (e, 0xA0, 69, -1)); } },
+            { "Send All Notes Off when playback stops off", {}, [] (lynx::PluginRef& r) { r.allNotesOffOnStop = false; },
+              [&] (const std::vector<Event>& e) { return "cc123=" + juce::String (count (e, 0xB0, 123, -1)); } },
+        };
+
+        lynx::AudioEngine engine (false);
+        auto& host = engine.getPluginHost();
+        report << "plugins_in_file=" << host.addPluginFile (juce::File (pluginPath)) << "\n";
+        std::optional<juce::PluginDescription> vst2;
+        for (const auto& type : host.getKnownPlugins().getTypes())
+            if (type.pluginFormatName == "VST")
+                vst2 = type;
+        if (! vst2 || logFile.getFullPathName().isEmpty())
+            ok = false;
+        else
+            for (const auto& option : options)
+            {
+                auto makeSong = [&] (bool changed) {
+                    auto song = lynx::Song::makeDefault();
+                    auto& channel = song.channels[0];
+                    channel.instrument = lynx::InstrumentKind::plugin;
+                    channel.plugin = {};
+                    channel.plugin.id = vst2->createIdentifierString().toStdString();
+                    channel.plugin.name = vst2->name.toStdString();
+                    if (option.before)
+                        option.before (channel.plugin);
+                    if (changed)
+                        option.change (channel.plugin);
+                    song.patterns[0].notes.clear();
+                    lynx::Note note;
+                    note.start = 0;
+                    note.length = lynx::ppq;
+                    note.channel = 0;
+                    note.key = 69;
+                    note.velocity = 1.0f;
+                    note.release = 0.25f; // 32 of 127
+                    note.modX = 0.75f;
+                    song.patterns[0].notes.push_back (note);
+                    for (std::size_t c = 1; c < song.channels.size(); ++c)
+                        song.channels[c].muted = true;
+                    return song;
+                };
+                // a block of the song, then a note held across "playback stopped", as the options act on either
+                auto play = [&] {
+                    logFile.deleteFile();
+                    engine.renderOffline (1.0, 48000.0);
+                    if (auto instrument = engine.getChannelInstrument (0))
+                    {
+                        instrument->noteOn (60, 1.0f);
+                        instrument->transportStopped();
+                    }
+                    engine.renderOffline (0.1, 48000.0);
+                    return take();
+                };
+                engine.setSong (makeSong (true));
+                const auto control = play();
+                engine.setSong (makeSong (false));
+                const auto before = play();
+                const auto instrumentBefore = engine.getChannelInstrument (0).get();
+                engine.editSong ([&] (lynx::Song& song) { option.change (song.channels[0].plugin); });
+                const auto after = play();
+                const auto sameInstance = engine.getChannelInstrument (0).get() == instrumentBefore;
+                const auto a = option.seen (control), b = option.seen (before), c = option.seen (after);
+                const auto visible = a != b;
+                const auto works = c == a;
+                report << option.name << ": control " << a << " | before " << b << " | after the change " << c << " | same_instance=" << (int) sameInstance
+                       << " | test_sees_the_option=" << (int) visible << " | " << (! visible ? "NOT PROVEN" : works ? "acts on the running plugin" : "DEAD until re-created") << "\n";
+                ok = ok && visible && works && sameInstance;
+            }
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
