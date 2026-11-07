@@ -5174,6 +5174,8 @@ private:
         lynx::MainComponent* ui = nullptr;
         double everyMs = 0.0, startMs = 0.0, lastForcedMs = 0.0, longestCallMs = 0.0;
         int ticks = 0, forced = 0;
+        std::uint64_t seenOver = 0, seenNear = 0;
+        juce::String misses; // each callback over (or near) its deadline: how long after the last forced backup
 
         void timerCallback() override
         {
@@ -5181,6 +5183,14 @@ private:
             if (++ticks % 3 == 0)
                 engine->injectMidiInput (juce::MidiMessage (0xfe));
             const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto s = engine->getRtStats().snapshot();
+            if (s.overBudget != seenOver || s.nearBudget != seenNear)
+            {
+                misses << "    +" << juce::String ((now - lastForcedMs) / 1000.0, 1) << " s after the last forced backup (or the start): over +"
+                       << (juce::int64) (s.overBudget - seenOver) << ", near +" << (juce::int64) (s.nearBudget - seenNear) << "\n";
+                seenOver = s.overBudget;
+                seenNear = s.nearBudget;
+            }
             if (everyMs > 0.0 && now - lastForcedMs >= everyMs)
             {
                 lastForcedMs = now;
@@ -5223,6 +5233,8 @@ private:
         text << "  backup test: MIDI light count " << (int) engine->getMidiActivity() << ", played count " << (int) played << " (clock and active sensing only)\n";
         text << "  backup test: " << backupTest->forced << " forced, longest forced call on the message thread "
              << juce::String (backupTest->longestCallMs, 1) << " ms\n";
+        if (backupTest->misses.isNotEmpty())
+            text << "  backup test: callbacks over or near the deadline (seen within 100 ms):\n" << backupTest->misses;
         auto files = lynx::autosaveFolder().findChildFiles (juce::File::findFiles, false, "*.lynx");
         text << "  backup test: " << files.size() << " file(s) in the backup folder:\n";
         for (const auto& f : files)
