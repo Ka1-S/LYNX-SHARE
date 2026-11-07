@@ -34,23 +34,9 @@
 #define JucePlugin_VersionCode 0x00000100
 #define JucePlugin_Version 0.1.0
 #define JucePlugin_VersionString LYNX_EXPORT_VERSION
-#if LYNX_EXPORT_INDEX == 0
- #define JucePlugin_Name "LYNX Facet EQ"
- #define JucePlugin_PluginCode 0x4c6e7846 // 'LnxF'
- #define JucePlugin_VSTUniqueID JucePlugin_PluginCode
- #define JucePlugin_IsSynth 0
- #define JucePlugin_WantsMidiInput 0
- #define JucePlugin_Vst3Category "Fx|EQ"
-#elif LYNX_EXPORT_INDEX == 1
- #define JucePlugin_Name "LYNX FM10" // (placeholder name: plugin/ExportCatalog.h)
- #define JucePlugin_PluginCode 0x4c6e7831 // 'Lnx1'
- #define JucePlugin_VSTUniqueID JucePlugin_PluginCode
- #define JucePlugin_IsSynth 1
- #define JucePlugin_WantsMidiInput 1
- #define JucePlugin_Vst3Category "Instrument|Synth"
-#else
- #error "no such plugin"
-#endif
+// (identity: the build passes it from plugin/plugins.def)
+#define JucePlugin_VSTUniqueID JucePlugin_PluginCode
+#define JucePlugin_WantsMidiInput JucePlugin_IsSynth
 
 #include <juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp>
 

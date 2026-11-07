@@ -1,8 +1,7 @@
 #pragma once
 
-// LYNX's own engines that ship as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Only engines
-// that need no FL Studio data files, and only under LYNX's own names. Identity fields must never change once released:
-// hosts store them in their projects.
+// LYNX's own engines that are built as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md): the entries
+// of plugin/plugins.def with built = 1. Only engines that need no FL Studio data files.
 
 #include <array>
 
@@ -17,12 +16,15 @@ struct Entry
     EffectKind effect;    // when ! instrument
     InstrumentKind synth; // when instrument
     const char* clapId;
-    const char* clapFeature;
 };
 
-inline constexpr std::array<Entry, 2> catalog {
-    Entry { "LYNX Facet EQ", false, EffectKind::facetEq, InstrumentKind::dx10, "com.ka1-s.lynx.facet-eq", "equalizer" },
-    // "LYNX FM10" is a PLACEHOLDER name (the user decides the synths' names): internal prototype, not for release
-    Entry { "LYNX FM10", true, EffectKind::eq, InstrumentKind::dx10, "com.ka1-s.lynx.fm10", "synthesizer" }
+#define LYNX_PLUGIN_ENTRY_0(...)
+#define LYNX_PLUGIN_ENTRY_1(name, instrument, effect, synth, clapId) Entry { name, instrument != 0, EffectKind::effect, InstrumentKind::synth, clapId },
+#define LYNX_PLUGIN(name, instrument, effect, synth, clapId, code, category, built) LYNX_PLUGIN_ENTRY_##built (name, instrument, effect, synth, clapId)
+inline constexpr std::array catalog {
+#include "plugin/plugins.def"
 };
+#undef LYNX_PLUGIN
+#undef LYNX_PLUGIN_ENTRY_0
+#undef LYNX_PLUGIN_ENTRY_1
 } // namespace lynx::plugexport

@@ -52,10 +52,18 @@ else()
 endif()
 
 set(LYNX_PLUGIN_OUT "${CMAKE_BINARY_DIR}/plugins")
-function(lynx_add_vst3 index name)
+# every built entry of the one table, src/plugin/plugins.def; the index counts the built entries (plugin/ExportCatalog.h)
+file(STRINGS src/plugin/plugins.def LYNX_PLUGIN_LINES REGEX "^LYNX_PLUGIN .*, 1\)$")
+set(index 0)
+foreach(line IN LISTS LYNX_PLUGIN_LINES)
+    if(NOT line MATCHES "^LYNX_PLUGIN \(\"([^\"]+)\", ([01]), [^,]+, [^,]+, \"[^\"]+\", (0x[0-9a-f]+), \"([^\"]+)\", 1\)$")
+        message(FATAL_ERROR "src/plugin/plugins.def: can't read: ${line}")
+    endif()
+    set(name "${CMAKE_MATCH_1}")
     set(target "lynx_vst3_${index}")
     add_library(${target} MODULE src/plugin/Vst3Entry.cpp)
-    target_compile_definitions(${target} PRIVATE LYNX_EXPORT_INDEX=${index})
+    target_compile_definitions(${target} PRIVATE LYNX_EXPORT_INDEX=${index} JucePlugin_Name="${name}" JucePlugin_IsSynth=${CMAKE_MATCH_2}
+        JucePlugin_PluginCode=${CMAKE_MATCH_3} JucePlugin_Vst3Category="${CMAKE_MATCH_4}")
     lynx_finish_plugin(${target})
     set_target_properties(${target} PROPERTIES
         OUTPUT_NAME "${name}"
@@ -63,10 +71,8 @@ function(lynx_add_vst3 index name)
     if(WIN32)
         set_target_properties(${target} PROPERTIES SUFFIX ".vst3")
     endif()
-endfunction()
-
-lynx_add_vst3(0 "LYNX Facet EQ")
-lynx_add_vst3(1 "LYNX FM10")
+    math(EXPR index "${index} + 1")
+endforeach()
 
 add_library(lynx_clap MODULE src/plugin/ClapEntry.cpp)
 lynx_finish_plugin(lynx_clap)

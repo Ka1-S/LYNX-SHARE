@@ -358,14 +358,15 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     plugin_cxx "$OUT/plugin/ExportProcessor.o" src/plugin/ExportProcessor.cpp -Wall -Wextra
     plugin_cxx "$OUT/plugin/ClapEntry.o" src/plugin/ClapEntry.cpp -Wall -Wextra
     plugin_link "$OUT/plugins/LYNX Plugins.clap" "$OUT/plugin/ClapEntry.o"
-    index=0
-    for name in "LYNX Facet EQ" "LYNX FM10"; do
+    index=0 # (one table, src/plugin/plugins.def: every built entry; the index counts them, plugin/ExportCatalog.h)
+    while IFS='~' read -r name synth code category; do
         dir="$OUT/plugins/$name.vst3/Contents/x86_64-win"
         mkdir -p "$dir"
-        plugin_cxx "$OUT/plugin/Vst3Entry$index.o" src/plugin/Vst3Entry.cpp -w -DLYNX_EXPORT_INDEX=$index
+        plugin_cxx "$OUT/plugin/Vst3Entry$index.o" src/plugin/Vst3Entry.cpp -w -DLYNX_EXPORT_INDEX=$index "-DJucePlugin_Name=\"$name\"" -DJucePlugin_IsSynth=$synth \
+            -DJucePlugin_PluginCode=$code "-DJucePlugin_Vst3Category=\"$category\""
         plugin_link "$dir/$name.vst3" "$OUT/plugin/Vst3Entry$index.o"
         index=$((index + 1))
-    done
+    done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", 1\)$/\1~\2~\3~\4/p' src/plugin/plugins.def)
     plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
     plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
     "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
