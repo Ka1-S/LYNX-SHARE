@@ -32,10 +32,12 @@ constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in F
 // mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
 constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
 constexpr int faderRailRepeatMs = 64;
-// The first repeat comes later than the rate, so a click never takes two steps however long the button stays down in it.
-// 300 ms is INFERRED (the usual Windows first delay) until FL's own is measured (REA_rodada177a section 4.2).
-constexpr int faderRailFirstRepeatMs = 300;
-// how many steps a press held `heldMs` takes: one at once, one at the first delay, then one every faderRailRepeatMs
+// FL measured (REA_rodada177a section 4.2): held 50 / 100 / 160 / 250 / 300 / 400 ms the cap took 1 / 2 / 3 / 4 / 5 / 7
+// steps, so the first repeat comes one period after the press, with no longer first delay. LYNX counts the steps from
+// the press time, not from when its timer happens to fire (a JUCE timer's first callback can come early, which turned
+// one click into two steps).
+constexpr int faderRailFirstRepeatMs = faderRailRepeatMs;
+// how many steps a press held `heldMs` has taken: one at once, then one per period
 constexpr int faderRailStepsForHold (int heldMs) noexcept
 {
     return heldMs < faderRailFirstRepeatMs ? 1 : 2 + (heldMs - faderRailFirstRepeatMs) / faderRailRepeatMs;
