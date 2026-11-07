@@ -394,7 +394,10 @@ TEST (comp177_comp_these_takes)
 
     CHECK (! comp::canComp (song, 0) && comp::canComp (song, 2));
     CHECK (comp::compTakes (song, 0) == -1); // no group there
+    const auto beforeComp = song;
     CHECK (comp::compTakes (song, 3) == 1);
+    // the undo step is named for what it does
+    CHECK (std::string (describeChange (beforeComp, song).text) == "Comp takes");
 
     // one comp track above the group: what is above it stays, the group moves down by one
     CHECK (song.playlistTracks[1].compTrack && song.playlistTracks[1].name == "Vox comp" && ! song.playlistTracks[1].grouped

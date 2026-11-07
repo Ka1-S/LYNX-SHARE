@@ -7838,3 +7838,4 @@ countries: tr
 "There are no audio clip channels selected." = "Seçili ses klibi kanalı yok."
 "Change declicking mode?" = "Declicking modu değiştirilsin mi?"
 "Change the declicking mode of all selected audio clip channels?" = "Seçili tüm ses klibi kanallarının declicking modu değiştirilsin mi?"
+"Comp takes" = "Bu kayıtlardan comp oluştur"

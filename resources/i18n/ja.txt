@@ -7838,3 +7838,4 @@ countries: jp
 "There are no audio clip channels selected." = "オーディオクリップチャンネルが選択されていません。"
 "Change declicking mode?" = "デクリックモードを変更しますか?"
 "Change the declicking mode of all selected audio clip channels?" = "選択したすべてのオーディオクリップチャンネルのデクリックモードを変更しますか?"
+"Comp takes" = "これらのテイクでコンプを作成"

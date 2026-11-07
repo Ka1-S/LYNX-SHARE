@@ -7838,3 +7838,4 @@ countries: kr
 "There are no audio clip channels selected." = "선택한 오디오 클립 채널이 없습니다."
 "Change declicking mode?" = "디클릭 모드를 변경할까요?"
 "Change the declicking mode of all selected audio clip channels?" = "선택한 모든 오디오 클립 채널의 디클릭 모드를 변경할까요?"
+"Comp takes" = "이 테이크로 컴프 만들기"

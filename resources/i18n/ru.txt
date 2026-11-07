@@ -7838,3 +7838,4 @@ countries: ru by kz
 "There are no audio clip channels selected." = "Не выбрано ни одного канала аудиоклипа."
 "Change declicking mode?" = "Изменить режим деклика?"
 "Change the declicking mode of all selected audio clip channels?" = "Изменить режим деклика всех выбранных каналов аудиоклипов?"
+"Comp takes" = "Собрать комп из этих дублей"

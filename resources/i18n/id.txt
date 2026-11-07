@@ -7838,3 +7838,4 @@ countries: id
 "There are no audio clip channels selected." = "Tidak ada saluran klip audio yang dipilih."
 "Change declicking mode?" = "Ubah mode declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Ubah mode declicking semua saluran klip audio yang dipilih?"
+"Comp takes" = "Buat comp dari take ini"

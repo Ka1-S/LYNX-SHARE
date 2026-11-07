@@ -7838,3 +7838,4 @@ countries: it ch sm
 "There are no audio clip channels selected." = "Nessun canale di clip audio selezionato."
 "Change declicking mode?" = "Cambiare la modalità di declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Cambiare la modalità di declicking di tutti i canali di clip audio selezionati?"
+"Comp takes" = "Crea un comp da queste take"

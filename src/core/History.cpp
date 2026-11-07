@@ -204,6 +204,12 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     // playlist
     if (! sameClips (before.playlist, after.playlist))
     {
+        // "Comp these takes" adds clips and a track in one step: it's named for what it does (round 177c)
+        const auto comps = [] (const Song& song) {
+            return std::count_if (song.playlistTracks.begin(), song.playlistTracks.end(), [] (const PlaylistTrack& t) { return t.compTrack; });
+        };
+        if (comps (after) > comps (before))
+            return label (TR_NOOP ("Comp takes"));
         if (after.playlist.size() > before.playlist.size())
             return label (TR_NOOP ("Add clips"));
         if (after.playlist.size() < before.playlist.size())

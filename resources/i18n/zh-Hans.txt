@@ -7838,3 +7838,4 @@ countries: cn sg
 "There are no audio clip channels selected." = "未选择音频片段通道。"
 "Change declicking mode?" = "更改去咔嗒模式?"
 "Change the declicking mode of all selected audio clip channels?" = "更改所有所选音频片段通道的去咔嗒模式?"
+"Comp takes" = "用这些录音合成"

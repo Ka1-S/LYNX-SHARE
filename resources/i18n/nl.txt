@@ -7838,3 +7838,4 @@ countries: nl be
 "There are no audio clip channels selected." = "Er zijn geen audioclipkanalen geselecteerd."
 "Change declicking mode?" = "Declickingmodus wijzigen?"
 "Change the declicking mode of all selected audio clip channels?" = "De declickingmodus van alle geselecteerde audioclipkanalen wijzigen?"
+"Comp takes" = "Comp maken van deze takes"
