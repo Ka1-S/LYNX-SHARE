@@ -15,7 +15,8 @@ namespace ProjectFile
 constexpr const char* extension = ".lynx";
 constexpr int currentVersion = 1;
 
-juce::String toJson (const Song& song);
+// `stampVersion` writes "savedBy"; false when the text is hashed (a new version must not change what a hash says).
+juce::String toJson (const Song& song, bool stampVersion = true);
 // `savedBy` (optional) receives the version of LYNX SHARE that wrote the project ("" for projects from before round
 // 177d, which did not write it): a newer one may hold things this build drops (safety::savedByNewerVersion).
 std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy = nullptr);

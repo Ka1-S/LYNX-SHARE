@@ -1133,14 +1133,15 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
         // View › "Ruler: song bars" (round 177d, LYNX's own; off = FL's pattern bars): the bar numbers the Playlist shows
         // where the pattern's first clip plays
-        const auto songOrigin = songBarsRuler ? polish::patternSongOrigin (song, song.currentPattern) : (std::int64_t) -1;
+        const auto songOrigin = songBarsRuler ? polish::patternSongOrigin (song, song.currentPattern) : std::nullopt;
         for (auto b = firstBar; b <= lastBar; ++b)
         {
             const auto x = (int) tickToX ((double) (b * bar));
             g.setColour (textSecondary);
             g.drawVerticalLine (x, (float) rulerTop + 10.0f, (float) headerHeight);
-            const auto number = songOrigin >= 0 ? (std::int64_t) std::floor ((double) (songOrigin + b * bar) / (double) bar) + 1 : b + 1;
-            textcache::drawText (g, juce::String (number), x + 3, rulerTop + 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
+            const std::int64_t number = songOrigin.has_value() ? polish::songBarNumber (*songOrigin, b, bar) : (std::int64_t) b + 1;
+            if (number > 0)
+                textcache::drawText (g, juce::String (number), x + 3, rulerTop + 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
         }
 
         // the pattern's time markers (round 168g): a flag and the name in the ruler's lower half, like the Playlist's

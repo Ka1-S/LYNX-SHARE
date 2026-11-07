@@ -39,6 +39,16 @@ TEST (pain177d_backups_wait_for_a_quiet_moment)
     CHECK (! backupMayRun (false, true, 1e9, true));
     CHECK (! backupMayRun (false, false, 1000.0, true));
     CHECK (backupMayRun (false, false, lynx::prefs::backupQuietMs, true));
+    // no limit on the wait for now (the user decides); a limit ends it, but never during a recording
+    CHECK (lynx::prefs::backupMaxWaitMs == 0.0);
+    CHECK (! backupMayRun (false, true, 1e9, true, 1e12));
+    CHECK (backupMayRun (false, true, 1e9, true, 60000.0, 60000.0));
+    CHECK (! backupMayRun (false, true, 1e9, true, 59999.0, 60000.0));
+    CHECK (! backupMayRun (true, true, 1e9, true, 1e12, 60000.0));
+    // clock and active sensing are not someone playing
+    using lynx::prefs::midiMeansPlaying;
+    CHECK (midiMeansPlaying (0x90) && midiMeansPlaying (0xB3) && midiMeansPlaying (0xE0));
+    CHECK (! midiMeansPlaying (0xF8) && ! midiMeansPlaying (0xFE) && ! midiMeansPlaying (0xF0) && ! midiMeansPlaying (0x40));
 }
 
 TEST (pain177d_saved_by_newer_version)

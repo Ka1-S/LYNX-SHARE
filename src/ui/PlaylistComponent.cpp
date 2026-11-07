@@ -6655,7 +6655,7 @@ juce::PopupMenu PatternPicker::pickerMenu()
         }
     };
 
-    juce::PopupMenu menu, select, sort, sortPatterns;
+    juce::PopupMenu menu, select, sort, sortMenu;
     menu.addSectionHeader (tr ("Tools")); // (FL: Playlist menu › Picker panel › Tools, checked in FL in round 177d)
     select.addItem (tr ("Patterns ({0})", { juce::String ((int) unused.size()) }), ! unused.empty(), false, [safe, unused] {
         if (safe == nullptr)
@@ -6667,15 +6667,15 @@ juce::PopupMenu PatternPicker::pickerMenu()
         safe->repaint();
     });
     menu.addSubMenu (tr ("Select unused"), select);
-    sortPatterns.addItem (tr ("By name"), song.patterns.size() > 1, false, [this, edited] {
-        engine.editSong ([] (Song& s) { sortPatterns (s, PatternSort::name); });
+    sortMenu.addItem (tr ("By name"), song.patterns.size() > 1, false, [this, edited] {
+        engine.editSongPatternOrder ([] (Song& s) { sortPatterns (s, PatternSort::name); });
         edited();
     });
-    sortPatterns.addItem (tr ("By color"), song.patterns.size() > 1, false, [this, edited] {
-        engine.editSong ([] (Song& s) { sortPatterns (s, PatternSort::colour); });
+    sortMenu.addItem (tr ("By color"), song.patterns.size() > 1, false, [this, edited] {
+        engine.editSongPatternOrder ([] (Song& s) { sortPatterns (s, PatternSort::colour); });
         edited();
     });
-    sort.addSubMenu (tr ("Patterns"), sortPatterns);
+    sort.addSubMenu (tr ("Patterns"), sortMenu);
     menu.addSubMenu (tr ("Sort"), sort);
     menu.addSeparator();
     // LYNX's own (not in FL)

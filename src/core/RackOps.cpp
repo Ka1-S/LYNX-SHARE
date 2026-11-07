@@ -249,6 +249,9 @@ std::vector<int> unusedPatterns (const Song& song)
             if (b.pattern >= 0 && b.pattern < (int) used.size())
                 used[(std::size_t) b.pattern] = 1;
     });
+    for (const auto& c : song.channels) // a Loop Starter channel plays from its pattern
+        if (c.loopStarterPattern >= 0 && c.loopStarterPattern < (int) used.size())
+            used[(std::size_t) c.loopStarterPattern] = 1;
     std::vector<int> out;
     for (int p = 0; p < (int) used.size(); ++p)
         if (! used[(std::size_t) p])
@@ -333,7 +336,7 @@ std::pair<int, int> colourKey (std::uint32_t argb)
 bool sameContent (const Pattern& a, const Pattern& b)
 {
     return a.notes == b.notes && a.lengthTicks == b.lengthTicks && a.events == b.events && a.loopOn == b.loopOn && a.loopMode == b.loopMode
-           && a.channelLoops == b.channelLoops && a.markers == b.markers;
+           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre;
 }
 } // namespace
 

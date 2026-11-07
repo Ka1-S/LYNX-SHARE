@@ -494,6 +494,7 @@ public:
     juce::StringArray getActiveMidiInputs() const;
     // Counts the messages received from the enabled MIDI inputs (the toolbar's MIDI activity light).
     std::uint32_t getMidiActivity() const noexcept { return midiActivity.load (std::memory_order_relaxed); }
+    std::uint32_t getMidiPlayed() const noexcept { return midiPlayed.load (std::memory_order_relaxed); }
     // Closes and opens again every enabled MIDI input (the MIDI light's click; Settings › MIDI › Refresh).
     void reconnectMidiInputs();
     const prefs::MidiPrefs& getMidiPrefs() const noexcept { return midiPrefs; }
@@ -526,6 +527,9 @@ public:
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
     // rack matches them by instance tag, round 168s).
     void editSongStructural (const std::function<void (Song&)>& edit);
+    // An edit that gives the patterns other indices (sort, move): one undo step like editSong, but without
+    // followPatternLengths, which compares by index and would resize clips that were sized by hand (round 177d).
+    void editSongPatternOrder (const std::function<void (Song&)>& edit);
     // An edit that changes only levels (mixer volume / pan / separation, channel volume / pan), e.g. a fader drag: one
     // undo step per press like editSong, but the playing snapshot takes the values at once without a rebuild (round
     // 171c); the full publish follows when the mouse is released. Anything else falls back to editSong.
@@ -891,7 +895,7 @@ private:
     juce::MidiDeviceListConnection midiDevicesChanged;
     std::vector<std::string> lastMidiInputIds;       // the MIDI inputs available at the last check (UI thread)
     int midiCheckTicks = 0;
-    std::atomic<std::uint32_t> midiActivity { 0 };
+    std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     prefs::MidiPrefs midiPrefs;                      // UI thread
     juce::SpinLock midiPrefsLock;                    // guards midiPrefsShared (UI writes, MIDI thread reads)
     prefs::MidiPrefs midiPrefsShared;

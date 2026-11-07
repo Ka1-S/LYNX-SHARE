@@ -101,7 +101,7 @@ bool movePattern (Song& song, int index, int delta);
 
 // --- pattern hygiene (round 177d; FL's Playlist picker "Select unused › Patterns" and "Sort patterns by name / color",
 // EEPickerSelectUnusedPatternsMenu / EEPickerSortPatternsBy*Menu in FLEngine; LYNX's own: merge identical patterns) ----
-// Patterns that no clip plays in any arrangement and no pattern block uses (ascending).
+// Patterns that no clip plays in any arrangement, no pattern block uses and no Loop Starter channel belongs to (ascending).
 std::vector<int> unusedPatterns (const Song& song);
 // Deletes the given patterns (clips follow, as Song::removePattern). Returns how many went.
 int deletePatterns (Song& song, std::vector<int> indices);
@@ -110,7 +110,7 @@ int deletePatterns (Song& song, std::vector<int> indices);
 void reorderPatterns (Song& song, const std::vector<int>& order);
 enum class PatternSort : std::uint8_t { name, colour };
 void sortPatterns (Song& song, PatternSort by);
-// Groups of patterns with the same content (notes, events, length, loops, markers; the name and colour may differ),
+// Groups of patterns with the same content (notes, events, length, loops, markers, Loop Starter genre; the name and colour may differ),
 // each group ascending, only groups of two or more.
 std::vector<std::vector<int>> identicalPatterns (const Song& song);
 // Every clip of a duplicate plays the group's first pattern instead, and the duplicates are deleted. Returns how many

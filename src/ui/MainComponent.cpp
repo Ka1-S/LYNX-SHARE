@@ -3178,7 +3178,7 @@ void MainComponent::clonePatternNow()
 
 void MainComponent::movePatternNow (int delta)
 {
-    engine.editSong ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
+    engine.editSongPatternOrder ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
 }
 
 void MainComponent::splitPatternByChannelNow()
@@ -4040,14 +4040,16 @@ void MainComponent::timerCallback()
     // (not in the middle of a recording: FL also postpones the timed backup until the transport is free; round 177d:
     // with "Wait with backups..." on, also while playing and for a few seconds after MIDI input, so writing the plugin
     // states never stutters the sound)
-    if (const auto midi = engine.getMidiActivity(); midi != backupMidiSeen)
+    if (const auto midi = engine.getMidiPlayed(); midi != backupMidiSeen)
     {
         backupMidiSeen = midi;
         backupMidiMs = juce::Time::getMillisecondCounterHiRes();
     }
-    if (autosaveMinutes > 0 && ++autosaveTicks >= 30 * 60 * autosaveMinutes
+    const auto backupDueTicks = 30 * 60 * autosaveMinutes;
+    if (autosaveMinutes > 0 && ++autosaveTicks >= backupDueTicks
         && prefs::backupMayRun (engine.isRecording(), engine.getTransport().playing.load(),
-                                juce::Time::getMillisecondCounterHiRes() - backupMidiMs, backupWaitsForQuiet))
+                                juce::Time::getMillisecondCounterHiRes() - backupMidiMs, backupWaitsForQuiet,
+                                (autosaveTicks - backupDueTicks) * 1000.0 / 30.0))
     {
         autosaveTicks = 0;
 

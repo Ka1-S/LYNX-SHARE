@@ -1932,12 +1932,13 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     return track;
 }
 
-juce::String toJson (const Song& song)
+juce::String toJson (const Song& song, bool stampVersion)
 {
     auto root = std::make_unique<juce::DynamicObject>();
     root->setProperty ("format", "lynx-project");
     root->setProperty ("version", currentVersion);
-    root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
+    if (stampVersion)
+        root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
 

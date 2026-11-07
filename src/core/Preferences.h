@@ -27,12 +27,21 @@ int clampAutosaveKeep (int keep); // 1..100
 // "waitForQuiet" on (the default) a due backup also waits while the song plays and until `quietMs` after the last
 // MIDI input, not only while recording (FL postpones it for recording only).
 constexpr double backupQuietMs = 5000.0;
-inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet) noexcept
+// `maxWaitMs` > 0 ends the wait once the backup is that overdue (never during a recording); 0 = no limit, the current
+// behaviour (backupMaxWaitMs).
+constexpr double backupMaxWaitMs = 0.0;
+inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet, double msOverdue = 0.0,
+                          double maxWaitMs = backupMaxWaitMs) noexcept
 {
     if (recording)
         return false;
+    if (maxWaitMs > 0.0 && msOverdue >= maxWaitMs)
+        return true;
     return ! waitForQuiet || (! playing && msSinceMidi >= backupQuietMs);
 }
+// A MIDI message that means someone is playing: channel messages only. Clock, active sensing and the rest of the
+// system messages (0xF0 and up) run by themselves whenever a device is plugged in.
+constexpr bool midiMeansPlaying (unsigned char status) noexcept { return status >= 0x80 && status < 0xF0; }
 
 // Backup file name (without extension) of project `stem` saved at a date/time: "Night Drive (2026-10-16 19.50.03)".
 // Sorting these names sorts them by time.

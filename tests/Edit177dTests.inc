@@ -6,7 +6,7 @@ TEST (pain177d_song_bars_ruler_origin)
 {
     lynx::Song s;
     s.patterns.resize (2);
-    CHECK (lynx::polish::patternSongOrigin (s, 1) == -1); // not on the Playlist: pattern bars
+    CHECK (! lynx::polish::patternSongOrigin (s, 1).has_value()); // not on the Playlist: pattern bars
     lynx::Clip late, early, muted;
     late.pattern = early.pattern = muted.pattern = 1;
     late.start = 8 * 3840;
@@ -16,6 +16,13 @@ TEST (pain177d_song_bars_ruler_origin)
     muted.muted = true;
     s.playlist = { late, early, muted };
     CHECK (lynx::polish::patternSongOrigin (s, 1) == 3 * 3840); // the first unmuted clip, minus its offset
+    CHECK (lynx::polish::songBarNumber (3 * 3840, 0, 3840) == 4);
+    // an offset past the song's start: the origin is negative but real, and the bars before bar 1 have no number
+    s.playlist = { early };
+    s.playlist[0].start = 0;
+    CHECK (lynx::polish::patternSongOrigin (s, 1) == -3840);
+    CHECK (lynx::polish::songBarNumber (-3840, 0, 3840) == 0);
+    CHECK (lynx::polish::songBarNumber (-3840, 1, 3840) == 1);
 }
 
 TEST (pain177d_instruments_only_channel_stems)

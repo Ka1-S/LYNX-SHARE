@@ -2024,6 +2024,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
 
     midiActivity.fetch_add (1, std::memory_order_relaxed); // the toolbar's MIDI input light
+    if (m.getRawDataSize() > 0 && prefs::midiMeansPlaying (m.getRawData()[0]))
+        midiPlayed.fetch_add (1, std::memory_order_relaxed); // what holds a backup back (not clock or active sensing)
 
     // FL's "Song marker jump (MIDI channel)": notes on that channel move the song to a marker instead of playing
     if (jumpChannel > 0 && m.getChannel() == jumpChannel && m.isNoteOnOrOff())
@@ -2485,6 +2487,15 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     edit (song);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
+    publishSong();
+}
+
+void AudioEngine::editSongPatternOrder (const std::function<void (Song&)>& edit)
+{
+    saveUndoStep();
+    modified = true;
+    edit (song);
+    clipops::updateCrossfades (song);
     publishSong();
 }
 

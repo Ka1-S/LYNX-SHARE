@@ -428,7 +428,7 @@ private:
     juce::Label animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, unusedTakes, checkUpdates;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };
