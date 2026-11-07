@@ -6,6 +6,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "core/PlaylistOps.h"
 #include "core/Performance.h"
 
 #include "core/TransportEdit.h"
@@ -699,6 +700,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
+    if (startInClipLaunchWorkflow)
+        setClipLaunchWorkflow (true, false); // (the saved workspace layout is already this style's)
     juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
             safe->startLiveFromCommandLine();
@@ -1971,6 +1974,10 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
+        else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
+            startInClipLaunchWorkflow = on;
+        else if (key == "lanesBeforeClipLaunch")
+            lanesBeforeClipLaunch = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -2120,6 +2127,8 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
+                                      + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
+                                      + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -2399,8 +2408,10 @@ private:
 };
 } // namespace
 
-void MainComponent::setClipLaunchWorkflow (bool on)
+void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
 {
+    if (on == clipLaunchWorkflow && (! on || clipGridView != nullptr))
+        return;
     if (on && clipGridView == nullptr)
     {
         clipGridView = makeClipGrid (engine);
@@ -2408,8 +2419,42 @@ void MainComponent::setClipLaunchWorkflow (bool on)
     }
     if (clipGridView == nullptr)
         return;
+
+    // the workspace layout is kept per style, so going back restores the Pattern layout exactly
+    const auto layoutFile = [] (bool clipLaunch) { return platform::settingsFile (clipLaunch ? "workspace-cliplaunch.txt" : "workspace-pattern.txt"); };
+    if (persistent && swapLayout && on != clipLaunchWorkflow)
+    {
+        layoutFile (clipLaunchWorkflow).replaceWithText (workspace.getLayoutText());
+        if (const auto saved = layoutFile (on); saved.existsAsFile())
+            workspace.applyLayoutText (saved.loadFileAsString());
+        else if (on)
+        {
+            workspace.hide (Panel::channelRack); // one click away, on the toolbar
+            workspace.show (Panel::playlist);
+        }
+        refreshPanelButtons();
+    }
+
+    // Clip-launch workflow shows the automation lanes; going back restores the user's setting
+    if (on != clipLaunchWorkflow)
+    {
+        if (on && swapLayout) // (at startup, the saved value holds)
+            lanesBeforeClipLaunch = autolanes::shown();
+        autolanes::setShown (on || lanesBeforeClipLaunch);
+        playlist.repaint();
+    }
+
+    clipLaunchWorkflow = on;
     playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
     workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
+}
+
+void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
+{
+    juce::PopupMenu styles;
+    styles.addItem (tr ("Pattern workflow (default)"), true, ! clipLaunchWorkflow, [this] { setClipLaunchWorkflow (false); saveUiSettings(); });
+    styles.addItem (tr ("Clip-launch workflow"), true, clipLaunchWorkflow, [this] { setClipLaunchWorkflow (true); saveUiSettings(); });
+    menu.addSubMenu (tr ("Layout style"), styles);
 }
 
 void MainComponent::setClipGridView (PlaylistArea::GridView view)
@@ -5217,6 +5262,7 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
+        o.clipLaunchWorkflow = self.clipLaunchWorkflow;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
         o.autosaveMinutes = safe->autosaveMinutes;
@@ -5291,6 +5337,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
             setStretchedClipsLoop (o.stretchedClipsLoop);
@@ -5876,6 +5923,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 2)
     {
+        addLayoutStyleItems (menu);
+        menu.addSeparator();
         for (auto panel : panelOrder)
             menu.addItem (panelName (panel) + shortcutText (panelAction (panel)), true, workspace.isPanelVisible (panel), [this, panel] { togglePanel (panel); });
 

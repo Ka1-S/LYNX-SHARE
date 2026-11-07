@@ -17,7 +17,7 @@ namespace lynx
 namespace
 {
 constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, sceneWidth = 128, launchZone = 20;
-constexpr int minColumns = 8;
+constexpr int minColumns = 8, minRows = 8;
 
 const std::pair<LaunchQuant, const char*> quantNames[] = {
     { LaunchQuant::global, TR_NOOP ("Global") }, { LaunchQuant::none, TR_NOOP ("None") }, { LaunchQuant::bars8, TR_NOOP ("8 bars") },
@@ -70,7 +70,6 @@ public:
             const auto q = (LaunchQuant) (globalQuant.getSelectedId() - 1);
             engine.editSong ([q] (Song& s) { launcher::ensureGrid (s).globalQuant = q; }, false);
         };
-        engine.editSong ([] (Song& s) { launcher::ensureGrid (s); }, false);
         syncControls();
     }
 
@@ -98,7 +97,7 @@ public:
         const auto& song = engine.getSong();
         const auto cells = cellArea();
         const auto columns = columnCount();
-        const auto scenes = (int) grid->scenes.size();
+        const auto scenes = rowCount();
 
         // column headers, slots and the stop row, clipped to the scrolling part
         {
@@ -216,7 +215,7 @@ public:
         if (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey || code == juce::KeyPress::downKey)
         {
             selectedTrack = juce::jlimit (0, columnCount() - 1, selectedTrack + (code == juce::KeyPress::leftKey ? -1 : code == juce::KeyPress::rightKey ? 1 : 0));
-            selectedScene = juce::jlimit (0, (int) grid->scenes.size() - 1, selectedScene + (code == juce::KeyPress::upKey ? -1 : code == juce::KeyPress::downKey ? 1 : 0));
+            selectedScene = juce::jlimit (0, rowCount() - 1, selectedScene + (code == juce::KeyPress::upKey ? -1 : code == juce::KeyPress::downKey ? 1 : 0));
             revealSelection();
             repaint();
             return true;
@@ -250,11 +249,15 @@ private:
         int track = -1, scene = -1;
     };
 
+    // The project's grid, or an empty one to draw: a project gets a real one with its first clip, so that looking at the
+    // grid does not change the project.
     const ClipGrid* gridOf() const noexcept
     {
+        static const ClipGrid none;
         const auto& g = engine.getSong().clipGrid;
-        return g ? &*g : nullptr;
+        return g ? &*g : &none;
     }
+    int rowCount() const noexcept { return std::max (minRows, (int) gridOf()->scenes.size()); }
     int columnCount() const
     {
         const auto& song = engine.getSong();
@@ -275,10 +278,9 @@ private:
 
     void clampScroll()
     {
-        const auto* grid = gridOf();
         const auto cells = cellArea();
         scrollX = juce::jlimit (0, juce::jmax (0, columnCount() * columnWidth - cells.getWidth()), scrollX);
-        scrollY = juce::jlimit (0, juce::jmax (0, (grid != nullptr ? (int) grid->scenes.size() : 0) * rowHeight - cells.getHeight()), scrollY);
+        scrollY = juce::jlimit (0, juce::jmax (0, rowCount() * rowHeight - cells.getHeight()), scrollY);
     }
     void revealSelection()
     {
@@ -297,11 +299,10 @@ private:
     {
         Cell out;
         const auto cells = cellArea();
-        const auto* grid = gridOf();
-        if (grid == nullptr || p.y < headerHeight || p.y >= cells.getBottom())
+        if (p.y < headerHeight || p.y >= cells.getBottom())
             return out;
         const auto r = (p.y - headerHeight + scrollY) / rowHeight;
-        if (r >= 0 && r < (int) grid->scenes.size())
+        if (r >= 0 && r < rowCount())
             out.scene = r;
         if (p.x < cells.getRight())
             if (const auto t = (p.x + scrollX) / columnWidth; t >= 0 && t < columnCount())
@@ -398,7 +399,8 @@ private:
     void paintScene (juce::Graphics& g, const ClipGrid& grid, int row, juce::Rectangle<int> r) const
     {
         namespace c = theme::colour;
-        const auto& scene = grid.scenes[(std::size_t) row];
+        static const ClipGridScene unnamed;
+        const auto& scene = row < (int) grid.scenes.size() ? grid.scenes[(std::size_t) row] : unnamed;
         const auto cell = r.reduced (1);
         g.setColour (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3);
         g.fillRect (cell);
