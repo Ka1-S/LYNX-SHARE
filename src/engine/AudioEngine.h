@@ -138,6 +138,11 @@ public:
         return performanceMidiChannel.load (std::memory_order_relaxed) == 1 && performanceMidiOn.load (std::memory_order_relaxed);
     }
     const perf::Live& performanceState() const noexcept { return *performanceLive; }
+    // The clip grid (round 181a, core/ClipLauncher.h; message thread). A launch while stopped starts the transport, as the
+    // first thing a launcher does; a stop while stopped does nothing. Without a grid in the project: nothing at all.
+    void launcherCommand (const launcher::Command& command);
+    // What plays per track, or nullptr while no project has had a grid (never with Pattern workflow).
+    const launcher::Runtime* launcherState() const noexcept { return clipLauncher.get(); }
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
 
@@ -933,6 +938,7 @@ private:
     juce::SpinLock takeLock;                       // the audio thread only tries (never waits)
     LiveInput liveInput;
     std::unique_ptr<perf::Live> performanceLive = std::make_unique<perf::Live>(); // Performance mode (round 165m)
+    std::unique_ptr<launcher::Runtime> clipLauncher; // made when a project first has a clip grid (round 181a)
     std::atomic<int> performanceMidiChannel { 0 }; // MidiPrefs::performanceChannel (UI writes, MIDI thread reads)
     std::atomic<bool> performanceMidiOn { false }; // Performance mode is on with a zone (UI writes, MIDI thread reads)
     perf::MidiMapping performanceMidi;             // MIDI thread only

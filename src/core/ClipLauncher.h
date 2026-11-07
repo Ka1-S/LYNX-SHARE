@@ -1,0 +1,184 @@
+#pragma once
+
+// The clip grid of the Clip-launch workflow (round 181a, slice N5): clips in a grid of Playlist tracks × scenes, launched
+// live and in time. The model (ClipGrid, in Song.h) exists only once a project uses it, and the engine only then too:
+// RackState::launchers is the one test the audio thread makes, in place of the one it made for Performance mode.
+//
+// The behaviour follows the published manual of the session-style launcher this workflow studies; docs/analise/REA_rodada181a.md
+// says what was checked and how:
+//   - a launch waits for the next multiple of the clip's launch quantisation (the grid's global one by default), counted
+//     from the start of the song on the steady transport clock;
+//   - a track plays one clip: the launched clip replaces the one playing, at that same point;
+//   - legato: the launched clip starts at the position the clip it replaces has reached;
+//   - a clip that starts on a track takes the track away from the Playlist's clips until "back to arrangement".
+//
+// Threads: the UI posts commands into Runtime::commands; the audio thread applies them at the start of a block, never
+// allocates, and publishes what plays per track (Runtime::tracks).
+
+#include <array>
+#include <atomic>
+#include <bitset>
+#include <cstdint>
+#include <limits>
+#include <vector>
+
+#include "core/LiveEventQueue.h"
+#include "core/Scheduler.h"
+#include "core/Song.h"
+
+namespace lynx::launcher
+{
+constexpr int maxTracks = 500;  // the Playlist's tracks
+constexpr int maxScenes = 1000;
+constexpr int maxSlots = 32000; // Clip::gridSlot is 16 bits
+// Audio clips: a grid clip's voice key sits above any real playlist index (audioClipKey wraps at 1000000)
+constexpr std::size_t slotKeyBase = 900000;
+
+// --- the model (message thread) ------------------------------------------------------------------------------------
+
+// The song's grid, created when it has none (with one scene).
+ClipGrid& ensureGrid (Song& song);
+// The clip in (track, scene), or nullptr.
+const Clip* clipAt (const ClipGrid& grid, int track, int scene) noexcept;
+// Puts a clip in a slot, replacing what is there; its settings start at their defaults. `clip` keeps what it plays
+// (kind, source, length, offset, gain…); pattern and audio clips only. Returns the slot's id, −1 when it cannot be placed.
+int setClip (Song& song, int track, int scene, Clip clip);
+// Empties a slot. False when it was empty.
+bool clearClip (Song& song, int track, int scene);
+// The settings of the clip in (track, scene), or nullptr.
+ClipGridSlot* settingsAt (ClipGrid& grid, int track, int scene) noexcept;
+// Scenes: `at` is the new scene's row; rows after it move down (with their clips).
+int insertScene (Song& song, int at);
+bool removeScene (Song& song, int scene); // with its clips (a grid keeps at least one scene)
+
+// Ticks of a launch quantisation (0 = none; `global` is resolved by the caller).
+double quantTicks (LaunchQuant quant, int beatsPerBar) noexcept;
+
+// Slot id → its clip's index in ClipGrid::clips (−1 = free), built off the audio thread with the rack state.
+using GridIndex = std::vector<int>;
+GridIndex makeIndex (const ClipGrid& grid);
+
+// --- launching ---------------------------------------------------------------------------------------------------
+
+struct Command
+{
+    enum class Type : std::uint8_t { launch, release, launchScene, stopTrack, stopAll, backToArrangement, reset };
+    Type type = Type::launch;
+    int track = 0;
+    int scene = 0;
+};
+
+static_assert (maxTracks == scheduleMaskTracks);
+
+// The clip's pass the scheduler plays in this block: a Clip copy placed on the Player's clock.
+struct VirtualClip
+{
+    Clip clip;
+    int slot = -1;
+};
+
+class Runtime;
+
+class Player
+{
+public:
+    static constexpr int maxActive = 64; // tracks with a clip at once
+    static constexpr int maxVirtual = 4 * maxActive;
+    static constexpr int maxCuts = 2 * maxActive;
+
+    // A clip's play that ended before its pass did, in this block: its sounding notes end there.
+    struct Cut
+    {
+        int slot = -1;
+        double position = 0.0; // ticks into the clip's source (its own offset included)
+        double at = 0.0;       // on the clock
+    };
+
+    // Audio thread. `clock` = the steady clock at the block's start (ticks), `blockTicks` = the block's length.
+    void process (const Song& song, const ClipGrid& grid, const GridIndex& index, Runtime* runtime, double clock,
+                  double blockTicks) noexcept;
+    // Transport stopped: every clip ends at once. Taken tracks stay taken until "back to arrangement", unless `giveBack`
+    // (ClipGrid::backOnStop).
+    void stopAll (Runtime* runtime, bool giveBack = false) noexcept;
+
+    int virtualCount() const noexcept { return numVirtual; }
+    const VirtualClip& virtualClip (int i) const noexcept { return virtuals[(std::size_t) i]; }
+    int cutCount() const noexcept { return numCuts; }
+    const Cut& cut (int i) const noexcept { return cuts[(std::size_t) i]; }
+
+    // The tracks whose Playlist clips are silent (a grid clip took them), those a clip took in this block (with when, on
+    // the clock), and those given back in this block (their Playlist clips resume where the song is).
+    const TrackMask& taken() const noexcept { return takenTracks; }
+    const TrackMask& givenBack() const noexcept { return backTracks; }
+    int takeoverCount() const noexcept { return numTakeovers; }
+    int takeoverTrack (int i) const noexcept { return takeovers[(std::size_t) i].track; }
+    double takeoverAt (int i) const noexcept { return takeovers[(std::size_t) i].at; }
+
+    // test access: the slot playing on a track (−1 = none)
+    int playingOn (int track) const noexcept;
+
+private:
+    static constexpr double never = std::numeric_limits<double>::infinity();
+
+    struct Play
+    {
+        int slot = -1;
+        double anchor = 0.0, from = 0.0, until = never; // the clip's position 0 is at anchor + k·length
+    };
+    struct TrackState
+    {
+        int track = -1;
+        Play current, previous, next;
+    };
+    struct Takeover
+    {
+        int track = 0;
+        double at = 0.0;
+    };
+
+    std::array<TrackState, maxActive> active {};
+    int numActive = 0;
+    std::array<VirtualClip, maxVirtual> virtuals {};
+    int numVirtual = 0;
+    std::array<Cut, maxCuts> cuts {};
+    int numCuts = 0;
+    std::array<Takeover, maxActive> takeovers {};
+    int numTakeovers = 0;
+    TrackMask takenTracks, backTracks;
+
+    TrackState* stateOf (int track, bool create) noexcept;
+    void launch (const Song& song, const ClipGrid& grid, const GridIndex& index, TrackState& t, int slot, double now) noexcept;
+    void stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, double now) noexcept;
+    void apply (const Song& song, const ClipGrid& grid, const GridIndex& index, const Command& c, double now) noexcept;
+    void addCut (const ClipGrid& grid, const GridIndex& index, const Play& p, double at) noexcept;
+};
+
+// Everything the launcher needs at run time, made the first time a project has a grid (never with Pattern workflow) and
+// kept for the engine's life: the rack states only point at it.
+class Runtime
+{
+public:
+    Runtime() noexcept { instances.fetch_add (1, std::memory_order_relaxed); }
+    static inline std::atomic<int> instances { 0 }; // how many were ever made (Pattern workflow: none; the tests and --selftest check)
+
+    SpscQueue<Command, 256> commands; // UI → audio (one producer: the message thread)
+
+    // audio → UI, per Playlist track: the scene playing (−1 = none), the one waiting to start, the position in the clip (0..1)
+    struct TrackView
+    {
+        std::atomic<int> playing { -1 }, pending { -1 };
+        std::atomic<float> progress { 0.0f };
+        std::atomic<bool> taken { false }; // its Playlist clips are silent until "back to arrangement"
+    };
+    std::array<TrackView, maxTracks> tracks;
+    std::atomic<bool> anyPlaying { false };
+
+    Player player;
+    double clock = 0.0; // the steady clock (ticks): the transport's position when playback started, never wrapping
+};
+
+// One block of the song while the project has a grid: the commands, then what the Playlist plays around the taken tracks,
+// then the grid's passes; ends what was cut. `clock` advances. Audio thread; `index` the song's schedule index.
+void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const GridIndex& gridIndex, double startTick, int numSamples,
+                double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, ScheduledNotes& notes) noexcept;
+} // namespace lynx::launcher

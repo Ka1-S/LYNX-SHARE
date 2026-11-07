@@ -1983,6 +1983,17 @@ private:
         original.loopEnd = 7680;
         original.playlistTracks.resize (3);
         original.playlistTracks[2].colour = 0xFF2A6FDB; // a track colour (round 90)
+        { // the clip grid (round 181a)
+            lynx::launcher::setClip (original, 1, 2, { 0, 0, 0, 1920, 0 });
+            auto& slot = *lynx::launcher::settingsAt (*original.clipGrid, 1, 2);
+            slot.name = "Clip ação";
+            slot.mode = lynx::LaunchMode::toggle;
+            slot.quant = lynx::LaunchQuant::eighthTriplet;
+            slot.legato = true;
+            slot.loop = false;
+            original.clipGrid->scenes[0].name = "Intro";
+            original.clipGrid->globalQuant = lynx::LaunchQuant::bars2;
+        }
         original.playlistTracks[2].grouped = true;      // track groups and rack filter groups (round 104)
         original.playlistTracks[1].collapsed = true;
         original.channelGroups = { "Drums", "Keys" };
@@ -1998,6 +2009,15 @@ private:
                                && reloaded->patterns[0].notes.size() == original.patterns[0].notes.size()
                                && reloaded->patterns[0].notes[3].start == original.patterns[0].notes[3].start
                                && reloaded->mode == lynx::PlayMode::song && reloaded->playlist.size() == 2
+                               && reloaded->clipGrid.has_value() && reloaded->clipGrid->globalQuant == lynx::LaunchQuant::bars2
+                               && reloaded->clipGrid->scenes.size() == 3 && reloaded->clipGrid->scenes[0].name == "Intro"
+                               && lynx::launcher::clipAt (*reloaded->clipGrid, 1, 2) != nullptr
+                               && [&reloaded] {
+                                      auto grid = *reloaded->clipGrid;
+                                      const auto* slot = lynx::launcher::settingsAt (grid, 1, 2);
+                                      return slot != nullptr && slot->name == "Clip ação" && slot->mode == lynx::LaunchMode::toggle
+                                             && slot->quant == lynx::LaunchQuant::eighthTriplet && slot->legato && ! slot->loop;
+                                  }()
                                && reloaded->playlist[1].kind == lynx::ClipKind::automation && reloaded->playlist[1].automation == 0
                                && reloaded->automations.size() == 1 && reloaded->automations[0].target == automation.target
                                && reloaded->automations[0].points.size() == 2 && reloaded->automations[0].points[0].tension == 0.5f

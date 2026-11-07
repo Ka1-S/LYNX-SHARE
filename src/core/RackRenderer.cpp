@@ -635,6 +635,12 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         std::stable_sort (p.notes.begin(), p.notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
     state->schedule = makeScheduleIndex (state->song);
     state->performanceZone = perf::zoneClips (state->song);
+    if (factories.clipLauncher != nullptr && state->song.clipGrid)
+    {
+        state->clipLauncher = factories.clipLauncher;
+        state->gridIndex = launcher::makeIndex (*state->song.clipGrid);
+    }
+    state->launchers = ! state->performanceZone.empty() || state->clipLauncher != nullptr;
     state->sampleRate = sampleRate;
     state->buildMidiRoutes();
     state->buildAutomationTables();
@@ -3190,32 +3196,68 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     events.clear();
 
     const auto songPlaying = playing && song.mode == PlayMode::song;
-    if (songPlaying)
+    // The launchers: Performance mode's clips (round 165m) and the clip grid (round 181a). Without either, this is the
+    // one test a block makes for them, the one Performance mode always made.
+    if (songPlaying && (state.launchers || launchersRunning))
     {
-        scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
-    }
-    // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
-    // where playback started, never wrapping with the song loop)
-    if (songPlaying && (! state.performanceZone.empty() || perfRunning))
-    {
-        if (! perfRunning)
-            perfClock = startTick;
-        perfRunning = true;
+        launchersRunning = true;
         const auto tps = ticksPerSample (bpm, sampleRate);
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
-        schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
-        perfClock += numSamples * tps;
+        const auto wrap = liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed);
+        if (state.clipLauncher != nullptr)
+        {
+            if (runningLauncher == nullptr)
+                state.clipLauncher->clock = startTick;
+            runningLauncher = state.clipLauncher;
+            launcher::playBlock (*state.clipLauncher, song, *song.clipGrid, state.gridIndex, startTick, numSamples, tps, events, resumeAudio,
+                                 &state.schedule, wrap, chaseNotes, *scheduledNotes);
+        }
+        else
+        {
+            if (runningLauncher != nullptr)
+            {
+                runningLauncher->player.stopAll (runningLauncher);
+                runningLauncher = nullptr;
+            }
+            scheduleSong (song, startTick, numSamples, tps, events, resumeAudio, &state.schedule, wrap, chaseNotes);
+        }
+        // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
+        // where playback started, never wrapping with the song loop)
+        if (! state.performanceZone.empty() || perfRunning)
+        {
+            if (! perfRunning)
+                perfClock = startTick;
+            perfRunning = true;
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
+            schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
+            perfClock += numSamples * tps;
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches without a zone
+        }
     }
-    else if (perfRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+    else
     {
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
-        perfRunning = false;
-    }
-    else if (perfLive != nullptr)
-    {
-        perf::Command c;
-        while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        if (songPlaying)
+            scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
+                          liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
+        if (launchersRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+        {
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
+            perfRunning = false;
+            launchersRunning = false;
+            if (runningLauncher != nullptr)
+            {
+                runningLauncher->player.stopAll (runningLauncher, song.clipGrid && song.clipGrid->backOnStop);
+                runningLauncher = nullptr;
+            }
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        }
     }
 
     if (! songPlaying && playing && ! song.patterns.empty())

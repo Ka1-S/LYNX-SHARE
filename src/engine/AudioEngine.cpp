@@ -2320,8 +2320,25 @@ void AudioEngine::updateRecording()
     takeHasUndoStep = true;
 }
 
+void AudioEngine::launcherCommand (const launcher::Command& command)
+{
+    if (clipLauncher == nullptr || ! song.clipGrid)
+        return;
+    using T = launcher::Command::Type;
+    const auto starts = command.type == T::launch || command.type == T::launchScene;
+    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::reset)
+        return;
+    if (starts && song.mode != PlayMode::song) // the grid plays with the song
+        editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+    if (starts && ! transport.playing.load())
+        play();
+    clipLauncher->commands.push (command);
+}
+
 void AudioEngine::setSong (Song newSong)
 {
+    if (clipLauncher != nullptr)
+        clipLauncher->commands.push ({ launcher::Command::Type::reset });
     undoStack.clear();
     redoStack.clear();
     sessionUndo.clear();
@@ -3209,6 +3226,12 @@ void AudioEngine::publishSong()
     const Song& played = projectedSong ? *projectedSong : song;
     standInChannels = std::move (projected.channels);
     standInInserts = std::move (projected.inserts);
+    if (played.clipGrid)
+    {
+        if (clipLauncher == nullptr)
+            clipLauncher = std::make_unique<launcher::Runtime>();
+        factories.clipLauncher = clipLauncher.get();
+    }
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"

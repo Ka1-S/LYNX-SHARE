@@ -30,6 +30,7 @@ add_library(lynx_core STATIC
     src/core/Scheduler.cpp
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
+    src/core/ClipLauncher.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
