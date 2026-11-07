@@ -170,6 +170,17 @@ the glide went on trying. The glide now takes the clamped position as its target
 before its zoom runs (another round's `--no-window` LYNX took the foreground; the guard stopped the session). This is about the history and does not change the fix. 174f-1 is the first build measured with the drop; what
 in it exposes the flip is unknown.
 
+### 3.5d Tried and dropped: scale each step from the last exact picture (stretch) [MEAS]
+
+A test switch (`LYNX_ZOOM_SCALE=stretch`, never landed; `wip/fluid174f` 5516eb23c) scaled every step of a gesture once from the last exact picture and repainted past a total stretch of 1.44x. Same build (n8), one session after the other, load 21–23, not final figures:
+
+| session | zoom fps | p95 ms | gaps > 33 ms per 10 s | full repaints | scaled paint, mean |
+|---|---|---|---|---|---|
+| z3r2, 2 steps | 79.7 / 85.9 | 38.4 / 36.3 | 70 / 61 | 161 | 6.7 ms |
+| zs, stretch | 82.0 / 77.8 | 38.8 / 38.7 | 64 / 62 | 163 | 10.2 ms |
+
+No better pacing: 1.44x is 2 notches of 1.2x, so it repaints as often as the cap. Its picture was also broken: the lanes were mostly black in every mid-gesture shot (98 % and 71 % of the crop, at 2 and 8 notches; 0 % when settled and 0 % throughout with 2 steps). Black picture cause not found. Those frames scaled a black picture, so the stretch row's paint cost may not hold for a working version. Dropped without a fix; the 2-step cap stays.
+
 ### 3.6 Invalid sessions, the profiler crash, the input guard [MEAS]
 
 - **Profiler crash.** The first copy-based `LYNX_PROFILE_MAIN` crashed at start-up, in 3 launches of 3: access violation at ntdll+0x20191 in
