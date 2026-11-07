@@ -158,6 +158,26 @@ bool isFolded (const Song& song, int track);
 // Folds (or unfolds) every group that can fold. Returns how many changed.
 int foldAll (Song& song, bool fold);
 
+// --- VCA faders (round 177a slice 3, LYNX's addition; REA_rodada177a §3) ---------------------------------------------
+// The VCAs that act on `track`: those it is a member of and their parents, each once (indices into Song::vcas).
+std::vector<int> vcasOf (const Song& song, int track);
+// The VCAs' linear gain on `track` (1 when it is in none), from their fader positions.
+float vcaGain (const Song& song, int track);
+// True when a VCA acting on `track` is muted.
+bool vcaMuted (const Song& song, int track);
+// "New VCA from selected": a VCA (at unity) whose members are the selected inserts. Returns its index (-1: none).
+int createVca (Song& song, const std::vector<int>& tracks, const std::string& name);
+// Adds / removes inserts to / from VCA `vca`. Returns how many changed.
+int assignToVca (Song& song, const std::vector<int>& tracks, int vca);
+int removeFromVca (Song& song, const std::vector<int>& tracks, int vca);
+// Deletes VCA `vca`: its members keep their faders; its children lose their parent; its automation loses its target.
+bool deleteVca (Song& song, int vca);
+// "Merge VCA into members" (undoable through the song edit): each member's fader (and its volume automation, when it
+// has one) takes the VCA's gain, then the VCA goes back to unity. The sound does not change (within the faders' range).
+bool mergeVcaIntoMembers (Song& song, int vca);
+// Solo on a VCA: its members (and the inserts its child VCAs reach) are soloed with FL's solo rules (soloSelected).
+std::vector<int> vcaReach (const Song& song, int vca);
+
 // --- FL's mixer track menu › Routing (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950) ------------------------------
 enum class RouteKind
 {

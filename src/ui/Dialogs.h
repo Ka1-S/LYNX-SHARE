@@ -20,6 +20,10 @@ std::unique_ptr<juce::AlertWindow> makeSamplePitchDialog (float pitch, bool keep
 // channel) shows "Blend with existing data" instead of the project options. `onAccept` gets the chosen options.
 void showMidiImportDialog (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& current,
                            bool pianoRoll, std::function<void (const midiimport::Options&)> onAccept);
+// The same window for the Event editor's File › Import MIDI file (REA_rodada178a §11): which tracks / channels / controller
+// (any CC), Realign events, Import time signatures, Import zero velocity notes.
+void showEventLaneMidiImportDialog (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& current,
+                                    std::function<void (const midiimport::Options&)> onAccept);
 std::unique_ptr<juce::AlertWindow> makeMidiImportDialog();
 
 // "Rename and color" dialog for patterns and channels (docs/WORKFLOW_FL.md, P1 item 4): a name field

@@ -37,6 +37,10 @@ std::string soundgoodizerPresetPath (const std::vector<std::uint8_t>& state);
 
 // FL effect preset (.fst from Plugin presets\Effects): the built-in effect with the preset's settings.
 std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& fileBytes, double bpm = 120.0);
+// The same with the installation's files: the plugins whose state only names them (Fruity Convolver's impulse response,
+// Distructor's and Hardcore's cabinets, Vocodex's carrier, Soundgoodizer's preset) become their exact engine (round 173d3:
+// without them all 261 of FL's Convolver presets came back as a generic reverb, which the preset bar then ignored)
+std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& fileBytes, double bpm, const FlDataReader& data);
 
 // FL plugins whose presets map to this built-in effect (for listing the preset folders).
 std::vector<std::string> flPluginsForEffect (EffectKind kind);

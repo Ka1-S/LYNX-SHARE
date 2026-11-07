@@ -4512,7 +4512,7 @@ bool displayTakesMouse (const char* display)
     if (display == nullptr)
         return false;
     static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
-                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve" };
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve", "equosend", "lpcurve", "cvcurve", "vxcurve", "vxmapsel" };
     for (const auto* id : ids)
         if (std::strcmp (id, display) == 0)
             return true;
@@ -4629,7 +4629,7 @@ int optionAt (const LayoutItem& item, float value)
 
 bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectParams& params, const std::vector<std::uint8_t>* state)
 {
-    if (item.page >= 0 && item.page != page)
+    if (item.page >= 0 && (item.pageModulo > 0 ? (page / std::max (1, item.pageStride)) % item.pageModulo : page) != item.page)
         return false;
     const auto inRange = [&] (const char* param, float lo, float hi) {
         if (param == nullptr)
