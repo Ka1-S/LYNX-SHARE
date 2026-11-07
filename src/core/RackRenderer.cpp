@@ -241,7 +241,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
         const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
 
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod))
+        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
             sample = std::move (stretched);
     }
 
