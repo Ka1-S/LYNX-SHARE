@@ -7877,3 +7877,6 @@ countries: kr
 "Use the suggested tempo" = "추천 템포 사용"
 "Voice / audio" = "보컬 / 오디오"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "여기에 루프, 오디오 또는 MIDI 파일을 놓으세요"

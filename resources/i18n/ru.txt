@@ -7877,3 +7877,6 @@ countries: ru by kz
 "Use the suggested tempo" = "Использовать предложенный темп"
 "Voice / audio" = "Голос / аудио"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Перетащите сюда луп, аудио- или MIDI-файл"

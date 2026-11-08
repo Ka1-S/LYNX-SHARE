@@ -7877,3 +7877,6 @@ countries: tw hk mo
 "Use the suggested tempo" = "使用建議的速度"
 "Voice / audio" = "人聲 / 音訊"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "將循環素材、音訊或 MIDI 檔案拖放到這裡"

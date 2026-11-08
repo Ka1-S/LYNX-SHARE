@@ -9403,6 +9403,55 @@ private:
             write ("simple-starter");
             simple->hideChooser();
             write ("simple-closed");
+            // slice S4: the Simple headers with a few tracks (voice, instrument, drums, an audio file), some levels moved
+            offline.editSong ([] (lynx::Song& s) {
+                namespace st = lynx::simpletracks;
+                st::Request q;
+                q.kind = st::Kind::voice;
+                q.name = "Lead vocal";
+                st::addTrack (s, q);
+                q = {};
+                q.kind = st::Kind::instrument;
+                q.name = "Keys";
+                lynx::ChannelDef keys;
+                keys.instrument = lynx::InstrumentKind::synth;
+                q.channel = keys;
+                lynx::Pattern chords;
+                for (int i = 0; i < 4; ++i)
+                    for (int k : { 60, 64, 67 })
+                        chords.notes.push_back (lynx::Note { (std::int64_t) i * 4 * lynx::ppq, 4 * lynx::ppq - lynx::ppq / 4, 0, k });
+                q.pattern = chords;
+                const auto r = st::addTrack (s, q);
+                q = {};
+                q.kind = st::Kind::drums;
+                for (auto kind : { lynx::InstrumentKind::kick, lynx::InstrumentKind::snare, lynx::InstrumentKind::hat })
+                {
+                    lynx::ChannelDef c;
+                    c.instrument = kind;
+                    c.name = kind == lynx::InstrumentKind::kick ? "Kick" : kind == lynx::InstrumentKind::snare ? "Snare" : "Hat";
+                    q.kit.push_back (c);
+                }
+                lynx::Pattern beat;
+                const auto hit = [&beat] (int step, int row) { beat.notes.push_back (lynx::Note { (std::int64_t) step * lynx::ticksPerStep, lynx::ticksPerStep, row, 60 }); };
+                for (int step = 0; step < 16; step += 2)
+                    hit (step, 2); // hats on the 8ths, kick on 1 and 3, snare on 2 and 4
+                for (int step : { 0, 8 })
+                    hit (step, 0);
+                for (int step : { 4, 12 })
+                    hit (step, 1);
+                q.pattern = beat;
+                q.bpm = 96.0;
+                st::addTrack (s, q);
+                if (r.insert > 0)
+                {
+                    s.mixer[(std::size_t) r.insert].volume = 0.55f;
+                    s.mixer[(std::size_t) r.insert].pan = -0.4f;
+                    s.mixer[(std::size_t) r.insert].solo = true;
+                }
+            });
+            offline.dispatchPendingMessages();
+            ui.getPlaylistForSnapshot().selectTrack (1);
+            write ("simple-tracks");
         }
         saveStyleMenus ("simple");
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");

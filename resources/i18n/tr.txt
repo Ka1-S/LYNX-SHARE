@@ -7877,3 +7877,6 @@ countries: tr
 "Use the suggested tempo" = "Önerilen tempoyu kullan"
 "Voice / audio" = "Ses / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Bir döngüyü, sesi veya MIDI dosyasını buraya bırakın"

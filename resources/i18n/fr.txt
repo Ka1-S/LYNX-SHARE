@@ -7877,3 +7877,6 @@ countries: fr be ch ca lu
 "Use the suggested tempo" = "Utiliser le tempo suggéré"
 "Voice / audio" = "Voix / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Déposez ici une boucle, un fichier audio ou MIDI"

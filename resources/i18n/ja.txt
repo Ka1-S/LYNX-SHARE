@@ -7877,3 +7877,6 @@ countries: jp
 "Use the suggested tempo" = "おすすめのテンポを使う"
 "Voice / audio" = "ボーカル / オーディオ"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "ここにループ、オーディオ、MIDI ファイルをドロップ"

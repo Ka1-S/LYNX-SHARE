@@ -7877,3 +7877,6 @@ countries: id
 "Use the suggested tempo" = "Gunakan tempo yang disarankan"
 "Voice / audio" = "Vokal / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Letakkan loop, audio, atau berkas MIDI di sini"
