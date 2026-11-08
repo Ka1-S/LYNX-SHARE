@@ -55,16 +55,21 @@ namespace lynx
 namespace
 {
 // An audio clip voice's fade gain at its position: FL's S curve (shape bits), with its tension, as FL's voices compute it (a
-// fade of N samples: x = (i + 1) / (N + 1), REA round 180d), or straight fades (FL's shape 1, and projects from before it)
+// fade of N samples: x = (i + 1) / (N + 1), REA round 180d), or straight fades (FL's shape 1, and projects from before it).
+// A comp crossfade (shape bits 3 / 4, round 177c) is the equal-power curve, which wins over the others and has no tension.
 float clipFadeGainOf (float elapsed, float remaining, float in, float out, std::uint8_t shape, float inTension, float outTension) noexcept
 {
     auto gain = 1.0f;
-    if (in > 0.0f && elapsed < in)
+    if (in > 0.0f && elapsed < in && (shape & 8) != 0)
+        gain *= clipops::equalPowerCurve (elapsed / in);
+    else if (in > 0.0f && elapsed < in)
     {
         const auto y = (shape & 1) != 0 ? clipops::crossfadeCurve ((elapsed + 1.0f) / (in + 1.0f)) : elapsed / in;
         gain *= inTension != 0.0f ? clipops::fadeTensionCurve (y, inTension) : y;
     }
-    if (out > 0.0f && remaining < out)
+    if (out > 0.0f && remaining < out && (shape & 16) != 0)
+        gain *= clipops::equalPowerCurve (std::max (0.0f, remaining) / out);
+    else if (out > 0.0f && remaining < out)
     {
         const auto y = (shape & 2) != 0 ? clipops::crossfadeCurve (std::max (0.0f, remaining) / (out + 1.0f)) : std::max (0.0f, remaining) / out;
         gain *= outTension != 0.0f ? clipops::fadeTensionCurve (y, outTension) : y;
@@ -1809,7 +1814,7 @@ public:
         target->clipRemaining = clipFades[1];
         target->fadeIn = clipFades[2];
         target->fadeOut = clipFades[3];
-        target->fadeShape = (std::uint8_t) (clipShape & 3);
+        target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16)); // (bits 3 / 4: a comp crossfade, round 177c)
         target->fadeInTension = std::exchange (nextClipTension[0], 0.0f);
         target->fadeOutTension = std::exchange (nextClipTension[1], 0.0f);
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio

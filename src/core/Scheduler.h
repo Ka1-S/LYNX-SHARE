@@ -42,6 +42,7 @@ struct NoteEvent
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
     // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);
     // bit 2: the audio clip itself is reversed (FL 2026's clip reverse, round 167k)
+    // bits 3 / 4: the fade-in / fade-out is an equal-power comp crossfade (Clip::fadeCurve, round 177c)
     std::uint8_t fadeShape = 0;
     float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade tensions (clipops::fadeTensionCurve)
     // audio clips: FL 2026's clip pitch in semitones (keys 7/8): a pitch shift that keeps the length (round 167k)

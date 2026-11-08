@@ -7738,6 +7738,11 @@ countries: ru by kz
 "{0} minutes" = "{0} мин"
 "Longest wait between backups" = "Наибольший интервал между копиями"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Собрать комп из этих дублей"
+"After loop recording, only the last pass plays" = "После записи по циклу играет только последний проход"
+"Loop-recorded audio: every pass plays" = "Аудио, записанное по циклу: играют все проходы"
+"Loop-recorded audio: every pass is muted" = "Аудио, записанное по циклу: все проходы заглушены"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Сетка клипов"
 "Stop all clips" = "Остановить все клипы"

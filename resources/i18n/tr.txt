@@ -7738,6 +7738,11 @@ countries: tr
 "{0} minutes" = "{0} dakika"
 "Longest wait between backups" = "Yedekler arası en uzun bekleme"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Bu kayıtlardan comp oluştur"
+"After loop recording, only the last pass plays" = "Döngü kaydından sonra yalnızca son geçiş çalar"
+"Loop-recorded audio: every pass plays" = "Döngüde kaydedilen ses: tüm geçişler çalar"
+"Loop-recorded audio: every pass is muted" = "Döngüde kaydedilen ses: tüm geçişler sessize alınır"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Klip ızgarası"
 "Stop all clips" = "Tüm klipleri durdur"

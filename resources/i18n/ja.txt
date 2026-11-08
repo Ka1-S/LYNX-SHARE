@@ -7738,6 +7738,11 @@ countries: jp
 "{0} minutes" = "{0} 分"
 "Longest wait between backups" = "バックアップ間の最長待ち時間"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "これらのテイクでコンプを作成"
+"After loop recording, only the last pass plays" = "ループ録音後は最後のパスのみ再生"
+"Loop-recorded audio: every pass plays" = "ループ録音したオーディオ: すべてのパスを再生"
+"Loop-recorded audio: every pass is muted" = "ループ録音したオーディオ: すべてのパスをミュート"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "クリップグリッド"
 "Stop all clips" = "すべてのクリップを停止"

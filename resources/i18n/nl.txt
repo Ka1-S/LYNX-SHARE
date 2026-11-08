@@ -7738,6 +7738,11 @@ countries: nl be
 "{0} minutes" = "{0} minuten"
 "Longest wait between backups" = "Langste wachttijd tussen back-ups"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Comp maken van deze takes"
+"After loop recording, only the last pass plays" = "Na loopopname speelt alleen de laatste doorgang"
+"Loop-recorded audio: every pass plays" = "In loop opgenomen audio: alle doorgangen spelen"
+"Loop-recorded audio: every pass is muted" = "In loop opgenomen audio: alle doorgangen zijn gedempt"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Clipraster"
 "Stop all clips" = "Alle clips stoppen"

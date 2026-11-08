@@ -7738,6 +7738,11 @@ countries: cn sg
 "{0} minutes" = "{0} 分钟"
 "Longest wait between backups" = "备份之间的最长间隔"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "用这些录音合成"
+"After loop recording, only the last pass plays" = "循环录音后仅播放最后一遍"
+"Loop-recorded audio: every pass plays" = "循环录制的音频:播放每一遍"
+"Loop-recorded audio: every pass is muted" = "循环录制的音频:每一遍都静音"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "片段网格"
 "Stop all clips" = "停止所有片段"

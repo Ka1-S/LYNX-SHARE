@@ -217,6 +217,9 @@ public:
         // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
         // and audio stay where they were played. Pattern mode always loops the pattern in LYNX.
         bool loopRecord = true;
+        // LYNX's own option (off = FL's result, REA round 177c): after loop recording only the last pass plays, on top
+        // of the other passes (muted, newest first, folded). Round 163's behaviour.
+        bool lastLoopPassPlays = false;
         // round 170d (the Busy Works video: the chord on the downbeat after the count-in was lost; Cubase's "MIDI Record
         // Catch Range", Logic keeps count-in notes): notes played during the count-in are recorded, and a note-on at most
         // this many ticks before the take's start goes onto the start (0 = off: they keep their real time)

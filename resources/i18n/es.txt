@@ -7738,6 +7738,11 @@ countries: es mx ar co cl pe ve
 "{0} minutes" = "{0} minutos"
 "Longest wait between backups" = "Espera máxima entre copias"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Crear comp con estas tomas"
+"After loop recording, only the last pass plays" = "Tras grabar en bucle, solo suena la última pasada"
+"Loop-recorded audio: every pass plays" = "Audio grabado en bucle: suenan todas las pasadas"
+"Loop-recorded audio: every pass is muted" = "Audio grabado en bucle: todas las pasadas quedan silenciadas"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Cuadrícula de clips"
 "Stop all clips" = "Detener todos los clips"

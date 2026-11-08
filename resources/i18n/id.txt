@@ -7738,6 +7738,11 @@ countries: id
 "{0} minutes" = "{0} menit"
 "Longest wait between backups" = "Jeda terlama antar cadangan"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Buat comp dari take ini"
+"After loop recording, only the last pass plays" = "Setelah rekam loop, hanya putaran terakhir yang diputar"
+"Loop-recorded audio: every pass plays" = "Audio rekaman loop: semua putaran diputar"
+"Loop-recorded audio: every pass is muted" = "Audio rekaman loop: semua putaran dibisukan"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Kisi klip"
 "Stop all clips" = "Hentikan semua klip"

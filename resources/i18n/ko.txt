@@ -7738,6 +7738,11 @@ countries: kr
 "{0} minutes" = "{0}분"
 "Longest wait between backups" = "백업 사이 최대 대기 시간"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "이 테이크로 컴프 만들기"
+"After loop recording, only the last pass plays" = "루프 녹음 후 마지막 패스만 재생"
+"Loop-recorded audio: every pass plays" = "루프 녹음한 오디오: 모든 패스 재생"
+"Loop-recorded audio: every pass is muted" = "루프 녹음한 오디오: 모든 패스 음소거"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "클립 그리드"
 "Stop all clips" = "모든 클립 정지"
