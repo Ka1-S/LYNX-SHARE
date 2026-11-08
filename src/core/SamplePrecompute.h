@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -297,52 +298,6 @@ inline bool needed (const SamplerSettings& s) noexcept
 }
 
 // The processed region of `in` (see the file comment). Returns nullptr when nothing is to be done.
-// What of the file a channel plays, in file frames: its Start / Length region (a Playlist audio clip plays the whole file),
-// then its Trim (the silence at both ends below trim/32768). FL stretches exactly that to TIME (REA round 180d,
-// FUN_00d26890 with FUN_00ff0db0 / FUN_00ff0b30), and a clip's offsets count from its first frame.
-struct PlayedSpan
-{
-    std::int64_t first = 0, frames = 0;
-};
-
-inline PlayedSpan playedSpan (const SampleData& in, const SamplerSettings& s, bool wholeRegion)
-{
-    const auto frames = (std::int64_t) in.frames();
-    if (frames < 2)
-        return { 0, frames };
-    std::int64_t t0 = 0, t1 = frames - 1;
-    if (! wholeRegion)
-    {
-        const auto start = (double) std::clamp (std::min (s.regionStart, s.regionEnd), 0.0f, 1.0f);
-        const auto end = (double) std::clamp (s.regionEnd, 0.0f, 1.0f);
-        const auto total = (double) (frames - 1);
-        t0 = (std::int64_t) std::nearbyint (start * total);
-        t1 = std::min<std::int64_t> (frames - 1, t0 + (std::int64_t) std::nearbyint (std::max (0.0, end - start) * total));
-    }
-    if (s.precompute.trim > 0)
-    {
-        const auto threshold = (float) s.precompute.trim * 3.0517578e-05f;
-        const auto stereo = in.isStereo();
-        auto level = [&] (std::int64_t i) {
-            auto a = std::fabs (in.leftData()[i]);
-            if (stereo)
-                a = std::max (a, std::fabs (in.rightData()[i]));
-            return a;
-        };
-        while (t0 < t1 && level (t0) < threshold)
-            ++t0;
-        while (t1 > t0 && level (t1) < threshold)
-            --t1;
-    }
-    return { t0, std::max<std::int64_t> (1, t1 - t0 + 1) };
-}
-
-// The frames TIME stretches to the channel's length (see playedSpan)
-inline std::int64_t stretchedFrames (const SampleData& in, const SamplerSettings& s, bool wholeRegion = false)
-{
-    return playedSpan (in, s, wholeRegion).frames;
-}
-
 inline std::shared_ptr<SampleData> apply (const SampleData& in, const SamplerSettings& s)
 {
     const auto frames = (std::int64_t) in.frames();
@@ -565,5 +520,73 @@ inline std::shared_ptr<SampleData> apply (const SampleData& in, const SamplerSet
     out->cropFrom = std::clamp (((double) s0 + (double) std::min (t0, n0 - 1)) / total, 0.0, 1.0);
     out->cropTo = std::clamp (((double) s0 + (double) std::min (t1, span)) / total, out->cropFrom, 1.0);
     return out;
+}
+
+// What of the file a channel plays, in file frames: its Start / Length region (a Playlist audio clip plays the whole file),
+// processed by its precomputed effects and cut by its Trim, as FL measures it after them (REA round 180d, FUN_00ff0db0:
+// the trim scans the processed sample; Thief's Importer Ride, faded out by its Precomputed fade out 807, trims to 0.38 s
+// of its 1.30 s). FL stretches exactly that to TIME, and a clip's offsets count from its first frame. Cached: the
+// Playlist asks for it on every paint.
+struct PlayedSpan
+{
+    std::int64_t first = 0, frames = 0;
+};
+
+inline PlayedSpan playedSpan (const SampleData& in, const SamplerSettings& s, bool wholeRegion)
+{
+    const auto frames = (std::int64_t) in.frames();
+    if (frames < 2)
+        return { 0, frames };
+    auto settings = s;
+    if (wholeRegion)
+        settings.regionStart = 0.0f, settings.regionEnd = 1.0f;
+    if (! needed (settings))
+    {
+        const auto start = (double) std::clamp (std::min (settings.regionStart, settings.regionEnd), 0.0f, 1.0f);
+        const auto end = (double) std::clamp (settings.regionEnd, 0.0f, 1.0f);
+        const auto total = (double) (frames - 1);
+        const auto t0 = (std::int64_t) std::nearbyint (start * total);
+        const auto t1 = std::min<std::int64_t> (frames - 1, t0 + (std::int64_t) std::nearbyint (std::max (0.0, end - start) * total));
+        return { t0, std::max<std::int64_t> (1, t1 - t0 + 1) };
+    }
+
+    struct Entry
+    {
+        const SampleData* data;
+        std::int64_t frames;
+        float regionStart, regionEnd;
+        bool reverse, loops;
+        std::vector<std::int32_t> flChannel;
+        SamplePrecompute precompute;
+        PlayedSpan span;
+    };
+    static std::mutex lock;
+    static std::vector<Entry> cache;
+    const auto same = [&] (const Entry& e) {
+        return e.data == &in && e.frames == frames && e.regionStart == settings.regionStart && e.regionEnd == settings.regionEnd
+               && e.reverse == settings.reverse && e.loops == settings.useLoopPoints && e.flChannel == settings.flChannel
+               && e.precompute == settings.precompute;
+    };
+    {
+        const std::scoped_lock l (lock);
+        for (const auto& e : cache)
+            if (same (e))
+                return e.span;
+    }
+    PlayedSpan span { 0, frames };
+    if (const auto processed = apply (in, settings))
+        span = { (std::int64_t) std::nearbyint (processed->cropFrom * (double) (frames - 1)), std::max<std::int64_t> (1, (std::int64_t) processed->frames()) };
+    const std::scoped_lock l (lock);
+    if (cache.size() >= 64)
+        cache.erase (cache.begin());
+    cache.push_back ({ &in, frames, settings.regionStart, settings.regionEnd, settings.reverse, settings.useLoopPoints,
+                       settings.flChannel, settings.precompute, span });
+    return span;
+}
+
+// The frames TIME stretches to the channel's length (see playedSpan)
+inline std::int64_t stretchedFrames (const SampleData& in, const SamplerSettings& s, bool wholeRegion = false)
+{
+    return playedSpan (in, s, wholeRegion).frames;
 }
 } // namespace lynx::precompute

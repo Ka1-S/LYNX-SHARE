@@ -83,3 +83,24 @@ TEST (render180d_a_trimmed_stretched_clip_plays_what_it_draws)
     std::fprintf (stderr, "  [r180d] drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", (long long) drawnTicks, playedTicks, firstLoud);
     CHECK (std::abs (playedTicks - (double) drawnTicks) < 0.03 * (double) drawnTicks);
 }
+
+TEST (render180d_time_stretches_what_the_precomputed_effects_leave)
+{
+    // FL trims after its precomputed effects (FUN_00ff0db0): Thief's Importer Ride, faded out by Precomputed fade out 807,
+    // trims to 0.38 s of its 1.30 s, and TIME stretches that (FL renders: 2x slower at TIME 367, round 180d)
+    using namespace lynx;
+    SampleData d;
+    d.sampleRate = 1000.0;
+    d.left.assign (1000, 0.5f);
+    SamplerSettings s;
+    s.precompute.trim = 256;
+    CHECK (precompute::stretchedFrames (d, s) == 1000);
+    s.precompute.fadeOut = 807;
+    const auto processed = precompute::apply (d, s);
+    CHECK (processed != nullptr);
+    const auto faded = precompute::stretchedFrames (d, s);
+    CHECK (processed != nullptr && faded == (std::int64_t) processed->frames());
+    CHECK (faded < 1000);
+    std::fprintf (stderr, "  [r180d] a constant second faded out by 807 trims to %lld frames\n", (long long) faded);
+    CHECK (precompute::stretchedFrames (d, s) == faded); // the cached answer
+}
