@@ -3693,6 +3693,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.track = item.track;
                 clip.start = rescale (item.position);
                 clip.length = rescale (item.length);
+                clip.muted = item.muted(); // (issue #110)
 
                 // trim in beats (-1 = no trim)
                 if (std::isfinite (item.startOffset) && item.startOffset > 0.0f)
@@ -3715,6 +3716,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.track = item.track;
                 clip.start = rescale (item.position);
                 clip.length = rescale (item.length);
+                clip.muted = item.muted();
 
                 // The region start comes in beats or in milliseconds, depending on the clip;
                 // we find out by the unit in which (end - start) matches the length.
@@ -3779,6 +3781,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             clip.start = rescale (item.position);
             clip.length = rescale (item.length);
             clip.offset = item.patternStartTick > 0 ? rescale (item.patternStartTick) : 0;
+            clip.muted = item.muted();
             clips.push_back (clip);
         }
 
