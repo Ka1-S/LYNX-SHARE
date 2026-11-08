@@ -649,6 +649,8 @@ public:
         };
         std::vector<Use> uses;
     };
+    // Settings › General: a Live set's Session clips go to the clip grid (false, the default) or the Playlist (round 181c)
+    static inline std::atomic<bool> alsSessionOnPlaylist { false };
     static void prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                   PreparedFlp& out);
     // one hosted plugin of the queue (message thread); false when the queue is done

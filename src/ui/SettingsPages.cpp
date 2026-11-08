@@ -101,7 +101,7 @@ public:
         else
             options.language = i18n::current(); // --snapshot: the language of the run
 
-        for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
+        for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
@@ -122,6 +122,15 @@ public:
         };
         styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
                                         + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away."));
+        styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
+        alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
+        alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
+        alsSessionBox.setSelectedId (options.alsSessionOnPlaylist ? 2 : 1, juce::dontSendNotification);
+        alsSessionBox.onChange = [this] {
+            options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2;
+            if (hooks.setGeneral)
+                hooks.setGeneral (options);
+        };
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -332,6 +341,7 @@ private:
         r.section (workflowTitle, true);
         layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
         layoutStyleNote.setBounds (r.indented (48).translated (0, -3));
+        alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
         languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
@@ -506,6 +516,8 @@ private:
     SectionTitle workflowTitle { tr ("Workflow") };
     juce::Label layoutStyleLabel, layoutStyleNote;
     juce::ComboBox layoutStyleBox;
+    juce::Label alsSessionLabel;
+    juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;

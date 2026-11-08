@@ -1648,17 +1648,16 @@ struct Arrangement
 
 // The clip grid of the Clip-launch workflow (round 181a; logic in core/ClipLauncher.h). Absent (Song::clipGrid empty) until
 // the workflow or the grid is first used: a project without one carries nothing but the empty optional.
-// LaunchQuant and LaunchMode follow the order of Live's menus. Mapping to the numbers a Live set stores (docs/ALS_FORMAT.md §5)
-// is seen in Live's GUI only for a set-wide GlobalQuantisation 9 shown as "1/8" (181a), which fits clip number = global + 1.
-// From shipped sets (175a): clip LaunchQuant 0 = global, LaunchMode 0..3. Every other number is INFERRED
-// (docs/analise/REA_rodada181a.md); per-clip reads are a follow-up for the next Live turn, before .als session import.
+// LaunchQuant, LaunchMode and FollowKind keep the numbers a Live set stores (docs/ALS_FORMAT.md §5), read in Live 12's own
+// GUI (docs/analise/REA_rodada181a.md, 181b): clip LaunchQuantisation 0..14, LaunchMode 0..3, FollowActionA 0..9 map
+// directly. A set-wide GlobalQuantisation has no Global entry: its number is LaunchQuant's minus 1 (9 = 1/8).
 enum class LaunchQuant : std::uint8_t
 {
     global, none, bars8, bars4, bars2, bar, half, halfTriplet, quarter, quarterTriplet, eighth, eighthTriplet, sixteenth,
     sixteenthTriplet, thirtySecond
 };
 enum class LaunchMode : std::uint8_t { trigger, gate, toggle, repeat };
-// A follow action, in the order of the manual's list; the numbers a set stores for them are INFERRED (docs/analise/REA_rodada181a.md)
+// A follow action, in the order of the manual's list, which is also the numbers a set stores (FollowActionA, seen in Live)
 enum class FollowKind : std::uint8_t { none, stop, playAgain, previous, next, first, last, any, other, jump };
 
 struct ClipFollow

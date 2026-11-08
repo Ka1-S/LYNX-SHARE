@@ -1,14 +1,14 @@
 # Round 181a: clip grid and launching (slice N5), what the behaviour is based on
 
 Clean room: LYNX's own code and art. Sources are the reference DAW's published manual and its own shipped sets. No trademarks in the UI.
-Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFERRED]** deduced, not proven, **[OPEN]** unverified: LYNX's choice until checked in the running program.
+Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFERRED]** deduced, not proven, **[LIVE]** seen in Live 12's own GUI on a set we wrote, **[OPEN]** unverified: LYNX's choice until checked in the running program.
 
 ## Launching
 | Behaviour | Source | LYNX |
 |---|---|---|
 | Launch Quantisation: Global, None, 8/4/2/1 bars, 1/2, 1/2T … 1/32 | [MANUAL] Launching Clips 16.4 | `LaunchQuant` |
 | A clip's quantisation number 0 = Global | [DATA] every default clip | `LaunchQuant::global` |
-| Set-wide default 1 Bar is stored as `GlobalQuantisation` 4, so a clip's number is that + 1 and 1 = None | [DATA] for one value: a set saved with `GlobalQuantisation` 9 shows "1/8" in Live 12's toolbar (181a Live turn, 2026-11-07), which is the 10th label (Global, None, 8, 4, 2, 1 bars, 1/2, 1/2T, 1/4, 1/4T, 1/8), i.e. clip number = global + 1. Other values still [INFERRED] | enum order; per-clip values to read in the next Live turn |
+| Set-wide default 1 Bar is stored as `GlobalQuantisation` 4, so a clip's number is that + 1 and 1 = None | [LIVE] `GlobalQuantisation` 9 shows "1/8" in the toolbar; clip `LaunchQuantisation` 10 shows "1/8" (181b, see below) | `LaunchQuant`; set-wide value = clip value − 1 |
 | Trigger: up ignored. Gate: up stops. Toggle: next down stops. Repeat: retriggers at the clip quantisation rate while held | [MANUAL] 16.2 | `LaunchMode`; numbers 0…3 [DATA] ALS-FORMAT §5 |
 | Gate's stop on release waits for the global quantisation | [OPEN] | as stated |
 | After Repeat is released the clip plays on | [OPEN] | as stated |
@@ -22,7 +22,7 @@ Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFER
 | Behaviour | Source | LYNX |
 |---|---|---|
 | No Action, Stop, Play Again, Previous, Next, First, Last, Any, Other, Jump; two actions with chances | [MANUAL] 16.7 | `FollowKind` in that order |
-| Numbers in a set follow that order: the default set stores A = 4 and B = 0, which reads as Next and No Action | [INFERRED] from the default only; the .als mapping must confirm it | |
+| Numbers in a set follow that order: 0 No Action, 1 Stop, 2 Again, 3 Previous, 4 Next, 5 First, 6 Last, 7 Any, 8 Other, 9 Jump | [LIVE] `FollowActionA` 0…9 read one by one in Live's Clip View (181b) | `FollowKind`, same numbers |
 | Linked: after the clip's end × the multiplier. Unlinked: after the Follow Action Time | [MANUAL] 16.7 | `ClipFollow::linked`, `iterations`, `ticks` |
 | "Follow Actions circumvent global quantization but not clip quantization" | [MANUAL] 16.7 | `Player::follow` |
 | A global switch for the whole set | [MANUAL] 16.7 | `ClipGrid::followActions` |
@@ -54,8 +54,14 @@ Settings > General > Workflow and View > Layout style: "Pattern workflow (defaul
 ## .als mapping, what is proven
 Read feature/ableton175a-2 (docs/analise/ALS_FORMAT.md, src/core/AlsImport.cpp). Its import places session clips on the Playlist, one section per scene, and leaves the real launcher to this slice. It does not read launch settings.
 - `LaunchMode` 0 trigger, 1 gate, 2 toggle, 3 repeat: documented by 175a, matches `LaunchMode` here.
-- `LaunchQuantisation` 0 = global: documented by 175a. [INFERRED] the other values, `GlobalQuantisation`, `FollowActionA/B`: from default sets only, no proof yet, except `GlobalQuantisation` 9 = "1/8" seen in Live (global + 1 holds there). Per-clip values were not read: Live's startup plugin scan raised a PACE licence window and the turn was stopped. To settle in the next Live GUI turn: set each value, save a set, read the file.
-- Follow-up (next Live turn, needs the coordinator's go): per-clip `LaunchQuantisation`, `LaunchMode` and `FollowAction` reads from a set saved in Live. Until then everything here except `GlobalQuantisation` 9 stays [INFERRED] or 175a [DATA], and the code says so (`Song.h`, above `LaunchQuant`). The grid is not filled from .als yet, so nothing the user sees depends on these numbers.
+- [LIVE] 181b read, 2026-11-07, Live 12 Trial, set `grid181b.als` written by `mkgrid.py` (clip i: `LaunchQuantisation` i, `LaunchMode` i % 4, `FollowActionA` i for i < 10; `GlobalQuantisation` 9), each clip selected in Session View and its Launch panel read:
+  - `LaunchQuantisation` 0 Global, 1 None, 2 8 Bars, 3 4 Bars, 4 2 Bars, 5 1 Bar, 6 1/2, 7 1/2T, 8 1/4, 9 1/4T, 10 1/8, 11 1/8T, 12 1/16, 13 1/16T, 14 1/32: exactly `LaunchQuant`'s order.
+  - `LaunchMode` 0 Trigger, 1 Gate, 2 Toggle, 3 Repeat (agrees with 175a's [DATA]).
+  - `FollowActionA` 0 No Action, 1 Stop, 2 Again, 3 Previous, 4 Next, 5 First, 6 Last, 7 Any, 8 Other, 9 Jump: exactly `FollowKind`'s order.
+  - `GlobalQuantisation` 9 shows "1/8", as clip value 10 does: a set-wide value has no Global entry, so clip n = set-wide n + 1. Default 4 = 1 Bar fits (clip 5 = 1 Bar).
+  - Still [INFERRED]: `FollowActionB` uses the same numbers as A (only B = 0 seen); set-wide values other than 9.
+  - [LIVE] 181c, 2026-11-08: LYNX's own export of that set (`--export-als`, every launch value identical to the source) opens in Live 12 with its 15 clips and scenes and the toolbar at 1/8. Clip Q9 with `JumpIndexA` 5 shows Jump "5"; with 0 (181b read) the field is empty: the jump number is stored as shown, 1-based. LYNX's jump row = the number − 1. [INFERRED] it counts scenes from the top, not clips of the group.
+  - Evidence: /mnt/e/lynx-work/session181a/rw/C1v…C14v.png and N05c.png (Q0). Live's plugin scan raised one PACE box (Metamorph 1), closed with Quit; no Live preference was changed.
 
 ## Real window session (Windows build, guarded clicks)
 Exercised in the running window: View > Layout style both ways, grid menu, put pattern, launch (starts the transport), follow of progress, pending blink at 8 bars, Stop all clips (quantised), Back to Playlist, Grid / Song / Both, per-style layout restored, style kept across restarts both ways. Found and fixed there: the switch lit two buttons (JUCE's radio group "clicks" the one it turns off), the switch kept its old view on re-entry, the Browser's search box took the keys after a layout swap, a quantised stop gave no feedback.
