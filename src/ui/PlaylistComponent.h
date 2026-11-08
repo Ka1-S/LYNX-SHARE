@@ -503,6 +503,12 @@ public:
     std::function<void()> onNewPattern;  // the "+" under the pattern list
     static constexpr int width = 150;
 
+    // Round 177d (pain point 31a): FL's Playlist menu › Picker panel › Tools items "Select unused › Patterns" and
+    // "Sort › Patterns › By name / By color" (EEPickerSelectUnusedPatternsMenu, EEPickerSortPatternsBy*Menu; FL's Audio
+    // and Automations entries are left out: the LYNX picker selects patterns only), then LYNX's own "Delete unused
+    // patterns" and "Merge identical patterns".
+    juce::PopupMenu pickerMenu();
+
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
     int getView() const noexcept { return view; }

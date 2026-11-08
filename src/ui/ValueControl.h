@@ -61,7 +61,7 @@ class ValueDrag
 {
 public:
     void begin (const juce::MouseEvent& e, double value);
-    // New value for the current mouse position (Ctrl held = fine; the switch is seamless mid-drag).
+    // New value for the current mouse position (Ctrl held = fine, Ctrl+Shift = ultra-fine; the switch is seamless mid-drag).
     double update (const juce::MouseEvent& e, const ValueSpec& spec);
     bool isActive() const noexcept { return active; }
     void end() noexcept { active = false; }
@@ -69,7 +69,8 @@ public:
 private:
     double startValue = 0.0;
     float anchorY = 0.0f;
-    bool fine = false, active = false;
+    double scale = 1.0; // controls::fineScale of the modifiers held
+    bool active = false;
 };
 
 // FL's "Last tweaked" (REA round 143): drags and wheel steps of a control with a target report it here (the main
@@ -83,6 +84,8 @@ bool isResetClick (const juce::MouseEvent& e) noexcept;
 // Value after a wheel move over the control (nothing if the wheel did not move vertically, or while the wheel is
 // scrolling a view: wheelScrolling).
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec);
+// One wheel notch's deltaY on this platform (what wheelValue counts as one step); offscreen checks send it.
+double wheelNotchSize() noexcept;
 
 // Round 169c (issue #32): a view that scrolled with the wheel calls noteWheelScroll(); while the wheel keeps turning
 // (controls::WheelScrollLatch), wheelScrolling() is true and the controls the pointer passes over keep scrolling the

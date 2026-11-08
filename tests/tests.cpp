@@ -425,6 +425,7 @@ TEST (flp_native_88_byte_playlist_items_with_clip_gain_and_fades)
         std::memcpy (&r[0x24], &fadeIn, 4);
         std::memcpy (&r[0x2C], &fadeOut, 4);
         std::memcpy (&r[0x34], &gain, 4);
+        r[0x38] = (std::uint8_t) ((fadeIn > 0.0f ? 1 : 0) | (fadeOut > 0.0f ? 2 : 0)); // manual fades (round 180d)
         const double stretch = 1.0;
         const std::int32_t minusOne = -1;
         std::memcpy (&r[0x40], &stretch, 8);
@@ -6683,6 +6684,26 @@ TEST (translations_embedded_table_is_up_to_date)
                 std::printf ("  %s.txt changed since the last python3 tools/make_i18n.py\n", id.c_str());
         }
     CHECK (files == (int) std::size (lynx::i18n::data::tables));
+}
+
+TEST (translations_no_value_is_a_python_dict)
+{
+    // a value written as a Python dict ("{'de': '...', 'es': ...}", 177a's menu slice) reaches the users verbatim:
+    // each table holds its own language's text only
+    using namespace i18ntest;
+    int bad = 0;
+    for (const auto& entry : std::filesystem::directory_iterator ("resources/i18n"))
+        if (entry.path().extension() == ".txt")
+        {
+            std::vector<std::string> unused;
+            for (const auto& [key, value] : parseTable (readFile (entry.path()), unused))
+                if (value.rfind ("{'", 0) == 0 || value.find ("': '") != std::string::npos)
+                {
+                    ++bad;
+                    std::printf ("  %s: \"%s\" holds a dict\n", entry.path().filename().string().c_str(), key.c_str());
+                }
+        }
+    CHECK (bad == 0);
 }
 
 TEST (translations_every_language_covers_the_reference_table)
@@ -17053,6 +17074,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rec168kTests.inc"
 #include "Rec170dTests.inc"
 #include "Rec177dTests.inc"
+#include "Pain177dTests.inc"
+#include "Mixer177dTests.inc"
+#include "Edit177dTests.inc"
+#include "Patterns177dTests.inc"
 #include "Issue32Tests.inc"
 #include "WrapperMidi181cTests.inc"
 #include "Mono168lTests.inc"
@@ -17120,6 +17145,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Merge180cTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
+#include "FlFades180dTests.inc"
 #include "Mixer177a2Tests.inc"
 #include "Mixer177a3Tests.inc"
 #include "Mixer177a4Tests.inc"
