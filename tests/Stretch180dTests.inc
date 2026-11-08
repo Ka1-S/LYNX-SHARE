@@ -60,7 +60,7 @@ TEST (render180d_a_trimmed_stretched_clip_plays_what_it_draws)
 
     RackState::Factories f;
     f.samples = [sample] (const std::string&) { return std::shared_ptr<const SampleData> (sample); };
-    f.stretchedSamples = [sample] (const std::string&, double ratio, StretchMethod m, double) {
+    f.stretchedSamples = [sample] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
         return std::shared_ptr<const SampleData> (timeStretch (*sample, ratio, m));
     };
     auto state = RackState::build (s, nullptr, rate, f);
