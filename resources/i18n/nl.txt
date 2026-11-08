@@ -7735,6 +7735,10 @@ countries: nl be
 "{0} crashed in its separate process." = "{0} is gecrasht in zijn aparte proces."
 "{0} stopped responding (separate process)." = "{0} reageert niet meer (apart proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Alleen het proces van de plugin werd getroffen: LYNX SHARE en je project bleven draaien en de plugin is gedempt. Sla je project op; de plugin laadt opnieuw als je het weer opent."
+"Interface font" = "Lettertype van de interface"
+"Default ({0})" = "Standaard ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Een nieuw lettertype voor de interface wordt toegepast wanneer LYNX SHARE opnieuw start."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animaties: panelen faden in en uit, knoppen lichten zacht op, het scrollwiel glijdt"
 "{0} minutes" = "{0} minuten"
 "Longest wait between backups" = "Langste wachttijd tussen back-ups"
 

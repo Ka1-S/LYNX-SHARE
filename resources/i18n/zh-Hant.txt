@@ -7735,6 +7735,10 @@ countries: tw hk mo
 "{0} crashed in its separate process." = "{0} 在其獨立處理程序中崩潰。"
 "{0} stopped responding (separate process)." = "{0} 停止回應（獨立處理程序）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已靜音。請儲存專案；下次開啟時外掛會重新載入。"
+"Interface font" = "介面字型"
+"Default ({0})" = "預設 ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "新的介面字型將在 LYNX SHARE 重新啟動後套用。"
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "動畫：面板淡入淡出，按鈕柔和亮起，滾輪平滑捲動"
 "{0} minutes" = "{0} 分鐘"
 "Longest wait between backups" = "備份之間的最長間隔"
 

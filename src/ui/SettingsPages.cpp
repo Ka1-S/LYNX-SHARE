@@ -103,13 +103,14 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
+        setupFontRow();
         styleLabel (layoutStyleLabel, tr ("Layout style"));
         layoutStyleBox.addItem (tr ("Pattern workflow (default)"), 1);
         layoutStyleBox.addItem (tr ("Clip-launch workflow"), 2);
@@ -186,6 +187,9 @@ public:
                 [this] (bool on) { options.artMotion = on; });
         toggle (reducedEffects, tr ("Reduced effects in plugin editors (no glows or animations, for slower graphics cards)"), options.reducedEffects,
                 [this] (bool on) { options.reducedEffects = on; });
+        // round 179a: FL's General › Animations, as one switch (REA_rodada179a.md part D)
+        toggle (uiAnimations, tr ("Animations: panels fade in and out, buttons light up gently, the wheel glides"), options.uiAnimations,
+                [this] (bool on) { options.uiAnimations = on; });
         // round 174e2: how often the playhead, meters and scopes move (the display's refresh by default, as FL)
         styleLabel (animationLabel, tr ("Animation rate"));
         animationBox.addItem (tr ("Display (default)"), 1);
@@ -316,7 +320,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &longestWaitBox, &languageBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -333,6 +337,16 @@ private:
         languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
         if (translationLink.isVisible())
             translationLink.setBounds (r.indented (18).translated (0, -4).withWidth (juce::jmin (420, width - 40)));
+        {
+            // (the reset button as wide as its text: "Auf Standard zurücksetzen" wrapped at a fixed width)
+            const auto resetWidth = juce::jlimit (110, 240, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                getLookAndFeel().getTextButtonFont (fontReset, 24), fontReset.getButtonText())) + 24);
+            auto row = r.row (fontLabel, 228 + resetWidth);
+            fontBox.setBounds (row.removeFromLeft (220));
+            fontReset.setBounds (row.withTrimmedLeft (8));
+        }
+        fontPreview.setBounds (r.indented (22).translated (0, -3));
+        fontNote.setBounds (r.indented (16).translated (0, -5));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -345,6 +359,7 @@ private:
         pluginStyleBox.setBounds (r.row (pluginStyleLabel, 300));
         artMotion.setBounds (r.full (24));
         reducedEffects.setBounds (r.full (24));
+        uiAnimations.setBounds (r.full (24));
         animationBox.setBounds (r.row (animationLabel, 180));
         animationNote.setBounds (r.indented (32).translated (0, -3));
        #if JUCE_WINDOWS
@@ -428,6 +443,43 @@ private:
             hooks.setGeneral (options);
     }
 
+    // The interface font: the platform's default or any installed family, saved at once, applied by the next start
+    // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
+    void setupFontRow()
+    {
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote })
+            add (*c);
+        styleLabel (fontLabel, tr ("Interface font"));
+        styleNote (fontNote, tr ("A new interface font is applied when LYNX SHARE restarts."));
+        const auto fallback = theme::defaultUiFont();
+        fontBox.addItem (fallback.isNotEmpty() ? tr ("Default ({0})", { fallback }) : tr ("Default"), 1);
+        fontBox.addSeparator();
+        fontNames = theme::installedUiFonts();
+        for (int i = 0; i < fontNames.size(); ++i)
+            fontBox.addItem (fontNames[i], i + 2);
+        // (a saved font that is gone reads as the default here too, as at start-up)
+        const auto at = fontNames.indexOf (options.uiFont);
+        fontBox.setSelectedId (at >= 0 ? at + 2 : 1, juce::dontSendNotification);
+        fontBox.onChange = [this] {
+            const auto index = fontBox.getSelectedId() - 2;
+            change ([&] { options.uiFont = juce::isPositiveAndBelow (index, fontNames.size()) ? fontNames[index] : juce::String(); });
+            updateFontPreview();
+        };
+        fontReset.onClick = [this] { fontBox.setSelectedId (1, juce::sendNotificationSync); };
+        fontPreview.setText ("LYNX SHARE  AaBbCc  0123456789", juce::dontSendNotification);
+        fontPreview.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        updateFontPreview();
+    }
+
+    void updateFontPreview()
+    {
+        const auto index = fontBox.getSelectedId() - 2;
+        const auto family = juce::isPositiveAndBelow (index, fontNames.size()) ? fontNames[index] : theme::defaultUiFont();
+        fontPreview.setFont (family.isNotEmpty() ? juce::Font (juce::FontOptions (family, 14.0f, juce::Font::plain))
+                                                 : juce::Font (juce::FontOptions (14.0f)));
+        fontReset.setEnabled (fontBox.getSelectedId() != 1);
+    }
+
     void updateTranslationLink()
     {
         // shown in the language just picked when it is already running, else in the current one
@@ -457,9 +509,13 @@ private:
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+    juce::Label fontLabel, fontPreview, fontNote;
+    juce::ComboBox fontBox;
+    juce::TextButton fontReset { tr ("Reset to default") };
+    juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };

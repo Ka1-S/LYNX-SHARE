@@ -7735,6 +7735,10 @@ countries: tr
 "{0} crashed in its separate process." = "{0} ayrı sürecinde çöktü."
 "{0} stopped responding (separate process)." = "{0} yanıt vermiyor (ayrı süreç)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Yalnızca onun süreci etkilendi: LYNX SHARE ve projeniz çalışmaya devam etti, plugin sessize alındı. Projenizi kaydedin; plugin bir sonraki açılışta yeniden yüklenir."
+"Interface font" = "Arayüz yazı tipi"
+"Default ({0})" = "Varsayılan ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Yeni arayüz yazı tipi LYNX SHARE yeniden başlatıldığında uygulanır."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animasyonlar: paneller yumuşakça belirip kaybolur, düğmeler yavaşça yanar, tekerlek yumuşak kaydırır"
 "{0} minutes" = "{0} dakika"
 "Longest wait between backups" = "Yedekler arası en uzun bekleme"
 

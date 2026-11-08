@@ -2018,6 +2018,8 @@ void MainComponent::loadUiSettings()
             const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
             ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
         }
+        else if (key == "uiAnimations") // round 179a (ui/Motion.h)
+            ui::motion::enabled() = on;
         else if (key == "artMotion")
             skin::setArtMotion (on);
         else if (key == "waveStereo")
@@ -2220,6 +2222,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
+                                      + "\nuiAnimations=" + juce::String (ui::motion::enabled() ? 1 : 0)
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -5614,6 +5617,7 @@ void MainComponent::openSettings (int page)
         if (safe == nullptr)
             return o;
         o.language = i18n::saved();
+        o.uiFont = theme::savedUiFont();
         o.uiScale = safe->toolbarLayout.uiScale;
         o.compactMenus = theme::menus::compact();
         o.waveSpectral = ui::WaveformCache::spectral;
@@ -5626,6 +5630,7 @@ void MainComponent::openSettings (int page)
         o.reducedEffects = skin::reducedEffects();
         o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
+        o.uiAnimations = ui::motion::enabled();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
         o.splash = safe->startup.splash;
@@ -5667,6 +5672,7 @@ void MainComponent::openSettings (int page)
         }
         theme::menus::setCompact (o.compactMenus);
         ui::FrameTicker::rateLimit() = o.animationRate; // (the tickers read it every frame)
+        ui::motion::enabled() = o.uiAnimations;
         if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
             skin::setArtMotion (o.artMotion);
@@ -5739,6 +5745,8 @@ void MainComponent::openSettings (int page)
         newProjectDefaults().autoCrossfades = o.crossfadesInNewProjects;
         self.autosaveTicks = 0;
         self.saveUiSettings();
+        if (o.uiFont != theme::savedUiFont())
+            theme::saveUiFont (o.uiFont);
         if (o.language != i18n::saved())
             self.showLanguageChoice (o.language);
     };

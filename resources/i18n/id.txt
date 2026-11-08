@@ -7735,6 +7735,10 @@ countries: id
 "{0} crashed in its separate process." = "{0} crash di proses terpisahnya."
 "{0} stopped responding (separate process)." = "{0} berhenti merespons (proses terpisah)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda; plugin dimuat lagi saat Anda membukanya berikutnya."
+"Interface font" = "Font antarmuka"
+"Default ({0})" = "Bawaan ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Font antarmuka baru diterapkan saat LYNX SHARE dimulai ulang."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animasi: panel muncul dan menghilang perlahan, tombol menyala lembut, roda gulir meluncur halus"
 "{0} minutes" = "{0} menit"
 "Longest wait between backups" = "Jeda terlama antar cadangan"
 

@@ -518,7 +518,9 @@ public:
 
         // interface language: saved in %APPDATA%\LYNX\language.txt; --lang pt-BR overrides it for this run
         lynx::i18n::initialise (args);
-        lookAndFeel.applyLanguageFont (lynx::i18n::current());
+        // interface font: saved in Settings › General; --uifont "Name" overrides it for this run
+        const auto uiFontArg = args.indexOf ("--uifont");
+        lookAndFeel.applyInterfaceFont (lynx::i18n::current(), uiFontArg >= 0 ? args[uiFontArg + 1].unquoted() : juce::String());
 
         if (args.contains ("--showcase"))
         {
@@ -5338,6 +5340,11 @@ private:
         crashEngine = engine.get();
         createMainWindow();
         mainWindow->reveal();
+        // LYNX_UIPERF_SIZE=WxH, LYNX_UIPERF_SCALE=<percent> (round 179a): a large window, a HiDPI desktop's scale
+        if (const auto scale = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SCALE", {}).getIntValue(); scale > 0)
+            juce::Desktop::getInstance().setGlobalScaleFactor ((float) scale / 100.0f);
+        if (const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SIZE", {}), "x", ""); size.size() == 2)
+            mainWindow->setBounds (0, 0, size[0].getIntValue(), size[1].getIntValue());
 
         juce::String error;
         auto ok = false;
