@@ -587,3 +587,66 @@ TEST (rack183c_als_racks_export_and_round_trip)
         }
     }
 }
+
+TEST (rack183c_midi_effect_rack_plays_its_children_only)
+{
+    using namespace lynx;
+    // channel 0: a MIDI Effect Rack (one chain: VFX Key Mapper at its identity map); channels 1 and 2 its children,
+    // channel 3 not (decision R1: like a Layer's children)
+    Song song;
+    song.mixer = Song::defaultMixer (2);
+    ChannelDef midiRack;
+    midiRack.name = "MIDI Effect Rack";
+    midiRack.instrument = InstrumentKind::patcher;
+    midiRack.patcher = rack::makeRack (RackDoc::Kind::midiEffect);
+    PatchNode mapper;
+    mapper.generator = true;
+    vfx::makeChannel (mapper.channel, vfx::Kind::keyMapper);
+    CHECK (rack::addDevice (midiRack.patcher, 0, mapper) >= 0);
+    midiRack.patcher.rack[0].chains[0].select = { 0, 127, 0, 127 };
+    midiRack.patcher.rack[0].children = { 1, 2 };
+    rack::compile (midiRack.patcher);
+    CHECK (! patcher::vfxHostPorts (midiRack.patcher).empty());
+    song.channels.push_back (midiRack);
+    for (int k = 1; k <= 3; ++k)
+    {
+        ChannelDef c;
+        c.instrument = InstrumentKind::plugin;
+        c.plugin.id = "spy" + std::to_string (k);
+        song.channels.push_back (c);
+    }
+    song.patterns.emplace_back();
+    std::vector<std::shared_ptr<layer164::NoteSpy>> spies (song.channels.size());
+    RackState::Factories f;
+    f.pluginInstruments = [&spies] (const PluginRef& ref, double) {
+        const auto k = std::stoi (ref.id.substr (3));
+        spies[(std::size_t) k] = std::make_shared<layer164::NoteSpy>();
+        return std::shared_ptr<Instrument> (spies[(std::size_t) k]);
+    };
+    const auto state = RackState::build (song, nullptr, 44100.0, f);
+    RackRenderer renderer;
+    renderer.prepare (44100.0, 256);
+    LiveEventQueue live;
+    auto block = [&] {
+        std::vector<float> l (256), r (256);
+        renderer.process (state.get(), false, 0.0, 256, l.data(), r.data(), &live, nullptr);
+    };
+    NoteEvent on;
+    on.channel = 0;
+    on.key = 60;
+    on.velocity = 0.8f;
+    live.push (on);
+    for (int b = 0; b < 4; ++b) // (what the rack plays goes out at the next chunk's start)
+        block();
+    CHECK (spies[1] != nullptr && spies[1]->ons() == 1 && spies[2] != nullptr && spies[2]->ons() == 1);
+    CHECK (spies[3] != nullptr && spies[3]->ons() == 0);
+    if (spies[1] != nullptr && ! spies[1]->got.empty())
+        CHECK (spies[1]->got[0].key == 60);
+    auto off = on;
+    off.type = NoteEvent::Type::off;
+    off.velocity = 0.0f;
+    live.push (off);
+    for (int b = 0; b < 4; ++b)
+        block();
+    CHECK (spies[1] != nullptr && spies[1]->got.size() == 2 && ! spies[1]->got.back().on);
+}
