@@ -9402,6 +9402,7 @@ private:
             detail->showSelection (1, 0);
             detail->setPage (lynx::DetailView::Page::clip);
             offline.dispatchPendingMessages();
+            ui.getPianoRollForSnapshot().scrollToNotes(); // (the app does it on the message loop, which this shot doesn't run)
             write ("clip"); // slice 2: the Piano roll docked here
             counts << "piano roll docked: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
                                                 && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() == detail ? 1 : 0) << "\n";
