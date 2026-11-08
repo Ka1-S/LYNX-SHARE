@@ -20,6 +20,7 @@
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/MixerComponent.h"
+#include "ui/DetailView.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
 #include "ui/LiveSessionUi.h"
@@ -82,6 +83,8 @@ public:
     void setClipLaunchWorkflow (bool on, bool swapLayout = true);
     void setClipGridView (PlaylistArea::GridView view);
     bool isClipLaunchWorkflow() const noexcept { return clipLaunchWorkflow; }
+    // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
+    DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -558,6 +561,10 @@ private:
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
+    void makeDetailView();
+    bool runDetailAction (const std::string& id);
+    void openGridClip (int track, int scene);
     MixerComponent mixer;
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first

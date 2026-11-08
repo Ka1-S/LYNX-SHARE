@@ -1,0 +1,1351 @@
+#include "ui/DetailView.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <map>
+#include <set>
+
+#include "core/ClipLauncher.h"
+#include "core/DetailChain.h"
+#include "core/Effects.h"
+#include "core/FlEffects.h"
+#include "core/MeterBallistics.h"
+#include "core/NativeEngines.h"
+#include "engine/AudioEngine.h"
+#include "engine/FlStudio.h"
+#include "ui/BrowserComponent.h"
+#include "ui/FlMods.h"
+#include "ui/HintBar.h"
+#include "ui/I18n.h"
+#include "ui/MixerComponent.h"
+#include "ui/PluginThumbs.h"
+#include "ui/QuickPick.h"
+#include "ui/Theme.h"
+#include "ui/TimerWhileShowing.h"
+#include "ui/ValueControl.h"
+
+namespace lynx
+{
+using namespace theme;
+
+namespace
+{
+juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
+
+// card geometry (px at 100 %)
+constexpr int contextWidth = 132, meterWidth = 22, gap = 4, titleHeight = 20, foldedWidth = 22, addWidth = 44;
+constexpr int knobColumn = 62, knobRow = 70, knobSize = 30, instrumentWidth = 196, pluginWidth = 172;
+constexpr int maxEffectKnobs = 7; // + the slot's Mix
+
+juce::String insertName (const Song& song, int insert)
+{
+    if (insert == 0)
+        return tr ("Master");
+    if (insert < 0 || insert >= (int) song.mixer.size())
+        return {};
+    const auto own = utf8 (song.mixer[(std::size_t) insert].name);
+    return own.isNotEmpty() ? tr ("Insert {0}", { juce::String (insert) }) + " " + own : tr ("Insert {0}", { juce::String (insert) });
+}
+
+juce::String trackName (const Song& song, int track)
+{
+    if (track >= 0 && track < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) track].name.empty())
+        return utf8 (song.playlistTracks[(std::size_t) track].name);
+    return tr ("Track {0}", { juce::String (track + 1) });
+}
+
+void drawVerticalText (juce::Graphics& g, const juce::String& text, juce::Rectangle<int> area)
+{
+    juce::Graphics::ScopedSaveState save (g);
+    g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) area.getCentreX(), (float) area.getCentreY()));
+    const auto turned = juce::Rectangle<int> (area.getHeight(), area.getWidth()).withCentre (area.getCentre());
+    g.drawText (text, turned.reduced (4, 0), juce::Justification::centredRight, true);
+}
+
+// The window glyph on a card's title bar.
+void drawWindowGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot)
+{
+    const auto box = r.toFloat().withSizeKeepingCentre (11.0f, 9.0f);
+    g.setColour (hot ? colour::textPrimary : colour::textSecondary);
+    g.drawRect (box, 1.0f);
+    g.fillRect (box.withHeight (2.5f));
+}
+} // namespace
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The Device View: the chain of cards.
+class DetailView::DeviceChain final : public juce::Component,
+                                      public ui::HintSource,
+                                      public juce::DragAndDropTarget,
+                                      private juce::ChangeListener,
+                                      private juce::Timer,
+                                      private juce::ScrollBar::Listener
+{
+public:
+    DeviceChain (AudioEngine& e, Hooks& h) : engine (e), hooks (h), slotActions (e)
+    {
+        setWantsKeyboardFocus (true);
+        setTitle (tr ("Device view"));
+        // the cards' menus are the Mixer slot's own (same code), opened over this view, with Fold / Unfold first
+        slotActions.setMenuTarget (this);
+        slotActions.extendSlotMenu = [this] (juce::PopupMenu& menu, int slot) {
+            const auto key = tagOf (slot);
+            menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
+            menu.addSeparator();
+        };
+        addAndMakeVisible (cardHost); // (custom card bodies; clicks elsewhere fall through to this view)
+        cardHost.setInterceptsMouseClicks (false, true);
+        addChildComponent (scrollBar);
+        scrollBar.addListener (this);
+        scrollBar.setAutoHide (false);
+        engine.addChangeListener (this);
+        showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30);
+    }
+
+    ~DeviceChain() override { engine.removeChangeListener (this); }
+
+    void setTrack (int t)
+    {
+        if (t != track)
+            chosenInsert = -1;
+        track = t;
+        refresh();
+    }
+
+    int insertShown() const noexcept { return insert; }
+    int channelShown() const noexcept { return channel; }
+    int cardCount() const noexcept { return (int) cards.size(); }
+    bool isCardFolded (int i) const { return i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].folded; }
+    void toggleCardFold (int i)
+    {
+        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
+            toggleFold (keyOf (cards[(std::size_t) i]));
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (colour::bg1);
+        paintContext (g);
+
+        const auto area = chainArea();
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (area);
+            for (int i = 0; i < (int) cards.size(); ++i)
+                paintCard (g, i);
+            if (insert < 0 && channel < 0)
+            {
+                g.setColour (colour::textDisabled);
+                g.setFont (font (type::small));
+                g.drawText (track < 0 ? tr ("Select a track in the clip grid to see its devices")
+                                      : tr ("This track has no clips yet: put a clip on it to see its devices"),
+                            area, juce::Justification::centred, true);
+            }
+            else if (insert >= 0) // the free room after the last card shows the drop hint, as the reference does [SHOT d01]
+            {
+                const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + gap);
+                if (room.getWidth() > 120)
+                {
+                    g.setColour (colour::textDisabled);
+                    g.setFont (font (type::small));
+                    g.drawText (tr ("Drop effects here"), room, juce::Justification::centred, true);
+                }
+            }
+            if (dropBefore >= 0)
+            {
+                g.setColour (colour::accent);
+                g.fillRect (juce::Rectangle<int> (dropLineX (dropBefore) - 1, area.getY() + 2, 3, area.getHeight() - 4));
+            }
+        }
+        paintMeter (g);
+    }
+
+    void resized() override
+    {
+        const auto area = chainArea();
+        scrollBar.setBounds (area.getX(), getHeight() - 8, area.getWidth(), 8);
+        cardHost.setBounds (area);
+        layoutCards();
+    }
+
+    // --- mouse ---------------------------------------------------------------------------------------------------
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        grabKeyboardFocus();
+        const auto hit = hitAt (e.getPosition());
+        dragCard = -1;
+        dragging = false;
+        if (hit.part == Part::picker)
+            return showInsertMenu();
+        if (hit.card < 0)
+            return;
+        const auto& card = cards[(std::size_t) hit.card];
+        if (card.kind == Card::add)
+        {
+            slotActions.showAddMenuFor (nextFreeRow());
+            return;
+        }
+        select (hit.card);
+
+        if (hit.part == Part::knob)
+        {
+            const auto spec = knobSpec (card, hit.knob);
+            const auto value = knobValue (card, hit.knob);
+            if (flmods::popup (e.mods))
+            {
+                ui::showValueMenu (*this, &engine, spec, value, [this, card, knob = hit.knob] (double v) { setKnob (card, knob, v); });
+                return;
+            }
+            if (ui::isResetClick (e))
+            {
+                setKnob (card, hit.knob, spec.defaultValue);
+                ui::flashValueTip (*this, knobBounds (card, hit.knob), spec.text (spec.defaultValue));
+                return;
+            }
+            knobDrag = hit.knob;
+            knobCard = hit.card;
+            drag.begin (e, value);
+            ui::showValueTip (*this, knobBounds (card, hit.knob), spec.text (value));
+            return;
+        }
+        if (flmods::popup (e.mods))
+            return showCardMenu (hit.card);
+        if (hit.part == Part::led)
+            return toggleOn (card);
+        if (hit.part == Part::window)
+            return toggleWindow (card);
+        if (hit.part == Part::title && card.kind == Card::effect)
+            dragCard = hit.card; // (a drag moves it; a click only selects)
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (knobDrag >= 0 && knobCard >= 0 && knobCard < (int) cards.size())
+        {
+            const auto card = cards[(std::size_t) knobCard];
+            const auto spec = knobSpec (card, knobDrag);
+            const auto v = drag.update (e, spec);
+            setKnob (card, knobDrag, v);
+            ui::reportTweak (spec);
+            ui::showValueTip (*this, knobBounds (card, knobDrag), spec.text (v));
+            return;
+        }
+        if (dragCard >= 0 && (dragging || e.getDistanceFromDragStart() > 4))
+        {
+            dragging = true;
+            dropBefore = positionAt (e.x);
+            repaint();
+        }
+    }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (knobDrag >= 0)
+        {
+            drag.end();
+            ui::hideValueTip();
+            knobDrag = knobCard = -1;
+            return;
+        }
+        if (dragging && dragCard >= 0 && dragCard < (int) cards.size())
+        {
+            const auto from = cards[(std::size_t) dragCard].index;
+            const auto to = effectPositionFor (positionAt (e.x));
+            const auto tag = tagOf (from);
+            engine.editSongStructural ([t = insert, from, to] (Song& song) { detailchain::moveEffectBefore (song, t, from, to); });
+            selectedTag = tag;
+        }
+        dragCard = -1;
+        dragging = false;
+        dropBefore = -1;
+        refresh();
+    }
+
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        const auto hit = hitAt (e.getPosition());
+        if (hit.card < 0 || cards[(std::size_t) hit.card].kind == Card::add)
+            return;
+        const auto& card = cards[(std::size_t) hit.card];
+        if (hit.part == Part::knob)
+        {
+            setKnob (card, hit.knob, knobSpec (card, hit.knob).defaultValue);
+            return;
+        }
+        if (hit.part == Part::title || hit.part == Part::folded) // fold / unfold (the reference: double-click the title bar)
+            toggleFold (keyOf (card));
+    }
+
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        const auto hit = hitAt (e.getPosition());
+        if (hit.part == Part::knob)
+        {
+            const auto& card = cards[(std::size_t) hit.card];
+            const auto spec = knobSpec (card, hit.knob);
+            if (const auto v = ui::wheelValue (knobValue (card, hit.knob), e, wheel, spec))
+            {
+                setKnob (card, hit.knob, *v);
+                ui::reportTweak (spec);
+                ui::flashValueTip (*this, knobBounds (card, hit.knob), spec.text (*v));
+                return;
+            }
+        }
+        const auto delta = wheel.deltaX != 0.0f ? wheel.deltaX : wheel.deltaY;
+        if (delta != 0.0f && contentWidth > chainArea().getWidth())
+        {
+            ui::noteWheelScroll();
+            setScroll (scroll - juce::roundToInt (delta * 240.0f));
+        }
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto hit = hitAt (e.getPosition());
+        if (hit.card != hover.card || hit.part != hover.part || hit.knob != hover.knob)
+        {
+            hover = hit;
+            repaint();
+        }
+    }
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        hover = {};
+        repaint();
+    }
+
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        const auto i = selectedCard();
+        if ((key.isKeyCode (juce::KeyPress::deleteKey) || key.isKeyCode (juce::KeyPress::backspaceKey)) && i >= 0
+            && cards[(std::size_t) i].kind == Card::effect)
+        {
+            slotActions.deleteSlot (cards[(std::size_t) i].index);
+            refresh();
+            return true;
+        }
+        if (key.isKeyCode (juce::KeyPress::leftKey) || key.isKeyCode (juce::KeyPress::rightKey))
+        {
+            const auto step = key.isKeyCode (juce::KeyPress::leftKey) ? -1 : 1;
+            const auto last = (int) cards.size() - (cards.empty() || cards.back().kind != Card::add ? 1 : 2);
+            if (last >= 0)
+                select (juce::jlimit (0, last, (i < 0 ? 0 : i + step)));
+            return true;
+        }
+        // LYNX extra (off by default): W shows or hides the selected card's window
+        if (DetailView::extraWindowKey && ! key.getModifiers().isAnyModifierKeyDown() && i >= 0
+            && (key.getKeyCode() == 'W' || juce::CharacterFunctions::toUpperCase (key.getTextCharacter()) == 'W'))
+        {
+            toggleWindow (cards[(std::size_t) i]);
+            return true;
+        }
+        return false;
+    }
+
+    // --- hints ---------------------------------------------------------------------------------------------------
+    ui::Hint hintAt (juce::Point<int> p) override
+    {
+        const auto hit = hitAt (p);
+        if (hit.part == Part::picker)
+            return { tr ("The insert this track plays through: click to pick another of its inserts"), insertName (engine.getSong(), insert), false, true };
+        if (hit.card < 0)
+            return {};
+        const auto& card = cards[(std::size_t) hit.card];
+        switch (hit.part)
+        {
+            case Part::knob:
+            {
+                const auto spec = knobSpec (card, hit.knob);
+                return { spec.name, spec.text (knobValue (card, hit.knob)), spec.target.has_value(), true };
+            }
+            case Part::led: return { card.kind == Card::instrument ? tr ("Channel on / off (its mute)") : tr ("Effect on / off (bypass)"), {}, false, false };
+            case Part::window: return { tr ("Show or hide the window"), {}, false, false };
+            case Part::title:
+            case Part::folded:
+                return { tr ("Click: select. Double-click: fold / unfold. Drag: move it in the chain. Right-click: its menu"), cardName (card), false, true };
+            default: break;
+        }
+        if (card.kind == Card::add)
+            return { tr ("Add an effect to this insert (or drop one from the Browser)"), {}, false, true };
+        return { {}, cardName (card), false, false };
+    }
+
+    // --- drops from the Browser ----------------------------------------------------------------------------------
+    bool isInterestedInDragSource (const SourceDetails& details) override
+    {
+        return insert >= 0
+               && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
+                   || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details));
+    }
+    void itemDragMove (const SourceDetails& details) override
+    {
+        const auto at = BrowserComponent::isGeneratorDrag (details) ? -1 : positionAt (details.localPosition.x);
+        if (at != dropBefore)
+        {
+            dropBefore = at;
+            repaint();
+        }
+    }
+    void itemDragExit (const SourceDetails&) override
+    {
+        dropBefore = -1;
+        repaint();
+    }
+    void itemDropped (const SourceDetails& details) override
+    {
+        const auto position = effectPositionFor (positionAt (details.localPosition.x));
+        dropBefore = -1;
+        repaint();
+        if (BrowserComponent::isGeneratorDrag (details))
+        {
+            if (auto c = BrowserComponent::draggedGenerator (details); c && hooks.instrumentDropped != nullptr)
+                hooks.instrumentDropped (insert, std::move (*c));
+            return;
+        }
+        std::optional<EffectSlot> fx;
+        if (BrowserComponent::isEffectDrag (details))
+            fx = BrowserComponent::draggedEffect (details);
+        else
+        {
+            juce::MemoryBlock data;
+            if (BrowserComponent::draggedFile (details).loadFileAsData (data))
+            {
+                const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm,
+                                         natives::flDataReader (flStudioAccess()));
+            }
+            if (! fx)
+            {
+                ui::postHint ({ tr ("LYNX SHARE can't build an effect from this preset."), {} }, 3000);
+                return;
+            }
+        }
+        if (! fx)
+            return;
+        dropEffect (std::move (*fx), position);
+    }
+
+private:
+    struct Card
+    {
+        enum Kind { instrument, effect, add } kind = effect;
+        int index = -1;                 // effect: its slot index; instrument: the channel
+        std::uint64_t tag = 0;          // effect: the slot's instance (fold and selection follow it through moves)
+        bool folded = false;
+        juce::Rectangle<int> bounds;    // in this component (scroll applied)
+        std::vector<int> knobs;         // effect: parameter ids (-1 = Mix); instrument: 0 volume, 1 pan
+        DetailCard* custom = nullptr;   // a body drawn by another module (DetailView::*CardFactory)
+    };
+    struct CustomEntry
+    {
+        int kind = -1; // the slot's EffectKind / the channel's InstrumentKind it was made for
+        std::unique_ptr<DetailCard> card;
+    };
+    enum class Part { none, picker, title, led, window, knob, body, folded };
+    struct Hit
+    {
+        Part part = Part::none;
+        int card = -1, knob = -1;
+    };
+
+    // --- the model -----------------------------------------------------------------------------------------------
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
+
+    void refresh()
+    {
+        const auto& song = engine.getSong();
+        const auto c = detailchain::forTrack (song, track);
+        auto wanted = c.insert;
+        if (chosenInsert >= 0 && chosenInsert < (int) song.mixer.size()
+            && (chosenInsert == c.insert || std::find (c.inserts.begin(), c.inserts.end(), chosenInsert) != c.inserts.end()))
+            wanted = chosenInsert;
+        if (wanted < 0 && ! c.inserts.empty())
+            wanted = c.inserts.front(); // several inserts: the first until one is picked
+        inserts = c.inserts;
+        if (c.insert >= 0 && std::find (inserts.begin(), inserts.end(), c.insert) == inserts.end())
+            inserts.insert (std::lower_bound (inserts.begin(), inserts.end(), c.insert), c.insert);
+        insert = wanted;
+        channel = c.channel >= 0 && detailchain::insertOfChannel (song, c.channel) == insert ? c.channel
+                  : c.channel >= 0 && c.fromTrackMode                                       ? c.channel
+                                                                                            : -1;
+        if (insert >= 0 && insert != actionsInsert)
+        {
+            slotActions.setTrack (insert);
+            actionsInsert = insert;
+        }
+        layoutCards();
+        repaint();
+    }
+
+    int effectCount() const
+    {
+        const auto& song = engine.getSong();
+        return insert >= 0 && insert < (int) song.mixer.size() ? (int) song.mixer[(std::size_t) insert].effects.size() : 0;
+    }
+    const EffectSlot* effectAt (int index) const
+    {
+        const auto& song = engine.getSong();
+        if (insert < 0 || insert >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) insert].effects.size())
+            return nullptr;
+        return &song.mixer[(std::size_t) insert].effects[(std::size_t) index];
+    }
+    std::uint64_t tagOf (int index) const
+    {
+        const auto* fx = effectAt (index);
+        return fx != nullptr ? fx->instance.id : 0;
+    }
+    // fold keys: an effect by its slot instance, the instrument by its channel (high bit set)
+    std::uint64_t keyOf (const Card& c) const noexcept
+    {
+        return c.kind == Card::instrument ? (std::uint64_t (1) << 63) | (std::uint64_t) c.index : c.tag;
+    }
+    void toggleFold (std::uint64_t key)
+    {
+        if (folded.erase (key) == 0)
+            folded.insert (key);
+        layoutCards();
+        repaint();
+    }
+
+    void layoutCards()
+    {
+        cards.clear();
+        const auto area = chainArea();
+        auto x = area.getX() - scroll;
+        const auto top = area.getY(), height = area.getHeight();
+        if (channel >= 0)
+        {
+            Card c;
+            c.kind = Card::instrument;
+            c.index = channel;
+            c.folded = folded.count (keyOf (c)) > 0;
+            c.knobs = { 0, 1 };
+            c.custom = customFor (keyOf (c), (int) engine.getSong().channels[(std::size_t) channel].instrument, [&] {
+                return DetailView::instrumentCardFactory != nullptr
+                           ? DetailView::instrumentCardFactory (engine, channel, engine.getSong().channels[(std::size_t) channel])
+                           : nullptr;
+            });
+            if (c.custom != nullptr)
+                c.knobs.clear();
+            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height) : instrumentWidth;
+            c.bounds = { x, top, w, height };
+            x += w + gap;
+            cards.push_back (std::move (c));
+        }
+        for (int i = 0; i < effectCount(); ++i)
+        {
+            const auto& fx = *effectAt (i);
+            Card c;
+            c.kind = Card::effect;
+            c.index = i;
+            c.tag = fx.instance.id;
+            c.folded = folded.count (c.tag) > 0;
+            const auto& info = effectInfo (fx.kind);
+            if (fx.kind != EffectKind::plugin)
+                for (int p = 0; p < std::min (maxEffectKnobs, (int) info.params.size()); ++p)
+                    c.knobs.push_back (p);
+            c.knobs.push_back (-1); // the slot's Mix
+            c.custom = customFor (c.tag, (int) fx.kind, [&] {
+                return DetailView::effectCardFactory != nullptr ? DetailView::effectCardFactory (engine, insert, i, fx) : nullptr;
+            });
+            if (c.custom != nullptr)
+                c.knobs.clear();
+            const auto columns = ((int) c.knobs.size() + 1) / 2;
+            const auto w = c.folded                ? foldedWidth
+                           : c.custom != nullptr      ? customWidth (*c.custom, height)
+                           : fx.kind == EffectKind::plugin ? pluginWidth
+                                                           : std::max (136, 16 + columns * knobColumn);
+            c.bounds = { x, top, w, height };
+            x += w + gap;
+            cards.push_back (std::move (c));
+        }
+        if (insert >= 0 && effectCount() < maxEffectSlots)
+        {
+            Card c;
+            c.kind = Card::add;
+            c.bounds = { x, top, addWidth, height };
+            x += addWidth + gap;
+            cards.push_back (std::move (c));
+        }
+        placeCustomCards();
+        contentWidth = x + scroll - area.getX();
+        const auto overflow = contentWidth > area.getWidth();
+        scrollBar.setVisible (overflow);
+        scrollBar.setRangeLimits (0.0, (double) std::max (contentWidth, area.getWidth()), juce::dontSendNotification);
+        scrollBar.setCurrentRange ((double) scroll, (double) area.getWidth(), juce::dontSendNotification);
+        if (! overflow && scroll != 0)
+        {
+            scroll = 0;
+            layoutCards();
+        }
+    }
+
+    // the custom card of `key`, made once (again when the slot's kind changes); nullptr = an ordinary card
+    DetailCard* customFor (std::uint64_t key, int kind, const std::function<std::unique_ptr<DetailCard>()>& make)
+    {
+        if (DetailView::effectCardFactory == nullptr && DetailView::instrumentCardFactory == nullptr)
+            return nullptr;
+        auto& entry = customs[key];
+        if (entry.kind != kind)
+        {
+            entry.kind = kind;
+            if (entry.card != nullptr)
+                cardHost.removeChildComponent (entry.card.get());
+            entry.card = make();
+            if (entry.card != nullptr)
+            {
+                cardHost.addChildComponent (*entry.card);
+                entry.card->onPreferredWidthChanged = [this] {
+                    layoutCards();
+                    repaint();
+                };
+                if (auto* extra = entry.card->titleAccessory())
+                    cardHost.addChildComponent (*extra);
+            }
+        }
+        return entry.card.get();
+    }
+    static int customWidth (const DetailCard& card, int height) { return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6)); }
+    void placeCustomCards()
+    {
+        std::set<DetailCard*> shown;
+        const auto origin = chainArea().getPosition();
+        for (const auto& c : cards)
+            if (c.custom != nullptr)
+            {
+                shown.insert (c.custom);
+                c.custom->setBounds (c.bounds.withTrimmedTop (titleHeight + 2).reduced (2, 0).withTrimmedBottom (2) - origin);
+                c.custom->setVisible (! c.folded);
+                if (auto* extra = c.custom->titleAccessory())
+                {
+                    const auto w = c.custom->titleAccessoryWidth();
+                    extra->setBounds (juce::Rectangle<int> (c.bounds.getRight() - 22 - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
+                    extra->setVisible (! c.folded);
+                }
+            }
+        for (auto it = customs.begin(); it != customs.end();) // (slots gone: their cards go too)
+        {
+            if (it->second.card != nullptr && shown.count (it->second.card.get()) == 0)
+            {
+                if (auto* extra = it->second.card->titleAccessory())
+                    cardHost.removeChildComponent (extra);
+                cardHost.removeChildComponent (it->second.card.get());
+                it = customs.erase (it);
+            }
+            else
+                ++it;
+        }
+    }
+
+    juce::Rectangle<int> chainArea() const
+    {
+        return { contextWidth, 2, std::max (0, getWidth() - contextWidth - meterWidth - 4), std::max (0, getHeight() - 12) };
+    }
+    void setScroll (int s)
+    {
+        scroll = juce::jlimit (0, std::max (0, contentWidth - chainArea().getWidth()), s);
+        layoutCards();
+        repaint();
+    }
+    void scrollBarMoved (juce::ScrollBar*, double start) override { setScroll ((int) start); }
+
+    // where a drop or a dragged card goes: before card `position` (cards.size() or the "+" card = after the last)
+    int positionAt (int x) const
+    {
+        for (int i = 0; i < (int) cards.size(); ++i)
+            if (x < cards[(std::size_t) i].bounds.getCentreX())
+                return cards[(std::size_t) i].kind == Card::instrument ? i + 1 : i; // (nothing goes before the instrument)
+        return (int) cards.size();
+    }
+    int dropLineX (int position) const
+    {
+        if (position >= 0 && position < (int) cards.size())
+            return cards[(std::size_t) position].bounds.getX() - gap / 2;
+        return cards.empty() ? chainArea().getX() : cards.back().bounds.getRight() + gap / 2;
+    }
+    // a card position as a place in the effect chain (0 = the first effect)
+    int effectPositionFor (int position) const
+    {
+        int effects = 0;
+        for (int i = 0; i < std::min (position, (int) cards.size()); ++i)
+            effects += cards[(std::size_t) i].kind == Card::effect ? 1 : 0;
+        return effects;
+    }
+    int nextFreeRow() const
+    {
+        const auto& song = engine.getSong();
+        if (insert < 0 || insert >= (int) song.mixer.size())
+            return 0;
+        const auto& fx = song.mixer[(std::size_t) insert].effects;
+        const auto rows = mixerops::effectRows (fx);
+        for (int r = rows.empty() ? 0 : rows.back() + 1; r < maxEffectSlots; ++r)
+            if (mixerops::effectAtRow (fx, r) < 0)
+                return r;
+        for (int r = 0; r < maxEffectSlots; ++r)
+            if (mixerops::effectAtRow (fx, r) < 0)
+                return r;
+        return 0;
+    }
+
+    void dropEffect (EffectSlot fx, int position)
+    {
+        if (effectCount() >= maxEffectSlots)
+        {
+            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            return;
+        }
+        int added = -1;
+        engine.editSong ([t = insert, position, &added, fx = std::move (fx)] (Song& song) mutable {
+            added = detailchain::insertEffectAt (song, t, std::move (fx), position);
+            if (added >= 0)
+                mixerops::linkAddedSidechain (song, t, added); // (as the Mixer's add: a sole sidechain sender feeds it)
+        });
+        if (added >= 0)
+        {
+            selectedTag = tagOf (added);
+            refresh();
+            if (const auto* fx2 = effectAt (added); fx2 != nullptr && fx2->kind == EffectKind::plugin)
+                slotActions.toggleSlotEditor (added); // (a plugin opens its window when added, as in the Mixer)
+        }
+    }
+
+    // --- selection and actions -----------------------------------------------------------------------------------
+    int selectedCard() const
+    {
+        for (int i = 0; i < (int) cards.size(); ++i)
+            if ((instrumentSelected && cards[(std::size_t) i].kind == Card::instrument)
+                || (! instrumentSelected && selectedTag != 0 && cards[(std::size_t) i].tag == selectedTag))
+                return i;
+        return -1;
+    }
+    void select (int i)
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind == Card::add)
+            return;
+        const auto& c = cards[(std::size_t) i];
+        instrumentSelected = c.kind == Card::instrument;
+        selectedTag = c.tag;
+        if (c.kind == Card::effect)
+            slotActions.selectSlot (c.index);
+        if (DetailView::extraSelectInMixer && hooks.selectInMixer != nullptr && insert >= 0)
+            hooks.selectInMixer (insert);
+        repaint();
+    }
+    void toggleOn (const Card& c)
+    {
+        if (c.kind == Card::instrument)
+            engine.editSong ([ch = c.index] (Song& song) {
+                if (ch >= 0 && ch < (int) song.channels.size())
+                    song.channels[(std::size_t) ch].muted = ! song.channels[(std::size_t) ch].muted;
+            });
+        else
+            engine.editSong ([t = insert, i = c.index] (Song& song) { // (the Mixer LED's edit)
+                if (t >= 0 && t < (int) song.mixer.size() && i >= 0 && i < (int) song.mixer[(std::size_t) t].effects.size())
+                    song.mixer[(std::size_t) t].effects[(std::size_t) i].enabled = ! song.mixer[(std::size_t) t].effects[(std::size_t) i].enabled;
+            });
+    }
+    void toggleWindow (const Card& c)
+    {
+        if (c.kind == Card::instrument)
+        {
+            if (hooks.toggleChannelWindow != nullptr)
+                hooks.toggleChannelWindow (c.index);
+        }
+        else if (c.kind == Card::effect)
+            slotActions.toggleSlotEditor (c.index);
+    }
+    void showCardMenu (int i)
+    {
+        const auto& c = cards[(std::size_t) i];
+        if (c.kind == Card::effect)
+        {
+            slotActions.showSlotMenuFor (c.index);
+            return;
+        }
+        juce::PopupMenu menu;
+        const auto key = keyOf (c);
+        menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
+        menu.addItem (tr ("Show or hide the window"), [this, c] { toggleWindow (c); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+    void showInsertMenu()
+    {
+        if (inserts.size() < 2)
+            return;
+        juce::PopupMenu menu;
+        const auto& song = engine.getSong();
+        for (const auto t : inserts)
+            menu.addItem (insertName (song, t), true, t == insert, [this, t] {
+                chosenInsert = t;
+                refresh();
+            });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    juce::String cardName (const Card& c) const
+    {
+        const auto& song = engine.getSong();
+        if (c.kind == Card::instrument)
+            return c.index >= 0 && c.index < (int) song.channels.size() ? utf8 (song.channels[(std::size_t) c.index].name) : juce::String();
+        if (const auto* fx = effectAt (c.index))
+            return quickpick::slotName (engine, *fx);
+        return {};
+    }
+    bool cardOn (const Card& c) const
+    {
+        const auto& song = engine.getSong();
+        if (c.kind == Card::instrument)
+            return c.index >= 0 && c.index < (int) song.channels.size() && ! song.channels[(std::size_t) c.index].muted;
+        const auto* fx = effectAt (c.index);
+        return fx != nullptr && fx->enabled;
+    }
+
+    // --- knobs ---------------------------------------------------------------------------------------------------
+    ui::ValueSpec knobSpec (const Card& c, int knob) const
+    {
+        if (c.kind == Card::effect)
+            return slotActions.slotParamSpec (c.knobs[(std::size_t) knob], c.index);
+        const auto name = cardName (c);
+        if (c.knobs[(std::size_t) knob] == 1)
+        {
+            auto spec = ui::panSpec (name + " - " + tr ("Pan"));
+            spec.target = AutomationTarget { AutomationTargetKind::channelPan, c.index };
+            return spec;
+        }
+        auto spec = ui::percentSpec (name + " - " + tr ("Volume"), 0.78); // (the Channel Rack's knob)
+        spec.target = AutomationTarget { AutomationTargetKind::channelVolume, c.index };
+        return spec;
+    }
+    double knobValue (const Card& c, int knob) const
+    {
+        if (c.kind == Card::effect)
+            return slotActions.slotParamValue (c.knobs[(std::size_t) knob], c.index);
+        const auto& song = engine.getSong();
+        if (c.index < 0 || c.index >= (int) song.channels.size())
+            return 0.0;
+        const auto& ch = song.channels[(std::size_t) c.index];
+        return c.knobs[(std::size_t) knob] == 1 ? ch.pan : ch.volume;
+    }
+    void setKnob (const Card& c, int knob, double v)
+    {
+        if (c.kind == Card::effect)
+        {
+            slotActions.setSlotParam (c.knobs[(std::size_t) knob], c.index, v);
+            return;
+        }
+        const auto pan = c.knobs[(std::size_t) knob] == 1;
+        engine.editLevels ([ch = c.index, pan, v = (float) v] (Song& song) {
+            if (ch < 0 || ch >= (int) song.channels.size())
+                return;
+            if (pan)
+                song.channels[(std::size_t) ch].pan = juce::jlimit (-1.0f, 1.0f, v);
+            else
+                song.channels[(std::size_t) ch].volume = juce::jlimit (0.0f, 1.0f, v);
+        });
+        repaint();
+    }
+    juce::Rectangle<int> knobBounds (const Card& c, int knob) const
+    {
+        if (c.folded || knob < 0 || knob >= (int) c.knobs.size())
+            return {};
+        const auto body = c.bounds.withTrimmedTop (titleHeight + 6);
+        if (c.kind == Card::instrument)
+            return { c.bounds.getX() + 16 + knob * knobColumn, body.getY() + 92, knobColumn - 8, knobRow - 6 };
+        if (c.kind == Card::effect)
+            if (const auto* fx = effectAt (c.index); fx != nullptr && fx->kind == EffectKind::plugin)
+                return { c.bounds.getX() + 8, body.getY() + 92, knobColumn - 8, knobRow - 6 };
+        const auto column = knob / 2, row = knob % 2;
+        return { c.bounds.getX() + 8 + column * knobColumn, body.getY() + row * knobRow, knobColumn - 8, knobRow - 6 };
+    }
+
+    // --- hit testing ---------------------------------------------------------------------------------------------
+    juce::Rectangle<int> pickerBounds() const { return { 8, 40, contextWidth - 16, 20 }; }
+    static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight); }
+    static juce::Rectangle<int> ledBounds (const Card& c) { return { c.bounds.getX() + 5, c.bounds.getY() + 5, 11, 11 }; }
+    static juce::Rectangle<int> windowBounds (const Card& c) { return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 }; }
+
+    Hit hitAt (juce::Point<int> p) const
+    {
+        Hit h;
+        if (inserts.size() > 1 && pickerBounds().contains (p))
+        {
+            h.part = Part::picker;
+            return h;
+        }
+        if (! chainArea().contains (p))
+            return h;
+        for (int i = 0; i < (int) cards.size(); ++i)
+        {
+            const auto& c = cards[(std::size_t) i];
+            if (! c.bounds.contains (p))
+                continue;
+            h.card = i;
+            if (c.kind == Card::add)
+                return h;
+            if (ledBounds (c).expanded (2).contains (p))
+                h.part = Part::led;
+            else if (c.folded)
+                h.part = Part::folded;
+            else if (windowBounds (c).contains (p))
+                h.part = Part::window;
+            else if (titleBounds (c).contains (p))
+                h.part = Part::title;
+            else
+            {
+                h.part = Part::body;
+                for (int k = 0; k < (int) c.knobs.size(); ++k)
+                    if (knobBounds (c, k).contains (p))
+                    {
+                        h.part = Part::knob;
+                        h.knob = k;
+                    }
+            }
+            return h;
+        }
+        return h;
+    }
+
+    // --- painting ------------------------------------------------------------------------------------------------
+    void paintContext (juce::Graphics& g)
+    {
+        const auto& song = engine.getSong();
+        auto r = juce::Rectangle<int> (0, 0, contextWidth - 6, getHeight());
+        g.setColour (colour::bg2);
+        g.fillRect (r);
+        g.setColour (colour::border);
+        g.fillRect (r.getRight(), 0, 1, getHeight());
+        r = r.reduced (8, 6);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        g.drawText (track >= 0 ? trackName (song, track) : juce::String(), r.removeFromTop (18), juce::Justification::centredLeft, true);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::caption));
+        g.drawText (tr ("Insert"), r.removeFromTop (14), juce::Justification::centredLeft, true);
+        const auto box = pickerBounds();
+        const bool choice = inserts.size() > 1;
+        if (choice)
+        {
+            g.setColour (hover.part == Part::picker ? colour::bg5 : colour::bg4);
+            g.fillRoundedRectangle (box.toFloat(), 3.0f);
+        }
+        g.setColour (insert >= 0 ? colour::textPrimary : colour::textDisabled);
+        g.setFont (font (type::small));
+        g.drawText ((insert >= 0 ? insertName (song, insert) : tr ("None")) + (choice ? juce::String::fromUTF8 (" \xe2\x96\xbe") : juce::String()),
+                    box.reduced (choice ? 6 : 0, 0), juce::Justification::centredLeft, true);
+        r = r.withTop (box.getBottom() + 8);
+        if (channel >= 0)
+        {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::caption));
+            g.drawText (tr ("Channel"), r.removeFromTop (14), juce::Justification::centredLeft, true);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (type::small));
+            g.drawText (utf8 (song.channels[(std::size_t) channel].name), r.removeFromTop (16), juce::Justification::centredLeft, true);
+        }
+        else if (inserts.size() > 1)
+        {
+            g.setColour (colour::textDisabled);
+            g.setFont (font (type::caption));
+            g.drawFittedText (tr ("This track plays through {0} inserts", { juce::String ((int) inserts.size()) }), r.removeFromTop (30),
+                              juce::Justification::topLeft, 2);
+        }
+    }
+
+    void paintCard (juce::Graphics& g, int i)
+    {
+        const auto& c = cards[(std::size_t) i];
+        if (! c.bounds.intersects (chainArea()))
+            return;
+        if (c.kind == Card::add)
+        {
+            const bool hot = hover.card == i;
+            g.setColour (hot ? colour::bg3 : colour::bg2);
+            g.fillRect (c.bounds.reduced (0, 1));
+            g.setColour (colour::border);
+            g.drawRect (c.bounds.reduced (0, 1));
+            g.setColour (hot ? colour::textPrimary : colour::textSecondary);
+            g.setFont (font (22.0f));
+            g.drawText ("+", c.bounds, juce::Justification::centred, false);
+            return;
+        }
+        const bool selected = i == selectedCard();
+        const bool on = cardOn (c);
+        const auto name = cardName (c);
+        g.setColour (c.folded ? colour::bg3 : colour::bg2);
+        g.fillRect (c.bounds);
+        // the title bar: LED, name, window button
+        if (! c.folded)
+        {
+            g.setColour (colour::bg3);
+            g.fillRect (titleBounds (c));
+        }
+        g.setColour (on ? colour::accent : colour::bg5);
+        g.fillEllipse (ledBounds (c).toFloat());
+        if (hover.card == i && hover.part == Part::led)
+        {
+            g.setColour (colour::textPrimary.withAlpha (0.6f));
+            g.drawEllipse (ledBounds (c).toFloat().expanded (1.0f), 1.0f);
+        }
+        g.setColour (on ? colour::textPrimary : colour::textSecondary);
+        g.setFont (font (type::caption, true));
+        if (c.folded)
+            drawVerticalText (g, name, c.bounds.withTrimmedTop (titleHeight));
+        else
+        {
+            g.drawText (name, titleBounds (c).withTrimmedLeft (21).withTrimmedRight (22 + (c.custom != nullptr ? c.custom->titleAccessoryWidth() : 0)),
+                        juce::Justification::centredLeft, true);
+            drawWindowGlyph (g, windowBounds (c), hover.card == i && hover.part == Part::window);
+            if (c.custom != nullptr)
+            {
+                // (its own component draws the body)
+            }
+            else if (on)
+                paintBody (g, i);
+            else // switched off: its controls dim, as the reference shows [SHOT d02]
+            {
+                g.beginTransparencyLayer (0.45f);
+                paintBody (g, i);
+                g.endTransparencyLayer();
+            }
+        }
+        g.setColour (selected ? colour::accent : colour::border);
+        g.drawRect (c.bounds, selected ? 2 : 1);
+    }
+
+    void paintBody (juce::Graphics& g, int i)
+    {
+        const auto& c = cards[(std::size_t) i];
+        const auto body = c.bounds.withTrimmedTop (titleHeight + 6).reduced (8, 0);
+        const auto* fx = c.kind == Card::effect ? effectAt (c.index) : nullptr;
+        if (c.kind == Card::instrument || (fx != nullptr && fx->kind == EffectKind::plugin))
+            paintPicture (g, c, body.withHeight (80));
+        for (int k = 0; k < (int) c.knobs.size(); ++k)
+        {
+            const auto r = knobBounds (c, k);
+            if (r.isEmpty())
+                continue;
+            const auto spec = knobSpec (c, k);
+            const auto value = knobValue (c, k);
+            const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? tr ("Mix")
+                               : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
+                                                                                        : tr ("Volume");
+            auto rr = r;
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::caption));
+            g.drawText (label, rr.removeFromTop (14), juce::Justification::centred, true);
+            const auto knob = rr.removeFromTop (knobSize).toFloat().withSizeKeepingCentre ((float) knobSize, (float) knobSize);
+            const auto range = spec.maximum - spec.minimum;
+            const auto v01 = range > 0.0 ? (float) ((value - spec.minimum) / range) : 0.0f;
+            drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), spec.minimum < 0.0, (hover.card == i && hover.knob == k) || (knobCard == i && knobDrag == k) ? colour::accent : colour::knobArc,
+                      hover.card == i && hover.knob == k);
+            g.setColour (colour::textPrimary);
+            g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
+        }
+    }
+
+    // the plugin's picture (Plugin picker thumbnails), else a tile with its name
+    void paintPicture (juce::Graphics& g, const Card& c, juce::Rectangle<int> area)
+    {
+        const auto& song = engine.getSong();
+        std::string key;
+        if (c.kind == Card::instrument && c.index >= 0 && c.index < (int) song.channels.size())
+            key = "lynx:gen:" + song.channels[(std::size_t) c.index].name; // (a built-in keeps its English name unless renamed)
+        juce::Image picture;
+        if (! key.empty())
+            if (const auto file = pluginthumbs::fileFor (key, true); file.existsAsFile())
+                picture = juce::ImageCache::getFromFile (file);
+        g.setColour (colour::bg0);
+        g.fillRect (area);
+        if (picture.isValid())
+        {
+            g.drawImageWithin (picture, area.getX(), area.getY(), area.getWidth(), area.getHeight(), juce::RectanglePlacement::centred);
+            return;
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small, true));
+        g.drawFittedText (cardName (c), area.reduced (6), juce::Justification::centred, 2);
+    }
+
+    void paintMeter (juce::Graphics& g)
+    {
+        const auto r = meterBounds();
+        g.setColour (colour::bg0);
+        g.fillRect (r);
+        for (int side = 0; side < 2; ++side)
+        {
+            const auto bar = juce::Rectangle<int> (r.getX() + 3 + side * 8, r.getY() + 2, 6, r.getHeight() - 4);
+            const auto& m = levels[(std::size_t) side];
+            const auto db = juce::Decibels::gainToDecibels (m.level, -60.0f);
+            const auto h = juce::roundToInt ((float) bar.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
+            g.setColour (m.level >= 1.0f ? colour::meterClip : db > -6.0f ? colour::meterMid : colour::meterLow);
+            g.fillRect (bar.withTop (bar.getBottom() - h));
+        }
+    }
+    juce::Rectangle<int> meterBounds() const { return { getWidth() - meterWidth, 4, meterWidth - 4, std::max (0, getHeight() - 16) }; }
+
+    void timerCallback() override
+    {
+        if (insert < 0 || hooks.levelOf == nullptr)
+            return;
+        bool moved = false;
+        for (int side = 0; side < 2; ++side)
+        {
+            auto& m = levels[(std::size_t) side];
+            const auto before = m.level;
+            m.tick (hooks.levelOf (insert, side));
+            moved = moved || std::abs (m.level - before) > 1e-4f;
+        }
+        if (moved)
+            repaint (meterBounds());
+    }
+
+    AudioEngine& engine;
+    Hooks& hooks;
+    EffectsPanel slotActions; // never shown: the Mixer slot's own menus, windows and edits, on this view's insert
+    juce::Component cardHost;  // the chain area: custom card bodies live here (clipped to it)
+    std::map<std::uint64_t, CustomEntry> customs;
+    juce::ScrollBar scrollBar { false };
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer;
+    std::array<meters::PeakHold, 2> levels {};
+
+    int track = -1, insert = -1, channel = -1, chosenInsert = -1, actionsInsert = -1;
+    std::vector<int> inserts;
+    std::vector<Card> cards;
+    std::set<std::uint64_t> folded; // UI only, not saved (D2a)
+    std::uint64_t selectedTag = 0;
+    bool instrumentSelected = false;
+    int scroll = 0, contentWidth = 0;
+    Hit hover;
+    ui::ValueDrag drag;
+    int knobDrag = -1, knobCard = -1;
+    int dragCard = -1, dropBefore = -1;
+    bool dragging = false;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The Clip View (slice 1: the selected slot's clip and a button to its editor; slice 2 docks the editors here).
+class DetailView::ClipPage final : public juce::Component, private juce::ChangeListener
+{
+public:
+    ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h)
+    {
+        addChildComponent (open);
+        open.onClick = [this] {
+            if (hooks.openClip != nullptr)
+                hooks.openClip (track, scene);
+        };
+        engine.addChangeListener (this);
+    }
+    ~ClipPage() override { engine.removeChangeListener (this); }
+
+    void setSlot (int t, int s)
+    {
+        track = t;
+        scene = s;
+        update();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (colour::bg1);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::body));
+        g.drawText (text, getLocalBounds().withTrimmedBottom (40), juce::Justification::centred, true);
+    }
+    void resized() override { open.setBounds (getLocalBounds().withSizeKeepingCentre (220, 26).translated (0, 16)); }
+
+private:
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { update(); }
+    void update()
+    {
+        const auto& song = engine.getSong();
+        const Clip* clip = song.clipGrid && track >= 0 && scene >= 0 ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+        if (clip == nullptr)
+        {
+            text = tr ("Select a clip in the clip grid to see it here");
+            open.setVisible (false);
+        }
+        else if (clip->kind == ClipKind::audio)
+        {
+            text = clip->channel >= 0 && clip->channel < (int) song.channels.size() ? utf8 (song.channels[(std::size_t) clip->channel].name) : tr ("Audio clip");
+            open.setButtonText (tr ("Open in the audio editor"));
+            open.setVisible (true);
+        }
+        else
+        {
+            text = clip->pattern >= 0 && clip->pattern < (int) song.patterns.size() ? utf8 (song.patterns[(std::size_t) clip->pattern].name) : tr ("Pattern");
+            open.setButtonText (tr ("Open in the piano roll"));
+            open.setVisible (true);
+        }
+        repaint();
+    }
+
+    AudioEngine& engine;
+    Hooks& hooks;
+    juce::TextButton open;
+    juce::String text;
+    int track = -1, scene = -1;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+DetailView::DetailView (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
+{
+    setTitle (tr ("Detail view"));
+    chain = std::make_unique<DeviceChain> (engine, hooks);
+    clipPage = std::make_unique<ClipPage> (engine, hooks);
+    addChildComponent (*chain);
+    addChildComponent (*clipPage);
+    for (auto* b : { &clipTab, &devicesTab, &optionsButton })
+    {
+        addAndMakeVisible (*b);
+        b->setConnectedEdges (0);
+        b->setColour (juce::TextButton::buttonOnColourId, colour::accent);
+        b->setColour (juce::TextButton::textColourOnId, colour::onAccent);
+    }
+    clipTab.setButtonText (tr ("Clip"));
+    devicesTab.setButtonText (tr ("Devices"));
+    clipTab.setTooltip (tr ("The selected clip (Shift+Tab switches, Ctrl+Alt+3)"));
+    devicesTab.setTooltip (tr ("The selected track's devices: its instrument and its insert's effects (Shift+Tab switches, Ctrl+Alt+4)"));
+    clipTab.onClick = [this] { setPage (Page::clip); };
+    devicesTab.onClick = [this] { setPage (Page::devices); };
+    optionsButton.setButtonText (juce::String::fromUTF8 ("\xe2\x8b\xaf"));
+    optionsButton.setTooltip (tr ("Detail view options"));
+    optionsButton.onClick = [this] { showOptionsMenu(); };
+    showPage();
+}
+
+DetailView::~DetailView() = default;
+
+void DetailView::showSelection (int t, int s)
+{
+    track = t;
+    scene = s;
+    chain->setTrack (t);
+    clipPage->setSlot (t, s);
+}
+
+void DetailView::setPage (Page page)
+{
+    devicesPage = page == Page::devices;
+    if (! shownSetting)
+    {
+        shownSetting = true;
+        setVisible (true);
+    }
+    showPage();
+    if (hooks.layoutChanged != nullptr)
+        hooks.layoutChanged();
+}
+
+void DetailView::togglePage() { setPage (devicesPage ? Page::clip : Page::devices); }
+
+void DetailView::showPage()
+{
+    chain->setVisible (devicesPage);
+    clipPage->setVisible (! devicesPage);
+    clipTab.setToggleState (! devicesPage, juce::dontSendNotification);
+    devicesTab.setToggleState (devicesPage, juce::dontSendNotification);
+    repaint();
+}
+
+int DetailView::heightFor (int available) const noexcept
+{
+    return juce::jlimit (std::min (minHeight, available / 2), std::max (minHeight, available * 6 / 10), preferredHeight);
+}
+
+void DetailView::showOptionsMenu()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("LYNX extras"));
+    menu.addItem (tr ("W shows or hides the selected device's window"), true, extraWindowKey, [this] {
+        extraWindowKey = ! extraWindowKey;
+        if (hooks.layoutChanged != nullptr)
+            hooks.layoutChanged();
+    });
+    menu.addItem (tr ("Selecting a device selects its insert in the Mixer"), true, extraSelectInMixer, [this] {
+        extraSelectInMixer = ! extraSelectInMixer;
+        if (hooks.layoutChanged != nullptr)
+            hooks.layoutChanged();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&optionsButton));
+}
+
+void DetailView::paint (juce::Graphics& g)
+{
+    g.fillAll (colour::bg1);
+    // the top edge: drag to resize
+    g.setColour (colour::bg3);
+    g.fillRect (0, 0, getWidth(), edgeHeight);
+    g.setColour (colour::border);
+    g.fillRect (0, edgeHeight - 1, getWidth(), 1);
+    g.setColour (colour::bg5);
+    g.fillRect (getWidth() / 2 - 16, 2, 32, 1);
+    // the bottom strip: what is shown, then the selectors on the right
+    const auto strip = getLocalBounds().removeFromBottom (stripHeight);
+    g.setColour (colour::border);
+    g.fillRect (strip.withHeight (1));
+    g.setColour (colour::textSecondary);
+    g.setFont (font (type::small));
+    const auto& song = engine.getSong();
+    juce::String what;
+    if (devicesPage)
+    {
+        what = track >= 0 ? tr ("Devices") + ": " + trackName (song, track) : tr ("Devices");
+        if (const auto i = chain->insertShown(); i >= 0)
+            what << juce::String::fromUTF8 (" \xc2\xb7 ") << insertName (song, i);
+    }
+    else
+        what = tr ("Clip");
+    what << "   (" << tr ("Shift+Tab: {0}", { devicesPage ? tr ("Clip") : tr ("Devices") }) << ")";
+    g.drawText (what, strip.reduced (8, 0).withTrimmedRight (240), juce::Justification::centredLeft, true);
+}
+
+void DetailView::resized()
+{
+    auto r = getLocalBounds();
+    r.removeFromTop (edgeHeight);
+    auto strip = r.removeFromBottom (stripHeight).reduced (2, 2);
+    optionsButton.setBounds (strip.removeFromRight (26));
+    strip.removeFromRight (4);
+    devicesTab.setBounds (strip.removeFromRight (96));
+    strip.removeFromRight (2);
+    clipTab.setBounds (strip.removeFromRight (96));
+    chain->setBounds (r);
+    clipPage->setBounds (r);
+}
+
+void DetailView::mouseMove (const juce::MouseEvent& e)
+{
+    setMouseCursor (e.y < edgeHeight ? juce::MouseCursor::UpDownResizeCursor : juce::MouseCursor::NormalCursor);
+}
+
+void DetailView::mouseDown (const juce::MouseEvent& e)
+{
+    resizing = e.y < edgeHeight;
+    dragStartHeight = getHeight();
+}
+
+void DetailView::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! resizing)
+        return;
+    preferredHeight = std::max (minHeight, dragStartHeight - e.getDistanceFromDragStartY());
+    if (hooks.layoutChanged != nullptr)
+        hooks.layoutChanged();
+}
+
+void DetailView::mouseUp (const juce::MouseEvent&)
+{
+    if (resizing && getParentComponent() != nullptr)
+        preferredHeight = getHeight(); // (what the dock allowed)
+    resizing = false;
+}
+
+int DetailView::cardCountForCheck() const { return chain->cardCount(); }
+int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
+int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
+bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
+void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
+} // namespace lynx

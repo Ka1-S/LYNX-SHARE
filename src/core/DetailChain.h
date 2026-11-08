@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "core/MixerOps.h"
 #include "core/Song.h"
 
 namespace lynx::detailchain
@@ -104,5 +105,77 @@ inline Chain forTrack (const Song& song, int track)
     else if (c.inserts.size() == 1)
         c.insert = c.inserts.front();
     return c;
+}
+// Puts `fx` into insert `track`'s chain at `position` (0 = first, the chain's size = last), the Device View's drop between
+// two cards. FL's slot places are kept as far as they go: the effect takes a free row between its neighbours; with none
+// free, the effects after it move one row down where there is room, else the ones before it move up, else the chain
+// is packed from the top. Effects only ever move into empty rows (moveEffectToRow), so automations follow them.
+// Returns the new effect's index, or -1 (no such insert, or all 10 slots taken).
+inline int insertEffectAt (Song& song, int track, EffectSlot fx, int position)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return -1;
+    const auto n = (int) song.mixer[(std::size_t) track].effects.size();
+    if (n >= maxEffectSlots)
+        return -1;
+    position = std::clamp (position, 0, n);
+    const auto rows = mixerops::effectRows (song.mixer[(std::size_t) track].effects);
+    const auto rowAt = [&] (int i) { return i < 0 ? -1 : i >= n ? maxEffectSlots : rows[(std::size_t) i]; };
+
+    if (rowAt (position) - rowAt (position - 1) < 2)
+    {
+        auto want = rows;
+        bool done = false;
+        // the effects from `position` on, one row further down each where needed
+        for (int i = position, next = rowAt (position - 1) + 2; i < n; ++i)
+        {
+            want[(std::size_t) i] = std::max (rows[(std::size_t) i], next);
+            next = want[(std::size_t) i] + 1;
+        }
+        if (position < n && want[(std::size_t) n - 1] < maxEffectSlots)
+        {
+            for (int i = n - 1; i >= position; --i) // (from the last: each target row is free)
+                mixerops::moveEffectToRow (song, track, i, want[(std::size_t) i]);
+            done = true;
+        }
+        if (! done)
+        {
+            want = rows;
+            for (int i = position - 1, next = rowAt (position) - 2; i >= 0; --i)
+            {
+                want[(std::size_t) i] = std::min (rows[(std::size_t) i], next);
+                next = want[(std::size_t) i] - 1;
+            }
+            if (position > 0 && want[0] >= 0)
+            {
+                for (int i = 0; i < position; ++i) // (from the first: each target row is free)
+                    mixerops::moveEffectToRow (song, track, i, want[(std::size_t) i]);
+                done = true;
+            }
+        }
+        if (! done) // packed: rows 0.. with a hole at `position`
+        {
+            for (int i = 0; i < n; ++i)
+                mixerops::moveEffectToRow (song, track, i, i);
+            for (int i = n - 1; i >= position; --i)
+                mixerops::moveEffectToRow (song, track, i, i + 1);
+        }
+    }
+    const auto after = mixerops::effectRows (song.mixer[(std::size_t) track].effects);
+    const auto row = position == 0 ? (n == 0 ? 0 : std::max (0, after[0] - 1)) : after[(std::size_t) position - 1] + 1;
+    return mixerops::insertEffectAtRow (song, track, std::move (fx), row);
+}
+
+// The Device View's drag of a card: effect `from` dropped before the card at `position` (the chain's size = after the
+// last). Returns the effect's new index, or -1 when nothing moves.
+inline int moveEffectBefore (Song& song, int track, int from, int position)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return -1;
+    const auto n = (int) song.mixer[(std::size_t) track].effects.size();
+    if (from < 0 || from >= n)
+        return -1;
+    const auto to = std::clamp (position > from ? position - 1 : position, 0, n - 1);
+    return to != from && mixerops::moveEffectSlot (song, track, from, to) ? to : -1;
 }
 } // namespace lynx::detailchain

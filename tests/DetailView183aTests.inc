@@ -122,3 +122,119 @@ TEST (detail183a_master_and_an_empty_mixer)
     c = detailchain::forTrack (s, 0);
     CHECK (c.channel == 0 && c.insert == -1 && c.inserts.empty());
 }
+
+namespace detail183a
+{
+// insert 1 with effects of the given kinds at the given rows (-1 = right after the previous)
+inline Song insertWith (const std::vector<int>& rows)
+{
+    Song s;
+    s.mixer.resize (2);
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        EffectSlot fx;
+        fx.kind = EffectKind::eq;
+        fx.params[0] = (float) i / 10.0f; // (tells them apart)
+        fx.row = rows[i];
+        s.mixer[1].effects.push_back (fx);
+    }
+    return s;
+}
+inline std::vector<float> order (const Song& s)
+{
+    std::vector<float> out;
+    for (const auto& fx : s.mixer[1].effects)
+        out.push_back (fx.params[0]);
+    return out;
+}
+inline EffectSlot marker()
+{
+    EffectSlot fx;
+    fx.kind = EffectKind::eq;
+    fx.params[0] = 0.99f;
+    return fx;
+}
+} // namespace detail183a
+
+TEST (detail183a_drop_between_cards_keeps_the_slot_places)
+{
+    using namespace lynx;
+    // a free row between the neighbours: taken, nobody moves
+    auto s = detail183a::insertWith ({ 0, 4, 7 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 1) == 1);
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.99f, 0.1f, 0.2f }));
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 1, 4, 7 }));
+
+    // packed neighbours: the ones after move down a row
+    s = detail183a::insertWith ({ 0, 1, 2 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 1) == 1);
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.99f, 0.1f, 0.2f }));
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 1, 2, 3 }));
+
+    // first place with the first row free / taken
+    s = detail183a::insertWith ({ 3, 5 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 0) == 0);
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 2, 3, 5 }));
+    s = detail183a::insertWith ({ 0, 1 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 0) == 0);
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.99f, 0.0f, 0.1f }));
+
+    // after the last, which sits in slot 10: the ones before move up
+    s = detail183a::insertWith ({ 0, 8, 9 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 3) == 3);
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.1f, 0.2f, 0.99f }));
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 7, 8, 9 }));
+
+    // the middle of a chain packed at both ends: packed from the top
+    s = detail183a::insertWith ({ 0, 1, 2, 3, 6, 7, 8, 9 });
+    s.mixer[1].effects[4].row = 6; // (rows 4 and 5 are free, but not where the drop is)
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 2) == 2);
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.1f, 0.99f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f }));
+    CHECK (s.mixer[1].effects.size() == 9);
+
+    // nine effects: the tenth goes in anywhere; then the insert is full
+    s = detail183a::insertWith ({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 4) == 4);
+    CHECK (s.mixer[1].effects.size() == 10);
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 0) == -1);
+    CHECK (detailchain::insertEffectAt (s, 5, detail183a::marker(), 0) == -1); // (no such insert)
+
+    // an empty insert
+    s = detail183a::insertWith ({});
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 7) == 0);
+}
+
+TEST (detail183a_drag_a_card_before_another)
+{
+    using namespace lynx;
+    auto s = detail183a::insertWith ({ 0, 2, 5 });
+    // automation of the first effect follows it
+    s.automations.emplace_back();
+    s.automations.back().target = AutomationTarget { AutomationTargetKind::effectParam, 1, 0, 0 };
+    CHECK (detailchain::moveEffectBefore (s, 1, 0, 3) == 2); // the first after the last
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.1f, 0.2f, 0.0f }));
+    CHECK (s.automations.back().target.slot == 2);
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 2, 5 })); // (the rows stay in use)
+    CHECK (detailchain::moveEffectBefore (s, 1, 2, 0) == 0); // back to the front
+    CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.1f, 0.2f }));
+    CHECK (detailchain::moveEffectBefore (s, 1, 1, 1) == -1); // onto itself: nothing
+    CHECK (detailchain::moveEffectBefore (s, 1, 1, 2) == -1); // before the next: the same place
+    CHECK (detailchain::moveEffectBefore (s, 1, 7, 0) == -1);
+}
+
+// The detail view's keys (the reference DAW's View menu, Live 12.4 [SHOT] d05): free before, no conflict, every focus.
+TEST (detail183a_keys_are_free_and_reach_the_detail_view)
+{
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    for (auto focus : { Context::global, Context::channelRack, Context::pianoRoll, Context::playlist, Context::mixer, Context::browser })
+    {
+        CHECK (map.find ({ 'L', ctrl | alt }, focus, false) == "view.detailToggle");
+        CHECK (map.find ({ '3', ctrl | alt }, focus, false) == "view.detailClip");
+        CHECK (map.find ({ '4', ctrl | alt }, focus, false) == "view.detailDevices");
+        CHECK (map.find ({ tab, shift }, focus, false) == "view.detailSwitch");
+    }
+    CHECK (map.find ({ tab, shift }, Context::pianoRoll, true) == "view.detailSwitch"); // (the typing piano doesn't take it)
+    CHECK (map.find ({ tab }, Context::global, false).empty()); // plain Tab keeps no binding
+}

@@ -17,7 +17,9 @@ Tags:
 |---|---|---|
 | The Detail View sits at the bottom of the main window, under the Session/Arrangement area, beside the Info View | [SHOT] `ableton175a/live/m3-live-clipview2.png` | PROVEN |
 | It shows either the **Clip View** (the selected clip) or the **Device View** (the selected track's devices) | [MANUAL] Live Concepts 3.12; [LESSON] Playing Software Instruments | PROVEN |
-| **Shift+Tab** toggles between Clip View and Device View | [LESSON] Creating Beats ("the $ShiftMod-Tab shortcut ... toggles between the Clip View ... and the Device View"); Playing Software Instruments | PROVEN |
+| **Shift+Tab** toggles between Clip View and Device View | [LESSON] Creating Beats ("the $ShiftMod-Tab shortcut ... toggles between the Clip View ... and the Device View"); [SHOT] d05 View menu "Toggle Clip/Device View Shift+Tab", d07→d08→d09 | PROVEN |
+| View menu (Live 12.4): Clip View Ctrl+Alt+3, Device View Ctrl+Alt+4 (ticked items), Toggle Clip/Device View Shift+Tab, Expand Clip View Ctrl+Alt+E, **Hide Device View Ctrl+Alt+L** (hides the Detail View), Arrange Clip View Panels Automatically / Horizontally / Vertically, MIDI Note Editor Shift+Alt+1, Envelope Editor Shift+Alt+2, Expression Editor Shift+Alt+3 | [SHOT] d05 | PROVEN |
+| Clicking a clip selects it but leaves the Device View showing | [SHOT] d07 | PROVEN |
 | Clicking the two **view selectors** in the bottom-right corner of the window also switches | [LESSON] Playing Software Instruments, picture `DetailOverviewsInst.png` (two selector tiles, bottom right) | PROVEN |
 | Live 12: both views can be shown at once, stacked; triangle buttons next to the selectors, **Ctrl+Alt+3** (Clip View) and **Ctrl+Alt+4** (Device View); Alt+click on a selector opens both; with both open, Shift+Tab moves the focus between them | [LESSON] What's New "Toggle Clip View Alongside Device View"; [MANUAL] 3.12 | PROVEN |
 | Double-clicking a clip opens the Clip View; double-clicking a track's title bar opens the Device View | [MANUAL] 3.12; [LESSON] ("double-click its title bar - the MIDI notes ... will appear in the Clip View") | PROVEN |
@@ -31,7 +33,10 @@ Tags:
 |---|---|---|
 | Shows the devices of the **selected track**: MIDI effects, the instrument, then audio effects, left to right in signal order ("Signals in a device chain always travel from left to right") | [MANUAL] Working with Instruments and Effects | PROVEN |
 | Audio, group and return tracks hold audio effects only | [MANUAL] 3.12 | PROVEN |
-| An empty chain shows a centred drop hint: "Drop Audio Effects Here" on an audio track | [SHOT] `ableton175a/live/m3-live-clipview.png` | PROVEN |
+| The free space after the last device shows the drop hint "Drop Audio Effects Here", with devices or without | [SHOT] `ableton175a/live/m3-live-clipview.png` (empty), `detail183a/live/d01-chain.png` (three devices) | PROVEN |
+| A deactivated device: its activator goes dark and its controls dim | [SHOT] d02 | PROVEN |
+| A folded device: a narrow column with the activator on top, the name written upwards, its title buttons below | [SHOT] d03 | PROVEN |
+| The title bar's context menu: Cut, Copy, Rename, Edit Info Text, Delete, Group, Group To Drum Rack, Fold, Show Preset Name, Compare: Switch to B / Copy A to B, Save as Default Preset, Hi-Quality | [SHOT] d04 | PROVEN |
 | Input and output meters enclose the chain (left: a MIDI activity column on a MIDI track; right: a stereo output meter) | [LESSON] `DeviceViewMeters.png`; [MANUAL] "meters appear between devices" | PROVEN (ends); between devices: see §6 |
 | Title bar: the **Activator** (on/off, a round switch at the left), the name, then Hot-Swap, Save Preset, the Options button, and optional toggles (expand arrow, scale awareness) | [MANUAL]; [LESSON] What's New "Device Title Bar Updates", `DeviceTitleBar.png` | PROVEN |
 | A deactivated device passes the signal unprocessed | [MANUAL] | PROVEN |
@@ -54,8 +59,15 @@ Tags:
 | Clip envelopes: the Envelopes tab with a **device chooser** (Clip, each device, Mixer, MIDI Ctrl) and a **control chooser**; envelopes of edited controls get an LED; Session clips have Automation (absolute, red) and Modulation (relative, blue) | [MANUAL] Clip Envelopes | PROVEN |
 | Clip envelope loops can be unlinked from the clip loop | [MANUAL] Clip Envelopes | PROVEN |
 
-## 4. Sizes (measured on 1920 × 1080 shots at 100 %)
-_(filled from the session shots, §7)_
+## 4. Sizes (measured on 1920 × 1080 shots at 100 %) [SHOT]
+| What | Size | Shot |
+|---|---|---|
+| Clip View (audio), frame to frame | 228 px (inner 224) | `ableton175a/live/m3-live-clipview2.png` |
+| Device View with devices | 188 px (y 807–995) | `detail183a/live/d01-chain.png` |
+| Device title bar | 17 px | d01 |
+| Folded device | a column of about 20–22 px | d03 |
+| Status bar with the two view selectors | 19 px; each selector about 197 px wide | `m3-live-clipview2.png` |
+| Stacked (Clip View above Device View) | the Clip View takes the window's full width over the Info View; the Device View keeps its height | d10 |
 
 ## 5. What LYNX already has to reuse
 | Piece | Where | Reuse |
@@ -87,8 +99,10 @@ track's existing insert slots, as a horizontal chain, with **no new model**.
   in the window's bottom-right corner [LESSON]). On the left of that strip, the context: "Track 3 · Insert 5 Bass" or the
   clip's name.
 - Keys, Clip-launch workflow only (all four chords are free in LYNX's key map, and remappable as usual):
-  **Shift+Tab** Clip ↔ Devices (opens the Detail View if hidden) [PROVEN in Live]; **Ctrl+Alt+3** Clip, **Ctrl+Alt+4**
-  Devices [PROVEN]; **Ctrl+Alt+L** show/hide the Detail View [SHOT, View menu: to confirm in §7]. A double-click on a grid
+  **Shift+Tab** Clip ↔ Devices (opens the Detail View if hidden) [PROVEN]; **Ctrl+Alt+3** Clip, **Ctrl+Alt+4**
+  Devices [PROVEN]; **Ctrl+Alt+L** show/hide the Detail View [PROVEN, d05: "Hide Device View Ctrl+Alt+L"]. In the
+  reference DAW Ctrl+Alt+3/4 toggle each view on its own (both can show); LYNX's slice 1 switches between them, and
+  "show both" comes with slice 2. A double-click on a grid
   column's title shows Devices, and on a filled slot shows Clip [MANUAL].
 - Live 12 can stack both views [LESSON]. LYNX: slice 2 adds "Show both" (Alt+click on a selector, as in Live) once the
   Clip View exists.
@@ -126,8 +140,10 @@ Left to right [MANUAL "left to right"; LESSON meters]:
   insertion line (`insertEffectAtRow`); onto a card it replaces it, as on a mixer slot. A generator dropped makes a new
   channel routed to this insert, as on the mixer (round 167u). With 10 effects the insert is full: the drop is refused
   with a hint.
-- **"+" card** at the end: the mixer's add menu for the next free slot. An empty insert shows "Drop effects here"
-  centred [SHOT].
+- **"+" card** at the end: the mixer's add menu for the next free slot. The free room after the last card shows
+  "Drop effects here", with cards or without [SHOT d01] (the round's first note said "empty only": the session showed
+  otherwise).
+- **Off**: the LED dark and the card's controls dimmed [SHOT d02].
 - **Meters**: the insert's input on the left and output on the right [LESSON]; between cards: not built (LYNX has no
   per-slot level; noted).
 - A wider chain than the view scrolls sideways (bar under the cards; Shift+wheel).
@@ -167,9 +183,25 @@ Left to right [MANUAL "left to right"; LESSON meters]:
   is untouched.
 
 ## 7. Open points
-- Live's View-menu shortcut for "Hide/Show Detail View": to read in §8.
 - Per-device meters between cards: no per-slot level in LYNX.
-- Fold state is not saved (D2a).
+- Fold state is not saved (D2a); the reference saves `IsFolded` [DATA].
+- The reference's left meter column on a MIDI track (note activity) [LESSON]: not built in slice 1; LYNX shows the
+  output meter on the right only.
+- Selection from a Playlist track header (Both / Song view): slice 1 follows the grid's selection only.
 
-## 8. Live GUI session
-_(to fill)_
+## 8. Live GUI session (2026-11-08 04:56–05:01, round 183a)
+- GUI lock held 04:54:44–05:01:44 (holder pid 63895), idle gate passed 04:56:43, every input through `act.ps1` /
+  own `rclick.ps1` (fresh shot + `safeinput.ps1` + licence-window guard); the input wall logged no new drop.
+- Set: Live's own shipped demo, `Core Library/Lessons/Demo Songs/Chuck Sutton - Patience (Live 12 Suite Demo).als`,
+  opened read-only in effect (closed with "No" to the save prompt; nothing saved).
+- Dialogs: the trial info box "Saving and exporting were successfully activated / Time remaining: 28 days" → OK
+  (`trialok.ps1`, pre-approved); no licence or PACE box appeared; no plugin scan ran.
+- Shots in `/mnt/e/lynx-work/detail183a/live/`: d01 chain (Drift, Utility, Audio Effect Rack), d02 Utility off,
+  d03 Utility folded, d04 the title bar's context menu, d05 the View menu, d07–d09 Shift+Tab both ways, d10 Clip and
+  Device View stacked (Ctrl+Alt+3).
+- Prefs: no setting changed. `Preferences.cfg` differs from the 04:19 backup only in Live's own runtime state (browser
+  filter rows) and a recent-file entry left by round 182b's session in between; backup and after-copy are kept next to
+  the shots. Not overwritten (that would erase 182b's state too).
+- Closing: `finish.ps1` skipped Live's ordinary save prompt because its licence filter matches Live's own "Track /
+  Clip / Device Activator" labels (bare "activat"); `guard.ps1`'s stricter filter does not, so "No" was clicked
+  through `act.ps1`. Live and its helper processes exited; AbletonAudioCpl (pid 20004) was running before the session.
