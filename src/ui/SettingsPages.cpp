@@ -3,6 +3,7 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/LayoutStyle.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
@@ -111,16 +112,19 @@ public:
             add (*c);
 
         styleLabel (layoutStyleLabel, tr ("Layout style"));
-        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), 1);
-        layoutStyleBox.addItem (tr ("Clip-launch workflow"), 2);
-        layoutStyleBox.setSelectedId (options.clipLaunchWorkflow ? 2 : 1, juce::dontSendNotification);
+        layoutStyleBox.setComponentID ("layoutStyle"); // (--simpleshot finds it)
+        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), layoutstyle::comboId (layoutstyle::Style::pattern));
+        layoutStyleBox.addItem (tr ("Clip-launch workflow"), layoutstyle::comboId (layoutstyle::Style::clipLaunch));
+        layoutStyleBox.addItem (tr ("Simple workflow"), layoutstyle::comboId (layoutstyle::Style::simple));
+        layoutStyleBox.setSelectedId (layoutstyle::comboId ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, options.layoutStyle)), juce::dontSendNotification);
         layoutStyleBox.onChange = [this] {
-            options.clipLaunchWorkflow = layoutStyleBox.getSelectedId() == 2;
+            options.layoutStyle = (int) layoutstyle::fromComboId (layoutStyleBox.getSelectedId());
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
         styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
-                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away."));
+                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.") + "\n"
+                                        + tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."));
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -310,7 +314,7 @@ private:
         Rows r (width);
         r.section (workflowTitle, true);
         layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
-        layoutStyleNote.setBounds (r.indented (48).translated (0, -3));
+        layoutStyleNote.setBounds (r.indented (66).translated (0, -3));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
         languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));

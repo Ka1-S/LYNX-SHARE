@@ -9,6 +9,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/LayoutStyle.h"
 #include "core/Performance.h"
 #include "ui/UiTrace.h"
 #include "core/ToolbarLayout.h"
@@ -22,6 +23,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
+#include "ui/SimpleWorkflow.h"
 #include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
@@ -79,9 +81,13 @@ public:
     void showDesktopForSnapshot (bool extraPanels);
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
-    void setClipLaunchWorkflow (bool on, bool swapLayout = true);
+    void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
-    bool isClipLaunchWorkflow() const noexcept { return clipLaunchWorkflow; }
+    bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
+    // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
+    void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
+    layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -554,10 +560,12 @@ private:
     PlaylistComponent playlist;
     PatternPicker picker { engine, playlist };
     PlaylistArea playlistArea { picker, playlist };
-    bool clipLaunchWorkflow = false, startInClipLaunchWorkflow = false;
+    layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
+    layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
     MixerComponent mixer;
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first

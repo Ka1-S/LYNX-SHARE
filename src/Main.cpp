@@ -1522,6 +1522,17 @@ public:
             return;
         }
 
+        if (args.contains ("--simpleshot"))
+        {
+            // LYNX.exe --simpleshot prefix: round 184a's Simple workflow off-screen — View › Layout style with each style
+            // chosen, Settings › General (Pattern, then Simple selected) with its style list, the window in Pattern, then
+            // Simple, then Pattern again, and how many Simple workflow objects existed before and after (0 before)
+            const auto i = args.indexOf ("--simpleshot");
+            runSimpleShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--typeaheadtest"))
         {
             // LYNX.exe --typeaheadtest out.txt: issue #64 — a real popup menu (headings, a submenu) driven by key presses
@@ -9307,6 +9318,91 @@ private:
         ui.setClipLaunchWorkflow (false);
         write ("pattern-after");
         juce::File (prefix + "-counts.txt").replaceWithText ("runtimes before " + juce::String (madeBefore) + ", after " + juce::String (lynx::launcher::Runtime::instances.load()) + "\n");
+    }
+
+    void runSimpleShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto writeImage = [&prefix] (const juce::Image& image, const char* name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        const auto write = [&ui, &writeImage] (const char* name) { writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), name); };
+
+        // View › Layout style, with its submenu, as it is with `style` chosen
+        const auto viewMenu = [&ui] {
+            const auto names = ui.getMenuNamesForSnapshot();
+            const auto view = names.indexOf (lynx::tr ("View"));
+            return ui.getMenuForSnapshot (juce::jmax (0, view));
+        };
+        const auto saveStyleMenus = [&] (const juce::String& suffix) {
+            const auto view = viewMenu();
+            juce::StringArray names { lynx::tr ("View") };
+            std::vector<juce::PopupMenu> menus { view };
+            for (juce::PopupMenu::MenuItemIterator it (view); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::tr ("Layout style"))
+                {
+                    names.add (lynx::tr ("Layout style"));
+                    menus.push_back (*it.getItem().subMenu);
+                }
+            saveMenus (names, menus, prefix + "-menu-" + suffix + ".png");
+        };
+
+        // Settings › General with `style` selected, and its style list
+        const auto saveSettings = [&] (lynx::layoutstyle::Style style, const char* name) {
+            lynx::SettingsHooks hooks;
+            hooks.getGeneral = [style] {
+                lynx::GeneralOptions o;
+                o.language = lynx::i18n::current();
+                o.layoutStyle = (int) style;
+                return o;
+            };
+            auto page = lynx::makeSettingsPanel (offline, lynx::SettingsPage::general, false, hooks);
+            juce::Image image (juce::Image::ARGB, page->getWidth(), juce::jmin (page->getHeight(), 420), true);
+            {
+                juce::Graphics g (image);
+                g.fillAll (lynx::theme::panel);
+                page->paintEntireComponent (g, false);
+            }
+            writeImage (image, name);
+            std::function<juce::ComboBox* (juce::Component&)> find = [&find] (juce::Component& c) -> juce::ComboBox* {
+                if (c.getComponentID() == "layoutStyle")
+                    return dynamic_cast<juce::ComboBox*> (&c);
+                for (auto* child : c.getChildren())
+                    if (auto* box = find (*child))
+                        return box;
+                return nullptr;
+            };
+            if (auto* box = find (*page); box != nullptr && box->getRootMenu() != nullptr)
+                saveMenus (juce::StringArray { lynx::tr ("Layout style") }, std::vector<juce::PopupMenu> { *box->getRootMenu() },
+                           prefix + "-" + name + "-list.png");
+        };
+
+        const auto madeBefore = lynx::SimpleWorkflow::instances.load();
+        ui.selectTabForSnapshot (2); // the Playlist panel, maximized (as --gridshot)
+        write ("pattern");
+        saveStyleMenus ("pattern");
+        saveSettings (lynx::layoutstyle::Style::pattern, "settings-pattern");
+        const auto madePattern = lynx::SimpleWorkflow::instances.load();
+        ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch);
+        saveStyleMenus ("cliplaunch");
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        write ("simple");
+        saveStyleMenus ("simple");
+        saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        offline.dispatchPendingMessages();
+        write ("pattern-after");
+        juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
+                                                             + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
+                                                             + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n");
     }
 
     void runPerfShot (const juce::String& prefix, const juce::String& projectPath)

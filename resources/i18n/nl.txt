@@ -7847,3 +7847,7 @@ countries: nl be
 "There are no audio clip channels selected." = "Er zijn geen audioclipkanalen geselecteerd."
 "Change declicking mode?" = "Declickingmodus wijzigen?"
 "Change the declicking mode of all selected audio clip channels?" = "De declickingmodus van alle geselecteerde audioclipkanalen wijzigen?"
+
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Eenvoudige werkwijze"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Eenvoudige werkwijze: één venster met de sporen en de tijdlijn; de andere vensters zijn één klik verwijderd."

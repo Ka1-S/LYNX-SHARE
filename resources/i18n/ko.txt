@@ -7847,3 +7847,7 @@ countries: kr
 "There are no audio clip channels selected." = "선택한 오디오 클립 채널이 없습니다."
 "Change declicking mode?" = "디클릭 모드를 변경할까요?"
 "Change the declicking mode of all selected audio clip channels?" = "선택한 모든 오디오 클립 채널의 디클릭 모드를 변경할까요?"
+
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "간단한 워크플로"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "간단한 워크플로: 트랙과 타임라인을 한 창에 표시하며, 다른 창은 한 번의 클릭으로 열 수 있습니다."
