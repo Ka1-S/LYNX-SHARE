@@ -63,7 +63,10 @@ class AudioEngine final : private juce::AudioIODeviceCallback,
 {
 public:
     // workerThreads: extra audio threads (< 0 = by the CPU's cores). An engine that only serves an editor needs none.
-    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1);
+    // userPluginList = false: the plugin host neither reads nor writes LYNX's plugin list and settings, nor reads FL's
+    // plugin database in the background (round 180b: an editor inside another host must not, and its close must not
+    // wait for that reader)
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true);
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
@@ -147,6 +150,12 @@ public:
         return performanceMidiChannel.load (std::memory_order_relaxed) == 1 && performanceMidiOn.load (std::memory_order_relaxed);
     }
     const perf::Live& performanceState() const noexcept { return *performanceLive; }
+    // The clip grid (round 181a, core/ClipLauncher.h; message thread). A launch while stopped starts the transport, as the
+    // first thing a launcher does; a stop while stopped does nothing. Without a grid in the project: nothing at all.
+    void launcherCommand (const launcher::Command& command);
+    // What plays per track, or nullptr while no project has had a grid (never with Pattern workflow).
+    const launcher::Runtime* launcherState() const noexcept { return clipLauncher.get(); }
+    launcher::Runtime* launcherStateForSnapshot() noexcept { return clipLauncher.get(); } // --gridshot: a sample of what plays
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
 
@@ -875,6 +884,8 @@ private:
     bool takeHasUndoStep = false;
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
+    void updateLauncherRecording();
+    bool launcherTakeHasUndoStep = false;
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
     std::atomic<bool> waitingForInput { false };
@@ -979,6 +990,7 @@ private:
     juce::SpinLock takeLock;                       // the audio thread only tries (never waits)
     LiveInput liveInput;
     std::unique_ptr<perf::Live> performanceLive = std::make_unique<perf::Live>(); // Performance mode (round 165m)
+    std::unique_ptr<launcher::Runtime> clipLauncher; // made when a project first has a clip grid (round 181a)
     std::atomic<int> performanceMidiChannel { 0 }; // MidiPrefs::performanceChannel (UI writes, MIDI thread reads)
     std::atomic<bool> performanceMidiOn { false }; // Performance mode is on with a zone (UI writes, MIDI thread reads)
     perf::MidiMapping performanceMidi;             // MIDI thread only

@@ -137,8 +137,8 @@ struct DcBlock
 
 struct LiveMeters
 {
-    std::array<std::atomic<float>, 8> v {};
-    float read (int k) const noexcept { return k >= 0 && k < 8 ? v[(std::size_t) k].load (std::memory_order_relaxed) : 0.0f; }
+    std::array<std::atomic<float>, 14> v {};
+    float read (int k) const noexcept { return k >= 0 && k < 14 ? v[(std::size_t) k].load (std::memory_order_relaxed) : 0.0f; }
     void set (int k, float x) noexcept { v[(std::size_t) k].store (x, std::memory_order_relaxed); }
 };
 
@@ -181,7 +181,9 @@ Style styleOf (const EffectParams& p) noexcept
 float styleValue (Style s) noexcept { return (int) s < styles ? (float) (int) s / (float) (styles - 1) : styleValue (Style::allround); }
 float voicingValue (Style s) noexcept { return (int) s < styles ? 0.0f : (float) ((int) s - styles + 1) / (float) (voicings - 1); }
 double thresholdDb (float v) noexcept { return lin (v, -60.0, 0.0); }
-double ratioOf (float v) noexcept { return ratioLaw (v); }
+// round tp172b6 [EXEC] (Pro-C 3, Clean, 1 kHz stair, threshold -30, knee 0): 24 -> 30 dB over adds 5.96 dB at the very top,
+// 5.89 dB at 91.9 : 1, so the top is a true limit whatever its parameter text says (100.00:1). Only the exact top changes.
+double ratioOf (float v) noexcept { return v >= 1.0f ? 1.0e9 : ratioLaw (v); }
 float ratioValue (double r) noexcept { return ratioLawValue (r); }
 double kneeDb (float v) noexcept { return lin (v, 0.0, 72.0); }
 double rangeDb (float v) noexcept { return lin (v, 0.0, 60.0); }
@@ -979,6 +981,10 @@ float thresholdValue (double db) noexcept
     return (float) (u * u);
 }
 double ratioOf (float v) noexcept { return ratioLaw (v); }
+bool isInfiniteRatio (float v) noexcept { return v >= 1.0f; }
+int auditionBand (const EffectParams& p) noexcept { return (int) std::lround (std::clamp (p[audition], 0.0f, 1.0f) * bands) - 1; }
+float levelMeterValue (double db) noexcept { return (float) std::clamp ((db + 120.0) / 120.0, 0.0, 1.0); }
+double levelMeterDb (float v) noexcept { return (double) v * 120.0 - 120.0; }
 double rangeDb (float v) noexcept { return lin (v, -30.0, 30.0); }
 double kneeDb (float v) noexcept { return lin (v, 0.0, 48.0); }
 double attackMs (float v) noexcept { return 0.11 + 89.0 * std::pow ((double) std::clamp (v, 0.0f, 1.0f), 3.9); }
@@ -1148,15 +1154,20 @@ double bandCurve (const EffectParams& p, int b, double x, bool soft = false) noe
         return 0.0;
     const bool expand = on (at (fMode));
     const auto limit = [&] (double v) { return soft ? softRange (v, std::abs (rng)) : std::min (std::abs (rng), v); };
+    // round tp172b6 [EXEC] (Pro-MB, 1 kHz stair, threshold -30, knee 0: -6.01 / -12.01 / -18.01 / -24.01 dB at 6 ... 24 dB
+    // over): the very top of the ratio is a true limit (slope 1, printed infinity : 1), whatever its parameter text
+    // says; 0.99 is still 91.9 : 1 (-5.95 dB). Only the exact top changes here; every value below keeps its law. The
+    // downward expander's top stays as it was: 54.8 : 1 and the top differ by under 0.1 dB on the same stair.
+    const auto squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / r;
     if (! expand)
     {
         if (rng < 0.0) // downward compression above the threshold
-            return -limit (kneeCurve (x - thr, 1.0 - 1.0 / r, kn));
-        return limit (kneeCurve (thr - x, 1.0 - 1.0 / r, kn)); // upward compression below it
+            return -limit (kneeCurve (x - thr, squeeze, kn));
+        return limit (kneeCurve (thr - x, squeeze, kn)); // upward compression below it
     }
     if (rng < 0.0) // downward expansion below the threshold
         return -limit (kneeCurve (thr - x, r - 1.0, kn));
-    return limit (kneeCurve (x - thr, 1.0 - 1.0 / r, kn)); // upward expansion above it
+    return limit (kneeCurve (x - thr, squeeze, kn)); // upward expansion above it
 }
 
 // round 150 [EXEC] the measured detector's time constants (fitted to Pro-MB's gain on 1 kHz steps −30 → −6 → −30 →
@@ -1474,6 +1485,7 @@ public:
             for (auto& s : row)
                 s.reset();
         delay.reset();
+        auditionDelay.reset();
         for (auto& d : bandDelay)
             d.reset();
         for (auto& d : gainDelay)
@@ -1520,10 +1532,25 @@ public:
             const auto m = std::min (chunk, n - i);
             const bool sc = sl != nullptr && sr2 != nullptr;
             processChunk (l + i, r + i, sc ? sl + i : nullptr, sc ? sr2 + i : nullptr, m, p);
+            // round tp172b6: Audition replaces the output with what the band's detector hears
+            if (auditionBand (p) >= 0 && auditionValid)
+            {
+                const auto outGain = (float) dbToGain (trimDb (p[output]));
+                for (int k = 0; k < m; ++k)
+                {
+                    l[i + k] = auditionBuffer[0][(std::size_t) k] * outGain;
+                    r[i + k] = auditionBuffer[1][(std::size_t) k] * outGain;
+                }
+            }
         }
         const auto nb = bandCount (p);
         for (int b = 0; b < bands; ++b)
+        {
             meters.set (bandMeter (b), b < nb ? (float) std::clamp (extreme[(std::size_t) b] / 30.0, -1.0, 1.0) : 0.0f);
+            // round tp172b6: the level each band's detector reads (peak), for the arc on the Threshold knob
+            meters.set (bandLevelMeter (b), b < nb ? levelMeterValue (20.0 * std::log10 (detectorPeak[(std::size_t) b] + 1.0e-12)) : 0.0f);
+            detectorPeak[(std::size_t) b] = 0.0;
+        }
         meters.set (4, inPeak);
         meters.set (5, blockPeak (l, r, n));
         scL = scR = nullptr;
@@ -1542,6 +1569,8 @@ private:
         for (int k = 0; k < ns - 1; ++k)
             slope[(std::size_t) k] = iirSlope (L.xoverSlope[(std::size_t) k]);
         const auto nb = bandCount (p);
+        const auto auditionNow = auditionBand (p) < nb ? auditionBand (p) : -1;
+        auditionValid = false;
         const auto md = (Phase) mode;
         const bool linear = md == Phase::linear, minimum = md == Phase::minimum;
         const bool freeLin = linear && freeLayout (p); // round 150: each band its own linear-phase FIR
@@ -1735,6 +1764,23 @@ private:
             for (int b = 0; b < nb; ++b)
             {
                 float g = 1.0f, g2 = 1.0f;
+                if (! enabled[(std::size_t) b] && b == auditionNow && L.segmentOf[(std::size_t) b] >= 0)
+                {
+                    // [EXEC] a switched-off band can still be auditioned: the same signals, its detector stays idle
+                    const auto unit = freeLin ? b : L.segmentOf[(std::size_t) b];
+                    float cl = bandExt[(std::size_t) b] ? sl0[L.segmentOf[(std::size_t) b]] : bl[unit];
+                    float cr = bandExt[(std::size_t) b] ? sr0[L.segmentOf[(std::size_t) b]] : br[unit];
+                    if (scFree[(std::size_t) b])
+                    {
+                        cl = bandExt[(std::size_t) b] ? extL : srcL;
+                        cr = bandExt[(std::size_t) b] ? extR : srcR;
+                        scFilter[(std::size_t) b].run (cl, cr);
+                    }
+                    auditionDelay.process (cl, cr);
+                    auditionBuffer[0][(std::size_t) i] = cl;
+                    auditionBuffer[1][(std::size_t) i] = cr;
+                    auditionValid = true;
+                }
                 if (enabled[(std::size_t) b])
                 {
                     const auto unit = freeLin ? b : L.segmentOf[(std::size_t) b];
@@ -1753,6 +1799,15 @@ private:
                         cl = ext ? sl0[seg] : bl[unit];
                         cr = ext ? sr0[seg] : br[unit];
                     }
+                    if (b == auditionNow)
+                    {
+                        float al = cl, ar = cr;
+                        auditionDelay.process (al, ar); // in time with the audio it replaces
+                        auditionBuffer[0][(std::size_t) i] = al;
+                        auditionBuffer[1][(std::size_t) i] = ar;
+                        auditionValid = true;
+                    }
+                    detectorPeak[(std::size_t) b] = std::max (detectorPeak[(std::size_t) b], (double) std::max (std::abs (cl), std::abs (cr)));
                     const auto follow = [&] (double& e, double& hold, double m) noexcept {
                         const auto x = std::max (-120.0, 20.0 * std::log10 (m + 1e-12));
                         e = x > e ? aA[(std::size_t) b] * e + (1.0 - aA[(std::size_t) b]) * x
@@ -2162,6 +2217,7 @@ private:
             const auto s = (int) std::lround (la * 0.001 * sr);
             laSamples = s;
             delay.setLength (s);
+            auditionDelay.setLength (s);
             for (auto& d : bandDelay)
                 d.setLength (s);
         }
@@ -2192,7 +2248,10 @@ private:
     std::array<peqfl::FftConvolver, bands> lin; // the split layout: one per segment below the top; free: one per band
     std::array<std::vector<float>, bands> linTable;
     LongDelay linDry, linSc;
-    StereoDelay delay;
+    StereoDelay delay, auditionDelay;
+    std::array<std::array<float, chunk>, 2> auditionBuffer {};
+    bool auditionValid = false;
+    std::array<double, bands> detectorPeak {};
     std::array<StereoDelay, maxSegments> bandDelay;
     std::array<MonoDelay, bands> gainDelay, gainDelayB;
     // round 147: the stereo link (linked part, mid- / side-only part, side mode), the free side-chain filters
@@ -2693,6 +2752,7 @@ const EffectInfo& prismInfo()
         }
         i.params.push_back ({ "Detector", 1.0f });
         i.params.push_back ({ "Revision", 1.0f }); // round 152: gain-stage attack, narrow bands, minimum width (projects saved before keep round 150's)
+        i.params.push_back ({ "Audition", 0.0f }); // round tp172b6: off, or the band whose detector signal replaces the output
         return i;
     }();
     return info;
@@ -2756,7 +2816,7 @@ std::string paramText (EffectKind kind, int param, float v)
                 return names[(int) styleOf (v)];
             }
             case threshold: return fmt ("%.1f dB", thresholdDb (v));
-            case ratio: return ratioText (ratioOf (v));
+            case ratio: return v >= 1.0f ? std::string ("\xe2\x88\x9e : 1") : ratioText (ratioOf (v));
             case knee: return fmt ("%.1f dB", kneeDb (v));
             case range: return fmt ("%.1f dB", rangeDb (v));
             case attack: return msText (attackMs (v));
@@ -2819,7 +2879,7 @@ std::string paramText (EffectKind kind, int param, float v)
             switch ((param < band5 ? param : param - band5) % fieldsPerBand)
             {
                 case fThreshold: return fmt ("%.1f dB", thresholdDb (v));
-                case fRatio: return ratioText (ratioOf (v));
+                case fRatio: return isInfiniteRatio (v) ? std::string ("\xe2\x88\x9e : 1") : ratioText (ratioOf (v));
                 case fRange: return db (rangeDb (v));
                 case fMode: return on (v) ? "expand" : "compress";
                 case fKnee: return fmt ("%.1f dB", kneeDb (v));
@@ -2859,6 +2919,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case bandLayout: return on (v) ? "free" : "split";
             case detectorLaw: return on (v) ? "measured" : "classic";
             case rev152: return on (v) ? "round 152" : "round 150";
+            case audition: return std::lround (v * bands) > 0 ? fmt ("Band %.0f", (double) std::lround (v * bands)) : std::string ("off");
             case lookahead: return v <= 0.0f ? "off" : msText (lookaheadMs (v));
             case mix: return fmt ("%.0f%%", v * 100.0);
             case input: case output: return db (trimDb (v));

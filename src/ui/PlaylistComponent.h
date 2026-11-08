@@ -80,6 +80,14 @@ public:
     void paintOverChildren (juce::Graphics& g) override;
     void resized() override;
     void setTitleBarInsets (int left, int right) override;
+    void setToolbarFitsNarrow (bool on)
+    {
+        if (on != toolbarFitsNarrow)
+        {
+            toolbarFitsNarrow = on;
+            resized();
+        }
+    }
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
@@ -184,6 +192,8 @@ private:
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
     void mergePatternClipsByKey();               // Ctrl+G
+    void mergeSimilarClipsByKey();               // Ctrl+Shift+G
+    void mergeAutomationClipsByKey();            // Ctrl+Alt+G (Ctrl+G on a selection of automation clips too)
     void makeSelectionUnique();                  // Ctrl+Shift+V
     void cloneTracksWithDialog (std::vector<int> tracks); // Ctrl+Shift+B, track menu "Clone..."
     void lockAllTracks (bool lock);              // Tools › Lock / Unlock all playlist tracks (to / from) content
@@ -354,6 +364,7 @@ private:
     void pitchSelectedAudioClips (int semitones);
     void reverseSelectedAudioClips();
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
+    bool toolbarFitsNarrow = false; // (round 181a; beside the clip grid only)
 
     double pixelsPerTick = 96.0 / (4 * ppq); // 96 px per 4-beat bar
     double scrollTicks = 0.0;
@@ -544,9 +555,49 @@ public:
         resized();
     }
 
+    // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
+    // alone, or hidden while only the Playlist shows. Small windows give the grid at least what it needs to be usable.
+    enum class GridView { beside, grid, song };
+    void setClipGrid (juce::Component* grid, GridView view)
+    {
+        if (clipGrid != nullptr && clipGrid != grid)
+            removeChildComponent (clipGrid);
+        clipGrid = grid;
+        gridView = view;
+        if (clipGrid != nullptr)
+        {
+            addChildComponent (*clipGrid);
+            clipGrid->setVisible (view != GridView::song);
+        }
+        picker.setVisible (clipGrid == nullptr || view != GridView::grid);
+        playlist.setToolbarFitsNarrow (clipGrid != nullptr && view == GridView::beside);
+        playlist.setVisible (clipGrid == nullptr || view != GridView::grid);
+        resized();
+    }
+
     void resized() override
     {
         auto area = getLocalBounds();
+        if (clipGrid != nullptr && gridView != GridView::song)
+        {
+            // (under the band the title bar shares with the Playlist's toolbar)
+            const auto top = titleLeft > 0 ? PlaylistComponent::toolbarHeight : 0;
+            if (gridView == GridView::grid)
+            {
+                clipGrid->setBounds (area.withTrimmedTop (top));
+                return;
+            }
+            clipGrid->setBounds (area.removeFromLeft (juce::jmax (juce::jmin (420, area.getWidth()), area.getWidth() * 45 / 100)).withTrimmedTop (top));
+            // a small window: the Playlist's room goes to its tracks; the toolbar's pattern box still picks a pattern
+            const auto pickerFits = area.getWidth() >= PatternPicker::width + 480;
+            picker.setVisible (pickerFits);
+            if (! pickerFits)
+            {
+                picker.setBounds (area.withWidth (0));
+                playlist.setBounds (area);
+                return;
+            }
+        }
         auto column = area.removeFromLeft (PatternPicker::width);
         picker.setBounds (titleLeft > 0 ? column.withTrimmedTop (PlaylistComponent::toolbarHeight) : column);
         playlist.setBounds (area);
@@ -554,15 +605,19 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::colour::bg3); // the toolbar band above the picker
-        g.fillRect (0, 0, PatternPicker::width, PlaylistComponent::toolbarHeight);
+        // the toolbar band above the picker (and above the grid, when one is beside the Playlist)
+        const auto bandWidth = clipGrid != nullptr ? picker.getRight() : PatternPicker::width;
+        g.setColour (theme::colour::bg3);
+        g.fillRect (0, 0, bandWidth, PlaylistComponent::toolbarHeight);
         g.setColour (theme::colour::border);
-        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, PatternPicker::width, 1);
+        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, bandWidth, 1);
     }
 
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
     int titleLeft = 0;
+    juce::Component* clipGrid = nullptr;
+    GridView gridView = GridView::beside;
 };
 } // namespace lynx

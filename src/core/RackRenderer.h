@@ -20,10 +20,12 @@
 #include "core/Effects.h"
 #include "core/HardwareOutput.h"
 #include "core/Instruments.h"
+#include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
 #include "core/Meters.h"
 #include "core/Pdc.h"
+#include "core/ClipLauncher.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
 #include "core/Vfx.h"
@@ -67,6 +69,11 @@ struct RackState
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
+    // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
+    // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
+    // marked as followers: they bind nothing and compute nothing.
+    std::vector<std::vector<int>> automationGroups;
+    std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
@@ -99,6 +106,11 @@ struct RackState
     std::shared_ptr<LiveLevels> live;
     ScheduleIndex schedule; // index to schedule the Playlist without scanning every note
     std::vector<int> performanceZone; // Performance mode: the zone's clips (perf::zoneClips), empty when off
+    // The Clip-launch workflow's grid (core/ClipLauncher.h): the engine's runtime while the song has a grid, else nullptr
+    // (always, in an export). `launchers`: Performance mode has a zone, or there is a grid.
+    launcher::Runtime* clipLauncher = nullptr;
+    launcher::GridIndex gridIndex;
+    bool launchers = false;
     int tempoAutomation = -1; // tempo automation, if any
     bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
@@ -240,7 +252,9 @@ struct RackState
     using PluginEffectFactory = std::function<std::shared_ptr<Effect> (const PluginRef&, double sampleRate)>;
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
-    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method, double semitones)>;
+    // `map`: the channel's warp map (core/TimeStretch warpStretchMap; empty = one ratio)
+    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
+                                                                                     double semitones, const StretchMap& map)>;
 
     struct Factories
     {
@@ -248,6 +262,7 @@ struct RackState
         StretchedSampleProvider stretchedSamples;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
     };
 
     // Builds the next state reusing the instruments from `previous` when the
@@ -280,7 +295,7 @@ struct ProcessTimes
     // Live meters of the effects that have them (the mixing suite's gain reduction, REA round 96; LYNX Tune's pitch and
     // Facet EQ's dynamic gains, round 103; the dynamics suite's band gains and levels, round 108), always published:
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
-    static constexpr int meterOutputs = 8;
+    static constexpr int meterOutputs = 14; // (round tp172b6: 8 ... 13 = Prism's band detector levels)
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * meterOutputs> effectMeters {};
     // Round 170c (issue #14, "everything is a shell"): any slot's input and output peaks for an editor's level meter
     // (FL's live meters in Soft Clipper, Multiband Compressor, Transient Processor, Balance...). An open editor counts
@@ -533,6 +548,8 @@ private:
     perf::Player perfPlayer;
     double perfClock = 0.0;      // the Player's steady clock (ticks): the transport's position, never wrapping
     bool perfRunning = false;
+    bool launchersRunning = false;                 // the launchers' branch of the block is on (Performance mode, the grid)
+    launcher::Runtime* runningLauncher = nullptr;  // the grid's runtime while it plays
     std::vector<float> hwScratch; // 2 × blockCapacity
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
     int liveInputOffset = 0; // of the chunk within the process() block
