@@ -492,6 +492,7 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
                 def.sampler.slices.push_back ((float) ((double) p / (double) frames));
     def.sampler.sliceFirstKey = firstNote (state);
     def.sampler.slicesToEnd = state.playToEnd != 0;
+    def.sampler.slicesCutAtEnd = true; // its voice ends with the slice (FL render: exact silence right after it)
     // The voice: Fruity Slicer's voices run the plugin voice processor (FUN_00756d30) with the state's 364-byte block —
     // the five articulators (the volume envelope's release is what a note-off plays, FL render round 180c), Mod X / Y
     // and the filter type. LYNX's sampler runs the same records as FL's channel voice (REA_rodada69 §3, REA_rodada76).

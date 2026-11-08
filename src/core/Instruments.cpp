@@ -1501,6 +1501,7 @@ struct SamplerVoice
     std::int64_t tickIndex = 0;
     double nextGap = 0.0;             // samples from this tick to the next one on the song's grid
     int endFade = -1;                 // ≥ 0: past the sample's end, the last frame fading out (FL's 10 ms end fade)
+    bool cutAtEnd = false;            // Fruity Slicer: no end fade, the voice ends with its slice
     bool endByDeclicker = false;      // that fade is the declicking mode's release (modes 1–5, round 167k)
     int offFade = -1;                 // ≥ 0: a looping voice fading out after its note-off (the same table)
     float holdL = 0.0f, holdR = 0.0f; // the last frame read
@@ -1652,6 +1653,7 @@ public:
             table.starts[(std::size_t) i] = std::clamp (s.slices[(std::size_t) i], 0.0f, 1.0f);
         table.firstKey = s.sliceFirstKey;
         table.toEnd = s.slicesToEnd;
+        table.cutAtEnd = s.slicesCutAtEnd;
         sliceMailbox.write (table);
         bpm.store (std::max (1.0, songBpm));
     }
@@ -1794,6 +1796,7 @@ public:
         target->position = startFrame;
         target->first = first;
         target->last = last;
+        target->cutAtEnd = sliced && slices.cutAtEnd;
         target->clipElapsed = clipFades[0];
         target->clipRemaining = clipFades[1];
         target->fadeIn = clipFades[2];
@@ -2663,6 +2666,11 @@ public:
                 // REA_rodada167k §10: 20 / 20 / 100 / 200 ms, mode 1 the follower, mode 5 curved).
                 if (v.endFade < 0 && ((double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first))
                 {
+                    if (v.cutAtEnd)
+                    {
+                        ended = true;
+                        break;
+                    }
                     v.endFade = 0;
                     if (! v.stolen && declickMode.load (std::memory_order_relaxed) != 0)
                     {
@@ -2943,6 +2951,7 @@ private:
         int count = 0;
         int firstKey = 60;   // Fruity Slicer: the key of slice 1
         bool toEnd = false;  // Fruity Slicer's "play to end"
+        bool cutAtEnd = false; // Fruity Slicer: the voice stops dead at the slice's end
     };
     SettingsMailbox<SliceTable> sliceMailbox;
     SliceTable slices; // audio thread's copy

@@ -290,6 +290,7 @@ struct SamplerSettings
     // end" (a slice plays on to the sample's end instead of stopping at the next slice)
     int sliceFirstKey = 60;
     bool slicesToEnd = false;
+    bool slicesCutAtEnd = false; // Fruity Slicer: a slice's voice stops at its end (no 10 ms end fade; FL render)
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats
     float cutoff = 20000.0f;   // channel filter (Hz); low-pass at 20 kHz with no resonance = off
