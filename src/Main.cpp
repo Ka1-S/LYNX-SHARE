@@ -2414,14 +2414,26 @@ private:
             b.fadeOut = 0;
             b.fadeIn = 20;
             b.fadeCurve = 1;
-            song.playlist = { a, b };
+            // round 180d's FL fade fields (indices 17..20) and the comp curve (index 21) on one clip, all kept
+            auto c = a;
+            c.start = 4 * lynx::ppq;
+            c.fadeIn = 30;
+            c.fadeInTension = -0.75f;
+            c.fadeOutTension = 0.5f;
+            c.linearFades = 2;
+            c.flFadeFlags = 0x1234u;
+            c.fadeCurve = 3;
+            song.playlist = { a, b, c };
             song.compCrossfadeMs = 12.5f;
             song.playlistTracks.resize (2);
             song.playlistTracks[0].compTrack = true;
             song.playlistTracks[1].grouped = true;
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
             const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
-            compOk = back && back->playlist.size() == 2 && back->playlist[0].fadeCurve == 2 && back->playlist[1].fadeCurve == 1
+            const auto* both = back && back->playlist.size() == 3 ? &back->playlist[2] : nullptr;
+            compOk = back && back->playlist.size() == 3 && back->playlist[0].fadeCurve == 2 && back->playlist[1].fadeCurve == 1
+                     && both != nullptr && both->fadeCurve == 3 && both->fadeInTension == -0.75f && both->fadeOutTension == 0.5f
+                     && both->linearFades == 2 && both->flFadeFlags == 0x1234u && both->fadeIn == 30
                      && back->playlist[1].fadeIn == 20 && back->compCrossfadeMs == 12.5f && back->playlistTracks[0].compTrack && ! back->playlistTracks[1].compTrack && plainBack
                      && plainBack->compCrossfadeMs == lynx::Song::defaultCompCrossfadeMs && ! plain.contains ("compCrossfadeMs") && ! plain.contains ("playlistCompTracks");
         }

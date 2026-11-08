@@ -352,3 +352,11 @@ and Flatten are in the core and have no UI until slice 177c-2.
   "add these takes to the comp" is possible; not built, and not asked for.
 - Live .als take-lane import: `core/AlsImport` landed (round 175a); whether it maps `TakeLanes` to lanes is not part of this
   round (ALS-FORMAT.md documents them).
+
+## 14. Living with round 180d's FL fades (merge of 2026-11-08)
+
+Round 180d (FL's fade tension, straight fades, FL's fade flags) landed first and owns the clip array's indices 17-20. The comp
+curve (`Clip::fadeCurve`) is saved at index 21, written only when it is not 0; no released LYNX wrote it at 17. The voice keeps
+180d's rules (FL's S curve by default, `(i+1)/(N+1)`, tension) and the comp crossfade's equal-power curve (shape bits 3 / 4)
+wins over them, without tension. FLP export is 180d's: a comp crossfade goes to FL as an ordinary fade of the same length (FL
+has no equal-power curve). Selftest `comp_crossfades` saves and loads one clip with every one of these fields.
