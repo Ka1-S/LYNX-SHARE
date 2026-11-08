@@ -409,6 +409,8 @@ juce::var rackToVar (const RackDoc& r)
     };
     auto zone = [&] (const RackZone& z) { return ints ({ z.lo, z.hi, z.fadeLo, z.fadeHi }); };
     o->setProperty ("kind", (int) r.kind);
+    if (! r.name.empty())
+        o->setProperty ("name", str (r.name));
     juce::Array<juce::var> chains;
     for (const auto& c : r.chains)
     {
@@ -492,6 +494,7 @@ RackDoc rackFromVar (const juce::var& v, int nodeCount)
 {
     RackDoc r;
     r.kind = (RackDoc::Kind) juce::jlimit (0, 2, (int) v.getProperty ("kind", 0));
+    r.name = v.getProperty ("name", "").toString().toStdString();
     const auto node = [nodeCount] (const juce::var& x) { const auto n = (int) x; return n >= 0 && n < nodeCount ? n : -1; };
     const auto zone = [] (const juce::var& a, RackZone fallback) {
         if (! a.isArray() || a.size() != 4)

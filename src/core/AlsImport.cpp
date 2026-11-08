@@ -566,6 +566,12 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         target.target = RackMapping::Target::selector;
         mapInto (doc, *m, target, (float) (m->min / 127.0), (float) (m->max / 127.0));
     }
+    // a mapped parameter follows its macro (Live drives it from the macro; its own stored value may be an old one [DATA:
+    // a chain volume stored at 0 dB under a macro that puts it at −9.6 dB])
+    for (int k = 0; k < rackMacroCount; ++k)
+        if (! rack::rackOf (doc)->macros[(std::size_t) k].mappings.empty())
+            rack::setMacro (doc, k, rack::rackOf (doc)->macros[(std::size_t) k].value);
+    rack::rackOf (doc)->name = device.value ("UserName");
     rack::compile (doc);
     ctx.note (&FlpImportReport::converted, instrumentRack ? "Instrument rack" : "Audio effect rack");
     return true;

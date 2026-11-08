@@ -54,6 +54,9 @@ public:
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseMove (const juce::MouseEvent& e) override;
 
+    // The title bar's on / off switch (a mixer slot's or a channel's): its state and its toggle (window header only)
+    void setPowerSwitch (std::function<bool()> isOn, std::function<void()> toggle);
+
     // (tests and shots) Map mode on / off
     void setMapMode (bool on);
     bool mapMode() const noexcept { return mapping; }

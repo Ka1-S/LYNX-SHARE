@@ -1078,6 +1078,7 @@ struct RackDoc
 {
     enum class Kind : std::uint8_t { audioEffect, instrument, midiEffect };
     Kind kind = Kind::audioEffect;
+    std::string name; // the user's name for the rack ("" = its kind's), shown in its title bar
     std::vector<RackChain> chains;
     std::array<RackMacro, rackMacroCount> macros {};
     int shownMacros = 8;        // 1, 2, 4 … 16

@@ -11,24 +11,45 @@ namespace lynx::rack
 // ---------------------------------------------------------------------------------------------------------------
 // Laws
 
+// Live's chain-volume taper (REA §4 [DATA]): 0 dB at 0.85, 40 dB per unit from −18 dB (0.4) up to +6 dB (1); below, the
+// stored points of Live's own racks, linear in dB between them, down to −70 dB, Live's floor (shown as −inf) at 0.
+namespace
+{
+constexpr float taperT[] { 0.0f, 0.143f, 0.22f, 0.282f, 0.329f, 0.36f, 0.4f };
+constexpr float taperDb[] { -70.0f, -42.0f, -32.0f, -25.69f, -22.0f, -20.0f, -18.0f };
+constexpr int taperPoints = 7;
+} // namespace
+
 float volumeGain (float v) noexcept
 {
     v = std::clamp (v, 0.0f, 1.0f);
     if (v <= 0.0f)
         return 0.0f;
-    if (v >= 0.4f) // 40 dB per unit, 0 dB at 0.85 (REA §4 [DATA], 0.4 = −18 dB)
-        return std::pow (10.0f, 40.0f * (v - unityVolume) / 20.0f);
-    return 0.12589254f * std::pow (v / 0.4f, 2.75f); // (continuous at −18 dB; fitted within 1 dB to Live's values)
+    float db = 0.0f;
+    if (v >= 0.4f)
+        db = 40.0f * (v - unityVolume);
+    else
+        for (int i = 1; i < taperPoints; ++i)
+            if (v <= taperT[i])
+            {
+                const auto f = (v - taperT[i - 1]) / (taperT[i] - taperT[i - 1]);
+                db = taperDb[i - 1] + (taperDb[i] - taperDb[i - 1]) * f;
+                break;
+            }
+    return std::pow (10.0f, db / 20.0f);
 }
 
 float volumeValue (float gain) noexcept
 {
-    if (! (gain > 0.0f))
+    if (! (gain > 0.0003163f)) // (Live's floor, −70 dB, is the bottom)
         return 0.0f;
     const auto db = 20.0f * std::log10 (gain);
     if (db >= -18.0f)
         return std::clamp (unityVolume + db / 40.0f, 0.0f, 1.0f);
-    return std::clamp (0.4f * std::pow (gain / 0.12589254f, 1.0f / 2.75f), 0.0f, 1.0f);
+    for (int i = 1; i < taperPoints; ++i)
+        if (db <= taperDb[i])
+            return taperT[i - 1] + (taperT[i] - taperT[i - 1]) * (db - taperDb[i - 1]) / (taperDb[i] - taperDb[i - 1]);
+    return 0.4f;
 }
 
 void panGains (float pan, float& left, float& right) noexcept

@@ -83,6 +83,8 @@ struct RackView::Impl
     std::vector<std::unique_ptr<ctlui::Knob>> knobs;
     juce::TextButton rand { "Rand" }, map { "Map" };
     std::uint32_t seed = 0x183c183cu;
+    std::function<bool()> isOn;
+    std::function<void()> toggleOn;
     int lastWidth = 0;
 
     // the sections laid out by place()
@@ -350,6 +352,7 @@ struct RackView::Impl
         return { rowsArea.getX() + (m % cols) * macroWidth, rowsArea.getY() + (m / cols) * cellH, macroWidth, cellH };
     }
 
+    juce::Rectangle<int> powerLed() const { return { header.getX() + 7, header.getCentreY() - 5, 10, 10 }; }
     juce::Rectangle<int> columnButton (int k) const { return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 }; }
     juce::Rectangle<int> chainRow (int c) const { return { chains.getX(), chains.getY() + headerStrip + c * rowHeight, chains.getWidth(), rowHeight }; }
     juce::Rectangle<int> zoneRow (int c) const { return { zones.getX() + 6, zones.getY() + headerStrip + c * rowHeight, zones.getWidth() - 12, rowHeight }; }
@@ -394,13 +397,19 @@ struct RackView::Impl
         {
             g.setColour (col::bg3);
             g.fillRect (header);
+            if (isOn) // the on / off LED (Live's title bar [SHOT])
+            {
+                g.setColour (isOn() ? col::ledOn : col::ledOff);
+                g.fillEllipse (powerLed().toFloat());
+            }
             g.setColour (col::textPrimary);
             g.setFont (theme::font (theme::type::small, true));
-            auto title = r->kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r->kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
+            auto title = ! r->name.empty() ? str (r->name)
+                         : r->kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r->kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
             if (r->kind == RackDoc::Kind::midiEffect)
                 title << "  -  " << (r->children.empty() ? tr ("No children yet: select channels in the Channel Rack, then use Set children in the chain menu.")
                                                           : tr ("Plays {0} channels", { juce::String ((int) r->children.size()) }));
-            g.drawText (title, header.reduced (8, 0), juce::Justification::centredLeft);
+            g.drawText (title, header.reduced (8, 0).withTrimmedLeft (isOn ? 16 : 0), juce::Justification::centredLeft);
             g.setFont (theme::font (theme::type::caption));
         }
 
@@ -701,6 +710,10 @@ struct RackView::Impl
         const auto p = e.getPosition();
         drag = Drag::none;
         dragStart = p;
+        if (ownHeader && toggleOn && powerLed().expanded (3).contains (p))
+            return toggleOn();
+        if (ownHeader && header.contains (p) && e.getNumberOfClicks() > 1)
+            return renameRack();
 
         for (int k = 0; k < 6; ++k)
             if (columnButton (k).contains (p))
@@ -1028,6 +1041,13 @@ struct RackView::Impl
                                       done (box->getTextEditorContents ("name").trim());
                               }),
                               true);
+    }
+
+    void renameRack()
+    {
+        askName (tr ("Rename"), str (rack()->name), [this] (juce::String n) {
+            edit ([n] (PatcherDoc& d) { rack::rackOf (d)->name = n.toStdString(); });
+        });
     }
 
     void renameChain (int c)
@@ -1442,6 +1462,13 @@ struct MapListPopup final : juce::Component, private juce::Timer
 };
 } // namespace
 
+void RackView::setPowerSwitch (std::function<bool()> isOn, std::function<void()> toggle)
+{
+    impl->isOn = std::move (isOn);
+    impl->toggleOn = std::move (toggle);
+    repaint();
+}
+
 void RackView::setMapMode (bool on)
 {
     mapping = on;
@@ -1547,8 +1574,22 @@ std::unique_ptr<RackView> makeSlotView (AudioEngine& engine, int track, int slot
     t.kind = AutomationTargetKind::effectParam;
     t.index = track;
     t.slot = slot;
-    return std::make_unique<RackView> (engine, slotLocator (track, slot), t, "rack-fx-" + juce::String (track) + "-" + juce::String (slot), ownHeader,
-                                       [&engine, track, slot] (int n) { PatcherWindows::openNodeEditor (engine, false, track, slot, n); });
+    auto view = std::make_unique<RackView> (engine, slotLocator (track, slot), t, "rack-fx-" + juce::String (track) + "-" + juce::String (slot), ownHeader,
+                                            [&engine, track, slot] (int n) { PatcherWindows::openNodeEditor (engine, false, track, slot, n); });
+    auto slotOf = [&engine, track, slot] () -> const EffectSlot* {
+        const auto& song = engine.getSong();
+        return track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size()
+                   ? &song.mixer[(std::size_t) track].effects[(std::size_t) slot]
+                   : nullptr;
+    };
+    view->setPowerSwitch ([slotOf] { const auto* s = slotOf(); return s != nullptr && s->enabled; },
+                          [&engine, track, slot] {
+                              engine.editSong ([track, slot] (Song& song) {
+                                  if (track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size())
+                                      song.mixer[(std::size_t) track].effects[(std::size_t) slot].enabled = ! song.mixer[(std::size_t) track].effects[(std::size_t) slot].enabled;
+                              });
+                          });
+    return view;
 }
 
 std::unique_ptr<RackView> makeChannelView (AudioEngine& engine, int channel, bool ownHeader)
@@ -1556,8 +1597,19 @@ std::unique_ptr<RackView> makeChannelView (AudioEngine& engine, int channel, boo
     AutomationTarget t;
     t.kind = AutomationTargetKind::channelParam;
     t.index = channel;
-    return std::make_unique<RackView> (engine, channelLocator (channel), t, channelKey (channel), ownHeader,
-                                       [&engine, channel] (int n) { PatcherWindows::openNodeEditor (engine, true, channel, 0, n); });
+    auto view = std::make_unique<RackView> (engine, channelLocator (channel), t, channelKey (channel), ownHeader,
+                                            [&engine, channel] (int n) { PatcherWindows::openNodeEditor (engine, true, channel, 0, n); });
+    view->setPowerSwitch ([&engine, channel] {
+                              const auto& song = engine.getSong();
+                              return channel >= 0 && channel < (int) song.channels.size() && ! song.channels[(std::size_t) channel].muted;
+                          },
+                          [&engine, channel] {
+                              engine.editSong ([channel] (Song& song) {
+                                  if (channel >= 0 && channel < (int) song.channels.size())
+                                      song.channels[(std::size_t) channel].muted = ! song.channels[(std::size_t) channel].muted;
+                              });
+                          });
+    return view;
 }
 
 void openSlot (AudioEngine& engine, int track, int slot)

@@ -363,7 +363,7 @@ struct Exporter
         if (out.name.empty())
             return false;
         out.value ("On/Manual", boolean (on));
-        out.value ("UserName", label);
+        out.value ("UserName", ! r->name.empty() ? r->name : label);
         // where each node went: its device element, to put the macro mappings on
         std::map<int, std::pair<int, int>> placeOf; // node → (chain, device index)
         auto* branches = out.child ("Branches");

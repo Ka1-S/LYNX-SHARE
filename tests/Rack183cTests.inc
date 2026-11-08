@@ -492,7 +492,10 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
     CHECK (r.chains[0].name == "Dry" && r.chains[1].name == "EQ Eight"); // (no user name: Live's effective name)
     CHECK (r.chains[0].nodes.size() == 1 && r.chains[1].nodes.empty());
     CHECK (r.chains[0].select == (RackZone { 0, 63, 0, 40 }) && r.chains[1].select == (RackZone { 40, 127, 63, 127 }));
-    CHECK (approx (r.chains[1].volume, 0.5f) && approx (r.chains[1].pan, -0.25f));
+    // chain 2's volume follows its macro (2, at 10 of 127, mapped from Live's floor to 0 dB), not its stored 0.5: Live drives a
+    // mapped parameter from the macro
+    CHECK (approx (r.chains[1].volume, rack::volumeGain (rack::unityVolume * 10.0f / 127.0f), 1.0e-5f) && approx (r.chains[1].pan, -0.25f));
+    CHECK (approx (20.0f * std::log10 (rack::volumeGain (rack::unityVolume * 91.0f / 127.0f)), -9.637f, 0.01f)); // (Live's -9.637 dB [SHOT])
     CHECK (r.macros[0].name == "Tone" && r.macros[1].name.empty() && r.macros[2].name == "Level" && r.macros[0].value == 64.0f && r.macros[3].excludeFromRandom);
     CHECK (r.shownMacros == 4 && r.selector == 20.0f);
     // the mappings: macro 3 → the plugin's parameter 1 (0.2…0.8); macro 2 → chain 2's volume; macro 1 → the selector

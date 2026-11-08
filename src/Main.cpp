@@ -1276,6 +1276,46 @@ public:
             return;
         }
 
+        if (args.contains ("--jsonroundtrip"))
+        {
+            // LYNX.exe --jsonroundtrip <folder>: round 183c's finding — a project saved, loaded and saved again: both texts
+            // (a.json, b.json) and the first lines that differ (diff.txt) for the default song, with and without a Patcher
+            const auto i = args.indexOf ("--jsonroundtrip");
+            const juce::File out (args[i + 1].unquoted());
+            out.createDirectory();
+            juce::String report;
+            auto check = [&] (const lynx::Song& song, const juce::String& name) {
+                const auto a = lynx::ProjectFile::toJson (song);
+                juce::String error;
+                const auto back = lynx::ProjectFile::fromJson (a, error);
+                const auto b = back ? lynx::ProjectFile::toJson (*back) : juce::String ("(not loaded: " + error + ")");
+                out.getChildFile (name + "-a.json").replaceWithText (a);
+                out.getChildFile (name + "-b.json").replaceWithText (b);
+                juce::StringArray la, lb;
+                la.addLines (a);
+                lb.addLines (b);
+                report << name << ": " << (a == b ? "stable" : "DIFFERS") << " (" << la.size() << " / " << lb.size() << " lines)\n";
+                int shown = 0;
+                for (int k = 0; k < juce::jmax (la.size(), lb.size()) && shown < 12; ++k)
+                    if (la[k] != lb[k])
+                    {
+                        report << "  line " << (k + 1) << "\n    a: " << la[k].trim().substring (0, 200) << "\n    b: " << lb[k].trim().substring (0, 200) << "\n";
+                        ++shown;
+                    }
+            };
+            auto song = lynx::Song::makeDefault();
+            check (song, "default");
+            song.mixer.resize (3);
+            song.mixer[1].effects = { lynx::makeEffectSlot (lynx::EffectKind::patcher) };
+            check (song, "patcher");
+            song.mixer[1].effects = { lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect) };
+            check (song, "rack");
+            out.getChildFile ("diff.txt").replaceWithText (report);
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
         if (args.contains ("--rackshot"))
         {
             // LYNX.exe --rackshot <folder>: round 183c's Rack view drawn off-screen (no window), for the LYNX | Live pairs:
@@ -1283,7 +1323,8 @@ public:
             // with the mapping list), rack-instrument.png (an Instrument Rack with its key zones)
             const auto i = args.indexOf ("--rackshot");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
-            setApplicationReturnValue (runRackShots (juce::File (args[i + 1].unquoted())) ? 0 : 1);
+            const auto set = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runRackShots (juce::File (args[i + 1].unquoted()), set) ? 0 : 1);
             quit();
             return;
         }
@@ -7524,7 +7565,7 @@ private:
             png.writeImageToStream (image, *stream);
     }
 
-    bool runRackShots (const juce::File& out)
+    bool runRackShots (const juce::File& out, const juce::String& liveSet = {})
     {
         out.createDirectory();
         lynx::AudioEngine offline (false);
@@ -7624,6 +7665,39 @@ private:
         offline.dispatchPendingMessages();
 
         bool ok = true;
+        // [set.als]: a Live set's racks as LYNX imports them, the one with the most chains drawn with its title bar (the
+        // like-for-like pair with Live's own picture of that set)
+        if (liveSet.isNotEmpty())
+        {
+            juce::MemoryBlock bytes;
+            juce::File (liveSet).loadFileAsData (bytes);
+            const std::vector<std::uint8_t> data ((const std::uint8_t*) bytes.getData(), (const std::uint8_t*) bytes.getData() + bytes.getSize());
+            lynx::AlsImportOptions o;
+            o.common.projectFolder = juce::File (liveSet).getParentDirectory().getFullPathName().toStdString();
+            std::string error;
+            if (auto imported = lynx::importAls (data, o, &error))
+            {
+                int bestTrack = -1, bestSlot = -1;
+                std::size_t most = 0;
+                for (int t = 0; t < (int) imported->mixer.size(); ++t)
+                    for (int s = 0; s < (int) imported->mixer[(std::size_t) t].effects.size(); ++s)
+                        if (const auto& fx = imported->mixer[(std::size_t) t].effects[(std::size_t) s]; lynx::rack::isRack (fx) && fx.patcher.rack[0].chains.size() > most)
+                            most = fx.patcher.rack[0].chains.size(), bestTrack = t, bestSlot = s;
+                if (bestTrack >= 0)
+                {
+                    offline.setSong (std::move (*imported));
+                    offline.dispatchPendingMessages();
+                    auto view = lynx::RackWindows::makeSlotView (offline, bestTrack, bestSlot, true);
+                    view->setSize (view->preferredWidth (228), 228);
+                    ok = save (*view, "rack-live-import.png") && ok;
+                    view->setMapMode (true);
+                    view->setSize (view->preferredWidth (228), 228);
+                    ok = save (*view, "rack-live-import-map.png") && ok;
+                    return ok;
+                }
+            }
+            return false;
+        }
         {
             auto view = lynx::RackWindows::makeSlotView (offline, 1, 0, false);
             view->setSize (view->preferredWidth (206), 206);

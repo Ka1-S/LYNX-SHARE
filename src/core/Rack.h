@@ -45,8 +45,8 @@ constexpr float unityVolume = 0.85f; // 0 dB on Live's chain volume taper
 // The "rack chain mixer" effect (EffectKind::rackMixer): volume × chain-select gain, then pan, ramped over each block
 std::unique_ptr<Effect> makeChainMixer();
 
-// Live's chain-volume taper (REA §4 [DATA]: 40 dB per unit above −18 dB, 0 dB at 0.85, +6 dB at 1; below, a power law
-// fitted to Live's stored values within 1 dB): 0..1 → linear gain (0 = silence), and back.
+// Live's chain-volume taper (REA §4 [DATA]: 40 dB per unit above −18 dB, 0 dB at 0.85, +6 dB at 1; below, Live's stored
+// points down to −70 dB at the bottom, Live's floor): 0..1 → linear gain (0 = silence), and back.
 float volumeGain (float v) noexcept;
 float volumeValue (float gain) noexcept;
 // The chain mixer's pan law: −1..1 → left / right gains (Live's, measured: equal power, +3 dB at the ends)
