@@ -7880,3 +7880,10 @@ countries: de at ch li lu
 
 # --- Simple workflow: track headers (round 184a)
 "Drop a loop, audio or MIDI file here" = "Loop, Audio- oder MIDI-Datei hier ablegen"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Spur: [LMB] ihre Mixer-Spur stumm / laut schalten"
+"Track: [LMB] solo its mixer track" = "Spur: [LMB] ihre Mixer-Spur solo schalten"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Spurlautstärke: [LMB] klicken oder ziehen  [Shift] fein  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Spur-Panorama: [LMB] nach oben / unten ziehen  [Shift] fein  [2xLMB] Mitte"
+"Track effects: [LMB] open the effects of its mixer track" = "Spureffekte: [LMB] die Effekte ihrer Mixer-Spur öffnen"

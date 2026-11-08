@@ -7880,3 +7880,10 @@ countries: ru by kz
 
 # --- Simple workflow: track headers (round 184a)
 "Drop a loop, audio or MIDI file here" = "Перетащите сюда луп, аудио- или MIDI-файл"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Дорожка: [LMB] заглушить / включить её дорожку микшера"
+"Track: [LMB] solo its mixer track" = "Дорожка: [LMB] соло её дорожки микшера"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Громкость дорожки: [LMB] щелчок или перетаскивание  [Shift] точно  [2xLMB] 0 дБ"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Панорама дорожки: [LMB] тянуть вверх / вниз  [Shift] точно  [2xLMB] центр"
+"Track effects: [LMB] open the effects of its mixer track" = "Эффекты дорожки: [LMB] открыть эффекты её дорожки микшера"

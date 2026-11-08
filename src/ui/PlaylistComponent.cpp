@@ -6365,7 +6365,8 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         return;
     }
     if (hover.header)
-        cursor = hover.led || hover.arrow || hover.arm || hover.input ? gesture::Cursor::point : gesture::Cursor::normal;
+        cursor = hover.led || hover.arrow || hover.arm || hover.input || hover.solo || hover.volume || hover.pan || hover.fx ? gesture::Cursor::point
+                                                                                                                         : gesture::Cursor::normal;
     else if (gridArea().contains (p))
     {
         const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
@@ -6401,6 +6402,24 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         hint.text = tr ("Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height");
         hint.value = juce::String (heightOf (h.divider)) + " px";
+        return hint;
+    }
+
+    if (h.header && simpleInsert (h.track) > 0 && (h.led || h.solo || h.volume || h.pan || h.fx))
+    {
+        // the Simple headers (round 184a): their controls are the track's mixer track's
+        const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
+        hint.text = h.led      ? tr ("Track: [LMB] mute / unmute its mixer track")
+                    : h.solo   ? tr ("Track: [LMB] solo its mixer track")
+                    : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
+                    : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
+                               : tr ("Track effects: [LMB] open the effects of its mixer track");
+        if (h.volume)
+            hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
+        else if (h.pan)
+            hint.value = juce::String (juce::roundToInt (m.pan * 100.0f));
+        else
+            hint.value = trackName (h.track);
         return hint;
     }
 

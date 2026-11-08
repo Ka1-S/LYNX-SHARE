@@ -7880,3 +7880,10 @@ countries: kr
 
 # --- Simple workflow: track headers (round 184a)
 "Drop a loop, audio or MIDI file here" = "여기에 루프, 오디오 또는 MIDI 파일을 놓으세요"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "트랙: [LMB] 믹서 트랙 음소거 / 해제"
+"Track: [LMB] solo its mixer track" = "트랙: [LMB] 믹서 트랙 솔로"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "트랙 볼륨: [LMB] 클릭 또는 드래그  [Shift] 미세  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "트랙 팬: [LMB] 위 / 아래로 드래그  [Shift] 미세  [2xLMB] 가운데"
+"Track effects: [LMB] open the effects of its mixer track" = "트랙 이펙트: [LMB] 믹서 트랙의 이펙트 열기"

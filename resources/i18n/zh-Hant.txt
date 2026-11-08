@@ -7880,3 +7880,10 @@ countries: tw hk mo
 
 # --- Simple workflow: track headers (round 184a)
 "Drop a loop, audio or MIDI file here" = "將循環素材、音訊或 MIDI 檔案拖放到這裡"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "音軌：[LMB] 將其混音器軌道靜音 / 取消靜音"
+"Track: [LMB] solo its mixer track" = "音軌：[LMB] 獨奏其混音器軌道"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "音軌音量：[LMB] 點擊或拖曳  [Shift] 微調  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "音軌聲像：[LMB] 上下拖曳  [Shift] 微調  [2xLMB] 置中"
+"Track effects: [LMB] open the effects of its mixer track" = "音軌效果：[LMB] 開啟其混音器軌道的效果"
