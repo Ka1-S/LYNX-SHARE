@@ -4,6 +4,7 @@
 #include "ui/AdrWindow.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
 #include "ui/FileChoosers.h"
@@ -510,6 +511,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
+    playlist.onViewOptionChanged = [this] { saveUiSettings(); };
     playlist.onOpenInSampler = [this] (int channel) {
         // the audio clip's file in a new Sampler channel (to play it from notes), its settings open
         const auto& song = engine.getSong();
@@ -1568,6 +1570,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);
+    // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
+    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (chord).taken, typingIntoText))
+        return keyPressed (key);
     const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
     return ! action.empty() && runAction (action);
 }
@@ -1984,6 +1989,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
+            autolanes::setShown (on);
         else if (key == "alternateUndo")
             alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
@@ -2050,6 +2057,8 @@ void MainComponent::loadUiSettings()
             chordShowNearHint = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
+        else if (key == "autoClipsAtPlayback")
+            autoclipplace::setAtPlayback (on);
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
             startInClipLaunchWorkflow = on;
         else if (key == "lanesBeforeClipLaunch")
@@ -2188,6 +2197,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
@@ -2217,6 +2227,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
+                                      + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
@@ -2726,6 +2737,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
+            action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
             action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
@@ -5609,6 +5621,7 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
+        o.autoClipsAtPlayback = autoclipplace::atPlayback();
         o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -5688,6 +5701,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
         self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
@@ -6289,6 +6303,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             pianoRoll.runAction ("pianoRoll.chordProgression");
         });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
+        menu.addItem (tr ("Modulators..."), [this] { openModulators (engine); }); // round 177b: LYNX's own (FL has none)
         // FL's Clipboard and Score logger sections, in FL's place (round 181b)
         menu.addSectionHeader (tr ("Clipboard"));
         menu.addItem (tr ("Save audio clipboard to browser"), audioclipboard::hasAudio(), false, [this] { saveClipboardToBrowser (false); });

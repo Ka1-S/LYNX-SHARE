@@ -2287,11 +2287,56 @@ juce::String toJson (const Song& song, bool stampVersion)
                 curve.add (juce::roundToInt (v * 10000.0f) / 10000.0);
             o->setProperty ("curve", curve);
         }
+        if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
+        {
+            juce::Array<juce::var> amp;
+            for (const auto& pt : l.amp)
+                amp.add (juce::Array<juce::var> { (juce::int64) pt.tick, (double) pt.value, (double) pt.tension });
+            o->setProperty ("lfo", juce::Array<juce::var> { l.on, l.level, l.add, l.flags, l.speed, l.tension, l.skew, l.pulseWidth,
+                                                            (juce::int64) l.phase, (double) l.range, amp });
+            if (l.fl.present)
+            {
+                juce::Array<juce::var> fl { l.fl.mainFlags, l.fl.mainEnabled };
+                for (const auto v : l.fl.mainLoop)
+                    fl.add (v);
+                for (const auto v : l.fl.adsr)
+                    fl.add (v);
+                for (const auto v : l.fl.lfoLoop)
+                    fl.add (v);
+                // the FL records of the LFO's points, while they still match `amp`
+                fl.add (l.amp == l.fl.rawAmp ? juce::Base64::toBase64 (l.fl.rawPoints.data(), l.fl.rawPoints.size()) : juce::String());
+                o->setProperty ("lfoFl", fl);
+            }
+        }
         automations.add (juce::var (o.release()));
     }
 
     if (! automations.isEmpty())
         root->setProperty ("automations", automations);
+
+    // round 177b: LYNX's modulators
+    if (! song.modulators.empty())
+    {
+        juce::Array<juce::var> mods;
+        for (const auto& m : song.modulators)
+        {
+            auto o = std::make_unique<juce::DynamicObject>();
+            o->setProperty ("name", str (m.name));
+            o->setProperty ("shape", (int) m.shape);
+            o->setProperty ("sync", m.sync);
+            o->setProperty ("beats", m.beats);
+            o->setProperty ("hz", m.hz);
+            o->setProperty ("phase", (double) m.phase);
+            o->setProperty ("unipolar", m.unipolar);
+            o->setProperty ("seed", (juce::int64) m.seed);
+            juce::Array<juce::var> routes;
+            for (const auto& r : m.routes)
+                routes.add (juce::Array<juce::var> { targetKindName (r.target.kind), r.target.index, r.target.slot, r.target.param, (double) r.depth });
+            o->setProperty ("routes", routes);
+            mods.add (juce::var (o.release()));
+        }
+        root->setProperty ("modulators", mods);
+    }
 
     if (! song.vcas.empty()) // VCA faders (round 177a)
     {
@@ -2489,6 +2534,19 @@ juce::String toJson (const Song& song, bool stampVersion)
 
         if (! locks.isEmpty())
             root->setProperty ("playlistTrackLocks", locks);
+
+        // automation lanes (round 177b): [track, folded 0/1, [automation, height], ...]
+        juce::Array<juce::var> lanes;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (const auto& t = song.playlistTracks[i]; ! t.lanes.empty())
+            {
+                juce::Array<juce::var> row { (int) i, t.lanesFolded ? 1 : 0 };
+                for (const auto& l : t.lanes)
+                    row.add (juce::Array<juce::var> { l.automation, l.height });
+                lanes.add (row);
+            }
+        if (! lanes.isEmpty())
+            root->setProperty ("playlistTrackLanes", lanes);
 
         // track modes (round 146a): [index, "audio" | "instrument", mixer track, channel]
         juce::Array<juce::var> modes;
@@ -2794,6 +2852,46 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
 
             std::stable_sort (automation.points.begin(), automation.points.end(),
                               [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
+            if (const auto& l = a["lfo"]; l.isArray() && l.size() >= 11) // round 177b: FL's clip LFO
+            {
+                auto& lfo = automation.lfo;
+                lfo.on = (bool) l[0];
+                lfo.level = juce::jlimit (-128, 128, (int) l[1]);
+                lfo.add = (bool) l[2];
+                lfo.flags = (int) l[3];
+                lfo.speed = juce::jlimit (512, 65536, (int) l[4]);
+                lfo.tension = juce::jlimit (-128, 128, (int) l[5]);
+                lfo.skew = juce::jlimit (-128, 128, (int) l[6]);
+                lfo.pulseWidth = juce::jlimit (-112, 112, (int) l[7]);
+                lfo.phase = (std::uint32_t) (juce::int64) l[8];
+                lfo.range = juce::jlimit (0.0f, 1.0f, (float) (double) l[9]);
+                lfo.amp.clear();
+                if (auto* amp = l[10].getArray())
+                    for (const auto& pt : *amp)
+                        if (pt.isArray() && pt.size() >= 3)
+                            lfo.amp.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) pt[0]), juce::jlimit (0.0f, 1.0f, (float) (double) pt[1]),
+                                                 juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) });
+                if (lfo.amp.empty())
+                    lfo.amp.push_back ({ 0, 1.0f, 0.0f });
+                if (const auto& f = a["lfoFl"]; f.isArray() && f.size() >= 13)
+                {
+                    lfo.fl.present = true;
+                    lfo.fl.mainFlags = (int) f[0];
+                    lfo.fl.mainEnabled = (int) f[1];
+                    for (int k = 0; k < 3; ++k)
+                        lfo.fl.mainLoop[(std::size_t) k] = (int) f[2 + k];
+                    for (int k = 0; k < 4; ++k)
+                        lfo.fl.adsr[(std::size_t) k] = (int) f[5 + k];
+                    for (int k = 0; k < 3; ++k)
+                        lfo.fl.lfoLoop[(std::size_t) k] = (int) f[9 + k];
+                    juce::MemoryOutputStream raw;
+                    if (f[12].toString().isNotEmpty() && juce::Base64::convertFromBase64 (raw, f[12].toString()))
+                    {
+                        lfo.fl.rawPoints.assign ((const std::uint8_t*) raw.getData(), (const std::uint8_t*) raw.getData() + raw.getDataSize());
+                        lfo.fl.rawAmp = lfo.amp;
+                    }
+                }
+            }
             song.automations.push_back (std::move (automation));
         }
 
@@ -2989,6 +3087,40 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
 
                 song.playlistTracks[index].grouped = index > 0 && (int) t[1] != 0;
                 song.playlistTracks[index].collapsed = (int) t[2] != 0;
+            }
+
+    if (auto* mods = root["modulators"].getArray()) // round 177b: LYNX's modulators
+        for (const auto& v : *mods)
+        {
+            Modulator m;
+            m.name = v["name"].toString().toStdString();
+            m.shape = (ModShape) juce::jlimit (0, (int) ModShape::smoothRandom, (int) v.getProperty ("shape", 0));
+            m.sync = (bool) v.getProperty ("sync", true);
+            m.beats = juce::jlimit (1.0 / 64.0, 1024.0, (double) v.getProperty ("beats", 4.0));
+            m.hz = juce::jlimit (0.001, 100.0, (double) v.getProperty ("hz", 1.0));
+            m.phase = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("phase", 0.0));
+            m.unipolar = (bool) v.getProperty ("unipolar", false);
+            m.seed = (std::uint32_t) (juce::int64) v.getProperty ("seed", 1);
+            if (auto* routes = v["routes"].getArray())
+                for (const auto& r : *routes)
+                    if (r.isArray() && r.size() >= 5)
+                        m.routes.push_back ({ { targetKindFromName (r[0].toString()), (int) r[1], (int) r[2], (int) r[3] },
+                                              juce::jlimit (-1.0f, 1.0f, (float) (double) r[4]) });
+            song.modulators.push_back (std::move (m));
+        }
+
+    if (auto* lanes = root["playlistTrackLanes"].getArray()) // round 177b (after the automations: indices checked)
+        for (const auto& t : *lanes)
+            if (t.isArray() && t.size() >= 2 && (int) t[0] >= 0 && (int) t[0] < 500)
+            {
+                const auto index = (std::size_t) (int) t[0];
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                auto& track = song.playlistTracks[index];
+                track.lanesFolded = (int) t[1] != 0;
+                for (int k = 2; k < t.size(); ++k)
+                    if (const auto& l = t[k]; l.isArray() && l.size() >= 1 && (int) l[0] >= 0 && (int) l[0] < (int) song.automations.size())
+                        track.lanes.push_back ({ (int) l[0], l.size() >= 2 ? juce::jlimit (0, 2000, (int) l[1]) : 0 });
             }
 
     if (auto* locks = root["playlistTrackLocks"].getArray())

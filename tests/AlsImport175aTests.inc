@@ -437,13 +437,25 @@ inline bool loaderRulesHold (const std::string& xmlText, int returns, std::strin
         const auto scenes = set.child ("Scenes").children ("Scene").size();
         for (const auto& t : set.child ("Tracks").children())
             for (const auto* seq : { "DeviceChain/MainSequencer/ClipSlotList", "DeviceChain/FreezeSequencer/ClipSlotList" })
-                if (t.path (seq) && t.path (seq).children ("ClipSlot").size() != (t.name() == "GroupTrack" ? 0 : scenes))
+                if (t.path (seq) && t.path (seq).children ("ClipSlot").size() != (t.name() == "GroupTrack" || t.name() == "ReturnTrack" ? 0 : scenes))
                     why = std::string ("clip slots of ") + std::string (t.name());
         for (const auto& g : set.child ("Tracks").children ("GroupTrack"))
             if (g.child ("Slots").children ("GroupTrackSlot").size() != scenes)
                 why = "group track slots";
         if ((int) set.child ("Tracks").children ("ReturnTrack").size() != returns)
             why = "returns";
+        // a return track's own sends are off, as Live 12 saves them (round 182b; Live 11's holders have no EnabledByUser)
+        for (const auto& r : set.child ("Tracks").children ("ReturnTrack"))
+            for (const auto& h : r.path ("DeviceChain/Mixer/Sends").children ("TrackSendHolder"))
+            {
+                if (! h.child ("EnabledByUser"))
+                {
+                    if (set.child ("MainTrack")) // Live 12 always writes it
+                        why = "return track send without EnabledByUser";
+                }
+                else if (h.child ("EnabledByUser").attr ("Value") != "false")
+                    why = "return track send enabled";
+            }
     }
     return why.empty();
 }

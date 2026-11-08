@@ -104,7 +104,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
@@ -229,6 +229,10 @@ public:
         toggle (clipsLoop, tr ("Stretched pattern clips loop their pattern (LYNX)"), options.stretchedClipsLoop,
                 [this] (bool on) { options.stretchedClipsLoop = on; });
         clipsLoop.setTooltip (tr ("On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio"));
+        // FL's Options › General › Miscellaneous (round 177b): where "Create automation clip" puts the clip
+        toggle (autoClipsAtPlayback, tr ("Create automation clips at the playback position"), options.autoClipsAtPlayback,
+                [this] (bool on) { options.autoClipsAtPlayback = on; });
+        autoClipsAtPlayback.setTooltip (tr ("On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song"));
 
         styleLabel (editInLabel, tr ("Double-click on a pattern clip opens"));
         const char* choices[] = { TR_NOOP ("Piano Roll when it has piano-roll notes, else Channel Rack"), TR_NOOP ("Channel Rack"), TR_NOOP ("Piano Roll") };
@@ -369,7 +373,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &hoverValues })
+        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -511,7 +515,7 @@ private:
     juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };

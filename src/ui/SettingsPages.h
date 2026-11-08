@@ -31,6 +31,7 @@ struct GeneralOptions
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
     bool clipLaunchWorkflow = false; // Settings › General › Workflow (round 181a): false = Pattern workflow, the default
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
+    bool autoClipsAtPlayback = true; // FL's General › "Create automation clips at the playback position" (on, round 177b)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
     // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the

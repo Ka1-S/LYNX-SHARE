@@ -371,6 +371,10 @@ struct Exporter
                     Node h = sk["TrackSendHolder"];
                     h.set ("Id", num (r));
                     h.value ("Send/Manual", num (minGain));
+                    // a return track's sends to the returns are off, as Live saves them [LIVE: its default set and
+                    // demo sets; round 182b]
+                    if (t.kind == LiveTrack::Kind::ret)
+                        h.value ("EnabledByUser", "false");
                     sends->add (std::move (h));
                 }
             }
@@ -389,7 +393,10 @@ struct Exporter
             if (auto* slots = n.at (seq))
             {
                 slots->kids.clear();
-                if (t.kind == LiveTrack::Kind::group)
+                // group and return tracks keep no clip slots of their own: Live saves a return track's freeze list
+                // empty too, and Live 12.4 crashed (access violation) loading a set whose return had one [LIVE,
+                // round 182b: Thief / Africa's Calling / Mic Check Ready exports]
+                if (t.kind == LiveTrack::Kind::group || t.kind == LiveTrack::Kind::ret)
                     continue;
                 Node slot = sk["ClipSlot"];
                 slot.set ("Id", "0");

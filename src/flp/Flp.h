@@ -82,6 +82,26 @@ struct AutomationPoint
     std::uint8_t curve = 0; // 0 = single curve, 1 = double, 2 = hold, 10 = smooth...
 };
 
+// The rest of event 0xEA after the points (REA round 177b, FL's TACArticulator stream FUN_00fe8640): the header's LFO
+// level and mode, the main envelope's tail and FL's automation clip LFO ("LFO mode"). The defaults are what FL writes
+// for a clip whose LFO was never touched.
+struct AutomationLfo
+{
+    bool present = false;     // the event had the whole layout (else the defaults)
+    std::int32_t level = 64;  // header +4: LFO level -128..128
+    std::uint8_t mode = 0;    // header +8: 0 = multiply ("Multiply" checked), 1 = add
+    std::int32_t mainFlags = 1, mainEnabled = -1;
+    std::array<std::int32_t, 3> mainLoop { -1, -1, -1 };     // decay / loop start / sustain points
+    std::array<std::int32_t, 4> adsr { 128, 128, 0, 128 };   // the articulator's A / D / S / R scale knobs
+    std::vector<AutomationPoint> points { AutomationPoint { 0.0, 1.0, 0.0f, 0 } }; // the LFO's amplitude points (≥ 1)
+    std::vector<std::uint8_t> rawPoints; // the points' records as read (24 B each); written back when its size matches
+    std::int32_t flags = 1;   // 1 tempo, 2 global phase, 4 unipolar tension, 8 frozen
+    std::int32_t enabled = 0; // "LFO mode": 0 off, -1 on
+    std::array<std::int32_t, 3> lfoLoop { -1, -1, -1 };
+    std::int32_t speed = 45819, tension = 0, skew = 0, pulseWidth = 0;
+    std::uint32_t phase = 0;
+};
+
 struct Channel
 {
     int index = 0;
@@ -92,6 +112,7 @@ struct Channel
     int mixerTrack = -1;
     bool enabled = true;         // 0x00: the channel's enabled switch in the Channel Rack (false: its notes don't play)
     std::vector<AutomationPoint> automation; // channels of type automationClip
+    AutomationLfo automationLfo;             // the rest of their 0xEA (round 177b)
 
     // event 0xDB (channel "levels"): pan 0..12800 (6400 = center), volume 0..12800
     // (10000 = 78%, the default), pitch in cents
