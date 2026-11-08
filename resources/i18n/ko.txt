@@ -7883,3 +7883,4 @@ countries: kr
 "W shows or hides the selected device's window" = "W로 선택한 장치의 창 표시 또는 숨기기"
 "the piano roll is in its own panel now" = "피아노 롤은 이제 자체 패널에 있습니다"
 "Dock the piano roll here" = "피아노 롤을 여기에 도킹"
+"Slot mix" = "슬롯 믹스"

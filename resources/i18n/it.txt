@@ -7883,3 +7883,4 @@ countries: it ch sm
 "W shows or hides the selected device's window" = "W mostra o nasconde la finestra del dispositivo selezionato"
 "the piano roll is in its own panel now" = "il piano roll ora è nel suo pannello"
 "Dock the piano roll here" = "Aggancia qui il piano roll"
+"Slot mix" = "Mix dello slot"

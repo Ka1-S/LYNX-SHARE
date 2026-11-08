@@ -7883,3 +7883,4 @@ countries: ru by kz
 "W shows or hides the selected device's window" = "W показывает или скрывает окно выбранного устройства"
 "the piano roll is in its own panel now" = "пиано-ролл теперь в своей панели"
 "Dock the piano roll here" = "Закрепить пиано-ролл здесь"
+"Slot mix" = "Микс слота"

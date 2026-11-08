@@ -7966,3 +7966,4 @@ countries: br
 "W shows or hides the selected device's window" = "W mostra ou oculta a janela do dispositivo selecionado"
 "the piano roll is in its own panel now" = "o piano roll está no painel próprio agora"
 "Dock the piano roll here" = "Encaixar o piano roll aqui"
+"Slot mix" = "Mix do slot"

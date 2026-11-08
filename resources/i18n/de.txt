@@ -7883,3 +7883,4 @@ countries: de at ch li lu
 "W shows or hides the selected device's window" = "W blendet das Fenster des ausgewählten Geräts ein oder aus"
 "the piano roll is in its own panel now" = "die Piano Roll ist jetzt in ihrem eigenen Panel"
 "Dock the piano roll here" = "Piano Roll hier andocken"
+"Slot mix" = "Slot-Mix"

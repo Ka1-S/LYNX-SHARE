@@ -7883,3 +7883,4 @@ countries: id
 "W shows or hides the selected device's window" = "W menampilkan atau menyembunyikan jendela perangkat yang dipilih"
 "the piano roll is in its own panel now" = "piano roll sekarang ada di panelnya sendiri"
 "Dock the piano roll here" = "Pasang piano roll di sini"
+"Slot mix" = "Mix slot"

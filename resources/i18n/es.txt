@@ -7883,3 +7883,4 @@ countries: es mx ar co cl pe ve
 "W shows or hides the selected device's window" = "W muestra u oculta la ventana del dispositivo seleccionado"
 "the piano roll is in its own panel now" = "el piano roll está ahora en su propio panel"
 "Dock the piano roll here" = "Acoplar el piano roll aquí"
+"Slot mix" = "Mezcla del slot"

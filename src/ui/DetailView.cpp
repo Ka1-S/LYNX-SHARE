@@ -1028,7 +1028,7 @@ private:
                 continue;
             const auto spec = knobSpec (c, k);
             const auto value = knobValue (c, k);
-            const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? tr ("Mix")
+            const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
                                : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
                                : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
                                                                                         : tr ("Volume");
@@ -1046,13 +1046,41 @@ private:
         }
     }
 
+    // The Plugin picker's key of a LYNX generator kind ("lynx:gen:<English name>"), from its entries once per run; ""
+    // for a hosted plugin or a kind the picker doesn't list.
+    std::string generatorKeyOf (InstrumentKind kind)
+    {
+        static std::map<int, std::string> keys;
+        static bool filled = false;
+        if (! filled)
+        {
+            filled = true;
+            for (const auto& e : quickpick::generatorEntries (engine))
+                if (e.folder == 0 && e.key.rfind ("lynx:gen:", 0) == 0)
+                    keys.emplace ((int) e.kind, e.key); // (the first entry of a kind)
+        }
+        if (kind == InstrumentKind::plugin)
+            return {};
+        const auto it = keys.find ((int) kind);
+        return it != keys.end() ? it->second : std::string();
+    }
+
+    // the effect has a parameter called Mix of its own: the slot's dry/wet is then labelled "Slot mix"
+    static bool hasOwnMix (EffectKind kind)
+    {
+        for (const auto& p : effectInfo (kind).params)
+            if (juce::String (p.name).equalsIgnoreCase ("Mix"))
+                return true;
+        return false;
+    }
+
     // the plugin's picture (Plugin picker thumbnails), else a tile with its name
     void paintPicture (juce::Graphics& g, const Card& c, juce::Rectangle<int> area)
     {
         const auto& song = engine.getSong();
         std::string key;
         if (c.kind == Card::instrument && c.index >= 0 && c.index < (int) song.channels.size())
-            key = "lynx:gen:" + song.channels[(std::size_t) c.index].name; // (a built-in keeps its English name unless renamed)
+            key = generatorKeyOf (song.channels[(std::size_t) c.index].instrument);
         juce::Image picture;
         if (! key.empty())
             if (const auto file = pluginthumbs::fileFor (key, true); file.existsAsFile())
