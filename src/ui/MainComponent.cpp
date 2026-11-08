@@ -5385,7 +5385,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.zip;*.lynxpack;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.flm;*.zip;*.lynxpack;*.mid;*.midi");
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -5459,7 +5459,8 @@ void MainComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("flp;als")) // (a Live set takes the .flp import's path, round 175a)
+    // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl"))
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -5508,7 +5509,9 @@ void MainComponent::flpImported (const juce::File& file)
         importedFlpFile = file;
         projectName = file.getFileNameWithoutExtension();
         rememberRecent (file);
-        importedSuffix = " " + (file.hasFileExtension ("als") ? tr ("(imported from .als)") : tr ("(imported from FL Studio)"));
+        importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
+                                : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
+                                                                         : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
 
@@ -5837,6 +5840,56 @@ void MainComponent::showMissingFiles (bool afterOpening)
             if (safe != nullptr && afterOpening && fromFlp)
                 safe->showImportReport();
         });
+}
+
+juce::PopupMenu MainComponent::makeSwitchAudioClipsMenu (bool selectedOnly)
+{
+    // FL's groups where LYNX has a match (Realtime: Resample), LYNX's stretch engine, and its Ableton-style warp modes
+    juce::PopupMenu m;
+    auto item = [this, &m, selectedOnly] (const char* name, bool keepPitch, StretchMethod method) {
+        m.addItem (tr (name), [this, selectedOnly, keepPitch, method, name] { switchAudioClips (selectedOnly, keepPitch, method, tr (name)); });
+    };
+    m.addSectionHeader (tr ("Realtime"));
+    item (TR_NOOP ("Resample"), false, StretchMethod::general);
+    m.addSectionHeader (tr ("Stretch engine"));
+    item (TR_NOOP ("General"), true, StretchMethod::general);
+    item (TR_NOOP ("Drums / transients"), true, StretchMethod::transients);
+    item (TR_NOOP ("Vocal / mono"), true, StretchMethod::mono);
+    m.addSectionHeader (tr ("Warp (Ableton-style)"));
+    item (TR_NOOP ("Beats"), true, StretchMethod::beats);
+    item (TR_NOOP ("Tones"), true, StretchMethod::tones);
+    item (TR_NOOP ("Texture"), true, StretchMethod::texture);
+    item (TR_NOOP ("Complex"), true, StretchMethod::complex);
+    return m;
+}
+
+void MainComponent::switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName)
+{
+    // FL's FUN_01213a20 (REA round 181b): the error when there is none, else a question, then the change (undoable)
+    std::vector<int> channels;
+    if (selectedOnly)
+        channels = engine.getSelectedChannels();
+    else
+        for (int i = 0; i < (int) engine.getSong().channels.size(); ++i)
+            channels.push_back (i);
+    if (audioClipsAmong (engine.getSong(), channels) == 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                selectedOnly ? tr ("No audio clip channels were selected.") : tr ("No audio clip channels were found."));
+        return;
+    }
+    const auto text = selectedOnly ? tr ("Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName })
+                                   : tr ("All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Confirm"))
+                       .withMessage (text)
+                       .withButton (tr ("OK"))
+                       .withButton (tr ("Cancel"));
+    juce::AlertWindow::showAsync (options, [this, channels, keepPitch, method] (int result) {
+        if (result == 1)
+            engine.editSong ([&channels, keepPitch, method] (Song& s) { setStretchOfAudioClips (s, channels, keepPitch, method); });
+    });
 }
 
 void MainComponent::saveClipboardToBrowser (bool midi)
@@ -6278,6 +6331,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
         menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
+        // FL's two Switch items, with LYNX's own modes inside (user's decision, round 181b)
+        menu.addSubMenu (tr ("Switch all audio clip channels to"), makeSwitchAudioClipsMenu (false));
+        menu.addSubMenu (tr ("Switch selected audio clip channels to"), makeSwitchAudioClipsMenu (true));
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
