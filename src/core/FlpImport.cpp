@@ -2408,7 +2408,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     // slots, instruments through a one-channel import), every cable (audio with its gain, notes, control values mapped
     // to LYNX's parameters), the editor positions and the extra outputs
     std::function<std::optional<PatcherDoc> (const std::vector<std::uint8_t>&, const flp::Channel*)> patcherFromFl;
-    int patcherSidechain = -1; // the last converted Patcher's side-chain pin: "7 Sidechain" = insert 7
+    // the last converted Patcher's side-chain pin: its bus k, an index into FL's input list of the insert, as for the
+    // other effects (REA_rodada22 §1.2). The pin's name is only the source track's name when saved (Bien Duro: "7
+    // Sidechain" on bus 1 and 4 is track 81, named "7 Sidechain"; issue #112: "Master"), REA round 182e
+    int patcherSidechain = -1;
     patcherFromFl = [&] (const std::vector<std::uint8_t>& state, const flp::Channel* asChannel) -> std::optional<PatcherDoc> {
         const auto graph = parsePatcher (state);
         if (! graph)
@@ -2593,8 +2596,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 w.kind = PatchWire::Kind::audio;
                 w.fromPort = src->node < 0 ? (src->index > 0 ? 1 : 0) : std::max (0, src->index);
                 if (src->node < 0 && src->index > 0)
-                    if (const auto track = std::atoi (src->name.c_str()); track > 0 && track < maxMixerTracks)
-                        patcherSidechain = track;
+                    patcherSidechain = src->index;
                 w.toPort = dst->node < 0 ? std::max (0, dst->index) : std::min (1, std::max (0, dst->index));
                 if (w.to == patchToHost && w.toPort > 0) // an extra output: "Insert N" names its insert
                 {
@@ -2819,8 +2821,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 {
                     auto slot = makeEffectSlot (EffectKind::patcher);
                     slot.patcher = std::move (*doc);
-                    if (patcherSidechain > 0 && patcherSidechain < tracks && patcherSidechain != insert.index)
-                        slot.sidechain = patcherSidechain;
+                    if (const auto source = sidechainSource (insert.index, patcherSidechain); source > 0 && source != insert.index)
+                        slot.sidechain = source;
                     effectSlotMap.insert ({ { insert.index, original.index }, { (int) track.effects.size(), original.plugin } });
                     slot.flOrigin = { original.plugin, original.state, 0 }; // (round 171e: Export to FL Studio)
                     track.effects.push_back (std::move (slot));

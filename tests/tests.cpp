@@ -17148,6 +17148,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
 #include "FlpPeak182eTests.inc"
+#include "FlpPatcherSc182eTests.inc"
 #include "FlFades180dTests.inc"
 #include "Mixer177a2Tests.inc"
 #include "Mixer177a3Tests.inc"
