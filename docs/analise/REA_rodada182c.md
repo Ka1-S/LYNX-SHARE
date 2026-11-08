@@ -292,3 +292,10 @@ Shots of the import (`/mnt/e/lynx-work/flm182c/shots/`):
 - `xonada-playlist.png`: the whole arrangement;
 - `xonada-mixer.png`: the 13 inserts with FLM's levels, Master −7.3 dB;
 - `xonada-desktop-mixer.png`.
+### F6 automation, first part (branch `feature/flm182c-f6`, after 0.1.25)
+
+- The rack's own lanes (module 0: [0] Level, [1] Pan) → LYNX automation clips on the channel's insert, the
+  Master's for the master channel. Each FLM clip is one clip, with its points repeated over its loop passes. Values
+  are u16 / 65535: Level goes through FLM's fader law onto LYNX's fader position, Pan is direct.
+- The point shapes (the negative key codes) are not decoded yet: straight lines, listed in the report.
+- Lanes on module parameters wait for F4/F5 and are listed.

@@ -376,6 +376,52 @@ void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const s
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip time-stretch (played unstretched)");
     ctx.song.playlist.push_back (c);
 }
+// An automation lane (F6). The rack's own parameters (module 0: [0] level, [1] pan) drive the channel's insert; a
+// module's parameters wait for their engines (F4/F5). Each clip becomes one LYNX automation clip with its points
+// repeated over the clip's loop passes; values are FLM's u16 0…65535; the point shapes (the negative keys) are not
+// decoded yet, so the points join with straight lines. Returns false for a lane it doesn't import.
+bool addAutomationLane (Ctx& ctx, const flm::Lane& lane, int insert, const std::string& owner)
+{
+    if (lane.targetModule != 0 || (lane.targetParam != 0 && lane.targetParam != 1) || lane.clips.empty())
+        return false;
+    const auto volume = lane.targetParam == 0;
+    PlaylistTrack row;
+    row.name = lane.name.empty() ? owner : owner + " " + lane.name;
+    ctx.song.playlistTracks.push_back (row);
+    const auto rowIndex = (int) ctx.song.playlistTracks.size() - 1;
+    for (const auto& clip : lane.clips)
+    {
+        Automation a;
+        a.name = row.name;
+        a.target = AutomationTarget { volume ? AutomationTargetKind::mixerVolume : AutomationTargetKind::mixerPan, insert, 0, 0 };
+        for (const auto& pass : passesOf (clip))
+            for (const auto& e : clip.events)
+            {
+                const auto beat = (double) e.tick / flm::ticksPerBeat;
+                if (beat < pass.from - 1e-9 || beat > pass.from + pass.length + 1e-9)
+                    continue;
+                const auto v = (float) e.value / 65535.0f;
+                AutomationPoint pt;
+                pt.tick = ticksOf (pass.at + beat - pass.from);
+                pt.value = volume ? faderPosition (std::min (flmGain (v), maxFaderGain)) : std::clamp (v, 0.0f, 1.0f);
+                if (! a.points.empty() && pt.tick < a.points.back().tick)
+                    continue;
+                a.points.push_back (pt);
+            }
+        if (a.points.empty())
+            continue;
+        ctx.song.automations.push_back (std::move (a));
+        Clip c;
+        c.kind = ClipKind::automation;
+        c.automation = (int) ctx.song.automations.size() - 1;
+        c.track = rowIndex;
+        c.start = ticksOf ((double) clip.startTick / flm::ticksPerBeat);
+        c.length = std::max<std::int64_t> (1, ticksOf (clip.timelineLength()));
+        ctx.song.playlist.push_back (c);
+    }
+    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: automation point shapes (straight lines)");
+    return true;
+}
 } // namespace
 
 std::string flmResourceRootIn (const std::string& flInstallFolder)
@@ -528,7 +574,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             const auto kind = lane.kind();
             if (kind == flm::LaneKind::automation)
             {
-                automationLanes += lane.clips.empty() ? 0 : 1;
+                if (! addAutomationLane (ctx, lane, insert, name))
+                    automationLanes += lane.clips.empty() ? 0 : 1;
                 continue;
             }
             if (kind == flm::LaneKind::other || lane.clips.empty())
@@ -623,7 +670,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     }
 
     if (automationLanes > 0 && ctx.report != nullptr)
-        ctx.report->unsupported["FL Studio Mobile: automation lanes (not imported yet)"] += automationLanes;
+        ctx.report->unsupported["FL Studio Mobile: automation of module parameters (not imported yet)"] += automationLanes;
 
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())
