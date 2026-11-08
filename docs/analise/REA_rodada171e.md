@@ -164,16 +164,19 @@ FL `/R` renders of FL's thief with one part of LYNX's export (`E:\lynx-work\rend
 FL's render window for that file showed "Length: 208 bars", against 144 bars of Playlist. The arrangement swap keeps FL's
 pattern numbers (BELL stays #5) and still gives 491.92 s, so the numbering is not the cause.
 
-Read from the files, not tested on its own in FL: LYNX wrote −1, −1 for every automation clip with no start offset; FL's
-files write the clip's span unless it shows the whole content. "MELODICS #2" at beat 284.5 is a 20.26-beat clip of a 546.3-beat
-automation: 284.5 + 546.3 = 830.8 beats = 207.7 bars, FL's 208. So −1 seems to mean "the whole content". That model gives
-about 254.8 beats past the song's end; the render measures about 252 (at the ramp's 60 BPM), a gap not explained.
+LYNX wrote −1, −1 for every automation clip with no start offset; FL's files write the clip's span unless it shows the
+whole content. "MELODICS #2" at beat 284.5 is a 20.26-beat clip of a 546.3-beat automation: 284.5 + 546.3 = 830.8 beats =
+207.7 bars, FL's 208. Tested on its own: FL's file with only that clip set to −1, −1 renders 491.92 s, so −1 means "the
+whole content" whatever the item's length says. The model gives about 254.8 beats past the song's end; the render measures
+about 252 (at the ramp's 60 BPM), a gap not explained.
 
 Fix: `playlistItem` writes the span unless the clip shows the whole automation.
 
 Also seen, not fixed here: audio clips' offsets differ from FL's where FL's ratio of span to length isn't 1 (SAX starts at
-3048 ms instead of 2690 ms, "VOCAL PITCHED #2" at 3193 ms instead of 1008 ms). FL's ratio varies per clip, so LYNX can't
-recompute it from the channel. Effect on FL's playback not measured.
+3048 ms instead of 2690 ms, "VOCAL PITCHED #2" at 3193 ms instead of 1008 ms). In FL's files the ratio is narrow inside a
+channel and differs between channels. It does not follow the stretch pitch. Against the sample length LYNX reads over TIME it
+does not fit either (Titey Tom 1.000 vs 1.482, Importer Ride 0.500 vs 1.701); FL's factory .wav files are packed (format
+0x674F), so lengths from the header's byte rate are no use. What it depends on is still open; see `REA_rodada180d.md`.
 
 ## 6. Decisions for the user
 

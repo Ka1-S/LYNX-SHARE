@@ -487,6 +487,7 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
+        src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp

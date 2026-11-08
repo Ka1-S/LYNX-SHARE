@@ -322,6 +322,10 @@ struct PlaylistItem
     // Audio clips, records of 60 B and more (FL 20.99+): fades in milliseconds and the clip gain (linear).
     float fadeInMs = 0.0f;
     float fadeOutMs = 0.0f;
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade curve values (+0x28, +0x30; 0 = its S curve)
+    // +0x38 (FL's own bits, REA round 180d): bit 0 / 1 the fade-in / -out is manual, >> 2 & 7 / >> 14 & 7 their declick
+    // choice, >> 8 & 3 / >> 12 & 3 their shape (1 = linear, else the S curve). The writer sets bit 0 / 1 for a fade it writes.
+    std::uint32_t fadeFlags = 0;
     float gain = 1.0f;
     // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
     float pitch = 0.0f;

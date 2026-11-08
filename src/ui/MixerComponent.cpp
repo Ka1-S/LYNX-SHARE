@@ -1977,8 +1977,10 @@ void MixerStrips::pressRail (int strip, int mouseY)
 {
     railStrip = strip;
     railMouseY = mouseY;
-    stepHeldRail();
-    railRepeat.startTimer (faderRailFirstRepeatMs); // (then faderRailRepeatMs, in stepHeldRail)
+    railPressMs = juce::Time::getMillisecondCounterHiRes();
+    stepRailOnce();
+    railSteps = 1;
+    railRepeat.startTimer (16); // (a poll: the steps themselves follow the time since the press)
 }
 
 float MixerStrips::railTarget (int strip) const
@@ -1989,15 +1991,24 @@ float MixerStrips::railTarget (int strip) const
 
 void MixerStrips::stepHeldRail()
 {
-    // (the repeat stops as soon as the button is up, even before the release reaches us: a busy message thread must not
-    // turn one click into several steps)
-    if (railRepeat.isTimerRunning() && ! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+    if (! railRepeat.isTimerRunning()) // (a direct call, as the offscreen check makes: one step)
+    {
+        stepRailOnce();
+        return;
+    }
+    // the repeat stops as soon as the button is up, even before the release reaches us
+    if (! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
     {
         railRepeat.stopTimer();
         return;
     }
-    if (railRepeat.isTimerRunning() && railRepeat.getTimerInterval() != faderRailRepeatMs)
-        railRepeat.startTimer (faderRailRepeatMs);
+    const auto due = faderRailStepsForHold ((int) (juce::Time::getMillisecondCounterHiRes() - railPressMs));
+    for (int guard = 0; railSteps < due && guard < 64; ++guard, ++railSteps)
+        stepRailOnce();
+}
+
+void MixerStrips::stepRailOnce()
+{
     const auto& song = engine.getSong();
     if (railStrip <= vcaStrip (0))
     {

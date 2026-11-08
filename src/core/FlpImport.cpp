@@ -510,7 +510,9 @@ void applyFlStretchPanel (SamplerSettings& s, int mode, int pitchCents, int mul,
     {
         s.keepPitch = true;
         s.stretchMethod = stretchMethodForFlMode (mode);
-        s.pitch = std::clamp (s.pitch + std::clamp (pitchCents, -4800, 4800) / 100.0f, -24.0f, 24.0f);
+        s.flStretchMode = mode;
+        s.flStretchPitch = std::clamp (pitchCents, -4800, 4800);
+        s.pitch = std::clamp (s.pitch + s.flStretchPitch / 100.0f, -24.0f, 24.0f);
     }
 
     if (timeTicks <= 0.0f && mul != 0 && sampleSeconds > 0.0 && bpm > 0.0)
@@ -1039,6 +1041,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         def.soloLock = c.soloLock;          // 0x20 "Lock active/mute state" (REA_rodada167l §5)
         def.ghostHidden = ! c.ghostShown;   // 0x32: the channel's ghost notes in the Piano Roll (REA_rodada167l §5)
         def.icon = std::clamp (c.icon, 0, 0xFFFF); // 0x9B (REA round 168j)
+        def.flWrapperFlags = c.wrapperFlags;
 
         if (c.colour != 0)
             def.colour = 0xFF000000u | c.colour;
@@ -3771,6 +3774,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);
                 clip.fadeOut = msToTicks (item.fadeOutMs);
+                clip.fadeInTension = item.fadeInTension;
+                clip.fadeOutTension = item.fadeOutTension;
+                clip.flFadeFlags = item.fadeFlags;
+                clip.linearFades = (std::uint8_t) ((((item.fadeFlags >> 8) & 3) == 1 ? 1 : 0) | (((item.fadeFlags >> 12) & 3) == 1 ? 2 : 0));
 
                 clips.push_back (clip);
                 continue;
