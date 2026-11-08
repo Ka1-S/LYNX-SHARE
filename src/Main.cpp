@@ -2326,6 +2326,29 @@ private:
 
         // round 180d: clip fades take FL's S curve; a project saved before that keeps its straight fades, also after another
         // save, and a clip made in it takes the S curve. FL's fade tensions and stretch mode and PITCH survive a save.
+        // issue #122: playlist tracks linked to inserts (audio) and channels (instrument) survive save, load and save
+        // again byte for byte (they were read before the mixer and fell back to Unassigned)
+        bool trackModes122Ok = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.playlistTracks.resize (6);
+            song.playlistTracks[1].mode = lynx::PlaylistTrackMode::audio;
+            song.playlistTracks[1].mixerTrack = 3;
+            song.playlistTracks[4].mode = lynx::PlaylistTrackMode::audio;
+            song.playlistTracks[4].mixerTrack = (int) song.mixer.size() - 1;
+            song.playlistTracks[5].mode = lynx::PlaylistTrackMode::instrument;
+            song.playlistTracks[5].channel = 1;
+            song.playlistTracks[5].mixerTrack = 2;
+            const auto json = lynx::ProjectFile::toJson (song, false);
+            const auto loaded = lynx::ProjectFile::fromJson (json, error);
+            const auto again = loaded ? lynx::ProjectFile::toJson (*loaded, false) : juce::String();
+            trackModes122Ok = loaded && json.contains ("playlistTrackModes") && again == json && loaded->playlistTracks.size() >= 6
+                              && loaded->playlistTracks[1].mode == lynx::PlaylistTrackMode::audio && loaded->playlistTracks[1].mixerTrack == 3
+                              && loaded->playlistTracks[4].mode == lynx::PlaylistTrackMode::audio
+                              && loaded->playlistTracks[4].mixerTrack == (int) song.mixer.size() - 1
+                              && loaded->playlistTracks[5].mode == lynx::PlaylistTrackMode::instrument && loaded->playlistTracks[5].channel == 1;
+        }
+
         bool clipFades180dOk = false;
         {
             auto song = lynx::Song::makeDefault();
@@ -3138,7 +3161,7 @@ private:
         }
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3147,6 +3170,7 @@ private:
         report << "connections=" << offline.getNumGraphConnections() << "\n"
                << "peak=" << peak << "\n"
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
+               << "playlist_track_modes_roundtrip=" << (trackModes122Ok ? "OK" : "ERROR") << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
