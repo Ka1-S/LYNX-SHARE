@@ -9426,6 +9426,17 @@ private:
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-opened.png");
 
+            // a muted clip selected
+            for (int c = 0; c < (int) offline.getSong().playlist.size(); ++c)
+                if (offline.getSong().playlist[(std::size_t) c].muted)
+                {
+                    playlist.selectClipsForSnapshot ({ c });
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-selected.png");
+                    playlist.selectClipsForSnapshot ({});
+                    break;
+                }
+
             juce::String report;
             const auto listTracks = [&offline, &report] (const juce::String& title) {
                 const auto& s = offline.getSong();

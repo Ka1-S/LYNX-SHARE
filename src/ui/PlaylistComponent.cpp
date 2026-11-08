@@ -124,9 +124,18 @@ void paintClipGlyph (juce::Graphics& g, juce::Rectangle<float> box, ClipGlyph gl
     }
 }
 
-// Clip body with the header bar, glyph and name; returns the body below the header.
+// The header's glyph place. A muted clip shows its X there, as FL Studio does, however narrow the clip (round 177c).
+juce::Rectangle<float> clipGlyphBox (juce::Rectangle<float> title)
+{
+    return title.withTrimmedLeft (3.0f).withTrimmedRight (2.0f).withWidth (juce::jmin (13.0f, title.getWidth() - 5.0f));
+}
+
+constexpr float mutedMarkMinWidth = 14.0f;
+
+// Clip body with the header bar, glyph and name; returns the body below the header. A muted clip leaves the glyph's place
+// empty for the X its veil draws on top (paintMutedVeil).
 juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour base, const juce::String& name,
-                                       ClipGlyph glyph = ClipGlyph::pattern)
+                                       ClipGlyph glyph = ClipGlyph::pattern, bool muted = false)
 {
     using namespace theme;
     const uitrace::Part tally (uitrace::part::frame);
@@ -167,7 +176,9 @@ juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float>
         if (r.getWidth() > 18.0f && title.getHeight() >= 9.0f)
         {
             auto text = title.withTrimmedLeft (3.0f).withTrimmedRight (2.0f);
-            if (r.getWidth() >= 40.0f) // room for the glyph (where the clip menu opens)
+            if (muted)
+                text.removeFromLeft (13.0f);
+            else if (r.getWidth() >= 40.0f) // room for the glyph (where the clip menu opens)
                 paintClipGlyph (g, text.removeFromLeft (13.0f), glyph, clipTitleText (header).withMultipliedAlpha (0.8f));
             const uitrace::Part tallyTitle (uitrace::part::title);
             g.setColour (clipTitleText (header));
@@ -177,6 +188,24 @@ juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float>
     }
 
     return r.withTrimmedTop (title.getHeight());
+}
+
+// A muted clip, as in FL Studio: the whole clip dims, its waveform or notes still readable, and an X takes the glyph's place.
+void paintMutedVeil (juce::Graphics& g, juce::Rectangle<float> r)
+{
+    using namespace theme;
+    g.setColour (colour::bg1.withAlpha (0.55f));
+    g.fillRoundedRectangle (r, radius::sm);
+
+    const auto title = r.withHeight (clipHeaderHeight (r));
+    if (r.getWidth() < mutedMarkMinWidth || title.getHeight() < 9.0f)
+        return;
+
+    const auto c = clipGlyphBox (title).getCentre();
+    const auto arm = juce::jmin (3.5f, title.getHeight() * 0.5f - 1.0f);
+    g.setColour (colour::textSecondary); // a little above the dimmed name, as FL's X is, not the brightest thing on the clip
+    g.drawLine (c.x - arm, c.y - arm, c.x + arm, c.y + arm, 1.4f);
+    g.drawLine (c.x - arm, c.y + arm, c.x + arm, c.y - arm, 1.4f);
 }
 
 void paintClipOutline (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour base, bool selected, bool current)
@@ -1409,15 +1438,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         g.setFont (font (type::caption));
 
-        // muted clips (the Mute tool) are veiled
         auto veilIfMuted = [&g] (const Clip& clip, juce::Rectangle<float> area) {
             if (clip.muted)
-            {
-                g.setColour (colour::bg1.withAlpha (0.62f));
-                g.fillRoundedRectangle (area, radius::sm);
-                g.setColour (colour::textDisabled);
-                g.drawLine (area.getX() + 2.0f, area.getBottom() - 2.0f, area.getRight() - 2.0f, area.getY() + 2.0f, 1.0f);
-            }
+                paintMutedVeil (g, area);
         };
 
         SmallClips smallClips;
@@ -1485,7 +1508,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             const auto selected = isSelected (i);
 
             // body + name strip
-            const auto clipBody = paintClipFrame (g, r, base, juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str()));
+            const auto clipBody = paintClipFrame (g, r, base, juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str()), ClipGlyph::pattern, c.muted);
 
             // note thumbnail: the pattern's notes as small rounded bars in a light tint of the clip colour,
             // spread over the body's height by pitch (a few keys of padding so single notes don't hug the edges)
@@ -2111,7 +2134,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     const auto& channel = song.channels[(std::size_t) c.channel];
     const auto colour = audioClipColour (channel);
     const auto name = juce::String::fromUTF8 (channel.name.c_str());
-    const auto body = paintClipFrame (g, r, colour, name, ClipGlyph::audio);
+    const auto body = paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted);
 
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
@@ -2201,7 +2224,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     const auto& automation = song.automations[(std::size_t) c.automation];
     const auto colour = automation.target.kind == AutomationTargetKind::none ? theme::colour::textDisabled
                                                                               : theme::colour::automation.withMultipliedSaturation (0.75f).withMultipliedBrightness (0.8f);
-    paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation);
+    paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted);
     paintClipOutline (g, r, colour, false, false);
 
     // automation curve over the clip's range
