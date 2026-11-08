@@ -22,7 +22,8 @@ void openAudioEditor (AudioEngine& engine);
 // A file (the Browser).
 void openAudioEditor (AudioEngine& engine, const juce::File& file);
 // The sample of a channel (a Sampler channel or the channel of a Playlist audio clip); the edit can go back to it.
-void openAudioEditorForChannel (AudioEngine& engine, int channel);
+// `clip`: the Playlist audio clip it was opened from (its warp markers are then edited for that clip alone).
+void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip = -1);
 // The record button's "Audio, into the audio editor" choice: an empty editor recording the audio input while the
 // song plays (it starts with the playback and stops with it, like FL's Edison record target).
 void openAudioEditorRecording (AudioEngine& engine);

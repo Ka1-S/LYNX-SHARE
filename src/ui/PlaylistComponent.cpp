@@ -3,6 +3,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
+#include "core/WarpEdit.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
 #include "ui/ImageReadback.h"
@@ -2060,6 +2061,18 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
     }
 }
 
+namespace
+{
+// the index of a clip painted from the song's own list (-1 for a copy: a clip being dragged is drawn from one)
+int playlistIndexOf (const Song& song, const Clip& c)
+{
+    const auto* first = song.playlist.data();
+    return ! song.playlist.empty() && std::less_equal<const Clip*>() (first, &c) && std::less<const Clip*>() (&c, first + song.playlist.size())
+               ? (int) (&c - first)
+               : -1;
+}
+} // namespace
+
 void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::Rectangle<float> r)
 {
     const uitrace::Scope trace ("Playlist audio clip", false);
@@ -2092,10 +2105,52 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
             style.gain = juce::jmin (style.gain, 8.0f);
         const uitrace::Part tally (uitrace::part::waveform);
-        ui::paintWaveform (g, wave, *summary, startFrame, (forward ? perTick : -perTick) / pixelsPerTick, style);
+        // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
+        auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};
+        const auto index = playlistIndexOf (song, c);
+        if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
+            markers[(std::size_t) warpIndex].beats = warpBeat;
+        if (markers.size() >= 3)
+        {
+            for (std::size_t k = 0; k + 1 < markers.size(); ++k)
+            {
+                const auto x0 = tickToX (warpedit::clipTickOfBeat (c, markers[k].beats)), x1 = tickToX (warpedit::clipTickOfBeat (c, markers[k + 1].beats));
+                const auto part = wave.withLeft (juce::jmax (wave.getX(), (float) x0)).withRight (juce::jmin (wave.getRight(), (float) x1));
+                if (part.getWidth() <= 0.0f || x1 <= x0)
+                    continue;
+                const auto perPixel = (markers[k + 1].seconds - markers[k].seconds) * summary->sampleRate / (x1 - x0);
+                const juce::Graphics::ScopedSaveState keep (g);
+                g.reduceClipRegion (part.toNearestIntEdges());
+                ui::paintWaveform (g, part, *summary, markers[k].seconds * summary->sampleRate + (part.getX() - x0) * perPixel, perPixel, style);
+            }
+        }
+        else
+            ui::paintWaveform (g, wave, *summary, startFrame, (forward ? perTick : -perTick) / pixelsPerTick, style);
     }
 
     paintClipOutline (g, r, colour, false, false);
+
+    // the warp markers: small flags on the body's top edge, the end marker included (the start one never moves)
+    {
+        const auto index = playlistIndexOf (song, c);
+        auto markers = index >= 0 ? clipWarpMarkers (index) : std::vector<WarpPoint> {};
+        if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
+            markers[(std::size_t) warpIndex].beats = warpBeat;
+        const auto flag = clipContentColour (colour).brighter (0.3f);
+        for (std::size_t k = 1; k < markers.size(); ++k)
+        {
+            const auto x = (float) tickToX (warpedit::clipTickOfBeat (c, markers[k].beats));
+            if (x < body.getX() - 0.5f || x > body.getRight() + 0.5f)
+                continue;
+            const auto active = drag == Drag::warpMarker && warpClip == index && warpIndex == (int) k;
+            g.setColour (flag.withAlpha (active ? 1.0f : 0.85f));
+            juce::Path p;
+            p.addTriangle (x - 3.5f, body.getY(), x + 3.5f, body.getY(), x, body.getY() + 5.0f);
+            g.fillPath (p);
+            g.setColour (flag.withAlpha (active ? 0.9f : 0.35f));
+            g.drawVerticalLine ((int) std::round (x), body.getY() + 5.0f, body.getBottom());
+        }
+    }
 
     // fades: a shaded ramp over the body and a handle at the header's corner; an automatic crossfade (round 166e)
     // replaces that side's fade with FL's two crossing S-curves over the overlap
@@ -2361,6 +2416,50 @@ void PlaylistComponent::showAutomationPointMenu (int clip, int point)
     menu.addSeparator();
     menu.addItem (tr ("Edit points..."), [this, a] { openAutomationEditor (engine, a); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+double PlaylistComponent::clipFileSeconds (int index) const
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size() || song.playlist[(std::size_t) index].kind != ClipKind::audio)
+        return 0.0;
+    const auto channel = song.playlist[(std::size_t) index].channel;
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return 0.0;
+    const auto data = engine.getSampleLibrary().findLoaded (juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str()));
+    return data != nullptr && data->sampleRate > 0.0 ? (double) data->frames() / data->sampleRate : 0.0;
+}
+
+std::vector<WarpPoint> PlaylistComponent::clipWarpMarkers (int index) const
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return {};
+    const auto& c = song.playlist[(std::size_t) index];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size()
+        || clipops::playsBackwards (song.channels[(std::size_t) c.channel], c))
+        return {};
+    return warpedit::playedMarkers (song.channels[(std::size_t) c.channel].sampler, clipFileSeconds (index));
+}
+
+int PlaylistComponent::warpMarkerAt (int index, juce::Point<int> p) const
+{
+    const auto markers = clipWarpMarkers (index);
+    if (markers.size() < 3)
+        return -1;
+    const auto& c = engine.getSong().playlist[(std::size_t) index];
+    const auto top = (float) clipBounds (index).getY() + (float) clipTitleHeight;
+    if (p.y < top - 1.0f || p.y > top + 8.0f)
+        return -1;
+    int best = -1;
+    double bestDx = 5.0;
+    for (std::size_t k = 1; k < markers.size(); ++k)
+        if (const auto dx = std::abs (tickToX (warpedit::clipTickOfBeat (c, markers[k].beats)) - p.x); dx <= bestDx)
+        {
+            bestDx = dx;
+            best = (int) k;
+        }
+    return best;
 }
 
 int PlaylistComponent::fadeHandleAt (int index, juce::Point<int> p) const
@@ -3188,6 +3287,18 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
     }
 
+    // warp marker flags (round 175a): drag a marker sideways; the change is applied on release
+    if (hit >= 0)
+        if (const auto marker = warpMarkerAt (hit, e.getPosition()); marker > 0)
+        {
+            setSelection ({});
+            warpClip = hit;
+            warpIndex = marker;
+            warpBeat = clipWarpMarkers (hit)[(std::size_t) marker].beats;
+            drag = Drag::warpMarker;
+            return;
+        }
+
     // audio clip fade handles (drawn at the top corners of the body)
     if (hit >= 0)
         if (const auto fade = fadeHandleAt (hit, e.getPosition()); fade != 0)
@@ -3502,6 +3613,22 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             return;
         }
 
+        case Drag::warpMarker:
+        {
+            const auto markers = clipWarpMarkers (warpClip);
+            if (warpIndex <= 0 || warpIndex >= (int) markers.size())
+                return;
+            const auto& clip = engine.getSong().playlist[(std::size_t) warpClip];
+            const auto tick = snapOn ? (double) snap (xToTick (e.x) + gridTicks() / 2.0, true) : xToTick (e.x);
+            const auto beats = (tick - warpedit::clipTickOfBeat (clip, 0.0)) / (ppq * std::clamp (clip.stretch, 0.01, 100.0));
+            const auto lo = markers[(std::size_t) warpIndex - 1].beats + warpedit::minBeatGap;
+            const auto hi = warpIndex + 1 < (int) markers.size() ? markers[(std::size_t) warpIndex + 1].beats - warpedit::minBeatGap : 1.0e6;
+            warpBeat = juce::jlimit (lo, juce::jmax (lo, hi), beats);
+            postDragHint();
+            repaint();
+            return;
+        }
+
         case Drag::fadeIn:
         case Drag::fadeOut:
         {
@@ -3800,6 +3927,7 @@ void PlaylistComponent::postDragHint()
             break;
         case Drag::fadeIn:
         case Drag::fadeOut: hint.text = tr ("Setting the fade  [Alt] no snap"); break;
+        case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
         case Drag::select:
@@ -3849,6 +3977,26 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         engine.performanceCommand (c);
         drag = Drag::none;
         perfTrack = -1;
+        return;
+    }
+    if (drag == Drag::warpMarker)
+    {
+        // one undoable edit: the clip gets its own copy of the channel if others share it (warpedit), then the marker
+        // moves (in the beats the channel plays, so the markers are rewritten as played first)
+        const auto seconds = clipFileSeconds (warpClip);
+        const auto markers = clipWarpMarkers (warpClip);
+        if (seconds > 0.0 && warpIndex > 0 && warpIndex < (int) markers.size() && std::abs (markers[(std::size_t) warpIndex].beats - warpBeat) > 1.0e-9)
+            engine.editSong ([clip = warpClip, index = warpIndex, beats = warpBeat, seconds] (Song& s) {
+                const auto channel = warpedit::channelForClipEdit (s, clip);
+                if (channel < 0)
+                    return;
+                auto& sampler = s.channels[(std::size_t) channel].sampler;
+                sampler.warp = warpedit::playedMarkers (sampler, seconds);
+                warpedit::moveMarker (sampler, index, beats, seconds);
+            });
+        drag = Drag::none;
+        warpClip = warpIndex = -1;
+        repaint();
         return;
     }
     if (drag == Drag::knife)
@@ -4951,7 +5099,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             if (onOpenInSampler)
                 onOpenInSampler (ch);
         });
-        menu.addItem (tr ("Edit in the audio editor..."), sample != nullptr, false, [this, ch = clip.channel] { openAudioEditorForChannel (engine, ch); });
+        menu.addItem (tr ("Edit in the audio editor..."), sample != nullptr, false, [this, ch = clip.channel, index] { openAudioEditorForChannel (engine, ch, index); });
         menu.addItem (tr ("Show the file in Explorer"), juce::File (path).existsAsFile(), false, [path] { juce::File (path).revealToUser(); });
     }
 
