@@ -2932,7 +2932,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     };
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
-    ui::addItemHeader (menu, t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }), trackName,
+    // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
+    const auto several = targets.size() > 1;
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+                       several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
@@ -2951,6 +2954,23 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+    });
+    // FL's "Gradient color..." (SetGradientColorMenuClick, REA_rodada177a §5): greyed below two selected tracks; the
+    // Gradient editor starts from the first and the last selected track's colours
+    menu.addItem (tr ("Gradient color..."), targets.size() > 1, false, [this, targets] {
+        auto sorted = targets;
+        std::sort (sorted.begin(), sorted.end());
+        const auto& mixer = engine.getSong().mixer;
+        const auto colourOf = [&mixer] (int track) {
+            const auto c = track >= 0 && track < (int) mixer.size() ? mixer[(std::size_t) track].colour : 0u;
+            return c != 0 ? juce::Colour (c) : juce::Colour (lynxPalette()[0]);
+        };
+        showGradientColourDialog (colourOf (sorted.front()), colourOf (sorted.back()), (int) sorted.size(),
+                                  [this, sorted] (juce::Colour first, juce::Colour last) {
+                                      engine.editSong ([sorted, a = first.getARGB(), b = last.getARGB()] (Song& s) {
+                                          mixerops::gradientColour (s, sorted, a, b);
+                                      });
+                                  });
     });
     // FL's "Change icon..." (SetIconMenuClick, REA round 168h: every selected track gets it); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, t, targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t }] {

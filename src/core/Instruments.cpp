@@ -310,6 +310,7 @@ private:
             case InstrumentKind::flkeys:
             case InstrumentKind::granulizer:
             case InstrumentKind::wavetraveller:
+            case InstrumentKind::fruityslicer:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -1508,6 +1509,7 @@ struct SamplerVoice
     std::int64_t tickIndex = 0;
     double nextGap = 0.0;             // samples from this tick to the next one on the song's grid
     int endFade = -1;                 // ≥ 0: past the sample's end, the last frame fading out (FL's 10 ms end fade)
+    bool cutAtEnd = false;            // Fruity Slicer: no end fade, the voice ends with its slice
     bool endByDeclicker = false;      // that fade is the declicking mode's release (modes 1–5, round 167k)
     int offFade = -1;                 // ≥ 0: a looping voice fading out after its note-off (the same table)
     float holdL = 0.0f, holdR = 0.0f; // the last frame read
@@ -1657,6 +1659,9 @@ public:
         table.count = (int) std::min<std::size_t> (s.slices.size(), table.starts.size());
         for (int i = 0; i < table.count; ++i)
             table.starts[(std::size_t) i] = std::clamp (s.slices[(std::size_t) i], 0.0f, 1.0f);
+        table.firstKey = s.sliceFirstKey;
+        table.toEnd = s.slicesToEnd;
+        table.cutAtEnd = s.slicesCutAtEnd;
         sliceMailbox.write (table);
         bpm.store (std::max (1.0, songBpm));
     }
@@ -1719,7 +1724,7 @@ public:
         // sliced sample: each key from C5 up plays one slice, at the original pitch
         if (! clipMode && slices.count > 0)
         {
-            const auto index = key - 60;
+            const auto index = key - slices.firstKey;
 
             if (index < 0 || index >= slices.count)
                 return;
@@ -1727,7 +1732,7 @@ public:
             // the starts are fractions of the sample (floats): the nearest frame, as a float a hair under p/total made
             // every Slicex slice start one frame early (round 170i2, REA_rodada170i §9)
             first = std::round (total * slices.starts[(std::size_t) index]);
-            last = index + 1 < slices.count ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
+            last = index + 1 < slices.count && ! slices.toEnd ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
         const auto base = baseRate (*data) / clipStretch;
@@ -1799,6 +1804,7 @@ public:
         target->position = startFrame;
         target->first = first;
         target->last = last;
+        target->cutAtEnd = sliced && slices.cutAtEnd;
         target->clipElapsed = clipFades[0];
         target->clipRemaining = clipFades[1];
         target->fadeIn = clipFades[2];
@@ -2671,6 +2677,11 @@ public:
                 // REA_rodada167k §10: 20 / 20 / 100 / 200 ms, mode 1 the follower, mode 5 curved).
                 if (v.endFade < 0 && ((double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first))
                 {
+                    if (v.cutAtEnd)
+                    {
+                        ended = true;
+                        break;
+                    }
                     v.endFade = 0;
                     if (! v.stolen && declickMode.load (std::memory_order_relaxed) != 0)
                     {
@@ -2950,6 +2961,9 @@ private:
     {
         std::array<float, 128> starts {};
         int count = 0;
+        int firstKey = 60;   // Fruity Slicer: the key of slice 1
+        bool toEnd = false;  // Fruity Slicer's "play to end"
+        bool cutAtEnd = false; // Fruity Slicer: the voice stops dead at the slice's end
     };
     SettingsMailbox<SliceTable> sliceMailbox;
     SliceTable slices; // audio thread's copy
@@ -3369,6 +3383,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeGranulizerInstrument (std::move (sample));
     if (kind == InstrumentKind::wavetraveller)
         return makeWaveTravellerInstrument (std::move (sample));
+    if (kind == InstrumentKind::fruityslicer) // the sampler's voices on the slices (the rack prepares the sample)
+        return makeInstrument (InstrumentKind::sampler, std::move (sample));
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

@@ -107,6 +107,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::vfx: return "VFX";
         case InstrumentKind::videoplayer: return "Fruity Video Player";
         case InstrumentKind::wavetraveller: return "Wave Traveller";
+        case InstrumentKind::fruityslicer: return "Fruity Slicer";
     }
     return "?";
 }

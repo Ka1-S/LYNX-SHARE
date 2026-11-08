@@ -79,6 +79,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::midiOut, "MIDI Out", false },        { InstrumentKind::voltage, "Fruity Voltage Controller", false },
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
+    { InstrumentKind::fruityslicer, "Fruity Slicer", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -656,8 +657,6 @@ struct Converter
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
-                if (c.muted)
-                    continue; // (left out)
                 use (c.start);
                 // (an audio clip's length goes unstretched, as playlistItem writes it)
                 use (c.kind == ClipKind::audio && c.stretch > 0.0 && c.stretch != 1.0 ? (std::int64_t) std::llround ((double) c.length / c.stretch)
@@ -1264,19 +1263,9 @@ struct Converter
             a.name = arrangement.name;
             for (const auto& m : current ? song.markers() : arrangement.markers)
                 a.markers.push_back (marker (m));
-            int muted = 0;
             for (const auto& clip : clips)
-            {
-                if (clip.muted)
-                {
-                    ++muted; // (FL's clip mute is not in the model: a muted clip is left out, as it is heard)
-                    continue;
-                }
                 if (auto item = playlistItem (clip))
                     a.items.push_back (*item);
-            }
-            if (muted > 0)
-                report.notes.push_back ("Arrangement '" + a.name + "': " + std::to_string (muted) + " muted clip(s) left out");
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
                 a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
@@ -1291,6 +1280,8 @@ struct Converter
         item.track = std::clamp (clip.track, 0, 499);
         item.position = ticks (clip.start);
         item.length = std::max<std::uint32_t> (1, ticks (clip.length));
+        // FL's clip mute: bit 0x2000 of the item flags (issue #110, REA round 182e)
+        item.flags = (std::uint16_t) (flp::PlaylistItem::defaultFlags | (clip.muted ? flp::PlaylistItem::mutedFlag : 0));
         switch (clip.kind)
         {
             case ClipKind::pattern:

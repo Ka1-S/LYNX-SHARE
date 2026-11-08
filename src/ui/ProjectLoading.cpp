@@ -120,7 +120,11 @@ private:
                 try
                 {
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (file.hasFileExtension ("als")) // a Live set (round 175a)
+                    if (file.hasFileExtension ("flm;songtmpl"))
+                    {
+                        // an FL Studio Mobile project (round 182c): no third-party plugins
+                    }
+                    else if (file.hasFileExtension ("als")) // a Live set (round 175a)
                         uses = alsForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
                     else
                         uses = flpForeignPlugins (flp::parseProject ({ bytes, data.getSize() }));
