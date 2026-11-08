@@ -122,6 +122,7 @@ struct RackView::Impl
                     return r != nullptr ? (double) r->macros[(std::size_t) m].value : 0.0;
                 },
                 [this, m] (double v) { edit ([m, v] (PatcherDoc& d) { rack::setMacro (d, m, (float) v); }, false); });
+            knob->compact = true; // (the rack draws the name plate above and the value below, as Live [SHOT])
             owner.addChildComponent (*knob);
             knobs.push_back (std::move (knob));
         }
@@ -194,7 +195,8 @@ struct RackView::Impl
             {
                 const auto& node = shown.nodes[(std::size_t) x.node];
                 if (! node.generator && node.effect.kind != EffectKind::plugin && node.effect.kind != EffectKind::patcher)
-                    return str (formatEffectParam (node.effect.kind, x.param, v, engine.getSong().bpm));
+                    if (const auto text = str (formatEffectParam (node.effect.kind, x.param, v, engine.getSong().bpm)); text.isNotEmpty())
+                        return text;
             }
         }
         return juce::String (juce::roundToInt (value));
@@ -322,7 +324,8 @@ struct RackView::Impl
             cell.removeFromTop (16); // (the name plate, painted)
             if (owner.mapping)
                 cell.removeFromBottom (15); // (the Map button, painted)
-            k.setBounds (cell.reduced (2, 0));
+            cell.removeFromBottom (13); // (the value, painted)
+            k.setBounds (cell.reduced (4, 1));
         }
         const auto w = width (owner.getHeight());
         if (w != lastWidth)
@@ -481,6 +484,10 @@ struct RackView::Impl
             g.fillRoundedRectangle (plate, theme::radius::sm);
             g.setColour (mapped ? col::textPrimary : col::textDisabled);
             g.drawFittedText (macroName (m), plate.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.8f);
+            auto valueRow = cell.withTrimmedBottom (owner.mapping ? 15 : 0);
+            valueRow = valueRow.removeFromBottom (13);
+            g.setColour (mapped ? col::textPrimary : col::textSecondary);
+            g.drawFittedText (macroText (m, r.macros[(std::size_t) m].value), valueRow, juce::Justification::centred, 1, 0.8f);
             if (owner.mapping)
             {
                 auto button = cell.withTrimmedTop (cell.getHeight() - 15).reduced (8, 1).toFloat();
