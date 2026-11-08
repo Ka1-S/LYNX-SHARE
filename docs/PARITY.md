@@ -72,7 +72,7 @@ there.
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
 | Echoform | ValhallaDelay | 9 | 8 | 4 | 6 | 137 |  |
-| Atrium | ValhallaRoom | 9 | 8 | 4 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work) |
+| Atrium | ValhallaRoom | 9 | 8 | 5 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work); 183b: sound 4 → 5 (fxparity 3.17 → 3.50, verb 8.08 → 8.54; bank 3.14 → 3.59 / 8.14 → 8.52): level laws of Early/Late, Decay and Late size |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
@@ -295,6 +295,22 @@ Sub-round 152b (`docs/analise/REA_rodada152b.md`), measured black-box on the off
 |---|---|---|---|---|
 | Ember Saturator | Saturn 2 | 8 → 9 | 8 → 8 | each crossover's own slope (6 … 48 dB/oct, exact), linear phase (zero-phase bands, 3072-sample latency), modulation (2 LFOs, envelope follower, 4 slots, the reference's laws), Breakdown's pitch drop on Collapse; translated |
 | LYNX Tune | Waves Tune Real-Time | 9 → 10 | 8 → 8 | Group Octaves off (per-key statuses), MIDI reference tone |
+
+## Round 183b slice 5: Atrium ← ValhallaRoom
+
+Measured on tp172d's settings and 13 new captures, with the impulse at −20 dB (the reference is linear): Decay 10 %, Early/Late 0 / 100 %, Late size 0 / 100 %, Bass and High multiply, Late mod depth 0 / 100 %, Early size, Diffusion 0, High cut. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 17 settings.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Atrium (slice 5) | ValhallaRoom | 3.17 → 3.50 / 3.14 → 3.59 | 8.08 → 8.54 / 8.14 → 8.52 | Over the bank: music 3.17 → 3.83, drums 3.60 → 3.80, the −20 dB impulse 3.00 → 3.54; the verb's early part goes from 7.0 to 9.4 and its level from 8.4 to 8.9 |
+
+- **Early/Late** is an equal-power crossfade. The reference's level moves only 2.6 dB from early only to late only (−28.7 / −27.2 / −26.1 dB at 0 / 50 / 100 %). Round 172d's linear fade moved it 10.7 dB.
+- **The late level holds over Decay** (the reference: −27.2 / −26.8 dB at RT 2.1 / 8.6 s; ours rose by 5.6 dB) and over **Late size** (ours ran +3 dB at 0 % and −1.2 dB at 100 %).
+- The low shelf goes from +10 to +5 dB at 90 Hz: with the louder early part it was 4–7 dB too much below 80 Hz on the impulse and on music. The level is +1.4 dB.
+- **Open:**
+  - The reference's early part alone is nearly mono (L/R correlation 0.96 at Early/Late 0); ours is decorrelated (−0.55).
+  - Its RT is 1.28 / 1.22 × ours at 125 Hz / 8 kHz at the defaults.
+  - S3 (High cut 30 %, Early/Late 20 %): the music is +2.6 dB while the impulse is −2.9 dB.
 
 ## Round 150: what changed (config / design, after 147 → after 150)
 
