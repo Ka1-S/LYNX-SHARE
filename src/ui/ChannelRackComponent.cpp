@@ -1,3 +1,4 @@
+#include "core/RackLayout.h"
 #include "core/RackFilter.h"
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
@@ -662,8 +663,8 @@ ChannelRackComponent::Area ChannelRackComponent::areaAt (int x, int y, int& row)
     if (laneBounds().contains (x, y))
         return x < gridLeft() ? Area::laneLevels : Area::lane;
 
-    if (row == channels)
-        return x < gridLeft() ? Area::addRow : Area::none;
+    if (row == channels) // only the "+ add channel" box opens the menu (issue #116: as FL's + button)
+        return racklayout::addChannelBox (nameLeft(), nameWidth, rowY (row), rowHeight).contains (x, y) ? Area::addRow : Area::none;
 
     if (advancedLoopShown() && x >= loopBoxBounds (row).getX() - 3) // the column covers the steps under it
         return loopBoxBounds (row).expanded (2, 3).contains (x, y) ? Area::loop : Area::none;
@@ -989,7 +990,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
         paintLane (g);
         {
-            const auto addArea = juce::Rectangle<float> ((float) nameLeft(), (float) addY + 3, (float) nameWidth, (float) rowHeight - 6);
+            const auto box = racklayout::addChannelBox (nameLeft(), nameWidth, addY, rowHeight);
+            const auto addArea = juce::Rectangle<float> ((float) box.x, (float) box.y, (float) box.width, (float) box.height);
             const float dash[] = { 3.0f, 3.0f };
             juce::Path outline, dashed;
             outline.addRoundedRectangle (addArea.reduced (0.5f), theme::radius::md);
