@@ -615,6 +615,24 @@ StretchMethod stretchMethodForFlMode (int flMode) noexcept
     }
 }
 
+std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method, double semitones)
+{
+    auto out = timeStretch (span, ratio, method, semitones);
+    if (out == nullptr)
+        return out;
+    out->cropped = span.cropped;
+    out->cropFrom = span.cropFrom;
+    out->cropTo = span.cropTo;
+    out->acidBeats = span.acidBeats;
+    if (span.loopStart >= 0 && span.loopEnd > span.loopStart)
+    {
+        const auto scale = (double) out->frames() / (double) std::max<std::size_t> (1, span.frames());
+        out->loopStart = (std::int64_t) std::llround ((double) span.loopStart * scale);
+        out->loopEnd = std::max<std::int64_t> (out->loopStart + 1, (std::int64_t) std::llround ((double) span.loopEnd * scale));
+    }
+    return out;
+}
+
 std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones)
 {
     const auto frames = (long) in.frames();

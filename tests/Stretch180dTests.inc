@@ -77,17 +77,18 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
             r.process (state.get(), true, tick, 441, l.data(), rr.data());
             out.insert (out.end(), l.begin(), l.end());
         }
-        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn; the stretcher smears
-        // the edges of a stretched one a little
+        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured by its
+        // oscillation: after the span the clip holds its last value as DC to the clip's end, as FL does (REA_rodada167l §1;
+        // whether FL holds a trimmed span's last value too is not rendered yet)
         std::size_t firstLoud = out.size(), lastLoud = 0;
-        for (std::size_t i = 0; i < out.size(); ++i)
-            if (std::abs (out[i]) > 0.02f)
-                firstLoud = std::min (firstLoud, i), lastLoud = i;
+        for (std::size_t i = 1; i < out.size(); ++i)
+            if (std::abs (out[i]) > 0.02f && std::abs (out[i] - out[i - 1]) > 0.005f)
+                firstLoud = std::min (firstLoud, i - 1), lastLoud = i;
         const auto playedTicks = (double) (lastLoud - firstLoud) / rate * s.bpm / 60.0 * ppq;
         std::fprintf (stderr, "  [r180d] %s: drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", stretched ? "stretched" : "plain",
                       (long long) drawnTicks, playedTicks, firstLoud);
-        CHECK (firstLoud < (stretched ? 4410u : 64u));
-        CHECK (std::abs (playedTicks - (double) drawnTicks) < (stretched ? 0.25 : 0.01) * (double) drawnTicks);
+        CHECK (firstLoud < (stretched ? 441u : 64u));
+        CHECK (std::abs (playedTicks - (double) drawnTicks) < (stretched ? 0.03 : 0.01) * (double) drawnTicks);
     }
 }
 
@@ -116,12 +117,11 @@ TEST (render180d_time_stretches_what_the_precomputed_effects_leave)
     CHECK (precompute::stretchedFrames (shared, s) == 1000); // another setting, another answer
 }
 
-TEST (render180d_a_stretched_trimmed_clip_starts_as_late_as_before_at_the_same_ratio)
+TEST (render180d_a_stretched_trimmed_clip_starts_on_time)
 {
-    // The tone of a stretched trimmed clip starts some frames late: the stretcher smears the edge of the silence before it,
-    // and the trim keeps that smear. That comes with the stretch ratio, not with this round's span: the old rule (ratio
-    // from the whole file) gives the same start at the same ratio. Rendered both ways at ratio 1/0.3 s; the old rule's own
-    // TIME for this clip (1 s for a 1 s file) did not stretch at all, and played 0.3 s where FL plays 1 s.
+    // Stretching the whole file and trimming after it kept the stretcher's smear of the silence before the tone: the tone
+    // started 966 frames late at this ratio, 1848 with a ratio 0.01 % off (round 180d, bl16). Like FL, the trimmed span
+    // alone is stretched now (RackState::Factories::stretchedSpans; unset here: stretched in place): the tone starts at once.
     using namespace lynx;
     constexpr double rate = 44100.0;
     auto sample = std::make_shared<SampleData>();
@@ -131,7 +131,7 @@ TEST (render180d_a_stretched_trimmed_clip_starts_as_late_as_before_at_the_same_r
         sample->left[(std::size_t) i] = 0.5f * (float) std::sin (2.0 * 3.141592653589793 * 440.0 * i / rate);
     const std::shared_ptr<const SampleData> shared = sample;
 
-    auto onset = [&] (float stretchBeats, double forcedRatio) {
+    auto onset = [&] (float stretchBeats) {
         Song s;
         s.bpm = 120.0;
         s.mode = PlayMode::song;
@@ -152,9 +152,8 @@ TEST (render180d_a_stretched_trimmed_clip_starts_as_late_as_before_at_the_same_r
         s.playlist = { clip };
         RackState::Factories f;
         f.samples = [shared] (const std::string&) { return shared; };
-        // forcedRatio > 0: the old rule's ratio, computed by hand (target / whole file)
-        f.stretchedSamples = [shared, forcedRatio] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
-            return std::shared_ptr<const SampleData> (timeStretch (*shared, forcedRatio > 0.0 ? forcedRatio : ratio, m));
+        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
+            return std::shared_ptr<const SampleData> (timeStretch (*shared, ratio, m));
         };
         auto state = RackState::build (s, nullptr, rate, f);
         RackRenderer r;
@@ -171,11 +170,7 @@ TEST (render180d_a_stretched_trimmed_clip_starts_as_late_as_before_at_the_same_r
         }
         return -1L;
     };
-    const auto ratio = 1.0 / 0.3;
-    const auto now = onset (2.0f, 0.0);                       // this round: TIME 1 s over the 0.3 s tone
-    const auto oldSameRatio = onset (2.0f, ratio);            // the old rule's code path at the same ratio
-    const auto oldOwnTime = onset (2.0f, 1.0);                // the old rule at this TIME: the whole file, no stretch
-    std::fprintf (stderr, "  [r180d] tone onset: now %ld, old rule at the same ratio %ld, old rule at its own TIME %ld frames\n", now,
-                  oldSameRatio, oldOwnTime);
-    CHECK (now >= 0 && oldSameRatio >= 0 && std::labs (now - oldSameRatio) <= 1);
+    const auto now = onset (2.0f);
+    std::fprintf (stderr, "  [r180d] tone onset of a stretched trimmed clip: %ld frames\n", now);
+    CHECK (now >= 0 && now < 441);
 }

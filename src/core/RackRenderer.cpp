@@ -3,6 +3,7 @@
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
+#include "core/TimeStretch.h"
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
@@ -236,38 +237,55 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
-    // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
-        && factories.stretchedSamples
-        && sample->frames() > 0)
-    {
-        // FL stretches what plays: the region after its precomputed effects and Trim, not the whole file (round 180d:
-        // Thief's Importer Ride, 1.30 s of file faded out to 0.38 s, plays 2x slower in FL at TIME 367)
-        const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
-        const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, kind == InstrumentKind::audioClip) / sample->sampleRate);
-
-        const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
-                                         (double) std::llround ((double) sample->frames() * ratio));
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
-            sample = std::move (stretched);
-    }
-
     // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
     // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
     // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
-    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+    const auto clip = kind == InstrumentKind::audioClip;
+    auto spanSettings = channel.sampler;
+    if (clip)
+        spanSettings.regionStart = 0.0f, spanSettings.regionEnd = 1.0f;
+    const auto precomputes = sample != nullptr
+                             && ((kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+                                 || (clip && channel.sampler.precompute.any()));
+    auto precomputed = false;
+
+    // pitch-preserving stretch: the sample comes already stretched to the current tempo
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+        && (factories.stretchedSamples || factories.stretchedSpans)
+        && sample->frames() > 0)
     {
-        if (auto processed = precompute::apply (*sample, channel.sampler))
-            sample = std::move (processed);
+        const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
+        if (precomputes && channel.sampler.warp.empty())
+        {
+            // FL stretches what plays: the region after its precomputed effects and Trim, not the whole file (round 180d:
+            // Thief's Importer Ride, 1.30 s of file faded out to 0.38 s, plays 2x slower in FL at TIME 367). The span is cut
+            // first and only it is stretched, so the stretcher's smear of the silence around it is not kept by the trim.
+            if (std::shared_ptr<const SampleData> span = precompute::apply (*sample, spanSettings); span != nullptr && span->frames() > 0)
+            {
+                const auto ratio = target / ((double) span->frames() / span->sampleRate);
+                auto stretched = factories.stretchedSpans
+                                     ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip), span, ratio,
+                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch)
+                                     : std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, channel.sampler.stretchMethod,
+                                                                                           channel.sampler.stretchPitch));
+                sample = stretched != nullptr ? std::move (stretched) : std::move (span);
+                precomputed = true;
+            }
+        }
+        else if (factories.stretchedSamples)
+        {
+            // the whole file (no precomputed effects; or a warp map, whose markers are in the file's frames)
+            const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, clip) / sample->sampleRate);
+            const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
+                                             (double) std::llround ((double) sample->frames() * ratio));
+            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
+                sample = std::move (stretched);
+        }
     }
-    else if (sample != nullptr && kind == InstrumentKind::audioClip && channel.sampler.precompute.any())
-    {
-        auto whole = channel.sampler;
-        whole.regionStart = 0.0f;
-        whole.regionEnd = 1.0f;
-        if (auto processed = precompute::apply (*sample, whole))
+
+    if (precomputes && ! precomputed)
+        if (auto processed = precompute::apply (*sample, spanSettings))
             sample = std::move (processed);
-    }
 
     const loadtrace::Scope timing ("rack_instruments");
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));

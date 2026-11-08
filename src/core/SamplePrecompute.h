@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -589,6 +590,23 @@ inline PlayedSpan playedSpan (const std::shared_ptr<const SampleData>& in, const
         cache.erase (cache.begin());
     cache.push_back ({ in, s.regionStart, s.regionEnd, s.reverse, s.useLoopPoints, wholeRegion, s.flChannel, s.precompute, span });
     return span;
+}
+
+// What makes two precomputed spans of one file the same (the stretch cache's key for a stretched span)
+inline std::string variantKey (const SamplerSettings& s, bool wholeRegion)
+{
+    const auto& p = s.precompute;
+    std::string k;
+    auto add = [&k] (double v) { k += std::to_string (v); k += ','; };
+    add (wholeRegion ? 0.0 : s.regionStart);
+    add (wholeRegion ? 1.0 : s.regionEnd);
+    for (const auto v : { (int) s.reverse, (int) s.useLoopPoints, (int) p.removeDc, (int) p.normalize, (int) p.reversePolarity,
+                          (int) p.fadeStereo, (int) p.swapStereo, p.fadeIn, p.fadeOut, p.crossfade, p.trim, (int) p.pingPong, p.boost, p.eq,
+                          p.ringMix, p.ringFreq, p.stereoDelay, p.cutoff, p.resonance, p.reverb, p.reverbType, p.pogo, (int) p.clip })
+        add ((double) v);
+    for (const auto v : s.flChannel)
+        add ((double) v);
+    return k;
 }
 
 // The frames TIME stretches to the channel's length (see playedSpan)
