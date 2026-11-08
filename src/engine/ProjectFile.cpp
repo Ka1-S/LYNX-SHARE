@@ -3185,25 +3185,6 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index].icon = juce::jlimit (0, 0xFFFF, (int) t[1]);
             }
 
-    if (auto* modes = root["playlistTrackModes"].getArray())
-        for (const auto& t : *modes)
-            if (t.isArray() && t.size() == 4 && (int) t[0] >= 0 && (int) t[0] < 500)
-            {
-                const auto index = (std::size_t) (int) t[0];
-                const auto mixer = (int) t[2], channel = (int) t[3];
-                const auto audio = t[1].toString() == "audio";
-                if (audio ? (mixer <= 0 || mixer >= (int) song.mixer.size()) : (channel < 0 || channel >= (int) song.channels.size()))
-                    continue;
-
-                if (song.playlistTracks.size() <= index)
-                    song.playlistTracks.resize (index + 1);
-
-                auto& track = song.playlistTracks[index];
-                track.mode = audio ? PlaylistTrackMode::audio : PlaylistTrackMode::instrument;
-                track.mixerTrack = mixer > 0 && mixer < (int) song.mixer.size() ? mixer : -1;
-                track.channel = audio ? -1 : channel;
-            }
-
     if (auto* arrangements = root["arrangements"].getArray(); arrangements != nullptr && ! arrangements->isEmpty())
     {
         song.arrangements.clear();
@@ -3264,6 +3245,27 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     for (const auto& c : song.channels)
         if (c.mixerTrack >= (int) song.mixer.size())
             mixerops::ensureInsert (song, c.mixerTrack);
+
+    // track modes (round 146a), after the mixer: an audio track's insert is checked against it (issue #122: read
+    // before it, every audio track fell back to Unassigned on reopen)
+    if (auto* modes = root["playlistTrackModes"].getArray())
+        for (const auto& t : *modes)
+            if (t.isArray() && t.size() == 4 && (int) t[0] >= 0 && (int) t[0] < 500)
+            {
+                const auto index = (std::size_t) (int) t[0];
+                const auto mixer = (int) t[2], channel = (int) t[3];
+                const auto audio = t[1].toString() == "audio";
+                if (audio ? (mixer <= 0 || mixer >= (int) song.mixer.size()) : (channel < 0 || channel >= (int) song.channels.size()))
+                    continue;
+
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+
+                auto& track = song.playlistTracks[index];
+                track.mode = audio ? PlaylistTrackMode::audio : PlaylistTrackMode::instrument;
+                track.mixerTrack = mixer > 0 && mixer < (int) song.mixer.size() ? mixer : -1;
+                track.channel = audio ? -1 : channel;
+            }
 
     // sends to tracks that don't exist are discarded
     for (auto& t : song.mixer)
