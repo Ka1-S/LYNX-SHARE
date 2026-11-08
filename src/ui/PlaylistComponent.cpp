@@ -7673,6 +7673,58 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
     repaint();
 }
 
+juce::PopupMenu PatternPicker::pickerMenu()
+{
+    const auto& song = engine.getSong();
+    const auto unused = unusedPatterns (song);
+    std::size_t duplicates = 0;
+    for (const auto& group : identicalPatterns (song))
+        duplicates += group.size() - 1;
+    const juce::Component::SafePointer<PatternPicker> safe (this);
+    auto edited = [safe] {
+        if (safe != nullptr)
+        {
+            safe->picked.clear(); // (the indices moved)
+            safe->repaint();
+        }
+    };
+
+    juce::PopupMenu menu, select, sort, sortMenu;
+    menu.addSectionHeader (tr ("Tools")); // (FL: Playlist menu › Picker panel › Tools, checked in FL in round 177d)
+    select.addItem (tr ("Patterns ({0})", { juce::String ((int) unused.size()) }), ! unused.empty(), false, [safe, unused] {
+        if (safe == nullptr)
+            return;
+        safe->setView (0);
+        safe->picked.clear();
+        for (auto p : unused)
+            safe->picked.add (p);
+        safe->repaint();
+    });
+    menu.addSubMenu (tr ("Select unused"), select);
+    sortMenu.addItem (tr ("By name"), song.patterns.size() > 1, false, [this, edited] {
+        engine.editSongPatternOrder ([] (Song& s) { sortPatterns (s, PatternSort::name); });
+        edited();
+    });
+    sortMenu.addItem (tr ("By color"), song.patterns.size() > 1, false, [this, edited] {
+        engine.editSongPatternOrder ([] (Song& s) { sortPatterns (s, PatternSort::colour); });
+        edited();
+    });
+    sort.addSubMenu (tr ("Patterns"), sortMenu);
+    menu.addSubMenu (tr ("Sort"), sort);
+    menu.addSeparator();
+    // LYNX's own (not in FL)
+    menu.addItem (tr ("Delete unused patterns ({0})", { juce::String ((int) unused.size()) }), ! unused.empty() && unused.size() < song.patterns.size(), false,
+                  [this, edited] {
+                      engine.editSong ([] (Song& s) { deletePatterns (s, unusedPatterns (s)); });
+                      edited();
+                  });
+    menu.addItem (tr ("Merge identical patterns ({0})", { juce::String ((int) duplicates) }), duplicates > 0, false, [this, edited] {
+        engine.editSong ([] (Song& s) { mergeIdenticalPatterns (s); });
+        edited();
+    });
+    return menu;
+}
+
 void PatternPicker::mouseUp (const juce::MouseEvent& e)
 {
     // FL's PickerPanelMouseUp FUN_00e4e080: plain = only this one, Ctrl = toggle, Shift = the range from the first picked

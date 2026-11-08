@@ -34,7 +34,7 @@ namespace
 modulewarm::Registry& warmup(); // (slow modules started ahead, round 121: below)
 } // namespace
 
-void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize)
+void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize, bool sideInput)
 {
     // Try stereo output; plugins that don't accept it keep whatever layout they have.
     plugin.enableAllBuses();
@@ -45,10 +45,17 @@ void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int bl
         layout.outputBuses.getReference (0) = juce::AudioChannelSet::stereo();
         if (! layout.inputBuses.isEmpty())
             layout.inputBuses.getReference (0) = juce::AudioChannelSet::stereo();
-
-        if (plugin.checkBusesLayoutSupported (layout))
-            plugin.setBusesLayout (layout);
     }
+    // Issue #109: the second input bus (a sidechain input) only while something feeds it. A plugin whose detector
+    // follows an enabled side bus (Waves' dynamics) otherwise listens to silence and never acts. The other extra inputs
+    // stay off too: nothing feeds them.
+    auto withoutSide = layout;
+    for (int i = sideInput ? 2 : 1; i < withoutSide.inputBuses.size(); ++i)
+        withoutSide.inputBuses.getReference (i) = juce::AudioChannelSet::disabled();
+    if (plugin.checkBusesLayoutSupported (withoutSide))
+        plugin.setBusesLayout (withoutSide);
+    else if (! layout.outputBuses.isEmpty() && plugin.checkBusesLayoutSupported (layout))
+        plugin.setBusesLayout (layout); // (a plugin that refuses it keeps its buses on, as before)
 
     plugin.setRateAndBufferSizeDetails (sampleRate, blockSize);
     plugin.prepareToPlay (sampleRate, blockSize);
@@ -576,19 +583,13 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
-    if (const auto side = sideInputChannels (*plugin); side > 0)
-    {
-        const auto first = plugin->getChannelIndexInProcessBlockBuffer (true, 1, 0);
-        if (first >= 2 && first + side <= buffer.getNumChannels())
-        {
-            sideChannel = first;
-            sideCount = juce::jmin (2, side);
-        }
-    }
+    sideBus = hasSideBus (*plugin);
+    findSideChannel();
     if (fixedBlock > 0)
     {
-        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), sideChannel >= 0 ? 4 : 2);
-        if (sideChannel >= 0)
+        // (with a side bus the fixed blocks always carry it, so turning it on later changes nothing here)
+        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), sideBus || sideChannel >= 0 ? 4 : 2);
+        if (sideBus || sideChannel >= 0)
             sideScratch.assign ((std::size_t) blockSize * 2, 0.0f);
     }
     options = o;
@@ -654,6 +655,44 @@ void PluginEffect::setParameter (int index, float value) noexcept
         failed (code);
 }
 
+void PluginEffect::findSideChannel() noexcept
+{
+    sideChannel = -1;
+    sideCount = 0;
+    if (const auto side = sideInputChannels (*plugin); side > 0)
+    {
+        const auto first = plugin->getChannelIndexInProcessBlockBuffer (true, 1, 0);
+        if (first >= 2 && first + side <= buffer.getNumChannels())
+        {
+            sideChannel = first;
+            sideCount = juce::jmin (2, side);
+        }
+    }
+}
+
+void PluginEffect::setSideInputActive (bool on)
+{
+    if (! sideBus || on == (sideChannel >= 0) || crashed.load (std::memory_order_relaxed))
+        return;
+    const std::lock_guard<std::mutex> lock (layoutLock); // waits for the block in progress
+    if (const auto code = crashguard::run ([this, on] {
+            plugin->releaseResources();
+            preparePlugin (*plugin, plugin->getSampleRate(), plugin->getBlockSize(), on);
+        });
+        code != 0)
+    {
+        failed (code);
+        return;
+    }
+    buffer.setSize (bufferChannels (*plugin), blockSize);
+    findSideChannel();
+}
+
+bool hasSideBus (const juce::AudioPluginInstance& plugin)
+{
+    return plugin.getBusCount (true) >= 2;
+}
+
 int sideInputChannels (const juce::AudioPluginInstance& plugin)
 {
     if (plugin.getBusCount (true) < 2)
@@ -699,6 +738,46 @@ public:
     void getStateInformation (juce::MemoryBlock&) override {}
     void setStateInformation (const void*, int) override {}
 };
+
+// issue #109: a compressor as Waves' RCompressor behaves: its detector follows the side bus when that bus is on, its own
+// input otherwise; a level over 0.5 turns the output down to a quarter
+class SideDetectCompressor final : public juce::AudioPluginInstance
+{
+public:
+    SideDetectCompressor()
+        : AudioPluginInstance (BusesProperties()
+                                   .withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                   .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
+                                   .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+    {
+    }
+    void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = "LYNX side compressor"; d.pluginFormatName = "Internal"; }
+    const juce::String getName() const override { return "LYNX side compressor"; }
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    bool isBusesLayoutSupported (const BusesLayout&) const override { return true; }
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+    {
+        const auto* side = getBusCount (true) > 1 ? getBus (true, 1) : nullptr;
+        auto detector = side != nullptr && side->isEnabled() ? getBusBuffer (buffer, true, 1) : getBusBuffer (buffer, true, 0);
+        const auto level = detector.getMagnitude (0, buffer.getNumSamples());
+        if (level > 0.5f)
+            for (int c = 0; c < 2; ++c)
+                buffer.applyGain (c, 0, buffer.getNumSamples(), 0.25f);
+    }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+};
 } // namespace
 
 juce::String pluginSidechainSelfTest()
@@ -708,11 +787,15 @@ juce::String pluginSidechainSelfTest()
     {
         auto instance = std::make_unique<SideEchoPlugin>();
         preparePlugin (*instance, 48000.0, block);
-        if (sideInputChannels (*instance) != 2)
-            return "ERROR no side bus";
+        // issue #109: the side bus stays off until the slot has a source
+        if (sideInputChannels (*instance) != 0 || ! hasSideBus (*instance))
+            return "ERROR side bus on without a source";
         PluginEffect fx (std::move (instance), block, fixedBlock);
-        if (! fx.hasSideInput())
-            return "ERROR side bus not found";
+        if (! fx.canTakeSideInput() || fx.hasSideInput())
+            return "ERROR side bus not found, or on without a source";
+        fx.setSideInputActive (true);
+        if (! fx.hasSideInput() || sideInputChannels (fx.getInstance()) != 2)
+            return "ERROR side bus not turned on";
         std::vector<float> l (block, 0.25f), r (block, 0.25f), sl (block), sr (block);
         for (int i = 0; i < block; ++i)
         {
@@ -735,6 +818,40 @@ juce::String pluginSidechainSelfTest()
             fx.process (l.data(), r.data(), block, params, 120.0);
         if (std::abs (l[block - 1]) > 1.0e-6f || std::abs (r[block - 1]) > 1.0e-6f)
             return "ERROR stale side input (fixed " + juce::String (fixedBlock) + ")";
+        // the source removed: the bus goes off again
+        fx.setSideInputActive (false);
+        if (fx.hasSideInput() || sideInputChannels (fx.getInstance()) != 0)
+            return "ERROR side bus still on (fixed " + juce::String (fixedBlock) + ")";
+    }
+
+    // issue #109 (Waves RCompressor): a compressor whose detector follows its side bus when that bus is on. With no
+    // source picked it must hear its own input and act; with a source it follows the source.
+    for (const auto fixedBlock : { 0, 64 })
+    {
+        auto instance = std::make_unique<SideDetectCompressor>();
+        preparePlugin (*instance, 48000.0, block);
+        PluginEffect fx (std::move (instance), block, fixedBlock);
+        EffectParams params {};
+        std::vector<float> l (block), r (block), quiet (block, 0.0f);
+        auto run = [&] (const float* side) {
+            for (int pass = 0; pass < (fixedBlock > 0 ? 2 : 1); ++pass)
+            {
+                std::fill (l.begin(), l.end(), 0.8f);
+                std::fill (r.begin(), r.end(), 0.8f);
+                if (side != nullptr)
+                    fx.setSidechain (side, side);
+                fx.process (l.data(), r.data(), block, params, 120.0);
+            }
+            return l[block - 1];
+        };
+        if (std::abs (run (nullptr) - 0.2f) > 1.0e-6f)
+            return "ERROR compressor without a source doesn't act (fixed " + juce::String (fixedBlock) + ")";
+        fx.setSideInputActive (true);
+        if (std::abs (run (quiet.data()) - 0.8f) > 1.0e-6f)
+            return "ERROR compressor doesn't follow its source (fixed " + juce::String (fixedBlock) + ")";
+        fx.setSideInputActive (false);
+        if (std::abs (run (nullptr) - 0.2f) > 1.0e-6f)
+            return "ERROR compressor deaf after the source is removed (fixed " + juce::String (fixedBlock) + ")";
     }
     return "OK";
 }
@@ -755,6 +872,10 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
     };
     if (crashed.load (std::memory_order_relaxed))
         return; // bypassed: the input plays through
+    // the buses being laid out again (a sidechain source picked or removed, issue #109): this block plays dry
+    const std::unique_lock<std::mutex> layout (layoutLock, std::try_to_lock);
+    if (! layout.owns_lock())
+        return;
     if (resetPending.exchange (false, std::memory_order_relaxed))
         if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
         {

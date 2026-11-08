@@ -208,7 +208,7 @@ bool Song::insertInUse (int t) const
         return true;
     // round 163 (hiding unused inserts): a fader, pan, mute or colour moved by hand, or automation on it, counts too
     const auto& m = mixer[(std::size_t) t];
-    if (m.volume != unityFader || m.pan != 0.0f || m.muted || m.solo || m.colour != 0 || m.stereo != 0.0f || m.eq.active()
+    if (m.volume != unityFader || m.pan != 0.0f || m.muted || m.solo || m.colour != 0 || m.stereo != 0.0f || m.eq.hasBoostOrCut()
         || m.outputChannel != outputDefault)
         return true;
     if (std::any_of (mixer.begin(), mixer.end(), [t] (const MixerTrack& o) {

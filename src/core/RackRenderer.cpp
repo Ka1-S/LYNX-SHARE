@@ -633,6 +633,16 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         }
     }
 
+    // Issue #109: a hosted plugin's side input is on only while its slot has a sidechain source (the same test as
+    // setSidechain below); a running plugin keeps its instance and state
+    for (std::size_t t = 0; t < state->effects.size() && t < song.mixer.size(); ++t)
+        for (std::size_t i = 0; i < state->effects[t].size() && i < song.mixer[t].effects.size(); ++i)
+            if (song.mixer[t].effects[i].kind == EffectKind::plugin && state->effects[t][i] != nullptr)
+            {
+                const auto source = song.mixer[t].effects[i].sidechain;
+                state->effects[t][i]->setSideInputActive (source >= 0 && source != (int) t && source < (int) song.mixer.size());
+            }
+
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
     // playback, the Playlist's pattern clips and export all play them without any cost on the audio thread
     // FL's legacy Pattern Blocks (round 170f): plain pattern clips from here on (playback, export, song length)

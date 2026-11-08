@@ -189,17 +189,24 @@ public:
         sideR = right;
     }
     bool hasSideInput() const noexcept { return sideChannel >= 0; }
+    // Issue #109: the plugin has a side input bus. It is on only while the slot has a sidechain source
+    // (setSideInputActive, called by the rack build, never on the audio thread; the block that meets the change plays dry).
+    bool canTakeSideInput() const noexcept { return sideBus; }
+    void setSideInputActive (bool on) override;
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
 
 private:
     void failed (std::uint32_t code) noexcept;
     void flushMidiControls() noexcept;
+    void findSideChannel() noexcept;
 
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     juce::AudioBuffer<float> buffer;
     juce::MidiBuffer midi;
     midictl::State midiControls;
     int blockSize;
+    bool sideBus = false;   // the plugin has a second input bus (issue #109)
+    std::mutex layoutLock;  // held by process() (try_lock) and by setSideInputActive while it lays the buses out again
     std::string name;
     std::atomic<bool> crashed { false };
     std::unique_ptr<FixedBlock> fixed;
@@ -213,6 +220,8 @@ private:
 
 // Round 177b: the channels of a plugin's second input bus (its sidechain input), 0 when it has none (or it is off).
 int sideInputChannels (const juce::AudioPluginInstance& plugin);
+// The plugin has a second input bus, on or off (issue #109: what decides whether the "Sidechain from" picker shows).
+bool hasSideBus (const juce::AudioPluginInstance& plugin);
 // --selftest: a stand-in plugin with a stereo sidechain bus (it outputs its side input) inside PluginEffect, plain and
 // with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
 juce::String pluginSidechainSelfTest();
@@ -466,7 +475,8 @@ std::unique_ptr<juce::AudioPluginInstance> createRightInstance (juce::AudioPlugi
                                                                 double sampleRate, int blockSize, juce::String& error);
 
 // Stereo layout (if the plugin accepts it), rate and block size; calls prepareToPlay.
-void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize);
+// `sideInput`: the second input bus (a sidechain input) on; off by default (issue #109).
+void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize, bool sideInput = false);
 
 // Current plugin state as base64 (for saving in the project).
 std::string capturePluginState (juce::AudioPluginInstance& plugin);

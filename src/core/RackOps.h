@@ -99,6 +99,24 @@ int clonePattern (Song& song, int index);
 // follow. Returns false at the ends.
 bool movePattern (Song& song, int index, int delta);
 
+// --- pattern hygiene (round 177d; FL's Playlist picker "Select unused › Patterns" and "Sort patterns by name / color",
+// EEPickerSelectUnusedPatternsMenu / EEPickerSortPatternsBy*Menu in FLEngine; LYNX's own: merge identical patterns) ----
+// Patterns that no clip plays in any arrangement, no pattern block uses and no Loop Starter channel belongs to (ascending).
+std::vector<int> unusedPatterns (const Song& song);
+// Deletes the given patterns (clips follow, as Song::removePattern). Returns how many went.
+int deletePatterns (Song& song, std::vector<int> indices);
+// Puts pattern `order[k]` at index k (a permutation of every pattern); clips, blocks, Loop Starter channels and the
+// current pattern follow.
+void reorderPatterns (Song& song, const std::vector<int>& order);
+enum class PatternSort : std::uint8_t { name, colour };
+void sortPatterns (Song& song, PatternSort by);
+// Groups of patterns with the same content (notes, events, length, loops, markers, Loop Starter genre; the name and colour may differ),
+// each group ascending, only groups of two or more.
+std::vector<std::vector<int>> identicalPatterns (const Song& song);
+// Every clip of a duplicate plays the group's first pattern instead, and the duplicates are deleted. Returns how many
+// patterns were removed.
+int mergeIdenticalPatterns (Song& song);
+
 // --- step sequencer (docs/WORKFLOW_FL.md P2: fill, Euclidean fill, rotate, graph lanes) --------------
 
 // Steps the pattern shows in the rack (its length in sixteenths, at least 16).
