@@ -5,7 +5,7 @@ namespace rack183c
 {
 using namespace lynx;
 
-bool near (float a, float b, float tol = 1.0e-3f) { return std::abs (a - b) <= tol; }
+bool approx (float a, float b, float tol = 1.0e-3f) { return std::abs (a - b) <= tol; }
 
 // one block of a steady 0.5 / 0.5 input through a graph; returns the output's first and last samples (left, right)
 std::array<float, 4> run (patcher::Graph& g, int n = 512, float in = 0.5f)
@@ -68,20 +68,20 @@ TEST (rack183c_note_fades_match_lives_renders)
     z.velocity = { 1, 127, 80, 127 };
     const std::pair<int, float> fadeIn[] { { 10, 1.25f }, { 20, 5.0f }, { 40, 20.0f }, { 60, 45.0f }, { 70, 61.25f }, { 80, 80.0f }, { 127, 127.0f } };
     for (const auto& [v, want] : fadeIn)
-        CHECK (near (rack::zoneVelocity (z, 60, (float) v / 127.0f, 0.0f) * 127.0f, want, 0.01f));
+        CHECK (approx (rack::zoneVelocity (z, 60, (float) v / 127.0f, 0.0f) * 127.0f, want, 0.01f));
     // the zone's first velocity still plays, at velocity 1
-    CHECK (near (rack::zoneVelocity (z, 60, 1.0f / 127.0f, 0.0f) * 127.0f, 1.0f, 0.01f));
+    CHECK (approx (rack::zoneVelocity (z, 60, 1.0f / 127.0f, 0.0f) * 127.0f, 1.0f, 0.01f));
     // fade-out: full to 40 (Live: 50 / 100 / 127 -> 44.3 / 31.8 / 1.44)
     z.velocity = { 1, 127, 1, 40 };
-    CHECK (near (rack::zoneVelocity (z, 60, 50.0f / 127.0f, 0.0f) * 127.0f, 44.32f, 0.02f));
-    CHECK (near (rack::zoneVelocity (z, 60, 100.0f / 127.0f, 0.0f) * 127.0f, 31.82f, 0.02f));
-    CHECK (near (rack::zoneVelocity (z, 60, 1.0f, 0.0f) * 127.0f, 1.443f, 0.01f));
+    CHECK (approx (rack::zoneVelocity (z, 60, 50.0f / 127.0f, 0.0f) * 127.0f, 44.32f, 0.02f));
+    CHECK (approx (rack::zoneVelocity (z, 60, 100.0f / 127.0f, 0.0f) * 127.0f, 31.82f, 0.02f));
+    CHECK (approx (rack::zoneVelocity (z, 60, 1.0f, 0.0f) * 127.0f, 1.443f, 0.01f));
     // key zone 48..127 full from 60 at velocity 127 (Live: keys 48 / 52 / 56 / 58 -> 9.72 / 48.60 / 87.92 / 107.45)
     PatchZone k;
     k.key = { 48, 127, 60, 127 };
     const std::pair<int, float> keys[] { { 48, 9.77f }, { 52, 48.85f }, { 56, 87.92f }, { 58, 107.46f }, { 60, 127.0f }, { 72, 127.0f } };
     for (const auto& [key, want] : keys)
-        CHECK (near (rack::zoneVelocity (k, key, 1.0f, 0.0f) * 127.0f, want, 0.05f));
+        CHECK (approx (rack::zoneVelocity (k, key, 1.0f, 0.0f) * 127.0f, want, 0.05f));
     // outside a zone: the note doesn't enter
     CHECK (rack::zoneVelocity (k, 47, 1.0f, 0.0f) == 0.0f);
     PatchZone s;
@@ -90,7 +90,7 @@ TEST (rack183c_note_fades_match_lives_renders)
     CHECK (rack::zoneVelocity (s, 60, 1.0f, 19.0f) == 0.0f);
     CHECK (rack::zoneVelocity (s, 60, 1.0f, 40.0f) == 1.0f); // (an Instrument Rack's select fade is on its output, not the velocity)
     s.selectorScalesVelocity = true;                          // (a MIDI Effect Rack's is on the velocity)
-    CHECK (near (rack::zoneVelocity (s, 60, 1.0f, 40.0f), 21.0f / 41.0f));
+    CHECK (approx (rack::zoneVelocity (s, 60, 1.0f, 40.0f), 21.0f / 41.0f));
 }
 
 TEST (rack183c_output_fade_pan_and_volume_match_lives_renders)
@@ -100,12 +100,12 @@ TEST (rack183c_output_fade_pan_and_volume_match_lives_renders)
     const RackZone in { 20, 127, 60, 127 };
     const std::pair<float, float> ins[] { { 20, 0.0383f }, { 25, 0.2279f }, { 30, 0.4091f }, { 40, 0.7205f }, { 50, 0.9275f }, { 55, 0.9817f }, { 60, 1.0f }, { 90, 1.0f } };
     for (const auto& [x, want] : ins)
-        CHECK (near (rack::selectOutputGain (in, x), want));
+        CHECK (approx (rack::selectOutputGain (in, x), want));
     // fade-out 0..100 full to 40 (Live: 55 / 70 / 100 -> 0.9263 / 0.7162 / 0.0257)
     const RackZone out { 0, 100, 0, 40 };
-    CHECK (near (rack::selectOutputGain (out, 55.0f), 0.9263f));
-    CHECK (near (rack::selectOutputGain (out, 70.0f), 0.7162f));
-    CHECK (near (rack::selectOutputGain (out, 100.0f), 0.0257f));
+    CHECK (approx (rack::selectOutputGain (out, 55.0f), 0.9263f));
+    CHECK (approx (rack::selectOutputGain (out, 70.0f), 0.7162f));
+    CHECK (approx (rack::selectOutputGain (out, 100.0f), 0.0257f));
     // outside: silent on a side that fades; on a side with no fade the output rings on (the input closes instead)
     CHECK (rack::selectOutputGain (in, 10.0f) == 0.0f && rack::selectOutputGain (out, 110.0f) == 0.0f);
     const RackZone hard { 64, 127, 64, 127 };
@@ -115,17 +115,17 @@ TEST (rack183c_output_fade_pan_and_volume_match_lives_renders)
     rack::panGains (0.0f, l, r);
     CHECK (l == 1.0f && r == 1.0f);
     rack::panGains (-0.5f, l, r);
-    CHECK (near (l, 1.3066f) && near (r, 0.5412f));
+    CHECK (approx (l, 1.3066f) && approx (r, 0.5412f));
     rack::panGains (1.0f, l, r);
-    CHECK (near (l, 0.0f) && near (r, 1.4142f));
+    CHECK (approx (l, 0.0f) && approx (r, 1.4142f));
     // the chain volume taper (Live's stored values): 0 dB at 0.85, -10 dB at 0.6, +6 dB at 1, -32 dB near 0.22
-    CHECK (near (rack::volumeGain (0.85f), 1.0f, 1.0e-4f));
-    CHECK (near (20.0f * std::log10 (rack::volumeGain (0.6f)), -10.0f, 0.01f));
-    CHECK (near (20.0f * std::log10 (rack::volumeGain (1.0f)), 6.0f, 0.01f));
+    CHECK (approx (rack::volumeGain (0.85f), 1.0f, 1.0e-4f));
+    CHECK (approx (20.0f * std::log10 (rack::volumeGain (0.6f)), -10.0f, 0.01f));
+    CHECK (approx (20.0f * std::log10 (rack::volumeGain (1.0f)), 6.0f, 0.01f));
     CHECK (std::abs (20.0f * std::log10 (rack::volumeGain (0.22f)) - (-32.0f)) < 1.0f);
     CHECK (rack::volumeGain (0.0f) == 0.0f);
     for (const float v : { 0.1f, 0.3f, 0.4f, 0.6f, 0.85f, 1.0f })
-        CHECK (near (rack::volumeValue (rack::volumeGain (v)), v, 1.0e-4f));
+        CHECK (approx (rack::volumeValue (rack::volumeGain (v)), v, 1.0e-4f));
 }
 
 TEST (rack183c_audio_rack_sums_chains_with_volume_pan_solo_and_selector)
@@ -141,7 +141,7 @@ TEST (rack183c_audio_rack_sums_chains_with_volume_pan_solo_and_selector)
     {
         auto g = graphOf (doc);
         const auto o = run (*g);
-        CHECK (near (o[2], 1.0f) && near (o[3], 1.0f));
+        CHECK (approx (o[2], 1.0f) && approx (o[3], 1.0f));
     }
     // solo: only the soloed chain; the activator: a chain off is silent
     rack::setSolo (doc, 1, true);
@@ -149,7 +149,7 @@ TEST (rack183c_audio_rack_sums_chains_with_volume_pan_solo_and_selector)
     {
         auto g = graphOf (doc);
         const auto o = run (*g);
-        CHECK (near (o[2], 0.25f));
+        CHECK (approx (o[2], 0.25f));
     }
     rack::setSolo (doc, 1, false);
     rack::setActive (doc, 0, false);
@@ -158,7 +158,7 @@ TEST (rack183c_audio_rack_sums_chains_with_volume_pan_solo_and_selector)
     {
         auto g = graphOf (doc);
         const auto o = run (*g);
-        CHECK (near (o[2], 0.5f * 1.3066f) && near (o[3], 0.5f * 0.5412f));
+        CHECK (approx (o[2], 0.5f * 1.3066f) && approx (o[3], 0.5f * 0.5412f));
     }
     // the chain selector: chain 1 fades in over 20..60; at 40 its output is sin (pi/2 * 21/41)
     rack::setActive (doc, 0, true);
@@ -171,12 +171,12 @@ TEST (rack183c_audio_rack_sums_chains_with_volume_pan_solo_and_selector)
         auto g = graphOf (doc);
         run (*g); // (the control cables act from the next block)
         const auto o = run (*g);
-        CHECK (near (o[2], 0.5f * 0.7205f, 2.0e-3f));
+        CHECK (approx (o[2], 0.5f * 0.7205f, 2.0e-3f));
         // automation of the selector (published parameter 16) moves it on the audio thread
         g->setPublished (rack::selectorOutput, 90.0f / 127.0f);
         run (*g);
         const auto o2 = run (*g);
-        CHECK (near (o2[2], 0.5f, 2.0e-3f));
+        CHECK (approx (o2[2], 0.5f, 2.0e-3f));
     }
 }
 
@@ -202,25 +202,25 @@ TEST (rack183c_macros_map_one_owner_per_target_and_drive_the_graph)
     CHECK (rack::macroName (doc.rack[0], 1, "Gain") == "Gain" && rack::macroName (doc.rack[0], 0) == "Macro 1");
     // the macro at 127: the utility's gain at -12 dB, in the document and in the running graph
     rack::setMacro (doc, 1, 127.0f);
-    CHECK (near (doc.nodes[(std::size_t) u].effect.params[0], 0.25f));
-    CHECK (near (rack::mappedValue (m, 63.5f), 0.375f));
+    CHECK (approx (doc.nodes[(std::size_t) u].effect.params[0], 0.25f));
+    CHECK (approx (rack::mappedValue (m, 63.5f), 0.375f));
     {
         auto g = graphOf (doc);
         run (*g);
         const auto o = run (*g);
-        CHECK (near (o[2], 0.5f * std::pow (10.0f, -12.0f / 20.0f), 2.0e-3f));
+        CHECK (approx (o[2], 0.5f * std::pow (10.0f, -12.0f / 20.0f), 2.0e-3f));
         // automation of macro 2 (published parameter 1): back to 0 dB
         g->setPublished (1, 0.0f);
         run (*g);
         const auto o2 = run (*g);
-        CHECK (near (o2[2], 0.5f, 2.0e-3f));
+        CHECK (approx (o2[2], 0.5f, 2.0e-3f));
     }
     // a macro on a chain's volume
     RackMapping v;
     v.target = RackMapping::Target::chainVolume, v.chain = 0, v.min = 0.0f, v.max = rack::unityVolume;
     CHECK (rack::map (doc, 2, v));
     rack::setMacro (doc, 2, 127.0f);
-    CHECK (near (doc.rack[0].chains[0].volume, 1.0f, 1.0e-4f));
+    CHECK (approx (doc.rack[0].chains[0].volume, 1.0f, 1.0e-4f));
     // unmap / invert
     CHECK (rack::invertRange (doc, 1, 0) && doc.rack[0].macros[1].mappings[0].min == 0.25f);
     CHECK (rack::unmap (doc, 1, 0) && doc.rack[0].macros[1].mappings.empty());
@@ -263,7 +263,7 @@ TEST (rack183c_variations_randomize_and_the_morph)
     CHECK (rack::launchVariation (doc, 0));
     CHECK (doc.rack[0].macros[0].value == 10.0f && doc.rack[0].macros[1].value == 20.0f && doc.rack[0].macros[2].value == 127.0f
            && doc.rack[0].macros[5].value == 3.0f);
-    CHECK (near (doc.nodes[(std::size_t) u].effect.params[0], 10.0f / 127.0f));
+    CHECK (approx (doc.nodes[(std::size_t) u].effect.params[0], 10.0f / 127.0f));
     // rename, duplicate, delete, overwrite
     CHECK (rack::renameVariation (doc, 0, "Verse") && doc.rack[0].variations[0].name == "Verse");
     CHECK (rack::duplicateVariation (doc, 0) == 1 && doc.rack[0].variations.size() == 3 && doc.rack[0].variations[1].name == "Verse");
@@ -281,9 +281,9 @@ TEST (rack183c_variations_randomize_and_the_morph)
     doc.rack[0].morphOn = true, doc.rack[0].morphA = 0, doc.rack[0].morphB = 1;
     rack::compile (doc);
     const auto mv = rack::morphValues (doc.rack[0], 0.5f);
-    CHECK (near (mv[0], (64.0f + 110.0f) / 2.0f) && near (mv[1], (20.0f + 120.0f) / 2.0f) && mv[2] == doc.rack[0].macros[2].value);
+    CHECK (approx (mv[0], (64.0f + 110.0f) / 2.0f) && approx (mv[1], (20.0f + 120.0f) / 2.0f) && mv[2] == doc.rack[0].macros[2].value);
     rack::setMorph (doc, 0.5f);
-    CHECK (near (doc.rack[0].macros[0].value, 87.0f));
+    CHECK (approx (doc.rack[0].macros[0].value, 87.0f));
     // in the graph the morph knob drives the morphing macros' cables (automation: published parameter 17)
     {
         auto g = graphOf (doc);
@@ -492,15 +492,15 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
     CHECK (r.chains[0].name == "Dry" && r.chains[1].name == "EQ Eight"); // (no user name: Live's effective name)
     CHECK (r.chains[0].nodes.size() == 1 && r.chains[1].nodes.empty());
     CHECK (r.chains[0].select == (RackZone { 0, 63, 0, 40 }) && r.chains[1].select == (RackZone { 40, 127, 63, 127 }));
-    CHECK (near (r.chains[1].volume, 0.5f) && near (r.chains[1].pan, -0.25f));
+    CHECK (approx (r.chains[1].volume, 0.5f) && approx (r.chains[1].pan, -0.25f));
     CHECK (r.macros[0].name == "Tone" && r.macros[1].name.empty() && r.macros[2].name == "Level" && r.macros[0].value == 64.0f && r.macros[3].excludeFromRandom);
     CHECK (r.shownMacros == 4 && r.selector == 20.0f);
     // the mappings: macro 3 → the plugin's parameter 1 (0.2…0.8); macro 2 → chain 2's volume; macro 1 → the selector
     RackMapping p;
     p.node = r.chains[0].nodes[0], p.param = 1;
     int at2 = -1;
-    CHECK (rack::macroOf (r, p, &at2) == 2 && near (r.macros[2].mappings[(std::size_t) std::max (0, at2)].min, 0.2f)
-           && near (r.macros[2].mappings[(std::size_t) std::max (0, at2)].max, 0.8f));
+    CHECK (rack::macroOf (r, p, &at2) == 2 && approx (r.macros[2].mappings[(std::size_t) std::max (0, at2)].min, 0.2f)
+           && approx (r.macros[2].mappings[(std::size_t) std::max (0, at2)].max, 0.8f));
     RackMapping vol;
     vol.target = RackMapping::Target::chainVolume, vol.chain = 1;
     CHECK (rack::macroOf (r, vol) == 1);
@@ -572,16 +572,16 @@ TEST (rack183c_als_racks_export_and_round_trip)
             CHECK (a.kind == b.kind && a.chains.size() == b.chains.size() && a.shownMacros == b.shownMacros && a.selector == b.selector);
             for (std::size_t c = 0; c < std::min (a.chains.size(), b.chains.size()); ++c)
                 CHECK (a.chains[c].name == b.chains[c].name && a.chains[c].select == b.chains[c].select && a.chains[c].key == b.chains[c].key
-                       && a.chains[c].velocity == b.chains[c].velocity && near (a.chains[c].volume, b.chains[c].volume, 1.0e-5f)
-                       && near (a.chains[c].pan, b.chains[c].pan, 1.0e-5f) && a.chains[c].nodes.size() == b.chains[c].nodes.size());
+                       && a.chains[c].velocity == b.chains[c].velocity && approx (a.chains[c].volume, b.chains[c].volume, 1.0e-5f)
+                       && approx (a.chains[c].pan, b.chains[c].pan, 1.0e-5f) && a.chains[c].nodes.size() == b.chains[c].nodes.size());
             for (int k = 0; k < rackMacroCount; ++k)
             {
                 const auto& x = a.macros[(std::size_t) k];
                 const auto& y = b.macros[(std::size_t) k];
                 CHECK (x.name == y.name && x.value == y.value && x.excludeFromRandom == y.excludeFromRandom && x.mappings.size() == y.mappings.size());
                 for (std::size_t m = 0; m < std::min (x.mappings.size(), y.mappings.size()); ++m)
-                    CHECK (x.mappings[m].target == y.mappings[m].target && near (x.mappings[m].min, y.mappings[m].min, 1.0e-4f)
-                           && near (x.mappings[m].max, y.mappings[m].max, 1.0e-4f) && x.mappings[m].param == y.mappings[m].param);
+                    CHECK (x.mappings[m].target == y.mappings[m].target && approx (x.mappings[m].min, y.mappings[m].min, 1.0e-4f)
+                           && approx (x.mappings[m].max, y.mappings[m].max, 1.0e-4f) && x.mappings[m].param == y.mappings[m].param);
             }
             CHECK (a.variations == b.variations);
         }
