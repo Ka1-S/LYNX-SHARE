@@ -170,6 +170,7 @@ add_library(lynx_core STATIC
     src/core/LynxVerbs.cpp
     src/core/FlPatcher.cpp
     src/core/Patcher.cpp
+    src/core/Rack.cpp
     src/core/Vfx.cpp
     src/core/VfxSequencer.cpp
     src/core/ThreeOsc.cpp

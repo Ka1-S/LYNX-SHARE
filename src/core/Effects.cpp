@@ -1,5 +1,6 @@
 #include "core/Patcher.h"
 #include "core/Effects.h"
+#include "core/Rack.h"
 #include "core/FormulaController.h"
 #include "core/RhythmPan.h"
 #include "core/MixSuite.h"
@@ -2986,6 +2987,11 @@ const EffectInfo& effectInfo (EffectKind kind)
         case EffectKind::kilnChannel: return mixsuite::kilnInfo();
         case EffectKind::fretChannel: return mixsuite::fretInfo();
         case EffectKind::shellChannel: return mixsuite::shellInfo();
+        case EffectKind::rackMixer:
+        {
+            static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
+            return rackMixerInfo;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3422,6 +3428,24 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return text;
         }
 
+        case EffectKind::rackMixer: // (round 183c: Live's chain units)
+            if (param == rack::mixerVolume)
+            {
+                const auto g = rack::volumeGain (v);
+                if (g <= 0.0f)
+                    return "-inf dB";
+                std::snprintf (text, sizeof (text), "%.1f dB", 20.0f * std::log10 (g));
+            }
+            else if (param == rack::mixerPan)
+            {
+                const auto pan = (int) std::lround ((v * 2.0f - 1.0f) * 50.0f);
+                if (pan == 0)
+                    return "C";
+                std::snprintf (text, sizeof (text), "%d%s", std::abs (pan), pan < 0 ? "L" : "R");
+            }
+            else
+                std::snprintf (text, sizeof (text), "%.0f%%", v * 100.0f);
+            return text;
         case EffectKind::utility:
             if (param == 0)
             {
@@ -4078,6 +4102,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
         case EffectKind::shellChannel: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
         case EffectKind::epochVerb:

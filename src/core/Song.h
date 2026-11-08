@@ -492,6 +492,7 @@ struct SampleZone
 // The two host nodes are "From LYNX" (patchFromHost: the slot's audio input, its side-chain, the channel's notes)
 // and "To LYNX" (patchToHost: the main audio output and the extra outputs to other mixer inserts).
 struct PatchNode; // defined after EffectSlot
+struct RackDoc;   // defined after PatchNode (round 183c)
 constexpr int patchFromHost = -1, patchToHost = -2;
 // FL's Patcher "Surface" node (REA round 151): its control outputs are the Surface tab's controls
 constexpr int patchSurface = -3;
@@ -519,6 +520,28 @@ struct SurfaceControl
     bool operator== (const SurfaceControl&) const = default;
 };
 
+// A rack zone (round 183c, docs/analise/REA_rodada183c.md §3; Live's KeyRange / VelocityRange / BranchSelectorRange):
+// the chain is open on [lo, hi], at full level on [fadeLo, fadeHi], fading in over [lo, fadeLo] and out over
+// [fadeHi, hi] (lo ≤ fadeLo ≤ fadeHi ≤ hi, values 0…127).
+struct RackZone
+{
+    int lo = 0, hi = 127, fadeLo = 0, fadeHi = 127;
+    bool operator== (const RackZone&) const = default;
+};
+
+// A rack chain's note filter on a MIDI cable (round 183c): the notes a cable passes and their velocity in the fades.
+// `selector` = the Surface output that holds the chain selector (−1: no chain-select zone); `selectorScalesVelocity`:
+// a MIDI Effect Rack's chain-select fade attenuates velocity (Instrument Racks fade the chain's output instead).
+struct PatchZone
+{
+    RackZone key, velocity { 1, 127, 1, 127 }, select;
+    int selector = -1;
+    float selectorMin = 0.0f, selectorMax = 1.0f; // the selector's range over the Surface value (a macro-mapped selector)
+    bool selectorScalesVelocity = false;
+    bool selectorFiltersCtrl = false; // Live's "Chain Selector Filters MIDI Ctrl"
+    bool operator== (const PatchZone&) const = default;
+};
+
 struct PatchWire
 {
     enum class Kind : std::uint8_t { audio, midi, control };
@@ -530,7 +553,14 @@ struct PatchWire
                               // control: the destination's parameter index
     float gain = 1.0f;        // audio: linear cable gain
     bool enabled = true;      // FL's disabled cable: ignored in the sum
-    std::vector<float> curve; // control: value map over 0..1 (≥ 2 points; empty = straight)
+    std::vector<float> curve; // control: value map over 0..1 (≥ 2 points; empty = straight); audio with gainSource: the
+                              // gain map over the source's value
+    // Rack chains (round 183c, built by core/Rack.h only, never saved with the cable): a MIDI cable's note filter
+    // (PatcherDoc::zones index, −1 none); an audio cable's pan (−1..1) and the Surface output that scales its gain
+    // through `curve` (the chain-select fade; −1 none)
+    int zone = -1;
+    float pan = 0.0f;
+    int gainSource = -1;
     // MIDI (round 162): "From LYNX" output pins: fromPort 0 = Notes (the channel's notes), patchMidiPortPin (N) = what
     // reaches the Patcher on MIDI port N; a node's MIDI output (MIDI Out) = fromPort 0; a node's notes input = toPort 0;
     // "To LYNX": toPort N = MIDI port N.
@@ -595,7 +625,13 @@ struct PatcherDoc
         return n;
     }
 
-    bool empty() const noexcept { return nodes.empty() && wires.empty(); }
+    // Rack mode (round 183c, core/Rack.h): the Rack this Patcher shows instead of its Map (0 or 1 element; empty = FL's
+    // Patcher). The nodes are the rack's devices; the cables, Surface and published parameters are built from it.
+    std::vector<RackDoc> rack;
+    std::vector<PatchZone> zones; // the cables' note filters (rack mode)
+
+    bool isRack() const noexcept { return ! rack.empty(); }
+    bool empty() const noexcept { return nodes.empty() && wires.empty() && rack.empty(); }
     bool operator== (const PatcherDoc& o) const; // (Song.cpp: needs PatchNode)
 };
 
@@ -884,10 +920,11 @@ enum class EffectKind : std::uint8_t
     flTransporter,   // FL's Transporter, exact (REA_rodada167f-transporter, core/TransporterFl.h): FL's 22 controls (raw − min) / range + source, stereo, send
     kilnChannel,     // LYNX's console channel (round tp172c7, core/MixSuite.h kiln): six measured console models, drive, noise, group bypass
     fretChannel,     // LYNX's guitar / bass channel strip (round tp172c8, core/MixSuite.h fret): phase correction, EQ, compressor, amp
-    shellChannel     // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    shellChannel,    // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    rackMixer        // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::shellChannel;
+constexpr EffectKind lastEffectKind = EffectKind::rackMixer;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).
@@ -981,6 +1018,86 @@ struct PatchNode
     std::vector<int> paramIns, paramOuts;
 
     bool operator== (const PatchNode& o) const;
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Racks (round 183c, docs/analise/REA_rodada183c.md; Live's Instrument / Audio Effect / MIDI Effect Racks): a Patcher in
+// rack mode. Chains run in parallel on the same input; each has zones, a volume, a pan, an activator and a solo. Up to
+// 16 macros map onto any parameter of the rack's devices; variations store macro values. core/Rack.h builds the
+// Patcher's cables from this.
+constexpr int rackMacroCount = 16;
+
+// What a macro moves: a device's parameter (a node of the Patcher: its parameter index; a nested rack's macro k is its
+// published parameter k), a chain's volume or pan, or the rack's chain selector. Live's law (REA §4): linear from
+// `min` to `max` in the target's 0..1 range (min > max inverts).
+struct RackMapping
+{
+    enum class Target : std::uint8_t { param, chainVolume, chainPan, selector };
+    Target target = Target::param;
+    int node = -1;  // param: the Patcher node
+    int chain = -1; // chainVolume / chainPan
+    int param = 0;  // param: the node's parameter
+    float min = 0.0f, max = 1.0f;
+    bool operator== (const RackMapping&) const = default;
+};
+
+struct RackMacro
+{
+    std::string name;          // "" = "Macro N", or the mapped parameter's name when it has one mapping
+    int colour = -1;           // −1 = the theme's
+    float value = 0.0f;        // 0…127 (Live's scale)
+    float defaultValue = -1.0f; // −1 = none (Live's MacroDefaults)
+    bool excludeFromRandom = false, excludeFromVariations = false;
+    std::vector<RackMapping> mappings;
+    bool operator== (const RackMacro&) const = default;
+};
+
+struct RackVariation
+{
+    std::string name;
+    std::array<float, rackMacroCount> values {}; // 0…127
+    std::array<bool, rackMacroCount> has {};     // false = the macro is left alone on launch
+    bool operator== (const RackVariation&) const = default;
+};
+
+struct RackChain
+{
+    std::string name;
+    int colour = -1;
+    bool active = true, solo = false;
+    float volume = 1.0f; // linear gain (Live: −70 dB…+6 dB)
+    float pan = 0.0f;    // −1..1
+    RackZone key, velocity { 1, 127, 1, 127 }, select { 0, 0, 0, 0 };
+    std::vector<int> nodes; // the Patcher's nodes in signal order: MIDI effects (VFX), the instrument, audio effects
+    int mixer = -1;         // the chain's "rack chain mixer" node (volume, pan, chain-select gain)
+    int gate = -1;          // an Audio Effect Rack chain's input gate (a zone without a fade closes the input)
+    bool operator== (const RackChain&) const = default;
+};
+
+struct RackDoc
+{
+    enum class Kind : std::uint8_t { audioEffect, instrument, midiEffect };
+    Kind kind = Kind::audioEffect;
+    std::vector<RackChain> chains;
+    std::array<RackMacro, rackMacroCount> macros {};
+    int shownMacros = 8;        // 1, 2, 4 … 16
+    float selector = 0.0f;      // the chain selector, 0…127
+    bool selectorFiltersCtrl = false;
+    std::vector<RackVariation> variations;
+    int selectedVariation = -1;
+    // LYNX's own (decision D6, off by default): a Morph knob between variations A and B, and a glide on launch
+    bool morphOn = false;
+    int morphA = -1, morphB = -1;
+    float morph = 0.0f;   // 0..1
+    float glideMs = 0.0f; // 0 = Live's instant jump
+    // a standalone MIDI Effect Rack (decision R1): the channels its notes play, like a Layer's children
+    std::vector<int> children;
+    // the views (saved with the project, as Live saves them)
+    bool showMacros = true, showChains = false, showDevices = false, showVariations = false;
+    int zoneEditor = -1; // −1 hidden, 0 key, 1 velocity, 2 chain select
+    int selectedChain = 0;
+    bool autoSelect = false;
+    bool operator== (const RackDoc&) const = default;
 };
 
 // The insert a Fruity Send slot sends its mid-chain signal to (1…127), or −1 (none, or not a Fruity Send).

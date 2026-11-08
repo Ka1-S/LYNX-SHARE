@@ -181,7 +181,17 @@ private:
         int node = 0, midiChannel = -1; // −1 = the incoming channel (a MIDI Out node on the way sets its own)
         bool vfx = false;               // a VFX node: the voice goes into its processor
         bool layer = false;             // a Layer node (round 165c): the note plays the nodes on its Children pin
+        int zone = -1;                  // a rack chain's note filter on the way (round 183c): zoneStates index
     };
+    // A rack chain's note filter (round 183c, core/Rack.h): which notes it let through, so their note-offs follow
+    struct ZoneState
+    {
+        PatchZone zone;
+        std::array<std::uint16_t, 128> held {}; // [key] the MIDI channels (bit) of the notes that entered
+    };
+    std::vector<ZoneState> zoneStates;
+    // true = the note enters (its velocity scaled by the zone); a note-off passes only if its note-on did
+    bool zoneGate (int zone, bool on, int key, int midiChannel, float& velocity) noexcept;
     // A Layer node (round 165c, FL's Layer inside a Patcher): the generator nodes cabled to its Children pin are its
     // children, in node order; Random / Sequential / Crossfade and its level, pan and pitch as a Layer channel's.
     struct LayerNode;

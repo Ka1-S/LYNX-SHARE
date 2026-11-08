@@ -1,0 +1,1118 @@
+#include "core/Rack.h"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
+
+#include "core/Effects.h"
+
+namespace lynx::rack
+{
+// ---------------------------------------------------------------------------------------------------------------
+// Laws
+
+float volumeGain (float v) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (v <= 0.0f)
+        return 0.0f;
+    if (v >= 0.4f) // 40 dB per unit, 0 dB at 0.85 (REA §4 [DATA], 0.4 = −18 dB)
+        return std::pow (10.0f, 40.0f * (v - unityVolume) / 20.0f);
+    return 0.12589254f * std::pow (v / 0.4f, 2.75f); // (continuous at −18 dB; fitted within 1 dB to Live's values)
+}
+
+float volumeValue (float gain) noexcept
+{
+    if (! (gain > 0.0f))
+        return 0.0f;
+    const auto db = 20.0f * std::log10 (gain);
+    if (db >= -18.0f)
+        return std::clamp (unityVolume + db / 40.0f, 0.0f, 1.0f);
+    return std::clamp (0.4f * std::pow (gain / 0.12589254f, 1.0f / 2.75f), 0.0f, 1.0f);
+}
+
+void panGains (float pan, float& left, float& right) noexcept
+{
+    // [RENDER] REA §8: equal power with unity at the centre, +3 dB on the near side at the ends (−0.5: +2.32 / −5.33 dB)
+    const auto theta = (std::clamp (pan, -1.0f, 1.0f) + 1.0f) * 0.78539816f;
+    left = 1.41421356f * std::cos (theta);
+    right = 1.41421356f * std::sin (theta);
+    if (std::abs (pan) < 1.0e-6f)
+        left = right = 1.0f;
+}
+
+bool inZone (const RackZone& z, float x) noexcept { return x >= (float) z.lo && x <= (float) z.hi; }
+
+float fadeGain (const RackZone& z, float x) noexcept
+{
+    // [RENDER] REA §8: linear, counting both ends: x = lo gives 1 / (fadeLo − lo + 1), fadeLo gives 1
+    if (! inZone (z, x))
+        return 0.0f;
+    if (x < (float) z.fadeLo && z.fadeLo > z.lo)
+        return std::clamp ((x - (float) z.lo + 1.0f) / (float) (z.fadeLo - z.lo + 1), 0.0f, 1.0f);
+    if (x > (float) z.fadeHi && z.hi > z.fadeHi)
+        return std::clamp (((float) z.hi - x + 1.0f) / (float) (z.hi - z.fadeHi + 1), 0.0f, 1.0f);
+    return 1.0f;
+}
+
+bool fadesTowards (const RackZone& z, float x) noexcept
+{
+    return x < (float) z.lo ? z.fadeLo > z.lo : x > (float) z.hi ? z.hi > z.fadeHi : false;
+}
+
+float selectOutputGain (const RackZone& z, float x) noexcept
+{
+    if (inZone (z, x))
+        return std::sin (1.57079633f * fadeGain (z, x)); // [RENDER] REA §8: sin (π/2 · the note fade), within 0.001
+    return fadesTowards (z, x) ? 0.0f : 1.0f; // (no fade on that side: the output rings out, the input is closed)
+}
+
+bool selectInputOpen (const RackZone& z, float x) noexcept { return inZone (z, x); }
+
+float zoneSelector (const PatchZone& zone, float surfaceValue) noexcept
+{
+    const auto v = zone.selectorMin + (zone.selectorMax - zone.selectorMin) * std::clamp (surfaceValue, 0.0f, 1.0f);
+    return std::clamp (v, 0.0f, 1.0f) * 127.0f;
+}
+
+float zoneVelocity (const PatchZone& zone, int key, float velocity, float selector) noexcept
+{
+    const auto v127 = std::clamp (velocity * 127.0f, 1.0f, 127.0f);
+    auto gain = fadeGain (zone.key, (float) key) * fadeGain (zone.velocity, std::round (v127));
+    if (zone.selector >= 0)
+    {
+        if (! inZone (zone.select, selector))
+            return 0.0f;
+        if (zone.selectorScalesVelocity)
+            gain *= fadeGain (zone.select, selector);
+    }
+    if (gain <= 0.0f)
+        return 0.0f;
+    // [RENDER] REA §8: the velocity is scaled, not rounded, and a note that enters keeps a velocity of at least 1
+    return std::max (1.0f / 127.0f, velocity * gain);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Documents
+
+namespace
+{
+bool isMidiEffectNode (const PatchNode& n) noexcept { return n.generator && n.channel.instrument == InstrumentKind::vfx; }
+bool isInstrumentNode (const PatchNode& n) noexcept { return n.generator && n.channel.instrument != InstrumentKind::vfx; }
+
+PatchNode mixerNode()
+{
+    PatchNode n;
+    n.effect = makeEffectSlot (EffectKind::rackMixer);
+    n.label = "Chain mixer";
+    return n;
+}
+
+int midiPortOfMidiRack() noexcept { return 0; }
+
+// shifts every rack index above `node` down by one (the node was erased from the Patcher)
+void forgetNode (RackDoc& r, int node)
+{
+    for (auto& c : r.chains)
+    {
+        std::erase (c.nodes, node);
+        for (auto& n : c.nodes)
+            if (n > node)
+                --n;
+        for (auto* k : { &c.mixer, &c.gate })
+            *k = *k == node ? -1 : (*k > node ? *k - 1 : *k);
+    }
+    for (auto& m : r.macros)
+    {
+        std::erase_if (m.mappings, [node] (const RackMapping& x) { return x.target == RackMapping::Target::param && x.node == node; });
+        for (auto& x : m.mappings)
+            if (x.target == RackMapping::Target::param && x.node > node)
+                --x.node;
+    }
+}
+
+void eraseNode (PatcherDoc& doc, int node)
+{
+    if (node < 0 || node >= (int) doc.nodes.size())
+        return;
+    doc.nodes.erase (doc.nodes.begin() + node);
+    doc.wires.clear(); // (compile() builds them again)
+    if (auto* r = rackOf (doc))
+        forgetNode (*r, node);
+}
+
+int newNode (PatcherDoc& doc, PatchNode node)
+{
+    doc.nodes.push_back (std::move (node));
+    return (int) doc.nodes.size() - 1;
+}
+
+void addChainNodes (PatcherDoc& doc, RackChain& chain, RackDoc::Kind kind)
+{
+    if (kind == RackDoc::Kind::midiEffect)
+        return;
+    if (chain.mixer < 0)
+        chain.mixer = newNode (doc, mixerNode());
+    if (kind == RackDoc::Kind::audioEffect && chain.gate < 0)
+    {
+        auto gate = mixerNode();
+        gate.label = "Chain input";
+        chain.gate = newNode (doc, std::move (gate));
+    }
+}
+
+std::vector<float> sampledCurve (int points, auto&& f)
+{
+    std::vector<float> curve ((std::size_t) points);
+    for (int i = 0; i < points; ++i)
+        curve[(std::size_t) i] = std::clamp (f ((float) i / (float) (points - 1)), 0.0f, 1.0f);
+    return curve;
+}
+
+// The selector's source on the Surface and its range there: its own control, or the macro mapped onto it
+void selectorSource (const RackDoc& r, int& output, float& lo, float& hi)
+{
+    output = selectorOutput;
+    lo = 0.0f;
+    hi = 1.0f;
+    for (int m = 0; m < rackMacroCount; ++m)
+        for (const auto& x : r.macros[(std::size_t) m].mappings)
+            if (x.target == RackMapping::Target::selector)
+            {
+                output = m;
+                lo = x.min;
+                hi = x.max;
+                return;
+            }
+}
+
+bool morphing (const RackDoc& r, int macro) noexcept
+{
+    if (! r.morphOn || r.morphA < 0 || r.morphB < 0 || r.morphA >= (int) r.variations.size() || r.morphB >= (int) r.variations.size())
+        return false;
+    const auto& a = r.variations[(std::size_t) r.morphA];
+    const auto& b = r.variations[(std::size_t) r.morphB];
+    return a.has[(std::size_t) macro] && b.has[(std::size_t) macro] && ! r.macros[(std::size_t) macro].excludeFromVariations;
+}
+} // namespace
+
+const RackDoc* rackOf (const PatcherDoc& doc) noexcept { return doc.rack.empty() ? nullptr : &doc.rack.front(); }
+RackDoc* rackOf (PatcherDoc& doc) noexcept { return doc.rack.empty() ? nullptr : &doc.rack.front(); }
+bool isRack (const EffectSlot& slot) noexcept { return slot.kind == EffectKind::patcher && slot.patcher.isRack(); }
+bool isRack (const ChannelDef& channel) noexcept { return channel.instrument == InstrumentKind::patcher && channel.patcher.isRack(); }
+
+PatcherDoc makeRack (RackDoc::Kind kind)
+{
+    PatcherDoc doc;
+    RackDoc r;
+    r.kind = kind;
+    r.showMacros = true;
+    doc.rack.push_back (std::move (r));
+    addChain (doc);
+    return doc;
+}
+
+EffectSlot makeRackSlot (RackDoc::Kind kind)
+{
+    auto slot = makeEffectSlot (EffectKind::patcher);
+    slot.patcher = makeRack (kind);
+    return slot;
+}
+
+const std::vector<int>& devices (const RackDoc& rack, int chain)
+{
+    static const std::vector<int> none;
+    return chain >= 0 && chain < (int) rack.chains.size() ? rack.chains[(std::size_t) chain].nodes : none;
+}
+
+bool isChainNode (const RackDoc& rack, int node) noexcept
+{
+    for (const auto& c : rack.chains)
+        if (c.mixer == node || c.gate == node)
+            return true;
+    return false;
+}
+
+void compile (PatcherDoc& doc)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr)
+        return;
+    doc.wires.clear();
+    doc.zones.clear();
+    doc.published.clear();
+    doc.fromMidiPorts.clear();
+    doc.toMidiPorts.clear();
+    doc.outputTracks.clear();
+
+    // the Surface: 16 macros, the chain selector, the morph (their values; the knobs are the rack's own UI)
+    doc.surface.assign ((std::size_t) surfaceOutputs, SurfaceControl {});
+    for (int k = 0; k < surfaceOutputs; ++k)
+    {
+        auto& s = doc.surface[(std::size_t) k];
+        s.kind = SurfaceControl::Kind::knob;
+        s.x = 40.0f + 60.0f * (float) (k % 9);
+        s.y = 30.0f + 60.0f * (float) (k / 9);
+        if (k < rackMacroCount)
+        {
+            s.name = macroName (*r, k);
+            s.value = std::clamp (r->macros[(std::size_t) k].value / 127.0f, 0.0f, 1.0f);
+        }
+        else if (k == selectorOutput)
+        {
+            s.name = "Chain Selector";
+            s.value = std::clamp (r->selector / 127.0f, 0.0f, 1.0f);
+        }
+        else
+        {
+            s.name = "Morph";
+            s.value = std::clamp (r->morph, 0.0f, 1.0f);
+        }
+        // automation: published parameter k sets Surface control k (one lane moves every mapping of a macro)
+        PatchParam p;
+        p.node = patchSurface;
+        p.param = k;
+        p.name = s.name;
+        doc.published.push_back (std::move (p));
+    }
+
+    int selOut = selectorOutput;
+    float selLo = 0.0f, selHi = 1.0f;
+    selectorSource (*r, selOut, selLo, selHi);
+    const auto selectorAt = [&] (float x) { return std::clamp (selLo + (selHi - selLo) * x, 0.0f, 1.0f) * 127.0f; };
+
+    const auto count = (int) doc.nodes.size();
+    const auto valid = [count] (int n) { return n >= 0 && n < count; };
+    bool anySolo = false;
+    for (const auto& c : r->chains)
+        anySolo = anySolo || c.solo;
+
+    for (int ci = 0; ci < (int) r->chains.size(); ++ci)
+    {
+        auto& c = r->chains[(std::size_t) ci];
+        const auto audible = c.active && (! anySolo || c.solo);
+        std::erase_if (c.nodes, [&] (int n) { return ! valid (n); });
+
+        // places on the Map (for anyone who opens it as a Patcher)
+        const auto y = 60.0f + 90.0f * (float) ci;
+        float x = 150.0f;
+        auto place = [&] (int n) {
+            if (valid (n))
+            {
+                doc.nodes[(std::size_t) n].x = x;
+                doc.nodes[(std::size_t) n].y = y;
+                x += 130.0f;
+            }
+        };
+
+        if (r->kind == RackDoc::Kind::audioEffect)
+        {
+            int previous = patchFromHost;
+            auto link = [&] (int n) {
+                PatchWire w;
+                w.kind = PatchWire::Kind::audio;
+                w.from = previous;
+                w.to = n;
+                doc.wires.push_back (w);
+                previous = n;
+            };
+            if (valid (c.gate))
+            {
+                place (c.gate);
+                link (c.gate);
+                auto& gate = doc.nodes[(std::size_t) c.gate].effect;
+                gate.params[(std::size_t) mixerVolume] = unityVolume;
+                gate.params[(std::size_t) mixerPan] = 0.5f;
+                PatchWire sel;
+                sel.kind = PatchWire::Kind::control;
+                sel.from = patchSurface;
+                sel.fromPort = selOut;
+                sel.to = c.gate;
+                sel.toPort = mixerSelect;
+                sel.curve = sampledCurve (129, [&] (float v) { return selectInputOpen (c.select, selectorAt (v)) ? 1.0f : 0.0f; });
+                doc.wires.push_back (std::move (sel));
+            }
+            for (const auto n : c.nodes)
+                if (! doc.nodes[(std::size_t) n].generator)
+                {
+                    place (n);
+                    link (n);
+                }
+            if (valid (c.mixer))
+            {
+                place (c.mixer);
+                link (c.mixer);
+            }
+            PatchWire out;
+            out.kind = PatchWire::Kind::audio;
+            out.from = previous;
+            out.to = patchToHost;
+            out.enabled = audible;
+            doc.wires.push_back (out);
+        }
+        else
+        {
+            // notes: From LYNX → (the chain's zones) → MIDI effects → the instrument; audio: instrument → effects → mixer
+            PatchZone z;
+            z.key = c.key;
+            z.velocity = c.velocity;
+            z.select = c.select;
+            z.selector = selOut;
+            z.selectorMin = selLo;
+            z.selectorMax = selHi;
+            z.selectorScalesVelocity = r->kind == RackDoc::Kind::midiEffect;
+            z.selectorFiltersCtrl = r->selectorFiltersCtrl;
+            const auto zone = (int) doc.zones.size();
+            doc.zones.push_back (z);
+
+            int noteFrom = patchFromHost, notePin = 0;
+            bool first = true;
+            int instrument = -1;
+            for (const auto n : c.nodes)
+            {
+                const auto& node = doc.nodes[(std::size_t) n];
+                if (! node.generator)
+                    continue;
+                place (n);
+                PatchWire w;
+                w.kind = PatchWire::Kind::midi;
+                w.from = noteFrom;
+                w.fromPort = notePin;
+                w.to = n;
+                w.enabled = c.active;
+                w.zone = first ? zone : -1;
+                doc.wires.push_back (w);
+                first = false;
+                if (isMidiEffectNode (node))
+                {
+                    noteFrom = n;
+                    notePin = 0;
+                }
+                else
+                {
+                    instrument = n;
+                    break;
+                }
+            }
+            if (r->kind == RackDoc::Kind::midiEffect)
+            {
+                if (noteFrom != patchFromHost) // the last MIDI effect plays on "To LYNX" port 0 (the rack's children)
+                {
+                    PatchWire w;
+                    w.kind = PatchWire::Kind::midi;
+                    w.from = noteFrom;
+                    w.fromPort = 0;
+                    w.to = patchToHost;
+                    w.toPort = midiPortOfMidiRack();
+                    w.enabled = audible;
+                    doc.wires.push_back (w);
+                    if (std::find (doc.toMidiPorts.begin(), doc.toMidiPorts.end(), midiPortOfMidiRack()) == doc.toMidiPorts.end())
+                        doc.toMidiPorts.push_back (midiPortOfMidiRack());
+                }
+                continue;
+            }
+            int previous = instrument;
+            if (previous >= 0)
+                for (const auto n : c.nodes)
+                    if (! doc.nodes[(std::size_t) n].generator)
+                    {
+                        place (n);
+                        PatchWire w;
+                        w.kind = PatchWire::Kind::audio;
+                        w.from = previous;
+                        w.to = n;
+                        doc.wires.push_back (w);
+                        previous = n;
+                    }
+            if (valid (c.mixer))
+            {
+                place (c.mixer);
+                if (previous >= 0)
+                {
+                    PatchWire w;
+                    w.kind = PatchWire::Kind::audio;
+                    w.from = previous;
+                    w.to = c.mixer;
+                    doc.wires.push_back (w);
+                }
+                PatchWire out;
+                out.kind = PatchWire::Kind::audio;
+                out.from = c.mixer;
+                out.to = patchToHost;
+                out.enabled = audible;
+                doc.wires.push_back (out);
+            }
+        }
+
+        // the chain mixer: volume, pan, and the chain-select gain from the selector (or its macro)
+        if (valid (c.mixer))
+        {
+            auto& mixer = doc.nodes[(std::size_t) c.mixer].effect;
+            mixer.params[(std::size_t) mixerVolume] = volumeValue (c.volume);
+            mixer.params[(std::size_t) mixerPan] = std::clamp ((c.pan + 1.0f) * 0.5f, 0.0f, 1.0f);
+            mixer.params[(std::size_t) mixerSelect] = 1.0f;
+            PatchWire sel;
+            sel.kind = PatchWire::Kind::control;
+            sel.from = patchSurface;
+            sel.fromPort = selOut;
+            sel.to = c.mixer;
+            sel.toPort = mixerSelect;
+            sel.curve = sampledCurve (129, [&] (float v) { return selectOutputGain (c.select, selectorAt (v)); });
+            doc.wires.push_back (std::move (sel));
+        }
+    }
+
+    // macro mappings: a control cable each, the curve {min, max} (Live's linear law in the target's 0..1 range); with
+    // the morph on, a morphing macro's cables come from the Morph knob (A's value → B's)
+    for (int m = 0; m < rackMacroCount; ++m)
+        for (const auto& x : r->macros[(std::size_t) m].mappings)
+        {
+            PatchWire w;
+            w.kind = PatchWire::Kind::control;
+            w.from = patchSurface;
+            w.fromPort = m;
+            w.curve = { std::clamp (x.min, 0.0f, 1.0f), std::clamp (x.max, 0.0f, 1.0f) };
+            if (morphing (*r, m))
+            {
+                const auto a = r->variations[(std::size_t) r->morphA].values[(std::size_t) m];
+                const auto b = r->variations[(std::size_t) r->morphB].values[(std::size_t) m];
+                w.fromPort = morphOutput;
+                w.curve = { mappedValue (x, a), mappedValue (x, b) };
+            }
+            switch (x.target)
+            {
+                case RackMapping::Target::param:
+                    if (! valid (x.node) || x.param < 0)
+                        continue;
+                    w.to = x.node;
+                    w.toPort = x.param;
+                    break;
+                case RackMapping::Target::chainVolume:
+                case RackMapping::Target::chainPan:
+                    if (x.chain < 0 || x.chain >= (int) r->chains.size() || ! valid (r->chains[(std::size_t) x.chain].mixer))
+                        continue;
+                    w.to = r->chains[(std::size_t) x.chain].mixer;
+                    w.toPort = x.target == RackMapping::Target::chainVolume ? mixerVolume : mixerPan;
+                    break;
+                case RackMapping::Target::selector: continue; // (composed into the selector's cables above)
+            }
+            doc.wires.push_back (std::move (w));
+        }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Chains and devices
+
+int addChain (PatcherDoc& doc, const std::string& name)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr)
+        return -1;
+    RackChain c;
+    c.name = name.empty() ? "Chain " + std::to_string (r->chains.size() + 1) : name;
+    addChainNodes (doc, c, r->kind);
+    r = rackOf (doc);
+    r->chains.push_back (std::move (c));
+    r->selectedChain = (int) r->chains.size() - 1;
+    compile (doc);
+    return (int) r->chains.size() - 1;
+}
+
+bool removeChain (PatcherDoc& doc, int chain)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+        return false;
+    auto nodes = r->chains[(std::size_t) chain].nodes;
+    for (const auto k : { r->chains[(std::size_t) chain].mixer, r->chains[(std::size_t) chain].gate })
+        if (k >= 0)
+            nodes.push_back (k);
+    for (auto& m : r->macros) // its volume / pan mappings go; the later chains' move down
+    {
+        std::erase_if (m.mappings, [chain] (const RackMapping& x) { return x.target != RackMapping::Target::param && x.target != RackMapping::Target::selector && x.chain == chain; });
+        for (auto& x : m.mappings)
+            if (x.target != RackMapping::Target::param && x.chain > chain)
+                --x.chain;
+    }
+    r->chains.erase (r->chains.begin() + chain);
+    std::sort (nodes.rbegin(), nodes.rend());
+    for (const auto n : nodes)
+        eraseNode (doc, n);
+    r = rackOf (doc);
+    r->selectedChain = std::clamp (r->selectedChain, 0, std::max (0, (int) r->chains.size() - 1));
+    compile (doc);
+    return true;
+}
+
+int duplicateChain (PatcherDoc& doc, int chain)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+        return -1;
+    auto copy = r->chains[(std::size_t) chain];
+    std::vector<std::pair<int, int>> moved; // old node → new node (for the mappings, which a copy keeps as Live does)
+    for (auto& n : copy.nodes)
+    {
+        auto node = doc.nodes[(std::size_t) n];
+        node.effect.instance = {};
+        const auto now = newNode (doc, std::move (node));
+        moved.emplace_back (n, now);
+        n = now;
+    }
+    copy.mixer = copy.gate = -1;
+    copy.solo = false;
+    r = rackOf (doc);
+    addChainNodes (doc, copy, r->kind);
+    r = rackOf (doc);
+    for (auto& m : r->macros)
+    {
+        const auto before = m.mappings.size();
+        for (std::size_t i = 0; i < before; ++i)
+        {
+            auto x = m.mappings[i];
+            if (x.target != RackMapping::Target::param)
+                continue;
+            for (const auto& [from, to] : moved)
+                if (x.node == from)
+                {
+                    x.node = to;
+                    m.mappings.push_back (x);
+                }
+        }
+    }
+    r->chains.insert (r->chains.begin() + chain + 1, std::move (copy));
+    r->selectedChain = chain + 1;
+    compile (doc);
+    return chain + 1;
+}
+
+bool moveChain (PatcherDoc& doc, int from, int to)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || from < 0 || from >= (int) r->chains.size() || to < 0 || to >= (int) r->chains.size() || from == to)
+        return false;
+    auto c = std::move (r->chains[(std::size_t) from]);
+    r->chains.erase (r->chains.begin() + from);
+    r->chains.insert (r->chains.begin() + to, std::move (c));
+    for (auto& m : r->macros)
+        for (auto& x : m.mappings)
+            if (x.target == RackMapping::Target::chainVolume || x.target == RackMapping::Target::chainPan)
+            {
+                if (x.chain == from)
+                    x.chain = to;
+                else if (from < to && x.chain > from && x.chain <= to)
+                    --x.chain;
+                else if (to < from && x.chain >= to && x.chain < from)
+                    ++x.chain;
+            }
+    r->selectedChain = to;
+    compile (doc);
+    return true;
+}
+
+int addDevice (PatcherDoc& doc, int chain, PatchNode node, int position)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+        return -1;
+    // what each rack kind holds (Live, REA §1): audio effects only; MIDI effects only; MIDI effects, one instrument,
+    // audio effects
+    const auto midi = isMidiEffectNode (node), instrument = isInstrumentNode (node);
+    if ((r->kind == RackDoc::Kind::audioEffect && node.generator) || (r->kind == RackDoc::Kind::midiEffect && ! midi))
+        return -1;
+    auto& list = r->chains[(std::size_t) chain].nodes;
+    auto rankOf = [&] (const PatchNode& n) { return isMidiEffectNode (n) ? 0 : isInstrumentNode (n) ? 1 : 2; };
+    if (instrument && std::any_of (list.begin(), list.end(), [&] (int n) { return isInstrumentNode (doc.nodes[(std::size_t) n]); }))
+        return -1; // (one instrument per chain)
+    const auto rank = rankOf (node);
+    const auto size = (int) list.size();
+    position = position < 0 || position > size ? size : position;
+    // the first place that keeps the order: after every device of a lower rank, before every one of a higher rank
+    int lo = 0, hi = size;
+    for (int i = 0; i < size; ++i)
+    {
+        const auto k = rankOf (doc.nodes[(std::size_t) list[(std::size_t) i]]);
+        if (k < rank)
+            lo = i + 1;
+        if (k > rank && hi == size)
+            hi = i;
+    }
+    position = std::clamp (position, lo, std::max (lo, hi));
+    const auto index = newNode (doc, std::move (node));
+    r = rackOf (doc);
+    auto& nodes = r->chains[(std::size_t) chain].nodes;
+    nodes.insert (nodes.begin() + position, index);
+    compile (doc);
+    return index;
+}
+
+bool removeDevice (PatcherDoc& doc, int chain, int position)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size() || position < 0 || position >= (int) r->chains[(std::size_t) chain].nodes.size())
+        return false;
+    eraseNode (doc, r->chains[(std::size_t) chain].nodes[(std::size_t) position]);
+    compile (doc);
+    return true;
+}
+
+bool moveDevice (PatcherDoc& doc, int chain, int from, int to)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+        return false;
+    auto& list = r->chains[(std::size_t) chain].nodes;
+    if (from < 0 || from >= (int) list.size() || to < 0 || to >= (int) list.size() || from == to)
+        return false;
+    const auto n = list[(std::size_t) from];
+    const auto& node = doc.nodes[(std::size_t) n];
+    // an Instrument Rack's order is kept: a device moves only among its own kind
+    const auto lo = (int) std::count_if (list.begin(), list.end(), [&] (int k) {
+        const auto& d = doc.nodes[(std::size_t) k];
+        return isMidiEffectNode (node) ? false : isInstrumentNode (node) ? isMidiEffectNode (d) : d.generator;
+    });
+    const auto same = (int) std::count_if (list.begin(), list.end(), [&] (int k) {
+        const auto& d = doc.nodes[(std::size_t) k];
+        return isMidiEffectNode (d) == isMidiEffectNode (node) && d.generator == node.generator;
+    });
+    to = std::clamp (to, lo, lo + same - 1);
+    if (to == from)
+        return false;
+    list.erase (list.begin() + from);
+    list.insert (list.begin() + to, n);
+    compile (doc);
+    return true;
+}
+
+void setSolo (PatcherDoc& doc, int chain, bool solo)
+{
+    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    {
+        r->chains[(std::size_t) chain].solo = solo;
+        compile (doc);
+    }
+}
+
+void setActive (PatcherDoc& doc, int chain, bool active)
+{
+    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    {
+        r->chains[(std::size_t) chain].active = active;
+        compile (doc);
+    }
+}
+
+void setChainVolume (PatcherDoc& doc, int chain, float gain)
+{
+    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    {
+        r->chains[(std::size_t) chain].volume = std::clamp (gain, 0.0f, volumeGain (1.0f));
+        compile (doc);
+    }
+}
+
+void setChainPan (PatcherDoc& doc, int chain, float pan)
+{
+    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    {
+        r->chains[(std::size_t) chain].pan = std::clamp (pan, -1.0f, 1.0f);
+        compile (doc);
+    }
+}
+
+void setSelector (PatcherDoc& doc, float value)
+{
+    if (auto* r = rackOf (doc))
+    {
+        r->selector = std::clamp (value, 0.0f, 127.0f);
+        if ((std::size_t) selectorOutput < doc.surface.size())
+            doc.surface[(std::size_t) selectorOutput].value = r->selector / 127.0f;
+        else
+            compile (doc);
+    }
+}
+
+EffectSlot group (const std::vector<EffectSlot>& slots)
+{
+    auto slot = makeRackSlot (RackDoc::Kind::audioEffect);
+    for (const auto& s : slots)
+    {
+        PatchNode n;
+        n.effect = s;
+        n.effect.row = -1;
+        n.effect.instance = {};
+        addDevice (slot.patcher, 0, std::move (n));
+    }
+    return slot;
+}
+
+std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot)
+{
+    std::vector<EffectSlot> out;
+    const auto* r = rackOf (rackSlot.patcher);
+    if (! isRack (rackSlot) || r == nullptr || r->kind != RackDoc::Kind::audioEffect || r->chains.size() != 1)
+        return out;
+    for (const auto n : r->chains.front().nodes)
+        if (n >= 0 && n < (int) rackSlot.patcher.nodes.size())
+            out.push_back (rackSlot.patcher.nodes[(std::size_t) n].effect);
+    return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Macros
+
+bool sameTarget (const RackMapping& a, const RackMapping& b) noexcept
+{
+    if (a.target != b.target)
+        return false;
+    switch (a.target)
+    {
+        case RackMapping::Target::param: return a.node == b.node && a.param == b.param;
+        case RackMapping::Target::chainVolume:
+        case RackMapping::Target::chainPan: return a.chain == b.chain;
+        case RackMapping::Target::selector: return true;
+    }
+    return false;
+}
+
+int macroOf (const RackDoc& rack, const RackMapping& target, int* mappingIndex) noexcept
+{
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        const auto& list = rack.macros[(std::size_t) m].mappings;
+        for (int i = 0; i < (int) list.size(); ++i)
+            if (sameTarget (list[(std::size_t) i], target))
+            {
+                if (mappingIndex != nullptr)
+                    *mappingIndex = i;
+                return m;
+            }
+    }
+    return -1;
+}
+
+bool map (PatcherDoc& doc, int macro, const RackMapping& mapping)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || macro < 0 || macro >= rackMacroCount)
+        return false;
+    switch (mapping.target)
+    {
+        case RackMapping::Target::param:
+            if (mapping.node < 0 || mapping.node >= (int) doc.nodes.size() || isChainNode (*r, mapping.node) || mapping.param < 0)
+                return false;
+            break;
+        case RackMapping::Target::chainVolume:
+        case RackMapping::Target::chainPan:
+            if (mapping.chain < 0 || mapping.chain >= (int) r->chains.size() || r->kind == RackDoc::Kind::midiEffect)
+                return false;
+            break;
+        case RackMapping::Target::selector: break;
+    }
+    int at = -1;
+    if (const auto owner = macroOf (*r, mapping, &at); owner >= 0)
+        r->macros[(std::size_t) owner].mappings.erase (r->macros[(std::size_t) owner].mappings.begin() + at);
+    r->macros[(std::size_t) macro].mappings.push_back (mapping);
+    compile (doc);
+    return true;
+}
+
+bool unmap (PatcherDoc& doc, int macro, int mapping)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || macro < 0 || macro >= rackMacroCount || mapping < 0 || mapping >= (int) r->macros[(std::size_t) macro].mappings.size())
+        return false;
+    auto& list = r->macros[(std::size_t) macro].mappings;
+    list.erase (list.begin() + mapping);
+    compile (doc);
+    return true;
+}
+
+bool invertRange (PatcherDoc& doc, int macro, int mapping)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || macro < 0 || macro >= rackMacroCount || mapping < 0 || mapping >= (int) r->macros[(std::size_t) macro].mappings.size())
+        return false;
+    auto& x = r->macros[(std::size_t) macro].mappings[(std::size_t) mapping];
+    std::swap (x.min, x.max);
+    compile (doc);
+    return true;
+}
+
+float mappedValue (const RackMapping& m, float value) noexcept
+{
+    const auto t = std::clamp (value / 127.0f, 0.0f, 1.0f);
+    return std::clamp (m.min + (m.max - m.min) * t, 0.0f, 1.0f);
+}
+
+void setMacro (PatcherDoc& doc, int macro, float value)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || macro < 0 || macro >= rackMacroCount)
+        return;
+    auto& m = r->macros[(std::size_t) macro];
+    m.value = std::clamp (value, 0.0f, 127.0f);
+    if ((std::size_t) macro < doc.surface.size())
+        doc.surface[(std::size_t) macro].value = m.value / 127.0f;
+    // what the macro drives, in the document too (the shown values, saving, export; Live stores them as well)
+    for (const auto& x : m.mappings)
+    {
+        const auto v = mappedValue (x, m.value);
+        switch (x.target)
+        {
+            case RackMapping::Target::param:
+                if (x.node >= 0 && x.node < (int) doc.nodes.size() && ! doc.nodes[(std::size_t) x.node].generator && x.param < maxEffectParams
+                    && doc.nodes[(std::size_t) x.node].effect.kind != EffectKind::plugin)
+                    doc.nodes[(std::size_t) x.node].effect.params[(std::size_t) x.param] = v;
+                break;
+            case RackMapping::Target::chainVolume:
+                if (x.chain >= 0 && x.chain < (int) r->chains.size())
+                {
+                    r->chains[(std::size_t) x.chain].volume = volumeGain (v);
+                    if (const auto n = r->chains[(std::size_t) x.chain].mixer; n >= 0 && n < (int) doc.nodes.size())
+                        doc.nodes[(std::size_t) n].effect.params[(std::size_t) mixerVolume] = v;
+                }
+                break;
+            case RackMapping::Target::chainPan:
+                if (x.chain >= 0 && x.chain < (int) r->chains.size())
+                {
+                    r->chains[(std::size_t) x.chain].pan = v * 2.0f - 1.0f;
+                    if (const auto n = r->chains[(std::size_t) x.chain].mixer; n >= 0 && n < (int) doc.nodes.size())
+                        doc.nodes[(std::size_t) n].effect.params[(std::size_t) mixerPan] = v;
+                }
+                break;
+            case RackMapping::Target::selector: r->selector = v * 127.0f; break;
+        }
+    }
+}
+
+std::string macroName (const RackDoc& rack, int macro, const std::string& paramName)
+{
+    if (macro < 0 || macro >= rackMacroCount)
+        return {};
+    const auto& m = rack.macros[(std::size_t) macro];
+    if (! m.name.empty())
+        return m.name;
+    if (m.mappings.size() == 1 && ! paramName.empty())
+        return paramName;
+    return "Macro " + std::to_string (macro + 1);
+}
+
+int randomize (PatcherDoc& doc, std::uint32_t& seed)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr)
+        return 0;
+    int changed = 0;
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        const auto& macro = r->macros[(std::size_t) m];
+        if (macro.mappings.empty() || macro.excludeFromRandom)
+            continue;
+        seed ^= seed << 13; // xorshift32
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        setMacro (doc, m, (float) (seed % 128u));
+        r = rackOf (doc);
+        ++changed;
+    }
+    return changed;
+}
+
+int moreMacros (int shown) noexcept { return shown < 2 ? 2 : std::min (rackMacroCount, (shown + 2) / 2 * 2); }
+int fewerMacros (int shown) noexcept { return shown <= 2 ? 1 : (shown - 1) / 2 * 2; }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Variations
+
+namespace
+{
+void capture (const RackDoc& r, RackVariation& v)
+{
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        const auto& macro = r.macros[(std::size_t) m];
+        // the mapped macros get a value (INFERRED from Live's stored variations, REA §5); the others stay untouched
+        v.has[(std::size_t) m] = ! macro.mappings.empty();
+        v.values[(std::size_t) m] = v.has[(std::size_t) m] ? macro.value : -1.0f;
+    }
+}
+} // namespace
+
+int storeVariation (PatcherDoc& doc)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr)
+        return -1;
+    RackVariation v;
+    // Live names them "Variation 1", "Variation 2"… (the first number not taken)
+    for (int n = 1;; ++n)
+    {
+        const auto name = "Variation " + std::to_string (n);
+        if (std::none_of (r->variations.begin(), r->variations.end(), [&] (const RackVariation& x) { return x.name == name; }))
+        {
+            v.name = name;
+            break;
+        }
+    }
+    capture (*r, v);
+    r->variations.push_back (std::move (v));
+    r->selectedVariation = (int) r->variations.size() - 1;
+    return r->selectedVariation;
+}
+
+bool overwriteVariation (PatcherDoc& doc, int index)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || index < 0 || index >= (int) r->variations.size())
+        return false;
+    capture (*r, r->variations[(std::size_t) index]);
+    r->selectedVariation = index;
+    compile (doc); // (a morph between it changes)
+    return true;
+}
+
+bool launchVariation (PatcherDoc& doc, int index)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || index < 0 || index >= (int) r->variations.size())
+        return false;
+    const auto v = r->variations[(std::size_t) index];
+    for (int m = 0; m < rackMacroCount; ++m)
+        if (v.has[(std::size_t) m] && ! r->macros[(std::size_t) m].excludeFromVariations)
+        {
+            setMacro (doc, m, v.values[(std::size_t) m]);
+            r = rackOf (doc);
+        }
+    r->selectedVariation = index;
+    return true;
+}
+
+bool renameVariation (PatcherDoc& doc, int index, const std::string& name)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || index < 0 || index >= (int) r->variations.size() || name.empty())
+        return false;
+    r->variations[(std::size_t) index].name = name;
+    return true;
+}
+
+int duplicateVariation (PatcherDoc& doc, int index)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || index < 0 || index >= (int) r->variations.size())
+        return -1;
+    auto copy = r->variations[(std::size_t) index];
+    r->variations.insert (r->variations.begin() + index + 1, std::move (copy));
+    for (auto* k : { &r->morphA, &r->morphB })
+        if (*k > index)
+            ++*k;
+    r->selectedVariation = index + 1;
+    return index + 1;
+}
+
+bool deleteVariation (PatcherDoc& doc, int index)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || index < 0 || index >= (int) r->variations.size())
+        return false;
+    r->variations.erase (r->variations.begin() + index);
+    for (auto* k : { &r->morphA, &r->morphB, &r->selectedVariation })
+        *k = *k == index ? -1 : (*k > index ? *k - 1 : *k);
+    compile (doc);
+    return true;
+}
+
+std::array<float, rackMacroCount> morphValues (const RackDoc& rack, float amount) noexcept
+{
+    std::array<float, rackMacroCount> out {};
+    amount = std::clamp (amount, 0.0f, 1.0f);
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        out[(std::size_t) m] = rack.macros[(std::size_t) m].value;
+        if (morphing (rack, m))
+        {
+            const auto a = rack.variations[(std::size_t) rack.morphA].values[(std::size_t) m];
+            const auto b = rack.variations[(std::size_t) rack.morphB].values[(std::size_t) m];
+            out[(std::size_t) m] = a + (b - a) * amount;
+        }
+    }
+    return out;
+}
+
+void setMorph (PatcherDoc& doc, float amount)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr)
+        return;
+    r->morph = std::clamp (amount, 0.0f, 1.0f);
+    if ((std::size_t) morphOutput < doc.surface.size())
+        doc.surface[(std::size_t) morphOutput].value = r->morph;
+    if (! r->morphOn)
+        return;
+    const auto values = morphValues (*r, r->morph);
+    for (int m = 0; m < rackMacroCount; ++m)
+        if (morphing (*r, m))
+        {
+            // (the macro's shown value and the document follow; its cables already come from the Morph knob)
+            setMacro (doc, m, values[(std::size_t) m]);
+            r = rackOf (doc);
+        }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The chain mixer node (EffectKind::rackMixer)
+
+namespace
+{
+class ChainMixer final : public Effect
+{
+public:
+    void prepare (double) noexcept override {}
+    void reset() noexcept override { primed = false; }
+    void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
+    {
+        float pl = 1.0f, pr = 1.0f;
+        panGains (p[(std::size_t) mixerPan] * 2.0f - 1.0f, pl, pr);
+        const auto g = volumeGain (p[(std::size_t) mixerVolume]) * std::clamp (p[(std::size_t) mixerSelect], 0.0f, 1.0f);
+        const auto tl = g * pl, tr = g * pr;
+        if (! primed)
+        {
+            gl = tl;
+            gr = tr;
+            primed = true;
+        }
+        if (n <= 0)
+            return;
+        // a linear ramp over the block to the new gains (no zipper when a macro or the selector moves)
+        const auto dl = (tl - gl) / (float) n, dr = (tr - gr) / (float) n;
+        if (dl == 0.0f && dr == 0.0f)
+        {
+            if (gl == 1.0f && gr == 1.0f)
+                return;
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] *= gl;
+                r[i] *= gr;
+            }
+            return;
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            gl += dl;
+            gr += dr;
+            l[i] *= gl;
+            r[i] *= gr;
+        }
+        gl = tl;
+        gr = tr;
+    }
+
+private:
+    float gl = 1.0f, gr = 1.0f;
+    bool primed = false;
+};
+} // namespace
+
+std::unique_ptr<Effect> makeChainMixer() { return std::make_unique<ChainMixer>(); }
+} // namespace lynx::rack
