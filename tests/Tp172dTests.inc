@@ -156,3 +156,43 @@ TEST (foil_plate_voicing_sub_bass_tp172d)
     std::printf ("  Foil plate voicing: 25 Hz %.1f dB under 110 Hz\n", bass - sub);
     CHECK (bass - sub > 8.0);
 }
+
+// Voice Shift at no shift passes the voice through (its delayed input, 2.7 dB down), as the reference does (round 172d
+// slice 11); a shift still goes through the overlap-add
+TEST (voice_shift_unity_passes_through_tp172d)
+{
+    using namespace lynx;
+    auto run = [] (float pitchValue, double& residualDb)
+    {
+        auto p = makeEffectSlot (EffectKind::voiceShift).params;
+        p[voiceshift::pitch] = pitchValue;
+        auto fx = makeEffect (EffectKind::voiceShift);
+        fx->prepare (48000.0);
+        const int lat = fx->latencySamples(), n = 48000;
+        std::vector<float> x ((std::size_t) n), a, b;
+        for (int i = 0; i < n; ++i)
+        {
+            double v = 0.0;
+            for (int k = 1; k <= 20; ++k)
+                v += std::sin (2.0 * 3.14159265358979 * 200.0 * k * i / 48000.0) / k;
+            x[(std::size_t) i] = (float) (0.1 * v);
+        }
+        a = b = x;
+        for (int i = 0; i < n; i += 256)
+            fx->process (a.data() + i, b.data() + i, std::min (256, n - i), p, 120.0);
+        double e = 0.0, s = 0.0;
+        for (int i = n / 2; i < n; ++i)
+        {
+            const double d = (double) a[(std::size_t) i] - 0.733 * x[(std::size_t) (i - lat)];
+            e += d * d;
+            s += (double) a[(std::size_t) i] * a[(std::size_t) i];
+        }
+        residualDb = 10.0 * std::log10 (e / s + 1.0e-30);
+    };
+    double atZero = 0.0, shifted = 0.0;
+    run (0.5f, atZero);
+    run (voiceshift::semitoneValue (5.0), shifted);
+    std::printf ("  Voice Shift: residual against the delayed input %.1f dB at 0 st, %.1f dB at +5 st\n", atZero, shifted);
+    CHECK (atZero < -60.0);
+    CHECK (shifted > -10.0);
+}

@@ -99,6 +99,7 @@ public:
         psola.prepare (sr, sr / minHz, latency);
         psola.setMarkLag (det.windowCentre());
         dcA = (float) std::exp (-2.0 * 3.14159265358979323846 * 10.0 / sr);
+        passStep = (float) (1.0 - std::exp (-1.0 / (0.020 * sr)));
         reset();
     }
 
@@ -113,6 +114,7 @@ public:
         unvoicedFor = 1e9;
         target = -1;
         dcX[0] = dcX[1] = dcY[0] = dcY[1] = 0.0f;
+        passGain = 1.0f;
     }
 
     void setHeldNotes (const NoteMask* channels, int count) noexcept override
@@ -192,6 +194,21 @@ public:
             float y[2];
             psola.process (xin, y, stereo ? 2 : 1);
             {
+                // round tp172d slice 11: at no shift the reference passes the voice almost untouched (its default state:
+                // a vocal comes out 2.7 dB down, flat within 0.4 dB to 4 kHz, the rest −15.5 dB under it; the overlap-add
+                // here left only −2.2 dB, and −0.5 dB on a sweep). So with nothing to shift the wet path is the input,
+                // delayed as the overlap-add is, with a 20 ms crossfade whenever shifting starts or stops
+                const bool unity = md == Mode::transpose && midiNote < 0 && std::abs (semis) < 1.0e-6
+                                   && std::abs ((linked ? ratio * fShift : fShift) - 1.0) < 1.0e-9;
+                passGain += ((unity ? 1.0f : 0.0f) - passGain) * passStep;
+                if (passGain > 1.0e-6f)
+                {
+                    const auto rdp = (std::size_t) ((dryPos - latency) & (dryRing - 1));
+                    y[0] += passGain * (dry[rdp] - y[0]);
+                    y[1] += passGain * ((stereo ? dry[rdp + dryRing] : dry[rdp]) - y[1]);
+                }
+            }
+            {
                 // round tp172d, measured on the reference's Pitch and Formant sweeps (refcap0124): its voice gets
                 // 0.36 dB louder per semitone the pitch moves up against the formants (and quieter going down), where
                 // the overlap-add here keeps the level — the tilt is matched before the drive, which hears it too
@@ -245,6 +262,7 @@ private:
     double sung = -1.0, wanted = 0.0, shift = 0.0, unvoicedFor = 1e9;
     int target = -1;
     float dcA = 0.999f, dcX[2] {}, dcY[2] {};
+    float passGain = 1.0f, passStep = 0.001f; // round tp172d slice 11: the share of the plain (delayed) input at no shift
     std::atomic<float> meterSung { -1.0f }, meterOut { -1.0f }, meterMidi { 0.0f };
     const NoteMask* held = nullptr;
     int heldCount = 0;
