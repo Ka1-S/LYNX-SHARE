@@ -153,6 +153,36 @@ private:
     int dragging = -1;
 };
 
+// FL's SliceScope: the selected slice's wave
+class SliceView final : public juce::Component
+{
+public:
+    std::function<std::shared_ptr<const SampleData>()> sample;
+    std::function<std::pair<std::int64_t, std::int64_t>()> range; // first frame, frame count
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg0);
+        const auto data = sample ? sample() : nullptr;
+        if (data == nullptr || ! range)
+            return;
+        const auto [from, count] = range();
+        if (count <= 0 || from < 0 || from + count > (std::int64_t) data->frames())
+            return;
+        const auto* x = data->leftData() + from;
+        const auto mid = getHeight() * 0.5f, half = getHeight() * 0.45f;
+        g.setColour (theme::colour::accent.brighter (0.2f));
+        for (int px = 0; px < getWidth(); ++px)
+        {
+            const auto a = count * px / getWidth(), b = std::max (a + 1, count * (px + 1) / getWidth());
+            float lo = 0.0f, hi = 0.0f;
+            for (auto i = a; i < b; ++i)
+                lo = std::min (lo, x[i]), hi = std::max (hi, x[i]);
+            g.drawVerticalLine (px, mid - hi * half, mid - lo * half + 1.0f);
+        }
+    }
+};
+
 // ---------------------------------------------------------------------------------------------------------------
 class FruitySlicerEditor final : public juce::Component,
                                  public juce::FileDragAndDropTarget,
@@ -212,7 +242,7 @@ public:
 
         auto wheel = [this] (juce::Slider& w, const juce::String& label, juce::Label& caption, const juce::String& hint, double lo, double hi,
                              std::function<int (const State&)> get, std::function<void (State&, int)> set, bool tempo) {
-            w.setSliderStyle (juce::Slider::LinearBarVertical);
+            w.setSliderStyle (juce::Slider::LinearVertical);
             w.setRange (lo, hi, 1.0);
             w.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
             w.setPopupDisplayEnabled (true, true, this);
@@ -283,6 +313,39 @@ public:
         ui::setHint (scope, tr ("Click a slice to select and play it; drag a slice start to move it; right click: remove or split"), true);
         addAndMakeVisible (scope);
 
+        // BPM / BEATS: the sample's original tempo and length (FL's TempoSelect 10…999, LengthSelect 1…999)
+        auto field = [this] (juce::Slider& s, juce::Label& caption, const juce::String& text, const juce::String& hint, double lo, double hi,
+                             std::function<void (State&, float)> set) {
+            s.setSliderStyle (juce::Slider::IncDecButtons);
+            s.setIncDecButtonsMode (juce::Slider::incDecButtonsDraggable_Vertical);
+            s.setRange (lo, hi, 1.0);
+            s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 30 * scale, 16 * scale);
+            ui::setHint (s, hint);
+            s.onValueChange = [this, &s, set] {
+                if (! loading)
+                    edit ([&s, set] (State& st) { set (st, (float) s.getValue()); });
+            };
+            addAndMakeVisible (s);
+            caption.setText (text, juce::dontSendNotification);
+            caption.setFont (theme::font (theme::type::caption));
+            addAndMakeVisible (caption);
+        };
+        field (tempo, tempoLabel, "BPM", tr ("Original sample tempo"), 10.0, 999.0, [] (State& st, float v) { st.bpm = v; });
+        field (beats, beatsLabel, "BEATS", tr ("Original sample length"), 1.0, 999.0, [] (State& st, float v) { st.lengthBeats = v; });
+
+        sliceView.sample = [this] { return processed; };
+        sliceView.range = [this] () -> std::pair<std::int64_t, std::int64_t> {
+            if (processed == nullptr || original == nullptr || state.slices.empty())
+                return { 0, 0 };
+            const auto at = fslicer::playedStarts (state, (std::int64_t) original->frames());
+            const auto total = (std::int64_t) processed->frames();
+            const auto i = (std::size_t) std::clamp (selected, 0, (int) at.size() - 1);
+            const auto from = std::clamp<std::int64_t> (at[i], 0, total);
+            const auto end = i + 1 < at.size() ? std::clamp<std::int64_t> (at[i + 1], from, total) : total;
+            return { from, end - from };
+        };
+        addAndMakeVisible (sliceView);
+
         engine.addChangeListener (this);
         reload();
         setSize (377 * scale, 330 * scale);
@@ -303,6 +366,11 @@ public:
     void resized() override
     {
         nameLabel.setBounds (fl (5, 3, 245, 17));
+        tempo.setBounds (fl (253, 4, 30, 16));
+        tempoLabel.setBounds (fl (284, 7, 24, 13));
+        beats.setBounds (fl (309, 4, 30, 16));
+        beatsLabel.setBounds (fl (340, 7, 35, 13));
+        sliceView.setBounds (fl (0, 82, 211, 62));
         openButton.setBounds (fl (5, 27, 50, 21));
         sampleButton.setBounds (fl (57, 27, 50, 21));
         slicingButton.setBounds (fl (109, 27, 50, 21));
@@ -417,15 +485,18 @@ private:
         playToEnd.setToggleState (state.playToEnd != 0, juce::dontSendNotification);
         const auto has = ! state.slices.empty();
         reverse.setToggleState (has && state.slices[(std::size_t) selected].reversed(), juce::dontSendNotification);
-        sliceName.setText (has ? (state.slices[(std::size_t) selected].name.empty() ? tr ("Slice {0}", { juce::String (selected + 1) })
+        sliceName.setText (has ? (state.slices[(std::size_t) selected].name.empty() ? tr ("Slice #{0}", { juce::String (selected + 1) })
                                                                                   : juce::String::fromUTF8 (state.slices[(std::size_t) selected].name.c_str()))
                                : juce::String(),
                            juce::dontSendNotification);
         sliceKey.setText (has ? keyName (fslicer::sliceKey (state, selected)) : juce::String(), juce::dontSendNotification);
         for (auto& w : wheels)
             w.slider->setValue (w.get (state), juce::dontSendNotification);
+        tempo.setValue (std::nearbyint (state.bpm), juce::dontSendNotification);
+        beats.setValue (std::nearbyint (state.lengthBeats), juce::dontSendNotification);
         loading = false;
         scope.repaint();
+        sliceView.repaint();
     }
 
     void edit (const std::function<void (State&)>& change, bool undoable = true)
@@ -811,6 +882,9 @@ private:
     juce::Slider pitch, stretch, fadeIn, fadeOut, autoLow, autoHigh;
     std::vector<Wheel> wheels;
     Scope scope;
+    juce::Slider tempo, beats;           // FL's TempoSelect / LengthSelect (shown at run time)
+    juce::Label tempoLabel, beatsLabel;
+    SliceView sliceView;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 } // namespace
