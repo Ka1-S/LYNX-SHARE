@@ -3043,6 +3043,10 @@ private:
                 one.channels = { song.channels[i] };
                 one.channels[0].mixerTrack = 1;
                 const auto kind = song.channels[i].instrument;
+                // A new Fruity Slicer has no sample and no slices, and FL's is silent then too (round 180c), so it is
+                // not one of the engines that must sound here (Linux / macOS CI: "SILENT 1 [Fruity Slicer]", 0.1.25)
+                if (kind == lynx::InstrumentKind::fruityslicer && one.channels[0].samplePath.empty())
+                    continue;
                 if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
                     one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
                 one.mixer[2].effects.clear();
