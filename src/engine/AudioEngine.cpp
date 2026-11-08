@@ -226,8 +226,9 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
     : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+      plugins (userPluginList),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -3037,6 +3038,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             double ratio;
             StretchMethod method;
             double semitones;
+            StretchMap map;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3048,9 +3050,11 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
+                    // (the same map the rack asks for: RackState::build)
+                    auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
-                        stretches.push_back ({ c.samplePath, ratio, method, semitones });
+                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map) });
                 }
         if (! stretches.empty())
         {
@@ -3058,7 +3062,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones))
+                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3332,9 +3336,9 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };

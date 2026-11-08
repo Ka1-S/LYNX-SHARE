@@ -151,8 +151,8 @@ std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, i
 int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to);
 // "Assign to new Audio track(s)" (FL's AssignAudiotrackMenuClick, Tag 0; REA_rodada177a §6): each selected insert
 // takes the first untouched Playlist track (no name, colour, mode or clip; FL scans tracks 1–500) as its audio track,
-// named and coloured as the insert. An insert that is already linked to an audio track is skipped. Returns how many
-// tracks were assigned.
+// named and coloured as the insert. FL skips an insert that a Playlist track already points at (any mode), or whose
+// only channel already has an instrument track. Returns how many tracks were assigned.
 int assignNewAudioTracks (Song& song, std::vector<int> inserts);
 // "Unassign from Audio track(s)" (the same handler, Tag 1): the first audio track linked to each selected insert goes
 // back to unassigned. Its name, colour and clips stay. Returns how many tracks changed.

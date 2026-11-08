@@ -63,7 +63,10 @@ class AudioEngine final : private juce::AudioIODeviceCallback,
 {
 public:
     // workerThreads: extra audio threads (< 0 = by the CPU's cores). An engine that only serves an editor needs none.
-    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1);
+    // userPluginList = false: the plugin host neither reads nor writes LYNX's plugin list and settings, nor reads FL's
+    // plugin database in the background (round 180b: an editor inside another host must not, and its close must not
+    // wait for that reader)
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true);
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)

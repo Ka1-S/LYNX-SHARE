@@ -2732,6 +2732,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.unmuteClips", tr ("Unmute"));
             action (menu, "playlist.makeUnique", tr ("Make unique"));
             action (menu, "playlist.mergePatternClips", tr ("Merge pattern clips"));
+            action (menu, "playlist.mergeSimilarClips", tr ("Merge similar pattern clips"));
+            action (menu, "playlist.mergeAutomationClips", tr ("Merge automation clips"));
             action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
             menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);

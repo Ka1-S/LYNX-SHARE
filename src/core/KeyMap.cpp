@@ -294,6 +294,9 @@ std::vector<Action> makeActions()
         // round 168f: FL's Playlist keys and menu items ([DFM ShortcutsModule] EEMergeAction Ctrl+G, EEClonePLTracksAction
         // Ctrl+Shift+B, EEMakeUniqueAction Ctrl+Shift+V; the STRETCH button's hint "Shift+M")
         { "playlist.mergePatternClips", TR_NOOP ("Merge pattern clips"), Context::playlist, { chord ('G', ctrl) } },
+        // round 180c: [DFM ShortcutsModule] EEMergeSimAction Ctrl+Shift+G, EEMergeAutoClipsAction Ctrl+Alt+G
+        { "playlist.mergeSimilarClips", TR_NOOP ("Merge similar pattern clips"), Context::playlist, { chord ('G', ctrl | shift) } },
+        { "playlist.mergeAutomationClips", TR_NOOP ("Merge automation clips"), Context::playlist, { chord ('G', ctrl | alt) } },
         { "playlist.cloneTracks", TR_NOOP ("Clone selected playlist track(s)"), Context::playlist, { chord ('B', ctrl | shift) } },
         { "playlist.makeUnique", TR_NOOP ("Make the selected clips unique"), Context::playlist, { chord ('V', ctrl | shift) } },
         // FL's Alt+M / Shift+Alt+M (EEMuteAction / EEUnmuteAction, issue #53): the selected clips, or all of them

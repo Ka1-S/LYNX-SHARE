@@ -7,6 +7,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include "core/Instruments.h"
+#include "core/TimeStretch.h"
 
 namespace lynx
 {
@@ -26,8 +27,10 @@ public:
     void forget (const juce::String& path);
 
     // The sample time-stretched without changing pitch (core/TimeStretch), cached by (path, ratio, method).
+    // `map` (round 175a, warp markers): stretched along that warp map instead of at one ratio (its own cache entries).
     std::shared_ptr<const SampleData> loadStretched (const juce::String& path, double ratio, StretchMethod method = StretchMethod::general,
-                                                    double semitones = 0.0); // semitones: Beats only (core/TimeStretch)
+                                                    double semitones = 0.0, // semitones: Beats only (core/TimeStretch)
+                                                    const StretchMap& map = {});
 
     // Above this, audio goes to a memory-mapped disk cache instead of staying entirely
     // in RAM ("disk streaming"). The cache is reused across sessions.
