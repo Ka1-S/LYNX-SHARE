@@ -9333,6 +9333,7 @@ private:
             juce::FileOutputStream out (file);
             juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
         };
+        ui.setVisible (true); // (not on the desktop: only so the Clip page sees itself shown and docks the Piano roll)
         lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
         ui.selectTabForSnapshot (2); // the Playlist panel, maximized
         offline.editSong ([] (lynx::Song& s) {
@@ -9395,8 +9396,13 @@ private:
             write ("empty-track");
             detail->showSelection (1, 0);
             detail->setPage (lynx::DetailView::Page::clip);
-            write ("clip");
+            offline.dispatchPendingMessages();
+            write ("clip"); // slice 2: the Piano roll docked here
+            counts << "piano roll docked: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
+                                                && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() == detail ? 1 : 0) << "\n";
             detail->setPage (lynx::DetailView::Page::devices);
+            counts << "piano roll back in its panel: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
+                                                           && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() != detail ? 1 : 0) << "\n";
         }
         else
             counts << "no detail view\n";
