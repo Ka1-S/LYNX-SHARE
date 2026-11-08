@@ -1697,6 +1697,7 @@ bool MainComponent::runAction (const std::string& id)
         saveUiSettings();
     }
     else if (is ("view.audioEditor")) openAudioEditorForSelection();
+    else if (is ("channel.soloSelected")) rack.solo (engine.getSelectedChannel());
     else if (is ("view.tempoTapper")) openTempoTapper (engine);
     else if (is ("view.sampleBrowser")) toggleSampleBrowser();
     else if (is ("view.pluginDatabase"))
@@ -2023,6 +2024,8 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
+        else if (key == "prSongBars")
+            PianoRollComponent::songBarsRuler = on;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2075,6 +2078,12 @@ void MainComponent::loadUiSettings()
             autosaveMinutes = prefs::clampAutosaveMinutes (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askUnusedRecordings")
             askUnusedRecordings = on;
+        else if (key == "backupWaitsForQuiet")
+            backupWaitsForQuiet = on;
+        else if (key == "backupLongestWait")
+            backupLongestWaitMinutes = prefs::clampBackupLongestWait (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "hoverValues")
+            hoverValues = on;
         else if (key == "autosaveKeep")
             autosaveKeep = prefs::clampAutosaveKeep (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "metronomeSound" && ! flMetronomeSound) // (before 0.1.20: 0 LYNX click, 1..5 hi-hat..pulse)
@@ -2197,6 +2206,7 @@ void MainComponent::saveUiSettings()
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
+                                      + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -2219,6 +2229,9 @@ void MainComponent::saveUiSettings()
                                       + "\ntoolbarVisible=" + juce::String (toolbarLayout.visible ? 1 : 0)
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
+                                      + "\nbackupWaitsForQuiet=" + juce::String (backupWaitsForQuiet ? 1 : 0)
+                                      + "\nbackupLongestWait=" + juce::String (backupLongestWaitMinutes)
+                                      + "\nhoverValues=" + juce::String (hoverValues ? 1 : 0)
                                       + "\nundoLevels=" + juce::String (engine.getUndoLevels())
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
                                       + "\nmetronomeSoundFl=" + juce::String (metronome::clampSound (engine.getTransport().metronomeSound.load()))
@@ -2724,6 +2737,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.mergeSimilarClips", tr ("Merge similar pattern clips"));
             action (menu, "playlist.mergeAutomationClips", tr ("Merge automation clips"));
             action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
+            menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
             action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
             {
@@ -3364,7 +3378,7 @@ void MainComponent::clonePatternNow()
 
 void MainComponent::movePatternNow (int delta)
 {
-    engine.editSong ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
+    engine.editSongPatternOrder ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
 }
 
 void MainComponent::splitPatternByChannelNow()
@@ -4413,8 +4427,19 @@ void MainComponent::timerCallback()
                                projectName.isNotEmpty() ? juce::File::createLegalFileName (projectName) : juce::String());
 
     // a backup copy every few minutes (Settings › General) when there are changes
-    // (not in the middle of a recording: FL also postpones the timed backup until the transport is free)
-    if (autosaveMinutes > 0 && ++autosaveTicks >= 30 * 60 * autosaveMinutes && ! engine.isRecording())
+    // (not in the middle of a recording: FL also postpones the timed backup until the transport is free; round 177d:
+    // with "Wait with backups..." on, also while playing and for a few seconds after MIDI input, so writing the plugin
+    // states never stutters the sound, up to the longest wait set there)
+    if (const auto midi = engine.getMidiPlayed(); midi != backupMidiSeen)
+    {
+        backupMidiSeen = midi;
+        backupMidiMs = juce::Time::getMillisecondCounterHiRes();
+    }
+    const auto backupDueTicks = 30 * 60 * autosaveMinutes;
+    if (autosaveMinutes > 0 && ++autosaveTicks >= backupDueTicks
+        && prefs::backupMayRun (engine.isRecording(), engine.getTransport().playing.load(),
+                                juce::Time::getMillisecondCounterHiRes() - backupMidiMs, backupWaitsForQuiet,
+                                autosaveTicks * 1000.0 / 30.0, backupLongestWaitMinutes * 60000.0))
     {
         autosaveTicks = 0;
 
@@ -4493,6 +4518,7 @@ void MainComponent::timerCallback()
         const uitrace::Scope part ("timer: hint", false);
         ui::Hint hint;
         bool live = false;
+        juce::Component* hovered = nullptr;
 
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
@@ -4512,6 +4538,7 @@ void MainComponent::timerCallback()
                 live = source.isDragging();
                 const auto at = live ? source.getLastMouseDownPosition() : source.getScreenPosition();
                 hint = ui::hintFor (under, under->getLocalPoint (nullptr, at).roundToInt());
+                hovered = under;
             }
         }
 
@@ -4522,6 +4549,8 @@ void MainComponent::timerCallback()
         }
 
         hintBar.setHint (hint, live && hint.value.isNotEmpty());
+        if (hoverValues)
+            updateHoverValue (hovered, hint, live);
         if (++tweakTicks >= 3) // 10 times a second
         {
             tweakTicks = 0;
@@ -5491,8 +5520,8 @@ void MainComponent::flpImported (const juce::File& file)
 
 void MainComponent::openLynxProject (const juce::File& file)
 {
-    juce::String error;
-    auto song = ProjectFile::load (file, error);
+    juce::String error, savedBy;
+    auto song = ProjectFile::load (file, error, &savedBy);
 
     if (! song)
     {
@@ -5513,6 +5542,18 @@ void MainComponent::openLynxProject (const juce::File& file)
     rememberRecent (file);
     updateTitle();
     playlist.showSongAfterOpen();
+
+    // pain point 37 (round 177d): a project from a newer LYNX SHARE opens, but saving it here would drop what that
+    // version added, so say so once (FL warns about a project from a more recent version too)
+    if (safety::savedByNewerVersion (savedBy.toStdString(), JUCE_APPLICATION_VERSION_STRING))
+    {
+        platform::testModeLog ("project saved by newer version " + savedBy);
+        if (! platform::testMode())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Saved by a newer version"),
+                                                    tr ("This project was saved by LYNX SHARE {0}, and this is {1}. What the newer version added may be "
+                                                        "lost if you save it here: use File › Save as... to keep the original.",
+                                                        { savedBy, JUCE_APPLICATION_VERSION_STRING }));
+    }
 
     if (persistent)
     {
@@ -5566,6 +5607,9 @@ void MainComponent::openSettings (int page)
         o.autosaveMinutes = safe->autosaveMinutes;
         o.autosaveKeep = safe->autosaveKeep;
         o.askUnusedRecordings = safe->askUnusedRecordings;
+        o.backupWaitsForQuiet = safe->backupWaitsForQuiet;
+        o.backupLongestWaitMinutes = safe->backupLongestWaitMinutes;
+        o.hoverValues = safe->hoverValues;
         o.crossfadesInNewProjects = newProjectDefaults().autoCrossfades;
         o.pluginSandbox = pluginSandboxEnabled();
         o.menuEntry = appImageMenuEntryInstalled();
@@ -5648,6 +5692,12 @@ void MainComponent::openSettings (int page)
         self.autosaveMinutes = prefs::clampAutosaveMinutes (o.autosaveMinutes);
         self.autosaveKeep = prefs::clampAutosaveKeep (o.autosaveKeep);
         self.askUnusedRecordings = o.askUnusedRecordings;
+        self.backupWaitsForQuiet = o.backupWaitsForQuiet;
+        self.backupLongestWaitMinutes = prefs::clampBackupLongestWait (o.backupLongestWaitMinutes);
+        if (self.hoverValues && ! o.hoverValues && self.hoverTipShown)
+            ui::hideValueTip();
+        self.hoverValues = o.hoverValues;
+        self.hoverTipShown = false;
         newProjectDefaults().autoCrossfades = o.crossfadesInNewProjects;
         self.autosaveTicks = 0;
         self.saveUiSettings();
@@ -6027,6 +6077,34 @@ void MainComponent::placeHintBar (juce::Rectangle<int> row)
     }
     hintBar.setVisible (true);
     hintBar.setBounds (row);
+}
+
+// Settings › General › "Show a control's value next to the mouse..." (round 177d, pain point 10; off by default = FL,
+// whose value shows in the hint bar only): the value the hint bar shows for the control under the mouse, in the
+// drag read-out's pill just above the cursor. A drag shows its own read-out, so nothing here while one runs.
+void MainComponent::updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live)
+{
+    if (live)
+    {
+        hoverTipShown = false; // (the drag's read-out owns the pill now)
+        return;
+    }
+    const auto at = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+    const auto show = hovered != nullptr && hint.value.isNotEmpty() && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()
+                      && hovered->getTopLevelComponent() == getTopLevelComponent();
+    if (! show)
+    {
+        if (hoverTipShown)
+            ui::hideValueTip();
+        hoverTipShown = false;
+        return;
+    }
+    if (hoverTipShown && hint.value == hoverTipText && at == hoverTipAt)
+        return;
+    hoverTipShown = true;
+    hoverTipText = hint.value;
+    hoverTipAt = at;
+    ui::showValueTip (*hovered, juce::Rectangle<int> (1, 18).withCentre (hovered->getLocalPoint (nullptr, at)), hint.value);
 }
 
 void MainComponent::refreshTweakReadout()

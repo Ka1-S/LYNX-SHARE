@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,27 @@ inline bool hasNoteInCell (const Pattern& pattern, int channel, int key, std::in
     return std::any_of (pattern.notes.begin(), pattern.notes.end(), [&] (const Note& n) {
         return n.channel == channel && n.key == key && n.start >= cellStart && n.start < cellStart + std::max<std::int64_t> (1, cell);
     });
+}
+
+// Round 177d (pain point 25): the song tick of the pattern's tick 0 as it plays in the Playlist (its first unmuted
+// clip, as for the clip ghosts; negative when the clip's offset reaches past the song's start), or nothing when no clip
+// of it is on the Playlist.
+inline std::optional<std::int64_t> patternSongOrigin (const Song& song, int pattern)
+{
+    const Clip* home = nullptr;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.pattern == pattern && ! c.muted && (home == nullptr || c.start < home->start))
+            home = &c;
+    if (home == nullptr)
+        return std::nullopt;
+    return home->start - home->offset;
+}
+
+// The number the ruler prints for bar `bar` of the pattern, for a song origin: as the Playlist counts, 0 or less when
+// that bar of the pattern falls before the song's first bar (no number then).
+inline std::int64_t songBarNumber (std::int64_t origin, std::int64_t bar, std::int64_t barTicks)
+{
+    return (std::int64_t) std::floor ((double) (origin + bar * barTicks) / (double) barTicks) + 1;
 }
 
 // --- Piano Roll: hollow ghost notes from other clips (R12) -------------------------------------------

@@ -2044,6 +2044,17 @@ the dynamics before the EQ (S5, +0.5 dB).
 
 FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.
 
+## Host workflow: LYNX extras over FL (round 177d)
+
+These are things LYNX's host does that FL Studio does not. None of them changes an FL gesture or default. They come from the FL pain-point list the user approved (docs/analise/REA_rodada177d.md, which also has the FL checks).
+
+| Item | FL | LYNX |
+|---|---|---|
+| Ultra-fine knob and slider drag (pain point 20) | Ctrl = fine. Ctrl+Shift is the same as Ctrl (checked in FL 2026) | Ctrl = fine (FL). Ctrl+Shift = 100× finer, for drags and the wheel |
+| Insert EQ bypass (pain point 6a) | No bypass, and no menu on the EQ title | Right-click the EQ title › "Bypass the EQ (its settings are kept)". A bypassed EQ costs nothing, and FLP export writes the bands flat |
+| Gain-reduction bar on the mixer strip (pain point 6b) | None (each plugin shows its own) | A 3 px bar, only on strips that have a LYNX dynamics effect |
+| Picker panel › "Delete unused patterns", "Merge identical patterns" (pain point 31a) | Not available (FL has "Select unused" and "Sort", and LYNX has those too) | After a separator, below FL's Tools items |
+
 ## Audio logger and Chord detection panel (round 181b)
 
 Proof: `docs/analise/REA_rodada181b.md`.

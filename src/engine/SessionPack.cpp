@@ -375,7 +375,7 @@ std::string sourceHash (const Song& song, bool insert, int index, int pattern, d
         mini.currentPattern = 0;
         mini.mode = PlayMode::song;
     }
-    const auto json = ProjectFile::toJson (mini) + "|" + (insert ? "insert " : "channel ") + juce::String (index) + "|"
+    const auto json = ProjectFile::toJson (mini, false) + "|" + (insert ? "insert " : "channel ") + juce::String (index) + "|"
                       + juce::String (pattern) + "|" + juce::String (sampleRate, 1);
     const auto bytes = json.toStdString();
     return sha256Hex ((const std::uint8_t*) bytes.data(), bytes.size());
