@@ -7850,7 +7850,6 @@ countries: ru by kz
 "Gradient color..." = "Градиентный цвет..."
 "Mixer tracks ({0} selected)" = "Дорожки микшера (выбрано: {0})"
 "Gradient editor" = "Редактор градиента"
-"First" = "Первый"
 "Copy First into Last" = "Копировать Первый в Последний"
 "Swap First and Last" = "Поменять Первый и Последний"
 "Copy Last into First" = "Копировать Последний в Первый"

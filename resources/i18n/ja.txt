@@ -7850,7 +7850,6 @@ countries: jp
 "Gradient color..." = "グラデーションカラー..."
 "Mixer tracks ({0} selected)" = "ミキサートラック（{0} 個選択）"
 "Gradient editor" = "グラデーションエディター"
-"First" = "最初"
 "Copy First into Last" = "最初を最後にコピー"
 "Swap First and Last" = "最初と最後を入れ替え"
 "Copy Last into First" = "最後を最初にコピー"

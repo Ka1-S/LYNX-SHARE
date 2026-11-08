@@ -7850,7 +7850,6 @@ countries: es mx ar co cl pe ve
 "Gradient color..." = "Color degradado..."
 "Mixer tracks ({0} selected)" = "Pistas del mezclador ({0} seleccionadas)"
 "Gradient editor" = "Editor de degradado"
-"First" = "Primero"
 "Copy First into Last" = "Copiar Primero en Último"
 "Swap First and Last" = "Intercambiar Primero y Último"
 "Copy Last into First" = "Copiar Último en Primero"

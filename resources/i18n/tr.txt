@@ -7850,7 +7850,6 @@ countries: tr
 "Gradient color..." = "Renk geçişi..."
 "Mixer tracks ({0} selected)" = "Mikser parçaları ({0} seçili)"
 "Gradient editor" = "Renk geçişi düzenleyici"
-"First" = "İlk"
 "Copy First into Last" = "İlki Sona kopyala"
 "Swap First and Last" = "İlk ve Sonu değiştir"
 "Copy Last into First" = "Sonu İlke kopyala"

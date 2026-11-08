@@ -7850,7 +7850,6 @@ countries: it ch sm
 "Gradient color..." = "Colore sfumato..."
 "Mixer tracks ({0} selected)" = "Tracce del mixer ({0} selezionate)"
 "Gradient editor" = "Editor sfumatura"
-"First" = "Primo"
 "Copy First into Last" = "Copia Primo in Ultimo"
 "Swap First and Last" = "Scambia Primo e Ultimo"
 "Copy Last into First" = "Copia Ultimo in Primo"

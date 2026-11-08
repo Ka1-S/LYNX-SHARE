@@ -7850,7 +7850,6 @@ countries: pl
 "Gradient color..." = "Kolor gradientu..."
 "Mixer tracks ({0} selected)" = "Ścieżki miksera (zaznaczono {0})"
 "Gradient editor" = "Edytor gradientu"
-"First" = "Pierwszy"
 "Copy First into Last" = "Kopiuj Pierwszy do Ostatniego"
 "Swap First and Last" = "Zamień Pierwszy i Ostatni"
 "Copy Last into First" = "Kopiuj Ostatni do Pierwszego"

@@ -7850,7 +7850,6 @@ countries: de at ch li lu
 "Gradient color..." = "Farbverlauf..."
 "Mixer tracks ({0} selected)" = "Mixer-Inserts ({0} ausgewählt)"
 "Gradient editor" = "Verlaufseditor"
-"First" = "Erste"
 "Copy First into Last" = "Erste in Letzte kopieren"
 "Swap First and Last" = "Erste und Letzte tauschen"
 "Copy Last into First" = "Letzte in Erste kopieren"

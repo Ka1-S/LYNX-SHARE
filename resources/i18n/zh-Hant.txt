@@ -7850,7 +7850,6 @@ countries: tw hk mo
 "Gradient color..." = "漸層顏色..."
 "Mixer tracks ({0} selected)" = "混音器軌道（已選 {0} 個）"
 "Gradient editor" = "漸層編輯器"
-"First" = "首個"
 "Copy First into Last" = "將首個複製到末個"
 "Swap First and Last" = "交換首個和末個"
 "Copy Last into First" = "將末個複製到首個"

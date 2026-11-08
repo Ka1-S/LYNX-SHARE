@@ -7850,7 +7850,6 @@ countries: fr be ch ca lu
 "Gradient color..." = "Couleur en dégradé..."
 "Mixer tracks ({0} selected)" = "Pistes de mixage ({0} sélectionnées)"
 "Gradient editor" = "Éditeur de dégradé"
-"First" = "Premier"
 "Copy First into Last" = "Copier Premier dans Dernier"
 "Swap First and Last" = "Échanger Premier et Dernier"
 "Copy Last into First" = "Copier Dernier dans Premier"

@@ -7850,7 +7850,6 @@ countries: kr
 "Gradient color..." = "그라데이션 색상..."
 "Mixer tracks ({0} selected)" = "믹서 트랙 ({0}개 선택됨)"
 "Gradient editor" = "그라데이션 편집기"
-"First" = "처음"
 "Copy First into Last" = "처음을 마지막에 복사"
 "Swap First and Last" = "처음과 마지막 바꾸기"
 "Copy Last into First" = "마지막을 처음에 복사"

@@ -7850,7 +7850,6 @@ countries: id
 "Gradient color..." = "Warna gradien..."
 "Mixer tracks ({0} selected)" = "Trek mixer ({0} dipilih)"
 "Gradient editor" = "Editor gradien"
-"First" = "Pertama"
 "Copy First into Last" = "Salin Pertama ke Terakhir"
 "Swap First and Last" = "Tukar Pertama dan Terakhir"
 "Copy Last into First" = "Salin Terakhir ke Pertama"

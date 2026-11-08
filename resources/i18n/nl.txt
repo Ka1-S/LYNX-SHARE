@@ -7850,7 +7850,6 @@ countries: nl be
 "Gradient color..." = "Kleurverloop..."
 "Mixer tracks ({0} selected)" = "Mixertracks ({0} geselecteerd)"
 "Gradient editor" = "Verloopeditor"
-"First" = "Eerste"
 "Copy First into Last" = "Eerste naar Laatste kopiëren"
 "Swap First and Last" = "Eerste en Laatste wisselen"
 "Copy Last into First" = "Laatste naar Eerste kopiëren"
