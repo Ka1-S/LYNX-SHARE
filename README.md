@@ -13,10 +13,12 @@ Windows, macOS and Linux.</p>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
+  <a href="https://discord.gg/XHKkbtbkY"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the LYNX SHARE Discord"></a>
 </p>
 
 <p align="center">
   <a href="https://lynx-share.com"><strong>Website</strong></a> ·
+  <a href="https://discord.gg/XHKkbtbkY"><strong>Discord</strong></a> ·
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><strong>Download</strong></a> ·
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#opens-fl-studio-projects">FL projects</a> ·
@@ -443,6 +445,11 @@ docs/         architecture, status, roadmap and the behavioural analysis of FL S
 
 > [!NOTE]
 > The documentation is being translated from Portuguese to English; some files are still in Portuguese.
+
+## Community
+
+- **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY). Chat, help, feedback and release announcements.
+- **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)): an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It's a separate community project, not an official LYNX SHARE release, and it isn't maintained or reviewed by us.
 
 ## Credits and notice
 
