@@ -978,6 +978,13 @@ protected:
         s.buildSec = m.buildMs / 1000.0 * (0.25 + 1.5 * p[4]);
         s.gateSec = m.gate > 0.0 ? m.gate * decay + 0.05 : 0.0;
         s.gain = m.gain;
+        // round 183b (the reference's impulse at −20 dB, 17 settings; it is linear): its first 80 ms hold more of the
+        // energy at longer decays (−3.8 dB of the total at its default 4 s, ours −7.2; at 2 s round 100's −3.1 dB in the
+        // first 100 ms still holds), its modes sit denser low down (lines × 0.85: the −20 dB impulses and music both
+        // closer), and it is 0.7 dB lower
+        s.lineScale *= 0.85;
+        s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
+        s.gain *= 0.92;
     }
 };
 

@@ -310,6 +310,18 @@ Round 150 (`docs/analise/REA_rodada150.md`, sub-rounds `REA_rodada150a.md` / `RE
 | Auto-pan (stand-in) | PanMan | 7 → 8 | 6 → 7 | Tweak page (rate / offset / width modulation by the measured envelope law, Feel / Groove, beyond the speakers) |
 | Foil Plate | Little Plate | 8 → 9 | 6 → 6 | measured Little Plate voicing (band decays, 0.7 ms onset, ∞ ≈ 80 s) |
 
+## Round 183b slice 6: Epoch Verb ← ValhallaVintageVerb
+
+Measured on tp172d's settings and 12 new captures, with the impulse at −20 dB (the reference is linear): Decay 20 %, Size 50 %, Attack 0 / 100 %, Bass multiply 0, Mod depth 0 / 100 %, Early / Late diffusion 0, and the 1970s / 1990s colours. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 17 settings. The main table's Sound stays 5: Atrium scores 5 at fxparity 3.50 / verb 8.54, and this pair is at 3.07 / 8.44.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Epoch Verb (slice 6) | ValhallaVintageVerb | 2.93 → 3.07 / 3.06 → 3.39 | 8.11 → 8.44 / 8.11 → 8.49 | Over the bank: music 1.89 → 2.89 (level error 3.3 → 1.9 dB), drums 3.00 → 3.17, the −20 dB impulse 3.67 → 3.83; the verb's early part goes from 6.9 to 8.4 and its edc part from 8.2 to 8.6 |
+
+- **The early share grows with Decay.** At its default 4 s, the reference's first 80 ms hold −3.8 dB of the total; ours held −7.2. The early pattern now scales by 1.13 × √(Decay / 2 s), capped at 1.6, so round 100's measurement at 2 s (−3.1 dB in the first 100 ms) still holds.
+- **The lines are 15 % shorter.** That puts the modes denser low down. The −20 dB impulses come closer (3.75 → 3.92 with the early change alone) and so does music: the 172d "39 Hz mode" gap goes from +5.7 to +3.5 dB at the defaults. The level is −0.7 dB.
+- **Open:** music at the defaults still runs +2…+3.5 dB, on its bass notes.
+
 ## Round 147: what changed (config / design, after 144 → after 147)
 
 Round 147 (`docs/analise/REA_rodada147.md`, sub-rounds `REA_rodada147a.md` / `REA_rodada147b.md`).
