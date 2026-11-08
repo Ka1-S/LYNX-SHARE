@@ -45,6 +45,7 @@
 #include "core/ProjectContents.h"
 #include "core/FlPatcher.h"
 #include "core/Patcher.h"
+#include "core/Rack.h"
 #include "core/Layer.h"
 #include "core/XyController.h"
 #include "core/ControlSurface.h"
@@ -17125,3 +17126,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer177a4Tests.inc"
 #include "Sc177bTests.inc"
 #include "Issue97Tests.inc"
+#include "Rack183cTests.inc"

@@ -7,6 +7,7 @@
 #include "core/LoadTrace.h"
 #include "core/ProjectSafety.h"
 #include "core/Patcher.h"
+#include "core/Rack.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -2837,6 +2838,87 @@ private:
                         && back->channels.back().patcher.wires == ch.patcher.wires;
         }
 
+        // Round 183c, Racks: (1) a plain Patcher's stored JSON loads and saves back byte for byte and never holds a
+        // "rack" key (FL's Patcher is untouched); (2) an Audio Effect Rack slot and an Instrument Rack channel survive save /
+        // load with their chains, zones, macros, mappings, variations and compiled cables
+        juce::String rackResult = "OK";
+        {
+            lynx::MixerTrack plain;
+            plain.name = "Plain Patcher";
+            auto fx = lynx::makeEffectSlot (lynx::EffectKind::patcher);
+            lynx::PatchNode a, b;
+            a.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            a.label = "A";
+            a.x = 120.5f;
+            b.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            b.effect.enabled = false;
+            fx.patcher.nodes = { a, b };
+            lynx::PatchWire w1, w2, w3, wc;
+            w1.to = 0;
+            w2.from = 0, w2.to = 1, w2.gain = 0.5f;
+            w3.from = 1;
+            wc.kind = lynx::PatchWire::Kind::control, wc.from = 0, wc.to = 1, wc.toPort = 0, wc.curve = { 0.0f, 0.25f, 1.0f };
+            fx.patcher.wires = { w1, w2, w3, wc };
+            lynx::SurfaceControl knob;
+            knob.name = "Drive";
+            knob.value = 0.25f;
+            fx.patcher.surface = { knob };
+            lynx::PatchParam pp;
+            pp.node = 0, pp.param = 1, pp.name = "Balance";
+            fx.patcher.published = { pp };
+            plain.effects = { fx };
+            const auto first = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (plain), true);
+            const auto again = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (lynx::ProjectFile::mixerTrackFromVar (juce::JSON::parse (first))), true);
+            if (first != again || first.contains ("\"rack\"") || first.contains ("rackMixer"))
+                rackResult = "ERROR plain Patcher changed";
+
+            auto song = lynx::Song::makeDefault();
+            song.mixer.resize (3);
+            auto rackSlot = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
+            auto& doc = rackSlot.patcher;
+            lynx::PatchNode u;
+            u.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            const auto n0 = lynx::rack::addDevice (doc, 0, u);
+            lynx::rack::addChain (doc, "Wet");
+            lynx::rack::addDevice (doc, 1, u);
+            doc.rack[0].chains[1].select = { 10, 90, 30, 70 };
+            lynx::rack::setChainPan (doc, 1, -0.5f);
+            lynx::RackMapping m;
+            m.node = n0, m.param = 0, m.min = 0.2f, m.max = 0.9f;
+            lynx::rack::map (doc, 0, m);
+            lynx::RackMapping v;
+            v.target = lynx::RackMapping::Target::chainVolume, v.chain = 1, v.min = 0.0f, v.max = lynx::rack::unityVolume;
+            lynx::rack::map (doc, 1, v);
+            lynx::rack::setMacro (doc, 0, 64.0f);
+            lynx::rack::storeVariation (doc);
+            lynx::rack::setMacro (doc, 0, 100.0f);
+            lynx::rack::storeVariation (doc);
+            doc.rack[0].morphOn = true, doc.rack[0].morphA = 0, doc.rack[0].morphB = 1;
+            lynx::rack::setMorph (doc, 0.5f);
+            lynx::rack::compile (doc);
+            song.mixer[1].effects = { rackSlot };
+            lynx::ChannelDef inst;
+            inst.name = "Instrument Rack";
+            inst.instrument = lynx::InstrumentKind::patcher;
+            inst.patcher = lynx::rack::makeRack (lynx::RackDoc::Kind::instrument);
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            synth.channel.name = "Synth";
+            lynx::rack::addDevice (inst.patcher, 0, synth);
+            inst.patcher.rack[0].chains[0].velocity = { 1, 127, 64, 127 };
+            lynx::rack::compile (inst.patcher);
+            song.channels.push_back (inst);
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            // (the devices' parameters are stored to 4 decimals: the documents are compared as stored, the rack exactly)
+            if (! back || back->mixer.size() < 2 || back->mixer[1].effects.size() != 1 || back->mixer[1].effects[0].patcher.rack != doc.rack
+                || back->mixer[1].effects[0].patcher.wires != doc.wires || back->mixer[1].effects[0].patcher.zones != doc.zones
+                || back->channels.back().patcher.rack != inst.patcher.rack || back->channels.back().patcher.wires != inst.patcher.wires
+                || back->channels.back().patcher.zones != inst.patcher.zones || lynx::ProjectFile::toJson (*back) != json)
+                rackResult = "ERROR rack save / load";
+        }
+
         // FL engines in a native project (round 142, issue #5): every engine this PC can make survives save / load and
         // the instruments play through the rack
         juce::String nativesResult = "OK";
@@ -3060,7 +3142,7 @@ private:
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK";
@@ -3077,6 +3159,7 @@ private:
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
+               << "racks=" << rackResult << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
