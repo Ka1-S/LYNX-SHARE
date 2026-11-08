@@ -7735,9 +7735,18 @@ countries: id
 "{0} crashed in its separate process." = "{0} crash di proses terpisahnya."
 "{0} stopped responding (separate process)." = "{0} berhenti merespons (proses terpisah)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda; plugin dimuat lagi saat Anda membukanya berikutnya."
+"Interface font" = "Font antarmuka"
+"Default ({0})" = "Bawaan ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Font antarmuka baru diterapkan saat LYNX SHARE dimulai ulang."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animasi: panel muncul dan menghilang perlahan, tombol menyala lembut, roda gulir meluncur halus"
 "{0} minutes" = "{0} menit"
 "Longest wait between backups" = "Jeda terlama antar cadangan"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Buat comp dari take ini"
+"After loop recording, only the last pass plays" = "Setelah rekam loop, hanya putaran terakhir yang diputar"
+"Loop-recorded audio: every pass plays" = "Audio rekaman loop: semua putaran diputar"
+"Loop-recorded audio: every pass is muted" = "Audio rekaman loop: semua putaran dibisukan"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Kisi klip"
 "Stop all clips" = "Hentikan semua klip"
@@ -7948,6 +7957,11 @@ countries: id
 "Folders" = "Folder"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink ke kontroler"
+"Please tweak the controls you want to link..." = "Gerakkan kontrol yang ingin Anda tautkan..."
+"Multilink to controllers on/off" = "Multilink ke kontroler aktif/nonaktif"
+"Link to controller" = "Tautkan ke kontroler"
+"Override global links" = "Timpa tautan global"
 "Change color..." = "Ubah warna..."
 "Track routing" = "Perutean trek"
 "Open audio editor and record" = "Buka editor audio dan rekam"
@@ -7968,6 +7982,9 @@ countries: id
 "There are no audio clip channels selected." = "Tidak ada saluran klip audio yang dipilih."
 "Change declicking mode?" = "Ubah mode declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Ubah mode declicking semua saluran klip audio yang dipilih?"
+"Session clips of Live sets" = "Klip sesi dari set Live"
+"Clip grid (default)" = "Kisi klip (bawaan)"
+"Playlist, after the arrangement" = "Playlist, setelah aransemen"
 "Gradient color..." = "Warna gradien..."
 "Mixer tracks ({0} selected)" = "Trek mixer ({0} dipilih)"
 "Gradient editor" = "Editor gradien"
@@ -7995,3 +8012,4 @@ countries: id
 "Tones" = "Nada"
 "Texture" = "Tekstur"
 "Complex" = "Kompleks"
+"Comp takes" = "Buat comp dari take ini"

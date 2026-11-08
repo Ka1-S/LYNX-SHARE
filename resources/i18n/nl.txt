@@ -7735,9 +7735,18 @@ countries: nl be
 "{0} crashed in its separate process." = "{0} is gecrasht in zijn aparte proces."
 "{0} stopped responding (separate process)." = "{0} reageert niet meer (apart proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Alleen het proces van de plugin werd getroffen: LYNX SHARE en je project bleven draaien en de plugin is gedempt. Sla je project op; de plugin laadt opnieuw als je het weer opent."
+"Interface font" = "Lettertype van de interface"
+"Default ({0})" = "Standaard ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Een nieuw lettertype voor de interface wordt toegepast wanneer LYNX SHARE opnieuw start."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animaties: panelen faden in en uit, knoppen lichten zacht op, het scrollwiel glijdt"
 "{0} minutes" = "{0} minuten"
 "Longest wait between backups" = "Langste wachttijd tussen back-ups"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Comp maken van deze takes"
+"After loop recording, only the last pass plays" = "Na loopopname speelt alleen de laatste doorgang"
+"Loop-recorded audio: every pass plays" = "In loop opgenomen audio: alle doorgangen spelen"
+"Loop-recorded audio: every pass is muted" = "In loop opgenomen audio: alle doorgangen zijn gedempt"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Clipraster"
 "Stop all clips" = "Alle clips stoppen"
@@ -7948,6 +7957,11 @@ countries: nl be
 "Folders" = "Mappen"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink naar controllers"
+"Please tweak the controls you want to link..." = "Beweeg de regelaars die je wilt koppelen..."
+"Multilink to controllers on/off" = "Multilink naar controllers aan/uit"
+"Link to controller" = "Koppelen aan controller"
+"Override global links" = "Globale koppelingen overschrijven"
 "Change color..." = "Kleur wijzigen..."
 "Track routing" = "Trackroutering"
 "Open audio editor and record" = "Audio-editor openen en opnemen"
@@ -7968,6 +7982,9 @@ countries: nl be
 "There are no audio clip channels selected." = "Er zijn geen audioclipkanalen geselecteerd."
 "Change declicking mode?" = "Declickingmodus wijzigen?"
 "Change the declicking mode of all selected audio clip channels?" = "De declickingmodus van alle geselecteerde audioclipkanalen wijzigen?"
+"Session clips of Live sets" = "Sessieclips uit Live-sets"
+"Clip grid (default)" = "Clipraster (standaard)"
+"Playlist, after the arrangement" = "Playlist, na het arrangement"
 "Gradient color..." = "Kleurverloop..."
 "Mixer tracks ({0} selected)" = "Mixertracks ({0} geselecteerd)"
 "Gradient editor" = "Verloopeditor"
@@ -7995,3 +8012,4 @@ countries: nl be
 "Tones" = "Tonen"
 "Texture" = "Textuur"
 "Complex" = "Complex"
+"Comp takes" = "Comp maken van deze takes"

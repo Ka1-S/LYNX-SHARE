@@ -7735,9 +7735,18 @@ countries: ru by kz
 "{0} crashed in its separate process." = "Сбой {0} в отдельном процессе."
 "{0} stopped responding (separate process)." = "{0} не отвечает (отдельный процесс)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Затронут только его процесс: LYNX SHARE и проект продолжили работу, а плагин заглушён. Сохраните проект; плагин снова загрузится при следующем открытии."
+"Interface font" = "Шрифт интерфейса"
+"Default ({0})" = "По умолчанию ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Новый шрифт интерфейса применится после перезапуска LYNX SHARE."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Анимация: панели плавно появляются и исчезают, кнопки мягко подсвечиваются, колесо прокручивает плавно"
 "{0} minutes" = "{0} мин"
 "Longest wait between backups" = "Наибольший интервал между копиями"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Собрать комп из этих дублей"
+"After loop recording, only the last pass plays" = "После записи по циклу играет только последний проход"
+"Loop-recorded audio: every pass plays" = "Аудио, записанное по циклу: играют все проходы"
+"Loop-recorded audio: every pass is muted" = "Аудио, записанное по циклу: все проходы заглушены"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Сетка клипов"
 "Stop all clips" = "Остановить все клипы"
@@ -7948,6 +7957,11 @@ countries: ru by kz
 "Folders" = "Папки"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Мультипривязка к контроллерам"
+"Please tweak the controls you want to link..." = "Покрутите регуляторы, которые хотите привязать..."
+"Multilink to controllers on/off" = "Мультипривязка к контроллерам вкл/выкл"
+"Link to controller" = "Привязать к контроллеру"
+"Override global links" = "Переопределить глобальные привязки"
 "Change color..." = "Изменить цвет..."
 "Track routing" = "Маршрутизация дорожки"
 "Open audio editor and record" = "Открыть аудиоредактор и записать"
@@ -7968,6 +7982,9 @@ countries: ru by kz
 "There are no audio clip channels selected." = "Не выбрано ни одного канала аудиоклипа."
 "Change declicking mode?" = "Изменить режим деклика?"
 "Change the declicking mode of all selected audio clip channels?" = "Изменить режим деклика всех выбранных каналов аудиоклипов?"
+"Session clips of Live sets" = "Клипы сессии из сетов Live"
+"Clip grid (default)" = "Сетка клипов (по умолчанию)"
+"Playlist, after the arrangement" = "Плейлист, после аранжировки"
 "Gradient color..." = "Градиентный цвет..."
 "Mixer tracks ({0} selected)" = "Дорожки микшера (выбрано: {0})"
 "Gradient editor" = "Редактор градиента"
@@ -7995,3 +8012,4 @@ countries: ru by kz
 "Tones" = "Тона"
 "Texture" = "Текстура"
 "Complex" = "Комплексный"
+"Comp takes" = "Собрать комп из этих дублей"

@@ -7735,9 +7735,18 @@ countries: it ch sm
 "{0} crashed in its separate process." = "{0} è andato in crash nel suo processo separato."
 "{0} stopped responding (separate process)." = "{0} ha smesso di rispondere (processo separato)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "È stato colpito solo il suo processo: LYNX SHARE e il progetto hanno continuato a funzionare e il plugin è stato silenziato. Salva il progetto; il plugin si ricarica alla prossima apertura."
+"Interface font" = "Carattere dell'interfaccia"
+"Default ({0})" = "Predefinito ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Il nuovo carattere dell'interfaccia si applica al riavvio di LYNX SHARE."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animazioni: i pannelli compaiono e scompaiono in dissolvenza, i pulsanti si illuminano dolcemente, la rotella scorre fluida"
 "{0} minutes" = "{0} minuti"
 "Longest wait between backups" = "Attesa massima tra i backup"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Crea un comp da queste take"
+"After loop recording, only the last pass plays" = "Dopo la registrazione in loop, suona solo l'ultimo passaggio"
+"Loop-recorded audio: every pass plays" = "Audio registrato in loop: suonano tutti i passaggi"
+"Loop-recorded audio: every pass is muted" = "Audio registrato in loop: tutti i passaggi sono silenziati"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Griglia di clip"
 "Stop all clips" = "Ferma tutte le clip"
@@ -7948,6 +7957,11 @@ countries: it ch sm
 "Folders" = "Cartelle"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink ai controller"
+"Please tweak the controls you want to link..." = "Muovi i controlli che vuoi collegare..."
+"Multilink to controllers on/off" = "Multilink ai controller attivo/disattivo"
+"Link to controller" = "Collega al controller"
+"Override global links" = "Sovrascrivi i collegamenti globali"
 "Change color..." = "Cambia colore..."
 "Track routing" = "Instradamento traccia"
 "Open audio editor and record" = "Apri l'editor audio e registra"
@@ -7968,6 +7982,9 @@ countries: it ch sm
 "There are no audio clip channels selected." = "Nessun canale di clip audio selezionato."
 "Change declicking mode?" = "Cambiare la modalità di declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Cambiare la modalità di declicking di tutti i canali di clip audio selezionati?"
+"Session clips of Live sets" = "Clip di sessione dei set di Live"
+"Clip grid (default)" = "Griglia di clip (predefinito)"
+"Playlist, after the arrangement" = "Playlist, dopo l'arrangiamento"
 "Gradient color..." = "Colore sfumato..."
 "Mixer tracks ({0} selected)" = "Tracce del mixer ({0} selezionate)"
 "Gradient editor" = "Editor sfumatura"
@@ -7995,3 +8012,4 @@ countries: it ch sm
 "Tones" = "Toni"
 "Texture" = "Texture"
 "Complex" = "Complesso"
+"Comp takes" = "Crea un comp da queste take"

@@ -7735,9 +7735,18 @@ countries: jp
 "{0} crashed in its separate process." = "{0} が別プロセス内でクラッシュしました。"
 "{0} stopped responding (separate process)." = "{0} が応答しなくなりました（別プロセス）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。次に開いたときにプラグインは再び読み込まれます。"
+"Interface font" = "インターフェイスのフォント"
+"Default ({0})" = "既定 ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "新しいインターフェイスのフォントは LYNX SHARE の再起動後に適用されます。"
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "アニメーション: パネルがフェードイン・アウトし、ボタンがなめらかに点灯し、ホイールでなめらかにスクロールします"
 "{0} minutes" = "{0} 分"
 "Longest wait between backups" = "バックアップ間の最長待ち時間"
 
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "これらのテイクでコンプを作成"
+"After loop recording, only the last pass plays" = "ループ録音後は最後のパスのみ再生"
+"Loop-recorded audio: every pass plays" = "ループ録音したオーディオ: すべてのパスを再生"
+"Loop-recorded audio: every pass is muted" = "ループ録音したオーディオ: すべてのパスをミュート"
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "クリップグリッド"
 "Stop all clips" = "すべてのクリップを停止"
@@ -7948,6 +7957,11 @@ countries: jp
 "Folders" = "フォルダー"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "コントローラーへのマルチリンク"
+"Please tweak the controls you want to link..." = "リンクしたいコントロールを動かしてください..."
+"Multilink to controllers on/off" = "コントローラーへのマルチリンク オン/オフ"
+"Link to controller" = "コントローラーにリンク"
+"Override global links" = "グローバルリンクを上書き"
 "Change color..." = "色を変更..."
 "Track routing" = "トラックのルーティング"
 "Open audio editor and record" = "オーディオエディターを開いて録音"
@@ -7968,6 +7982,9 @@ countries: jp
 "There are no audio clip channels selected." = "オーディオクリップチャンネルが選択されていません。"
 "Change declicking mode?" = "デクリックモードを変更しますか?"
 "Change the declicking mode of all selected audio clip channels?" = "選択したすべてのオーディオクリップチャンネルのデクリックモードを変更しますか?"
+"Session clips of Live sets" = "Live セットのセッションクリップ"
+"Clip grid (default)" = "クリップグリッド (既定)"
+"Playlist, after the arrangement" = "プレイリスト、アレンジメントの後"
 "Gradient color..." = "グラデーションカラー..."
 "Mixer tracks ({0} selected)" = "ミキサートラック（{0} 個選択）"
 "Gradient editor" = "グラデーションエディター"
@@ -7995,3 +8012,4 @@ countries: jp
 "Tones" = "トーン"
 "Texture" = "テクスチャ"
 "Complex" = "コンプレックス"
+"Comp takes" = "これらのテイクでコンプを作成"

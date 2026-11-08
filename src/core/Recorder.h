@@ -44,6 +44,15 @@ enum class RecordMode : std::uint8_t
 // Commits finished notes of a take into `pattern`: starts quantised to the nearest multiple of `grid`
 // (grid <= 1: as played; lengths kept). In replace mode, `clearedChannels` remembers the channels already
 // cleared during this take, so later notes of the same take stay.
+// What "Blend recorded notes" starts as (round 177c). A new install starts off, as FL Studio's factory form does.
+// Before 0.1.25 the switch wasn't saved and every session started on, so a settings file that has no answer yet keeps it on.
+[[nodiscard]] constexpr RecordMode startingRecordMode (bool settingsFileExists, bool hasSavedBlend, bool savedBlend) noexcept
+{
+    if (hasSavedBlend)
+        return savedBlend ? RecordMode::overdub : RecordMode::replace;
+    return settingsFileExists ? RecordMode::overdub : RecordMode::replace;
+}
+
 void commitTake (Pattern& pattern, std::vector<Note> notes, RecordMode mode, std::int64_t grid, std::vector<int>& clearedChannels);
 
 // FL's record menu "Quantize" section (REA round 139, FLEngine FUN_012ca7b0; settings QuantizeNoteStartTime,

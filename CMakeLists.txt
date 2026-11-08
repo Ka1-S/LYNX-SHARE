@@ -59,6 +59,7 @@ add_library(lynx_core STATIC
     src/core/NoteEdit.cpp
     src/core/Recorder.cpp
     src/core/TakeRecording.cpp
+    src/core/Comping.cpp
     src/core/Pdc.cpp
     src/core/WorkerPool.cpp
     src/core/TimeStretch.cpp
@@ -553,6 +554,16 @@ if(LYNX_BUILD_APP)
         # LYNX's own PipeWire driver (round 161): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
         target_include_directories(LYNX SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+
+    # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files
+    if(UNIX AND NOT APPLE)
+        juce_add_binary_data(LynxFontData
+            HEADER_NAME LynxFontData.h
+            NAMESPACE lynxfontdata
+            SOURCES resources/fonts/OpenSans-Regular.ttf resources/fonts/OpenSans-Bold.ttf)
+        target_link_libraries(LYNX PRIVATE LynxFontData)
+        target_compile_definitions(LYNX PRIVATE LYNX_BUNDLED_FONT=1)
     endif()
 
     target_link_libraries(LYNX

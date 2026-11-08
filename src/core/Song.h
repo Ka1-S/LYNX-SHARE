@@ -1473,6 +1473,10 @@ struct Clip
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.
     std::int64_t crossfadeIn = 0, crossfadeOut = 0;
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a): whose clip it is
+    // audio clips, LYNX comping (round 177c, core/Comping.h): bit 0 = the fade-in is an equal-power crossfade (sin), bit 1 =
+    // the fade-out (cos). Set where a comp switches takes: the two clips overlap by the fade and their gains sum to
+    // constant power. Saved with the project.
+    std::uint8_t fadeCurve = 0;
 
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
@@ -1587,6 +1591,9 @@ struct PlaylistTrack
     // ungrouped track above it (the group's header). `collapsed` on a header folds its members into thin rows.
     bool grouped = false;
     bool collapsed = false;
+    // A comp track (round 177c, core/Comping.h): this group header is what plays, its grouped tracks are take lanes. Set
+    // only by "Comp these takes"; a group of takes is an ordinary track group until then.
+    bool compTrack = false;
     // FL's "Track mode" (REA round 146a; .flp record 0xEE: u32 mode at byte 49 = 0 / 1 audio / 3 instrument, i32 mixer
     // track at 53, i32 channel at 57). An audio track is linked to a mixer track: audio clips placed on it play through
     // that track (their channel is routed there). An instrument track belongs to a channel (and its mixer track).
@@ -1641,17 +1648,16 @@ struct Arrangement
 
 // The clip grid of the Clip-launch workflow (round 181a; logic in core/ClipLauncher.h). Absent (Song::clipGrid empty) until
 // the workflow or the grid is first used: a project without one carries nothing but the empty optional.
-// LaunchQuant and LaunchMode follow the order of Live's menus. Mapping to the numbers a Live set stores (docs/ALS_FORMAT.md §5)
-// is seen in Live's GUI only for a set-wide GlobalQuantisation 9 shown as "1/8" (181a), which fits clip number = global + 1.
-// From shipped sets (175a): clip LaunchQuant 0 = global, LaunchMode 0..3. Every other number is INFERRED
-// (docs/analise/REA_rodada181a.md); per-clip reads are a follow-up for the next Live turn, before .als session import.
+// LaunchQuant, LaunchMode and FollowKind keep the numbers a Live set stores (docs/ALS_FORMAT.md §5), read in Live 12's own
+// GUI (docs/analise/REA_rodada181a.md, 181b): clip LaunchQuantisation 0..14, LaunchMode 0..3, FollowActionA 0..9 map
+// directly. A set-wide GlobalQuantisation has no Global entry: its number is LaunchQuant's minus 1 (9 = 1/8).
 enum class LaunchQuant : std::uint8_t
 {
     global, none, bars8, bars4, bars2, bar, half, halfTriplet, quarter, quarterTriplet, eighth, eighthTriplet, sixteenth,
     sixteenthTriplet, thirtySecond
 };
 enum class LaunchMode : std::uint8_t { trigger, gate, toggle, repeat };
-// A follow action, in the order of the manual's list; the numbers a set stores for them are INFERRED (docs/analise/REA_rodada181a.md)
+// A follow action, in the order of the manual's list, which is also the numbers a set stores (FollowActionA, seen in Live)
 enum class FollowKind : std::uint8_t { none, stop, playAgain, previous, next, first, last, any, other, jump };
 
 struct ClipFollow
@@ -1905,6 +1911,13 @@ struct Song
     // without it loads with it off (FL: "old projects now load with automatic crossfades turned off"); new projects
     // take Settings' "Enable automatic crossfades in new projects".
     bool autoCrossfades = false;
+    // LYNX comping (round 177c, core/Comping.h): the length of the equal-power crossfade where a comp switches takes (ms,
+    // 0 = a hard cut). Saved with the project when it is not the default.
+    static constexpr float defaultCompCrossfadeMs = 5.0f;
+    float compCrossfadeMs = defaultCompCrossfadeMs;
+    // Comping: the take lane being auditioned (a Playlist track, -1 = none) and its comp track. While set, the lane
+    // plays (its muted take clips too) instead of the comp track. Not saved; comp::setAudition sets both.
+    int auditionLane = -1, auditionComp = -1;
     // FL's Project › "Play truncated notes in clips" (REA round 167g, .flp 0x1E): a note that starts before a pattern
     // clip's start (the clip trimmed or sliced into it) plays from the clip's start with what is left of its length
     // (FL FUN_010608a0); off = such notes are dropped (LYNX's behaviour before; projects saved before keep it off).

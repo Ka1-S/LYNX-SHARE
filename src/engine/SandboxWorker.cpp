@@ -108,6 +108,22 @@ public:
 
     void closeButtonPressed() override { setVisible (false); }
 
+    // A key the plugin's editor left unused (issue #99): LYNX never sees this process's keys, so it goes to LYNX's
+    // shortcuts (Space plays, as with an in-process plugin window); Esc closes the window, as in LYNX's other windows.
+    // Always used here: macOS would otherwise beep for every key.
+    // shortcut: keys typed into a plugin's native child view on Windows never reach JUCE, so they still stay in the
+    // plugin; upgrade with a keyboard hook in this process (as pluginKeyProc in WindowOwner.cpp) if that is wanted.
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::escapeKey)
+            closeButtonPressed();
+        else if (onUnusedKey != nullptr)
+            onUnusedKey (key);
+        return true;
+    }
+
+    std::function<void (const juce::KeyPress&)> onUnusedKey;
+
    #if JUCE_MAC
 private:
     juce::TimedCallback followLynx { [this] {
@@ -204,6 +220,11 @@ private:
             if (window == nullptr)
             {
                 window = std::make_unique<SandboxWindow> (plugin->getName());
+                window->onUnusedKey = [this] (const juce::KeyPress& key) {
+                    send (juce::ValueTree ("key").setProperty ("code", key.getKeyCode(), nullptr)
+                                                 .setProperty ("mods", key.getModifiers().getRawFlags(), nullptr)
+                                                 .setProperty ("char", (int) key.getTextCharacter(), nullptr));
+                };
                 if (auto* ed = plugin->createEditorIfNeeded())
                     window->setContentOwned (ed, true);
                 window->centreWithSize (window->getWidth(), window->getHeight());
