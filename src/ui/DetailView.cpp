@@ -11,6 +11,9 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/MeterBallistics.h"
+#include "core/NoteEdit.h"
+#include "core/NoteTools.h"
+#include "core/PlaylistOps.h"
 #include "core/NativeEngines.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
@@ -1155,12 +1158,270 @@ private:
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Slice 2b: the Clip page's left column, the reference's Clip / Launch / Notes panels [SHOT d08, m3-live-clipview2] over
+// LYNX's existing model: the grid clip's offset and length, its slot's loop and launch settings, and the pattern's
+// notes through the Piano roll's own note tools. No new model: Signature is the project's, Scale waits for the project
+// key (round 184a's core/ProjectKey.h), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
+class ClipColumn final : public juce::Component, private juce::ChangeListener
+{
+public:
+    explicit ClipColumn (AudioEngine& e) : engine (e)
+    {
+        for (auto* t : { &clipTitle, &launchTitle, &notesTitle })
+        {
+            t->setFont (font (type::small, true));
+            t->setColour (juce::Label::textColourId, colour::textSecondary);
+            addAndMakeVisible (*t);
+        }
+        clipTitle.setText (tr ("Clip"), juce::dontSendNotification);
+        launchTitle.setText (tr ("Launch"), juce::dontSendNotification);
+        notesTitle.setText (tr ("Notes"), juce::dontSendNotification);
+        const std::pair<juce::Label*, const char*> labels[] = { { &nameLabel, TR_NOOP ("Name") }, { &startLabel, TR_NOOP ("Start") },
+                                                                 { &endLabel, TR_NOOP ("End") }, { &lengthLabel, TR_NOOP ("Length") },
+                                                                 { &signatureLabel, TR_NOOP ("Signature") }, { &modeLabel, TR_NOOP ("Launch mode") },
+                                                                 { &quantLabel, TR_NOOP ("Launch quantisation") } };
+        for (const auto& [l, text] : labels)
+        {
+            l->setText (tr (text), juce::dontSendNotification);
+            l->setFont (font (type::caption));
+            l->setColour (juce::Label::textColourId, colour::textSecondary);
+            addAndMakeVisible (*l);
+        }
+        for (auto* ed : { &name, &start, &end, &length })
+        {
+            addAndMakeVisible (*ed);
+            ed->setFont (font (type::small));
+            ed->onReturnKey = [this] { apply(); };
+            ed->onFocusLost = [this] { apply(); };
+            ed->onEscapeKey = [this] { load(); };
+        }
+        start.setTooltip (tr ("Where the clip starts in its source (bars:beats:ticks)"));
+        end.setTooltip (tr ("Where the clip ends in its source (bars:beats:ticks)"));
+        length.setTooltip (tr ("bars:beats:ticks"));
+        signature.setFont (font (type::small));
+        signature.setColour (juce::Label::textColourId, colour::textPrimary);
+        signature.setTooltip (tr ("The project's time signature (clips have no signature of their own in LYNX SHARE)"));
+        addAndMakeVisible (signature);
+        loop.setButtonText (tr ("Loop"));
+        loop.onClick = [this] { editSlot ([on = loop.getToggleState()] (ClipGridSlot& slot) { slot.loop = on; }); };
+        legato.setButtonText (tr ("Legato (keep the position)"));
+        legato.onClick = [this] { editSlot ([on = legato.getToggleState()] (ClipGridSlot& slot) { slot.legato = on; }); };
+        for (auto* b : { &loop, &legato })
+            addAndMakeVisible (*b);
+        const char* modes[] = { TR_NOOP ("Trigger"), TR_NOOP ("Gate"), TR_NOOP ("Toggle"), TR_NOOP ("Repeat") };
+        for (int i = 0; i < 4; ++i)
+            mode.addItem (tr (modes[i]), i + 1);
+        mode.onChange = [this] { editSlot ([m = mode.getSelectedId() - 1] (ClipGridSlot& slot) { slot.mode = (LaunchMode) juce::jlimit (0, 3, m); }); };
+        const char* quants[] = { TR_NOOP ("Global"), TR_NOOP ("None"), TR_NOOP ("8 bars"), TR_NOOP ("4 bars"), TR_NOOP ("2 bars"), TR_NOOP ("1 bar"),
+                                 "1/2", "1/2T", "1/4", "1/4T", "1/8", "1/8T", "1/16", "1/16T", "1/32" };
+        for (int i = 0; i < 15; ++i)
+            quant.addItem (i < 6 ? tr (quants[i]) : juce::String (quants[i]), i + 1);
+        quant.onChange = [this] { editSlot ([q = quant.getSelectedId() - 1] (ClipGridSlot& slot) { slot.quant = (LaunchQuant) juce::jlimit (0, 14, q); }); };
+        for (auto* c : { &mode, &quant })
+            addAndMakeVisible (*c);
+
+        // the reference's note tools, each the Piano roll's own operation on every note of the clip's pattern
+        const std::pair<juce::TextButton*, const char*> tools[] = {
+            { &invert, TR_NOOP ("Invert") },       { &reverse, TR_NOOP ("Reverse") }, { &makeLegato, TR_NOOP ("Make legato") },
+            { &humanize, TR_NOOP ("Humanize") },   { &duplicate, TR_NOOP ("Duplicate") }, { &quantize, TR_NOOP ("Quantize") },
+            { &randomize, TR_NOOP ("Randomize velocity") } };
+        for (const auto& [b, text] : tools)
+        {
+            b->setButtonText (tr (text));
+            b->setConnectedEdges (0);
+            addAndMakeVisible (*b);
+        }
+        invert.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { notetools::flip (p, all, false, true); }); };
+        reverse.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { notetools::flip (p, all, true, false); }); };
+        makeLegato.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { noteedit::legato (p, all); }); };
+        humanize.onClick = [this] {
+            notes ([seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt()] (Pattern& p, const std::vector<int>& all, const Song&) {
+                notetools::HumanizeOptions o;
+                o.seed = seed;
+                notetools::humanize (p, all, o);
+            });
+        };
+        duplicate.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) { noteedit::duplicateBars (p, all, song.beatsPerBar); }); };
+        quantize.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { noteedit::quantize (p, all, ppq / 4); }); };
+        randomize.onClick = [this] {
+            notes ([seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt()] (Pattern& p, const std::vector<int>& all, const Song&) {
+                notetools::RandomiseOptions o;
+                o.seed = seed;
+                notetools::randomise (p, all, o);
+            });
+        };
+        engine.addChangeListener (this);
+    }
+    ~ClipColumn() override { engine.removeChangeListener (this); }
+
+    static constexpr int width = 236;
+
+    void setSlot (int t, int s)
+    {
+        track = t;
+        scene = s;
+        load();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (colour::bg2);
+        g.setColour (colour::border);
+        g.fillRect (getWidth() - 1, 0, 1, getHeight());
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (8, 4).withTrimmedRight (1);
+        const auto row = [&r] (int h = 20) { auto x = r.removeFromTop (h); r.removeFromTop (3); return x; };
+        const auto pair = [&] (juce::Label& l, juce::Component& c) {
+            auto x = row();
+            l.setBounds (x.removeFromLeft (76));
+            c.setBounds (x);
+        };
+        clipTitle.setBounds (row (16));
+        pair (nameLabel, name);
+        pair (startLabel, start);
+        pair (endLabel, end);
+        pair (lengthLabel, length);
+        loop.setBounds (row());
+        pair (signatureLabel, signature);
+        r.removeFromTop (4);
+        launchTitle.setBounds (row (16));
+        pair (modeLabel, mode);
+        pair (quantLabel, quant);
+        legato.setBounds (row());
+        r.removeFromTop (4);
+        notesTitle.setBounds (row (16));
+        auto grid = r;
+        const juce::TextButton* order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize };
+        for (int i = 0; i < 7; ++i)
+        {
+            auto* b = const_cast<juce::TextButton*> (order[i]);
+            const auto w = (grid.getWidth() - 4) / 2;
+            b->setBounds (grid.getX() + (i % 2) * (w + 4), grid.getY() + (i / 2) * 24, i == 6 ? grid.getWidth() : w, 21);
+        }
+    }
+
+private:
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { load(); }
+
+    // the grid clip of the slot (const) and its settings
+    const Clip* clip() const
+    {
+        const auto& song = engine.getSong();
+        return song.clipGrid && track >= 0 && scene >= 0 ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+    }
+
+    void load()
+    {
+        const auto* c = clip();
+        setVisible (c != nullptr);
+        if (c == nullptr)
+            return;
+        const auto& song = engine.getSong();
+        const auto bpb = song.beatsPerBar;
+        const ClipGridSlot* slot = c->gridSlot >= 0 && c->gridSlot < (int) song.clipGrid->slots.size() ? &song.clipGrid->slots[(std::size_t) c->gridSlot] : nullptr;
+        const auto n = juce::dontSendNotification;
+        if (! name.hasKeyboardFocus (false))
+            name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
+        if (! start.hasKeyboardFocus (false))
+            start.setText (clipprops::formatLength (c->offset, bpb), false);
+        if (! end.hasKeyboardFocus (false))
+            end.setText (clipprops::formatLength (c->offset + c->length, bpb), false);
+        if (! length.hasKeyboardFocus (false))
+            length.setText (clipprops::formatLength (c->length, bpb), false);
+        signature.setText (juce::String (bpb) + "/4", n);
+        if (slot != nullptr)
+        {
+            loop.setToggleState (slot->loop, n);
+            legato.setToggleState (slot->legato, n);
+            mode.setSelectedId ((int) slot->mode + 1, n);
+            quant.setSelectedId ((int) slot->quant + 1, n);
+        }
+        const bool pattern = c->kind == ClipKind::pattern;
+        for (auto* b : { &notesTitle })
+            b->setVisible (pattern);
+        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize })
+            b->setVisible (pattern);
+    }
+
+    // the clip's own fields (one undo step)
+    void apply()
+    {
+        const auto* c = clip();
+        if (c == nullptr)
+            return;
+        const auto bpb = engine.getSong().beatsPerBar;
+        auto offset = c->offset, len = c->length;
+        if (const auto t = clipprops::parseLength (start.getText().toStdString(), bpb); t >= 0)
+            offset = t;
+        if (const auto t = clipprops::parseLength (length.getText().toStdString(), bpb); t > 0 && length.getText() != juce::String (clipprops::formatLength (c->length, bpb)))
+            len = t;
+        else if (const auto e = clipprops::parseLength (end.getText().toStdString(), bpb); e > offset)
+            len = e - offset;
+        const auto newName = name.getText().trim().toStdString();
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc, offset, len, newName] (Song& song) {
+            if (! song.clipGrid)
+                return;
+            for (auto& clip : song.clipGrid->clips)
+                if (clip.track == t && clip.length > 0 && clip.gridSlot >= 0 && clip.gridSlot < (int) song.clipGrid->slots.size()
+                    && song.clipGrid->slots[(std::size_t) clip.gridSlot].scene == sc)
+                {
+                    clip.offset = offset;
+                    clip.length = len;
+                    song.clipGrid->slots[(std::size_t) clip.gridSlot].name = newName;
+                }
+        });
+        load();
+    }
+
+    void editSlot (std::function<void (ClipGridSlot&)> fn)
+    {
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc, fn] (Song& song) {
+            if (song.clipGrid)
+                if (auto* slot = launcher::settingsAt (*song.clipGrid, t, sc))
+                    fn (*slot);
+        });
+    }
+
+    // a note tool on every note of the clip's pattern (one undo step)
+    void notes (std::function<void (Pattern&, const std::vector<int>&, const Song&)> fn)
+    {
+        const auto* c = clip();
+        if (c == nullptr || c->kind != ClipKind::pattern)
+            return;
+        engine.editSong ([pattern = c->pattern, fn] (Song& song) {
+            if (pattern < 0 || pattern >= (int) song.patterns.size())
+                return;
+            auto& p = song.patterns[(std::size_t) pattern];
+            std::vector<int> all ((std::size_t) p.notes.size());
+            for (int i = 0; i < (int) all.size(); ++i)
+                all[(std::size_t) i] = i;
+            fn (p, all, song);
+            noteedit::sortTracking (p, all);
+        });
+    }
+
+    AudioEngine& engine;
+    int track = -1, scene = -1;
+    juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
+    juce::TextEditor name, start, end, length;
+    juce::ToggleButton loop, legato;
+    juce::ComboBox mode, quant;
+    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
 // The Clip View (slice 1: the selected slot's clip and a button to its editor; slice 2 docks the editors here).
 class DetailView::ClipPage final : public juce::Component, private juce::ChangeListener
 {
 public:
-    ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h)
+    ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
+        addChildComponent (column); // (slice 2b: shown while a grid clip is)
         for (auto* b : { &notesTab, &envelopesTab })
         {
             addChildComponent (*b);
@@ -1198,6 +1459,7 @@ public:
             takenBack = false; // (a new clip docks again)
         track = t;
         scene = s;
+        column.setSlot (t, s);
         update();
     }
     void editorTakenBack()
@@ -1236,12 +1498,15 @@ public:
             return;
         g.setColour (colour::textSecondary);
         g.setFont (font (type::body));
-        g.drawText (text, getLocalBounds().withTrimmedBottom (40), juce::Justification::centred, true);
+        g.drawText (text, getLocalBounds().withTrimmedLeft (column.isVisible() ? ClipColumn::width : 0).withTrimmedBottom (40),
+                    juce::Justification::centred, true);
     }
     void resized() override
     {
-        open.setBounds (getLocalBounds().withSizeKeepingCentre (240, 26).translated (0, 16));
         auto area = getLocalBounds();
+        if (column.isVisible())
+            column.setBounds (area.removeFromLeft (ClipColumn::width));
+        open.setBounds (area.withSizeKeepingCentre (240, 26).translated (0, 16));
         if (notesTab.isVisible())
         {
             // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08]
@@ -1324,6 +1589,11 @@ private:
     {
         const auto& song = engine.getSong();
         const auto* clip = clipShown();
+        if (column.isVisible() != (clip != nullptr))
+        {
+            column.setVisible (clip != nullptr);
+            resized();
+        }
         // a pattern clip, on screen: the Piano roll docks here (unless its panel took it back since this clip was picked)
         const bool patternClip = clip != nullptr && clip->kind == ClipKind::pattern;
         const bool tabs = patternClip && onScreen();
@@ -1395,6 +1665,7 @@ private:
     Hooks& hooks;
     juce::TextButton open;
     juce::String text;
+    ClipColumn column;
     juce::TextButton notesTab, envelopesTab;
     static constexpr int tabHeight = 26;
     std::unique_ptr<juce::Component> events; // the Envelopes tab's Event editor

@@ -232,3 +232,32 @@ Left to right [MANUAL "left to right"; LESSON meters]:
   the same tab when it lands.
 - Not built: the reference's Shift+Alt+1 / 2 / 3 (Note / Envelope / Expression editor) [SHOT d05]; modulation vs
   automation per clip (no model).
+
+### Slice 2b: the Clip page's left column (coordinator: yes, after slice 3; no new model)
+The reference's Clip / Launch / Notes panels [SHOT d08, `m3-live-clipview2.png`] over LYNX's model, for the grid clip shown:
+| Reference field | LYNX | Status |
+|---|---|---|
+| Start / End | the clip's `offset` / `offset + length` (clipprops' bars:beats:ticks text) | built |
+| Position / Length (loop brace) | one length: a grid clip loops all of itself, so Position = Start and Length = the clip's length | built (merged) |
+| Loop | `ClipGridSlot::loop` | built |
+| Signature | the project's, read-only (no per-clip signature in LYNX) | built, read-only |
+| Groove | no groove model in LYNX | **missing** |
+| Scale | round 184a's project key (`core/ProjectKey.h`, `Song::scaleHighlight`); read-only first, editing once the branch is on main | waits for 184a |
+| Launch: mode, quantisation, legato | `ClipGridSlot` (round 181a) | built |
+
+Note tools (pattern clips), each the Piano roll's own operation on every note of the clip's pattern, one undo step:
+| Reference | LYNX | Status |
+|---|---|---|
+| Invert | `notetools::flip` (vertical) | built |
+| Reverse | `notetools::flip` (horizontal) | built |
+| Legato | `noteedit::legato` ("Make legato") | built |
+| Humanize | `notetools::humanize` | built |
+| Duplicate | `noteedit::duplicateBars` | built |
+| Quantize (Grid) | `noteedit::quantize` (1/16) | built |
+| Velocity: Randomize | `notetools::randomise` | built |
+| Fit to Scale | "Move the notes onto the scale" (`snapNotesToScale`) needs the project key | waits for 184a |
+| Set Length | only "Shrink to grid" (one grid unit) exists | **missing** as such |
+| Stretch ×2 / ÷2 | no one-click time stretch of notes | **missing** |
+| Add Interval | no parallel-interval tool | **missing** |
+| Velocity: Ramp / Deviation | `scaleLevels` covers a ramp; no deviation | Ramp not wired; Deviation **missing** |
+| Live 12 MIDI Tools tabs (Transform / Generate) | partly FL's Piano roll tools (strum, arpeggiate, chop, riff) | out of this round |
