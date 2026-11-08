@@ -3049,7 +3049,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 {
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
                     // the same ratio as RackRenderer: the region after its Trim (round 180d)
-                    const auto ratio = target / ((double) precompute::stretchedFrames (*data, c.sampler, c.instrument == InstrumentKind::audioClip) / data->sampleRate);
+                    const auto ratio = target / ((double) precompute::stretchedFrames (data, c.sampler, c.instrument == InstrumentKind::audioClip) / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
                     // (the same map the rack asks for: RackState::build)

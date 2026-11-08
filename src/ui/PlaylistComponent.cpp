@@ -2011,7 +2011,7 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         // what the clip plays of the file (its Trim; round 180d): the same frames as the playback
         const auto data = engine.getSampleLibrary().load (path);
-        const auto span = data != nullptr ? clipops::clipSpan (channel, *data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+        const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
         const auto total = (double) span.frames;
         const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
@@ -2086,7 +2086,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         // what the clip plays of the file (its Trim; round 180d): the same frames as the playback
         const auto data = engine.getSampleLibrary().load (path);
-        const auto span = data != nullptr ? clipops::clipSpan (channel, *data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+        const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
         const auto total = (double) span.frames;
         const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         // r's left edge is the clip start, i.e. tick `offset` of the audio (counted from the played span's end when
@@ -4828,7 +4828,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         const auto path = juce::String::fromUTF8 (channel.samplePath.c_str());
         const auto sample = engine.getSampleLibrary().load (path);
         // the frames the clip plays (its Trim; round 180d), as the drawing and the playback count them
-        const auto frames = sample != nullptr ? (double) clipops::clipSpan (channel, *sample).frames : 0.0;
+        const auto frames = sample != nullptr ? (double) clipops::clipSpan (channel, sample).frames : 0.0;
         const auto rate = sample != nullptr ? sample->sampleRate : 44100.0;
 
         menu.addItem (tr ("Reverse"), sample != nullptr, channel.sampler.reverse, [this, index, frames, rate] {
@@ -5037,7 +5037,7 @@ void PlaylistComponent::normalizeClips (const std::vector<int>& targets)
         if (sample == nullptr || sample->frames() == 0)
             continue;
 
-        const auto span = clipops::clipSpan (channel, *sample); // what the clip plays of the file (round 180d)
+        const auto span = clipops::clipSpan (channel, sample); // what the clip plays of the file (round 180d)
         const auto total = (double) span.frames;
         const auto perTick = clipops::framesPerTick (channel, c, total, sample->sampleRate, song.bpm);
         auto from = juce::jlimit (0.0, total, (double) c.offset * perTick);
@@ -5760,7 +5760,7 @@ void PlaylistComponent::reverseSelectedAudioClips()
                 {
                     const auto& channel = song.channels[(std::size_t) c.channel];
                     if (const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str())); sample != nullptr)
-                        t = clipops::fileTicks (channel, c, (double) clipops::clipSpan (channel, *sample).frames, sample->sampleRate, song.bpm);
+                        t = clipops::fileTicks (channel, c, (double) clipops::clipSpan (channel, sample).frames, sample->sampleRate, song.bpm);
                 }
             ticks.push_back (t);
         }

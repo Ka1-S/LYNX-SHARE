@@ -244,7 +244,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         // FL stretches what plays: the region after its precomputed effects and Trim, not the whole file (round 180d:
         // Thief's Importer Ride, 1.30 s of file faded out to 0.38 s, plays 2x slower in FL at TIME 367)
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
-        const auto ratio = target / ((double) precompute::stretchedFrames (*sample, channel.sampler, kind == InstrumentKind::audioClip) / sample->sampleRate);
+        const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, kind == InstrumentKind::audioClip) / sample->sampleRate);
 
         const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
                                          (double) std::llround ((double) sample->frames() * ratio));

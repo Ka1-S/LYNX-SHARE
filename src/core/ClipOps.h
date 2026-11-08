@@ -19,7 +19,7 @@ namespace lynx::clipops
 // The part of its file an audio clip's channel plays (its Trim; a clip plays the whole region): a clip's offsets count from
 // its first frame, and TIME stretches its length (FL: FUN_00ff9d70, REA round 180d). Pass its `frames` as `fileFrames`
 // below and add `first` to a frame drawn from them, so that drawing, clip lengths and playback agree.
-inline precompute::PlayedSpan clipSpan (const ChannelDef& channel, const SampleData& data)
+inline precompute::PlayedSpan clipSpan (const ChannelDef& channel, const std::shared_ptr<const SampleData>& data)
 {
     return precompute::playedSpan (data, channel.sampler, channel.instrument == InstrumentKind::audioClip);
 }

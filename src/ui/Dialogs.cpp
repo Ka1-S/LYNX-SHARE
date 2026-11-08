@@ -568,7 +568,7 @@ void showSamplePitchDialog (AudioEngine& engine, int channel)
                                  const auto pitch = result == 2 ? 0.0 : window->pitch();
                                  const auto keep = window->keepLength();
                                  const auto sample = path.isNotEmpty() ? engine.getSampleLibrary().load (path) : nullptr;
-                                 const auto frames = sample != nullptr ? (double) clipops::clipSpan (settings, *sample).frames : 0.0;
+                                 const auto frames = sample != nullptr ? (double) clipops::clipSpan (settings, sample).frames : 0.0;
                                  const auto rate = sample != nullptr ? sample->sampleRate : 0.0;
                                  engine.editSong ([channel, pitch, keep, frames, rate] (Song& s) {
                                      clipops::setChannelPitch (s, channel, pitch, 0.0, keep, frames, rate);

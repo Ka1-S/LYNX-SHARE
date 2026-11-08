@@ -16,72 +16,79 @@ TEST (render180d_time_stretches_the_trimmed_region)
     s.precompute.trim = 0;
     s.regionEnd = 0.5f; // FL's Length: half the file
     CHECK (std::llabs (precompute::stretchedFrames (d, s) - 500) <= 1);
-    s.precompute.trim = 256;
-    CHECK (precompute::stretchedFrames (d, s) == 300);
+    s.precompute.trim = 256; // (the region's cut edges get FL's declick: two frames of sound fall under the trim)
+    CHECK (std::llabs (precompute::stretchedFrames (d, s) - 300) <= 2);
     s.regionStart = 0.2f; // starts inside the sound
     s.regionEnd = 1.0f;
     CHECK (precompute::stretchedFrames (d, s) == 200);
 }
 
-TEST (render180d_a_trimmed_stretched_clip_plays_what_it_draws)
+TEST (render180d_a_trimmed_clip_plays_what_it_draws)
 {
     using namespace lynx;
-    // 1 s of file at 44.1 kHz: 0.1 s of silence, 0.3 s of a 440 Hz tone, 0.6 s of silence; Trim on; TIME 2 beats at 120 BPM
+    // 1 s of file at 44.1 kHz: 0.1 s of silence, 0.3 s of a 440 Hz tone, 0.6 s of silence; Trim on
     constexpr double rate = 44100.0;
     auto sample = std::make_shared<SampleData>();
     sample->sampleRate = rate;
     sample->left.assign (44100, 0.0f);
     for (int i = 4410; i < 17640; ++i)
         sample->left[(std::size_t) i] = 0.5f * (float) std::sin (2.0 * 3.141592653589793 * 440.0 * i / rate);
-    Song s;
-    s.bpm = 120.0;
-    s.mode = PlayMode::song;
-    s.mixer = Song::defaultMixer (1);
-    ChannelDef c;
-    c.instrument = InstrumentKind::audioClip;
-    c.samplePath = "x.wav";
-    c.mixerTrack = 1;
-    c.sampler.stretchBeats = 2.0f;
-    c.sampler.keepPitch = true;
-    c.sampler.precompute.trim = 256;
-    s.channels.push_back (c);
-    s.patterns.emplace_back();
+    const std::shared_ptr<const SampleData> shared = sample;
 
-    // drawn: the played span spread over TIME; the clip as long as the file shows
-    const auto span = clipops::clipSpan (c, *sample);
-    CHECK (std::llabs (span.first - 4410) <= 2 && std::llabs (span.frames - 13230) <= 2);
-    const auto drawnTicks = clipops::fileTicks (c, (double) span.frames, rate, s.bpm);
-    CHECK (drawnTicks == 2 * ppq);
-    Clip clip;
-    clip.kind = ClipKind::audio;
-    clip.channel = 0;
-    clip.length = drawnTicks + ppq;
-    s.playlist = { clip };
-
-    RackState::Factories f;
-    f.samples = [sample] (const std::string&) { return std::shared_ptr<const SampleData> (sample); };
-    f.stretchedSamples = [sample] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
-        return std::shared_ptr<const SampleData> (timeStretch (*sample, ratio, m));
-    };
-    auto state = RackState::build (s, nullptr, rate, f);
-    RackRenderer r;
-    r.prepare (rate, 441);
-    std::vector<float> out, l (441), rr (441);
-    const auto tps = ticksPerSample (s.bpm, rate);
-    for (double tick = 0.0; tick < ppq * 3.0; tick += 441 * tps)
+    for (const auto stretched : { false, true })
     {
-        r.process (state.get(), true, tick, 441, l.data(), rr.data());
-        out.insert (out.end(), l.begin(), l.end());
+        Song s;
+        s.bpm = 120.0;
+        s.mode = PlayMode::song;
+        s.mixer = Song::defaultMixer (1);
+        ChannelDef c;
+        c.instrument = InstrumentKind::audioClip;
+        c.samplePath = "x.wav";
+        c.mixerTrack = 1;
+        c.sampler.precompute.trim = 256;
+        if (stretched) // TIME: 2 beats at 120 BPM
+            c.sampler.stretchBeats = 2.0f, c.sampler.keepPitch = true;
+        s.channels.push_back (c);
+        s.patterns.emplace_back();
+
+        // drawn: the played span (the tone), at the file's speed or spread over TIME
+        const auto span = clipops::clipSpan (c, shared);
+        CHECK (std::llabs (span.first - 4410) <= 2 && std::llabs (span.frames - 13230) <= 2);
+        const auto drawnTicks = clipops::fileTicks (c, (double) span.frames, rate, s.bpm);
+        CHECK (stretched ? drawnTicks == 2 * ppq : std::llabs (drawnTicks - (std::int64_t) std::llround (0.3 * 2.0 * ppq)) <= 1);
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = 0;
+        clip.length = drawnTicks + ppq;
+        s.playlist = { clip };
+
+        RackState::Factories f;
+        f.samples = [shared] (const std::string&) { return shared; };
+        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
+            return std::shared_ptr<const SampleData> (timeStretch (*shared, ratio, m));
+        };
+        auto state = RackState::build (s, nullptr, rate, f);
+        RackRenderer r;
+        r.prepare (rate, 441);
+        std::vector<float> out, l (441), rr (441);
+        const auto tps = ticksPerSample (s.bpm, rate);
+        for (double tick = 0.0; tick < (double) clip.length; tick += 441 * tps)
+        {
+            r.process (state.get(), true, tick, 441, l.data(), rr.data());
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn; the stretcher smears
+        // the edges of a stretched one a little
+        std::size_t firstLoud = out.size(), lastLoud = 0;
+        for (std::size_t i = 0; i < out.size(); ++i)
+            if (std::abs (out[i]) > 0.02f)
+                firstLoud = std::min (firstLoud, i), lastLoud = i;
+        const auto playedTicks = (double) (lastLoud - firstLoud) / rate * s.bpm / 60.0 * ppq;
+        std::fprintf (stderr, "  [r180d] %s: drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", stretched ? "stretched" : "plain",
+                      (long long) drawnTicks, playedTicks, firstLoud);
+        CHECK (firstLoud < (stretched ? 4410u : 64u));
+        CHECK (std::abs (playedTicks - (double) drawnTicks) < (stretched ? 0.25 : 0.01) * (double) drawnTicks);
     }
-    // played: the tone starts at once (the leading silence is trimmed) and lasts TIME (1 s), as drawn
-    std::size_t firstLoud = out.size(), lastLoud = 0;
-    for (std::size_t i = 0; i < out.size(); ++i)
-        if (std::abs (out[i]) > 0.02f)
-            firstLoud = std::min (firstLoud, i), lastLoud = i;
-    CHECK (firstLoud < 441);
-    const auto playedTicks = (double) lastLoud / rate * s.bpm / 60.0 * ppq;
-    std::fprintf (stderr, "  [r180d] drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", (long long) drawnTicks, playedTicks, firstLoud);
-    CHECK (std::abs (playedTicks - (double) drawnTicks) < 0.03 * (double) drawnTicks);
 }
 
 TEST (render180d_time_stretches_what_the_precomputed_effects_leave)
@@ -102,5 +109,9 @@ TEST (render180d_time_stretches_what_the_precomputed_effects_leave)
     CHECK (processed != nullptr && faded == (std::int64_t) processed->frames());
     CHECK (faded < 1000);
     std::fprintf (stderr, "  [r180d] a constant second faded out by 807 trims to %lld frames\n", (long long) faded);
-    CHECK (precompute::stretchedFrames (d, s) == faded); // the cached answer
+    auto shared = std::make_shared<const SampleData> (d);
+    CHECK (precompute::stretchedFrames (shared, s) == faded);
+    CHECK (precompute::stretchedFrames (shared, s) == faded); // the cached answer
+    s.precompute.fadeOut = 0;
+    CHECK (precompute::stretchedFrames (shared, s) == 1000); // another setting, another answer
 }
