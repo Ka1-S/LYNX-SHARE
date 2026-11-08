@@ -561,13 +561,14 @@ void showSamplePitchDialog (AudioEngine& engine, int channel)
     const auto& c = channels[(std::size_t) channel];
     auto* window = new SamplePitchWindow (c.sampler.pitch, c.sampler.keepPitch, c.instrument == InstrumentKind::audioClip);
     const auto path = juce::String::fromUTF8 (c.samplePath.c_str());
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, &engine, channel, path] (int result) {
+    const auto settings = c; // its Trim and region, for the frames its clips play (round 180d)
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, &engine, channel, path, settings] (int result) {
                                  if (result == 0)
                                      return;
                                  const auto pitch = result == 2 ? 0.0 : window->pitch();
                                  const auto keep = window->keepLength();
                                  const auto sample = path.isNotEmpty() ? engine.getSampleLibrary().load (path) : nullptr;
-                                 const auto frames = sample != nullptr ? (double) sample->frames() : 0.0;
+                                 const auto frames = sample != nullptr ? (double) clipops::clipSpan (settings, *sample).frames : 0.0;
                                  const auto rate = sample != nullptr ? sample->sampleRate : 0.0;
                                  engine.editSong ([channel, pitch, keep, frames, rate] (Song& s) {
                                      clipops::setChannelPitch (s, channel, pitch, 0.0, keep, frames, rate);

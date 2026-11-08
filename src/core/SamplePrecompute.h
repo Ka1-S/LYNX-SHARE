@@ -297,6 +297,52 @@ inline bool needed (const SamplerSettings& s) noexcept
 }
 
 // The processed region of `in` (see the file comment). Returns nullptr when nothing is to be done.
+// What of the file a channel plays, in file frames: its Start / Length region (a Playlist audio clip plays the whole file),
+// then its Trim (the silence at both ends below trim/32768). FL stretches exactly that to TIME (REA round 180d,
+// FUN_00d26890 with FUN_00ff0db0 / FUN_00ff0b30), and a clip's offsets count from its first frame.
+struct PlayedSpan
+{
+    std::int64_t first = 0, frames = 0;
+};
+
+inline PlayedSpan playedSpan (const SampleData& in, const SamplerSettings& s, bool wholeRegion)
+{
+    const auto frames = (std::int64_t) in.frames();
+    if (frames < 2)
+        return { 0, frames };
+    std::int64_t t0 = 0, t1 = frames - 1;
+    if (! wholeRegion)
+    {
+        const auto start = (double) std::clamp (std::min (s.regionStart, s.regionEnd), 0.0f, 1.0f);
+        const auto end = (double) std::clamp (s.regionEnd, 0.0f, 1.0f);
+        const auto total = (double) (frames - 1);
+        t0 = (std::int64_t) std::nearbyint (start * total);
+        t1 = std::min<std::int64_t> (frames - 1, t0 + (std::int64_t) std::nearbyint (std::max (0.0, end - start) * total));
+    }
+    if (s.precompute.trim > 0)
+    {
+        const auto threshold = (float) s.precompute.trim * 3.0517578e-05f;
+        const auto stereo = in.isStereo();
+        auto level = [&] (std::int64_t i) {
+            auto a = std::fabs (in.leftData()[i]);
+            if (stereo)
+                a = std::max (a, std::fabs (in.rightData()[i]));
+            return a;
+        };
+        while (t0 < t1 && level (t0) < threshold)
+            ++t0;
+        while (t1 > t0 && level (t1) < threshold)
+            --t1;
+    }
+    return { t0, std::max<std::int64_t> (1, t1 - t0 + 1) };
+}
+
+// The frames TIME stretches to the channel's length (see playedSpan)
+inline std::int64_t stretchedFrames (const SampleData& in, const SamplerSettings& s, bool wholeRegion = false)
+{
+    return playedSpan (in, s, wholeRegion).frames;
+}
+
 inline std::shared_ptr<SampleData> apply (const SampleData& in, const SamplerSettings& s)
 {
     const auto frames = (std::int64_t) in.frames();

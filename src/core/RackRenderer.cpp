@@ -241,8 +241,10 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         && factories.stretchedSamples
         && sample->frames() > 0)
     {
+        // FL stretches what plays: the region after its Trim, not the whole file (round 180d: Thief's Importer Ride, 1.30 s
+        // of file and 0.38 s of sound, plays 2x slower in FL at TIME 367 where LYNX squeezed the file 1.7x)
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
-        const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
+        const auto ratio = target / ((double) precompute::stretchedFrames (*sample, channel.sampler, kind == InstrumentKind::audioClip) / sample->sampleRate);
 
         if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
             sample = std::move (stretched);

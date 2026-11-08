@@ -39,6 +39,7 @@
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
+#include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
 #include "flp/Flp.h"
 
@@ -3034,7 +3035,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (const auto data = library.load (juce::String::fromUTF8 (c.samplePath.c_str())); data != nullptr && data->frames() > 0)
                 {
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
-                    const auto ratio = target / ((double) data->frames() / data->sampleRate);
+                    // the same ratio as RackRenderer: the region after its Trim (round 180d)
+                    const auto ratio = target / ((double) precompute::stretchedFrames (*data, c.sampler, c.instrument == InstrumentKind::audioClip) / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
