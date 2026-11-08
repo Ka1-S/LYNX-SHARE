@@ -625,3 +625,11 @@ block). The Reverb kind has no LFO and runs once per block (identical output). T
 
 Not reproduced (INFERRED from the fit, not REA): whether FL or the rack wrapper makes the tick chunks. FLM's own app
 calls with its device buffer and voice-derived activity; LYNX follows the measurable host (FL).
+
+### F4 MiniSynth (branch `feature/flm182c-f4`, after 0.1.25)
+
+FLM's MiniSynth parameters 1…43 are FL's desktop MiniSynth parameters 0…42, in the same order: the two name tables
+match one for one (FLM_FORMAT §7.1, REA_rodada41 §1.2). FLM's parameter 0 is the module's Enable. The importer writes
+the state the way the desktop plugin saves it ("SSLF" + .flms: HEAD with a name, DATA "0rev" + 43 floats). The channel
+then plays on LYNX's MiniSynth engine, which round 41 built bit-exact to FL's MiniSynth. The engine's wave tables come
+from `oscdata.dat`, a file byte-identical in FLM's resources and in FL's Minisynth folder (checked with cmp).

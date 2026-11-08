@@ -4,6 +4,7 @@
 
 #include "core/FlmFormat.h"
 #include "core/FlmImport.h"
+#include "core/MiniSynth.h"
 
 namespace flm182c
 {
@@ -281,7 +282,7 @@ inline Bytes project()
                                            module (7, 3) }),
                   rack (flm::kindNormal, {}, { sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav"), sample ("Snare", "@R@", "Drum Samples\\Snare\\Gone.wav") }),
                   rack (flm::kindNormal, { module (35, 2) }),
-                  rack (flm::kindNormal, { module (0, 2) }),
+                  rack (flm::kindNormal, { module (0, 2, {}, "Default/Default", 0, 127, 44) }),
                   rack (flm::kindBus, { module (12, 2) }),
                   channel (flm::kindMaster, "MASTER", 0, { lane (1, "Level", { clip (8, 0, 16, 0, 1, { { 0, 0, -5 } }) }, 0, 0) }),
                   // 2 clips of content 1 (8 beats, 4-beat loop → 2 passes each) and one of content 2 starting 1 beat in
@@ -302,7 +303,8 @@ inline lynx::FlmImportOptions options (lynx::FlpImportReport* report)
     o.resourceRoot = "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed";
     o.common.fileExists = [] (const std::string& p) {
         return p == "E:/flm/Song/My Samples/808.wav" || p == "E:/flm/Song/My Samples/Vocal.wav"
-               || p == "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed/Drum Samples/Kick/Kick 1.wav";
+               || p == "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed/Drum Samples/Kick/Kick 1.wav"
+               || p == "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed/oscdata.dat";
     };
     o.common.report = report;
     return o;
@@ -432,10 +434,16 @@ TEST (flm182c_imports_a_project)
     CHECK (snare != nullptr && snare->instrument == InstrumentKind::sampler && snare->samplePath.empty());
     CHECK (report.missingSamples == 1 && report.missingFiles.size() == 1
            && report.missingFiles[0].path == "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed/Drum Samples/Snare/Gone.wav");
-    // MiniSynth: the built-in synth for now, listed
+    // MiniSynth (F4): LYNX's MiniSynth engine, FLM's parameters 1…43 as the desktop plugin's 0…42, oscdata.dat from FLM's resources
     const auto* lead = flm182c::channelNamed (s, "Lead");
-    CHECK (lead != nullptr && lead->instrument == InstrumentKind::synth && lead->mixerTrack == 4);
-    CHECK (report.unsupported.count ("FL Studio Mobile: MiniSynth") == 1);
+    CHECK (lead != nullptr && lead->instrument == InstrumentKind::minisynth && lead->mixerTrack == 4
+           && lead->samplePath == "C:/FL/Plugins/Fruity/Generators/FL Studio Mobile/Installed/oscdata.dat");
+    if (lead != nullptr)
+    {
+        const auto params = miniSynthParams (lead->pluginState);
+        CHECK (params.size() == 43 && std::all_of (params.begin(), params.end(), [] (float v) { return std::abs (v - 0.5f) < 1e-6f; }));
+    }
+    CHECK (report.converted.count ("FL Studio Mobile: MiniSynth") == 1 && report.unsupported.count ("FL Studio Mobile: MiniSynth") == 0);
     // effects: Graphic EQ, Reverb 2 and the legacy Reverb are mapped since round 188f (F5), the Limiter since 188h
     CHECK (report.converted.count ("FL Studio Mobile: Reverb 2") == 1 && report.converted.count ("FL Studio Mobile: Graphic EQ") == 1
            && report.converted.count ("FL Studio Mobile: Reverb (legacy)") == 1 && report.converted.count ("FL Studio Mobile: Limiter") == 1
