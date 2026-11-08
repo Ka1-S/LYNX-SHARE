@@ -620,6 +620,19 @@ public:
             picker.setColour (c, false);
         };
         addCustomComponent (&picker);
+        // FL's "Reset all" (ResetAllBtnClick 0x7b60c0: every swatch back to the colour the editor opened with, read
+        // back from its saved "=$hex" list, REA_rodada177a §5); it doesn't close the editor
+        resetAll.setButtonText (tr ("Reset all"));
+        resetAll.onClick = [this, first, last] {
+            panel.first = first;
+            panel.last = last;
+            panel.onEdit (panel.editing());
+            panel.repaint();
+        };
+        resetRow.addAndMakeVisible (resetAll);
+        resetRow.setSize (panel.getWidth(), 28);
+        resetAll.setBounds (0, 0, 96, 28);
+        addCustomComponent (&resetRow);
         addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     }
@@ -630,6 +643,8 @@ public:
 private:
     GradientPanel panel;
     juce::Label hint;
+    juce::Component resetRow;
+    juce::TextButton resetAll;
     ui::ColourPicker picker { juce::Colours::red };
 };
 } // namespace

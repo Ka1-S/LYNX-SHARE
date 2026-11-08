@@ -340,6 +340,13 @@ It reads:
   #636C71"), Hue / Saturation / Luminance and Red / Green / Blue.
 - At the bottom, "Reset all" and "Accept". Escape doesn't close it; its X cancels.
 
+**Reset all [FLEngine_x64.dll, static]:** `ResetAllBtnClick` (0x7b60c0) calls 0x7b5dd0 (self, i) for every swatch,
+then refreshes. 0x7b5dd0 reads swatch i's line from the list the editor saved when it opened (+0x9a4), takes the text
+after "=", prefixes "$" and parses it as a hex colour (StrToIntDef, default 0x808080). So Reset all puts First and Last
+back to the first and last selected tracks' colours, as they were when the editor opened. `ResetBtnClick` (0x7b6120),
+the "Reset" half of the split button, does the same for the swatch being edited. LYNX has "Reset all", which keeps the
+editor open.
+
 LYNX: `mixerops::gradientColourStep` and `mixerops::gradientColour` follow those steps exactly. The test checks the ends,
 amount 85 (0xaa / 0x54) and 128 (0x7f). The menu item waits for FL's dialog shot.
 
