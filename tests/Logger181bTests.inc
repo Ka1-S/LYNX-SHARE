@@ -512,6 +512,8 @@ TEST (macros181b_prepare_for_midi_export_follows_fl)
     kept.channels.resize (3);
     kept.channels[1].instrument = lynx::InstrumentKind::layer;
     lynx::prepareForMidiExport (kept);
-    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::layer);
-    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 1);
+    // as FL 2026 does (seen at runtime): a Layer becomes a MIDI Out too, and takes its turn
+    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::midiOut);
+    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 2);
 }
+
