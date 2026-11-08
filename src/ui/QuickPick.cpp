@@ -264,6 +264,8 @@ juce::String slotName (AudioEngine& engine, const EffectSlot& slot)
     const auto original = juce::String::fromUTF8 (projectcontents::effectSlotName (slot).c_str());
     if (slot.kind == EffectKind::plugin)
         return slot.plugin.id.empty() ? original : shownName (engine, slot.plugin.id, original);
+    if (slot.kind == EffectKind::patcher && slot.patcher.isRack()) // (round 183c: a rack, in the language shown)
+        return tr ("Audio Effect Rack");
     if (slot.isSubstitute() || original != juce::String (effectInfo (slot.kind).name)) // (a stand-in shows what it stands for)
         return original;
     return shownName (engine, std::string ("lynx:fx:") + effectInfo (slot.kind).name, original);
