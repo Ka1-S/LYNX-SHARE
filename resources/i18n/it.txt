@@ -7957,6 +7957,11 @@ countries: it ch sm
 "Folders" = "Cartelle"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink ai controller"
+"Please tweak the controls you want to link..." = "Muovi i controlli che vuoi collegare..."
+"Multilink to controllers on/off" = "Multilink ai controller attivo/disattivo"
+"Link to controller" = "Collega al controller"
+"Override global links" = "Sovrascrivi i collegamenti globali"
 "Change color..." = "Cambia colore..."
 "Track routing" = "Instradamento traccia"
 "Open audio editor and record" = "Apri l'editor audio e registra"

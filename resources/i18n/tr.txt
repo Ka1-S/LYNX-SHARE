@@ -7957,6 +7957,11 @@ countries: tr
 "Folders" = "Klasörler"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Denetleyicilere çoklu bağlantı"
+"Please tweak the controls you want to link..." = "Bağlamak istediğiniz kontrolleri oynatın..."
+"Multilink to controllers on/off" = "Denetleyicilere çoklu bağlantı açık/kapalı"
+"Link to controller" = "Denetleyiciye bağla"
+"Override global links" = "Genel bağlantıları geçersiz kıl"
 "Change color..." = "Rengi değiştir..."
 "Track routing" = "Parça yönlendirme"
 "Open audio editor and record" = "Ses düzenleyiciyi aç ve kaydet"

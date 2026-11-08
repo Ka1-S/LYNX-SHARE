@@ -7957,6 +7957,11 @@ countries: pl
 "Folders" = "Foldery"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink do kontrolerów"
+"Please tweak the controls you want to link..." = "Porusz kontrolki, które chcesz połączyć..."
+"Multilink to controllers on/off" = "Multilink do kontrolerów wł./wył."
+"Link to controller" = "Połącz z kontrolerem"
+"Override global links" = "Nadpisz globalne połączenia"
 "Change color..." = "Zmień kolor..."
 "Track routing" = "Routing ścieżki"
 "Open audio editor and record" = "Otwórz edytor audio i nagrywaj"

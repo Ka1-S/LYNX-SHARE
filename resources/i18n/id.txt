@@ -7957,6 +7957,11 @@ countries: id
 "Folders" = "Folder"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink ke kontroler"
+"Please tweak the controls you want to link..." = "Gerakkan kontrol yang ingin Anda tautkan..."
+"Multilink to controllers on/off" = "Multilink ke kontroler aktif/nonaktif"
+"Link to controller" = "Tautkan ke kontroler"
+"Override global links" = "Timpa tautan global"
 "Change color..." = "Ubah warna..."
 "Track routing" = "Perutean trek"
 "Open audio editor and record" = "Buka editor audio dan rekam"

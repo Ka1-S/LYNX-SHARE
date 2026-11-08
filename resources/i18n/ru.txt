@@ -7957,6 +7957,11 @@ countries: ru by kz
 "Folders" = "Папки"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Мультипривязка к контроллерам"
+"Please tweak the controls you want to link..." = "Покрутите регуляторы, которые хотите привязать..."
+"Multilink to controllers on/off" = "Мультипривязка к контроллерам вкл/выкл"
+"Link to controller" = "Привязать к контроллеру"
+"Override global links" = "Переопределить глобальные привязки"
 "Change color..." = "Изменить цвет..."
 "Track routing" = "Маршрутизация дорожки"
 "Open audio editor and record" = "Открыть аудиоредактор и записать"

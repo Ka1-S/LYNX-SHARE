@@ -7957,6 +7957,11 @@ countries: jp
 "Folders" = "フォルダー"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "コントローラーへのマルチリンク"
+"Please tweak the controls you want to link..." = "リンクしたいコントロールを動かしてください..."
+"Multilink to controllers on/off" = "コントローラーへのマルチリンク オン/オフ"
+"Link to controller" = "コントローラーにリンク"
+"Override global links" = "グローバルリンクを上書き"
 "Change color..." = "色を変更..."
 "Track routing" = "トラックのルーティング"
 "Open audio editor and record" = "オーディオエディターを開いて録音"

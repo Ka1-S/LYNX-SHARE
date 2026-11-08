@@ -7957,6 +7957,11 @@ countries: es mx ar co cl pe ve
 "Folders" = "Carpetas"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multivínculo a controladores"
+"Please tweak the controls you want to link..." = "Mueve los controles que quieres vincular..."
+"Multilink to controllers on/off" = "Multivínculo a controladores activado/desactivado"
+"Link to controller" = "Vincular a controlador"
+"Override global links" = "Sobrescribir vínculos globales"
 "Change color..." = "Cambiar color..."
 "Track routing" = "Enrutamiento de pistas"
 "Open audio editor and record" = "Abrir el editor de audio y grabar"

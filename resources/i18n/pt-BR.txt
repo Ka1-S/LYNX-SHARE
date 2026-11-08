@@ -8040,6 +8040,11 @@ countries: br
 "Folders" = "Pastas"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink para controladores"
+"Please tweak the controls you want to link..." = "Mexa nos controles que você quer vincular..."
+"Multilink to controllers on/off" = "Multilink para controladores liga/desliga"
+"Link to controller" = "Vincular ao controlador"
+"Override global links" = "Substituir vínculos globais"
 "Change color..." = "Mudar cor..."
 "Track routing" = "Roteamento de faixas"
 "Open audio editor and record" = "Abrir editor de áudio e gravar"
