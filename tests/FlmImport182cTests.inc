@@ -574,13 +574,13 @@ TEST (flm182c_directwave_program)
     const char* resources = std::getenv ("LYNX_FLM_RESOURCES");
     if (resources == nullptr)
         return;
-    using namespace flm182c;
-    Bytes f;
-    tag (f, "10LF");
-    const auto bytes = cat ({ f, head ("DW", 120.0), rack (flm::kindMaster, {}),
-                              rack (flm::kindNormal, { module (1, 2, "Resources/DirectWave Samples/Keyboard/Electric.dwp", "Keyboard/Electric", 0, 127, 34) }),
-                              channel (flm::kindMaster, "MASTER", 0, {}),
-                              channel (flm::kindNormal, "Keys", 1, { lane (0, "Keys", { clip (0, 4, 4, 0, 1, { { 0, 1, 60 } }) }) }) });
+    namespace t = flm182c;
+    t::Bytes f;
+    t::tag (f, "10LF");
+    const auto bytes = t::cat ({ f, t::head ("DW", 120.0), t::rack (flm::kindMaster, {}),
+                                 t::rack (flm::kindNormal, { t::module (1, 2, "Resources/DirectWave Samples/Keyboard/Electric.dwp", "Keyboard/Electric", 0, 127, 34) }),
+                                 t::channel (flm::kindMaster, "MASTER", 0, {}),
+                                 t::channel (flm::kindNormal, "Keys", 1, { t::lane (0, "Keys", { t::clip (0, 4, 4, 0, 1, { { 0, 1, 60 } }) }) }) });
     FlpImportReport report;
     FlmImportOptions o;
     o.common.projectFolder = "/nonexistent";
@@ -592,7 +592,7 @@ TEST (flm182c_directwave_program)
     o.common.report = &report;
     o.resourceRoot = resources;
     const auto song = importFlm (bytes, o);
-    const auto* keys = song ? channelNamed (*song, "Keys") : nullptr;
+    const auto* keys = song ? t::channelNamed (*song, "Keys") : nullptr;
     CHECK (keys != nullptr && keys->instrument == InstrumentKind::directwave && keys->zones.size() > 1);
     CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (DirectWave program)") == 1 && report.missingSamples == 0);
     if (keys != nullptr)
