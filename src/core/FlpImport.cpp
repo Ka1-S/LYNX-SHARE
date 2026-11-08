@@ -2663,8 +2663,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         if (const auto k = surface::flOutputToLynx (source.effect.state, w.fromPort))
                             w.fromPort = *k;
                 }
-                if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
-                    w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
+                // (a Peak Controller's outputs keep FL's numbers: 0 Peak+LFO, 1 Peak, 2 LFO, as LYNX's and as the mixer links;
+                // REA_rodada17 §5.1, issue #111)
                 if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)
                 {
                     // the source has no such output in LYNX (an X-Y controller, a Control Surface…): its target keeps the
