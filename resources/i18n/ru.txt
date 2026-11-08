@@ -53,6 +53,7 @@ countries: ru by kz
 "(imported from MIDI)" = "(импорт из MIDI)"
 "(imported from FL Studio)" = "(импорт из FL Studio)"
 "(imported from .als)" = "(импортировано из .als)"
+"(imported from FL Studio Mobile)" = "(импортировано из FL Studio Mobile)"
 "Could not save" = "Не удалось сохранить"
 "File" = "Файл"
 "Edit" = "Правка"

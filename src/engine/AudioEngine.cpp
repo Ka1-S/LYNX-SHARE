@@ -25,6 +25,7 @@
 
 #include "core/FlpImport.h"
 #include "core/AlsImport.h"
+#include "core/FlmImport.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -2851,8 +2852,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         const auto* fileBytes = static_cast<const std::uint8_t*> (data.getData());
         // a Live set (.als, round 175a) takes the same pipeline: samples, plugins, report and Missing files window
         const auto liveSet = file.hasFileExtension ("als");
+        // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
+        const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
         std::optional<flp::Project> project;
-        if (! liveSet)
+        if (! liveSet && ! mobileProject)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -2918,7 +2921,23 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         options.relocations = relocations;
         {
             const auto t = std::chrono::steady_clock::now();
-            if (liveSet)
+            if (mobileProject)
+            {
+                FlmImportOptions flmOptions;
+                flmOptions.common = options;
+                if (! options.roots.factoryData.empty())
+                    if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
+                        flmOptions.resourceRoot = root;
+                std::string flmError;
+                auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
+                if (! song)
+                {
+                    out.error = utf8 (flmError.empty() ? "not a readable FL Studio Mobile project" : flmError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (liveSet)
             {
                 AlsImportOptions alsOptions;
                 alsOptions.common = options;

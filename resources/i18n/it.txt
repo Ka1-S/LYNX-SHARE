@@ -53,6 +53,7 @@ countries: it ch sm
 "(imported from MIDI)" = "(importato da MIDI)"
 "(imported from FL Studio)" = "(importato da FL Studio)"
 "(imported from .als)" = "(importato da .als)"
+"(imported from FL Studio Mobile)" = "(importato da FL Studio Mobile)"
 "Could not save" = "Impossibile salvare"
 "File" = "File"
 "Edit" = "Modifica"

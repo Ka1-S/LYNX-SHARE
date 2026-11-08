@@ -53,6 +53,7 @@ countries: id
 "(imported from MIDI)" = "(diimpor dari MIDI)"
 "(imported from FL Studio)" = "(diimpor dari FL Studio)"
 "(imported from .als)" = "(diimpor dari .als)"
+"(imported from FL Studio Mobile)" = "(diimpor dari FL Studio Mobile)"
 "Could not save" = "Tidak dapat menyimpan"
 "File" = "File"
 "Edit" = "Edit"

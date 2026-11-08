@@ -203,3 +203,55 @@ None of these is FL-desktop parity, so none changes a default. For each one the 
   - the extracted user zip;
   - the walker and prototype reader;
   - the REA pseudocode notes in `rea/`, kept for the study only and never copied into LYNX.
+
+## 8. Build log (after the plan was approved, 2026-11-08)
+
+The coordinator approved option A: native .flm import as an added command (File › Open, and the open dialog's
+`*.flm`), in the slice order F1 → F3 → F2 → F6 → F5 → F4 → F7, with F8 as the check.
+
+### F1 + F3 (branch `feature/flm182c-f1`)
+
+- `src/core/FlmFormat.{h,cpp}` is the clean-room C++ reader of the structure in FLM_FORMAT.md. It is
+  version-tolerant: each field is read only when its chunk is long enough. A nested container that runs short keeps
+  what came before it. Only a top-level chunk past the end of the file fails.
+- `src/core/FlmImport.{h,cpp}` turns the project into a Song (header comment). The import report and the Missing files
+  window are the .flp/.als ones. FL's FLM resources (`<FL>/Plugins/Fruity/Generators/FL Studio Mobile/Installed`) are
+  found from FL's install folder.
+- F3:
+  - a DW Sampler with one sample becomes a LYNX sampler, keeping its key range;
+  - a DW Sampler with a `.dwp` program becomes LYNX's DirectWave: the file is "DwPr" + DirectWave's own state, and
+    its zone files are looked for in the program's folder;
+  - a drum kit becomes one sampler channel per sample.
+- Paths saved on the device (Android `…/com.imageline.FLM/files/`, Windows `…/LocalState/`, the app's `Resources/`)
+  are mapped onto the project folder and FL's resources.
+- Wiring:
+  - the open dialog lists `*.flm`, and `.flm`/`.songtmpl` take the .flp import path (progress panel, samples,
+    report);
+  - an FLM share-zip opens like a project package: `ProjectPackage::extractZip` finds the `.flm`, and its
+    `My Samples/…` tree sits beside it;
+  - `--render` / `--export-*` accept it too;
+  - the title shows "(imported from FL Studio Mobile)", translated in all 14 tables.
+- Tests (`tests/FlmImport182cTests.inc`) use synthetic projects written field by field:
+  - structure;
+  - damage: a truncated file, an oversized nested chunk, 300 random-noise rounds;
+  - the import: inserts, sampler and key range, kit channels, missing file under FL's resources and its relocation,
+    patterns and loop passes, offsets, the audio clip's offset and pitch, report entries.
+
+  Two opt-in tests run on files that stay on this PC: `LYNX_FLM_DIR` + `LYNX_FLM_RESOURCES`, and DirectWave with
+  FL's `Electric.dwp`.
+- Local check (mini harness with ASan/UBSan on the reader and importer; the full build-local below):
+
+| Project | Result |
+|---|---|
+| User's MONTAGEM XONADA REMAKE.flm | 130 BPM, 14 inserts, 13 channels (6 samplers with their sample), 21 patterns (751 notes), 168 clips (93 audio, all found), end 163.784 beats. 1 missing: `Grand Piano.dwp`, a resource FL's copy lacks |
+| 11 FL demos + 9 templates | all import. Missing samples are FLM resources absent from FL's copy, or paid EXP packs |
+
+Not yet (later slices):
+- channel volume/pan and sends (F2);
+- automation lanes (F6), listed in the report;
+- effects (F5), listed as dropped;
+- MiniSynth / GMSynth / SuperSaw / TransistorBass / 3x Osc / SoundFont / Slicer engines (F4): they play the built-in
+  synth for now, listed;
+- the Mobile Rack inside .flp (F7).
+
+The six workflow ideas in §6 go to the user as options, with the "Simple" layout proposal (the coordinator, 2026-11-08).

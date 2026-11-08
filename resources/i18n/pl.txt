@@ -53,6 +53,7 @@ countries: pl
 "(imported from MIDI)" = "(zaimportowano z MIDI)"
 "(imported from FL Studio)" = "(zaimportowano z FL Studio)"
 "(imported from .als)" = "(zaimportowano z .als)"
+"(imported from FL Studio Mobile)" = "(zaimportowano z FL Studio Mobile)"
 "Could not save" = "Nie można zapisać"
 "File" = "Plik"
 "Edit" = "Edycja"
