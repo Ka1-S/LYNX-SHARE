@@ -2510,7 +2510,19 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
     }
     if (style == Style::simple && simpleWorkflow == nullptr)
-        simpleWorkflow = std::make_unique<SimpleWorkflow>();
+    {
+        SimpleWorkflow::Host host;
+        host.setOverlay = [this] (juce::Component* c) { playlistArea.setOverlay (c); };
+        host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
+        host.showLoops = [this] {
+            if (findToolWindow ("sampleBrowser") == nullptr)
+                toggleSampleBrowser();
+        };
+        host.trackAdded = [this] (int) { playlist.repaint(); };
+        simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+    }
+    if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->left();
 
     // the workspace layout is kept per style, so going back restores the Pattern layout exactly
     const auto layoutFile = [] (Style s) { return platform::settingsFile (layoutstyle::workspaceFile (s)); };
@@ -2556,6 +2568,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             flip->show (PlaylistArea::GridView::beside);
         workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
     }
+    if (style == Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
 }
 
 void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
@@ -3812,6 +3826,8 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->songChanged(); // (an empty project opens on the New track chooser)
     // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
     if (song.currentPattern != lastCurrentPattern)
     {

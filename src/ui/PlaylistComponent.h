@@ -575,7 +575,29 @@ public:
         resized();
     }
 
+    // A component over everything under the toolbar band (round 184a: the Simple workflow's New track chooser); not
+    // owned, nullptr = none.
+    void setOverlay (juce::Component* c)
+    {
+        if (overlay != nullptr && overlay != c)
+            removeChildComponent (overlay);
+        overlay = c;
+        if (overlay != nullptr)
+        {
+            addAndMakeVisible (*overlay);
+            overlay->toFront (false);
+        }
+        resized();
+    }
+
     void resized() override
+    {
+        layoutChildren();
+        if (overlay != nullptr)
+            overlay->setBounds (getLocalBounds().withTrimmedTop (PlaylistComponent::toolbarHeight));
+    }
+
+    void layoutChildren()
     {
         auto area = getLocalBounds();
         if (clipGrid != nullptr && gridView != GridView::song)
@@ -619,5 +641,6 @@ private:
     int titleLeft = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
+    juce::Component* overlay = nullptr;
 };
 } // namespace lynx

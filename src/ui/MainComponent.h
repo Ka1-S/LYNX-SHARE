@@ -88,6 +88,7 @@ public:
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
+    SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
