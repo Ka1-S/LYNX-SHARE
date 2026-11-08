@@ -79,6 +79,7 @@ add_library(lynx_core STATIC
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
+    src/core/SimpleTracks.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp

@@ -29,6 +29,8 @@ CORE="$CORE src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/co
 CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp"
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
+# Simple workflow: adding a track (round 184a)
+CORE="$CORE src/core/SimpleTracks.cpp"
 # start-up sound (procedural)
 CORE="$CORE src/core/StartupSound.cpp"
 # speech synthesizer: .speech files, LYNX voice (round 168b)
