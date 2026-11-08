@@ -223,8 +223,8 @@ struct Engine::Impl
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
     float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
-    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, band[maxBandSections];
-    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, bandOn = false;
+    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, toneLow, band[maxBandSections];
+    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, toneLowOn = false, bandOn = false;
     int bandSections = 0;
 
     // tap patterns (unit times and gains), drawn once
@@ -320,6 +320,7 @@ struct Engine::Impl
         for (auto& b : band)
             b.reset();
         toneHigh.reset();
+        toneLow.reset();
         toneMid.reset();
         shiftState = 0.0f;
         first = true;
@@ -435,6 +436,9 @@ struct Engine::Impl
             for (int k = 0; k < bandSections; ++k)
                 band[k].filter (sr, 0, s.bandLimit, 1.0 / (2.0 * std::cos ((2 * k + 1) * pi / (4.0 * bandSections))));
         }
+        toneLowOn = std::abs (s.toneLowDb) > 0.01;
+        if (toneLowOn)
+            toneLow.shelf (sr, s.toneLowHz, s.toneLowDb, false, 0.7);
         toneHighOn = std::abs (s.toneHighDb) > 0.01;
         if (toneHighOn)
             toneHigh.shelf (sr, std::min (s.toneHighHz, 0.45 * sr), s.toneHighDb, true, 0.7);
@@ -671,6 +675,8 @@ struct Engine::Impl
                 band[k].processBlock (L, R, n);
         if (toneHighOn)
             toneHigh.processBlock (L, R, n);
+        if (toneLowOn)
+            toneLow.processBlock (L, R, n);
         if (toneMidOn)
             toneMid.processBlock (L, R, n);
         if (shelfLowOn)
@@ -1158,15 +1164,33 @@ protected:
         s.width = p[4] <= 0.5f ? 2.0 * p[4] : 1.0 + 0.48 * (p[4] - 0.5);
         s.modRateHz = skewLaw (p[5], 0.05, 5.0, 2.381);
         s.modDepthMs = 1.0 * p[6] / std::sqrt (std::max (0.3, s.modRateHz));
-        s.lowShelfHz = 20.0 + 1980.0 * p[7];
-        s.lowShelfDb = 0.75 * (-12.0 + 24.0 * p[8]);
-        s.highShelfHz = 200.0 + 19800.0 * p[9];
-        s.highShelfDb = -12.0 + 24.0 * p[10];
+        // round 183b: the reference's Low / High EQ (Mix 100 %, the impulse at −20 dB, gain at 0 / 100 %): the low shelf
+        // spans ±12 dB with its half-gain point at ~0.47 × the frequency law (−6 dB near 330 Hz at the default 711 Hz),
+        // the high one +12 dB with its half-gain point at ~0.5 × (5 kHz at the default) but only −4.5 dB down
+        s.lowShelfHz = 0.47 * (20.0 + 1980.0 * p[7]);
+        s.lowShelfDb = -12.0 + 24.0 * p[8];
+        s.highShelfHz = 0.5 * (200.0 + 19800.0 * p[9]);
+        s.highShelfDb = p[10] >= 0.5f ? 24.0 * (p[10] - 0.5) : -9.0 * (0.5 - p[10]);
         // the plate speaks at once after its own delay: a short, smeared early burst
         s.earlyLevel = t.early;
         s.earlySec = 0.015;
         s.earlyDiffusion = 0.8;
         s.gain = t.gain * 1.3; // round 172d: +2.3 dB (the reference plate at its defaults: music / drums RMS −3.6 / −4.2 dB)
+        // round 183b (the ValhallaPlate role, voicing off; the reference's impulse at −20 dB and music): Width keeps the
+        // level (the reference: −27.4 / −27.5 / −27.2 dB at 0 / 50 / 100 %, ours moved 4 dB), its tail is fuller below
+        // 80 Hz (+5 dB at 28 … 71 Hz) and less forward at 2.8 … 7 kHz (−3.5 dB), and it sits ~1 dB lower; shorter decays
+        // are no louder than the default
+        if (p[14] < 0.5f)
+        {
+            s.gain *= 0.9 * std::sqrt (2.0 / (1.0 + s.width * s.width));
+            // and shorter decays a little quieter (Decay 20 / 25 %: this tank ran +1.4 … +2.7 dB on music, +3 dB on the impulse)
+            s.gain *= std::pow (10.0, -2.5 * std::max (0.0, 0.5 - (double) p[2]) / 0.3 / 20.0);
+            s.toneLowHz = 60.0;
+            s.toneLowDb = 5.0;
+            s.toneMidHz = 4500.0;
+            s.toneMidDb = -3.5;
+            s.toneMidQ = 0.8;
+        }
         // round 135: a low cut on the plate's output, 20 Hz … 1 kHz (0 = off; 12 dB/oct)
         s.outLowCut = foil::lowCutHz (p[13]);
         s.outLowOrder = 2;
