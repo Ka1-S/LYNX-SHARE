@@ -100,7 +100,8 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
         std::fprintf (stderr, "  [r180d] %s: drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", stretched ? "stretched" : "plain",
                       (long long) drawnTicks, playedTicks, firstLoud);
         std::fprintf (stderr, "  [r180d]   span %ld -> %ld frames; level at 0.5 / 0.9 / 1.1 / 1.4 s: %.3f %.3f %.3f %.3f\n", spanIn, spanOut,
-                      std::abs (out[22050]), std::abs (out[39690]), out.size() > 48510 ? std::abs (out[48510]) : -1.0f,
+                      out.size() > 22050 ? std::abs (out[22050]) : -1.0f, out.size() > 39690 ? std::abs (out[39690]) : -1.0f,
+                      out.size() > 48510 ? std::abs (out[48510]) : -1.0f,
                       out.size() > 61740 ? std::abs (out[61740]) : -1.0f);
         CHECK (firstLoud == 0);
         CHECK (std::abs (playedTicks - (double) drawnTicks) < 0.03 * (double) drawnTicks);
