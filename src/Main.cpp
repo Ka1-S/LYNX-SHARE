@@ -7029,7 +7029,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als"))
+        if (input.hasFileExtension ("flp;als;flm;songtmpl"))
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -7088,7 +7088,7 @@ private:
             const juce::File input (inputPath);
             bool ok = false;
             // --scan: the targeted plugin scan an open runs first (child processes), so the set's plugins load
-            if (juce::JUCEApplication::getCommandLineParameterArray().contains ("--scan") && input.hasFileExtension ("flp;als"))
+            if (juce::JUCEApplication::getCommandLineParameterArray().contains ("--scan") && input.hasFileExtension ("flp;als;flm;songtmpl"))
             {
                 juce::MemoryBlock data;
                 if (input.loadFileAsData (data))
@@ -7106,7 +7106,7 @@ private:
                     }
                 }
             }
-            if (input.hasFileExtension ("flp;als"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {

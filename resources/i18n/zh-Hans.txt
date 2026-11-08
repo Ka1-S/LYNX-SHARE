@@ -53,6 +53,7 @@ countries: cn sg
 "(imported from MIDI)" = "（从MIDI导入）"
 "(imported from FL Studio)" = "（从FL Studio导入）"
 "(imported from .als)" = "(从 .als 导入)"
+"(imported from FL Studio Mobile)" = "(从 FL Studio Mobile 导入)"
 "Could not save" = "无法保存"
 "File" = "文件"
 "Edit" = "编辑"

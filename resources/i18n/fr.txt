@@ -53,6 +53,7 @@ countries: fr be ch ca lu
 "(imported from MIDI)" = "(importé depuis un MIDI)"
 "(imported from FL Studio)" = "(importé depuis FL Studio)"
 "(imported from .als)" = "(importé depuis .als)"
+"(imported from FL Studio Mobile)" = "(importé depuis FL Studio Mobile)"
 "Could not save" = "Impossible d'enregistrer"
 "File" = "Fichier"
 "Edit" = "Éditer"

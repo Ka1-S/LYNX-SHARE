@@ -53,6 +53,7 @@ countries: es mx ar co cl pe ve
 "(imported from MIDI)" = "(importado de MIDI)"
 "(imported from FL Studio)" = "(importado de FL Studio)"
 "(imported from .als)" = "(importado de .als)"
+"(imported from FL Studio Mobile)" = "(importado de FL Studio Mobile)"
 "Could not save" = "No se pudo guardar"
 "File" = "Archivo"
 "Edit" = "Editar"
