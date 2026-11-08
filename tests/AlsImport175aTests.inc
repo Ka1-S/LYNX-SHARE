@@ -121,7 +121,7 @@ inline lynx::AlsImportOptions options (lynx::FlpImportReport* report)
     o.common.projectFolder = "E:/sets/Song Project";
     o.common.fileExists = [] (const std::string& p) { return p == "E:/sets/Song Project/Samples/Imported/vocal.wav"; };
     o.common.report = report;
-    o.sessionOnPlaylist = true; // 175a's placement (round 181c made the clip grid the default: Als181cTests.inc)
+    o.sessionOnPlaylist = true; // 175a's placement, the default (round 181c added the clip grid: Als181cTests.inc)
     return o;
 }
 

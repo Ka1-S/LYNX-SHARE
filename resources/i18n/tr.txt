@@ -7834,5 +7834,4 @@ countries: tr
 "Change declicking mode?" = "Declicking modu değiştirilsin mi?"
 "Change the declicking mode of all selected audio clip channels?" = "Seçili tüm ses klibi kanallarının declicking modu değiştirilsin mi?"
 "Session clips of Live sets" = "Live setlerinin oturum klipleri"
-"Clip grid (default)" = "Klip ızgarası (varsayılan)"
-"Playlist, after the arrangement" = "Çalma listesi, aranjmandan sonra"
+"Playlist, after the arrangement (default)" = "Çalma listesi, aranjmandan sonra (varsayılan)"

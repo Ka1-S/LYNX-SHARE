@@ -7834,5 +7834,4 @@ countries: ru by kz
 "Change declicking mode?" = "Изменить режим деклика?"
 "Change the declicking mode of all selected audio clip channels?" = "Изменить режим деклика всех выбранных каналов аудиоклипов?"
 "Session clips of Live sets" = "Клипы сессии из сетов Live"
-"Clip grid (default)" = "Сетка клипов (по умолчанию)"
-"Playlist, after the arrangement" = "Плейлист, после аранжировки"
+"Playlist, after the arrangement (default)" = "Плейлист, после аранжировки (по умолчанию)"

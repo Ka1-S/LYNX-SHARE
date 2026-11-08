@@ -7,9 +7,9 @@
 //  - group tracks → an insert the members route to (their Playlist tracks grouped under a header);
 //  - return tracks → inserts fed by the tracks' sends;
 //  - tempo, time signature, locators, mixer volume / pan / mute / solo / send levels and their automation;
-//  - Session clips and scenes → the clip grid (round 181c: launch mode, quantisation, legato, loop, follow actions,
-//    stop buttons, scene names / tempo / meter), or, with `sessionOnPlaylist`, the Playlist after the arrangement, one
-//    section per scene (a marker per scene);
+//  - Session clips → the Playlist after the arrangement, one section per scene (a marker per scene) [the user's choice,
+//    2026-11-06]; or (round 181c, `sessionOnPlaylist` off) Session clips and scenes → the clip grid (launch mode,
+//    quantisation, legato, loop, follow actions, stop buttons, scene names / tempo / meter);
 //  - third-party VST2 / VST3 plugins → PluginRef::foreign (resolved like an .flp's, state carried over);
 //  - Live's own devices → the closest LYNX instrument (Simpler / Sampler / Drum rack / Instrument rack); the rest is
 //    listed in the report (unsupported / droppedEffects), as for an .flp.
@@ -39,9 +39,9 @@ struct AlsImportOptions
     // Folders the library-relative sample paths are relative to (RelativePathType 3 / 5 / 6): Live's Core Library,
     // installed packs, the user library. Searched in order.
     std::vector<std::string> libraryRoots;
-    // Session clips: false (default) → LYNX's clip grid, scene for scene; true → the Playlist after the arrangement,
-    // one section per scene, as before round 181c.
-    bool sessionOnPlaylist = false;
+    // Session clips: true (default, the user's choice) → the Playlist after the arrangement, one section per scene;
+    // false → LYNX's clip grid, scene for scene (round 181c).
+    bool sessionOnPlaylist = true;
 };
 
 // True for a gzip file whose XML root is a Live set (also for plain XML starting with <?xml … <Ableton).

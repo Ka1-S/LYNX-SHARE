@@ -179,7 +179,7 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 | Mixer Volume/Pan/Speaker/Solo | insert volume/pan/mute/solo |
 | Tempo / TimeSignature + automation | `Song::bpm`, `beatsPerBar` + tempo automation clip; signature changes → markers |
 | Locators | Playlist markers |
-| Session clips / Scenes | the clip grid (round 181c, section 13); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
+| Session clips / Scenes | Playlist after the arrangement, one section per scene (a marker per scene), the default; Settings › General › Workflow can put them in the clip grid instead (round 181c, section 13) |
 | Volume/Pan/Send/plugin-param automation | automation clips on the matching target |
 | PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
 | Native devices | closest LYNX engine (slice N3 table), otherwise dropped and listed in the import report |
@@ -260,7 +260,7 @@ Launch numbers read in Live 12's own Clip View on a set we wrote [LIVE: docs/ana
 - `FollowActionA` 0…9 = No Action, Stop, Again, Previous, Next, First, Last, Any, Other, Jump = `FollowKind`. [INFERRED] `FollowActionB` uses the same numbers; `JumpIndexA/B` is a scene index.
 - `GlobalQuantisation` (LiveSet) has no Global entry: it is the clip number − 1 (9 = 1/8; the default 4 = 1 Bar).
 
-Import (default; `AlsImportOptions::sessionOnPlaylist` keeps 175a's Playlist placement):
+Import with `AlsImportOptions::sessionOnPlaylist` off (Settings › General › Workflow › Session clips of Live sets: Clip grid; the default stays 175a's Playlist placement, the user's choice):
 - Each MIDI or audio track's `ClipSlotList` slot *s* → grid column = the track's Playlist track, row *s*. One clip per slot.
 - A looping clip → one pass of its loop region `[LoopStart, LoopEnd)` with the slot's Loop on; a start marker inside the loop (`StartRelative` ≠ 0) is reported as approximated. A one-shot → `[LoopStart + StartRelative, OutMarker)` with Loop off. MIDI clips get their own pattern, audio clips the same channel and warp handling as arrangement clips.
 - `LaunchMode`, `LaunchQuantisation`, `Legato`, `Name`, `Color`, and `FollowAction{FollowActionEnabled, FollowActionA/B, FollowChanceA/B, JumpIndexA/B, IsLinked, LoopIterations, FollowTime}` → the slot's settings.

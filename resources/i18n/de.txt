@@ -7834,5 +7834,4 @@ countries: de at ch li lu
 "Change declicking mode?" = "Declicking-Modus ändern?"
 "Change the declicking mode of all selected audio clip channels?" = "Den Declicking-Modus aller ausgewählten Audioclip-Kanäle ändern?"
 "Session clips of Live sets" = "Session-Clips aus Live-Sets"
-"Clip grid (default)" = "Clip-Raster (Standard)"
-"Playlist, after the arrangement" = "Playlist, nach dem Arrangement"
+"Playlist, after the arrangement (default)" = "Playlist, nach dem Arrangement (Standard)"

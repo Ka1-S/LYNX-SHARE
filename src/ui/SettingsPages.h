@@ -29,7 +29,7 @@ struct GeneralOptions
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
     bool clipLaunchWorkflow = false; // Settings › General › Workflow (round 181a): false = Pattern workflow, the default
-    bool alsSessionOnPlaylist = false; // Settings › General › Workflow (round 181c): a Live set's Session clips → the Playlist, not the clip grid
+    bool alsSessionOnPlaylist = true; // Settings › General › Workflow (round 181c): a Live set's Session clips → the Playlist (default) or the clip grid
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;

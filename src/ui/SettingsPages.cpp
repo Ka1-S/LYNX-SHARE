@@ -122,8 +122,8 @@ public:
         styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
                                         + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away."));
         styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
-        alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
-        alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
+        alsSessionBox.addItem (tr ("Playlist, after the arrangement (default)"), 2);
+        alsSessionBox.addItem (tr ("Clip grid"), 1);
         alsSessionBox.setSelectedId (options.alsSessionOnPlaylist ? 2 : 1, juce::dontSendNotification);
         alsSessionBox.onChange = [this] {
             options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2;

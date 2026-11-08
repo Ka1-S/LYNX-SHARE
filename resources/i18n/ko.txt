@@ -7834,5 +7834,4 @@ countries: kr
 "Change declicking mode?" = "디클릭 모드를 변경할까요?"
 "Change the declicking mode of all selected audio clip channels?" = "선택한 모든 오디오 클립 채널의 디클릭 모드를 변경할까요?"
 "Session clips of Live sets" = "Live 세트의 세션 클립"
-"Clip grid (default)" = "클립 그리드 (기본값)"
-"Playlist, after the arrangement" = "플레이리스트, 어레인지먼트 뒤"
+"Playlist, after the arrangement (default)" = "플레이리스트, 어레인지먼트 뒤 (기본)"
