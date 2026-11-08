@@ -1,4 +1,5 @@
 #include "ui/FlMods.h"
+#include "ui/Motion.h"
 #include "core/RulerGestures.h"
 #include "ui/ColourPicker.h"
 #include "ui/TrackIcons.h"
@@ -7157,7 +7158,7 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
     if (ticks != 0.0) // (a whole number of pixels from the start: the cached picture shifts, round 174e2)
         glideX.target = std::round (glideX.target * pixelsPerTick) / pixelsPerTick;
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) tracksHeight() - grid.getHeight()), glideY.target + pixels);
-    if (immediate)
+    if (immediate || ! ui::motion::enabled()) // (Settings › General › Animations off: the wheel jumps)
     {
         scrollTicks = glideX.target;
         scrollY = (int) std::round (glideY.target);

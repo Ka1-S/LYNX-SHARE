@@ -27,6 +27,7 @@
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/FrameTicker.h"
+#include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"
@@ -349,6 +350,7 @@ private:
     IconButton recordMenuButton { "recordMenu", Icon::mic };
     IconButton patternModeButton { "patternMode", Icon::pattern }, songModeButton { "songMode", Icon::song };
     IconButton metronomeButton { "metronome", Icon::metronome };
+    IconButton multilinkButton { "multilink", Icon::link }; // FL's MultiLinkBtn (round 177b-4)
     IconButton typingPianoButton { "typingPiano", Icon::keyboard };
     IconButton countInButton { "countIn", Icon::countIn };
     IconButton waitInputButton { "waitInput", Icon::waitInput };

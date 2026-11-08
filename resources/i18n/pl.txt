@@ -7735,6 +7735,10 @@ countries: pl
 "{0} crashed in its separate process." = "{0} uległ awarii w osobnym procesie."
 "{0} stopped responding (separate process)." = "{0} przestał odpowiadać (osobny proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Dotyczyło to tylko jego procesu: LYNX SHARE i projekt działały dalej, a plugin został wyciszony. Zapisz projekt; plugin wczyta się ponownie przy następnym otwarciu."
+"Interface font" = "Czcionka interfejsu"
+"Default ({0})" = "Domyślna ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "Nowa czcionka interfejsu zostanie zastosowana po ponownym uruchomieniu LYNX SHARE."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animacje: panele płynnie pojawiają się i znikają, przyciski delikatnie się podświetlają, kółko przewija płynnie"
 "{0} minutes" = "{0} min"
 "Longest wait between backups" = "Najdłuższa przerwa między kopiami"
 
@@ -7953,6 +7957,11 @@ countries: pl
 "Folders" = "Foldery"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink do kontrolerów"
+"Please tweak the controls you want to link..." = "Porusz kontrolki, które chcesz połączyć..."
+"Multilink to controllers on/off" = "Multilink do kontrolerów wł./wył."
+"Link to controller" = "Połącz z kontrolerem"
+"Override global links" = "Nadpisz globalne połączenia"
 "Change color..." = "Zmień kolor..."
 "Track routing" = "Routing ścieżki"
 "Open audio editor and record" = "Otwórz edytor audio i nagrywaj"
@@ -7973,6 +7982,9 @@ countries: pl
 "There are no audio clip channels selected." = "Nie zaznaczono żadnego kanału klipu audio."
 "Change declicking mode?" = "Zmienić tryb declickingu?"
 "Change the declicking mode of all selected audio clip channels?" = "Zmienić tryb declickingu wszystkich zaznaczonych kanałów klipów audio?"
+"Session clips of Live sets" = "Klipy sesji z zestawów Live"
+"Clip grid (default)" = "Siatka klipów (domyślnie)"
+"Playlist, after the arrangement" = "Playlista, po aranżacji"
 "Gradient color..." = "Kolor gradientu..."
 "Mixer tracks ({0} selected)" = "Ścieżki miksera (zaznaczono {0})"
 "Gradient editor" = "Edytor gradientu"

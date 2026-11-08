@@ -1,4 +1,5 @@
 #include "ui/Icons.h"
+#include "ui/Motion.h"
 
 #include <cmath>
 #include <map>
@@ -837,6 +838,13 @@ void IconButton::buttonStateChanged()
     juce::Button::buttonStateChanged();
 
     const auto target = isOver() || isDown() ? 1.0f : 0.0f;
+
+    if (! ui::motion::enabled()) // Settings › General › Animations off: no fade, no timer
+    {
+        stopTimer();
+        hover = target;
+        return;
+    }
 
     if (target != hover && ! isTimerRunning())
         startTimerHz (60);

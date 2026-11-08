@@ -7735,6 +7735,10 @@ countries: kr
 "{0} crashed in its separate process." = "{0}이(가) 별도 프로세스에서 충돌했습니다."
 "{0} stopped responding (separate process)." = "{0}이(가) 응답하지 않습니다(별도 프로세스)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "해당 프로세스만 영향을 받았습니다. LYNX SHARE와 프로젝트는 계속 실행되었고 플러그인은 음소거되었습니다. 프로젝트를 저장하세요. 다음에 열 때 플러그인이 다시 로드됩니다."
+"Interface font" = "인터페이스 글꼴"
+"Default ({0})" = "기본값 ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "새 인터페이스 글꼴은 LYNX SHARE를 다시 시작하면 적용됩니다."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "애니메이션: 패널이 서서히 나타나고 사라지며, 버튼이 부드럽게 켜지고, 휠 스크롤이 부드럽게 움직입니다"
 "{0} minutes" = "{0}분"
 "Longest wait between backups" = "백업 사이 최대 대기 시간"
 
@@ -7953,6 +7957,11 @@ countries: kr
 "Folders" = "폴더"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "컨트롤러에 멀티링크"
+"Please tweak the controls you want to link..." = "연결할 컨트롤을 움직이세요..."
+"Multilink to controllers on/off" = "컨트롤러에 멀티링크 켜기/끄기"
+"Link to controller" = "컨트롤러에 연결"
+"Override global links" = "전역 링크 덮어쓰기"
 "Change color..." = "색상 변경..."
 "Track routing" = "트랙 라우팅"
 "Open audio editor and record" = "오디오 편집기를 열고 녹음"
@@ -7973,6 +7982,9 @@ countries: kr
 "There are no audio clip channels selected." = "선택한 오디오 클립 채널이 없습니다."
 "Change declicking mode?" = "디클릭 모드를 변경할까요?"
 "Change the declicking mode of all selected audio clip channels?" = "선택한 모든 오디오 클립 채널의 디클릭 모드를 변경할까요?"
+"Session clips of Live sets" = "Live 세트의 세션 클립"
+"Clip grid (default)" = "클립 그리드 (기본)"
+"Playlist, after the arrangement" = "플레이리스트, 어레인지먼트 뒤"
 "Gradient color..." = "그라데이션 색상..."
 "Mixer tracks ({0} selected)" = "믹서 트랙 ({0}개 선택됨)"
 "Gradient editor" = "그라데이션 편집기"

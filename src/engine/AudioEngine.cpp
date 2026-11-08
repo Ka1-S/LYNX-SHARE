@@ -2963,6 +2963,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 AlsImportOptions alsOptions;
                 alsOptions.common = options;
                 alsOptions.libraryRoots = liveLibraryRoots();
+                alsOptions.sessionOnPlaylist = alsSessionOnPlaylist.load();
                 std::string alsError;
                 auto song = importAls (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), alsOptions, &alsError);
                 if (! song)
@@ -3466,6 +3467,24 @@ void AudioEngine::removeGlobalLink (const AutomationTarget& target)
     setMidiPrefs (p, saveGlobalLinks);
 }
 
+void AudioEngine::setMultilink (bool on)
+{
+    if (on)
+        multilink.emplace();
+    else
+        multilink.reset();
+    sendChangeMessage();
+}
+
+void AudioEngine::multilinkToControllers (bool global)
+{
+    if (! multilink)
+        return;
+    multilink->collecting = false;
+    multilink->global = global;
+    sendChangeMessage();
+}
+
 void AudioEngine::learnMidiController (const AutomationTarget& target)
 {
     learning = target;
@@ -3479,6 +3498,9 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
 {
     if (target.kind == AutomationTargetKind::none)
         return;
+
+    if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
+        multilink->add (target);
 
     if (! (lastTweaked[0] == target))
     {
@@ -3750,6 +3772,36 @@ void AudioEngine::applyControllers()
             learning = {};
             learningGlobal = false;
             setMidiPrefs (p, saveGlobalLinks);
+        }
+        else if (learning.kind == AutomationTargetKind::none && multilink)
+        {
+            // FL's Multilink (round 177b-4): the first message of each controller links the next queued control
+            if (const auto link = multilink->controller (e.cc, e.channel))
+            {
+                if (multilink->global) // "Override global links": as "Override global link...", for every project
+                {
+                    auto p = midiPrefs;
+                    const prefs::GlobalLink g { link->cc, link->channel, (int) link->target.kind, link->target.index, link->target.slot,
+                                                link->target.param };
+                    p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
+                                                         [&] (const prefs::GlobalLink& l) {
+                                                             return l.kind == g.kind && l.index == g.index && l.slot == g.slot && l.param == g.param;
+                                                         }),
+                                         p.globalLinks.end());
+                    p.globalLinks.push_back (g);
+                    setMidiPrefs (p, saveGlobalLinks);
+                }
+                else
+                    editSong ([l = *link] (Song& s) {
+                        s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& m) { return m.target == l.target; }),
+                                           s.midiLinks.end());
+                        s.midiLinks.push_back ({ l.cc, l.channel, l.target });
+                    });
+                if (multilink->complete())
+                    multilink.reset(); // FL: "the process will auto-close once the number of hardware controls tweaked
+                                       // equals the number of software targets"
+                sendChangeMessage();
+            }
         }
         else if (learning.kind != AutomationTargetKind::none)
         {

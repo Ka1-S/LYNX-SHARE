@@ -7818,6 +7818,10 @@ countries: br
 "{0} crashed in its separate process." = "{0} travou no seu processo separado."
 "{0} stopped responding (separate process)." = "{0} parou de responder (processo separado)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Só o processo dele foi afetado: o LYNX SHARE e o seu projeto continuaram rodando, e o plugin foi silenciado. Salve o projeto; o plugin carrega de novo na próxima vez que você abrir."
+"Interface font" = "Fonte da interface"
+"Default ({0})" = "Padrão ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "A nova fonte da interface é aplicada quando o LYNX SHARE reinicia."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animações: os painéis aparecem e somem suavemente, os botões acendem com suavidade, a roda do mouse desliza"
 "{0} minutes" = "{0} minutos"
 "Longest wait between backups" = "Espera máxima entre backups"
 
@@ -8036,6 +8040,11 @@ countries: br
 "Folders" = "Pastas"
 
 # round 177a: the mixer menu as FL's
+"Multilink to controllers" = "Multilink para controladores"
+"Please tweak the controls you want to link..." = "Mexa nos controles que você quer vincular..."
+"Multilink to controllers on/off" = "Multilink para controladores liga/desliga"
+"Link to controller" = "Vincular ao controlador"
+"Override global links" = "Substituir vínculos globais"
 "Change color..." = "Mudar cor..."
 "Track routing" = "Roteamento de faixas"
 "Open audio editor and record" = "Abrir editor de áudio e gravar"
@@ -8056,6 +8065,9 @@ countries: br
 "There are no audio clip channels selected." = "Nenhum canal de clipe de áudio está selecionado."
 "Change declicking mode?" = "Alterar o modo de declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Alterar o modo de declicking de todos os canais de clipe de áudio selecionados?"
+"Session clips of Live sets" = "Clipes de sessão de sets do Live"
+"Clip grid (default)" = "Grade de clipes (padrão)"
+"Playlist, after the arrangement" = "Playlist, depois do arranjo"
 "Gradient color..." = "Cor em degradê..."
 "Mixer tracks ({0} selected)" = "Faixas do mixer ({0} selecionadas)"
 "Gradient editor" = "Editor de degradê"
