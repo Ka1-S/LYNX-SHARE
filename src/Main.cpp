@@ -483,6 +483,7 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+        lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
 
         // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
         lynx::sfz::setDecoder ([] (const std::string& path, lynx::sfz::Audio& out) {
