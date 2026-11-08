@@ -267,3 +267,28 @@ A second REA turn (04:56–05:19) proved the level and route encoding (FLM_FORMA
 - **Instrument channels** sit at 0 dB (channel volume 1.0), because FLM's level lives on the rack, now the insert.
 
 Mute/solo flags (CHHD) stay INFERRED and are not imported.
+
+### F8 early sanity check (cloud build of 773f81ce9, run 42463458560)
+
+On the cloud build (LYNX_TEST_MODE=1, a fresh profile): `--selftest` result=OK; `--render` of MONTAGEM XONADA
+(76 s) result=OK with 11/11 samples loaded. That render was compared with the user's WAV, an FLM export at 48 kHz
+lasting 74.1 s, by `/mnt/e/lynx-work/flm182c/compare.py` (10 ms RMS envelopes):
+
+| Measure | Result |
+|---|---|
+| Timing | aligned: best envelope lag 0 ms; matched onsets median error 0.0 ms, p90 10 ms (one envelope hop) |
+| Onsets | 56 of the reference's 159 have a LYNX onset within 30 ms (35 %). Envelope correlation 0.34 |
+| Level per 8 bars (LYNX − reference) | +0.2, +0.8, +1.8, +1.1, +4.9 dB (bars 1–40, where the export ends) |
+
+The differences are expected while the later slices are missing:
+- the Grand Piano program (`Keyboard/Grand Piano.dwp`) is not in FL's copy of FLM's resources, so it plays LYNX's
+  built-in synth (F3/F4);
+- no FLM effects yet (F5): MultiFX on the master, Gate, Reverb 2, Leveller, Graphic EQ;
+- the "Mix : FX Gate" automation is a module-parameter lane (F6, after F5). The +4.9 dB in the last section is where
+  FLM's gate pumps the piano;
+- FLM's channel levels reach +6 dB, and LYNX's fader tops out at +5.6 dB.
+
+Shots of the import (`/mnt/e/lynx-work/flm182c/shots/`):
+- `xonada-playlist.png`: the whole arrangement;
+- `xonada-mixer.png`: the 13 inserts with FLM's levels, Master −7.3 dB;
+- `xonada-desktop-mixer.png`.
