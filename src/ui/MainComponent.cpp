@@ -1570,6 +1570,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);
+    // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
+    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (chord).taken, typingIntoText))
+        return keyPressed (key);
     const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
     return ! action.empty() && runAction (action);
 }
