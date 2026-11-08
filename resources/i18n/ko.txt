@@ -8000,3 +8000,4 @@ countries: kr
 "Tones" = "톤"
 "Texture" = "텍스처"
 "Complex" = "컴플렉스"
+"Comp takes" = "이 테이크로 컴프 만들기"

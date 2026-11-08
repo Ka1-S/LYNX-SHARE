@@ -8000,3 +8000,4 @@ countries: tw hk mo
 "Tones" = "音調"
 "Texture" = "紋理"
 "Complex" = "複雜"
+"Comp takes" = "用這些錄音合成"

@@ -8000,3 +8000,4 @@ countries: jp
 "Tones" = "トーン"
 "Texture" = "テクスチャ"
 "Complex" = "コンプレックス"
+"Comp takes" = "これらのテイクでコンプを作成"

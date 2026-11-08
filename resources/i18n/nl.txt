@@ -8000,3 +8000,4 @@ countries: nl be
 "Tones" = "Tonen"
 "Texture" = "Textuur"
 "Complex" = "Complex"
+"Comp takes" = "Comp maken van deze takes"

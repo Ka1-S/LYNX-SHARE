@@ -8083,3 +8083,4 @@ countries: br
 "Tones" = "Tons"
 "Texture" = "Textura"
 "Complex" = "Complexo"
+"Comp takes" = "Fazer comp destas tomadas"

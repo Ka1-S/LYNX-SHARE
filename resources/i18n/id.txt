@@ -8000,3 +8000,4 @@ countries: id
 "Tones" = "Nada"
 "Texture" = "Tekstur"
 "Complex" = "Kompleks"
+"Comp takes" = "Buat comp dari take ini"

@@ -8000,3 +8000,4 @@ countries: it ch sm
 "Tones" = "Toni"
 "Texture" = "Texture"
 "Complex" = "Complesso"
+"Comp takes" = "Crea un comp da queste take"
