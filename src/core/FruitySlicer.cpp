@@ -1,5 +1,6 @@
 #include "core/FruitySlicer.h"
 
+#include "core/FlVoiceProcessor.h"
 #include "core/Instruments.h"
 #include "core/Song.h"
 
@@ -491,6 +492,22 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
                 def.sampler.slices.push_back ((float) ((double) p / (double) frames));
     def.sampler.sliceFirstKey = firstNote (state);
     def.sampler.slicesToEnd = state.playToEnd != 0;
+    // The voice: Fruity Slicer's voices run the plugin voice processor (FUN_00756d30) with the state's 364-byte block —
+    // the five articulators (the volume envelope's release is what a note-off plays, FL render round 180c), Mod X / Y
+    // and the filter type. LYNX's sampler runs the same records as FL's channel voice (REA_rodada69 §3, REA_rodada76).
+    {
+        std::array<std::uint8_t, flvp::snapshotSize> block {};
+        if (state.voiceBlock.size() == (std::size_t) flvp::snapshotSize)
+            std::memcpy (block.data(), state.voiceBlock.data(), block.size());
+        else
+            block = flvp::defaultSnapshot(); // FUN_00757bd0: a state without the block keeps the plugin's defaults
+        def.sampler.flChannel.assign (89, 0);
+        std::memcpy (def.sampler.flChannel.data(), block.data(), 85 * 4);
+        std::memcpy (&def.sampler.flChannel[85], block.data() + 0x15c, 4);
+        std::memcpy (&def.sampler.flChannel[86], block.data() + 0x160, 4);
+        std::memcpy (&def.sampler.flChannel[87], block.data() + 0x168, 4);
+        def.sampler.flChannel[88] = 96; // FL's project PPQ (the articulator times are in ticks of it)
+    }
     // PS: FL shifts the pitch and keeps the length through its licensed stretch engine; LYNX resamples (the slice gets
     // shorter or longer with the pitch)
     def.sampler.pitch = std::clamp (def.sampler.pitch + (float) state.pitchCents / 100.0f, -24.0f, 24.0f);
