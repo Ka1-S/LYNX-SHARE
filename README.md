@@ -142,10 +142,10 @@ Up to 127 inserts, sends with levels, 10 effect slots with dry/wet per track, bu
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/img/eq.png" alt="Parametric EQ">
+<img src="docs/img/eq.png" alt="Facet EQ">
 
-### 7-band parametric EQ
-Draggable handles, shelves, 12–48 dB/oct cuts, band-pass and notch, with the response drawn in real time.
+### Facet EQ
+8 bands of bells, shelves, tilt, notch and band pass, cuts up to 96 dB/oct, dynamic bands and a live pre/post analyser, at zero latency. The FL-style 7-band Parametric EQ is there too.
 
 </td>
 <td width="50%" valign="top">
@@ -157,6 +157,11 @@ Any knob or fader (channel, mixer, effect, plugin parameter) becomes a clip with
 </td>
 </tr>
 </table>
+
+<p align="center">
+  <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes beside the Playlist" width="100%">
+  <br><sub><strong>Clip-launch workflow</strong> (View › Layout style): a grid of clips and scenes beside the Playlist, with launch modes, quantisation and follow actions. The Pattern workflow stays the default.</sub>
+</p>
 
 ### Everything in the box
 
