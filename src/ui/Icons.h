@@ -40,9 +40,10 @@ enum class Icon
     tapTempo,   // the tempo tapper: a fingertip tapping a pad (round 170e2)
     loopRecord, // recording: loop record (a loop arrow around a record dot; round 170e3)
     stepEdit,   // recording: step edit (steps typed one after another, an arrow to the next; round 170e3)
-    punch       // recording: punch in/out on the loop region (a record dot between two brackets; round 170e3)
+    punch,      // recording: punch in/out on the loop region (a record dot between two brackets; round 170e3)
+    note        // the Browser's Scores folder: an eighth note (round 178a)
 };
-constexpr int iconCount = (int) Icon::punch + 1;
+constexpr int iconCount = (int) Icon::note + 1;
 
 namespace icons
 {

@@ -54,17 +54,26 @@ namespace lynx
 {
 namespace
 {
-// An audio clip voice's fade gain at its position: linear fades, FL's S curve for an automatic crossfade, or the
-// equal-power curve of a comp crossfade (round 177c)
-float clipFadeGainOf (float elapsed, float remaining, float in, float out, std::uint8_t shape) noexcept
+// An audio clip voice's fade gain at its position: FL's S curve (shape bits), with its tension, as FL's voices compute it (a
+// fade of N samples: x = (i + 1) / (N + 1), REA round 180d), or straight fades (FL's shape 1, and projects from before it).
+// A comp crossfade (shape bits 3 / 4, round 177c) is the equal-power curve, which wins over the others and has no tension.
+float clipFadeGainOf (float elapsed, float remaining, float in, float out, std::uint8_t shape, float inTension, float outTension) noexcept
 {
     auto gain = 1.0f;
-    if (in > 0.0f && elapsed < in)
-        gain *= (shape & 8) != 0 ? clipops::equalPowerCurve (elapsed / in)
-              : (shape & 1) != 0 ? clipops::crossfadeCurve (elapsed / in) : elapsed / in;
-    if (out > 0.0f && remaining < out)
-        gain *= (shape & 16) != 0 ? clipops::equalPowerCurve (std::max (0.0f, remaining) / out)
-              : (shape & 2) != 0 ? clipops::crossfadeCurve (std::max (0.0f, remaining) / out) : std::max (0.0f, remaining) / out;
+    if (in > 0.0f && elapsed < in && (shape & 8) != 0)
+        gain *= clipops::equalPowerCurve (elapsed / in);
+    else if (in > 0.0f && elapsed < in)
+    {
+        const auto y = (shape & 1) != 0 ? clipops::crossfadeCurve ((elapsed + 1.0f) / (in + 1.0f)) : elapsed / in;
+        gain *= inTension != 0.0f ? clipops::fadeTensionCurve (y, inTension) : y;
+    }
+    if (out > 0.0f && remaining < out && (shape & 16) != 0)
+        gain *= clipops::equalPowerCurve (std::max (0.0f, remaining) / out);
+    else if (out > 0.0f && remaining < out)
+    {
+        const auto y = (shape & 2) != 0 ? clipops::crossfadeCurve (std::max (0.0f, remaining) / (out + 1.0f)) : std::max (0.0f, remaining) / out;
+        gain *= outTension != 0.0f ? clipops::fadeTensionCurve (y, outTension) : y;
+    }
     return gain;
 }
 
@@ -1473,7 +1482,8 @@ struct SamplerVoice
     int stage = 1;         // 0 attack, 1 decay, 2 sustain, 3 release
     double first = 0.0, last = 0.0; // played region: first and last frame (inclusive)
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f; // clip fades
-    std::uint8_t fadeShape = 0; // bit 0 / 1: the fade-in / fade-out is an automatic crossfade (S curve, round 166e)
+    std::uint8_t fadeShape = 0; // bit 0 / 1: the fade-in / fade-out is on the S curve (else straight)
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade tensions
     float panL = 1.0f, panR = 1.0f;
     double glideRatio = 1.0;
     int glideLeft = 0;
@@ -1798,7 +1808,9 @@ public:
         target->clipRemaining = clipFades[1];
         target->fadeIn = clipFades[2];
         target->fadeOut = clipFades[3];
-        target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16));
+        target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16)) // (bits 3 / 4: a comp crossfade, round 177c);
+        target->fadeInTension = std::exchange (nextClipTension[0], 0.0f);
+        target->fadeOutTension = std::exchange (nextClipTension[1], 0.0f);
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;
@@ -2122,10 +2134,11 @@ public:
         nextModY = std::isfinite (modY) ? std::clamp (modY, 0.0f, 1.0f) : 0.5f;
     }
 
-    void setNextClipFades (float elapsed, float remaining, float in, float out, std::uint8_t shape) noexcept override
+    void setNextClipFades (float elapsed, float remaining, float in, float out, std::uint8_t shape, float inTension, float outTension) noexcept override
     {
         nextClip = { elapsed, remaining, in, out };
         nextClipShape = shape;
+        nextClipTension = { inTension, outTension };
     }
 
     bool setNextNoteGain (float gain) noexcept override
@@ -2482,7 +2495,7 @@ public:
 
                 if (v.fadeIn > 0.0f || v.fadeOut > 0.0f)
                 {
-                    gain *= clipFadeGainOf (v.clipElapsed, v.clipRemaining, v.fadeIn, v.fadeOut, v.fadeShape);
+                    gain *= clipFadeGainOf (v.clipElapsed, v.clipRemaining, v.fadeIn, v.fadeOut, v.fadeShape, v.fadeInTension, v.fadeOutTension);
 
                     v.clipElapsed += 1.0f;
                     v.clipRemaining -= 1.0f;
@@ -2697,7 +2710,7 @@ public:
                 auto gain = v.fade * v.zoneGain * outGain.load (std::memory_order_relaxed);
                 if (v.fadeIn > 0.0f || v.fadeOut > 0.0f)
                 {
-                    gain *= clipFadeGainOf (v.clipElapsed, v.clipRemaining, v.fadeIn, v.fadeOut, v.fadeShape);
+                    gain *= clipFadeGainOf (v.clipElapsed, v.clipRemaining, v.fadeIn, v.fadeOut, v.fadeShape, v.fadeInTension, v.fadeOutTension);
                     v.clipElapsed += 1.0f;
                     v.clipRemaining -= 1.0f;
                 }
@@ -2936,6 +2949,7 @@ private:
     float nextClipStretch = 1.0f;     // the next clip's own stretch (round 167l, audio thread)
     bool clipShift = false;           // pitch shifters for the clips' own pitch (set before prepareKeyShift)
     std::uint8_t nextClipShape = 0;
+    std::array<float, 2> nextClipTension {};
 
     struct SliceTable
     {
