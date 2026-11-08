@@ -986,11 +986,9 @@ void prepareForMidiExport (Song& song)
     int next = 0;
     for (auto& c : song.channels)
     {
-        // FL skips channels with a flag whose meaning is not known yet (REA round 181b); LYNX keeps the channels
-        // that make no sound of their own and drive others, which a MIDI Out could not stand in for
-        if (c.instrument == InstrumentKind::controller || c.instrument == InstrumentKind::layer
-            || c.instrument == InstrumentKind::dashboard || c.instrument == InstrumentKind::voltage)
-            continue;
+        // FL converts every channel but automation clips (seen in FL 2026, round 181b: Layer and Envelope
+        // Controller became MIDI Out, the automation clip stayed and took no MIDI channel). LYNX's automation clips
+        // aren't channels, so every channel converts.
         midictl::MidiOutSettings settings;
         if (c.plugin.name == "FPC")
         {
