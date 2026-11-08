@@ -477,7 +477,7 @@ private:
     {
         loading = true;
         selected = std::clamp (selected, 0, std::max (0, (int) state.slices.size() - 1));
-        nameLabel.setText (samplePath.empty() ? tr ("No sample") : fileName (samplePath), juce::dontSendNotification);
+        nameLabel.setText (samplePath.empty() ? tr ("No sample") : fileName (samplePath).upToLastOccurrenceOf (".", false, false), juce::dontSendNotification); // FL: the name without its extension
         autoDump.setToggleState (state.autoDump != 0, juce::dontSendNotification);
         autoFit.setToggleState (state.autoFit != 0, juce::dontSendNotification);
         declick.setToggleState (state.declick != 0, juce::dontSendNotification);
