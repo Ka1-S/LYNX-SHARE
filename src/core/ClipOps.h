@@ -11,13 +11,22 @@
 #include <limits>
 #include <vector>
 
+#include "core/SamplePrecompute.h"
 #include "core/Song.h"
 
 namespace lynx::clipops
 {
+// The part of its file an audio clip's channel plays (its Trim; a clip plays the whole region): a clip's offsets count from
+// its first frame, and TIME stretches its length (FL: FUN_00ff9d70, REA round 180d). Pass its `frames` as `fileFrames`
+// below and add `first` to a frame drawn from them, so that drawing, clip lengths and playback agree.
+inline precompute::PlayedSpan clipSpan (const ChannelDef& channel, const std::shared_ptr<const SampleData>& data)
+{
+    return precompute::playedSpan (data, channel.sampler, channel.instrument == InstrumentKind::audioClip);
+}
+
 // Audio frames of the file per Playlist tick for an audio clip's channel: the file's own speed, or, when the
-// channel is stretched (stretchBeats > 0, with or without keeping the pitch), the whole file spread over that
-// many beats.
+// channel is stretched (stretchBeats > 0, with or without keeping the pitch), the played span (clipSpan) spread over
+// that many beats.
 inline double framesPerTick (const SamplerSettings& sampler, double fileFrames, double fileRate, double bpm) noexcept
 {
     if (sampler.stretchBeats > 0.0f && fileFrames > 0.0)

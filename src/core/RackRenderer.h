@@ -276,10 +276,18 @@ struct RackState
     using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
                                                                                      double semitones, const StretchMap& map)>;
 
+    // A channel's precomputed span (its region after its precomputed effects and Trim) stretched by `ratio`, cached in the
+    // app by (path, variantKey, ratio, method): FL stretches that span, not the whole file (round 180d). Unset: stretched
+    // here, uncached (tests).
+    using StretchedSpanProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, const std::string& variantKey,
+                                                                                  const std::shared_ptr<const SampleData>& span, double ratio,
+                                                                                  StretchMethod method, double semitones)>;
+
     struct Factories
     {
         SampleProvider samples;
         StretchedSampleProvider stretchedSamples;
+        StretchedSpanProvider stretchedSpans;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid

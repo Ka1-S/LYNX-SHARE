@@ -46,7 +46,22 @@ declick choice to 2 on audio clips. An 11.1.0 demo with 88-byte records and bits
 (xcorr 0.840), so FL honours them there too. Its fade fields hold garbage (1.6e10, NaN). Record sizes below 88 keep LYNX's old reading,
 untested.
 
-## 3. Open
+## 3. What FL's TIME stretches [FL renders + DECOMP]
+
+- Rate (`FUN_00d26890`, every block): Stretch modes with TIME: inc = L / (TIME/192 beats × 2^(MUL/10000) × item +0x40). A
+  clip's start / end are source milliseconds (`FUN_00d2a7b0`); the end only cuts (probe `p59`: end at 0.5x / 1x / 2x of
+  the clip length plays at one speed).
+- L (`FUN_00ff0db0`, `FUN_00ff0b30`): the region after the precomputed effects, cut by Trim (backward scan, trim/32768
+  per frame); 0xD7 +0x9D on: the trimmed length.
+- Probe `p61` (Importer Ride alone): TIME 367 plays 2.00x slower than TIME 0, TIME 734 about 4x, Trim off 0.55x (the
+  whole 1.30 s), stretch PITCH -100 or 0 the same (cents, pitch only). Ride's Precomputed fade out 807 (0x4B) makes the
+  trimmed length 0.38 s; Titey Tom (no fade) trims to 1.668 s = its TIME, and FL leaves it alone.
+- Probe `p60`: an audio clip channel's Start 0.25 is honoured (the clip starts 618 ms into Titey Tom). LYNX plays audio
+  clips over the whole file (round 167k): a follow-up.
+- REA sessions this round: the trim session ran about 35 minutes, longer than the 20-minute turn the brief asks for (it was
+  not pre-sized). The Ghidra lock was held for all of it and the binary closed after.
+
+## 4. Open
 
 - Audio clip offsets: what FL's span / length ratio depends on. Start and end must be read together (FL's start with LYNX's end
   moves the song to 0.977; LYNX's start with FL's end to 0.627).
