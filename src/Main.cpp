@@ -10514,6 +10514,23 @@ private:
                 saveWindow (lynx::makeAudioEditorForSnapshot (offline, d, true), "-audioeditor-spectrum.png");
             }
 
+            // warp markers (round 175a, M3): the audio editor of the first audio clip whose channel has warp markers,
+            // opened as the Playlist opens it, with its warp lane
+            {
+                const auto& song = offline.getSong();
+                for (int i = 0; i < (int) song.playlist.size(); ++i)
+                {
+                    const auto& c = song.playlist[(std::size_t) i];
+                    if (c.kind == lynx::ClipKind::audio && juce::isPositiveAndBelow (c.channel, (int) song.channels.size())
+                        && song.channels[(std::size_t) c.channel].sampler.warp.size() >= 3)
+                    {
+                        if (auto panel = lynx::makeAudioEditorPanel (offline, c.channel, i, true))
+                            saveWindow (std::move (panel), "-audioeditor-warp.png");
+                        break;
+                    }
+                }
+            }
+
             // the tempo tapper after five steady taps (round 132)
             saveWindow (lynx::makeTempoTapperForSnapshot (offline, 5, 128.0), "-tempotapper.png");
 
