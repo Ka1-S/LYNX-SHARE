@@ -153,10 +153,10 @@ public:
         if (options.stemsIncludeMaster)
             items.push_back ({ juce::String ("Master"), baseFile, song });
 
-        if (options.stems == exportopts::Stems::channels)
+        if (options.stems == exportopts::Stems::channels || options.stems == exportopts::Stems::channelsDry)
             for (auto c : exportopts::stemChannels (song, options.range))
                 items.push_back ({ juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), file (c + 1, song.channels[(std::size_t) c].name),
-                                   exportopts::makeChannelStemSong (song, c) });
+                                   exportopts::makeChannelStemSong (song, c, options.stems == exportopts::Stems::channelsDry) });
         else
             for (auto t : exportopts::stemTracks (song, onlyTracks))
                 items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()),
@@ -391,7 +391,7 @@ public:
         combo (tailLabel, tr ("Tail"), tailBox, { tr ("Cut remainder"), tr ("Leave remainder"), tr ("Wrap remainder") },
                tr ("Cut: stop exactly at the end (loops). Leave: let reverbs and releases ring out (songs). Wrap: mix the tail into the start (seamless loops)"));
         combo (tailLengthLabel, tr ("Longest tail"), tailLengthBox, { "3 s", "6 s", "12 s", "30 s" }, tr ("The tail stops earlier when the sound has faded out"));
-        combo (stemsLabel, tr ("Files"), stemsBox, { tr ("One file (the mix)"), tr ("One per mixer insert (stems)"), tr ("One per channel (stems)") },
+        combo (stemsLabel, tr ("Files"), stemsBox, { tr ("One file (the mix)"), tr ("One per mixer insert (stems)"), tr ("One per channel (stems)"), tr ("One per channel, instruments only (no sends or buses)") },
                tr ("Stems: a file for each mixer insert that gets sound, or for each channel that plays"));
         stemsMaster.setButtonText (tr ("Also the full mix"));
         stemsMaster.onClick = [this] { readControls(); };
@@ -897,7 +897,7 @@ private:
             info << "  ·  " << tr ("MP3 at {0} Hz", { juce::String ((int) mp3SampleRate (options.sampleRate)) });
         if (options.stems == Stems::mixerTracks)
             info << "  ·  " << tr ("{0} file(s)", { juce::String ((int) stemTracks (song, onlyTracks).size() + (options.stemsIncludeMaster ? 1 : 0)) });
-        else if (options.stems == Stems::channels)
+        else if (options.stems == Stems::channels || options.stems == Stems::channelsDry)
             info << "  ·  " << tr ("{0} file(s)", { juce::String ((int) stemChannels (song, options.range).size() + (options.stemsIncludeMaster ? 1 : 0)) });
         if (options.stems == Stems::none || realtime)
             info << "  ·  " << tr ("Disk space: {0}", { juce::File::descriptionOfSizeInBytes (estimatedBytes (shown, seconds)) });
