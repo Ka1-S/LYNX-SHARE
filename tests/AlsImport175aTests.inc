@@ -444,11 +444,18 @@ inline bool loaderRulesHold (const std::string& xmlText, int returns, std::strin
                 why = "group track slots";
         if ((int) set.child ("Tracks").children ("ReturnTrack").size() != returns)
             why = "returns";
-        // a return track's own sends are off, as Live saves them (round 182b)
+        // a return track's own sends are off, as Live 12 saves them (round 182b; Live 11's holders have no EnabledByUser)
         for (const auto& r : set.child ("Tracks").children ("ReturnTrack"))
             for (const auto& h : r.path ("DeviceChain/Mixer/Sends").children ("TrackSendHolder"))
-                if (h.child ("EnabledByUser").attr ("Value") != "false")
+            {
+                if (! h.child ("EnabledByUser"))
+                {
+                    if (set.child ("MainTrack")) // Live 12 always writes it
+                        why = "return track send without EnabledByUser";
+                }
+                else if (h.child ("EnabledByUser").attr ("Value") != "false")
                     why = "return track send enabled";
+            }
     }
     return why.empty();
 }
