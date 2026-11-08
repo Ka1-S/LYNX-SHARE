@@ -39,6 +39,12 @@ juce::String volumeText (float gain)
     return juce::String (20.0f * std::log10 (gain), 1) + " dB";
 }
 
+// a chain's colour: its own (ARGB), else LYNX's hue wheel by its place (Live colours its chains [SHOT])
+juce::Colour chainColour (const RackChain& c, int index)
+{
+    return c.colour >= 0 ? juce::Colour ((juce::uint32) c.colour).withAlpha (1.0f) : theme::noteGroupHue (1 + (index * 5) % 15);
+}
+
 juce::String panText (float pan)
 {
     const auto p = (int) std::lround (pan * 50.0f);
@@ -531,9 +537,10 @@ struct RackView::Impl
             }
             auto cells = row.reduced (2, 1);
             auto nameCell = cells.removeFromLeft (92).toFloat();
-            g.setColour (col::bg4);
+            const auto tint = chainColour (chain, c);
+            g.setColour (chain.active ? tint : tint.withSaturation (0.1f).darker (0.6f));
             g.fillRoundedRectangle (nameCell, theme::radius::sm);
-            g.setColour (chain.active ? col::textPrimary : col::textDisabled);
+            g.setColour (tint.getPerceivedBrightness() > 0.55f ? col::bg0 : col::textPrimary);
             g.drawText (str (chain.name), nameCell.reduced (4, 0), juce::Justification::centredLeft);
             if (r.kind != RackDoc::Kind::midiEffect) // (MIDI chains have no volume / pan)
             {
@@ -568,16 +575,27 @@ struct RackView::Impl
         for (int v = 0; v <= 127; v += 16)
             g.drawText (juce::String (v), juce::Rectangle<float> (zoneX (rulerRow, (float) v) - 10.0f, (float) rulerRow.getY(), 20.0f, (float) rulerRow.getHeight()),
                         juce::Justification::centred);
+        g.setColour (col::bg2);
+        for (int v = 8; v < 128; v += 8)
+        {
+            const auto x = zoneX (rulerRow, (float) v);
+            g.drawVerticalLine (juce::roundToInt (x), (float) (zones.getY() + headerStrip), (float) zones.getBottom() - 2.0f);
+        }
         for (int c = 0; c < (int) r.chains.size(); ++c)
         {
             const auto row = zoneRow (c);
             if (row.getBottom() > zones.getBottom())
                 break;
+            if (c == r.selectedChain)
+            {
+                g.setColour (col::accentMuted.withAlpha (0.45f));
+                g.fillRect (row);
+            }
             const auto z = zoneOf (r.chains[(std::size_t) c]);
             const auto x0 = zoneX (row, (float) z.lo), x1 = zoneX (row, (float) z.hi + 1.0f);
             const auto f0 = zoneX (row, (float) z.fadeLo), f1 = zoneX (row, (float) z.fadeHi + 1.0f);
             const auto top = (float) row.getY() + 3.0f, mid = (float) row.getY() + 7.0f, bottom = (float) row.getBottom() - 2.0f;
-            g.setColour (col::info.withAlpha (0.85f));
+            g.setColour (chainColour (r.chains[(std::size_t) c], c).interpolatedWith (col::info, 0.55f).withAlpha (0.9f));
             g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x0, mid, x1, bottom));
             // the fades: a line ramping up to the full part [SHOT]
             juce::Path ramp;
