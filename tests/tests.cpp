@@ -17079,7 +17079,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Edit177dTests.inc"
 #include "Patterns177dTests.inc"
 #include "Issue32Tests.inc"
-#include "Rack116Tests.inc"
 #include "Sc109Tests.inc"
 #include "WrapperMidi181cTests.inc"
 #include "Mono168lTests.inc"
@@ -17158,3 +17157,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer177a4Tests.inc"
 #include "Sc177bTests.inc"
 #include "Issue97Tests.inc"
+#include "Rack116Tests.inc"
