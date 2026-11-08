@@ -33,6 +33,16 @@ constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in F
 // mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
 constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
 constexpr int faderRailRepeatMs = 64;
+// FL measured (REA_rodada177a section 4.2): held 50 / 100 / 160 / 250 / 300 / 400 ms the cap took 1 / 2 / 3 / 4 / 5 / 7
+// steps, so the first repeat comes one period after the press, with no longer first delay. LYNX counts the steps from
+// the press time, not from when its timer happens to fire (a JUCE timer's first callback can come early, which turned
+// one click into two steps).
+constexpr int faderRailFirstRepeatMs = faderRailRepeatMs;
+// how many steps a press held `heldMs` has taken: one at once, then one per period
+constexpr int faderRailStepsForHold (int heldMs) noexcept
+{
+    return heldMs < faderRailFirstRepeatMs ? 1 : 2 + (heldMs - faderRailFirstRepeatMs) / faderRailRepeatMs;
+}
 constexpr float faderRailStepTowards (float value, float target) noexcept
 {
     const auto distance = target - value;
@@ -279,6 +289,14 @@ struct SamplePrecompute
     bool operator== (const SamplePrecompute&) const = default;
 };
 
+// A warp marker (round 175a, M1; Ableton Live's WarpMarker SecTime / BeatTime): a time in the sample file and the
+// content beat it plays on. Between markers the sample is stretched evenly.
+struct WarpPoint
+{
+    double seconds = 0.0, beats = 0.0;
+    bool operator== (const WarpPoint&) const = default;
+};
+
 struct SamplerSettings
 {
     float pitch = 0.0f;   // semitones, -24..24
@@ -294,6 +312,10 @@ struct SamplerSettings
     int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
     int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // with keepPitch and stretchBeats: the file's warp markers (seconds → beats, increasing). The file still lasts
+    // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
+    // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
+    std::vector<WarpPoint> warp;
     // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept
@@ -990,8 +1012,11 @@ struct TrackEq
     std::array<float, 3> gainDb { 0.0f, 0.0f, 0.0f };          // ±18
     std::array<float, 3> hz { 90.0f, 1500.0f, 8000.0f };       // 10 Hz .. 16 kHz
     std::array<float, 3> width { 0.267f, 0.267f, 0.267f };     // 0..1: peak Q / shelf slope
+    // round 177d (an FL wishlist item; LYNX's own): the EQ is skipped and its settings kept (FL has no bypass for it)
+    bool bypassed = false;
 
-    bool active() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool hasBoostOrCut() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool active() const noexcept { return ! bypassed && hasBoostOrCut(); }
     bool operator== (const TrackEq&) const = default;
 
     // FL conversions: peak Q = 0.0999·(1001^w − 1) + 0.1; shelves S = 1.9·w + 0.1
@@ -1730,6 +1755,14 @@ struct Song
     // Applies `fn` to all Pattern Block lists (the current arrangement's and the stored ones).
     template <typename Fn>
     void forEachBlockList (Fn&& fn)
+    {
+        fn (blocks);
+        for (std::size_t i = 0; i < arrangements.size(); ++i)
+            if ((int) i != currentArrangement)
+                fn (arrangements[i].blocks);
+    }
+    template <typename Fn>
+    void forEachBlockList (Fn&& fn) const
     {
         fn (blocks);
         for (std::size_t i = 0; i < arrangements.size(); ++i)

@@ -399,8 +399,51 @@ std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::u
     return makeMaximusPreset (d, MaximusBuild::shared);
 }
 
-std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::uint8_t>& d, MaximusBuild build)
+// round 173d3b: Maximus states of version 1…2 (11 of FL's 41 Maximus presets) as the version-3 layout. FUN_0083ef50
+// (SG_x64.dll) reads them in four pieces into the same object: 0x18 bytes, then 0x8000 into the next int, 0xD0 bytes,
+// 0x18 bytes, 0x8000 into the next int, then 0xE6 bytes (0xE5 for version 1); the v3 block is the same with the two
+// ints stored (0x1EE bytes). What follows (the four bands' curves) is unchanged.
+static std::vector<std::uint8_t> maximusPreV3AsV3 (const std::vector<std::uint8_t>& d, int version)
 {
+    const std::size_t last = version < 2 ? 0xe5 : 0xe6, read = 0x18 + 0xd0 + 0x18 + last;
+    if (d.size() < 4 + read)
+        return {};
+    std::vector<std::uint8_t> v;
+    v.reserve (d.size() + 8);
+    const std::uint8_t header[4] = { 3, 0, 0, 0 }, half[4] = { 0, 0x80, 0, 0 };
+    auto copy = [&] (std::size_t from, std::size_t n) { v.insert (v.end(), d.begin() + (std::ptrdiff_t) from, d.begin() + (std::ptrdiff_t) (from + n)); };
+    v.insert (v.end(), header, header + 4);
+    copy (4, 0x18);
+    v.insert (v.end(), half, half + 4);
+    copy (4 + 0x18, 0xd0 + 0x18);
+    v.insert (v.end(), half, half + 4);
+    copy (4 + 0x18 + 0xd0 + 0x18, last);
+    if (last == 0xe5)
+        v.push_back (0); // (the byte version 1 does not reach keeps the reset value)
+    copy (4 + read, d.size() - 4 - read);
+    return v;
+}
+
+std::vector<std::uint8_t> maximusStateAsV3 (const std::vector<std::uint8_t>& d)
+{
+    const auto header = d.size() >= 4 ? (std::uint32_t) i32At (d, 0) : 0u;
+    const auto version = header > 0xFFFFu ? (int) (header >> 16) : (int) header;
+    if (version < 1 || version >= 3)
+        return d;
+    auto v = maximusPreV3AsV3 (d, version);
+    return v.empty() ? d : v;
+}
+
+std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::uint8_t>& original, MaximusBuild build)
+{
+    std::vector<std::uint8_t> converted;
+    {
+        const auto header = original.size() >= 4 ? (std::uint32_t) i32At (original, 0) : 0u;
+        const auto version = header > 0xFFFFu ? (int) (header >> 16) : (int) header;
+        if (version >= 1 && version < 3 && (converted = maximusPreV3AsV3 (original, version)).empty())
+            return nullptr;
+    }
+    const auto& d = converted.empty() ? original : converted;
     const auto sgz = build == MaximusBuild::soundgoodizer;
     if (sgz && (std::uint32_t) i32At (d, 0) > 13)
         return nullptr; // that build's loader stops after the fixed block (no v14+ options)
@@ -411,7 +454,7 @@ std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::u
     const auto header = (std::uint32_t) i32At (d, 0);
     const auto version = header > 0xFFFFu ? (int) (header >> 16) : (int) header;
     if (version < 3)
-        return nullptr; // the pre-v3 piecewise layout is not used by any preset or demo state
+        return nullptr; // (versions 1…2 arrive converted above)
     // fixed block read raw into the object (FUN_0083ef50): 0x1FA bytes for v ≥ 7, 0x1F9 (v6), 0x1F5 (v5), 0x1F1 (v4),
     // 0x1EE (v3); the bytes the block does not reach keep the plugin's reset values (0)
     const std::size_t block = version >= 7 ? 0x1fa : version == 6 ? 0x1f9 : version == 5 ? 0x1f5 : version == 4 ? 0x1f1 : 0x1ee;

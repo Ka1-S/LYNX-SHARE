@@ -288,6 +288,17 @@ The step, measured in fader units: one click moves the value by 0.0056 of the tr
 unity). Held, the press repeats about every 64 ms (about 15.6 steps a second, with no first delay) and stops once the
 cap's centre is under the mouse.
 
+**Timing, measured 2026-11-07 13:13 (FL, inserts 1–8 at 0 dB, a press below the cap held for a set time, cap read from
+the pixels at about 1.07 px a step):** 50 ms → 1 step, 100 → 2, 130 → 2, 160 → 3, 200 → 3, 250 → 4, 300 → 5,
+400 → 7. FL repeats one period (about 64 ms) after the press, with no longer first delay. The 130 and 200 ms points are
+one step below `1 + t / 64`, within the pixel and sleep precision.
+
+**LYNX's extra steps (real window, 2026-11-07 10:39):** ten clicks gave -2.4 dB. Four more single clicks about 3 s apart
+went -2.6, -2.8, -3.1 and -3.4 dB, so some isolated 50 ms clicks took two steps. The release check is not the cause:
+JUCE reads the button through GetAsyncKeyState. The cause is a JUCE timer whose first callback can come before its
+period. 177a-10 counts the steps from the press time (`faderRailStepsForHold`), polling every 16 ms, so an early
+callback can't add a step. The earlier 300 ms first delay (177a-6, INFERRED) is replaced by FL's measured timing.
+
 LYNX (slice 177a-4) now does the same by default, as the coordinator decided: a stray click can't jump a mix.
 `faderRailStep = 0.0056` and `faderRailRepeatMs = 64` are in `Song.h`, and Ctrl+click still resets. The VCA faders
 behave the same. In the real LYNX window one click gave -0.2 dB, as FL. Ten quick clicks first gave -2.1 dB against
@@ -320,6 +331,15 @@ It reads:
    `c = a + ((b - a) * 16 * amount * 16) >> 16` on R, G and B, so it is a floor. FL also stores a darker shade
    (0x660a00 with -150) for the strip itself.
 
+**FL's dialog [SHOT 2026-11-07 13:16, pairs/fl-gradient-editor.png]:** with several tracks selected the menu title is
+"Mixer tracks (18 selected)" and "Gradient color..." is enabled. It opens a "Gradient editor" window:
+
+- On the left, "Gradient colors": a "First" swatch (ticked while it is the one being edited), a wide preview of the blend
+  and a "Last" swatch. Under them are three buttons: copy First into Last (→), swap (↔) and copy Last into First (←).
+- On the right, FL's full colour selector: a wheel and a palette view, presets 0–9, the named colour (e.g. "Granite Gray
+  #636C71"), Hue / Saturation / Luminance and Red / Green / Blue.
+- At the bottom, "Reset all" and "Accept". Escape doesn't close it; its X cancels.
+
 LYNX: `mixerops::gradientColourStep` and `mixerops::gradientColour` follow those steps exactly. The test checks the ends,
 amount 85 (0xaa / 0x54) and 128 (0x7f). The menu item waits for FL's dialog shot.
 
@@ -335,8 +355,13 @@ Both items are one handler, `AssignAudiotrackMenuClick` (0x12a2a90), split on th
   insert -1. Name and colour stay.
 - There is one undo step, and the Playlist refreshes.
 
-FL skips an insert when 0x12a7620 (t, true) >= 0 or 0x12a76e0 (t, false) is true. The first walks the channels routed
-to the insert and checks a channel kind. LYNX skips an insert that already has a linked audio track. Whether FL also
-skips an insert with an audio clip channel routed to it is still to be checked in FL's window.
+FL skips an insert in two cases:
+
+- 0x12a76e0 (t, false) is true when any Playlist track's insert field (+0xdc) is t, in any mode.
+- 0x12a7620 (t, true) >= 0 when a channel routed to t (+0x258) is on an instrument track (mode 3, via 0xffac90 /
+  0xffaee0) and is the only channel on that insert (0xffae00 with false). Channel types 1, 4 (audio clip) and 5 are
+  excluded by the mask 0b110010.
+
+LYNX's `assignNewAudioTracks` follows both (`hasPlaylistTrack`); the test is `mixer177a_d_...`.
 
 The menu items are enabled as in FL's shot: Assign when a selected insert has no audio track, Unassign when one has.

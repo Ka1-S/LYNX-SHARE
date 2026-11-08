@@ -6686,6 +6686,26 @@ TEST (translations_embedded_table_is_up_to_date)
     CHECK (files == (int) std::size (lynx::i18n::data::tables));
 }
 
+TEST (translations_no_value_is_a_python_dict)
+{
+    // a value written as a Python dict ("{'de': '...', 'es': ...}", 177a's menu slice) reaches the users verbatim:
+    // each table holds its own language's text only
+    using namespace i18ntest;
+    int bad = 0;
+    for (const auto& entry : std::filesystem::directory_iterator ("resources/i18n"))
+        if (entry.path().extension() == ".txt")
+        {
+            std::vector<std::string> unused;
+            for (const auto& [key, value] : parseTable (readFile (entry.path()), unused))
+                if (value.rfind ("{'", 0) == 0 || value.find ("': '") != std::string::npos)
+                {
+                    ++bad;
+                    std::printf ("  %s: \"%s\" holds a dict\n", entry.path().filename().string().c_str(), key.c_str());
+                }
+        }
+    CHECK (bad == 0);
+}
+
 TEST (translations_every_language_covers_the_reference_table)
 {
     // every key of pt-BR.txt (the reference table) exists, translated, in every other language; keys just added to
@@ -17054,6 +17074,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rec168kTests.inc"
 #include "Rec170dTests.inc"
 #include "Rec177dTests.inc"
+#include "Pain177dTests.inc"
+#include "Mixer177dTests.inc"
+#include "Edit177dTests.inc"
+#include "Patterns177dTests.inc"
 #include "Issue32Tests.inc"
 #include "WrapperMidi181cTests.inc"
 #include "Mono168lTests.inc"
@@ -17118,6 +17142,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
 #include "ClipLauncher181aTests.inc"
+#include "Merge180cTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlFades180dTests.inc"

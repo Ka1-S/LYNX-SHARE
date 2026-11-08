@@ -5,7 +5,6 @@
 #include "core/AlsExport.h"
 #include "engine/Mp3Format.h"
 #include "engine/SampleLibrary.h"
-#include "core/OggVorbis.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -82,16 +81,14 @@ void showAlsReport (const juce::File& target, const juce::String& text)
 
 namespace
 {
-// A sample Live cannot read as it is: FL's WavPack (.wv), Ogg Vorbis inside a WAV file (format tags 0x674F…0x6751), or any
-// other file type LYNX decodes that is not WAV, AIFF, FLAC, Ogg or MP3
+// A sample Live cannot read as it is (core alsSampleNeedsWav): FL's WavPack (.wv), Ogg Vorbis inside a WAV file, a raw
+// Ogg Vorbis stream named .wav (FL ships many), or any other file type LYNX decodes that Live doesn't
 bool needsWavForLive (const juce::File& file)
 {
-    if (! file.hasFileExtension ("wav;wave"))
-        return ! file.hasFileExtension ("aif;aiff;flac;ogg;mp3");
     juce::MemoryBlock head;
     if (juce::FileInputStream in (file); in.openedOk())
         in.readIntoMemoryBlock (head, 4096);
-    return oggvorbis::isOggWav (static_cast<const std::uint8_t*> (head.getData()), head.getSize());
+    return alsSampleNeedsWav (file.getFileExtension().toStdString(), static_cast<const std::uint8_t*> (head.getData()), head.getSize());
 }
 
 // Decodes `source` the way LYNX plays it and writes it as a 32-bit float WAV

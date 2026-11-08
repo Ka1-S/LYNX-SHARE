@@ -274,6 +274,7 @@ inline bool trefoilInside (float u, float v)
 inline const juce::Image& trefoilMask (int px)
 {
     static std::map<int, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     if (cache.size() > 24) cache.clear();
     auto& img = cache[px];
     if (img.isNull())

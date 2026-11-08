@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <iomanip>
 #include <locale>
@@ -16,6 +17,8 @@
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
+#include "core/OggVorbis.h"
+#include "core/TimeStretch.h"
 #include "core/XmlLite.h"
 
 // Evidence tags as in docs/analise/ALS_FORMAT.md. [LIVE] = checked by opening the result in Live 12.4.
@@ -522,16 +525,34 @@ struct Exporter
         const auto beatsPerSecond = (ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f && seconds > 0.0 ? (double) ch.sampler.stretchBeats / seconds
                                                                                                              : song.bpm / 60.0)
                                     * clip.stretch;
+        // the markers: the file's start and end, and in between the channel's warp markers when they bend the tempo
+        // (round 175a, M1), each at its content beat (the file spans stretchBeats · the clip's stretch)
+        std::vector<std::pair<double, double>> points { { 0.0, 0.0 }, { spanSeconds, spanSeconds * beatsPerSecond } };
+        if (ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f && seconds > 0.0
+            && ! warpStretchMap (ch.sampler.warp, seconds * 1000.0, 1000.0, (double) ch.sampler.stretchBeats * 1000.0).empty())
+        {
+            StretchMap beatsOf;
+            for (const auto& w : ch.sampler.warp)
+                if (beatsOf.empty() || (w.seconds > beatsOf.back().first + 1e-9 && w.beats > beatsOf.back().second + 1e-9))
+                    beatsOf.push_back ({ w.seconds, w.beats });
+            const auto b0 = stretchMapOutput (beatsOf, 0.0), b1 = stretchMapOutput (beatsOf, seconds);
+            const auto scale = (double) ch.sampler.stretchBeats * clip.stretch / (b1 - b0);
+            points = { { 0.0, 0.0 } };
+            for (const auto& [sec, beat] : beatsOf)
+                if (sec > 1e-6 && sec < seconds - 1e-6)
+                    points.push_back ({ sec, (beat - b0) * scale });
+            points.push_back ({ seconds, (b1 - b0) * scale });
+        }
         if (auto* markers = c.child ("WarpMarkers"))
         {
             markers->kids.clear();
-            for (int k = 0; k < 2; ++k)
+            for (std::size_t k = 0; k < points.size(); ++k)
             {
                 Node m;
                 m.name = "WarpMarker";
-                m.set ("Id", num (k));
-                m.set ("SecTime", num (k == 0 ? 0.0 : spanSeconds));
-                m.set ("BeatTime", num (k == 0 ? 0.0 : spanSeconds * beatsPerSecond));
+                m.set ("Id", num ((int) k));
+                m.set ("SecTime", num (points[k].first));
+                m.set ("BeatTime", num (points[k].second));
                 markers->add (std::move (m));
             }
         }
@@ -1041,5 +1062,25 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
     Exporter e { song, options, sk, result, false, {} };
     e.run();
     return result;
+}
+bool alsSampleNeedsWav (const std::string& extension, const std::uint8_t* head, std::size_t size)
+{
+    std::string ext;
+    for (const auto c : extension)
+        if (c != '.')
+            ext += (char) std::tolower ((unsigned char) c);
+    const auto starts = [&] (const char* magic, std::size_t at) {
+        const auto n = std::char_traits<char>::length (magic);
+        return size >= at + n && std::equal (magic, magic + n, head + at);
+    };
+    const auto ogg = starts ("OggS", 0);
+    const auto riffWave = (starts ("RIFF", 0) || starts ("RF64", 0)) && starts ("WAVE", 8);
+    if (ext == "wav" || ext == "wave")
+        return ! riffWave || oggvorbis::isOggWav (head, size); // raw Ogg, Ogg-in-WAV or anything else named .wav
+    if (ext == "ogg")
+        return ! ogg && riffWave; // a WAV file named .ogg
+    if (ext == "aif" || ext == "aiff" || ext == "flac" || ext == "mp3")
+        return ogg || riffWave; // the content is not what the name says
+    return true; // WavPack (.wv) and every other type LYNX decodes
 }
 } // namespace lynx

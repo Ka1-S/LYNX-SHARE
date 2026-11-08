@@ -1507,6 +1507,13 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("flStretchPitch", c.sampler.flStretchPitch);
         if (c.sampler.stretchPitch != 0.0f)
             sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
+        if (! c.sampler.warp.empty()) // warp markers (round 175a, M1): [seconds, beats] pairs
+        {
+            juce::Array<juce::var> warp;
+            for (const auto& w : c.sampler.warp)
+                warp.add (juce::Array<juce::var> { w.seconds, w.beats });
+            sampler->setProperty ("warp", warp);
+        }
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
         if (c.sampler.startOffset > 0.0f)
             sampler->setProperty ("startOffset", c.sampler.startOffset);
@@ -1835,6 +1842,11 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.flStretchMode = (int) s.getProperty ("flStretchMode", 0);
         def.sampler.flStretchPitch = (int) s.getProperty ("flStretchPitch", 0);
         def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
+        const auto warpVar = s.getProperty ("warp", {});
+        if (const auto* warp = warpVar.getArray())
+            for (const auto& w : *warp)
+                if (const auto* pair = w.getArray(); pair != nullptr && pair->size() >= 2)
+                    def.sampler.warp.push_back ({ (double) (*pair)[0], (double) (*pair)[1] });
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
@@ -1980,6 +1992,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     if (! (t.eq == TrackEq {})) // [gains dB, frequencies Hz, widths 0..1] of the 3 bands
         o->setProperty ("eq", juce::Array<juce::var> { t.eq.gainDb[0], t.eq.gainDb[1], t.eq.gainDb[2], t.eq.hz[0], t.eq.hz[1], t.eq.hz[2],
                                                        t.eq.width[0], t.eq.width[1], t.eq.width[2] });
+    if (t.eq.bypassed)
+        o->setProperty ("eqBypassed", true);
 
     if (! t.sends.empty())
     {
@@ -2054,6 +2068,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
             track.eq.hz[b] = juce::jlimit (10.0f, 16000.0f, (float) (double) eq[(int) b + 3]);
             track.eq.width[b] = juce::jlimit (0.0f, 1.0f, (float) (double) eq[(int) b + 6]);
         }
+    track.eq.bypassed = (bool) t.getProperty ("eqBypassed", false);
 
     if (auto* sends = t["sends"].getArray())
         for (const auto& send : *sends)
@@ -2073,11 +2088,13 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     return track;
 }
 
-juce::String toJson (const Song& song)
+juce::String toJson (const Song& song, bool stampVersion)
 {
     auto root = std::make_unique<juce::DynamicObject>();
     root->setProperty ("format", "lynx-project");
     root->setProperty ("version", currentVersion);
+    if (stampVersion)
+        root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
 
@@ -2594,7 +2611,7 @@ juce::String toJson (const Song& song)
     return juce::JSON::toString (juce::var (root.release()), false);
 }
 
-std::optional<Song> fromJson (const juce::String& json, juce::String& error)
+std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy)
 {
     juce::var root;
     const auto parsed = juce::JSON::parse (json, root);
@@ -2617,6 +2634,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         error = utf8 ("project saved by a newer version of LYNX SHARE");
         return std::nullopt;
     }
+    if (savedBy != nullptr)
+        *savedBy = root["savedBy"].toString();
 
     Song song;
     song.bpm = juce::jlimit (10.0, 999.0, (double) root.getProperty ("bpm", 130.0));
@@ -3154,7 +3173,7 @@ juce::File withProjectExtension (const juce::File& file)
     return file.getSiblingFile (juce::String::fromUTF8 (safety::withProjectExtension (file.getFileName().toStdString(), extension).c_str()));
 }
 
-std::optional<Song> load (const juce::File& file, juce::String& error)
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy)
 {
     if (! file.existsAsFile())
     {
@@ -3162,7 +3181,7 @@ std::optional<Song> load (const juce::File& file, juce::String& error)
         return std::nullopt;
     }
 
-    auto song = fromJson (file.loadFileAsString(), error);
+    auto song = fromJson (file.loadFileAsString(), error, savedBy);
 
     // samples saved relative to the project (a package) or moved along with it are found next to it (REA round 118)
     if (song)

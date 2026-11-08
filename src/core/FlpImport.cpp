@@ -260,7 +260,7 @@ std::optional<EffectKind> effectForFlPlugin (const std::string& name)
 }
 
 // FL's own spelling of a native effect's name (Patcher nodes keep old casings: "Fruity delay 2", REA_rodada14 §1.3)
-static std::string canonicalFlEffectName (const std::string& name)
+std::string canonicalFlEffectName (const std::string& name)
 {
     const auto wanted = lowercase (name);
     for (const auto& entry : flEffectTable)

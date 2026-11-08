@@ -192,7 +192,7 @@ void ValueDrag::begin (const juce::MouseEvent& e, double value)
 {
     startValue = value;
     anchorY = e.position.y;
-    fine = e.mods.isCtrlDown();
+    scale = controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown());
     active = true;
 }
 
@@ -207,16 +207,16 @@ void reportTweak (const ValueSpec& spec)
 double ValueDrag::update (const juce::MouseEvent& e, const ValueSpec& spec)
 {
     reportTweak (spec);
-    const auto nowFine = e.mods.isCtrlDown();
+    const auto nowScale = controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown());
 
-    if (nowFine != fine) // switching mid-drag: continue from where the value is now
+    if (nowScale != scale) // switching mid-drag: continue from where the value is now
     {
-        startValue = controls::dragValue (startValue, anchorY - e.position.y, spec.minimum, spec.maximum, spec.pixelsForRange, fine);
+        startValue = controls::dragValueScaled (startValue, anchorY - e.position.y, spec.minimum, spec.maximum, spec.pixelsForRange, scale);
         anchorY = e.position.y;
-        fine = nowFine;
+        scale = nowScale;
     }
 
-    const auto v = controls::dragValue (startValue, anchorY - e.position.y, spec.minimum, spec.maximum, spec.pixelsForRange, fine);
+    const auto v = controls::dragValueScaled (startValue, anchorY - e.position.y, spec.minimum, spec.maximum, spec.pixelsForRange, scale);
     return controls::snapToInterval (v, spec.minimum, spec.interval);
 }
 
@@ -237,6 +237,17 @@ controls::WheelScrollLatch& wheelLatch() noexcept
 void noteWheelScroll() noexcept { wheelLatch().scrolled (juce::Time::getMillisecondCounterHiRes()); }
 bool wheelScrolling() noexcept { return wheelLatch().scrolling (juce::Time::getMillisecondCounterHiRes()); }
 
+double wheelNotchSize() noexcept
+{
+   #if JUCE_WINDOWS
+    return 120.0 * 0.5 / 256.0;
+   #elif JUCE_LINUX || JUCE_BSD
+    return 50.0 / 256.0;
+   #else
+    return 0.12;
+   #endif
+}
+
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec)
 {
     const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
@@ -244,25 +255,18 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
     if (delta == 0.0f || wheelScrolling())
         return std::nullopt;
 
-   #if JUCE_WINDOWS
-    constexpr double notchSize = 120.0 * 0.5 / 256.0;
-   #elif JUCE_LINUX || JUCE_BSD
-    constexpr double notchSize = 50.0 / 256.0;
-   #else
-    constexpr double notchSize = 0.12;
-   #endif
-    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, notchSize);
+    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, wheelNotchSize());
     reportTweak (spec);
 
     if (spec.wheelPerNotch > 0.0)
     {
-        const auto step = juce::jmax (spec.wheelPerNotch * (e.mods.isCtrlDown() ? controls::fineFactor : 1.0), spec.interval);
+        const auto step = juce::jmax (spec.wheelPerNotch * controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown()), spec.interval);
         // one step per wheel notch (round 168s: `notches` now counts a click as one notch on every platform; a fast
         // spin that the system sends as one event of several notches moves that many steps)
         return juce::jlimit (spec.minimum, spec.maximum, value + notches * step);
     }
 
-    return controls::wheelValue (value, notches, spec.minimum, spec.maximum, e.mods.isCtrlDown(), spec.interval);
+    return controls::wheelValueScaled (value, notches, spec.minimum, spec.maximum, controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown()), spec.interval);
 }
 
 // --- menu --------------------------------------------------------------------------------------
@@ -567,10 +571,11 @@ bool wantsValueTip (juce::Slider& s)
     return s.getTextBoxPosition() == juce::Slider::NoTextBox;
 }
 
-void setFine (juce::Slider& s, bool fine)
+// `scale` = controls::fineScale: 1 plain, fineFactor with Ctrl, ultraFineFactor with Ctrl+Shift
+void setFine (juce::Slider& s, double scale)
 {
     const auto base = (int) s.getProperties().getWithDefault (sensitivityProperty, 250);
-    const auto wanted = fine ? (int) (base / controls::fineFactor) : base;
+    const auto wanted = scale < 1.0 ? (int) (base / scale) : base;
 
     if (s.getMouseDragSensitivity() != wanted)
         s.setMouseDragSensitivity (wanted);
@@ -592,7 +597,7 @@ struct SliderContract final : juce::MouseListener
             return;
 
         configure (*s);
-        setFine (*s, e.mods.isCtrlDown());
+        setFine (*s, controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown()));
         juce::Component::SafePointer<juce::Slider> safe (s);
         auto set = [safe] (double v) {
             if (safe != nullptr)
@@ -612,7 +617,7 @@ struct SliderContract final : juce::MouseListener
     {
         if (auto* s = sliderOf (e.eventComponent); takesContract (s))
         {
-            setFine (*s, e.mods.isCtrlDown());
+            setFine (*s, controls::fineScale (e.mods.isCtrlDown(), e.mods.isShiftDown()));
             if (wantsValueTip (*s) && ! e.mods.isPopupMenu())
                 showValueTip (*s, s->getLocalBounds(), s->getTextFromValue (s->getValue()));
         }
@@ -622,7 +627,7 @@ struct SliderContract final : juce::MouseListener
     {
         if (auto* s = sliderOf (e.eventComponent); takesContract (s))
         {
-            setFine (*s, false);
+            setFine (*s, 1.0);
             if (wantsValueTip (*s))
                 hideValueTip();
         }
