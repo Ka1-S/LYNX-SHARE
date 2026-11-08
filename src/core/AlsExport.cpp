@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <iomanip>
 #include <locale>
@@ -16,6 +17,7 @@
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
+#include "core/OggVorbis.h"
 #include "core/TimeStretch.h"
 #include "core/XmlLite.h"
 
@@ -1060,5 +1062,25 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
     Exporter e { song, options, sk, result, false, {} };
     e.run();
     return result;
+}
+bool alsSampleNeedsWav (const std::string& extension, const std::uint8_t* head, std::size_t size)
+{
+    std::string ext;
+    for (const auto c : extension)
+        if (c != '.')
+            ext += (char) std::tolower ((unsigned char) c);
+    const auto starts = [&] (const char* magic, std::size_t at) {
+        const auto n = std::char_traits<char>::length (magic);
+        return size >= at + n && std::equal (magic, magic + n, head + at);
+    };
+    const auto ogg = starts ("OggS", 0);
+    const auto riffWave = (starts ("RIFF", 0) || starts ("RF64", 0)) && starts ("WAVE", 8);
+    if (ext == "wav" || ext == "wave")
+        return ! riffWave || oggvorbis::isOggWav (head, size); // raw Ogg, Ogg-in-WAV or anything else named .wav
+    if (ext == "ogg")
+        return ! ogg && riffWave; // a WAV file named .ogg
+    if (ext == "aif" || ext == "aiff" || ext == "flac" || ext == "mp3")
+        return ogg || riffWave; // the content is not what the name says
+    return true; // WavPack (.wv) and every other type LYNX decodes
 }
 } // namespace lynx

@@ -23,6 +23,19 @@ namespace
 // ---- small helpers ----
 int iround (double v) noexcept { return (int) std::lround (v); }
 
+// FL's time-stretching mode. Each one is a different algorithm in FL (Thief with −2 instead of its −1 renders at xcorr
+// 0.869 against FL's own, round 180d), so an imported channel goes back with its own mode, as long as that still is the
+// method it plays; otherwise FL's Stretch for General. Every mode but Resample (0) keeps the length, also without a TIME.
+int flStretchMode (const SamplerSettings& s) noexcept
+{
+    if (! s.keepPitch)
+        return 0;
+    if (s.flStretchMode != 0 && stretchMethodForFlMode (s.flStretchMode) == s.stretchMethod)
+        return s.flStretchMode;
+    const auto m = s.stretchMethod;
+    return m == StretchMethod::mono || m == StretchMethod::tones ? 2 : m == StretchMethod::transients || m == StretchMethod::beats ? 7 : -1;
+}
+
 std::uint32_t rgb (std::uint32_t argb) noexcept { return argb & 0xFFFFFFu; }
 
 struct Hash
@@ -777,6 +790,9 @@ struct Converter
         c.name = def.name;
         c.colour = def.colour != 0 ? rgb (def.colour) : 0;
         c.icon = def.icon;
+        // FL keeps a Smart disabled generator from running through silence, so it changes the phase of what it plays
+        // (Thief without FL's own flags: xcorr 0.891, same spectrum; round 180d)
+        c.wrapperFlags = def.flWrapperFlags;
         c.enabled = ! def.muted;
         c.soloLock = def.soloLock;
         c.ghostShown = ! def.ghostHidden;
@@ -800,7 +816,10 @@ struct Converter
         c.volume = std::clamp (iround (volume * 12800.0), 0, 12800);
         c.pan = std::clamp (iround (6400.0 + def.pan * 6400.0), 0, 12800);
         const auto root = std::clamp (def.misc.rootNote, 0, 127);
-        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0);
+        // FL's stretch PITCH knob and the header pitch add up, but do not sound the same in FL's stretcher (Thief with all
+        // of it in the header: xcorr 0.934 against FL's own, round 180d), so what came from the knob goes back to the knob
+        c.stretchPitch = def.sampler.keepPitch ? def.sampler.flStretchPitch : 0;
+        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0) - c.stretchPitch;
         c.pitchCents = cents;
         c.rootNote = root;
         c.fineTune = iround (def.misc.fineTune);
@@ -983,8 +1002,8 @@ struct Converter
         {
             c.stretchTime = s.stretchBeats * 192.0f;
             c.stretchMul = 0;
-            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono || s.stretchMethod == StretchMethod::tones ? 2 : s.stretchMethod == StretchMethod::transients || s.stretchMethod == StretchMethod::beats ? 7 : -2;
         }
+        c.stretchMode = flStretchMode (s);
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)
             c.cutGroup = c.cutBy = freeCutGroup++; // "cut itself"
     }
@@ -1307,6 +1326,15 @@ struct Converter
                 item.endOffset = (float) ((offset + (double) clip.length / stretch) * msPerTick * factor);
                 item.fadeInMs = (float) ((double) clip.fadeIn * msPerTick);
                 item.fadeOutMs = (float) ((double) clip.fadeOut * msPerTick);
+                item.fadeInTension = clip.fadeIn > 0 ? clip.fadeInTension : 0.0f;
+                item.fadeOutTension = clip.fadeOut > 0 ? clip.fadeOutTension : 0.0f;
+                {
+                    // the shapes follow the clip, the rest of FL's bits stay as they came
+                    const auto shape = [&clip] (int side, std::uint32_t raw) -> std::uint32_t
+                    { return (clip.linearFades & (1 << side)) != 0 ? 1u : raw == 1u ? 0u : raw; };
+                    item.fadeFlags = (clip.flFadeFlags & ~((3u << 8) | (3u << 12)))
+                                     | (shape (0, (clip.flFadeFlags >> 8) & 3) << 8) | (shape (1, (clip.flFadeFlags >> 12) & 3) << 12);
+                }
                 item.gain = clip.gain;
                 item.pitch = clip.pitch;
                 item.reversed = clip.reversed;
@@ -1410,7 +1438,8 @@ struct Converter
             for (int b = 0; b < 3; ++b)
             {
                 const auto& eq = track.eq;
-                control (0, flp::ControlId::mixerEqBase + b, std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
+                // (a bypassed EQ, LYNX's own: FL has no bypass, so it goes flat — what is heard stays the same)
+                control (0, flp::ControlId::mixerEqBase + b, eq.bypassed ? 0 : std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
                 const auto hz = std::clamp ((double) eq.hz[(std::size_t) b], 10.0, 16000.0);
                 control (0, flp::ControlId::mixerEqBase + 8 + b, std::clamp (iround (65536.0 * std::log ((hz - 10.0) / 159.9 + 1.0) / std::log (101.0)), 0, 65536));
                 control (0, flp::ControlId::mixerEqBase + 16 + b, std::clamp (iround (eq.width[(std::size_t) b] * 65536.0), 0, 65536));

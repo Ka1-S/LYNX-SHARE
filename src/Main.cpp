@@ -2319,6 +2319,48 @@ private:
                         && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
         }
 
+        // round 180d: clip fades take FL's S curve; a project saved before that keeps its straight fades, also after another
+        // save, and a clip made in it takes the S curve. FL's fade tensions and stretch mode and PITCH survive a save.
+        bool clipFades180dOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::Clip faded;
+            faded.kind = lynx::ClipKind::audio;
+            faded.channel = 0;
+            faded.length = lynx::ppq * 8;
+            faded.fadeIn = lynx::ppq;
+            faded.fadeOutTension = -812.933f;
+            faded.fadeOut = lynx::ppq * 2;
+            lynx::Clip plainClip = faded;
+            plainClip.fadeIn = plainClip.fadeOut = 0;
+            plainClip.fadeOutTension = 0.0f;
+            plainClip.start = lynx::ppq * 16;
+            song.playlist = { faded, plainClip };
+            song.channels[0].sampler.flStretchMode = 5;
+            song.channels[0].sampler.flStretchPitch = 247;
+
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto current = lynx::ProjectFile::fromJson (json, error);
+            const auto oldJson = json.replace ("\"clipFadesPerClip\"", "\"clipFadesOther\"");
+            auto old = lynx::ProjectFile::fromJson (oldJson, error);
+            auto resaved = old;
+            if (resaved)
+            {
+                auto added = faded;
+                added.start = lynx::ppq * 32;
+                added.linearFades = 0;
+                resaved->playlist.push_back (added);
+                resaved = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (*resaved), error);
+            }
+            clipFades180dOk = current && old && resaved && json.contains ("clipFadesPerClip") && ! oldJson.contains ("clipFadesPerClip")
+                              && current->playlist.size() == 2 && ! current->playlist[0].linearFades
+                              && current->playlist[0].fadeOutTension == -812.933f && ! current->playlist[1].linearFades
+                              && current->channels[0].sampler.flStretchMode == 5 && current->channels[0].sampler.flStretchPitch == 247
+                              && old->playlist.size() == 2 && old->playlist[0].linearFades && ! old->playlist[1].linearFades
+                              && resaved->playlist.size() == 3 && resaved->playlist[0].linearFades && ! resaved->playlist[1].linearFades
+                              && ! resaved->playlist[2].linearFades && resaved->playlist[0].fadeOutTension == -812.933f;
+        }
+
         // FL's legacy Pattern Blocks (round 170f): the option and every arrangement's blocks are saved; a project without
         // them has neither in its file and loads with the option off
         bool blocksOk = false;
@@ -3060,7 +3102,7 @@ private:
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK";
@@ -3072,6 +3114,7 @@ private:
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
+               << "clip_fades_180d=" << (clipFades180dOk ? "OK" : "ERROR") << "\n"
                << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
@@ -5465,6 +5508,88 @@ private:
 
     // --rtstress: opens the project in the normal window with the saved audio device, plays it from the start for
     // `seconds` and writes the real-time statistics (deadline misses, late device calls, load histogram, heaviest units)
+    // --rtstress --backuptest N (round 177d): while the project plays, a device's MIDI clock (10/s) and active sensing
+    // (3/s) arrive, and the project counts as changed. N > 0 also forces a backup every N seconds on top of the timed ones.
+    // The report tells how many backups were written, when, and what the MIDI counters did.
+    struct BackupTest final : juce::Timer
+    {
+        lynx::AudioEngine* engine = nullptr;
+        lynx::MainComponent* ui = nullptr;
+        double everyMs = 0.0, startMs = 0.0, lastForcedMs = 0.0, longestCallMs = 0.0;
+        int ticks = 0, forced = 0;
+        std::uint64_t seenOver = 0, seenNear = 0;
+        juce::String misses; // each callback over (or near) its deadline: how long after the last forced backup
+
+        void timerCallback() override
+        {
+            engine->injectMidiInput (juce::MidiMessage (0xf8));
+            if (++ticks % 3 == 0)
+                engine->injectMidiInput (juce::MidiMessage (0xfe));
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto s = engine->getRtStats().snapshot();
+            if (s.overBudget != seenOver || s.nearBudget != seenNear)
+            {
+                misses << "    +" << juce::String ((now - lastForcedMs) / 1000.0, 1) << " s after the last forced backup (or the start): over +"
+                       << (juce::int64) (s.overBudget - seenOver) << ", near +" << (juce::int64) (s.nearBudget - seenNear) << "\n";
+                seenOver = s.overBudget;
+                seenNear = s.nearBudget;
+            }
+            if (everyMs > 0.0 && now - lastForcedMs >= everyMs)
+            {
+                lastForcedMs = now;
+                ++forced;
+                ui->backupNowForTest();
+                longestCallMs = juce::jmax (longestCallMs, juce::Time::getMillisecondCounterHiRes() - now);
+            }
+        }
+    };
+    std::unique_ptr<BackupTest> backupTest;
+
+    void startBackupTest()
+    {
+        const auto& cli = juce::JUCEApplication::getCommandLineParameterArray();
+        const auto at = cli.indexOf ("--backuptest");
+        auto* ui = mainWindow != nullptr ? dynamic_cast<lynx::MainComponent*> (mainWindow->getContentComponent()) : nullptr;
+        if (at < 0 || ui == nullptr)
+            return;
+        backupTest = std::make_unique<BackupTest>();
+        backupTest->engine = engine.get();
+        backupTest->ui = ui;
+        backupTest->everyMs = cli[at + 1].getDoubleValue() * 1000.0;
+        backupTest->startMs = backupTest->lastForcedMs = juce::Time::getMillisecondCounterHiRes();
+        // (the project counts as changed, so a backup has something to write; the Master's fader is down, so a long run
+        // makes no sound: everything else is processed as usual)
+        engine->editSong ([] (lynx::Song& s) {
+            if (! s.mixer.empty())
+                s.mixer[0].volume = 0.0f;
+        });
+        backupTest->startTimer (100);
+    }
+
+    juce::String finishBackupTest()
+    {
+        if (backupTest == nullptr)
+            return {};
+        backupTest->stopTimer();
+        juce::String text;
+        const auto played = engine->getMidiPlayed();
+        text << "  backup test: MIDI light count " << (int) engine->getMidiActivity() << ", played count " << (int) played << " (clock and active sensing only)\n";
+        text << "  backup test: " << backupTest->forced << " forced, longest forced call on the message thread "
+             << juce::String (backupTest->longestCallMs, 1) << " ms\n";
+        if (backupTest->misses.isNotEmpty())
+            text << "  backup test: callbacks over or near the deadline (seen within 100 ms):\n" << backupTest->misses;
+        auto files = lynx::autosaveFolder().findChildFiles (juce::File::findFiles, false, "*.lynx");
+        text << "  backup test: " << files.size() << " file(s) in the backup folder:\n";
+        for (const auto& f : files)
+            text << "    " << juce::String ((f.getLastModificationTime().toMilliseconds() - juce::Time::getCurrentTime().toMilliseconds()) / 1000) << " s before the end: "
+                 << f.getFileName() << " (" << f.getSize() << " bytes)\n";
+        engine->injectMidiInput (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 1));
+        engine->injectMidiInput (juce::MidiMessage::noteOff (1, 60));
+        text << "  backup test: after a played note, played count " << (int) engine->getMidiPlayed() << "\n";
+        backupTest.reset();
+        return text;
+    }
+
     void runRealtimeStress (const juce::File& project, const juce::File& report, double seconds, int bufferSize,
                             const juce::String& deviceType, const juce::String& deviceName, const juce::String& recordTo = {})
     {
@@ -5534,9 +5659,11 @@ private:
                 engine->getAudioLogger().start (juce::File (cli[at + 1].unquoted()), engine->getDeviceManager().getCurrentAudioDevice() != nullptr
                                                                                      ? engine->getDeviceManager().getCurrentAudioDevice()->getCurrentSampleRate() : 44100.0);
             engine->play();
+            startBackupTest();
             juce::Timer::callAfterDelay ((int) (seconds * 1000.0), [this, project, report, seconds, loadMs, recordTo] {
                 if (engine == nullptr)
                     return;
+                const auto backupReport = finishBackupTest();
                 engine->stop();
                 juce::String recording;
                 if (engine->getAudioLogger().isLogging())
@@ -5563,7 +5690,7 @@ private:
                     if (s.histogram[b] > 0)
                         text << " " << (int) (b * 10) << (b + 1 == s.histogram.size() ? juce::String ("+") : "-" + juce::String ((int) (b * 10 + 10))) << "%:" << (juce::int64) s.histogram[b];
                 text << "\n";
-                text << recording;
+                text << recording << backupReport;
                 // --settingsshot file.png (round 161): Options > Audio settings of this run's device, as a picture
                 if (const auto at = cli.indexOf ("--settingsshot"); at >= 0 && at + 1 < cli.size())
                 {
