@@ -7847,3 +7847,7 @@ countries: it ch sm
 "There are no audio clip channels selected." = "Nessun canale di clip audio selezionato."
 "Change declicking mode?" = "Cambiare la modalità di declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Cambiare la modalità di declicking di tutti i canali di clip audio selezionati?"
+
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Flusso semplice"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Flusso semplice: una sola finestra con le tracce e la timeline; le altre finestre restano a un clic."

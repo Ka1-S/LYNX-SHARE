@@ -7847,3 +7847,7 @@ countries: jp
 "There are no audio clip channels selected." = "オーディオクリップチャンネルが選択されていません。"
 "Change declicking mode?" = "デクリックモードを変更しますか?"
 "Change the declicking mode of all selected audio clip channels?" = "選択したすべてのオーディオクリップチャンネルのデクリックモードを変更しますか?"
+
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "シンプルワークフロー"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "シンプルワークフロー: トラックとタイムラインを1つのウィンドウに表示します。ほかのウィンドウはワンクリックで開けます。"

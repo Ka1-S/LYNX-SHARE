@@ -7847,3 +7847,7 @@ countries: tw hk mo
 "There are no audio clip channels selected." = "未選取音訊片段通道。"
 "Change declicking mode?" = "變更去喀嗒模式?"
 "Change the declicking mode of all selected audio clip channels?" = "變更所有所選音訊片段通道的去喀嗒模式?"
+
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "簡易工作流程"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "簡易工作流程：音軌和時間軸在同一個視窗中；其他視窗一鍵即可開啟。"
