@@ -89,6 +89,8 @@ private:
     // ---- processor -> host
     void audioProcessorParameterChanged (juce::AudioProcessor*, int index, float) override
     {
+        if (loadingState)
+            return;
         if (index >= 0 && index < parameters.size())
             pending[(std::size_t) index].store (true, std::memory_order_release);
         if (hostParams != nullptr && hostParams->request_flush != nullptr)
@@ -318,7 +320,12 @@ private:
                     all.write (chunk, (std::size_t) n);
                 }
                 auto* s = self (p);
-                if (! loadState (*s->processor, all.getData(), (int) all.getDataSize()))
+                // (a loaded state is not an edit: no parameter events and no "project modified" for the host, which
+                // reads the new values through the rescan below; FL Studio asked to save a project it had only opened)
+                s->loadingState = true;
+                const auto loaded = loadState (*s->processor, all.getData(), (int) all.getDataSize());
+                s->loadingState = false;
+                if (! loaded)
                     return false;
                 if (s->hostParams != nullptr) // (CLAP: the values changed, the host must read them again)
                     s->hostParams->rescan (s->host, CLAP_PARAM_RESCAN_VALUES);
@@ -417,6 +424,7 @@ private:
     const clap_host_params_t* hostParams = nullptr;
     const clap_host_latency_t* hostLatency = nullptr;
     const clap_host_state_t* hostState = nullptr;
+    bool loadingState = false; // (main thread: state load in progress)
     const clap_host_timer_support_t* hostTimer = nullptr;
     clap_id timerId = CLAP_INVALID_ID;
     juce::MidiBuffer midi;

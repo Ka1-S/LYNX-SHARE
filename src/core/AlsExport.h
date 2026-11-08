@@ -51,4 +51,11 @@ struct AlsExportResult
 };
 
 AlsExportResult exportAls (const Song& song, const AlsExportOptions& options = {});
+
+// True when Live can't read a sample file as it is and it has to be written as a plain WAV first (round 182b). Live picks
+// the decoder by the file's extension and reads WAV (PCM / float), AIFF, FLAC, Ogg and MP3 only. FL ships Ogg Vorbis
+// inside RIFF/WAVE (format tags 0x674F…0x6751) and also raw Ogg Vorbis streams ("OggS") named .wav: Live 12.4 reports
+// "This file does not appear to be a valid WAV file" for both, and crashed loading a set full of them. `extension` is
+// the file's extension without the dot (any case); `head` is the start of the file (4 KB is plenty).
+bool alsSampleNeedsWav (const std::string& extension, const std::uint8_t* head, std::size_t size);
 } // namespace lynx

@@ -512,6 +512,23 @@ TEST (macros181b_prepare_for_midi_export_follows_fl)
     kept.channels.resize (3);
     kept.channels[1].instrument = lynx::InstrumentKind::layer;
     lynx::prepareForMidiExport (kept);
-    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::layer);
-    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 1);
+    // as FL 2026 does (seen at runtime): a Layer becomes a MIDI Out too, and takes its turn
+    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::midiOut);
+    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 2);
+}
+
+TEST (macros181b_switch_audio_clips_sets_the_mode_of_clips_only)
+{
+    lynx::Song song;
+    song.channels.resize (3);
+    song.channels[0].instrument = lynx::InstrumentKind::audioClip;
+    song.channels[2].instrument = lynx::InstrumentKind::audioClip;
+    CHECK (lynx::setStretchOfAudioClips (song, { 0, 1, 2 }, true, lynx::StretchMethod::tones) == 2);
+    CHECK (song.channels[0].sampler.keepPitch && song.channels[0].sampler.stretchMethod == lynx::StretchMethod::tones);
+    CHECK (! song.channels[1].sampler.keepPitch);
+    // Resample: the stretch engine goes off, the method stays for when it comes back on
+    CHECK (lynx::setStretchOfAudioClips (song, { 2 }, false, lynx::StretchMethod::general) == 1);
+    CHECK (! song.channels[2].sampler.keepPitch && song.channels[2].sampler.stretchMethod == lynx::StretchMethod::tones);
+    CHECK (song.channels[0].sampler.keepPitch);
+    CHECK (lynx::setStretchOfAudioClips (song, { 1 }, true, lynx::StretchMethod::beats) == 0);
 }

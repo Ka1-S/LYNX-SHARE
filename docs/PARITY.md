@@ -2039,6 +2039,20 @@ voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8,
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
 
+## Round 180c: Merge similar pattern clips, Merge automation clips (issue #74)
+
+FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.
+
+## Host workflow: LYNX extras over FL (round 177d)
+
+These are things LYNX's host does that FL Studio does not. None of them changes an FL gesture or default. They come from the FL pain-point list the user approved (docs/analise/REA_rodada177d.md, which also has the FL checks).
+
+| Item | FL | LYNX |
+|---|---|---|
+| Ultra-fine knob and slider drag (pain point 20) | Ctrl = fine. Ctrl+Shift is the same as Ctrl (checked in FL 2026) | Ctrl = fine (FL). Ctrl+Shift = 100× finer, for drags and the wheel |
+| Insert EQ bypass (pain point 6a) | No bypass, and no menu on the EQ title | Right-click the EQ title › "Bypass the EQ (its settings are kept)". A bypassed EQ costs nothing, and FLP export writes the bands flat |
+| Gain-reduction bar on the mixer strip (pain point 6b) | None (each plugin shows its own) | A 3 px bar, only on strips that have a LYNX dynamics effect |
+| Picker panel › "Delete unused patterns", "Merge identical patterns" (pain point 31a) | Not available (FL has "Select unused" and "Sort", and LYNX has those too) | After a separator, below FL's Tools items |
 
 ## Audio logger and Chord detection panel (round 181b)
 
@@ -2055,7 +2069,10 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Chord style (Roman) | a working item | ➕ | LYNX addition: FL hides the item and its flag does nothing in the detector |
 | Near the hint bar | same menu item, outlined text under the hint bar | ✅ | seen in FL at runtime; the 15 s cap comes from the decompile |
 | Tools › Macros › Change declicking for selected channels to | same six modes, same messages | ✅ | LYNX can undo it, so no "(no undo)" |
-| Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ⚠️ | FL's skip flag is unknown; LYNX keeps Controller / Layer / Dashboard / Voltage channels |
+| Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ✅ | FL skips only automation clip channels (seen at runtime); LYNX's automation clips aren't channels |
 | Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
 | Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
 | Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
+| Tools › Macros › Switch all / selected audio clip channels to | same items, place and texts, with LYNX's modes (Resample, stretch engine, Ableton-style warp) | ⚠️ | user's decision: no élastique / slice modes; no tempo detection for channels without a stretch length |
+| Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
+| Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |

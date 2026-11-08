@@ -51,6 +51,8 @@ add_library(lynx_core STATIC
     src/core/XmlLite.cpp
     src/core/Gzip.cpp
     src/core/AlsImport.cpp
+    src/core/FlmFormat.cpp
+    src/core/FlmImport.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
@@ -101,6 +103,7 @@ add_library(lynx_core STATIC
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
     src/core/WaveTraveller.cpp
+    src/core/FruitySlicer.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -448,6 +451,7 @@ if(LYNX_BUILD_APP)
         src/ui/VideoTracks.cpp
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
+        src/ui/FruitySlicerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp
@@ -485,6 +489,7 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
+        src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp

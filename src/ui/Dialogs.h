@@ -32,6 +32,12 @@ std::unique_ptr<juce::AlertWindow> makeMidiImportDialog();
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone);
 
+// FL's "Gradient editor" (mixer "Gradient color...", REA_rodada177a §5): First and Last swatches with the blend over
+// `count` tracks, copy / swap buttons and LYNX's colour picker for the swatch being edited. Accept gives the two colours;
+// Cancel or Escape drops them.
+void showGradientColourDialog (juce::Colour first, juce::Colour last, int count, std::function<void (juce::Colour, juce::Colour)> onAccept);
+std::unique_ptr<juce::AlertWindow> makeGradientColourDialog (juce::Colour first, juce::Colour last, int count);
+
 // The record button's question (FL's "Recording - What would you like to record?", REA_rodada88): audio into
 // the Playlist, notes, everything, or audio into the audio editor. `onChoice(choice, dontAskAgain)`: 1 = audio,
 // 2 = notes, 3 = everything, 4 = audio editor.

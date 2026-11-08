@@ -104,8 +104,8 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &animationLabel, &animationBox, &animationNote, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &editInLabel, &editInBox, &undoLabel,
-                                                                 &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &unusedTakes,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
@@ -228,6 +228,8 @@ public:
                 [this] (bool on) { options.selectFirstChannelWithNotes = on; });
         toggle (rememberSeek, tr ("Remember seek time: Stop goes back to the position clicked on the Playlist ruler"), options.rememberSeek,
                 [this] (bool on) { options.rememberSeek = on; });
+        toggle (hoverValues, tr ("Show a control's value next to the mouse when hovering over it (LYNX)"), options.hoverValues,
+                [this] (bool on) { options.hoverValues = on; });
         // LYNX extra (issue #25): FL plays a stretched pattern clip once; off = FL's behaviour
         toggle (clipsLoop, tr ("Stretched pattern clips loop their pattern (LYNX)"), options.stretchedClipsLoop,
                 [this] (bool on) { options.stretchedClipsLoop = on; });
@@ -271,6 +273,17 @@ public:
             autosaveFolder().startAsProcess();
         };
 
+        toggle (backupQuiet, tr ("Wait with backups while the song plays or a MIDI keyboard is being played"), options.backupWaitsForQuiet,
+                [this] (bool on) {
+                    options.backupWaitsForQuiet = on;
+                    longestWaitBox.setEnabled (on);
+                });
+        styleLabel (longestWaitLabel, tr ("Longest wait between backups") /* (fits the label column, as the other rows) */);
+        for (const auto minutes : prefs::backupLongestWaitChoices)
+            longestWaitBox.addItem (tr ("{0} minutes", { juce::String (minutes) }), minutes);
+        selectNearest (longestWaitBox, options.backupLongestWaitMinutes);
+        longestWaitBox.setEnabled (options.backupWaitsForQuiet);
+        longestWaitBox.onChange = [this] { change ([&] { options.backupLongestWaitMinutes = longestWaitBox.getSelectedId(); }); };
         toggle (unusedTakes, tr ("When a project closes, offer to delete the recordings it no longer uses"), options.askUnusedRecordings,
                 [this] (bool on) { options.askUnusedRecordings = on; });
 
@@ -308,7 +321,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &languageBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &longestWaitBox, &languageBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -351,7 +364,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel })
+        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -365,6 +378,8 @@ private:
             openBackups.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), 170)));
         }
         keepBox.setBounds (r.row (keepLabel, 120));
+        backupQuiet.setBounds (r.full (24));
+        longestWaitBox.setBounds (r.row (longestWaitLabel, 120));
         unusedTakes.setBounds (r.full (24));
 
         r.section (pluginsTitle);
@@ -449,10 +464,10 @@ private:
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
-    juce::Label animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::HyperlinkButton translationLink;
-    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, alternateUndo, sandbox, substitutes, unusedTakes, checkUpdates;
+    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };

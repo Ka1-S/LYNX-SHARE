@@ -111,6 +111,9 @@ public:
     // Sidechain input for the next process(): another track's output, or nullptr if that track is
     // silent. Only called when the slot has a sidechain.
     virtual void setSidechain (const float* /*left*/, const float* /*right*/) noexcept {}
+    // Whether the slot has a sidechain source, after every rack build (UI thread, never the audio thread): a hosted
+    // plugin turns its side input bus on only then (issue #109).
+    virtual void setSideInputActive (bool /*on*/) {}
     // Second side input (Vocodex carrier), same rules; only called when the slot has `sidechain2`.
     virtual void setSidechain2 (const float* /*left*/, const float* /*right*/) noexcept {}
     // The notes held on every Channel Rack channel (`count` masks, by channel index) during the next process(); the

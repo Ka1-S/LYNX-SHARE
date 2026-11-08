@@ -173,7 +173,7 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 |---|---|
 | MidiTrack + instrument | channel (instrument) + mixer insert + Playlist track |
 | MidiClip (arrangement) | its own pattern (the clip's notes) + pattern clip; looped clip = clip longer than the pattern (stretched clips loop) |
-| AudioTrack + AudioClip | audioClip channel per sample + audio clip; `PitchCoarse/Fine` → clip pitch; `SampleVolume` → clip gain; warp → clip `stretch` (constant rate between first and last marker; multi-segment warp = slice N4) |
+| AudioTrack + AudioClip | audioClip channel per sample + audio clip; `PitchCoarse/Fine` → clip pitch; `SampleVolume` → clip gain; warp → clip `stretch` (one rate between first and last marker), or, when the clip is stretched offline (keeps its pitch, file length known), the channel stretches the file to its content beats; markers that bend the tempo stay as the channel's warp markers and each segment is stretched at its own rate in one pass (round 175a, M1; export writes them back) |
 | GroupTrack | mixer insert. Children route to it (`toMaster` off + send) and their Playlist tracks are grouped under a header track |
 | ReturnTrack + sends | mixer insert + `MixerSend` from every track with level > −70 dB |
 | Mixer Volume/Pan/Speaker/Solo | insert volume/pan/mute/solo |
@@ -210,7 +210,7 @@ The reference renders are in `warp-refs/`: one vocal, 6 warp modes, played at 0.
   - The N4 own-DSP modes target these numbers.
 
 ## 11. Export (slice N2, 2026-11-06)
-File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`.
+File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`. The other way, `LYNX.exe --export-flp <set.als> <out.flp|zip>` opens a Live set and writes it as an FL Studio project (round 182b). `--export <set.als> <out.wav>` and `--stems <set.als> <base.wav>` render a set the same way.
 
 **Skeletons.** Each element starts from its kind's skeleton in `src/core/AlsSkeleton.h`, which `tools/als_skeleton.py` generates from sets saved by Live (kept local, never committed):
 - **Live 12:** the 12.4 shipped sets, plus two probe sets saved on this machine.

@@ -25,6 +25,7 @@
 
 #include "core/FlpImport.h"
 #include "core/AlsImport.h"
+#include "core/FlmImport.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -226,8 +227,9 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
     : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+      plugins (userPluginList),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -2052,6 +2054,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
 
     midiActivity.fetch_add (1, std::memory_order_relaxed); // the toolbar's MIDI input light
+    if (m.getRawDataSize() > 0 && prefs::midiMeansPlaying (m.getRawData()[0]))
+        midiPlayed.fetch_add (1, std::memory_order_relaxed); // what holds a backup back (not clock or active sensing)
 
     // FL's "Song marker jump (MIDI channel)": notes on that channel move the song to a marker instead of playing
     if (jumpChannel > 0 && m.getChannel() == jumpChannel && m.isNoteOnOrOff())
@@ -2542,6 +2546,15 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     publishSong();
 }
 
+void AudioEngine::editSongPatternOrder (const std::function<void (Song&)>& edit)
+{
+    saveUndoStep();
+    modified = true;
+    edit (song);
+    clipops::updateCrossfades (song);
+    publishSong();
+}
+
 void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undoable)
 {
     // A fader or knob drag (round 171c, discussion #10): every mouse move used to go through editSong, i.e. a whole
@@ -2850,8 +2863,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         const auto* fileBytes = static_cast<const std::uint8_t*> (data.getData());
         // a Live set (.als, round 175a) takes the same pipeline: samples, plugins, report and Missing files window
         const auto liveSet = file.hasFileExtension ("als");
+        // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
+        const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
         std::optional<flp::Project> project;
-        if (! liveSet)
+        if (! liveSet && ! mobileProject)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -2917,7 +2932,23 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         options.relocations = relocations;
         {
             const auto t = std::chrono::steady_clock::now();
-            if (liveSet)
+            if (mobileProject)
+            {
+                FlmImportOptions flmOptions;
+                flmOptions.common = options;
+                if (! options.roots.factoryData.empty())
+                    if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
+                        flmOptions.resourceRoot = root;
+                std::string flmError;
+                auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
+                if (! song)
+                {
+                    out.error = utf8 (flmError.empty() ? "not a readable FL Studio Mobile project" : flmError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (liveSet)
             {
                 AlsImportOptions alsOptions;
                 alsOptions.common = options;
@@ -2979,7 +3010,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         for (const auto& c : out.song.channels)
         {
             if (c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip || c.instrument == InstrumentKind::granulizer
-                || c.instrument == InstrumentKind::wavetraveller
+                || c.instrument == InstrumentKind::wavetraveller || c.instrument == InstrumentKind::fruityslicer
                 || c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
                 addPath (c.samplePath);
             for (const auto& z : c.zones)
@@ -3027,6 +3058,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             double ratio;
             StretchMethod method;
             double semitones;
+            StretchMap map;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3038,9 +3070,11 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
+                    // (the same map the rack asks for: RackState::build)
+                    auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
-                        stretches.push_back ({ c.samplePath, ratio, method, semitones });
+                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map) });
                 }
         if (! stretches.empty())
         {
@@ -3048,7 +3082,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones))
+                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3322,9 +3356,9 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };

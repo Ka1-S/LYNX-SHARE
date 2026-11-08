@@ -506,6 +506,24 @@ bool listensToSidechain (EffectKind kind) noexcept
            || kind == EffectKind::vocoder;
 }
 
+bool reportsGainReduction (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor:
+        case EffectKind::apexLimiter:
+        case EffectKind::crestCompressor:
+        case EffectKind::sentryGate:
+        case EffectKind::quellDenoiser:
+        case EffectKind::ridgeStrip:
+        case EffectKind::glowLeveler:
+        case EffectKind::hushDeEsser:
+            return true;
+        default:
+            return false;
+    }
+}
+
 int soleSidechainSender (const Song& song, int to)
 {
     if (! isInsert (song, to))
@@ -1307,6 +1325,27 @@ std::vector<int> sortedInserts (const Song& song, std::vector<int> inserts)
     return inserts;
 }
 
+// FL skips an insert that any Playlist track already points at (0x12a76e0: any mode), or whose one and only channel
+// already has an instrument track (0x12a7620 with 0xffac90 / 0xffae00; audio clip channels don't count).
+bool hasPlaylistTrack (const Song& song, int insert)
+{
+    for (const auto& pt : song.playlistTracks)
+        if (pt.mode != PlaylistTrackMode::unassigned && pt.mixerTrack == insert)
+            return true;
+    int sole = -1, count = 0;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == insert)
+        {
+            sole = c;
+            ++count;
+        }
+    if (count != 1 || song.channels[(std::size_t) sole].instrument == InstrumentKind::audioClip)
+        return false;
+    return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [sole] (const PlaylistTrack& pt) {
+        return pt.mode == PlaylistTrackMode::instrument && pt.channel == sole;
+    });
+}
+
 int audioTrackOf (const Song& song, int insert)
 {
     for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
@@ -1324,7 +1363,7 @@ int assignNewAudioTracks (Song& song, std::vector<int> inserts)
     int assigned = 0;
     for (auto t : sortedInserts (song, std::move (inserts)))
     {
-        if (audioTrackOf (song, t) >= 0)
+        if (hasPlaylistTrack (song, t))
             continue;
         for (int i = 0; i < audioTrackScan; ++i)
         {
