@@ -1,4 +1,6 @@
 #include "core/RackOps.h"
+
+#include "core/MidiControls.h"
 #include "core/PatternBlocks.h"
 
 #include <algorithm>
@@ -957,4 +959,52 @@ int stepPatternCreating (Song& song, int delta)
     return std::clamp (target, 0, last);
 }
 
+int audioClipsAmong (const Song& song, const std::vector<int>& channels)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+            ++count;
+    return count;
+}
+
+int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mode)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+        {
+            song.channels[(std::size_t) c].sampler.declickMode = std::clamp (mode, 0, 5);
+            ++count;
+        }
+    return count;
+}
+
+void prepareForMidiExport (Song& song)
+{
+    constexpr int drums = 9; // (MIDI channel 10)
+    int next = 0;
+    for (auto& c : song.channels)
+    {
+        // FL converts every channel but automation clips (seen in FL 2026, round 181b: Layer and Envelope
+        // Controller became MIDI Out, the automation clip stayed and took no MIDI channel). LYNX's automation clips
+        // aren't channels, so every channel converts.
+        midictl::MidiOutSettings settings;
+        if (c.plugin.name == "FPC")
+        {
+            settings.channel = drums;
+        }
+        else
+        {
+            settings.channel = next;
+            next = (next + 1) & 15;
+            if (next == drums)
+                ++next;
+        }
+        c.instrument = InstrumentKind::midiOut;
+        c.plugin = {};
+        c.pluginState.clear();
+        midictl::writeMidiOut (c.pluginState, settings);
+    }
+}
 } // namespace lynx

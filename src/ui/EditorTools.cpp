@@ -166,12 +166,16 @@ void ToolStrip::resized()
     {
         if (i > 0 && toolGroup (tools[i]) != toolGroup (tools[i - 1]))
             x += toolGroupGap;
-        if (i == 0 || toolGroup (tools[i]) != toolGroup (tools[i - 1]))
+        // (narrower than its ideal width: a button that does not fit whole goes)
+        const auto fits = x + width <= getWidth();
+        if (fits && (i == 0 || toolGroup (tools[i]) != toolGroup (tools[i - 1])))
             wells.push_back ({ x, 0, 0, size });
         buttons[i]->setIconSizing (1.0f, icon);
         buttons[i]->setBounds (x, 0, width, size);
+        buttons[i]->setVisible (fits);
         x += width;
-        wells.back().setRight (x);
+        if (fits)
+            wells.back().setRight (x);
     }
 }
 

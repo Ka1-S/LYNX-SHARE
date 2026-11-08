@@ -216,7 +216,7 @@ public:
 private:
     double sr = 48000.0;
     double cf = 0.0, cs = 0.0, el = 0.0, mem = 0.0, ctl = 0.0, yc[2] {}, fx1[2] {}, fy1[2] {}, tx[2][4] {}, ty[2][4] {}, xp[2] {};
-    Biquad sc;
+    Biquad sc, sc172, scLow172; // round 123's emphasis; round 172d's (Compress with the measured release)
     double scDesignedRate = 0.0;
     float last = 0.0f;
 };

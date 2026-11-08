@@ -139,6 +139,8 @@ Both numbers are given below.
 | Auto-pan (Rhythm) | PanMan | 3.2 → 4.8 | — | PanMan's default shape is a ramp (fitted within 1° on its 0.25 / 0.63 Hz pan trajectories): right to left over the period, back over 45 ms + Smoothing × a quarter of the period. New Pattern option "Ramp" (Left / right · Ramp · 8 steps; saved 0 / 1 keep their meaning). Harness fix: the original's In/Out "Analog" is the analog stage, not the "hot" one (3.2 → 4.3 of the gain). Per setting: D 2.7 → 4.7, S1 2.7 → 4.7, S2 4.3 → 5.0. |
 | Voice Shift | Little AlterBoy | 2.0 → 2.8 | — | measured on refcap0124's Drive, Pitch and Formant sweeps: Drive adds 1.72 dB per step into an output that falls 1.46 dB per step (a soft clipper with a small bias); the wet sits 2.7 dB under the input; the original's voice gets 0.36 dB louder per semitone of pitch against the formants (ours kept the level). Levels now within ~1 dB (they were up to +5.5 dB). Per setting: D 2.7 → 4.0, S1 2.3 → 2.3, S2 2.0 → 2.3, S3 1.0 → 2.7. Open: the original decorrelates L / R in shifted settings; its tracking of polyphonic music differs. |
 | Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
+| Glow Leveler (slice 9) | CLA-2A (Waves) | 4.3 → 5.2 | — | the Compress side chain refitted (black-box: the trial's renders of 11-04 and refcap0124's sweeps at peak reduction 46 / 56 / 100). The original reduces more at both ends of the band than at 750 Hz (−18 dBFS sweep, peak reduction 56: 1.9 dB more at 95 Hz, 5.2 dB more at 6 kHz), so music, drums and pink noise came out about 2 dB too loud while the 1 kHz stairs matched. A low peak (105 Hz, +5 dB) and a wider, stronger high one (8.9 kHz, +11.9 dB, bounded at 12 dB) replace round 123's emphasis; the chain keeps its 1 kHz gain, so the 1 kHz laws of rounds 152 / 165w / 165x hold. Gain error rms 1.54 → 1.02 dB; per setting D 4.0 → 5.5, S1 4.3 → 5.5, S3 3.5 → 4.3. Limit keeps the old side chain (its law was fitted on it; the new one made it worse). Open: a steady 6 kHz sine reduces 7.1 dB more than 750 Hz, the sweep 5.2 |
+| Foil Plate (plate voicing, slice 10) | Little Plate | 2.2 → 3.4 | — | measured on the trial's renders (Decay 1 / 3 / 10 s, impulse, drums, music) and refcap0124's sweeps at Decay 0.5 / 1.7 / 3 / 5.7 / 19 s. The original has no sub-bass: 20 … 32 Hz sat 11 … 16 dB and 32 … 40 Hz 2 … 8 dB above it, which put music 5 dB too loud (its energy is in bass notes at 32 … 48 Hz). The voicing now cuts at 55 Hz, 12 dB/oct, unless the panel's Low Cut is higher (45 Hz scored 3.2). It was also 7 … 9 dB too bright from 2 to 8 kHz up to Decay 1.7 s, 5 … 7 dB at 3 s and 2 … 3 dB from 5.7 s on: the high shelf at 2.5 kHz goes from −5 dB to −13.5 / −12 / −9 dB with Decay, the edge from 7 to 9 kHz. Per setting D 2.0 → 3.7, S1 1.7 → 2.7, S2 3.3 → 3.3, S3 2.0 → 4.0. ValhallaPlate (voicing off) unchanged, 3.1. Open: at Decay 1 s the trial's impulse and music read 4 … 5 dB too loud from 250 Hz to 4 kHz, while its sweeps at 0.5 / 1.7 s do not; not changed |
 
 **Decapitator captures:** the original's Auto moves its Output knob asynchronously after a Drive change made by host automation. The earlier captures had the trim in some settings only, which made styles E / N / T look 8–11 dB too loud and gave a mean of 3.2. All its captures now set Auto off and pin Output at 0 dB first.
 
@@ -2037,6 +2039,9 @@ voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8,
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
 
+## Round 180c: Merge similar pattern clips, Merge automation clips (issue #74)
+
+FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.
 
 ## Round 177b: workflow extras beyond FL (FL's own way stays unchanged)
 
@@ -2060,3 +2065,10 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Display delay menu | same | ✅ | |
 | Chord style (Roman) | a working item | ➕ | LYNX addition: FL hides the item and its flag does nothing in the detector |
 | Near the hint bar | same menu item, outlined text under the hint bar | ✅ | seen in FL at runtime; the 15 s cap comes from the decompile |
+| Tools › Macros › Change declicking for selected channels to | same six modes, same messages | ✅ | LYNX can undo it, so no "(no undo)" |
+| Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ✅ | FL skips only automation clip channels (seen at runtime); LYNX's automation clips aren't channels |
+| Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
+| Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
+| Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
+| Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
+| Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |

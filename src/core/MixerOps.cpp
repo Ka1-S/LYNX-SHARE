@@ -1255,6 +1255,134 @@ int autoColorGroup (Song& song, int track)
     return changed;
 }
 
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept
+{
+    if (n < 2)
+        return from;
+    const auto amount = (k << 8) / (n - 1); // FL: shl 8, idiv
+    std::uint32_t out = 0xff000000u;
+    for (int shift = 0; shift <= 16; shift += 8)
+    {
+        const auto a = (int) ((from >> shift) & 0xffu), b = (int) ((to >> shift) & 0xffu);
+        // FL blends with pmulhw on (b - a) * 16 and amount * 16: the high word, an arithmetic shift (floor)
+        const auto c = a + (((b - a) * 16 * (amount * 16)) >> 16);
+        out |= (std::uint32_t) std::clamp (c, 0, 255) << shift;
+    }
+    return out;
+}
+
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&] (int t) { return t < 0 || t >= (int) song.mixer.size(); }),
+                  tracks.end());
+    const auto n = (int) tracks.size();
+    if (n < 2)
+        return 0;
+    int changed = 0;
+    for (int k = 0; k < n; ++k)
+    {
+        auto& colour = song.mixer[(std::size_t) tracks[(std::size_t) k]].colour;
+        const auto next = gradientColourStep (from, to, k, n);
+        if (colour != next)
+        {
+            colour = next;
+            ++changed;
+        }
+    }
+    return changed;
+}
+
+namespace
+{
+constexpr int audioTrackScan = 500; // FL: playlist tracks 1..500
+
+std::vector<int> sortedInserts (const Song& song, std::vector<int> inserts)
+{
+    std::sort (inserts.begin(), inserts.end());
+    inserts.erase (std::unique (inserts.begin(), inserts.end()), inserts.end());
+    inserts.erase (std::remove_if (inserts.begin(), inserts.end(), [&] (int t) { return t <= 0 || t >= (int) song.mixer.size(); }),
+                   inserts.end());
+    return inserts;
+}
+
+// FL skips an insert that any Playlist track already points at (0x12a76e0: any mode), or whose one and only channel
+// already has an instrument track (0x12a7620 with 0xffac90 / 0xffae00; audio clip channels don't count).
+bool hasPlaylistTrack (const Song& song, int insert)
+{
+    for (const auto& pt : song.playlistTracks)
+        if (pt.mode != PlaylistTrackMode::unassigned && pt.mixerTrack == insert)
+            return true;
+    int sole = -1, count = 0;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == insert)
+        {
+            sole = c;
+            ++count;
+        }
+    if (count != 1 || song.channels[(std::size_t) sole].instrument == InstrumentKind::audioClip)
+        return false;
+    return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [sole] (const PlaylistTrack& pt) {
+        return pt.mode == PlaylistTrackMode::instrument && pt.channel == sole;
+    });
+}
+
+int audioTrackOf (const Song& song, int insert)
+{
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) i];
+        if (pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert)
+            return i;
+    }
+    return -1;
+}
+} // namespace
+
+int assignNewAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int assigned = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+    {
+        if (hasPlaylistTrack (song, t))
+            continue;
+        for (int i = 0; i < audioTrackScan; ++i)
+        {
+            const auto untouched = i >= (int) song.playlistTracks.size()
+                                   || (song.playlistTracks[(std::size_t) i].name.empty() && song.playlistTracks[(std::size_t) i].colour == 0
+                                       && song.playlistTracks[(std::size_t) i].mode == PlaylistTrackMode::unassigned);
+            if (! untouched || std::any_of (song.playlist.begin(), song.playlist.end(), [i] (const Clip& c) { return c.track == i; }))
+                continue;
+            if ((int) song.playlistTracks.size() <= i)
+                song.playlistTracks.resize ((std::size_t) i + 1);
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            const auto& insert = song.mixer[(std::size_t) t];
+            pt.mode = PlaylistTrackMode::audio;
+            pt.mixerTrack = t;
+            pt.name = insert.name.empty() ? "Insert " + std::to_string (t) : insert.name;
+            pt.colour = insert.colour;
+            ++assigned;
+            break;
+        }
+    }
+    return assigned;
+}
+
+int unassignAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int changed = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+        if (const auto i = audioTrackOf (song, t); i >= 0)
+        {
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            pt.mode = PlaylistTrackMode::unassigned;
+            pt.mixerTrack = -1;
+            ++changed;
+        }
+    return changed;
+}
+
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on)
 {
     for (auto t : tracks)
