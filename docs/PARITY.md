@@ -124,7 +124,7 @@ engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (r
 - **Low EQ** is a single −6 dB/oct cut, in the echo. Moving it from 100 to 400 Hz takes 11.5 dB at 30 Hz; with the old echo and output cuts together it would be 23.
 - **High EQ** is a −6 dB/oct cut in the echo and in the reverb, and it sets the high decay. RT(8 kHz) / RT(1 kHz) is 0.47 / 0.65 / 0.99 at 1 / 4.5 / 20 kHz; before, it was fixed.
 - A +3 dB shelf below 1.4 kHz: the reference's tail is fuller there, measured on the −20 dB impulse and on music.
-- **Colours** follow the manual and the renders. Bright and Neutral play alike. Dark adds a steep 8 kHz low-pass. The fourth colour (the reference's Studio) adds a 12 dB/oct cut at 560 Hz and a steep 12 kHz low-pass. Before, these were first-order cuts at 16, 11 and 9 kHz.
+- **Colours** follow the manual and the renders. Bright and Neutral play alike. Dark adds a steep 8 kHz low-pass. The fourth colour, now named Studio as in the reference (it was "Vintage"; saved projects keep it), adds a 12 dB/oct cut at 560 Hz and a steep 12 kHz low-pass. Before, these were first-order cuts at 16, 11 and 9 kHz.
 - **Modes:** RT against Decay, bass decay, the onset after the echo, level and tone are measured per mode (Room, Chamber, Plate, Hall, Cathedral, Space).
   - Room's lines are 1.6 × longer. Before, a tank mode sat on the stimulus's 48 Hz bass note, and music was 9 dB loud.
   - Plate feeds its tank at once. Before, its 8 ms build-up taps cancelled each other below 120 Hz.
