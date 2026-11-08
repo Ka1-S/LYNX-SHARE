@@ -67,6 +67,13 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
         f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
             return std::shared_ptr<const SampleData> (timeStretch (*shared, ratio, m));
         };
+        long spanIn = -1, spanOut = -1;
+        f.stretchedSpans = [&spanIn, &spanOut] (const std::string&, const std::string&, const std::shared_ptr<const SampleData>& span, double ratio,
+                                                StretchMethod m, double st) {
+            auto out = std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, m, st));
+            spanIn = (long) span->frames(), spanOut = out != nullptr ? (long) out->frames() : -1;
+            return out;
+        };
         auto state = RackState::build (s, nullptr, rate, f);
         RackRenderer r;
         r.prepare (rate, 441);
@@ -77,17 +84,20 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
             r.process (state.get(), true, tick, 441, l.data(), rr.data());
             out.insert (out.end(), l.begin(), l.end());
         }
-        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured by its
-        // oscillation: after the span the clip holds its last value as DC to the clip's end, as FL does (REA_rodada167l §1;
-        // whether FL holds a trimmed span's last value too is not rendered yet)
+        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured by its zero
+        // crossings: after the span the clip holds its last value as DC to the clip's end and then declicks, as FL does
+        // (REA_rodada167l §1; whether FL holds a trimmed span's last value too is not rendered yet)
         std::size_t firstLoud = out.size(), lastLoud = 0;
         for (std::size_t i = 1; i < out.size(); ++i)
-            if (std::abs (out[i]) > 0.02f && std::abs (out[i] - out[i - 1]) > 0.005f)
+            if (out[i] * out[i - 1] < 0.0f && std::max (std::abs (out[i]), std::abs (out[i - 1])) > 0.005f) // a zero crossing of the tone
                 firstLoud = std::min (firstLoud, i - 1), lastLoud = i;
         const auto playedTicks = (double) (lastLoud - firstLoud) / rate * s.bpm / 60.0 * ppq;
         std::fprintf (stderr, "  [r180d] %s: drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", stretched ? "stretched" : "plain",
                       (long long) drawnTicks, playedTicks, firstLoud);
-        CHECK (firstLoud < (stretched ? 441u : 64u));
+        std::fprintf (stderr, "  [r180d]   span %ld -> %ld frames; level at 0.5 / 0.9 / 1.1 / 1.4 s: %.3f %.3f %.3f %.3f\n", spanIn, spanOut,
+                      std::abs (out[22050]), std::abs (out[39690]), out.size() > 48510 ? std::abs (out[48510]) : -1.0f,
+                      out.size() > 61740 ? std::abs (out[61740]) : -1.0f);
+        CHECK (firstLoud < (stretched ? 441u : 120u)); // (the first zero crossing: within about a cycle of 440 Hz)
         CHECK (std::abs (playedTicks - (double) drawnTicks) < (stretched ? 0.03 : 0.01) * (double) drawnTicks);
     }
 }
