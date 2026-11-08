@@ -980,3 +980,48 @@ TEST (als175a_warp_markers_import_and_export)
         bent += c.sampler.warp.size() >= 3 && std::abs (c.sampler.stretchBeats - 8.0f) < 1e-4;
     CHECK (bent == 1);
 }
+
+// Round 182b: Live 12.4 crashed loading a LYNX export of FL's "Africa's Calling" demo; its log listed samples that were
+// "not a valid WAV file". FL ships raw Ogg Vorbis streams named .wav, and the export copied them as they were. Live picks
+// the decoder by the extension, so every file whose content doesn't match its extension is written as a plain WAV.
+TEST (als182b_raw_ogg_named_wav_goes_to_live_as_a_real_wav)
+{
+    using namespace lynx;
+    const std::uint8_t rawOgg[] = { 'O', 'g', 'g', 'S', 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x91, 0x41, 0xf2, 0x21, 1, 0x1e, 1, 'v', 'o', 'r', 'b', 'i', 's' };
+    const std::uint8_t pcmWav[] = { 'R', 'I', 'F', 'F', 36, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 2, 0 };
+    const std::uint8_t floatWav[] = { 'R', 'I', 'F', 'F', 36, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 3, 0, 2, 0 };
+    const std::uint8_t oggInWav[] = { 'R', 'I', 'F', 'F', 30, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 2, 0, 0, 0, 0x4F, 0x67 };
+    const std::uint8_t flac[] = { 'f', 'L', 'a', 'C', 0, 0, 0, 34 };
+
+    // the case Live crashed on: an Ogg stream named .wav (any case of the extension)
+    CHECK (alsSampleNeedsWav ("wav", rawOgg, sizeof rawOgg));
+    CHECK (alsSampleNeedsWav (".WAV", rawOgg, sizeof rawOgg));
+    // as before: Ogg inside RIFF/WAVE, WavPack and unknown types are converted; plain PCM / float WAVs are not
+    CHECK (alsSampleNeedsWav ("wav", oggInWav, sizeof oggInWav));
+    CHECK (alsSampleNeedsWav ("wv", rawOgg, sizeof rawOgg));
+    CHECK (! alsSampleNeedsWav ("wav", pcmWav, sizeof pcmWav));
+    CHECK (! alsSampleNeedsWav ("wav", floatWav, sizeof floatWav));
+    // types Live reads: kept when the content is what the name says
+    CHECK (! alsSampleNeedsWav ("ogg", rawOgg, sizeof rawOgg));
+    CHECK (! alsSampleNeedsWav ("flac", flac, sizeof flac));
+    CHECK (alsSampleNeedsWav ("flac", rawOgg, sizeof rawOgg));
+    CHECK (alsSampleNeedsWav ("ogg", pcmWav, sizeof pcmWav));
+    // an empty or unreadable .wav is never passed through as a WAV
+    CHECK (alsSampleNeedsWav ("wav", rawOgg, 0));
+
+    // FL's own raw Ogg samples (FL Data folder, when present): detected and decodable, so the export can write a WAV
+    if (realFlpDir.empty())
+        return;
+    const auto root = std::filesystem::path (realFlpDir).parent_path();
+    for (const auto* file : { "Data/Patches/Misc/Used by demo projects/Cuebur & Thandi Draai - Africa's Calling/AP Clap Human 02.wav" })
+    {
+        const auto path = root / file;
+        if (! std::filesystem::exists (path))
+            continue;
+        std::ifstream in (path, std::ios::binary);
+        const std::vector<std::uint8_t> bytes { std::istreambuf_iterator<char> (in), {} };
+        CHECK (alsSampleNeedsWav (path.extension().string(), bytes.data(), std::min<std::size_t> (bytes.size(), 4096)));
+        oggvorbis::Decoded decoded;
+        CHECK (oggvorbis::decode (bytes.data(), bytes.size(), decoded) && decoded.channels > 0);
+    }
+}
