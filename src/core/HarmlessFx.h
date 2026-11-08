@@ -25,6 +25,8 @@ std::optional<std::vector<std::uint8_t>> maximusStateFromFst (const std::vector<
 // saturation tables). Built off the audio thread; shared read-only by the instruments that use it.
 struct MaximusPreset;
 std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::uint8_t>& state);
+// A Maximus state of version 1…2 in the version-3 layout (FUN_0083ef50 reads both into the same object); others as they are
+std::vector<std::uint8_t> maximusStateAsV3 (const std::vector<std::uint8_t>& state);
 
 // Which build of the engine runs the state: Shared/SG_x64.dll (= Maximus_x64.dll, bit-identical on the demo states)
 // or the older copy inside Soundgoodizer_x64.dll (16-bit saturation tables, another curve end; REA_rodada40 §3)

@@ -305,3 +305,43 @@ colour only. The icon is the separate "Change icon..." item, so FL's text would 
 
 Still open, each as its own slice: FL's "Gradient color" and "Assign to new Audio track(s)" / "Unassign from Audio
 track(s)".
+
+## 5. Gradient color (slice 177a-6) [FLEngine_x64.dll, static]
+
+FL's mixer handler is `SetGradientColorMenuClick` (code 0x12a3110; its undo text is "name/color/icon mixer track(s)").
+It reads:
+
+1. It walks the selected inserts in mixer order. The first one's colour is the start and the last one's is the end.
+2. With fewer than two selected it calls 0x128f9f0 instead, so the menu item is greyed with one track (seen in the
+   menu shot).
+3. It calls 0x12e2080 (start, end), which returns false on cancel. This is a dialog that takes the two colours. What it
+   looks like is still to be shot in FL before LYNX builds any UI for it.
+4. One undo step. Then track k of n gets `blend (start, end, k * 256 / (n - 1))`. The blend is 0x660c40, MMX:
+   `c = a + ((b - a) * 16 * amount * 16) >> 16` on R, G and B, so it is a floor. FL also stores a darker shade
+   (0x660a00 with -150) for the strip itself.
+
+LYNX: `mixerops::gradientColourStep` and `mixerops::gradientColour` follow those steps exactly. The test checks the ends,
+amount 85 (0xaa / 0x54) and 128 (0x7f). The menu item waits for FL's dialog shot.
+
+## 6. Assign to new / Unassign from Audio track(s) (slice 177a-7) [FLEngine_x64.dll, static]
+
+Both items are one handler, `AssignAudiotrackMenuClick` (0x12a2a90), split on the item's Tag.
+
+- **Assign** (Tag 0): for each selected insert (not the Master), FL takes the first playlist track 1–500 that is
+  untouched and holds no clip. It checks 0x12ef3d0 (no name, default colour, two more fields 0) and 0x12ef2a0 (no clip
+  on it). That track gets mode audio and the insert, and its name and colour are set from the insert (0x12be330,
+  0x12e60f0). Then it stops for that insert.
+- **Unassign** (Tag 1): for each selected insert, the first track with mode audio and that insert gets mode 0 and
+  insert -1. Name and colour stay.
+- There is one undo step, and the Playlist refreshes.
+
+FL skips an insert in two cases:
+
+- 0x12a76e0 (t, false) is true when any Playlist track's insert field (+0xdc) is t, in any mode.
+- 0x12a7620 (t, true) >= 0 when a channel routed to t (+0x258) is on an instrument track (mode 3, via 0xffac90 /
+  0xffaee0) and is the only channel on that insert (0xffae00 with false). Channel types 1, 4 (audio clip) and 5 are
+  excluded by the mask 0b110010.
+
+LYNX's `assignNewAudioTracks` follows both (`hasPlaylistTrack`); the test is `mixer177a_d_...`.
+
+The menu items are enabled as in FL's shot: Assign when a selected insert has no audio track, Unassign when one has.

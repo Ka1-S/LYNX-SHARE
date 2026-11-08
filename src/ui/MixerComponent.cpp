@@ -1978,7 +1978,7 @@ void MixerStrips::pressRail (int strip, int mouseY)
     railStrip = strip;
     railMouseY = mouseY;
     stepHeldRail();
-    railRepeat.startTimer (faderRailRepeatMs);
+    railRepeat.startTimer (faderRailFirstRepeatMs); // (then faderRailRepeatMs, in stepHeldRail)
 }
 
 float MixerStrips::railTarget (int strip) const
@@ -1996,6 +1996,8 @@ void MixerStrips::stepHeldRail()
         railRepeat.stopTimer();
         return;
     }
+    if (railRepeat.isTimerRunning() && railRepeat.getTimerInterval() != faderRailRepeatMs)
+        railRepeat.startTimer (faderRailRepeatMs);
     const auto& song = engine.getSong();
     if (railStrip <= vcaStrip (0))
     {
@@ -2913,6 +2915,20 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             });
         });
     });
+    // FL's "Assign to new Audio track(s)" / "Unassign from Audio track(s)" (AssignAudiotrackMenuClick, REA_rodada177a §6)
+    {
+        const auto linked = [&song] (int insert) {
+            return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [insert] (const PlaylistTrack& pt) {
+                return pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert;
+            });
+        };
+        const auto anyLinked = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && linked (x); });
+        const auto anyFree = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && ! linked (x); });
+        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree, false,
+                      [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::assignNewAudioTracks (s, targets); }); });
+        menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
+                      [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
+    }
     menu.addSeparator();
 
     // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list
@@ -2968,6 +2984,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     }
     menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
     menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
+    menu.addSeparator(); // (FL: a line before Reset)
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
     // --- FL's "Routing" section -----------------------------------------------------------------------
