@@ -304,9 +304,12 @@ private:
     static constexpr int railNone = -1000000;
     int railStrip = railNone;
     int railMouseY = 0;
+    double railPressMs = 0.0; // when the rail press began (the steps are counted from it)
+    int railSteps = 0;
     juce::TimedCallback railRepeat { [this] { stepHeldRail(); } };
     void pressRail (int strip, int mouseY);
     float railTarget (int strip) const;
+    void stepRailOnce();
     juce::Rectangle<int> tipArea (Part part, int track) const;
     void setHover (Part part, int track);
     Part hoverPart = Part::none;

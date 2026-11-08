@@ -543,11 +543,12 @@ std::vector<std::uint8_t> playlistRecords (const std::vector<PlaylistItem>& item
         }
         b.put<std::uint32_t> (++serial);
         b.put<float> (item.fadeInMs);    // +0x24
-        b.put<std::uint32_t> (0);        // +0x28
+        b.put<float> (item.fadeInTension);  // +0x28
         b.put<float> (item.fadeOutMs);   // +0x2C
-        b.put<std::uint32_t> (0);        // +0x30
+        b.put<float> (item.fadeOutTension); // +0x30
         b.put<float> (item.gain); // +0x34 (FL 26 saves 0 or 1 for pattern clips; the reader keeps what it finds)
-        b.put<std::uint32_t> (0);        // +0x38
+        // +0x38: a written fade is manual; a manual fade of length 0 stays manual (FL plays a sharp cut there, no declick)
+        b.put<std::uint32_t> (item.fadeFlags | (item.fadeInMs > 0.0f ? 1u : 0u) | (item.fadeOutMs > 0.0f ? 2u : 0u));
         b.put<float> (item.pitch);       // +0x3C
         b.put<double> (item.stretch);    // +0x40
         b.put<std::uint32_t> (item.reversed ? 1u : 0u); // +0x48
