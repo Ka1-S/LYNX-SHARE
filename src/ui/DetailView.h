@@ -56,6 +56,9 @@ public:
         // (showing `pattern`; its panel lets go of it), `undockPianoRoll` gives it back to its panel.
         std::function<juce::Component* (int pattern)> dockPianoRoll;
         std::function<void()> undockPianoRoll;
+        // Slice 3: the Envelopes tab edits the current pattern's events (the existing Event editor); this makes the
+        // clip's pattern the current one.
+        std::function<void (int pattern)> selectPattern;
     };
 
     DetailView (AudioEngine& engine, Hooks hooks);
@@ -70,6 +73,8 @@ public:
     void editorTakenBack();
     // The Clip page lets go of a docked editor (Pattern workflow chosen, the window closing).
     void releaseEditor();
+    // The Clip page's tab for a pattern clip: Notes (the Piano roll) or Envelopes (the pattern's events).
+    void setClipTab (bool envelopes);
 
     // The height the owner gives it out of `available` px (the dock keeps at least half for the grid and Playlist).
     int heightFor (int available) const noexcept;
@@ -80,6 +85,7 @@ public:
     static inline bool devicesPage = true;         // false: the Clip page
     static inline bool extraWindowKey = false;     // LYNX extra (off by default): W shows the selected card's window
     static inline bool extraSelectInMixer = false; // LYNX extra (off by default): selecting a card selects its insert
+    static inline bool envelopesTab = false;       // the Clip page shows Envelopes instead of Notes (not saved)
     static constexpr int minHeight = 140, edgeHeight = 5, stripHeight = 22;
 
     // tests and --snapshot

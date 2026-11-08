@@ -2600,6 +2600,7 @@ void MainComponent::makeDetailView()
     h.openClip = [this] (int track, int scene) { openGridClip (track, scene); };
     h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
     h.undockPianoRoll = [this] { undockPianoRoll(); };
+    h.selectPattern = [this] (int pattern) { selectPattern (pattern); };
     // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
     workspace.onWillShow = [this] (Panel panel) {
         if (panel == Panel::pianoRoll && pianoRollDocked)

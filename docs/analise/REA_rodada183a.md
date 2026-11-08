@@ -205,3 +205,30 @@ Left to right [MANUAL "left to right"; LESSON meters]:
 - Closing: `finish.ps1` skipped Live's ordinary save prompt because its licence filter matches Live's own "Track /
   Clip / Device Activator" labels (bare "activat"); `guard.ps1`'s stricter filter does not, so "No" was clicked
   through `act.ps1`. Live and its helper processes exited; AbletonAudioCpl (pid 20004) was running before the session.
+
+## 9. Slices built
+### Slice 1: Device View (approved by the coordinator 2026-11-08, LYNX|Live pair `/mnt/e/lynx-work/detail183a/pair-slice1.png`)
+- `src/ui/DetailView.*`, `core/DetailChain.h` (`forTrack`, `insertEffectAt`, `moveEffectBefore`), the grid's pick listener,
+  four key-map actions (Clip-launch only), the Mixer's additive hooks (menu target, `extendSlotMenu`, knob accessors,
+  shared A/B spare, `shownLevel`), `--detailshot`.
+- Pattern workflow unchanged: `--snapshot` base bbb948055 vs branch, both cloud builds: 152/156 identical; the 4 others
+  are the new actions count (257 → 261), the profile path, the working-time clock and the tempo tapper's known noise.
+- The slot's dry/wet reads "Slot mix" on effects that have a Mix parameter of their own (found in the pair).
+- A card hook (`DetailCard`, `DetailView::effectCardFactory` / `instrumentCardFactory`) for round 183c's racks.
+
+### Slice 2: Clip View docks the Piano roll (D1a)
+- A pattern clip selected in the grid shows the existing Piano roll in the Clip page. Its workspace panel lets go of it
+  (`Workspace::releaseContent`) and takes it back first whenever the panel is shown in any way (`onWillShow`), when the
+  Clip page hides, or when Pattern workflow is chosen; the main window gives it back before its members are destroyed.
+- Keys: after a click in the docked Piano roll the keys are its own (a global mouse listener, only while docked).
+- The audio clip side waits for round 175a's `makeAudioEditorPanel (engine, channel, clip, showWarp)` (M3).
+
+### Slice 3: Envelopes tab (pattern clips)
+- A pattern clip's Clip page has the reference's **Notes | Envelopes** tabs [SHOT d08]. Envelopes hosts the existing Event
+  editor (`makeEventEditor`) of the clip's pattern, preset to its first event lane (else its channel's volume). Its own
+  target box picks the target: one chooser where the reference has two (device, then control) [MANUAL]. Existing model
+  only (`Pattern::events`).
+- Audio clip envelopes: round 177d's #24 (not started) will provide `makeClipEnvelopeEditor (engine, clip)`; it goes in
+  the same tab when it lands.
+- Not built: the reference's Shift+Alt+1 / 2 / 3 (Note / Envelope / Expression editor) [SHOT d05]; modulation vs
+  automation per clip (no model).

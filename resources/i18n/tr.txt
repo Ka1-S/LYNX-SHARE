@@ -7884,3 +7884,5 @@ countries: tr
 "the piano roll is in its own panel now" = "piano roll artık kendi panelinde"
 "Dock the piano roll here" = "Piano roll'u buraya yerleştir"
 "Slot mix" = "Slot karışımı"
+"Envelopes" = "Zarflar"
+"The pattern's events: the levels and controls it changes while it plays" = "Pattern'in olayları: çalarken değiştirdiği seviyeler ve kontroller"

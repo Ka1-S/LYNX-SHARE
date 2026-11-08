@@ -7884,3 +7884,5 @@ countries: es mx ar co cl pe ve
 "the piano roll is in its own panel now" = "el piano roll está ahora en su propio panel"
 "Dock the piano roll here" = "Acoplar el piano roll aquí"
 "Slot mix" = "Mezcla del slot"
+"Envelopes" = "Envolventes"
+"The pattern's events: the levels and controls it changes while it plays" = "Los eventos del patrón: los niveles y controles que cambia mientras suena"

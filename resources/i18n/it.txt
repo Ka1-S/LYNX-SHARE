@@ -7884,3 +7884,5 @@ countries: it ch sm
 "the piano roll is in its own panel now" = "il piano roll ora è nel suo pannello"
 "Dock the piano roll here" = "Aggancia qui il piano roll"
 "Slot mix" = "Mix dello slot"
+"Envelopes" = "Inviluppi"
+"The pattern's events: the levels and controls it changes while it plays" = "Gli eventi del pattern: i livelli e i controlli che cambia mentre suona"

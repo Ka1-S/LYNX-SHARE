@@ -9369,6 +9369,11 @@ private:
                 s.patterns[0].notes.push_back (note);
             }
             s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            lynx::PatternEvents lane; // a volume swell for the Envelopes tab (slice 3)
+            lane.target = lynx::AutomationTarget { lynx::AutomationTargetKind::channelVolume, 0 };
+            for (int e = 0; e < 16; ++e)
+                lane.events.push_back ({ e * lynx::ppq / 4, 0.3f + 0.6f * (float) e / 15.0f });
+            s.patterns[0].events = { lane };
             s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 3));
             s.playlistTracks[1].name = "Bass";
         }, false);
@@ -9400,6 +9405,10 @@ private:
             write ("clip"); // slice 2: the Piano roll docked here
             counts << "piano roll docked: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
                                                 && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() == detail ? 1 : 0) << "\n";
+            detail->setClipTab (true); // slice 3: the pattern's events in the Envelopes tab
+            offline.dispatchPendingMessages();
+            write ("envelopes");
+            detail->setClipTab (false);
             detail->setPage (lynx::DetailView::Page::devices);
             counts << "piano roll back in its panel: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
                                                            && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() != detail ? 1 : 0) << "\n";

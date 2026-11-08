@@ -7884,3 +7884,5 @@ countries: de at ch li lu
 "the piano roll is in its own panel now" = "die Piano Roll ist jetzt in ihrem eigenen Panel"
 "Dock the piano roll here" = "Piano Roll hier andocken"
 "Slot mix" = "Slot-Mix"
+"Envelopes" = "Hüllkurven"
+"The pattern's events: the levels and controls it changes while it plays" = "Die Events des Patterns: die Pegel und Regler, die es beim Abspielen ändert"

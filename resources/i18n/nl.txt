@@ -7884,3 +7884,5 @@ countries: nl be
 "the piano roll is in its own panel now" = "de piano roll staat nu in een eigen paneel"
 "Dock the piano roll here" = "De piano roll hier vastzetten"
 "Slot mix" = "Slotmix"
+"Envelopes" = "Envelopes"
+"The pattern's events: the levels and controls it changes while it plays" = "De events van het patroon: de niveaus en regelaars die het tijdens het spelen verandert"

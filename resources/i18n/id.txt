@@ -7884,3 +7884,5 @@ countries: id
 "the piano roll is in its own panel now" = "piano roll sekarang ada di panelnya sendiri"
 "Dock the piano roll here" = "Pasang piano roll di sini"
 "Slot mix" = "Mix slot"
+"Envelopes" = "Envelope"
+"The pattern's events: the levels and controls it changes while it plays" = "Event pattern: level dan kontrol yang diubahnya saat diputar"

@@ -7884,3 +7884,5 @@ countries: pl
 "the piano roll is in its own panel now" = "piano roll jest teraz we własnym panelu"
 "Dock the piano roll here" = "Zadokuj tutaj piano roll"
 "Slot mix" = "Miks slotu"
+"Envelopes" = "Obwiednie"
+"The pattern's events: the levels and controls it changes while it plays" = "Zdarzenia patternu: poziomy i regulatory, które zmienia podczas odtwarzania"

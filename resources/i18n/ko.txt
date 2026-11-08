@@ -7884,3 +7884,5 @@ countries: kr
 "the piano roll is in its own panel now" = "피아노 롤은 이제 자체 패널에 있습니다"
 "Dock the piano roll here" = "피아노 롤을 여기에 도킹"
 "Slot mix" = "슬롯 믹스"
+"Envelopes" = "엔벨로프"
+"The pattern's events: the levels and controls it changes while it plays" = "패턴의 이벤트: 재생하는 동안 바뀌는 레벨과 컨트롤"

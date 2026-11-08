@@ -7884,3 +7884,5 @@ countries: fr be ch ca lu
 "the piano roll is in its own panel now" = "le piano roll est maintenant dans son propre panneau"
 "Dock the piano roll here" = "Ancrer le piano roll ici"
 "Slot mix" = "Mix du slot"
+"Envelopes" = "Enveloppes"
+"The pattern's events: the levels and controls it changes while it plays" = "Les événements du pattern : les niveaux et contrôles qu'il modifie pendant la lecture"

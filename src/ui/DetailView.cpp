@@ -16,6 +16,7 @@
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
 #include "ui/EditorTools.h"
+#include "ui/EventEditor.h"
 #include "ui/FlMods.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
@@ -1160,6 +1161,19 @@ class DetailView::ClipPage final : public juce::Component, private juce::ChangeL
 public:
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h)
     {
+        for (auto* b : { &notesTab, &envelopesTab })
+        {
+            addChildComponent (*b);
+            b->setConnectedEdges (0);
+            b->setClickingTogglesState (false);
+            b->setColour (juce::TextButton::buttonOnColourId, colour::accent);
+            b->setColour (juce::TextButton::textColourOnId, colour::onAccent);
+        }
+        notesTab.setButtonText (tr ("Notes"));
+        envelopesTab.setButtonText (tr ("Envelopes"));
+        envelopesTab.setTooltip (tr ("The pattern's events: the levels and controls it changes while it plays"));
+        notesTab.onClick = [this] { showTab (false); };
+        envelopesTab.onClick = [this] { showTab (true); };
         addChildComponent (open);
         open.onClick = [this] {
             if (dockable())
@@ -1196,8 +1210,16 @@ public:
         }
         update();
     }
+    void showTab (bool envelopes)
+    {
+        DetailView::envelopesTab = envelopes;
+        if (! envelopes)
+            takenBack = false; // (Notes: the Piano roll docks again)
+        update();
+    }
     void release()
     {
+        dropEvents();
         dockedTrack = dockedScene = -1;
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
@@ -1210,7 +1232,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         g.fillAll (colour::bg1);
-        if (editor != nullptr)
+        if (editor != nullptr || events != nullptr)
             return;
         g.setColour (colour::textSecondary);
         g.setFont (font (type::body));
@@ -1219,9 +1241,20 @@ public:
     void resized() override
     {
         open.setBounds (getLocalBounds().withSizeKeepingCentre (240, 26).translated (0, 16));
+        auto area = getLocalBounds();
+        if (notesTab.isVisible())
+        {
+            // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08]
+            auto bar = area.removeFromTop (tabHeight).reduced (2, 2);
+            envelopesTab.setBounds (bar.removeFromRight (96));
+            bar.removeFromRight (2);
+            notesTab.setBounds (bar.removeFromRight (96));
+        }
+        if (events != nullptr)
+            events->setBounds (area);
         if (editor != nullptr)
         {
-            editor->setBounds (getLocalBounds());
+            editor->setBounds (area);
             if (auto* sharer = dynamic_cast<SharesTitleBar*> (editor))
                 sharer->setTitleBarInsets (0, 0); // (its toolbar runs across the top, there is no title bar here)
         }
@@ -1252,11 +1285,70 @@ private:
         return clip != nullptr && clip->kind == ClipKind::pattern && hooks.dockPianoRoll != nullptr;
     }
 
+    // The Event editor of the clip's pattern, made for this slot (its own target box picks another target): preset to
+    // the pattern's first event lane, else the volume of the track's channel (or of the pattern's first channel).
+    void showEvents (const Clip& clip)
+    {
+        if (events != nullptr && eventsTrack == track && eventsScene == scene)
+            return;
+        dropEvents();
+        const auto& song = engine.getSong();
+        if (hooks.selectPattern != nullptr && clip.pattern != song.currentPattern)
+            hooks.selectPattern (clip.pattern);
+        AutomationTarget target;
+        if (clip.pattern >= 0 && clip.pattern < (int) song.patterns.size() && ! song.patterns[(std::size_t) clip.pattern].events.empty())
+            target = song.patterns[(std::size_t) clip.pattern].events.front().target;
+        else
+        {
+            const auto chain = detailchain::forTrack (song, track);
+            auto channel = chain.channel;
+            if (channel < 0 && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size() && ! song.patterns[(std::size_t) clip.pattern].notes.empty())
+                channel = song.patterns[(std::size_t) clip.pattern].notes.front().channel;
+            target = AutomationTarget { AutomationTargetKind::channelVolume, std::max (0, channel) };
+        }
+        events = makeEventEditor (engine, target);
+        eventsTrack = track;
+        eventsScene = scene;
+        addAndMakeVisible (*events);
+        resized();
+    }
+    void dropEvents()
+    {
+        if (events != nullptr)
+            removeChildComponent (events.get());
+        events.reset();
+        eventsTrack = eventsScene = -1;
+    }
+
     void update()
     {
         const auto& song = engine.getSong();
         const auto* clip = clipShown();
         // a pattern clip, on screen: the Piano roll docks here (unless its panel took it back since this clip was picked)
+        const bool patternClip = clip != nullptr && clip->kind == ClipKind::pattern;
+        const bool tabs = patternClip && onScreen();
+        if (tabs != notesTab.isVisible())
+        {
+            notesTab.setVisible (tabs);
+            envelopesTab.setVisible (tabs);
+            resized();
+        }
+        notesTab.setToggleState (! DetailView::envelopesTab, juce::dontSendNotification);
+        envelopesTab.setToggleState (DetailView::envelopesTab, juce::dontSendNotification);
+        if (tabs && DetailView::envelopesTab)
+        {
+            if (editor != nullptr && hooks.undockPianoRoll != nullptr) // (the Piano roll goes home while Envelopes shows)
+            {
+                editor = nullptr;
+                dockedTrack = dockedScene = -1;
+                hooks.undockPianoRoll();
+            }
+            showEvents (*clip);
+            open.setVisible (false);
+            repaint();
+            return;
+        }
+        dropEvents();
         if (clip != nullptr && clip->kind == ClipKind::pattern && onScreen() && ! takenBack && hooks.dockPianoRoll != nullptr)
         {
             if (editor != nullptr && dockedTrack == track && dockedScene == scene)
@@ -1303,6 +1395,10 @@ private:
     Hooks& hooks;
     juce::TextButton open;
     juce::String text;
+    juce::TextButton notesTab, envelopesTab;
+    static constexpr int tabHeight = 26;
+    std::unique_ptr<juce::Component> events; // the Envelopes tab's Event editor
+    int eventsTrack = -1, eventsScene = -1;
     juce::Component* editor = nullptr; // the docked Piano roll (not owned)
     int dockedTrack = -1, dockedScene = -1;
     bool takenBack = false;
@@ -1363,6 +1459,7 @@ void DetailView::togglePage() { setPage (devicesPage ? Page::clip : Page::device
 
 void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
+void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
 
 void DetailView::showPage()
 {

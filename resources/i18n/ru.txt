@@ -7884,3 +7884,5 @@ countries: ru by kz
 "the piano roll is in its own panel now" = "пиано-ролл теперь в своей панели"
 "Dock the piano roll here" = "Закрепить пиано-ролл здесь"
 "Slot mix" = "Микс слота"
+"Envelopes" = "Огибающие"
+"The pattern's events: the levels and controls it changes while it plays" = "События паттерна: уровни и регуляторы, которые он меняет во время воспроизведения"
