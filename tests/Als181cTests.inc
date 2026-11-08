@@ -77,7 +77,7 @@ inline lynx::AlsImportOptions options (lynx::FlpImportReport* report = nullptr)
     o.common.projectFolder = "E:/sets";
     o.common.fileExists = [] (const std::string&) { return true; };
     o.common.report = report;
-    o.sessionOnPlaylist = false; // the clip grid (the default is the Playlist, the user's choice)
+    o.sessionOnPlaylist = false; // the clip grid, the default (the user's choice of 2026-11-08)
     return o;
 }
 
@@ -169,10 +169,10 @@ TEST (als181c_session_clips_fill_the_grid)
     CHECK (song->markers().empty());
 }
 
-TEST (als181c_session_clips_go_to_the_playlist_by_default)
+TEST (als181c_session_clips_on_the_playlist_stay_an_option)
 {
     using namespace lynx;
-    CHECK (AlsImportOptions {}.sessionOnPlaylist); // the user's choice, 2026-11-06
+    CHECK (! AlsImportOptions {}.sessionOnPlaylist); // the clip grid is the default: the user's choice, 2026-11-08
     auto o = als181c::options();
     o.sessionOnPlaylist = true;
     const auto song = importAls (als175a::bytesOf (als181c::sessionSet()), o);

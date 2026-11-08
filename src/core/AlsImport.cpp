@@ -1235,8 +1235,8 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             ctx.note (&FlpImportReport::unsupported, "Take lanes (only the main lane is kept)");
     }
 
-    // Session clips: on the Playlist after the arrangement, one section per scene [the user's choice, 2026-11-06, the
-    // default], or (round 181c, an option) in the clip grid
+    // Session clips: in the clip grid (round 181c, the default: the user's choice of 2026-11-08), or on the Playlist
+    // after the arrangement, one section per scene (an option; the default before)
     const auto scenes = set.child ("Scenes").children ("Scene");
     if (options.sessionOnPlaylist)
     {

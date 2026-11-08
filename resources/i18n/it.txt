@@ -7834,4 +7834,5 @@ countries: it ch sm
 "Change declicking mode?" = "Cambiare la modalità di declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Cambiare la modalità di declicking di tutti i canali di clip audio selezionati?"
 "Session clips of Live sets" = "Clip di sessione dei set di Live"
-"Playlist, after the arrangement (default)" = "Playlist, dopo l'arrangiamento (predefinito)"
+"Clip grid (default)" = "Griglia di clip (predefinito)"
+"Playlist, after the arrangement" = "Playlist, dopo l'arrangiamento"

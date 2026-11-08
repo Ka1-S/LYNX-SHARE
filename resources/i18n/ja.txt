@@ -7834,4 +7834,5 @@ countries: jp
 "Change declicking mode?" = "デクリックモードを変更しますか?"
 "Change the declicking mode of all selected audio clip channels?" = "選択したすべてのオーディオクリップチャンネルのデクリックモードを変更しますか?"
 "Session clips of Live sets" = "Live セットのセッションクリップ"
-"Playlist, after the arrangement (default)" = "プレイリスト、アレンジメントの後 (既定)"
+"Clip grid (default)" = "クリップグリッド (既定)"
+"Playlist, after the arrangement" = "プレイリスト、アレンジメントの後"

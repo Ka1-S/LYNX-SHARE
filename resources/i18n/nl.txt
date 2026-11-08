@@ -7834,4 +7834,5 @@ countries: nl be
 "Change declicking mode?" = "Declickingmodus wijzigen?"
 "Change the declicking mode of all selected audio clip channels?" = "De declickingmodus van alle geselecteerde audioclipkanalen wijzigen?"
 "Session clips of Live sets" = "Sessieclips uit Live-sets"
-"Playlist, after the arrangement (default)" = "Playlist, na het arrangement (standaard)"
+"Clip grid (default)" = "Clipraster (standaard)"
+"Playlist, after the arrangement" = "Playlist, na het arrangement"
