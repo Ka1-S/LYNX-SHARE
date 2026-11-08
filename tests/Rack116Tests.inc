@@ -1,5 +1,7 @@
 // Issue #116: only the "+ add channel" box opens the Channel rack's add menu, as FL's + button.
 
+#include "core/RackLayout.h"
+
 TEST (rack116_add_menu_opens_only_from_its_box)
 {
     using namespace lynx::racklayout;
