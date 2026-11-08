@@ -420,9 +420,11 @@ inline std::string macros (const std::vector<std::string>& names, const std::vec
 }
 } // namespace rack183c
 
-TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
+namespace rack183c
 {
-    using namespace rack183c;
+// The set of the import test: an Audio Effect Rack on an audio track, an Instrument Rack on a MIDI track
+inline std::string rackSet()
+{
     using als175a::v;
     // an Audio Effect Rack: "Dry" (a VST2 whose parameter 1 is on macro 3, 0.2…0.8) and "Wet" (Live's EQ Eight: dropped),
     // chain 2's volume on macro 2, the selector on macro 1; a stored variation "Verse"
@@ -461,6 +463,14 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
          "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting><DeviceChain><Devices>" + instrumentRack + "</Devices></DeviceChain></DeviceChain></MidiTrack>";
     s += "</Tracks><MainTrack><DeviceChain>" + als175a::mixer (900, 1.0, 0.0, true, {}, "<Tempo><Manual Value=\"120\" /></Tempo>") + "</DeviceChain></MainTrack></LiveSet>\n</Ableton>\n";
 
+    return s;
+}
+} // namespace rack183c
+
+TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
+{
+    using namespace rack183c;
+    const auto s = rackSet();
     FlpImportReport report;
     std::string error;
     const auto song = importAls (als175a::bytesOf (s), als175a::options (&report), &error);
@@ -514,5 +524,66 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
     {
         const auto& n = keys->patcher.nodes[(std::size_t) ir.chains[0].nodes[0]];
         CHECK (n.generator && n.channel.instrument == InstrumentKind::plugin && n.channel.plugin.name == "kHs Gain");
+    }
+}
+
+TEST (rack183c_als_racks_export_and_round_trip)
+{
+    using namespace rack183c;
+    const auto first = importAls (als175a::bytesOf (rackSet()), als175a::options (nullptr));
+    CHECK (first.has_value());
+    if (! first)
+        return;
+    const auto racksOf = [] (const Song& song) {
+        std::vector<RackDoc> out;
+        for (const auto& t : song.mixer)
+            for (const auto& fx : t.effects)
+                if (rack::isRack (fx))
+                    out.push_back (fx.patcher.rack.front());
+        for (const auto& c : song.channels)
+            if (rack::isRack (c))
+                out.push_back (c.patcher.rack.front());
+        return out;
+    };
+    const auto before = racksOf (*first);
+    CHECK (before.size() == 2);
+    for (const auto version : { AlsVersion::live12, AlsVersion::live11 })
+    {
+        AlsExportOptions o;
+        o.version = version;
+        const auto out = exportAls (*first, o);
+        CHECK (! out.bytes.empty());
+        std::string why;
+        CHECK (als175a::loaderRulesHold (out.xml, 0, why));
+        if (! why.empty())
+            std::printf ("  loader rule: %s\n", why.c_str());
+        CHECK (out.xml.find ("<AudioEffectGroupDevice") != std::string::npos && out.xml.find ("<InstrumentGroupDevice") != std::string::npos);
+        CHECK (out.xml.find ("<MacroSnapshot ") != std::string::npos && out.xml.find ("<Channel Value=\"16\" />") != std::string::npos);
+        const auto back = importAls (out.bytes, als175a::options (nullptr));
+        CHECK (back.has_value());
+        if (! back)
+            continue;
+        const auto after = racksOf (*back);
+        CHECK (after.size() == before.size());
+        for (std::size_t i = 0; i < std::min (after.size(), before.size()); ++i)
+        {
+            const auto& a = before[i];
+            const auto& b = after[i];
+            CHECK (a.kind == b.kind && a.chains.size() == b.chains.size() && a.shownMacros == b.shownMacros && a.selector == b.selector);
+            for (std::size_t c = 0; c < std::min (a.chains.size(), b.chains.size()); ++c)
+                CHECK (a.chains[c].name == b.chains[c].name && a.chains[c].select == b.chains[c].select && a.chains[c].key == b.chains[c].key
+                       && a.chains[c].velocity == b.chains[c].velocity && near (a.chains[c].volume, b.chains[c].volume, 1.0e-5f)
+                       && near (a.chains[c].pan, b.chains[c].pan, 1.0e-5f) && a.chains[c].nodes.size() == b.chains[c].nodes.size());
+            for (int k = 0; k < rackMacroCount; ++k)
+            {
+                const auto& x = a.macros[(std::size_t) k];
+                const auto& y = b.macros[(std::size_t) k];
+                CHECK (x.name == y.name && x.value == y.value && x.excludeFromRandom == y.excludeFromRandom && x.mappings.size() == y.mappings.size());
+                for (std::size_t m = 0; m < std::min (x.mappings.size(), y.mappings.size()); ++m)
+                    CHECK (x.mappings[m].target == y.mappings[m].target && near (x.mappings[m].min, y.mappings[m].min, 1.0e-4f)
+                           && near (x.mappings[m].max, y.mappings[m].max, 1.0e-4f) && x.mappings[m].param == y.mappings[m].param);
+            }
+            CHECK (a.variations == b.variations);
+        }
     }
 }
