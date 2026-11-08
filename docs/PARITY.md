@@ -264,6 +264,22 @@ sound.
 | synthetic: HF balance, formant distance (dB) | —, 0.18 | −0.40, 0.28 | −0.04, 0.36 |
 | CPU per instance (block 128, 44.1 kHz, median) | — | ~64 µs (2.3 % RT) | ~65 µs (+1 %) |
 
+## Round 183b slice 3: Halo ← ValhallaShimmer
+
+Measured on tp172d's settings, refs/halo (13 states) and 13 new captures, with the impulse at −20 dB, at Mix 100 %: Mod depth 0 / 60 / 100 %, Mod rate, Size 20 / 80 %, the stereo modes, Feedback 50 / 80 %, Diffusion 50 %. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 31 settings. **Sound 3 → 4** in the main table (that row is set when the slice lands, so it doesn't clash with slice 1's row next to it).
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Halo (slice 3) | ValhallaShimmer | 3.00 → 3.25 / 2.66 → 2.93 | 6.52 → 7.17 / 5.89 → 6.80 | Over the bank, the verb's stereo part goes from 7.2 to 9.5 and its early part from 3.5 to 7.6; music scores 2.95 → 3.35 and drums 2.72 → 3.11. |
+
+- **Mono mode** (the reference's default: mono in) gives a partly correlated tail: L/R correlation 0.25 / 0.31 / 0.43 at Size 30 / 50 / 80 %. Ours was ~0, so the side gain now follows Size, and the level is kept equal to the full width. The stereo modes stay at ~0, as the reference's.
+- In Mono mode the reference's first 80 ms hold 3.4 dB less of the energy than ours did, so the early pattern is at 40 % there.
+- **Linearity:** the reference's tail is linear with Mod depth 0. With its modulation on, the 0.5 impulse comes out 2–6 dB fuller below 300 Hz than the −20 dB one. 172d saw the same low end against music; as in slice 1, the fit follows the −20 dB impulse and the programme.
+- **Open:**
+  - The reference's tail fluctuates about twice as much frame to frame (spectral centroid, 385 against 223), even at Mod depth 0. That looks like a sparser, grainier tank, not modulation.
+  - Its RT at Diffusion 50 % (verb 3.8 there).
+  - The tail balance, 2.7 dB off on average.
+
 ## Round 145: SSL Native Vocalstrip 2 (Ridge Strip's Vocal strip voicing)
 
 Round 145 (`docs/analise/REA_rodada145.md`) measured the official Vocalstrip 2 trial (Complete Access) black-box and

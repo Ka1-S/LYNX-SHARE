@@ -1408,6 +1408,15 @@ protected:
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
+        // round 183b: the reference's Mono mode (mono in) gives a partly correlated tail: L/R correlation 0.25 / 0.31 /
+        // 0.43 at Size 30 / 50 / 80 % (its stereo modes: ~0, as this tank's)
+        if (m.stereo == 1)
+        {
+            const auto c = 0.13 + 0.375 * size;
+            s.width = std::sqrt ((1.0 - c) / (1.0 + c));
+            s.gain *= std::sqrt (2.0 / (1.0 + s.width * s.width)); // (the same energy as the full width)
+            s.earlyLevel *= 0.4; // its first 80 ms hold 3.4 dB less of the energy than ours did (impulse at −20 dB)
+        }
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)
