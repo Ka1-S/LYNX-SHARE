@@ -2528,7 +2528,7 @@ countries: it ch sm
 "Echo > Rev|Rev > Echo" = "Eco > Rev|Rev > Eco"
 "Reverb mode" = "Modalità reverb"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Brillante|Neutro|Scuro|Vintage"
+"Bright|Neutral|Dark|Studio" = "Brillante|Neutro|Scuro|Studio"
 "Damping" = "Smorzamento"
 "Bass freq" = "Freq. bassi"
 "Late mix" = "Mix coda"

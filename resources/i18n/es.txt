@@ -2528,7 +2528,7 @@ countries: es mx ar co cl pe ve
 "Echo > Rev|Rev > Echo" = "Eco > Rev|Rev > Eco"
 "Reverb mode" = "Modo de reverb"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Habitación|Cámara|Placa|Sala|Catedral|Espacio|Congelar|Gated"
-"Bright|Neutral|Dark|Vintage" = "Brillante|Neutro|Oscuro|Vintage"
+"Bright|Neutral|Dark|Studio" = "Brillante|Neutro|Oscuro|Estudio"
 "Damping" = "Amortiguación"
 "Bass freq" = "Frec. graves"
 "Late mix" = "Mezcla tardía"

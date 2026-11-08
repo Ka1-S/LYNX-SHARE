@@ -2528,7 +2528,7 @@ countries: jp
 "Echo > Rev|Rev > Echo" = "エコー > リバーブ|リバーブ > エコー"
 "Reverb mode" = "リバーブモード"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "ブライト|ニュートラル|ダーク|ビンテージ"
+"Bright|Neutral|Dark|Studio" = "ブライト|ニュートラル|ダーク|スタジオ"
 "Damping" = "ダンピング"
 "Bass freq" = "低域周波数"
 "Late mix" = "後期ミックス"

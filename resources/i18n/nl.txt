@@ -2528,7 +2528,7 @@ countries: nl be
 "Echo > Rev|Rev > Echo" = "Echo > Rev|Rev > Echo"
 "Reverb mode" = "Reverbmodus"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Helder|Neutraal|Donker|Vintage"
+"Bright|Neutral|Dark|Studio" = "Helder|Neutraal|Donker|Studio"
 "Damping" = "Demping"
 "Bass freq" = "Bass freq"
 "Late mix" = "Late mix"

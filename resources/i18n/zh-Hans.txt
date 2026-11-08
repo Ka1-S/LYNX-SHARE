@@ -2528,7 +2528,7 @@ countries: cn sg
 "Echo > Rev|Rev > Echo" = "回声 > 混响|混响 > 回声"
 "Reverb mode" = "混响模式"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "明亮|中性|暗|复古"
+"Bright|Neutral|Dark|Studio" = "明亮|中性|暗|录音室"
 "Damping" = "阻尼"
 "Bass freq" = "低音频率"
 "Late mix" = "后期混合"

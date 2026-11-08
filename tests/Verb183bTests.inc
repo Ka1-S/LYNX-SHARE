@@ -151,3 +151,17 @@ TEST (horizon_mode_steps_and_loud_programme_verb183b)
     const auto squeeze = wetDb (0.01f) - wetDb (0.5f);
     CHECK (squeeze > 2.5 && squeeze < 6.0);
 }
+
+TEST (horizon_studio_colour_keeps_index_three_verb183b)
+{
+    using namespace verbs100;
+    // round 183b: the fourth colour is relabelled "Studio" (the reference's name); a saved project keeps the index,
+    // so value 1.0 (index 3, formerly "Vintage") still loads as the fourth colour and plays its steep 560 Hz cut
+    CHECK (std::string (lynx::formatEffectParam (EffectKind::horizon, 23, 1.0f, 120.0)) == "Studio");
+    CHECK (lynx::verbs::choice (1.0f, 4) == 3);
+    auto p = verb183b::horizon();
+    const auto neutral = impulse (EffectKind::horizon, p, 1.0);
+    p[23] = 1.0f;
+    const auto studio = impulse (EffectKind::horizon, p, 1.0);
+    CHECK (verb183b::powerAt (studio.l, 120.0, 0, 48000) - verb183b::powerAt (neutral.l, 120.0, 0, 48000) < -15.0);
+}

@@ -1455,7 +1455,7 @@ LYNX_FIT_TABLE HorizonReverb horizonReverbs[horizon::reverbModeCount] = {
 // round 183b: the reference's colours (its manual and measured): Bright and Neutral play the same at these decays;
 // Dark adds a steep low-pass at 8 kHz (and −1.5 dB from 3 kHz up); the fourth (the reference's Studio) a steep
 // 600 Hz low cut (12 dB/oct, −3 dB at ~560 Hz) and a steep 10 kHz high cut (36 dB/oct at 12 kHz)
-const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Vintage" };
+const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Studio" };
 
 double horizonDecaySec (float v) { return knotLaw (v, horizonDecayKnots, horizonDecayCount); }
 double horizonEchoMs (float v) { return knotLaw (v, horizonEchoKnots, horizonEchoCount); }

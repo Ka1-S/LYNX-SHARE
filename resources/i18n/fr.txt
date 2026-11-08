@@ -2528,7 +2528,7 @@ countries: fr be ch ca lu
 "Echo > Rev|Rev > Echo" = "Écho > Rév|Rév > Écho"
 "Reverb mode" = "Mode de réverb"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Pièce|Chambre|Plaque|Salle|Cathédrale|Espace|Gel|Gated"
-"Bright|Neutral|Dark|Vintage" = "Brillant|Neutre|Sombre|Vintage"
+"Bright|Neutral|Dark|Studio" = "Brillant|Neutre|Sombre|Studio"
 "Damping" = "Amortissement"
 "Bass freq" = "Fréq. graves"
 "Late mix" = "Mix tardif"
