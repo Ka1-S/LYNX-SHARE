@@ -7885,3 +7885,6 @@ countries: pl
 "Launch glide (LYNX)" = "Płynne przejście przy uruchomieniu (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Brak kanałów podrzędnych: zaznacz kanały w Channel Rack i użyj Ustaw dzieci w menu łańcucha."
 "Plays {0} channels" = "Gra kanały: {0}"
+"Group into Audio Effect Rack" = "Grupuj w rack efektów audio"
+"Group all into Audio Effect Rack" = "Grupuj wszystko w rack efektów audio"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Tych efektów nie można umieścić w racku (sidechain lub ponad 16 automatyzowanych parametrów)."

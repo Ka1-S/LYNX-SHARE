@@ -746,6 +746,82 @@ EffectSlot group (const std::vector<EffectSlot>& slots)
     return slot;
 }
 
+bool fromPatcher (PatcherDoc& doc, const std::function<float (int node, int param)>& pluginValue)
+{
+    if (doc.isRack() || doc.nodes.empty() || doc.published.size() > (std::size_t) rackMacroCount || ! doc.surface.empty())
+        return false;
+    // a plugin's parameter: its current value, or no grouping (a macro at 0 would move it)
+    std::vector<float> pluginValues (doc.published.size(), -1.0f);
+    for (std::size_t k = 0; k < doc.published.size(); ++k)
+        if (const auto& p = doc.published[k]; p.node >= 0 && p.node < (int) doc.nodes.size() && doc.nodes[(std::size_t) p.node].effect.kind == EffectKind::plugin)
+        {
+            pluginValues[k] = pluginValue ? pluginValue (p.node, p.param) : -1.0f;
+            if (! (pluginValues[k] >= 0.0f))
+                return false;
+        }
+    for (const auto& n : doc.nodes)
+        if (n.generator || ! n.busHeads.empty())
+            return false;
+    for (const auto& p : doc.published)
+        if (p.curve.size() > 2 || (p.node >= 0 && p.node >= (int) doc.nodes.size()))
+            return false;
+    // the series: From LYNX → a → b → … → To LYNX, every node once, nothing else
+    std::vector<int> order;
+    int at = patchFromHost;
+    for (std::size_t guard = 0; guard <= doc.nodes.size(); ++guard)
+    {
+        const PatchWire* next = nullptr;
+        int count = 0;
+        for (const auto& w : doc.wires)
+            if (w.kind == PatchWire::Kind::audio && w.from == at && w.fromPort == 0 && w.enabled)
+            {
+                next = &w;
+                ++count;
+            }
+        if (count != 1 || next->toPort != 0 || next->gain != 1.0f)
+            return false;
+        if (next->to == patchToHost)
+            break;
+        order.push_back (next->to);
+        at = next->to;
+    }
+    if (order.size() != doc.nodes.size() || doc.wires.size() != doc.nodes.size() + 1)
+        return false;
+    const auto published = doc.published;
+    RackDoc r;
+    r.kind = RackDoc::Kind::audioEffect;
+    r.showDevices = true;
+    doc.rack.push_back (std::move (r));
+    RackChain chain;
+    chain.name = "Chain 1";
+    chain.nodes = order;
+    chain.select = { 0, 127, 0, 127 };
+    addChainNodes (doc, chain, RackDoc::Kind::audioEffect);
+    auto* rk = rackOf (doc);
+    rk->chains.push_back (std::move (chain));
+    for (int k = 0; k < (int) published.size(); ++k)
+    {
+        const auto& p = published[(std::size_t) k];
+        if (p.node < 0)
+            continue;
+        RackMapping m;
+        m.node = p.node;
+        m.param = p.param;
+        if (p.curve.size() == 2)
+            m.min = p.curve[0], m.max = p.curve[1];
+        auto& macro = rk->macros[(std::size_t) k];
+        macro.name = p.name;
+        macro.mappings.push_back (m);
+        const auto& node = doc.nodes[(std::size_t) p.node];
+        const auto now = node.effect.kind == EffectKind::plugin ? pluginValues[(std::size_t) k]
+                         : p.param >= 0 && p.param < maxEffectParams ? node.effect.params[(std::size_t) p.param] : 0.0f;
+        if (m.max != m.min)
+            macro.value = std::clamp ((now - m.min) / (m.max - m.min), 0.0f, 1.0f) * 127.0f;
+    }
+    compile (doc);
+    return true;
+}
+
 std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot)
 {
     std::vector<EffectSlot> out;

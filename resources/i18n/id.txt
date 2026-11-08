@@ -7885,3 +7885,6 @@ countries: id
 "Launch glide (LYNX)" = "Glide saat dijalankan (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Belum ada anak: pilih kanal di Channel Rack, lalu gunakan Atur child di menu rantai."
 "Plays {0} channels" = "Memainkan {0} kanal"
+"Group into Audio Effect Rack" = "Kelompokkan ke rak efek audio"
+"Group all into Audio Effect Rack" = "Kelompokkan semua ke rak efek audio"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Efek ini tidak bisa masuk ke rak (ada sidechain, atau lebih dari 16 parameter otomasi)."

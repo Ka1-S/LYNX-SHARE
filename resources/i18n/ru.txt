@@ -7885,3 +7885,6 @@ countries: ru by kz
 "Launch glide (LYNX)" = "Плавный переход при запуске (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Дочерних каналов пока нет: выберите каналы в Channel Rack и используйте «Задать дочерние» в меню цепи."
 "Plays {0} channels" = "Играет каналов: {0}"
+"Group into Audio Effect Rack" = "Сгруппировать в рэк аудиоэффектов"
+"Group all into Audio Effect Rack" = "Сгруппировать всё в рэк аудиоэффектов"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Эти эффекты нельзя поместить в рэк (сайдчейн или более 16 автоматизированных параметров)."

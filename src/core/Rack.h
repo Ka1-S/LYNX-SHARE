@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -111,6 +112,12 @@ void setSelector (PatcherDoc& doc, float value);
 // Group: effect slots into a new Audio Effect Rack with one chain holding them (Live's Group, Ctrl+G). Ungroup: a
 // one-chain rack's devices back as slots (empty when the rack has several chains or isn't an effect rack).
 EffectSlot group (const std::vector<EffectSlot>& slots);
+// A plain Patcher of effects in series (what Patcherize makes, core/Patcherize.h) turned into an Audio Effect Rack with one
+// chain: its published parameters 0…15 become macros 0…15 on the same parameters (full range), so automation and
+// links that drove them keep working. False (document untouched) for a side-chain, a generator, a branch, more than 16
+// published parameters or a curved one. A hosted plugin's parameter needs its current value (`pluginValue (node,
+// param)`, 0..1; −1 = unknown → false), so the macro starts where the plugin is and grouping changes no sound.
+bool fromPatcher (PatcherDoc& doc, const std::function<float (int node, int param)>& pluginValue = {});
 std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot);
 
 // ---------------------------------------------------------------------------------------------------------------

@@ -10,6 +10,7 @@
 #include "ui/TextCache.h"
 
 #include "core/Patcherize.h"
+#include "core/Rack.h"
 #include "core/FlpImport.h"
 #include "engine/FlStudio.h"
 #include "core/FlEffects.h"
@@ -3753,6 +3754,39 @@ juce::Rectangle<int> EffectsPanel::inputBoxBounds() const
     return { 38, panelHeader + 2, getWidth() - 46, inputRowHeight - 8 };
 }
 
+void EffectsPanel::groupIntoRack (int slot, bool all)
+{
+    engine.capturePluginStates(); // (the plugins' current settings go with them)
+    const auto t = track;
+    const auto moved = all ? patcherize::slotsForAll (engine.getSong(), t) : std::vector<int> { slot };
+    // a hosted plugin's automated parameter: its value now (node k is moved slot k), so its macro starts there
+    auto values = [this, t, moved] (int node, int param) -> float {
+        if (node < 0 || node >= (int) moved.size())
+            return -1.0f;
+        if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (t, moved[(std::size_t) node]).get()); p != nullptr && ! p->hasCrashed())
+            if (auto& instance = p->getInstance(); param >= 0 && param < instance.getParameters().size())
+                return instance.getParameters()[param]->getValue();
+        return -1.0f;
+    };
+    auto trial = engine.getSong();
+    const auto at = patcherize::patcherizeSlots (trial, t, slot, all);
+    if (at < 0 || ! rack::fromPatcher (trial.mixer[(std::size_t) t].effects[(std::size_t) at].patcher, values))
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Group into Audio Effect Rack"),
+                                                tr ("These effects can't go into a rack (a side-chain, or more than 16 automated parameters)."));
+        return;
+    }
+    int placed = -1;
+    engine.editSong ([t, slot, all, values, &placed] (Song& song) {
+        placed = patcherize::patcherizeSlots (song, t, slot, all);
+        if (placed >= 0)
+            rack::fromPatcher (song.mixer[(std::size_t) t].effects[(std::size_t) placed].patcher, values);
+    });
+    if (placed >= 0)
+        selectedSlot = placed;
+    repaint();
+}
+
 void EffectsPanel::timerCallback()
 {
     // the input level of the shown insert (the strips read their own); decays like a meter
@@ -6267,6 +6301,10 @@ void EffectsPanel::showSlotMenu (int slot)
             selectedSlot = placed;
         repaint();
     });
+    // round 183c: Live's Group (Ctrl+G): the effect (or the whole chain) into a new Audio Effect Rack, same sound; the
+    // automation of the moved effects' parameters drives the rack's macros
+    menu.addItem (tr ("Group into Audio Effect Rack"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] { groupIntoRack (slot, false); });
+    menu.addItem (tr ("Group all into Audio Effect Rack"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] { groupIntoRack (slot, true); });
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 

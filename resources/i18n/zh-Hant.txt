@@ -7885,3 +7885,6 @@ countries: tw hk mo
 "Launch glide (LYNX)" = "啟動時滑移 (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "還沒有子通道：在 Channel Rack 中選擇通道，然後在鏈選單中使用「設定子通道」。"
 "Plays {0} channels" = "演奏 {0} 個通道"
+"Group into Audio Effect Rack" = "組合到音訊效果機架"
+"Group all into Audio Effect Rack" = "全部組合到音訊效果機架"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "這些效果無法放入機架（有側鏈，或自動化參數超過 16 個）。"

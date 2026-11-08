@@ -7885,3 +7885,6 @@ countries: tr
 "Launch glide (LYNX)" = "Başlatırken geçiş (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Henüz alt kanal yok: Channel Rack'te kanalları seçin, sonra zincir menüsünde Alt kanalları ata'yı kullanın."
 "Plays {0} channels" = "{0} kanal çalar"
+"Group into Audio Effect Rack" = "Ses efekti rafında grupla"
+"Group all into Audio Effect Rack" = "Tümünü ses efekti rafında grupla"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Bu efektler bir rafa konamaz (bir sidechain veya 16'dan fazla otomasyonlu parametre)."

@@ -7885,3 +7885,6 @@ countries: nl be
 "Launch glide (LYNX)" = "Glijden bij starten (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Nog geen kinderen: selecteer kanalen in de Channel Rack en gebruik dan Children instellen in het ketenmenu."
 "Plays {0} channels" = "Speelt {0} kanalen"
+"Group into Audio Effect Rack" = "Groeperen in audio-effectrack"
+"Group all into Audio Effect Rack" = "Alles groeperen in audio-effectrack"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Deze effecten kunnen niet in een rack (een sidechain, of meer dan 16 geautomatiseerde parameters)."

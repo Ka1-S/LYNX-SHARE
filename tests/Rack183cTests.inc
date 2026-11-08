@@ -650,3 +650,57 @@ TEST (rack183c_midi_effect_rack_plays_its_children_only)
         block();
     CHECK (spies[1] != nullptr && spies[1]->got.size() == 2 && ! spies[1]->got.back().on);
 }
+
+TEST (rack183c_group_into_a_rack_keeps_the_sound_and_the_automation)
+{
+    using namespace rack183c;
+    // insert 1: two utilities (the second at -12 dB), its gain automated; grouped into one Audio Effect Rack
+    Song song;
+    song.mixer = Song::defaultMixer (2);
+    auto quiet = makeEffectSlot (EffectKind::utility);
+    quiet.params[0] = 0.25f;
+    song.mixer[1].effects = { makeEffectSlot (EffectKind::utility), quiet };
+    Automation a;
+    a.target = { AutomationTargetKind::effectParam, 1, 1, 0 };
+    song.automations.push_back (a);
+    const auto at = patcherize::patcherizeSlots (song, 1, 0, true);
+    CHECK (at == 0 && song.mixer[1].effects.size() == 1);
+    if (at != 0)
+        return;
+    auto& doc = song.mixer[1].effects[0].patcher;
+    CHECK (rack::fromPatcher (doc));
+    CHECK (rack::isRack (song.mixer[1].effects[0]) && doc.rack[0].chains.size() == 1 && doc.rack[0].chains[0].nodes == (std::vector<int> { 0, 1 }));
+    // the automation now drives macro 0 (= its old published parameter), mapped on the same parameter over its full range
+    const auto& target = song.automations[0].target;
+    CHECK (target.slot == 0 && target.param >= 0 && target.param < rackMacroCount);
+    if (target.param >= 0 && target.param < rackMacroCount)
+    {
+        const auto& m = doc.rack[0].macros[(std::size_t) target.param];
+        CHECK (m.mappings.size() == 1 && m.mappings[0].node == 1 && m.mappings[0].param == 0 && approx (m.value, 0.25f * 127.0f, 1.0e-3f));
+    }
+    // the same sound: -12 dB
+    auto g = graphOf (doc);
+    run (*g);
+    const auto o = run (*g);
+    CHECK (approx (o[2], 0.5f * std::pow (10.0f, -12.0f / 20.0f), 2.0e-3f));
+    // what can't go into a rack: a side-chain cable, a branch
+    PatcherDoc branch;
+    branch.nodes = { utilityNode(), utilityNode() };
+    PatchWire w1, w2, w3, w4;
+    w1.to = 0, w2.to = 1, w3.from = 0, w4.from = 1;
+    branch.wires = { w1, w2, w3, w4 };
+    CHECK (! rack::fromPatcher (branch) && ! branch.isRack());
+    // a plugin parameter needs its current value (else its macro would move it)
+    PatcherDoc plugin;
+    PatchNode p;
+    p.effect = makeEffectSlot (EffectKind::plugin);
+    plugin.nodes = { p };
+    PatchWire in, out;
+    in.to = 0, out.from = 0;
+    plugin.wires = { in, out };
+    PatchParam pp;
+    pp.node = 0, pp.param = 3;
+    plugin.published = { pp };
+    CHECK (! rack::fromPatcher (plugin));
+    CHECK (rack::fromPatcher (plugin, [] (int, int) { return 0.4f; }) && approx (plugin.rack[0].macros[0].value, 0.4f * 127.0f, 1.0e-3f));
+}

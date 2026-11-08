@@ -7885,3 +7885,6 @@ countries: es mx ar co cl pe ve
 "Launch glide (LYNX)" = "Deslizamiento al lanzar (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Aún sin hijos: selecciona canales en el Channel Rack y usa Asignar hijos en el menú de la cadena."
 "Plays {0} channels" = "Toca {0} canales"
+"Group into Audio Effect Rack" = "Agrupar en rack de efectos de audio"
+"Group all into Audio Effect Rack" = "Agrupar todo en rack de efectos de audio"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "Estos efectos no pueden ir a un rack (un side-chain, o más de 16 parámetros automatizados)."

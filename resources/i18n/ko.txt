@@ -7885,3 +7885,6 @@ countries: kr
 "Launch glide (LYNX)" = "실행 시 글라이드 (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "아직 자식 채널이 없습니다: Channel Rack에서 채널을 선택한 뒤 체인 메뉴의 자식 설정을 사용하세요."
 "Plays {0} channels" = "{0}개 채널 연주"
+"Group into Audio Effect Rack" = "오디오 이펙트 랙으로 그룹화"
+"Group all into Audio Effect Rack" = "모두 오디오 이펙트 랙으로 그룹화"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "이 이펙트들은 랙에 넣을 수 없습니다 (사이드체인, 또는 오토메이션된 파라미터가 16개 초과)."

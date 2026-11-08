@@ -7885,3 +7885,6 @@ countries: jp
 "Launch glide (LYNX)" = "起動時のグライド (LYNX)"
 "No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "子チャンネルがまだありません: Channel Rack でチャンネルを選び、チェーンメニューの「子を設定」を使ってください。"
 "Plays {0} channels" = "{0} チャンネルを演奏"
+"Group into Audio Effect Rack" = "オーディオエフェクトラックにグループ化"
+"Group all into Audio Effect Rack" = "すべてをオーディオエフェクトラックにグループ化"
+"These effects can't go into a rack (a side-chain, or more than 16 automated parameters)." = "これらのエフェクトはラックに入れられません (サイドチェーン、または17個以上のオートメーションパラメーター)。"
