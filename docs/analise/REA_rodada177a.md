@@ -299,6 +299,10 @@ JUCE reads the button through GetAsyncKeyState. The cause is a JUCE timer whose 
 period. 177a-10 counts the steps from the press time (`faderRailStepsForHold`), polling every 16 ms, so an early
 callback can't add a step. The earlier 300 ms first delay (177a-6, INFERRED) is replaced by FL's measured timing.
 
+**After 177a-10 (real window, 2026-11-08 05:28, the same clicks as the failing run):** ten clicks give -1.6 dB, the same as
+FL (before: -2.4 dB). Four more single clicks went -1.8 / -1.9 / -2.1 / -2.3 dB, one step each within the display's
+±0.05 dB rounding [SHOT pairs/lynx-rail-10clicks-after-177a-10.png].
+
 LYNX (slice 177a-4) now does the same by default, as the coordinator decided: a stray click can't jump a mix.
 `faderRailStep = 0.0056` and `faderRailRepeatMs = 64` are in `Song.h`, and Ctrl+click still resets. The VCA faders
 behave the same. In the real LYNX window one click gave -0.2 dB, as FL. Ten quick clicks first gave -2.1 dB against
