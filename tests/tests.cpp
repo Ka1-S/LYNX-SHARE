@@ -17126,3 +17126,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sc177bTests.inc"
 #include "Issue97Tests.inc"
 #include "SimpleTracks184aTests.inc"
+#include "SimpleChooser184aTests.inc"
