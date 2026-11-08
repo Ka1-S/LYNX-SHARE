@@ -323,6 +323,21 @@ Round 147 (`docs/analise/REA_rodada147.md`, sub-rounds `REA_rodada147a.md` / `RE
 | Ridge Strip | SSL E-Channel | 7 → 8 | 7 → 7 | ANALOG (measured noise floor), auto make-up for Ridge's own compressor, translated |
 | Hush De-esser | DeEsser | 9 → 9 | 7 → 8 | the energy-detector bar beside the threshold arrow |
 
+## Round 183b slice 7: Echoform ← ValhallaDelay
+
+Measured on tp172d's settings and 12 new captures at Mix 100 %: the default (Tape), Age 0 / 100 %, wow and flutter off, Feedback 70 %, Drive, Diffusion, the Past / Future eras, and three other modes. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 16 settings. **Sound 4 → 5** in the main table: that row sits next to Atrium's, so it is set when the slice lands.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Echoform (slice 7) | ValhallaDelay | 3.75 → 4.06 / 2.88 → 3.34 | 5.12 → 6.32 / 5.18 → 6.01 | Over the bank: music 3.27 → 3.82, drums 3.80 → 4.00, the −20 dB impulse 1.83 → 2.50; the verb's rt60 part goes from 2.8 to 4.3 and its edc part from 2.7 to 6.0 |
+
+- **Tape mode's repeats.** At 300 ms and Feedback 70 % (its defaults), the reference's first repeat sits 2.6 dB above ours. After that it loses 5.6, 4.9, 4.6 … 4.3 dB per repeat; ours lost 7.9, 6.8 … 6.3. Echoform's tape path took −1.9 dB on every pass, so that loss is removed. The other modes were already right: the 0.2083 mode matches per repeat within 0.3 dB. EchoBoy's and H-Delay's settings don't use this path, and their scores are unchanged.
+- **Measured, not modelled:**
+  - The reference's tape hiss (−92 dBFS RMS, uncorrelated; −88 dBFS in the Future era) is inaudible, so it is left out, but it dominates the score of the quiet −20 dB impulses.
+  - The Tape mode is not linear: the 0.5 impulse comes out 2–6 dB fuller below 300 Hz than the −20 dB one, as in FutureVerb.
+  - At Feedback 140 % the reference's repeats grow by ~0.4 dB per pass at −20 dB, where ours stay level.
+  - Its wow and flutter are random per render: two renders of the same setting differ by +2.7 dB ESR, so their phase cannot be matched.
+
 ## Round 144: what changed (config / design, after 137 → after 144)
 
 Round 144 (`docs/analise/REA_rodada144.md`, sub-rounds `REA_rodada144a.md` / `REA_rodada144b.md`).
