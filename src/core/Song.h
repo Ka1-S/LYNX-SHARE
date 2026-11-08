@@ -33,6 +33,16 @@ constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in F
 // mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
 constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
 constexpr int faderRailRepeatMs = 64;
+// FL measured (REA_rodada177a section 4.2): held 50 / 100 / 160 / 250 / 300 / 400 ms the cap took 1 / 2 / 3 / 4 / 5 / 7
+// steps, so the first repeat comes one period after the press, with no longer first delay. LYNX counts the steps from
+// the press time, not from when its timer happens to fire (a JUCE timer's first callback can come early, which turned
+// one click into two steps).
+constexpr int faderRailFirstRepeatMs = faderRailRepeatMs;
+// how many steps a press held `heldMs` has taken: one at once, then one per period
+constexpr int faderRailStepsForHold (int heldMs) noexcept
+{
+    return heldMs < faderRailFirstRepeatMs ? 1 : 2 + (heldMs - faderRailFirstRepeatMs) / faderRailRepeatMs;
+}
 constexpr float faderRailStepTowards (float value, float target) noexcept
 {
     const auto distance = target - value;
@@ -279,6 +289,14 @@ struct SamplePrecompute
     bool operator== (const SamplePrecompute&) const = default;
 };
 
+// A warp marker (round 175a, M1; Ableton Live's WarpMarker SecTime / BeatTime): a time in the sample file and the
+// content beat it plays on. Between markers the sample is stretched evenly.
+struct WarpPoint
+{
+    double seconds = 0.0, beats = 0.0;
+    bool operator== (const WarpPoint&) const = default;
+};
+
 struct SamplerSettings
 {
     float pitch = 0.0f;   // semitones, -24..24
@@ -291,7 +309,13 @@ struct SamplerSettings
     float stretchBeats = 0.0f; // > 0: the whole sample lasts this long (in beats), following the BPM
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
+    int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
+    int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // with keepPitch and stretchBeats: the file's warp markers (seconds → beats, increasing). The file still lasts
+    // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
+    // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
+    std::vector<WarpPoint> warp;
     // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept
@@ -731,6 +755,7 @@ struct ChannelDef
     std::vector<StandIn> standIns;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
+    int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
@@ -1335,6 +1360,11 @@ struct Clip
     int channel = -1;         // audio clips: channel (audioClip) that holds the sample
     int automation = -1;      // automation clips: index into Song::automations
     std::int64_t fadeIn = 0, fadeOut = 0; // audio clips: fades (ticks)
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // audio clips: FL's raw fade curve values, kept for the export
+    // audio clips: straight fades instead of FL's S curve, bit 0 the fade-in, bit 1 the fade-out (FL's shape 1, round 180d).
+    // Also every clip of a project saved before that round: a finished mix must not change when it is reopened.
+    std::uint8_t linearFades = 0;
+    std::uint32_t flFadeFlags = 0; // FL's raw fade flags of an imported clip (flp::PlaylistItem::fadeFlags), back in the export
     float gain = 1.0f;        // audio clips: clip volume (linear; FL's gain handle: −96.1 … +36 dB, round 166e)
     float pan = 0.0f;         // audio clips: clip pan -1..1 (FL 2026's clip pan; REA round 153)
     bool muted = false;       // clip-level mute (the Mute tool); independent of the track mute

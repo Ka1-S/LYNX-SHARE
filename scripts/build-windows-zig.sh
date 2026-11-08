@@ -325,11 +325,12 @@ echo "Linking..."
 # bisect step without that branch) must never be linked in
 APP_OBJECTS=()
 for src in "${APP_SOURCES[@]}"; do APP_OBJECTS+=("$OUT/app/$(echo "$src" | tr / _).o"); done
+# (one list: the plugins of LYNX_BUILD_PLUGINS=1 below link the same app objects, so they need the same libraries)
+APP_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32
+          -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi
+          -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp)
 "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
-    -Wl,--subsystem,windows \
-    -lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32 \
-    -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi \
-    -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp
+    -Wl,--subsystem,windows "${APP_LIBS[@]}"
 
 ls -la "$OUT/LYNX.exe"
 
@@ -344,9 +345,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     PLUGIN_OBJECTS=()
     for src in "${APP_SOURCES[@]}"; do [[ "$src" == src/Main.cpp ]] || PLUGIN_OBJECTS+=("$OUT/app/$(echo "$src" | tr / _).o"); done
     mkdir -p "$OUT/plugin" "$OUT/plugins"
-    PLUGIN_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32
-                 -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi
-                 -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfuuid -lksuser -lavrt -lwinhttp -lpsapi)
+    PLUGIN_LIBS=("${APP_LIBS[@]}" -lpsapi)
     plugin_cxx() { # <obj> <source> [flags...]
         local obj="$1" source="$2"; shift 2
         cached_pp "$obj" -- $ZIG c++ $COMMON_STR -Isrc -DLYNX_EXPORT_VERSION="\"$VERSION\"" -DJUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1 "$@" -c "$source" -o "$obj"
