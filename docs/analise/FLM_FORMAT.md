@@ -90,7 +90,7 @@ normal channel. PROVEN-FILE; the values match the CHNL kind in the same slot.
 |---|---|---|
 | `RHED` | u32 (skipped), u32 next module id, i32, i32 (−1 = none). INFERRED: selected or focused slots | PROVEN-REA 0x18059b100 |
 | `FOUT` | i32, i32 → output routing (the channel's output target) | PROVEN-REA (tag at 0x1809f4f38) |
-| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats: [0] **volume** 0…1, [1] **pan** 0…1 (0.5 = centre), [2..5] other rack controls. INFERRED: [2..5] are mute/solo/send-type controls | PROVEN-REA (6 values → 0x18059e0c0); the meaning of [0] and [1] is INFERRED from the values (0.69…1.0 and 0.5) |
+| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats (the rack's parameters 0…5; the same ids automation lanes use with module 0):<br>• [0] **volume**, gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB: 0 dB at v ≈ 0.853, +6 dB at 1, silent at 0<br>• [1] **pan** p = 2v − 1 as a balance: p > 0 scales the left side by 1 − p, p < 0 the right side by 1 + p<br>• [4] pitch bend: a ratio of 2^(4v − 2) on the playing voices<br>• [5] is passed on to the modules<br>• [2], [3]: not handled by the setter | PROVEN-REA: setter 0x18059e0c0, fader law 0x1805943b0 (round 182c F2) |
 | `CCLK` | list of (i32, i32, i32) triples, deduplicated. INFERRED: controller links | PROVEN-REA |
 | `RSMP` | **built-in drum sampler**: magic `10MS` + u32 + `PADS` (22 bytes, pad → sample index; identity by default) + one `SMPl`/`SMPL` per kit sample (section 6). Drum notes use key = sample index | PROVEN-REA (0x18074fcd0), PROVEN-FILE (2404 drum notes, all keys < kit size) |
 | `RMOd` | **one module (instrument or effect)**: u32 module **type id** + u32 module **instance id** + module body (section 3.1). Order = slot order in the rack | PROVEN-REA 0x18059b100 → factory 0x180597870 |
@@ -141,9 +141,17 @@ PROVEN-REA:
 
 ### SEND
 
-One chunk per send, 6 × 32-bit: target, level, …. The writer converts a level through a dB-style curve and also
-stores the linear value. INFERRED: a send to the AUX track (0x80 rack) at that level. PROVEN-REA (writer); the meaning
-is INFERRED.
+One chunk per route of the channel, 6 × 32-bit (PROVEN-REA: writer 0x180757d80, reader 0x180758ac0):
+- [0] the **target channel id** (CHHD +1080). The master's id is its route to the main output, another id is a send
+  to that channel (an AUX/bus track);
+- [1] a float (1.0 in every sample);
+- [2] the **linear gain**, from [5] by the fader law, capped at 1;
+- [3] a float (1.0);
+- [4] a float (0.853 = 0 dB);
+- [5] the **level 0…1 on the fader law**. When [5] is missing the reader rebuilds it from [2].
+
+Every channel of the user's song has one SEND, to id 0 (the master) at 0.853 = 0 dB. FLM 4.x demos have none: their
+channels then use the default route.
 
 ### TRKH: one track lane of the channel (a channel can have several)
 
@@ -310,7 +318,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
 
 1. EVN2 bytes 14–19 meanings (velocity scale, pan, fine pitch, repeat). Close it with one REA pass on the note loader,
    or by round-tripping a note edited in the plugin UI (GUI turn).
-2. RPRM [2..5], CHHD colour/mute/solo, SEND fields.
+2. CHHD colour/mute/solo; RPRM [2], [3]; SEND words [1], [3], [4].
 3. The automation point shape codes (negative keys) and their curve maths.
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
    TransistorBass first).

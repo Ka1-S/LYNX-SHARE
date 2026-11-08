@@ -210,7 +210,14 @@ inline Bytes lane (std::uint32_t kind, const std::string& name, std::initializer
     return chunk ("TRKH", body);
 }
 
-inline Bytes channel (std::uint32_t kind, const std::string& name, double order, std::initializer_list<Bytes> lanes, bool oldHeader = false)
+struct Send
+{
+    std::uint32_t target;
+    float level;
+};
+
+inline Bytes channel (std::uint32_t kind, const std::string& name, double order, std::initializer_list<Bytes> lanes, bool oldHeader = false,
+                      std::initializer_list<Send> sends = {})
 {
     Bytes b;
     u32 (b, kind);
@@ -233,6 +240,18 @@ inline Bytes channel (std::uint32_t kind, const std::string& name, double order,
         lp32 (hd, "");
     }
     auto body = cat ({ b, chunk ("CHHD", hd) });
+    for (const auto& snd : sends)
+    {
+        Bytes w;
+        u32 (w, snd.target);
+        f32 (w, 1.0f);
+        f32 (w, std::min (1.0f, snd.level)); // (the linear gain FLM writes is capped at 1)
+        f32 (w, 1.0f);
+        f32 (w, snd.level);
+        f32 (w, snd.level);
+        const auto c = chunk ("SEND", w);
+        put (body, c.data(), c.size());
+    }
     for (const auto& l : lanes)
         put (body, l.data(), l.size());
     return chunk ("CHNL", body);
@@ -263,14 +282,17 @@ inline Bytes project()
                   rack (flm::kindNormal, {}, { sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav"), sample ("Snare", "@R@", "Drum Samples\\Snare\\Gone.wav") }),
                   rack (flm::kindNormal, { module (35, 2) }),
                   rack (flm::kindNormal, { module (0, 2) }),
+                  rack (flm::kindBus, { module (12, 2) }),
                   channel (flm::kindMaster, "MASTER", 0, { lane (1, "Level", { clip (8, 0, 16, 0, 1, { { 0, 0, -5 } }) }, 0, 0) }),
                   // 2 clips of content 1 (8 beats, 4-beat loop → 2 passes each) and one of content 2 starting 1 beat in
                   channel (flm::kindNormal, "808", 1, { lane (0, "808", { clip (4, 8, 4, 0, 1, { { 0, 1, 36 }, { 2, 0.5, 48, 255 } }),
                                                                         clip (20, 8, 4, 0, 1, { { 0, 1, 36 }, { 2, 0.5, 48, 255 } }),
                                                                         clip (32, 3, 4, 1, 2, { { 1, 1, 40 }, { 3, 1, 41 } }) }) }),
                   channel (flm::kindNormal, "Drums", 3, { lane (3, "Drums", { clip (0, 4, 4, 0, 1, { { 0, 0.1249, 0, 255 }, { 1, 0.1249, 1 }, { 2, 0.1249, 5 } }) }) }),
-                  channel (flm::kindNormal, "Vocal", 2, { lane (2, "Vocal", { clip (2, 10, 256, 0.125, 1, {}, sample ("Vocal", "@L@", "My Samples/Vocal.wav", 2.0), 10.125) }) }),
-                  channel (flm::kindNormal, "Lead", 4, { lane (0, "Lead", { clip (0, 0, 4, 0, 1, { { 0, 4, 60 } }) }) }, true) });
+                  channel (flm::kindNormal, "Vocal", 2, { lane (2, "Vocal", { clip (2, 10, 256, 0.125, 1, {}, sample ("Vocal", "@L@", "My Samples/Vocal.wav", 2.0), 10.125) }) },
+                           false, { { 0, 0.6f }, { 5, 0.8531241f } }),
+                  channel (flm::kindNormal, "Lead", 4, { lane (0, "Lead", { clip (0, 0, 4, 0, 1, { { 0, 4, 60 } }) }) }, true),
+                  channel (flm::kindBus, "Reverb Bus", 5, {}) });
 }
 
 inline lynx::FlmImportOptions options (lynx::FlpImportReport* report)
@@ -312,7 +334,7 @@ TEST (flm182c_reads_the_structure)
     CHECK (p->title == "Test Song" && p->tempo == 130.0 && p->numerator == 3 && p->denominator == 4);
     CHECK (p->scale == 5 && p->root == 2 && p->appVersion == "5.0.4");
     CHECK (p->created == "2025-07-06 11-39-10" && p->saved == "2026-11-08 02:09:36" && p->originalName == "New Song (1)");
-    CHECK (p->racks.size() == 5 && p->channels.size() == 5);
+    CHECK (p->racks.size() == 6 && p->channels.size() == 6);
     CHECK (p->racks[1].params.size() == 6 && std::abs (p->racks[1].params[0] - 0.9f) < 1e-6f);
     CHECK (p->racks[1].modules.size() == 2 && p->racks[1].modules[0].type == 1 && p->racks[1].modules[0].keyLow == 24
            && p->racks[1].modules[0].keyHigh == 96 && p->racks[1].modules[0].params.size() == 34);
@@ -355,7 +377,7 @@ TEST (flm182c_rejects_damaged_files)
         const std::uint32_t huge = 0x7FFFFFF0u;
         std::memcpy (&*(at + 4), &huge, 4);
         const auto p = flm::parse ({ bytes.data(), bytes.size() }, &error);
-        CHECK (p && p->channels.size() == 5 && p->channels[0].lanes.size() == 1 && p->channels[0].lanes[0].clips[0].events.empty());
+        CHECK (p && p->channels.size() == 6 && p->channels[0].lanes.size() == 1 && p->channels[0].lanes[0].clips[0].events.empty());
     }
     // random damage never crashes the reader
     std::mt19937 rng (182);
@@ -384,15 +406,24 @@ TEST (flm182c_imports_a_project)
     const auto& s = *song;
     CHECK (std::abs (s.bpm - 130.0) < 1e-9 && s.beatsPerBar == 3 && s.info.title == "Test Song" && s.mode == PlayMode::song);
 
-    // inserts: Master + 808, Vocal, Drums, Lead (FLM's display order)
-    CHECK (s.mixer.size() == 5);
-    if (s.mixer.size() == 5)
-        CHECK (s.mixer[1].name == "808" && s.mixer[2].name == "Vocal" && s.mixer[3].name == "Drums" && s.mixer[4].name == "Lead");
+    // inserts: Master + 808, Vocal, Drums, Lead, Reverb Bus (FLM's display order)
+    CHECK (s.mixer.size() == 6);
+    if (s.mixer.size() == 6)
+    {
+        CHECK (s.mixer[1].name == "808" && s.mixer[2].name == "Vocal" && s.mixer[3].name == "Drums" && s.mixer[4].name == "Lead"
+               && s.mixer[5].name == "Reverb Bus");
+        // F2: the rack's level (FLM's law: 66·v^0.6 − 60 dB) and pan; the Vocal's routes: Master at 0.6, the bus at 0 dB
+        const auto gain09 = (float) std::pow (10.0, 3.3 * std::pow (0.9, 0.6) - 3.0);
+        CHECK (std::abs (faderGain (s.mixer[1].volume) - gain09) < 1e-3f && std::abs (s.mixer[1].pan) < 1e-6f);
+        CHECK (s.mixer[2].toMaster && std::abs (s.mixer[2].masterLevel - (float) std::pow (10.0, 3.3 * std::pow (0.6, 0.6) - 3.0)) < 1e-4f);
+        CHECK (s.mixer[2].sends.size() == 1 && s.mixer[2].sends[0].target == 5 && std::abs (s.mixer[2].sends[0].level - 1.0f) < 1e-4f);
+        CHECK (s.mixer[1].toMaster && s.mixer[1].sends.empty());
+    }
 
     // the DW Sampler with one sample → a sampler with the module's key range
     const auto* sampler = flm182c::channelNamed (s, "808");
     CHECK (sampler != nullptr && sampler->instrument == InstrumentKind::sampler && sampler->samplePath == "E:/flm/Song/My Samples/808.wav"
-           && sampler->keyLow == 24 && sampler->keyHigh == 96 && sampler->mixerTrack == 1);
+           && sampler->keyLow == 24 && sampler->keyHigh == 96 && sampler->mixerTrack == 1 && sampler->volume == 1.0f);
     // the drum kit: one sampler per sample (the second one missing, reported under FL's resources folder)
     const auto* kick = flm182c::channelNamed (s, "Kick");
     const auto* snare = flm182c::channelNamed (s, "Snare");

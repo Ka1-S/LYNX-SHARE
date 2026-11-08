@@ -184,6 +184,16 @@ std::vector<Pass> passesOf (const flm::Clip& clip)
     return out;
 }
 
+// FLM's fader law (FLM_FORMAT §3, PROVEN-REA 0x1805943b0): gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB; 0 dB at
+// v ≈ 0.853, +6 dB at the top
+float flmGain (float v) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (v <= 0.0f)
+        return 0.0f;
+    return (float) std::pow (10.0, 3.3 * std::pow ((double) v, 0.6) - 3.0);
+}
+
 float velocityOf (const flm::Event& e) noexcept { return std::clamp ((float) e.velocity / 255.0f, 0.0f, 1.0f); }
 
 // The pattern holding one content of a note or drum lane: `channelFor(key)` is the channel and key a note plays on
@@ -288,6 +298,7 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
     ChannelDef c;
     c.name = ch.name.empty() ? ch.typeName : ch.name;
     c.mixerTrack = insert;
+    c.volume = 1.0f; // 0 dB: FLM's level is the rack's, on the channel's insert (F2)
     const auto gen = std::find_if (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) { return flm::isGenerator (m.type); });
     if (gen == rack.modules.end())
     {
@@ -422,6 +433,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
 
     static const flm::Rack noRack {};
     int automationLanes = 0;
+    std::map<int, int> insertOfId;                          // FLM channel id → insert
+    std::vector<std::pair<int, const flm::Channel*>> routes; // insert, channel (its SEND chunks)
     for (const auto i : order)
     {
         const auto& ch = project.channels[i];
@@ -437,6 +450,19 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             song.mixer.push_back (std::move (m));
             insert = (int) song.mixer.size() - 1;
         }
+        // the rack's level and pan on it (F2: RPRM [0] volume with FLM's fader law, [1] pan 0…1 → −1…1)
+        if (rack.params.size() >= 2)
+        {
+            auto& m = song.mixer[(std::size_t) insert];
+            const auto gain = flmGain (rack.params[0]);
+            if (gain > maxFaderGain * 1.0001f)
+                ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: level above +5.6 dB (capped)");
+            m.volume = faderPosition (std::min (gain, maxFaderGain));
+            m.pan = std::clamp (rack.params[1] * 2.0f - 1.0f, -1.0f, 1.0f);
+        }
+        if (ch.channelId >= 0)
+            insertOfId[ch.channelId] = insert;
+        routes.push_back ({ insert, &ch });
 
         // effects (F5) and generators past the first are not imported yet; analysis-only modules change nothing
         bool firstGenerator = true;
@@ -477,6 +503,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     c.instrument = InstrumentKind::sampler;
                     c.samplePath = ctx.resolveSample (s, name + ": " + c.name);
                     c.mixerTrack = insert;
+                    c.volume = 1.0f;
                     song.channels.push_back (std::move (c));
                     kitChannels.push_back ((int) song.channels.size() - 1);
                 }
@@ -562,6 +589,39 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 song.playlistTracks[(std::size_t) rowIndex].channel = instrument;
         }
     }
+    // routing (F2): a SEND is (target channel id, …, linear gain capped at 1, …, …, level 0…1 on FLM's fader law)
+    // [FLM_FORMAT §4]; the master's id is its route to the Master, another channel's a send to that insert. A channel
+    // with SENDs but none to the master doesn't reach it directly; one without any keeps LYNX's default route.
+    int masterId = -1;
+    for (const auto& c : project.channels)
+        if (c.kind == flm::kindMaster)
+            masterId = c.channelId < 0 ? 0 : c.channelId;
+    for (const auto& [insert, ch] : routes)
+    {
+        if (insert <= 0 || ch->sends.empty())
+            continue;
+        auto& m = song.mixer[(std::size_t) insert];
+        bool toMaster = false;
+        for (const auto& w : ch->sends)
+        {
+            if (w.empty())
+                continue;
+            const auto target = (int) w[0];
+            float level = 0.853f;
+            if (w.size() >= 6)
+                std::memcpy (&level, &w[5], 4);
+            const auto gain = std::min (flmGain (level), maxFaderGain);
+            if (target == masterId)
+            {
+                toMaster = true;
+                m.masterLevel = gain;
+            }
+            else if (const auto it = insertOfId.find (target); it != insertOfId.end() && it->second > 0 && it->second != insert)
+                m.sends.push_back ({ it->second, gain });
+        }
+        m.toMaster = toMaster;
+    }
+
     if (automationLanes > 0 && ctx.report != nullptr)
         ctx.report->unsupported["FL Studio Mobile: automation lanes (not imported yet)"] += automationLanes;
 

@@ -255,3 +255,15 @@ Not yet (later slices):
 - the Mobile Rack inside .flp (F7).
 
 The six workflow ideas in §6 go to the user as options, with the "Simple" layout proposal (the coordinator, 2026-11-08).
+
+### F2 mixer basics (branch `feature/flm182c-f2`, on top of F1 + F3)
+
+A second REA turn (04:56–05:19) proved the level and route encoding (FLM_FORMAT §3–4):
+- **Volume:** RPRM [0] → the channel's insert. The FLM fader law gives gain = 10^(3.3·v^0.6 − 3), i.e.
+  66·v^0.6 − 60 dB. FLM's top (+6 dB) is capped at LYNX's +5.6 dB and noted in the report.
+- **Pan:** RPRM [1] → the insert's pan (2v − 1).
+- **Routes:** SEND (target channel id, …, level) → the insert's route to the Master and its level (masterLevel), or
+  a send to the target's insert. A channel with routes but none to the master doesn't reach it directly.
+- **Instrument channels** sit at 0 dB (channel volume 1.0), because FLM's level lives on the rack, now the insert.
+
+Mute/solo flags (CHHD) stay INFERRED and are not imported.
