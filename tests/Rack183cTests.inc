@@ -378,3 +378,141 @@ TEST (rack183c_chains_group_ungroup_and_plain_patchers_untouched)
     CHECK (plain == copy && ! plain.isRack() && rack::addChain (plain) == -1 && plain == copy);
     CHECK (! rack::isRack (makeEffectSlot (EffectKind::patcher)));
 }
+
+namespace rack183c
+{
+// A Live rack as Live writes it [DATA: the shipped sets' member names]; only what the import reads
+inline std::string keyMidi (int macro)
+{
+    using als175a::v;
+    return "<KeyMidi>" + v ("PersistentKeyString", "") + v ("IsNote", "false") + v ("Channel", "16") + v ("NoteOrController", std::to_string (macro)) +
+           v ("LowerRangeNote", "-1") + v ("UpperRangeNote", "-1") + v ("ControllerMapMode", "0") + "</KeyMidi>";
+}
+inline std::string range (const char* tag, int lo, int hi, int flo, int fhi)
+{
+    using als175a::v;
+    return std::string ("<") + tag + ">" + v ("Min", std::to_string (lo)) + v ("Max", std::to_string (hi)) + v ("CrossfadeMin", std::to_string (flo)) +
+           v ("CrossfadeMax", std::to_string (fhi)) + "</" + tag + ">";
+}
+inline std::string branchMixer (double volume, double pan, const std::string& volumeMap = {})
+{
+    using als175a::v;
+    return "<MixerDevice><Speaker><Manual Value=\"true\" /></Speaker><Volume>" + volumeMap + v ("Manual", std::to_string (volume)) +
+           "<MidiControllerRange>" + v ("Min", "0.0003162277571") + v ("Max", "1") + "</MidiControllerRange></Volume><Panorama>" + v ("Manual", std::to_string (pan)) +
+           "</Panorama></MixerDevice>";
+}
+inline std::string macros (const std::vector<std::string>& names, const std::vector<int>& values, const std::string& selectorMap)
+{
+    using als175a::v;
+    std::string s;
+    for (int k = 0; k < 16; ++k)
+    {
+        const auto n = std::to_string (k);
+        s += "<MacroControls." + n + ">" + v ("Manual", std::to_string (k < (int) values.size() ? values[(std::size_t) k] : 0)) + "</MacroControls." + n + ">";
+        s += v (("MacroDisplayNames." + n).c_str(), k < (int) names.size() ? names[(std::size_t) k] : "Macro " + std::to_string (k + 1));
+        s += v (("MacroDefaults." + n).c_str(), "-1");
+        s += v (("ExcludeMacroFromRandomization." + n).c_str(), k == 3 ? "true" : "false");
+        s += v (("ExcludeMacroFromSnapshots." + n).c_str(), "false");
+    }
+    s += "<ChainSelector>" + selectorMap + v ("Manual", "20") + "<MidiControllerRange>" + v ("Min", "0") + v ("Max", "127") + "</MidiControllerRange></ChainSelector>";
+    s += v ("NumVisibleMacroControls", "4");
+    return s;
+}
+} // namespace rack183c
+
+TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
+{
+    using namespace rack183c;
+    using als175a::v;
+    // an Audio Effect Rack: "Dry" (a VST2 whose parameter 1 is on macro 3, 0.2…0.8) and "Wet" (Live's EQ Eight: dropped),
+    // chain 2's volume on macro 2, the selector on macro 1; a stored variation "Verse"
+    const auto mappedVst2 = std::string ("<PluginDevice Id=\"1\"><On><Manual Value=\"true\" /></On><PluginDesc><VstPluginInfo Id=\"0\">") + v ("Path", "C:/VST/kHs Gain.dll") +
+                            v ("PlugName", "kHs Gain") + v ("UniqueId", "1802725230") + v ("NumAudioInputs", "1") + "</VstPluginInfo></PluginDesc><ParameterList>" +
+                            "<PluginFloatParameter Id=\"0\">" + v ("ParameterName", "Gain") + v ("ParameterId", "1") + "<ParameterValue>" + keyMidi (2) +
+                            v ("Manual", "0.5") + "<MidiControllerRange>" + v ("Min", "0.2") + v ("Max", "0.8") + "</MidiControllerRange></ParameterValue>" +
+                            "</PluginFloatParameter></ParameterList></PluginDevice>";
+    const auto audioRack = "<AudioEffectGroupDevice Id=\"5\"><On><Manual Value=\"true\" /></On>" + v ("UserName", "Bus") + "<Branches>" +
+                           "<AudioEffectBranch Id=\"0\"><Name>" + v ("EffectiveName", "kHs Gain") + v ("UserName", "Dry") + "</Name>" + v ("IsSoloed", "false") +
+                           "<DeviceChain><AudioToAudioDeviceChain><Devices>" + mappedVst2 + "</Devices></AudioToAudioDeviceChain></DeviceChain>" +
+                           range ("BranchSelectorRange", 0, 63, 0, 40) + branchMixer (1.0, 0.0) + "</AudioEffectBranch>" +
+                           "<AudioEffectBranch Id=\"1\"><Name>" + v ("EffectiveName", "EQ Eight") + v ("UserName", "") + "</Name>" + v ("IsSoloed", "false") +
+                           "<DeviceChain><AudioToAudioDeviceChain><Devices><Eq8 Id=\"0\">" + v ("UserName", "") + "</Eq8></Devices></AudioToAudioDeviceChain></DeviceChain>" +
+                           range ("BranchSelectorRange", 40, 127, 63, 127) + branchMixer (0.5, -0.25, keyMidi (1)) + "</AudioEffectBranch></Branches>" +
+                           macros ({ "Tone", "Macro 2", "Level" }, { 64, 10, 100 }, keyMidi (0)) +
+                           "<MacroVariations><MacroSnapshots><MacroSnapshot Id=\"0\">" + v ("SnapshotName", "Verse");
+    std::string snap;
+    for (int k = 0; k < 16; ++k)
+        snap += v (("MacroValues." + std::to_string (k)).c_str(), k == 0 ? "32" : "-1");
+    for (int k = 0; k < 16; ++k)
+        snap += v (("MacroHasValue." + std::to_string (k)).c_str(), k == 0 ? "true" : "false");
+    const auto audioRackFull = audioRack + snap + "</MacroSnapshot></MacroSnapshots></MacroVariations></AudioEffectGroupDevice>";
+    // an Instrument Rack: one chain, a VST3 instrument (DeviceType 1) on keys 0…59
+    std::string instrument = als175a::vst3Device ("01");
+    for (std::size_t p = instrument.find ("<DeviceType Value=\"2\" />"); p != std::string::npos; p = instrument.find ("<DeviceType Value=\"2\" />"))
+        instrument.replace (p, 24, "<DeviceType Value=\"1\" />");
+    const auto instrumentRack = "<InstrumentGroupDevice Id=\"6\"><On><Manual Value=\"true\" /></On><Branches><InstrumentBranch Id=\"0\"><Name>" + v ("EffectiveName", "Keys") +
+                                "</Name><DeviceChain><MidiToAudioDeviceChain><Devices>" + instrument + "</Devices></MidiToAudioDeviceChain></DeviceChain>" +
+                                range ("BranchSelectorRange", 0, 127, 0, 127) + "<ZoneSettings>" + range ("KeyRange", 0, 59, 0, 59) + range ("VelocityRange", 1, 127, 1, 127) +
+                                "</ZoneSettings>" + branchMixer (1.0, 0.0) + "</InstrumentBranch></Branches>" + macros ({}, {}, {}) + "</InstrumentGroupDevice>";
+    std::string s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Ableton MajorVersion=\"5\" MinorVersion=\"12.0_12117\" Creator=\"test\">\n<LiveSet><Tracks>";
+    s += "<AudioTrack Id=\"20\">" + als175a::name ("Vocal") + v ("Color", "20") + v ("TrackGroupId", "-1") + "<DeviceChain>" + als175a::mixer (200, 1.0, 0.0, true) +
+         "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting><DeviceChain><Devices>" + audioRackFull + "</Devices></DeviceChain></DeviceChain></AudioTrack>";
+    s += "<MidiTrack Id=\"10\">" + als175a::name ("Keys") + v ("Color", "3") + v ("TrackGroupId", "-1") + "<DeviceChain>" + als175a::mixer (100, 1.0, 0.0, true) +
+         "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting><DeviceChain><Devices>" + instrumentRack + "</Devices></DeviceChain></DeviceChain></MidiTrack>";
+    s += "</Tracks><MainTrack><DeviceChain>" + als175a::mixer (900, 1.0, 0.0, true, {}, "<Tempo><Manual Value=\"120\" /></Tempo>") + "</DeviceChain></MainTrack></LiveSet>\n</Ableton>\n";
+
+    FlpImportReport report;
+    std::string error;
+    const auto song = importAls (als175a::bytesOf (s), als175a::options (&report), &error);
+    CHECK (song.has_value());
+    if (! song)
+        return;
+    const MixerTrack* vocal = nullptr;
+    for (const auto& t : song->mixer)
+        if (t.name == "Vocal")
+            vocal = &t;
+    CHECK (vocal != nullptr && vocal->effects.size() == 1 && rack::isRack (vocal->effects[0]));
+    if (vocal == nullptr || vocal->effects.empty() || ! rack::isRack (vocal->effects[0]))
+        return;
+    const auto& doc = vocal->effects[0].patcher;
+    const auto& r = *rack::rackOf (doc);
+    CHECK (r.kind == RackDoc::Kind::audioEffect && r.chains.size() == 2);
+    if (r.chains.size() != 2)
+        return;
+    CHECK (r.chains[0].name == "Dry" && r.chains[1].name == "EQ Eight"); // (no user name: Live's effective name)
+    CHECK (r.chains[0].nodes.size() == 1 && r.chains[1].nodes.empty());
+    CHECK (r.chains[0].select == (RackZone { 0, 63, 0, 40 }) && r.chains[1].select == (RackZone { 40, 127, 63, 127 }));
+    CHECK (near (r.chains[1].volume, 0.5f) && near (r.chains[1].pan, -0.25f));
+    CHECK (r.macros[0].name == "Tone" && r.macros[1].name.empty() && r.macros[2].name == "Level" && r.macros[0].value == 64.0f && r.macros[3].excludeFromRandom);
+    CHECK (r.shownMacros == 4 && r.selector == 20.0f);
+    // the mappings: macro 3 → the plugin's parameter 1 (0.2…0.8); macro 2 → chain 2's volume; macro 1 → the selector
+    RackMapping p;
+    p.node = r.chains[0].nodes[0], p.param = 1;
+    int at2 = -1;
+    CHECK (rack::macroOf (r, p, &at2) == 2 && near (r.macros[2].mappings[(std::size_t) std::max (0, at2)].min, 0.2f)
+           && near (r.macros[2].mappings[(std::size_t) std::max (0, at2)].max, 0.8f));
+    RackMapping vol;
+    vol.target = RackMapping::Target::chainVolume, vol.chain = 1;
+    CHECK (rack::macroOf (r, vol) == 1);
+    RackMapping sel;
+    sel.target = RackMapping::Target::selector;
+    CHECK (rack::macroOf (r, sel) == 0);
+    CHECK (r.variations.size() == 1 && r.variations[0].name == "Verse" && r.variations[0].has[0] && r.variations[0].values[0] == 32.0f && ! r.variations[0].has[1]);
+    CHECK (report.droppedEffects.count ("Eq8") == 1);
+    // the instrument rack: a channel whose Patcher is a rack, its chain's instrument the VST3, keys 0…59
+    const ChannelDef* keys = nullptr;
+    for (const auto& c : song->channels)
+        if (c.name == "Keys")
+            keys = &c;
+    CHECK (keys != nullptr && rack::isRack (*keys));
+    if (keys == nullptr || ! rack::isRack (*keys))
+        return;
+    const auto& ir = *rack::rackOf (keys->patcher);
+    CHECK (ir.kind == RackDoc::Kind::instrument && ir.chains.size() == 1 && ir.chains[0].nodes.size() == 1
+           && ir.chains[0].key == (RackZone { 0, 59, 0, 59 }));
+    if (! ir.chains.empty() && ! ir.chains[0].nodes.empty())
+    {
+        const auto& n = keys->patcher.nodes[(std::size_t) ir.chains[0].nodes[0]];
+        CHECK (n.generator && n.channel.instrument == InstrumentKind::plugin && n.channel.plugin.name == "kHs Gain");
+    }
+}

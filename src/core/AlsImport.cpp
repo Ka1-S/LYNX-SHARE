@@ -1,4 +1,6 @@
 #include "core/AlsImport.h"
+#include "core/Effects.h"
+#include "core/Rack.h"
 
 #include <algorithm>
 #include <cmath>
@@ -312,8 +314,265 @@ void applySimplerEnvelope (const Element& device, SamplerSettings& s)
     s.release = (float) std::clamp (ms ("ReleaseTime", 50), 0.0, 4.0);
 }
 
+bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::vector<DrumPad>* pads, int depth = 0);
+
+// ---------------------------------------------------------------------------------------------------------------
+// Racks (round 183c, docs/analise/REA_rodada183c.md §1–5 [DATA]): Live's Audio Effect / Instrument Racks become LYNX
+// racks (a Patcher in rack mode, core/Rack.h) with their chains, zones, chain mixers, macros, variations and the macro
+// mappings onto the devices LYNX keeps (plugins, nested racks, the chains' volume / pan, the chain selector). Live's own
+// devices inside a chain are dropped and listed, as on a track.
+
+// A macro mapping stored on a parameter: KeyMidi on channel 16, NoteOrController = the macro, MidiControllerRange =
+// the range in the parameter's own units [DATA]. nullopt = not mapped.
+struct LiveMapping
+{
+    int macro = 0;
+    double min = 0.0, max = 1.0;
+};
+std::optional<LiveMapping> mappingOf (const Element& parameter)
+{
+    const auto key = parameter.child ("KeyMidi");
+    if (! key || (int) key.number ("Channel", -1) != 16)
+        return std::nullopt;
+    LiveMapping m;
+    m.macro = (int) key.number ("NoteOrController", -1);
+    if (m.macro < 0 || m.macro >= rackMacroCount)
+        return std::nullopt;
+    m.min = parameter.number ("MidiControllerRange/Min", 0.0);
+    m.max = parameter.number ("MidiControllerRange/Max", 1.0);
+    return m;
+}
+
+void mapInto (PatcherDoc& doc, const LiveMapping& m, RackMapping target, float min, float max)
+{
+    target.min = std::clamp (min, 0.0f, 1.0f);
+    target.max = std::clamp (max, 0.0f, 1.0f);
+    rack::map (doc, m.macro, target);
+}
+
+// The plugin parameters of a PluginDevice that a macro drives (VST2: ParameterId is the parameter's index [model];
+// VST3 ids are not indices: listed, not mapped)
+void pluginMappings (Ctx& ctx, const Element& device, PatcherDoc& doc, int node)
+{
+    const auto vst3 = (bool) device.path ("PluginDesc/Vst3PluginInfo");
+    for (const auto& p : device.path ("ParameterList").children ("PluginFloatParameter"))
+        if (const auto m = mappingOf (p.child ("ParameterValue")))
+        {
+            if (vst3)
+            {
+                ctx.note (&FlpImportReport::approximated, "Macro mapping on a VST3 parameter (not kept)");
+                continue;
+            }
+            RackMapping target;
+            target.node = node;
+            target.param = (int) p.number ("ParameterId", -1);
+            if (target.param >= 0)
+                mapInto (doc, *m, target, (float) m->min, (float) m->max);
+        }
+}
+
+bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth);
+
+// One device of a rack chain → a Patcher node (−1 = dropped and listed)
+int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth)
+{
+    const auto tag = std::string (d.name());
+    PatchNode node;
+    if (tag == "PluginDevice")
+    {
+        const auto p = pluginOf (d);
+        if (! p)
+            return -1;
+        // in an Instrument Rack chain, the chain's instrument: a VST3 Live marks as one (DeviceType 1 [DATA]) or a VST2
+        // with no audio input (NumAudioInputs 0 [DATA]), when the chain has none yet
+        const auto chainNodes = rack::devices (*rack::rackOf (doc), chain);
+        const auto hasInstrument = std::any_of (chainNodes.begin(), chainNodes.end(), [&doc] (int n) { return doc.nodes[(std::size_t) n].generator; });
+        const auto asInstrument = instrumentRack && ! hasInstrument
+                                  && ((int) d.number ("PluginDesc/Vst3PluginInfo/DeviceType", 0) == 1
+                                      || ((bool) d.path ("PluginDesc/VstPluginInfo") && (int) d.number ("PluginDesc/VstPluginInfo/NumAudioInputs", 2) == 0));
+        if (asInstrument)
+        {
+            node.generator = true;
+            node.channel.instrument = InstrumentKind::plugin;
+            node.channel.plugin.name = p->name;
+            node.channel.plugin.foreign = *p;
+            node.channel.name = p->name;
+        }
+        else
+        {
+            node.effect.kind = EffectKind::plugin;
+            node.effect.enabled = d.boolean ("On/Manual", true);
+            node.effect.plugin.name = p->name;
+            node.effect.plugin.foreign = *p;
+        }
+        ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
+        const auto n = rack::addDevice (doc, chain, std::move (node));
+        if (n >= 0)
+            pluginMappings (ctx, d, doc, n);
+        return n;
+    }
+    if ((tag == "AudioEffectGroupDevice" || tag == "InstrumentGroupDevice") && depth < 8)
+    {
+        auto inner = rack::makeRack (tag == "InstrumentGroupDevice" ? RackDoc::Kind::instrument : RackDoc::Kind::audioEffect);
+        if (! rackFrom (ctx, d, inner, depth + 1))
+            return -1;
+        if (tag == "InstrumentGroupDevice")
+        {
+            node.generator = true;
+            node.channel.instrument = InstrumentKind::patcher;
+            node.channel.name = d.value ("UserName");
+            node.channel.patcher = std::move (inner);
+        }
+        else
+        {
+            node.effect = makeEffectSlot (EffectKind::patcher);
+            node.effect.enabled = d.boolean ("On/Manual", true);
+            node.effect.patcher = std::move (inner);
+        }
+        node.label = d.value ("UserName");
+        const auto n = rack::addDevice (doc, chain, std::move (node));
+        if (n < 0)
+            return -1;
+        // the inner rack's macros mapped onto the outer rack's (0…127 → 0..1) [DATA]
+        for (int k = 0; k < rackMacroCount; ++k)
+            if (const auto m = mappingOf (d.child ("MacroControls." + std::to_string (k))))
+            {
+                RackMapping target;
+                target.node = n;
+                target.param = k;
+                mapInto (doc, *m, target, (float) (m->min / 127.0), (float) (m->max / 127.0));
+            }
+        return n;
+    }
+    if (instrumentRack && isInstrumentDevice (tag))
+    {
+        ChannelDef channel;
+        channel.name = d.value ("UserName");
+        if (instrumentFrom (ctx, d, channel, nullptr, depth + 1))
+        {
+            node.generator = true;
+            node.channel = std::move (channel);
+            return rack::addDevice (doc, chain, std::move (node));
+        }
+        return -1;
+    }
+    if (isMidiEffect (tag))
+        ctx.note (&FlpImportReport::unsupported, deviceName (d));
+    else
+        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+    return -1;
+}
+
+RackZone zoneOf (const Element& range, RackZone fallback)
+{
+    if (! range)
+        return fallback;
+    RackZone z;
+    z.lo = std::clamp ((int) range.number ("Min", fallback.lo), 0, 127);
+    z.hi = std::clamp ((int) range.number ("Max", fallback.hi), z.lo, 127);
+    z.fadeLo = std::clamp ((int) range.number ("CrossfadeMin", z.lo), z.lo, z.hi);
+    z.fadeHi = std::clamp ((int) range.number ("CrossfadeMax", z.hi), z.fadeLo, z.hi);
+    return z;
+}
+
+// Fills a new rack document from a Live rack device (the document comes from rack::makeRack: its first chain is replaced)
+bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
+{
+    auto* r = rack::rackOf (doc);
+    if (r == nullptr)
+        return false;
+    const auto instrumentRack = r->kind == RackDoc::Kind::instrument;
+    while (! r->chains.empty())
+    {
+        rack::removeChain (doc, 0);
+        r = rack::rackOf (doc);
+    }
+    for (const auto& branch : device.path ("Branches").children())
+    {
+        auto name = branch.value ("Name/UserName");
+        if (name.empty())
+            name = branch.value ("Name/EffectiveName");
+        const auto c = rack::addChain (doc, name.empty() ? "Chain" : name);
+        r = rack::rackOf (doc);
+        auto& chain = r->chains[(std::size_t) c];
+        chain.active = branch.boolean ("MixerDevice/Speaker/Manual", true);
+        chain.solo = branch.boolean ("IsSoloed", false);
+        chain.volume = (float) std::clamp (branch.number ("MixerDevice/Volume/Manual", 1.0), 0.0, 2.0);
+        chain.pan = (float) std::clamp (branch.number ("MixerDevice/Panorama/Manual", 0.0), -1.0, 1.0);
+        chain.select = zoneOf (branch.child ("BranchSelectorRange"), RackZone { 0, 0, 0, 0 });
+        chain.key = zoneOf (branch.path ("ZoneSettings/KeyRange"), RackZone {});
+        chain.velocity = zoneOf (branch.path ("ZoneSettings/VelocityRange"), RackZone { 1, 127, 1, 127 });
+        // the chain's devices (Live's chain kinds: AudioToAudio, MidiToAudio, MidiToMidi) [DATA]
+        for (const auto* list : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices" })
+            for (const auto& d : branch.path (list).children())
+                rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth);
+        // macros on the chain's volume / pan (Live's linear gain and −1..1 → LYNX's 0..1 controls)
+        if (const auto m = mappingOf (branch.path ("MixerDevice/Volume")))
+        {
+            RackMapping target;
+            target.target = RackMapping::Target::chainVolume;
+            target.chain = c;
+            mapInto (doc, *m, target, rack::volumeValue ((float) m->min), rack::volumeValue ((float) m->max));
+        }
+        if (const auto m = mappingOf (branch.path ("MixerDevice/Panorama")))
+        {
+            RackMapping target;
+            target.target = RackMapping::Target::chainPan;
+            target.chain = c;
+            mapInto (doc, *m, target, (float) ((m->min + 1.0) * 0.5), (float) ((m->max + 1.0) * 0.5));
+        }
+        r = rack::rackOf (doc);
+    }
+    if (r->chains.empty())
+        rack::addChain (doc);
+    r = rack::rackOf (doc);
+    for (int k = 0; k < rackMacroCount; ++k)
+    {
+        const auto n = std::to_string (k);
+        auto& m = r->macros[(std::size_t) k];
+        m.value = (float) std::clamp (device.number ("MacroControls." + n + "/Manual", 0.0), 0.0, 127.0);
+        const auto shown = device.value ("MacroDisplayNames." + n);
+        if (shown != "Macro " + std::to_string (k + 1))
+            m.name = shown;
+        const auto def = device.number ("MacroDefaults." + n, -1.0);
+        m.defaultValue = def < 0.0 ? -1.0f : (float) std::min (def, 127.0);
+        m.excludeFromRandom = device.boolean ("ExcludeMacroFromRandomization." + n, false);
+        m.excludeFromVariations = device.boolean ("ExcludeMacroFromSnapshots." + n, false);
+    }
+    r->shownMacros = std::clamp ((int) device.number ("NumVisibleMacroControls", 8), 1, rackMacroCount);
+    r->selector = (float) std::clamp (device.number ("ChainSelector/Manual", 0.0), 0.0, 127.0);
+    r->selectorFiltersCtrl = device.boolean ("ChainSelectorFilterMidiCtrl", false);
+    r->autoSelect = device.boolean ("IsAutoSelectEnabled", false);
+    r->showMacros = device.boolean ("AreMacroControlsVisible", true);
+    r->showChains = device.boolean ("IsBranchesListVisible", false);
+    r->showDevices = device.boolean ("AreDevicesVisible", false);
+    r->showVariations = device.boolean ("AreMacroVariationsControlsVisible", false);
+    for (const auto& snapshot : device.path ("MacroVariations/MacroSnapshots").children ("MacroSnapshot"))
+    {
+        RackVariation v;
+        v.name = snapshot.value ("SnapshotName");
+        for (int k = 0; k < rackMacroCount; ++k)
+        {
+            const auto n = std::to_string (k);
+            v.has[(std::size_t) k] = snapshot.boolean ("MacroHasValue." + n, false);
+            v.values[(std::size_t) k] = v.has[(std::size_t) k] ? (float) std::clamp (snapshot.number ("MacroValues." + n, 0.0), 0.0, 127.0) : -1.0f;
+        }
+        r->variations.push_back (std::move (v));
+    }
+    // the chain selector on a macro (0…127 → 0..1)
+    if (const auto m = mappingOf (device.child ("ChainSelector")))
+    {
+        RackMapping target;
+        target.target = RackMapping::Target::selector;
+        mapInto (doc, *m, target, (float) (m->min / 127.0), (float) (m->max / 127.0));
+    }
+    rack::compile (doc);
+    ctx.note (&FlpImportReport::converted, instrumentRack ? "Instrument rack" : "Audio effect rack");
+    return true;
+}
+
 // Fills `channel` from a MIDI track's instrument device. Returns false for none.
-bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::vector<DrumPad>* pads, int depth = 0)
+bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::vector<DrumPad>* pads, int depth)
 {
     const auto tag = std::string (device.name());
     if (tag == "PluginDevice")
@@ -398,9 +657,20 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
         ctx.note (&FlpImportReport::converted, "Drum rack");
         return true;
     }
-    if ((tag == "InstrumentGroupDevice" || tag == "DrumGroupDevice") && depth < 8)
+    if (tag == "InstrumentGroupDevice" && depth < 8) // (round 183c: a LYNX Instrument Rack)
     {
-        // a rack: its first chain's instrument (the other chains and the macros are not kept yet)
+        auto doc = rack::makeRack (RackDoc::Kind::instrument);
+        if (rackFrom (ctx, device, doc, depth))
+        {
+            channel.instrument = InstrumentKind::patcher;
+            channel.patcher = std::move (doc);
+            return true;
+        }
+        return false;
+    }
+    if (tag == "DrumGroupDevice" && depth < 8)
+    {
+        // a Drum Rack without pads (nested): its first chain's instrument
         for (const auto& branch : device.path ("Branches").children())
             for (const auto& inner : branch.path ("DeviceChain/MidiToAudioDeviceChain/Devices").children())
                 if (isInstrumentDevice (inner.name()) || inner.name() == "PluginDevice")
@@ -434,6 +704,14 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                 insert.effects.push_back (std::move (slot));
                 ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
             }
+            continue;
+        }
+        if (tag == "AudioEffectGroupDevice" && insert.effects.size() < (std::size_t) maxEffectSlots) // (round 183c)
+        {
+            auto slot = rack::makeRackSlot (RackDoc::Kind::audioEffect);
+            slot.enabled = d.boolean ("On/Manual", true);
+            if (rackFrom (ctx, d, slot.patcher, 0))
+                insert.effects.push_back (std::move (slot));
             continue;
         }
         if (isMidiEffect (tag))
