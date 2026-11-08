@@ -84,9 +84,8 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
             r.process (state.get(), true, tick, 441, l.data(), rr.data());
             out.insert (out.end(), l.begin(), l.end());
         }
-        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured on 5 ms RMS
-        // windows above 0.1 (the tone is 0.35): after the span the clip holds its last value (0.06 here) as DC to the clip's
-        // end, as FL does (REA_rodada167l §1; whether FL holds a trimmed span's last value too is not rendered yet)
+        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn (5 ms RMS windows above
+        // 0.1; the tone is 0.35). After a stretched span the clip is silent, as in FL (render p62): the span ends at zero.
         constexpr std::size_t window = 220;
         std::size_t firstLoud = out.size(), lastLoud = 0;
         for (std::size_t w = 0; w + window <= out.size(); w += window)
@@ -105,6 +104,8 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
                       out.size() > 61740 ? std::abs (out[61740]) : -1.0f);
         CHECK (firstLoud == 0);
         CHECK (std::abs (playedTicks - (double) drawnTicks) < 0.03 * (double) drawnTicks);
+        if (stretched) // nothing held after the span (no DC to the clip's end)
+            CHECK (out.size() > 52920 && std::abs (out[52920]) < 1.0e-4f && std::abs (out[out.size() - 1]) < 1.0e-4f);
     }
 }
 

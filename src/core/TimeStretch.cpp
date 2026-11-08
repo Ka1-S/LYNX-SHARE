@@ -620,6 +620,18 @@ std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double rati
     auto out = timeStretch (span, ratio, method, semitones);
     if (out == nullptr)
         return out;
+    // FL ends a cut span at zero: after a trimmed, stretched span its clip is silent to the clip's end (FL render p62, round
+    // 180d), where the stretcher's last frame is not zero and the clip would hold it as DC. A raised-cosine over 1 ms, as
+    // FL's region declick (FUN_006a0760).
+    const auto fade = std::min<long> ((long) out->frames(), (long) std::llround (out->sampleRate * 0.001));
+    for (long i = 0; i < fade; ++i)
+    {
+        const auto g = (float) (0.5 - 0.5 * std::cos (3.141592653589793 * (double) i / (double) std::max (1L, fade)));
+        const auto at = (std::size_t) ((long) out->frames() - 1 - i);
+        out->left[at] *= g;
+        if (! out->right.empty())
+            out->right[at] *= g;
+    }
     out->cropped = span.cropped;
     out->cropFrom = span.cropFrom;
     out->cropTo = span.cropTo;
