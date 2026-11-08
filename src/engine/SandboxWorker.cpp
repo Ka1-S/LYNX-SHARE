@@ -115,6 +115,9 @@ public:
     // plugin; upgrade with a keyboard hook in this process (as pluginKeyProc in WindowOwner.cpp) if that is wanted.
     bool keyPressed (const juce::KeyPress& key) override
     {
+        if (key == heldKey) // an autorepeat: holding Space would toggle playback on and off (pluginKeyProc skips them too)
+            return true;
+        heldKey = key;
         if (key == juce::KeyPress::escapeKey)
             closeButtonPressed();
         else if (onUnusedKey != nullptr)
@@ -122,7 +125,15 @@ public:
         return true;
     }
 
+    bool keyStateChanged (bool) override
+    {
+        if (! juce::KeyPress::isKeyCurrentlyDown (heldKey.getKeyCode()))
+            heldKey = {}; // released: the next press of it is a new one
+        return false;
+    }
+
     std::function<void (const juce::KeyPress&)> onUnusedKey;
+    juce::KeyPress heldKey;
 
    #if JUCE_MAC
 private:
