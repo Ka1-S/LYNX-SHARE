@@ -1,4 +1,5 @@
 #include "ui/FlMods.h"
+#include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
 #include "core/ChordReadout.h"
@@ -3587,7 +3588,7 @@ void PianoRollComponent::glideBy (double ticks, double pixels, bool immediate)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, (double) viewLengthTicks() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) rows.count * rowHeight - grid.getHeight()), glideY.target + pixels);
-    if (immediate)
+    if (immediate || ! ui::motion::enabled()) // (Settings › General › Animations off: the wheel jumps)
     {
         scrollTicks = glideX.target;
         scrollY = (int) std::round (glideY.target);
@@ -4041,6 +4042,11 @@ bool PianoRollComponent::runKeyAction (const std::string& id)
 void PianoRollComponent::refreshToolKeys (const std::function<juce::String (const std::string&)>& keyOf)
 {
     tools.refreshKeys ([&keyOf] (EditTool t) { return keyOf ("pianoRoll.tool." + std::string (editToolId (t))); });
+    // round 179a: the slide toggle is only an icon, so its tips name its key the way the tool buttons do
+    const auto slideKey = keyOf ("pianoRoll.slide");
+    slideButton.setTooltip (tr ("New notes are \"slide\" notes: the currently sounding note glides to them (808 glide)")
+                            + (slideKey.isNotEmpty() ? " (" + slideKey + ")" : juce::String()));
+    ui::setQuickTip (slideButton, tr ("Slide notes"), slideKey);
 }
 
 juce::PopupMenu PianoRollComponent::midiMenu()

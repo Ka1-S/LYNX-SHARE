@@ -27,6 +27,7 @@
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/FrameTicker.h"
+#include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"
@@ -291,6 +292,8 @@ private:
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
     void saveClipboardToBrowser (bool midi);
+    juce::PopupMenu makeSwitchAudioClipsMenu (bool selectedOnly);
+    void switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName);
     void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();
@@ -347,6 +350,7 @@ private:
     IconButton recordMenuButton { "recordMenu", Icon::mic };
     IconButton patternModeButton { "patternMode", Icon::pattern }, songModeButton { "songMode", Icon::song };
     IconButton metronomeButton { "metronome", Icon::metronome };
+    IconButton multilinkButton { "multilink", Icon::link }; // FL's MultiLinkBtn (round 177b-4)
     IconButton typingPianoButton { "typingPiano", Icon::keyboard };
     IconButton countInButton { "countIn", Icon::countIn };
     IconButton waitInputButton { "waitInput", Icon::waitInput };

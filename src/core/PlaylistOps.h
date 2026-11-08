@@ -150,10 +150,37 @@ std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& 
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
 
-// STUB, round 181a N6: the exact contract of wip/177b-s3 (this namespace). Delete this block when 177b lands; a rebase
-// over it fails to compile until then, on purpose.
+// FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).
+namespace lynx::autoclipplace
+{
+// FL's Options › General "Create automation clips at the playback position" (CreateAutoClipsAtCursorBox, checked in
+// FL's form [DFM]); an app setting, not saved in projects.
+inline std::atomic<bool>& atPlaybackFlag() noexcept
+{
+    static std::atomic<bool> on { true };
+    return on;
+}
+inline bool atPlayback() noexcept { return atPlaybackFlag().load (std::memory_order_relaxed); }
+inline void setAtPlayback (bool on) noexcept { atPlaybackFlag().store (on, std::memory_order_relaxed); }
+
+struct Place
+{
+    int track = 0;
+    std::int64_t start = 0, length = 0;
+};
+// Where a new automation clip goes. The Playlist time selection (Song::loopStart / loopEnd) gives its place and length.
+// Otherwise it starts at `playTick` when `atPlayback` (FL's Options › General "Create automation clips at the
+// playback position", on by default), else at the song start; it reaches the end of the song (at least one bar). The
+// track: the first one, from the top, with no clips at all (checked live in FL 2026: a free gap on a used track is not
+// taken; instrument tracks take no automation clips: FL's "Instrument tracks are not for audio or automation clips.").
+Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick);
+} // namespace lynx::autoclipplace
+
+// Round 177b: optional automation lanes under Playlist tracks (Song.h AutomationLane). Plain edits for editSong.
 namespace lynx::autolanes
 {
+// Playlist › "Automation lanes" (round 177b): whether lanes are shown under their tracks. Off by default (FL has no
+// lanes); an app setting, not saved in projects. The Ableton-style layout (round 175a) turns it on by default.
 inline std::atomic<bool>& shownFlag() noexcept
 {
     static std::atomic<bool> on { false };
@@ -161,4 +188,23 @@ inline std::atomic<bool>& shownFlag() noexcept
 }
 inline bool shown() noexcept { return shownFlag().load (std::memory_order_relaxed); }
 inline void setShown (bool on) noexcept { shownFlag().store (on, std::memory_order_relaxed); }
+
+// The track a new lane for `target` goes on: the track that already has a lane for it; else the instrument track of
+// its channel; else an audio / instrument track linked to its mixer track (a channel's own insert counts); else the
+// first track with no clips and no lanes.
+int trackFor (const Song& song, const AutomationTarget& target);
+// The track whose lanes hold automation `a`, or -1 (an automation clip's automation, a live link...).
+int ownerTrack (const Song& song, int automation);
+// A new lane on `track` for `target`, a flat line at `value` over the song; returns the automation index (-1: bad track).
+int addLane (Song& song, int track, const AutomationTarget& target, const std::string& name, float value);
+// Removes lane `lane` of `track` and its automation.
+bool removeLane (Song& song, int track, int lane);
+// "Move clip into lane": the automation clip's curve (over its span, offset applied) replaces what the lane of the same
+// target on `track` has there (a lane is made when there is none); the clip is removed. Returns the lane's automation.
+int clipToLane (Song& song, int clip, int track);
+// "Lane to automation clip": the lane's automation becomes a clip on the first free track over [0, its end]; the lane
+// entry goes. Returns the new clip's index, or -1.
+int laneToClip (Song& song, int track, int lane);
+// Every lane to a clip (the .flp export: FL has no lanes). Returns how many.
+int lanesToClips (Song& song);
 } // namespace lynx::autolanes

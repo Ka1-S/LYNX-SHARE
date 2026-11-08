@@ -9,6 +9,8 @@
 //    an insert with one track → that track's own mixer (volume, pan, mute, solo, send levels);
 //  - third-party VST2 / VST3 instruments and effects → plugin devices with their state (byte for byte);
 //  - tempo, time signature, markers (→ locators), the song loop, mixer and tempo automation.
+//  - the clip grid (round 181c) → Session view: one scene per grid row, grid clips in their tracks' clip slots with
+//    their launch settings and follow actions, stop buttons, scene names / tempo / meter, the global quantisation.
 // LYNX's own instruments and effects are not converted yet (N3): they are listed in `notes`.
 
 #include <cstdint>
