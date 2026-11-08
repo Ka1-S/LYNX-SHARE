@@ -330,7 +330,12 @@ struct PlaylistItem
     int track = 0;               // 0 = first playlist track
     Kind kind = Kind::pattern;
     int index = 0;               // pattern index, or channel index (audio/automation clip)
-    std::uint16_t flags = 0;
+    std::uint16_t flags = 0;     // +0x12: 0x40 by default; see mutedFlag
+    // +0x12 bit 13: the clip is muted (the Mute tool / clip menu › Mute). FL keeps the record in memory as it is in the
+    // file and tests bit 0x20 of byte +0x13 (REA round 182e)
+    static constexpr std::uint16_t mutedFlag = 0x2000;
+    static constexpr std::uint16_t defaultFlags = 0x40;
+    bool muted() const noexcept { return (flags & mutedFlag) != 0; }
 
     // The same 8 bytes mean different things per clip type:
     //  - pattern: two int32 in ticks (start/end of the pattern section); -1 = no trimming
@@ -343,6 +348,10 @@ struct PlaylistItem
     // Audio clips, records of 60 B and more (FL 20.99+): fades in milliseconds and the clip gain (linear).
     float fadeInMs = 0.0f;
     float fadeOutMs = 0.0f;
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade curve values (+0x28, +0x30; 0 = its S curve)
+    // +0x38 (FL's own bits, REA round 180d): bit 0 / 1 the fade-in / -out is manual, >> 2 & 7 / >> 14 & 7 their declick
+    // choice, >> 8 & 3 / >> 12 & 3 their shape (1 = linear, else the S curve). The writer sets bit 0 / 1 for a fade it writes.
+    std::uint32_t fadeFlags = 0;
     float gain = 1.0f;
     // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
     float pitch = 0.0f;

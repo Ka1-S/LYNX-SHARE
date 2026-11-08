@@ -1,4 +1,6 @@
 #include "core/RackOps.h"
+
+#include "core/MidiControls.h"
 #include "core/PatternBlocks.h"
 
 #include <algorithm>
@@ -232,6 +234,193 @@ bool movePattern (Song& song, int index, int delta)
         song.currentPattern = index;
 
     return true;
+}
+
+// --- pattern hygiene (round 177d) ------------------------------------------------------------------
+
+std::vector<int> unusedPatterns (const Song& song)
+{
+    std::vector<char> used (song.patterns.size(), 0);
+    song.forEachClipList ([&used] (const std::vector<Clip>& clips) {
+        for (const auto& c : clips)
+            if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) used.size())
+                used[(std::size_t) c.pattern] = 1;
+    });
+    song.forEachBlockList ([&used] (const std::vector<PatternBlock>& list) {
+        for (const auto& b : list)
+            if (b.pattern >= 0 && b.pattern < (int) used.size())
+                used[(std::size_t) b.pattern] = 1;
+    });
+    for (const auto& c : song.channels) // a Loop Starter channel plays from its pattern
+        if (c.loopStarterPattern >= 0 && c.loopStarterPattern < (int) used.size())
+            used[(std::size_t) c.loopStarterPattern] = 1;
+    std::vector<int> out;
+    for (int p = 0; p < (int) used.size(); ++p)
+        if (! used[(std::size_t) p])
+            out.push_back (p);
+    return out;
+}
+
+int deletePatterns (Song& song, std::vector<int> indices)
+{
+    std::sort (indices.begin(), indices.end());
+    indices.erase (std::unique (indices.begin(), indices.end()), indices.end());
+    int removed = 0;
+    for (auto it = indices.rbegin(); it != indices.rend(); ++it) // (from the last: the earlier indices stay valid)
+        if (*it >= 0 && *it < (int) song.patterns.size() && song.patterns.size() > 1)
+        {
+            song.removePattern (*it);
+            ++removed;
+        }
+    return removed;
+}
+
+void reorderPatterns (Song& song, const std::vector<int>& order)
+{
+    const auto n = (int) song.patterns.size();
+    if ((int) order.size() != n)
+        return;
+    std::vector<int> where ((std::size_t) n, -1); // old index -> new index
+    for (int k = 0; k < n; ++k)
+    {
+        const auto old = order[(std::size_t) k];
+        if (old < 0 || old >= n || where[(std::size_t) old] >= 0)
+            return; // not a permutation
+        where[(std::size_t) old] = k;
+    }
+    std::vector<Pattern> moved;
+    moved.reserve ((std::size_t) n);
+    for (const auto old : order)
+        moved.push_back (std::move (song.patterns[(std::size_t) old]));
+    song.patterns = std::move (moved);
+    const auto remap = [&where, n] (int p) { return p >= 0 && p < n ? where[(std::size_t) p] : p; };
+    song.forEachClipList ([&remap] (std::vector<Clip>& clips) {
+        for (auto& c : clips)
+            if (c.kind == ClipKind::pattern)
+                c.pattern = remap (c.pattern);
+    });
+    song.forEachBlockList ([&remap, n] (std::vector<PatternBlock>& list) {
+        for (auto& b : list)
+            b.pattern = remap (b.pattern);
+        patternblocks::normalize (list, n);
+    });
+    for (auto& c : song.channels)
+        if (c.loopStarterPattern >= 0)
+            c.loopStarterPattern = remap (c.loopStarterPattern);
+    song.currentPattern = remap (song.currentPattern);
+}
+
+namespace
+{
+std::string lowered (std::string s)
+{
+    std::transform (s.begin(), s.end(), s.begin(), [] (unsigned char c) { return (char) std::tolower (c); });
+    return s;
+}
+
+// a pattern's colour as the Picker shows it (automatic colours follow the index): hue, then lightness
+std::pair<int, int> colourKey (std::uint32_t argb)
+{
+    const auto r = (int) ((argb >> 16) & 0xff), g = (int) ((argb >> 8) & 0xff), b = (int) (argb & 0xff);
+    const auto hi = std::max ({ r, g, b }), lo = std::min ({ r, g, b });
+    int hue = 0;
+    if (hi != lo)
+    {
+        const auto d = (double) (hi - lo);
+        double h = hi == r ? (g - b) / d : hi == g ? 2.0 + (b - r) / d : 4.0 + (r - g) / d;
+        hue = (int) std::lround (h * 60.0);
+        if (hue < 0)
+            hue += 360;
+    }
+    return { hi == lo ? 360 + 1 : hue, hi + lo }; // (greys after the colours)
+}
+
+bool sameContent (const Pattern& a, const Pattern& b)
+{
+    return a.notes == b.notes && a.lengthTicks == b.lengthTicks && a.events == b.events && a.loopOn == b.loopOn && a.loopMode == b.loopMode
+           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre;
+}
+} // namespace
+
+void sortPatterns (Song& song, PatternSort by)
+{
+    std::vector<int> order (song.patterns.size());
+    for (int i = 0; i < (int) order.size(); ++i)
+        order[(std::size_t) i] = i;
+    if (by == PatternSort::name)
+    {
+        std::vector<std::string> keys;
+        for (const auto& p : song.patterns)
+            keys.push_back (lowered (p.name));
+        std::stable_sort (order.begin(), order.end(), [&keys] (int a, int b) { return keys[(std::size_t) a] < keys[(std::size_t) b]; });
+    }
+    else
+    {
+        // (a pattern without its own colour: the automatic one; those keep their order, after the coloured ones)
+        std::stable_sort (order.begin(), order.end(), [&song] (int a, int b) {
+            const auto ca = song.patterns[(std::size_t) a].colour, cb = song.patterns[(std::size_t) b].colour;
+            if ((ca == 0) != (cb == 0))
+                return cb == 0;
+            return ca != 0 && colourKey (ca) < colourKey (cb);
+        });
+    }
+    reorderPatterns (song, order);
+}
+
+std::vector<std::vector<int>> identicalPatterns (const Song& song)
+{
+    std::vector<std::vector<int>> groups;
+    std::vector<char> grouped (song.patterns.size(), 0);
+    for (int a = 0; a < (int) song.patterns.size(); ++a)
+    {
+        if (grouped[(std::size_t) a] || (song.patterns[(std::size_t) a].notes.empty() && song.patterns[(std::size_t) a].events.empty()))
+            continue; // (empty patterns are not duplicates of each other: they are where new parts get written)
+        std::vector<int> group { a };
+        for (int b = a + 1; b < (int) song.patterns.size(); ++b)
+            if (! grouped[(std::size_t) b] && sameContent (song.patterns[(std::size_t) a], song.patterns[(std::size_t) b]))
+            {
+                group.push_back (b);
+                grouped[(std::size_t) b] = 1;
+            }
+        if (group.size() > 1)
+            groups.push_back (std::move (group));
+    }
+    return groups;
+}
+
+int mergeIdenticalPatterns (Song& song)
+{
+    const auto groups = identicalPatterns (song);
+    if (groups.empty())
+        return 0;
+    std::vector<int> target (song.patterns.size());
+    for (int i = 0; i < (int) target.size(); ++i)
+        target[(std::size_t) i] = i;
+    std::vector<int> duplicates;
+    for (const auto& g : groups)
+        for (std::size_t k = 1; k < g.size(); ++k)
+        {
+            target[(std::size_t) g[k]] = g.front();
+            duplicates.push_back (g[k]);
+        }
+    song.forEachClipList ([&target] (std::vector<Clip>& clips) {
+        for (auto& c : clips)
+            if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) target.size())
+                c.pattern = target[(std::size_t) c.pattern];
+    });
+    const auto count = (int) target.size();
+    song.forEachBlockList ([&target, count] (std::vector<PatternBlock>& list) {
+        for (auto& b : list)
+            if (b.pattern >= 0 && b.pattern < (int) target.size())
+                b.pattern = target[(std::size_t) b.pattern];
+        patternblocks::normalize (list, count);
+    });
+    for (auto& c : song.channels)
+        if (c.loopStarterPattern >= 0 && c.loopStarterPattern < count)
+            c.loopStarterPattern = target[(std::size_t) c.loopStarterPattern];
+    if (song.currentPattern >= 0 && song.currentPattern < count)
+        song.currentPattern = target[(std::size_t) song.currentPattern];
+    return deletePatterns (song, duplicates);
 }
 
 // --- step sequencer ----------------------------------------------------------------------------
@@ -957,4 +1146,68 @@ int stepPatternCreating (Song& song, int delta)
     return std::clamp (target, 0, last);
 }
 
+int audioClipsAmong (const Song& song, const std::vector<int>& channels)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+            ++count;
+    return count;
+}
+
+int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mode)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+        {
+            song.channels[(std::size_t) c].sampler.declickMode = std::clamp (mode, 0, 5);
+            ++count;
+        }
+    return count;
+}
+
+int setStretchOfAudioClips (Song& song, const std::vector<int>& channels, bool keepPitch, StretchMethod method)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+        {
+            auto& s = song.channels[(std::size_t) c].sampler;
+            s.keepPitch = keepPitch;
+            if (keepPitch)
+                s.stretchMethod = method;
+            s.moveBakedPitchToKnob(); // (outside Beats nothing renders a baked pitch; round 175a)
+            ++count;
+        }
+    return count;
+}
+
+void prepareForMidiExport (Song& song)
+{
+    constexpr int drums = 9; // (MIDI channel 10)
+    int next = 0;
+    for (auto& c : song.channels)
+    {
+        // FL converts every channel but automation clips (seen in FL 2026, round 181b: Layer and Envelope
+        // Controller became MIDI Out, the automation clip stayed and took no MIDI channel). LYNX's automation clips
+        // aren't channels, so every channel converts.
+        midictl::MidiOutSettings settings;
+        if (c.plugin.name == "FPC")
+        {
+            settings.channel = drums;
+        }
+        else
+        {
+            settings.channel = next;
+            next = (next + 1) & 15;
+            if (next == drums)
+                ++next;
+        }
+        c.instrument = InstrumentKind::midiOut;
+        c.plugin = {};
+        c.pluginState.clear();
+        midictl::writeMidiOut (c.pluginState, settings);
+    }
+}
 } // namespace lynx

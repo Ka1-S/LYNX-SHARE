@@ -1,5 +1,7 @@
 #include "core/RackRenderer.h"
 #include "core/MixerOps.h"
+
+#include "core/FruitySlicer.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
@@ -51,11 +53,14 @@ namespace lynx
 {
 namespace
 {
-// a hosted plugin is created again when its processing options change (fixed blocks, own process)
+// a hosted plugin is created again when its processing options change (fixed blocks, own process) or the options it
+// gets at creation (HostedOptions: the wrapper's MIDI and reset options, which did nothing until a reload otherwise)
 bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
 {
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
-           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize;
+           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
+           && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
@@ -229,19 +234,22 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     std::shared_ptr<const SampleData> sample;
 
     if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
-         || kind == InstrumentKind::wavetraveller) && samples
+         || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer) && samples
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
     // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller
+        && kind != InstrumentKind::fruityslicer && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
         && factories.stretchedSamples
         && sample->frames() > 0)
     {
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
         const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
 
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
+        const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
+                                         (double) std::llround ((double) sample->frames() * ratio));
+        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
             sample = std::move (stretched);
     }
 
@@ -260,6 +268,25 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         whole.regionEnd = 1.0f;
         if (auto processed = precompute::apply (*sample, whole))
             sample = std::move (processed);
+    }
+
+    // Fruity Slicer (round 180c): FL's edits to the sample (reverse, declick, fades), then the sampler on the slices
+    if (kind == InstrumentKind::fruityslicer)
+    {
+        auto def = channel;
+        if (const auto state = fslicer::parse (channel.pluginState); state && sample != nullptr)
+        {
+            auto prepared = fslicer::prepare (*sample, *state);
+            fslicer::configureSampler (def, *state, (std::int64_t) prepared->frames());
+            sample = std::move (prepared);
+        }
+        else
+            def.sampler.slices.clear();
+        std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
+        instrument->prepare (sampleRate);
+        instrument->configure (def, bpm);
+        instrument->settleNew();
+        return instrument;
     }
 
     const loadtrace::Scope timing ("rack_instruments");
@@ -466,6 +493,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             && previous->song.channels[p].instrument == kind && kind != InstrumentKind::patcher
             && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
                 || previous->song.channels[p].samplePath == channel.samplePath)
+            && (kind != InstrumentKind::fruityslicer
+                || (previous->song.channels[p].samplePath == channel.samplePath
+                    && previous->song.channels[p].pluginState == channel.pluginState))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
@@ -487,6 +517,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && (! channel.sampler.keepPitch
                         || (previous->song.channels[p].sampler.stretchBeats == channel.sampler.stretchBeats
                             && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
+                            && previous->song.channels[p].sampler.stretchPitch == channel.sampler.stretchPitch
+                            && previous->song.channels[p].sampler.warp == channel.sampler.warp
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
@@ -626,6 +658,16 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         }
     }
 
+    // Issue #109: a hosted plugin's side input is on only while its slot has a sidechain source (the same test as
+    // setSidechain below); a running plugin keeps its instance and state
+    for (std::size_t t = 0; t < state->effects.size() && t < song.mixer.size(); ++t)
+        for (std::size_t i = 0; i < state->effects[t].size() && i < song.mixer[t].effects.size(); ++i)
+            if (song.mixer[t].effects[i].kind == EffectKind::plugin && state->effects[t][i] != nullptr)
+            {
+                const auto source = song.mixer[t].effects[i].sidechain;
+                state->effects[t][i]->setSideInputActive (source >= 0 && source != (int) t && source < (int) song.mixer.size());
+            }
+
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
     // playback, the Playlist's pattern clips and export all play them without any cost on the audio thread
     // FL's legacy Pattern Blocks (round 170f): plain pattern clips from here on (playback, export, song length)
@@ -639,6 +681,12 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         std::stable_sort (p.notes.begin(), p.notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
     state->schedule = makeScheduleIndex (state->song);
     state->performanceZone = perf::zoneClips (state->song);
+    if (factories.clipLauncher != nullptr && state->song.clipGrid)
+    {
+        state->clipLauncher = factories.clipLauncher;
+        state->gridIndex = launcher::makeIndex (*state->song.clipGrid);
+    }
+    state->launchers = ! state->performanceZone.empty() || state->clipLauncher != nullptr;
     state->sampleRate = sampleRate;
     state->buildMidiRoutes();
     state->buildAutomationTables();
@@ -2340,7 +2388,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 if (e.clipStretch != 1.0f)
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
-                    instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape);
+                    instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
                 auto velocity = e.velocity;
@@ -3372,32 +3420,70 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     events.clear();
 
     const auto songPlaying = playing && song.mode == PlayMode::song;
-    if (songPlaying)
+    // The launchers: Performance mode's clips (round 165m) and the clip grid (round 181a). Without either, this is the
+    // one test a block makes for them, the one Performance mode always made.
+    if (songPlaying && (state.launchers || launchersRunning))
     {
-        scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
-    }
-    // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
-    // where playback started, never wrapping with the song loop)
-    if (songPlaying && (! state.performanceZone.empty() || perfRunning))
-    {
-        if (! perfRunning)
-            perfClock = startTick;
-        perfRunning = true;
+        launchersRunning = true;
         const auto tps = ticksPerSample (bpm, sampleRate);
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
-        schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
-        perfClock += numSamples * tps;
+        const auto wrap = liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed);
+        if (state.clipLauncher != nullptr)
+        {
+            if (runningLauncher == nullptr)
+                state.clipLauncher->clock = startTick;
+            runningLauncher = state.clipLauncher;
+            launcher::playBlock (*state.clipLauncher, song, *song.clipGrid, state.gridIndex, startTick, numSamples, tps, events, resumeAudio,
+                                 &state.schedule, wrap, chaseNotes, *scheduledNotes);
+        }
+        else
+        {
+            if (runningLauncher != nullptr)
+            {
+                runningLauncher->player.stopAll (runningLauncher);
+                runningLauncher = nullptr;
+            }
+            scheduleSong (song, startTick, numSamples, tps, events, resumeAudio, &state.schedule, wrap, chaseNotes);
+        }
+        // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
+        // where playback started, never wrapping with the song loop)
+        if (! state.performanceZone.empty() || perfRunning)
+        {
+            if (! perfRunning)
+                perfClock = startTick;
+            perfRunning = true;
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
+            schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
+            perfClock += numSamples * tps;
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches without a zone
+        }
     }
-    else if (perfRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+    else
     {
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
-        perfRunning = false;
-    }
-    else if (perfLive != nullptr)
-    {
-        perf::Command c;
-        while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        if (songPlaying)
+            scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
+                          liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
+        if (launchersRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+        {
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
+            perfRunning = false;
+            launchersRunning = false;
+            if (runningLauncher != nullptr)
+            {
+                if (song.clipGrid)
+                    runningLauncher->player.recordStop (*song.clipGrid, state.gridIndex, runningLauncher);
+                runningLauncher->player.stopAll (runningLauncher, song.clipGrid && song.clipGrid->backOnStop);
+                runningLauncher = nullptr;
+            }
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        }
     }
 
     if (! songPlaying && playing && ! song.patterns.empty())

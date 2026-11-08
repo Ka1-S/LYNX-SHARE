@@ -40,7 +40,9 @@ enum class Stems : int
 {
     none,
     mixerTracks, // one file per insert that gets sound (FL's "Split mixer tracks")
-    channels     // one file per Channel Rack channel that plays something (each heard through its mixer path)
+    channels,    // one file per Channel Rack channel that plays something (each heard through its mixer path)
+    channelsDry  // round 177d (pain point 35, LYNX's own): the same, but each channel's insert goes straight to the
+                 // Master: no sends, no group/bus inserts after it (the "instruments only" stems)
 };
 
 enum class DitherMode : int
@@ -179,8 +181,10 @@ std::vector<int> stemTracks (const Song& song, const std::vector<int>& only);
 // pattern range), or an audio clip.
 std::vector<int> stemChannels (const Song& song, Range range);
 
-// Copy of the song where only `channel` plays (every other channel muted); the mixer stays as it is.
-Song makeChannelStemSong (const Song& song, int channel);
+// Copy of the song where only `channel` plays (every other channel muted); the mixer stays as it is. `dry` (Stems::
+// channelsDry): the channel's insert loses its sends and goes to the Master at its route level, so what the buses
+// and the send effects add is left out (a channel on the Master itself is unchanged).
+Song makeChannelStemSong (const Song& song, int channel, bool dry = false);
 
 // "<base> - <number> <name><ext>" with characters that are illegal in file names replaced.
 std::string stemFileName (const std::string& base, int number, const std::string& name, const char* ext);

@@ -437,13 +437,25 @@ inline bool loaderRulesHold (const std::string& xmlText, int returns, std::strin
         const auto scenes = set.child ("Scenes").children ("Scene").size();
         for (const auto& t : set.child ("Tracks").children())
             for (const auto* seq : { "DeviceChain/MainSequencer/ClipSlotList", "DeviceChain/FreezeSequencer/ClipSlotList" })
-                if (t.path (seq) && t.path (seq).children ("ClipSlot").size() != (t.name() == "GroupTrack" ? 0 : scenes))
+                if (t.path (seq) && t.path (seq).children ("ClipSlot").size() != (t.name() == "GroupTrack" || t.name() == "ReturnTrack" ? 0 : scenes))
                     why = std::string ("clip slots of ") + std::string (t.name());
         for (const auto& g : set.child ("Tracks").children ("GroupTrack"))
             if (g.child ("Slots").children ("GroupTrackSlot").size() != scenes)
                 why = "group track slots";
         if ((int) set.child ("Tracks").children ("ReturnTrack").size() != returns)
             why = "returns";
+        // a return track's own sends are off, as Live 12 saves them (round 182b; Live 11's holders have no EnabledByUser)
+        for (const auto& r : set.child ("Tracks").children ("ReturnTrack"))
+            for (const auto& h : r.path ("DeviceChain/Mixer/Sends").children ("TrackSendHolder"))
+            {
+                if (! h.child ("EnabledByUser"))
+                {
+                    if (set.child ("MainTrack")) // Live 12 always writes it
+                        why = "return track send without EnabledByUser";
+                }
+                else if (h.child ("EnabledByUser").attr ("Value") != "false")
+                    why = "return track send enabled";
+            }
     }
     return why.empty();
 }
@@ -825,4 +837,203 @@ TEST (als175a_leaving_beats_moves_the_baked_transpose_to_the_pitch_knob)
     s.stretchPitch = 40.0f; // a transpose beyond the knob's range is limited to it
     CHECK (s.moveBakedPitchToKnob());
     CHECK (s.pitch == 24.0f);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Warp markers (round 175a, M1): a channel's markers bend the stretch inside the file
+
+TEST (als175a_warp_map_from_markers)
+{
+    using namespace lynx;
+    // markers in a straight line (one tempo): no map, the plain stretch
+    CHECK (warpStretchMap ({ { 0.0, 0.0 }, { 1.0, 2.0 }, { 2.0, 4.0 } }, 96000.0, 48000.0, 192000.0).empty());
+    CHECK (warpStretchMap ({ { 0.0, 0.0 } }, 96000.0, 48000.0, 192000.0).empty());
+    // 1 s → 2 beats, then 1 s → 6 beats: the file (8 beats) fills 192000 frames, the bend at 48000 → 48000
+    const std::vector<WarpPoint> bent { { 0.0, 0.0 }, { 1.0, 2.0 }, { 2.0, 8.0 } };
+    const auto map = warpStretchMap (bent, 96000.0, 48000.0, 192000.0);
+    CHECK (map.size() == 3);
+    if (map.size() == 3)
+    {
+        CHECK (map[0] == (std::pair<double, double> { 0.0, 0.0 }));
+        CHECK (std::abs (map[1].first - 48000.0) < 1e-6 && std::abs (map[1].second - 48000.0) < 1e-6);
+        CHECK (std::abs (map[2].first - 96000.0) < 1e-6 && std::abs (map[2].second - 192000.0) < 1e-6);
+    }
+    CHECK (std::abs (stretchMapOutput (map, 72000.0) - 120000.0) < 1e-6);
+    CHECK (std::abs (stretchMapSource (map, 120000.0) - 72000.0) < 1e-6);
+    // markers past the file's ends (Live writes one after the last real one) and out of order still give the same map
+    const auto wide = warpStretchMap ({ { 3.0, 14.0 }, { 1.0, 2.0 }, { -0.5, -1.0 } }, 96000.0, 48000.0, 192000.0);
+    CHECK (wide.size() == 3);
+    if (wide.size() == 3)
+        CHECK (std::abs (wide[1].first - 48000.0) < 1e-6 && std::abs (wide[1].second - 48000.0) < 1e-6);
+}
+
+namespace als175a
+{
+// 2 s of silence with 20 ms 1 kHz bursts at the given seconds (44.1 kHz stereo)
+inline lynx::SampleData bursts (const std::vector<double>& at)
+{
+    lynx::SampleData s;
+    s.sampleRate = 44100.0;
+    s.left.assign (88200, 0.0f);
+    for (auto t : at)
+        for (long i = 0; i < 882; ++i)
+            s.left[(std::size_t) (std::lround (t * 44100.0) + i)] = (float) (0.7 * std::exp (-(double) i / 300.0) * std::sin (2.0 * 3.141592653589793 * 1000.0 * (double) i / 44100.0));
+    s.right = s.left;
+    return s;
+}
+// the frame where the 2 ms RMS envelope peaks within ±60 ms of `around`
+inline long envelopePeak (const lynx::SampleData& s, long around)
+{
+    const long w = 88, from = std::max (0L, around - 2646), to = std::min ((long) s.frames() - w, around + 2646);
+    long best = from;
+    double bestE = -1.0;
+    for (long i = from; i < to; i += 8)
+    {
+        double e = 0.0;
+        for (long k = 0; k < w; ++k)
+            e += (double) s.left[(std::size_t) (i + k)] * s.left[(std::size_t) (i + k)];
+        if (e > bestE)
+        {
+            bestE = e;
+            best = i;
+        }
+    }
+    return best;
+}
+} // namespace als175a
+
+TEST (als175a_warp_markers_place_the_audio)
+{
+    // bursts at 0.25, 0.75, 1.25 and 1.75 s; markers: the first second plays over 0.5 s, the second over 1.5 s (2 s in all).
+    // Every warp mode puts each burst where the map says (within 8 ms of the peak the source's own burst has)
+    using namespace lynx;
+    const std::vector<double> at { 0.25, 0.75, 1.25, 1.75 };
+    const auto in = als175a::bursts (at);
+    const StretchMap map { { 0.0, 0.0 }, { 44100.0, 22050.0 }, { 88200.0, 88200.0 } };
+    std::vector<long> sourcePeak;
+    for (auto t : at)
+        sourcePeak.push_back (als175a::envelopePeak (in, std::lround (t * 44100.0)));
+    for (auto method : { StretchMethod::general, StretchMethod::transients, StretchMethod::mono, StretchMethod::beats, StretchMethod::tones,
+                         StretchMethod::texture, StretchMethod::complex })
+    {
+        const auto out = timeStretchMapped (in, map, method);
+        CHECK (out != nullptr && out->frames() == 88200 && out->isStereo());
+        if (out == nullptr || out->frames() != 88200)
+            continue;
+        int placed = 0;
+        for (std::size_t k = 0; k < at.size(); ++k)
+        {
+            const auto want = (long) std::llround (stretchMapOutput (map, (double) sourcePeak[k]));
+            const auto got = als175a::envelopePeak (*out, want);
+            placed += std::abs (got - want) <= 353; // 8 ms
+        }
+        CHECK (placed == 4);
+        if (placed != 4)
+            std::printf ("  warp markers: method %d placed %d of 4 bursts\n", (int) method, placed);
+    }
+    // fewer than 3 points: the plain stretch at the overall ratio (the same samples as timeStretch)
+    const auto plain = timeStretchMapped (in, { { 0.0, 0.0 }, { 88200.0, 110250.0 } }, StretchMethod::complex);
+    CHECK (plain->left == timeStretch (in, 1.25, StretchMethod::complex)->left);
+}
+
+TEST (als175a_warp_markers_import_and_export)
+{
+    // the rich set's clip with the file length recorded and markers that bend: 1 s → 2 beats, then 1 s → 6 beats. The
+    // channel keeps them (8 beats in all), the clip starts at the file's start, and nothing is reported as approximated;
+    // exported, the same three markers come back
+    using namespace lynx;
+    auto xml = als175a::richSet();
+    const std::string from = "</FileRef></SampleRef></AudioClip>";
+    const std::string markers = "<WarpMarkers><WarpMarker Id=\"0\" SecTime=\"0\" BeatTime=\"0\" /><WarpMarker Id=\"1\" SecTime=\"2\" BeatTime=\"8\" /></WarpMarkers>";
+    CHECK (xml.find (from) != std::string::npos && xml.find (markers) != std::string::npos);
+    if (xml.find (from) == std::string::npos || xml.find (markers) == std::string::npos)
+        return;
+    xml.replace (xml.find (from), from.size(), "</FileRef><DefaultDuration Value=\"96000\" /><DefaultSampleRate Value=\"48000\" /></SampleRef></AudioClip>");
+    xml.replace (xml.find (markers), markers.size(),
+                 "<WarpMarkers><WarpMarker Id=\"0\" SecTime=\"0\" BeatTime=\"0\" /><WarpMarker Id=\"1\" SecTime=\"1\" BeatTime=\"2\" />"
+                 "<WarpMarker Id=\"2\" SecTime=\"2\" BeatTime=\"8\" /><WarpMarker Id=\"3\" SecTime=\"2.03125\" BeatTime=\"8.1875\" /></WarpMarkers>");
+    FlpImportReport report;
+    const auto bytes = als175a::bytesOf (xml);
+    const auto song = importAls (gzip::compressStored (bytes.data(), bytes.size()), als175a::options (&report), nullptr);
+    CHECK (song.has_value());
+    if (! song)
+        return;
+    const Clip* take = nullptr;
+    for (const auto& c : song->playlist)
+        if (c.kind == ClipKind::audio)
+            take = &c;
+    CHECK (take != nullptr);
+    if (take == nullptr)
+        return;
+    const auto& ch = song->channels[(std::size_t) take->channel];
+    CHECK (ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::complex);
+    CHECK (std::abs (ch.sampler.stretchBeats - 8.0f) < 1e-5);
+    CHECK (ch.sampler.warp.size() == 4);
+    CHECK (take->stretch == 1.0 && take->offset == 0);
+    CHECK (report.partialEffects.count ("Warp markers (one tempo per clip)") == 0);
+    CHECK (! warpStretchMap (ch.sampler.warp, 96000.0, 48000.0, 96000.0 * 1.875 * 2.0).empty());
+
+    AlsExportOptions options;
+    options.sampleSeconds = [] (const std::string&) { return 2.0; };
+    const auto als = exportAls (*song, options);
+    CHECK (als.xml.find ("SecTime=\"1\" BeatTime=\"2\"") != std::string::npos);
+    CHECK (als.xml.find ("SecTime=\"2\" BeatTime=\"8\"") != std::string::npos);
+
+    // back into LYNX (LYNX writes no file length: the file's own, from sampleSeconds): the markers again
+    auto again = als175a::options (nullptr);
+    again.common.sampleSeconds = [] (const std::string&) { return 2.0; };
+    again.common.fileExists = [] (const std::string&) { return true; };
+    const auto back = importAls (als.bytes, again);
+    CHECK (back.has_value());
+    if (! back)
+        return;
+    int bent = 0;
+    for (const auto& c : back->channels)
+        bent += c.sampler.warp.size() >= 3 && std::abs (c.sampler.stretchBeats - 8.0f) < 1e-4;
+    CHECK (bent == 1);
+}
+
+// Round 182b: Live 12.4 crashed loading a LYNX export of FL's "Africa's Calling" demo; its log listed samples that were
+// "not a valid WAV file". FL ships raw Ogg Vorbis streams named .wav, and the export copied them as they were. Live picks
+// the decoder by the extension, so every file whose content doesn't match its extension is written as a plain WAV.
+TEST (als182b_raw_ogg_named_wav_goes_to_live_as_a_real_wav)
+{
+    using namespace lynx;
+    const std::uint8_t rawOgg[] = { 'O', 'g', 'g', 'S', 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x91, 0x41, 0xf2, 0x21, 1, 0x1e, 1, 'v', 'o', 'r', 'b', 'i', 's' };
+    const std::uint8_t pcmWav[] = { 'R', 'I', 'F', 'F', 36, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 2, 0 };
+    const std::uint8_t floatWav[] = { 'R', 'I', 'F', 'F', 36, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 3, 0, 2, 0 };
+    const std::uint8_t oggInWav[] = { 'R', 'I', 'F', 'F', 30, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 2, 0, 0, 0, 0x4F, 0x67 };
+    const std::uint8_t flac[] = { 'f', 'L', 'a', 'C', 0, 0, 0, 34 };
+
+    // the case Live crashed on: an Ogg stream named .wav (any case of the extension)
+    CHECK (alsSampleNeedsWav ("wav", rawOgg, sizeof rawOgg));
+    CHECK (alsSampleNeedsWav (".WAV", rawOgg, sizeof rawOgg));
+    // as before: Ogg inside RIFF/WAVE, WavPack and unknown types are converted; plain PCM / float WAVs are not
+    CHECK (alsSampleNeedsWav ("wav", oggInWav, sizeof oggInWav));
+    CHECK (alsSampleNeedsWav ("wv", rawOgg, sizeof rawOgg));
+    CHECK (! alsSampleNeedsWav ("wav", pcmWav, sizeof pcmWav));
+    CHECK (! alsSampleNeedsWav ("wav", floatWav, sizeof floatWav));
+    // types Live reads: kept when the content is what the name says
+    CHECK (! alsSampleNeedsWav ("ogg", rawOgg, sizeof rawOgg));
+    CHECK (! alsSampleNeedsWav ("flac", flac, sizeof flac));
+    CHECK (alsSampleNeedsWav ("flac", rawOgg, sizeof rawOgg));
+    CHECK (alsSampleNeedsWav ("ogg", pcmWav, sizeof pcmWav));
+    // an empty or unreadable .wav is never passed through as a WAV
+    CHECK (alsSampleNeedsWav ("wav", rawOgg, 0));
+
+    // FL's own raw Ogg samples (FL Data folder, when present): detected and decodable, so the export can write a WAV
+    if (realFlpDir.empty())
+        return;
+    const auto root = std::filesystem::path (realFlpDir).parent_path();
+    for (const auto* file : { "Data/Patches/Misc/Used by demo projects/Cuebur & Thandi Draai - Africa's Calling/AP Clap Human 02.wav" })
+    {
+        const auto path = root / file;
+        if (! std::filesystem::exists (path))
+            continue;
+        std::ifstream in (path, std::ios::binary);
+        const std::vector<std::uint8_t> bytes { std::istreambuf_iterator<char> (in), {} };
+        CHECK (alsSampleNeedsWav (path.extension().string(), bytes.data(), std::min<std::size_t> (bytes.size(), 4096)));
+        oggvorbis::Decoded decoded;
+        CHECK (oggvorbis::decode (bytes.data(), bytes.size(), decoded) && decoded.channels > 0);
+    }
 }

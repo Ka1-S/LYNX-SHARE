@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -32,6 +33,16 @@ constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in F
 // mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
 constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
 constexpr int faderRailRepeatMs = 64;
+// FL measured (REA_rodada177a section 4.2): held 50 / 100 / 160 / 250 / 300 / 400 ms the cap took 1 / 2 / 3 / 4 / 5 / 7
+// steps, so the first repeat comes one period after the press, with no longer first delay. LYNX counts the steps from
+// the press time, not from when its timer happens to fire (a JUCE timer's first callback can come early, which turned
+// one click into two steps).
+constexpr int faderRailFirstRepeatMs = faderRailRepeatMs;
+// how many steps a press held `heldMs` has taken: one at once, then one per period
+constexpr int faderRailStepsForHold (int heldMs) noexcept
+{
+    return heldMs < faderRailFirstRepeatMs ? 1 : 2 + (heldMs - faderRailFirstRepeatMs) / faderRailRepeatMs;
+}
 constexpr float faderRailStepTowards (float value, float target) noexcept
 {
     const auto distance = target - value;
@@ -123,8 +134,10 @@ enum class InstrumentKind : std::uint8_t
                 // pluginState; plays the video's sound in sync with the song, the video is shown by its editor
     keplerExo,  // FL 2026's Kepler Exo (REA_rodada167d): Kepler's engine with the "Kepler-2" state in pluginState, the user's
                 // Kepler Exo engine_x64.dll in samplePath
-    wavetraveller // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
-                  // the channel's sample in samplePath
+    wavetraveller, // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
+                   // the channel's sample in samplePath
+    fruityslicer   // FL's Fruity Slicer (round 180c, core/FruitySlicer.h): FL's state (slices, fades, declick...) in pluginState,
+                   // the sample in samplePath; the sampler's voices play the slices
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
@@ -278,6 +291,14 @@ struct SamplePrecompute
     bool operator== (const SamplePrecompute&) const = default;
 };
 
+// A warp marker (round 175a, M1; Ableton Live's WarpMarker SecTime / BeatTime): a time in the sample file and the
+// content beat it plays on. Between markers the sample is stretched evenly.
+struct WarpPoint
+{
+    double seconds = 0.0, beats = 0.0;
+    bool operator== (const WarpPoint&) const = default;
+};
+
 struct SamplerSettings
 {
     float pitch = 0.0f;   // semitones, -24..24
@@ -290,7 +311,13 @@ struct SamplerSettings
     float stretchBeats = 0.0f; // > 0: the whole sample lasts this long (in beats), following the BPM
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
+    int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
+    int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // with keepPitch and stretchBeats: the file's warp markers (seconds → beats, increasing). The file still lasts
+    // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
+    // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
+    std::vector<WarpPoint> warp;
     // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept
@@ -306,6 +333,11 @@ struct SamplerSettings
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
                                // the precompute crops it, REA_rodada167h §4)
     std::vector<float> slices; // slices (starts as fractions): key 60 + i plays slice i, at the original pitch
+    // Fruity Slicer (round 180c, set from its state when the rack is built, not saved): the key of slice 1, and "play to
+    // end" (a slice plays on to the sample's end instead of stopping at the next slice)
+    int sliceFirstKey = 60;
+    bool slicesToEnd = false;
+    bool slicesCutAtEnd = false; // Fruity Slicer: a slice's voice stops at its end (no 10 ms end fade; FL render)
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats
     float cutoff = 20000.0f;   // channel filter (Hz); low-pass at 20 kHz with no resonance = off
@@ -730,6 +762,7 @@ struct ChannelDef
     std::vector<StandIn> standIns;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
+    int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
@@ -986,8 +1019,11 @@ struct TrackEq
     std::array<float, 3> gainDb { 0.0f, 0.0f, 0.0f };          // ±18
     std::array<float, 3> hz { 90.0f, 1500.0f, 8000.0f };       // 10 Hz .. 16 kHz
     std::array<float, 3> width { 0.267f, 0.267f, 0.267f };     // 0..1: peak Q / shelf slope
+    // round 177d (an FL wishlist item; LYNX's own): the EQ is skipped and its settings kept (FL has no bypass for it)
+    bool bypassed = false;
 
-    bool active() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool hasBoostOrCut() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool active() const noexcept { return ! bypassed && hasBoostOrCut(); }
     bool operator== (const TrackEq&) const = default;
 
     // FL conversions: peak Q = 0.0999·(1001^w − 1) + 0.1; shelves S = 1.9·w + 0.1
@@ -1413,6 +1449,11 @@ struct Clip
     int channel = -1;         // audio clips: channel (audioClip) that holds the sample
     int automation = -1;      // automation clips: index into Song::automations
     std::int64_t fadeIn = 0, fadeOut = 0; // audio clips: fades (ticks)
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // audio clips: FL's raw fade curve values, kept for the export
+    // audio clips: straight fades instead of FL's S curve, bit 0 the fade-in, bit 1 the fade-out (FL's shape 1, round 180d).
+    // Also every clip of a project saved before that round: a finished mix must not change when it is reopened.
+    std::uint8_t linearFades = 0;
+    std::uint32_t flFadeFlags = 0; // FL's raw fade flags of an imported clip (flp::PlaylistItem::fadeFlags), back in the export
     float gain = 1.0f;        // audio clips: clip volume (linear; FL's gain handle: −96.1 … +36 dB, round 166e)
     float pan = 0.0f;         // audio clips: clip pan -1..1 (FL 2026's clip pan; REA round 153)
     bool muted = false;       // clip-level mute (the Mute tool); independent of the track mute
@@ -1420,6 +1461,9 @@ struct Clip
     // per clip, on top of the channel's own pitch and reverse (FL: the playlist item's +0x3C / +0x48 bit 0, round 167k)
     float pitch = 0.0f;
     bool reversed = false;
+    // A slot of the clip grid (Clip-launch workflow, core/ClipLauncher.h): this clip's entry in ClipGrid::slots, −1 for
+    // every clip of the Playlist. It fits the padding after `reversed`: Clip stays the same size.
+    std::int16_t gridSlot = -1;
     // audio clips: FL 2026's per-clip stretch (the playlist item's +0x40 double, REA_rodada167l §2): the clip plays its
     // audio `stretch` times longer (2 = half speed). Its channel's time-stretch mode decides how: Resample changes the
     // speed and the pitch together, the other modes keep the pitch. `length` is already the stretched length.
@@ -1435,6 +1479,8 @@ struct Clip
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
     bool operator== (const Clip&) const = default;
 };
+
+static_assert (offsetof (Clip, gridSlot) + sizeof (std::int16_t) <= offsetof (Clip, stretch)); // (in the padding)
 
 // LYNX extra (issue #25; the user's choice, after round 168k showed FL plays such a clip once and is silent after its
 // pattern): a pattern clip stretched past its pattern loops the pattern until the clip ends. An app setting (Options ›
@@ -1593,6 +1639,71 @@ struct Arrangement
     bool operator== (const Arrangement&) const = default;
 };
 
+// The clip grid of the Clip-launch workflow (round 181a; logic in core/ClipLauncher.h). Absent (Song::clipGrid empty) until
+// the workflow or the grid is first used: a project without one carries nothing but the empty optional.
+// LaunchQuant and LaunchMode follow the order of Live's menus. Mapping to the numbers a Live set stores (docs/ALS_FORMAT.md §5)
+// is seen in Live's GUI only for a set-wide GlobalQuantisation 9 shown as "1/8" (181a), which fits clip number = global + 1.
+// From shipped sets (175a): clip LaunchQuant 0 = global, LaunchMode 0..3. Every other number is INFERRED
+// (docs/analise/REA_rodada181a.md); per-clip reads are a follow-up for the next Live turn, before .als session import.
+enum class LaunchQuant : std::uint8_t
+{
+    global, none, bars8, bars4, bars2, bar, half, halfTriplet, quarter, quarterTriplet, eighth, eighthTriplet, sixteenth,
+    sixteenthTriplet, thirtySecond
+};
+enum class LaunchMode : std::uint8_t { trigger, gate, toggle, repeat };
+// A follow action, in the order of the manual's list; the numbers a set stores for them are INFERRED (docs/analise/REA_rodada181a.md)
+enum class FollowKind : std::uint8_t { none, stop, playAgain, previous, next, first, last, any, other, jump };
+
+struct ClipFollow
+{
+    bool enabled = false;
+    FollowKind a = FollowKind::next, b = FollowKind::none;
+    int chanceA = 100, chanceB = 0;
+    int jumpA = 0, jumpB = 0;       // jump: the target row
+    bool linked = true;             // after `iterations` passes of the clip; off: after `ticks`
+    int iterations = 1;
+    std::int64_t ticks = 4 * 960;
+    bool operator== (const ClipFollow&) const = default;
+};
+
+// What a clip of the grid keeps besides the Clip itself. A Clip finds its entry through Clip::gridSlot.
+struct ClipGridSlot
+{
+    int scene = 0;
+    std::string name;
+    std::uint32_t colour = 0;       // 0xFFRRGGBB, 0 = the source's colour
+    LaunchMode mode = LaunchMode::trigger;
+    LaunchQuant quant = LaunchQuant::global;
+    bool legato = false;            // takes over the position of the clip it replaces
+    bool loop = true;               // off: plays once, then the track stops
+    bool noStop = false;            // an empty slot without its stop button (a scene leaves that track alone): its Clip has length 0
+    ClipFollow follow;
+    bool operator== (const ClipGridSlot&) const = default;
+};
+
+struct ClipGridScene
+{
+    std::string name;
+    std::uint32_t colour = 0;
+    double tempo = 0.0;   // > 0: the song takes this tempo when the scene is launched
+    int beatsPerBar = 0;  // > 0: and this bar length
+    bool operator== (const ClipGridScene&) const = default;
+};
+
+struct ClipGrid
+{
+    // Columns are Playlist tracks (Clip::track), rows are scenes (ClipGridSlot::scene). Every Clip has start 0: it has no
+    // place on a timeline. Song::forEachClipList visits this list, so every reference to a pattern, channel or track
+    // follows edits as the Playlist's clips do.
+    std::vector<Clip> clips;
+    std::vector<ClipGridSlot> slots; // an entry no clip refers to is free
+    std::vector<ClipGridScene> scenes;
+    LaunchQuant globalQuant = LaunchQuant::bar;
+    bool followActions = true; // follow actions on the whole grid (off: edit playing clips with no jumps)
+    bool backOnStop = false; // "Give tracks back to the Playlist when the transport stops" (off: they stay taken until asked)
+    bool operator== (const ClipGrid&) const = default;
+};
+
 // The project's credits (FL's Settings › Info page): shown and edited in Settings › Info, kept in .lynx, imported from .flp.
 struct ProjectInfo
 {
@@ -1720,7 +1831,7 @@ struct Song
     }
     void removeDeadMidiLinks();
 
-    // Applies `fn` to all clip lists (the current one and the stored ones).
+    // Applies `fn` to all clip lists (the current one, the stored ones and the clip grid's).
     template <typename Fn>
     void forEachClipList (Fn&& fn)
     {
@@ -1728,6 +1839,8 @@ struct Song
         for (std::size_t i = 0; i < arrangements.size(); ++i)
             if ((int) i != currentArrangement)
                 fn (arrangements[i].clips);
+        if (clipGrid)
+            fn (clipGrid->clips);
     }
     template <typename Fn>
     void forEachClipList (Fn&& fn) const
@@ -1736,11 +1849,21 @@ struct Song
         for (std::size_t i = 0; i < arrangements.size(); ++i)
             if ((int) i != currentArrangement)
                 fn (arrangements[i].clips);
+        if (clipGrid)
+            fn (clipGrid->clips);
     }
 
     // Applies `fn` to all Pattern Block lists (the current arrangement's and the stored ones).
     template <typename Fn>
     void forEachBlockList (Fn&& fn)
+    {
+        fn (blocks);
+        for (std::size_t i = 0; i < arrangements.size(); ++i)
+            if ((int) i != currentArrangement)
+                fn (arrangements[i].blocks);
+    }
+    template <typename Fn>
+    void forEachBlockList (Fn&& fn) const
     {
         fn (blocks);
         for (std::size_t i = 0; i < arrangements.size(); ++i)
@@ -1754,6 +1877,7 @@ struct Song
     // "Start" marker (the performance zone) don't play with the song; they are launched live (click, controller pads)
     // and loop on their track by its Performance settings, while the song plays from the Start marker on.
     bool performanceMode = false;
+    std::optional<ClipGrid> clipGrid; // the Clip-launch workflow's grid (round 181a); empty until it is first used
     // The end of the performance zone: the first Start marker's tick, or 0 (no zone) without one / when off.
     std::int64_t performanceZoneEnd() const noexcept;
     bool inPerformanceZone (const Clip& clip) const noexcept { return performanceMode && clip.start < performanceZoneEnd(); }

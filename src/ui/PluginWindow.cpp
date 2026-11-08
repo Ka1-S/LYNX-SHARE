@@ -83,9 +83,15 @@ public:
             bendRange.addItem (juce::String (st), st);
         bendRange.setTooltip (tr ("The pitch bend range sent to the plugin (semitones)"));
         bendRange.onChange = [this] {
-            engine.editSong ([fn = find, v = bendRange.getSelectedId()] (Song& song) {
-                if (auto* ref = fn (song); ref != nullptr && v > 0)
-                    ref->bendRange = v;
+            // as the toggles beside it: the new instance takes the range, and starts from the current settings
+            juce::MessageManager::callAsync ([en = &engine, fn = find, inst = &plugin, v = bendRange.getSelectedId()] {
+                if (PluginWindows::isOpen (*inst))
+                    PluginWindows::close (*inst);
+                en->capturePluginStates();
+                en->editSong ([fn, v] (Song& song) {
+                    if (auto* ref = fn (song); ref != nullptr && v > 0)
+                        ref->bendRange = v;
+                });
             });
         };
         addChildComponent (bendRange);
@@ -392,7 +398,7 @@ public:
     {
         // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
         // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
-        if (sideTrack >= 0 && sideSlot >= 0 && sideInputChannels (plugin) > 0)
+        if (sideTrack >= 0 && sideSlot >= 0 && hasSideBus (plugin))
         {
             addAndMakeVisible (sidechain);
             sidechain.setTooltip (tr ("Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs"));

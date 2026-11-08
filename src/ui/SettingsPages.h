@@ -28,10 +28,14 @@ struct GeneralOptions
     bool splash = true, startupSound = true, scanAtStart = true;
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
+    bool clipLaunchWorkflow = false; // Settings › General › Workflow (round 181a): false = Pattern workflow, the default
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
     bool autoClipsAtPlayback = true; // FL's General › "Create automation clips at the playback position" (on, round 177b)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
+    // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the
+    // control under the mouse also shows next to the cursor
+    bool hoverValues = false;
     int editPatternsIn = 0;     // 0 = Piano Roll when it has notes, 1 = Channel Rack, 2 = Piano Roll
     int undoLevels = prefs::defaultUndoLevels;
     // FL's General › "Alternate undo mode" (off by default: Ctrl+Z undoes, then redoes; on: classic undo; round 167k)
@@ -39,6 +43,8 @@ struct GeneralOptions
     int autosaveMinutes = prefs::defaultAutosaveMinutes; // 0 = never
     int autosaveKeep = prefs::defaultAutosaveKeep;
     bool askUnusedRecordings = true; // offer to delete takes a project no longer uses when it closes
+    bool backupWaitsForQuiet = true; // round 177d: a backup waits while playing and right after MIDI input too
+    int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...and is written anyway after this long
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
     bool pluginSandbox = false;
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)

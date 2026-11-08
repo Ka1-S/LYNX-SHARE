@@ -1162,6 +1162,19 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                         item.gain = std::max (0.0f, finiteOr (readLE<float> (e.data, o + 0x34), 1.0f));
                     }
 
+                    if (recordSize >= 88)
+                    {
+                        // +0x38: bit 0 = the fade-in is on, bit 1 = the fade-out is on (round 180d, FL renders of one clip
+                        // with each value). An off fade keeps its length in the file and FL does not play it.
+                        const auto finiteOr = [] (float v) { return std::isfinite (v) ? v : 0.0f; };
+                        const auto fades = readLE<std::uint32_t> (e.data, o + 0x38);
+                        item.fadeFlags = fades;
+                        item.fadeInMs = (fades & 1) != 0 ? item.fadeInMs : 0.0f;
+                        item.fadeOutMs = (fades & 2) != 0 ? item.fadeOutMs : 0.0f;
+                        item.fadeInTension = item.fadeInMs > 0.0f ? finiteOr (readLE<float> (e.data, o + 0x28)) : 0.0f;
+                        item.fadeOutTension = item.fadeOutMs > 0.0f ? finiteOr (readLE<float> (e.data, o + 0x30)) : 0.0f;
+                    }
+
                     if (recordSize >= 80)
                     {
                         // FL 2026's clip pitch (+0x3C, semitones, -12..12: keys 7/8, FUN_00e2d7b0) and clip flags

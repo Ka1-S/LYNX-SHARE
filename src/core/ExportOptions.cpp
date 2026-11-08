@@ -131,7 +131,7 @@ Options clamped (Options o)
     o.maxTailSeconds = std::min (o.maxTailSeconds, 60.0);
     if ((int) o.range < 0 || (int) o.range > 2) o.range = d.range;
     o.loops = std::clamp (o.loops, 1, 16);
-    if ((int) o.stems < 0 || (int) o.stems > 2) o.stems = d.stems;
+    if ((int) o.stems < 0 || (int) o.stems > (int) Stems::channelsDry) o.stems = d.stems;
     if ((int) o.channels < 0 || (int) o.channels > 3) o.channels = d.channels;
     o.moreFormats &= 0xFu & ~(1u << (int) o.format);
     if (! (o.masterLufs >= -30.0 && o.masterLufs <= -5.0)) o.masterLufs = d.masterLufs;
@@ -483,12 +483,26 @@ std::vector<int> stemChannels (const Song& original, Range range)
     return out;
 }
 
-Song makeChannelStemSong (const Song& song, int channel)
+Song makeChannelStemSong (const Song& song, int channel, bool dry)
 {
     Song out = song;
     for (int c = 0; c < (int) out.channels.size(); ++c)
         if (c != channel)
             out.channels[(std::size_t) c].muted = true;
+    if (dry && channel >= 0 && channel < (int) out.channels.size())
+    {
+        const auto t = out.channels[(std::size_t) channel].mixerTrack;
+        if (t > 0 && t < (int) out.mixer.size())
+        {
+            auto& track = out.mixer[(std::size_t) t];
+            track.sends.clear();
+            if (! track.toMaster)
+            {
+                track.toMaster = true;
+                track.masterLevel = 1.0f;
+            }
+        }
+    }
     return out;
 }
 
