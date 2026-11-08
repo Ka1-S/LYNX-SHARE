@@ -7881,3 +7881,5 @@ countries: tw hk mo
 "This track plays through {0} inserts" = "此音軌經過 {0} 個插入通道"
 "Unfold" = "展開"
 "W shows or hides the selected device's window" = "W 顯示或隱藏選取裝置的視窗"
+"the piano roll is in its own panel now" = "鋼琴捲簾現在在它自己的面板中"
+"Dock the piano roll here" = "將鋼琴捲簾停駐在這裡"

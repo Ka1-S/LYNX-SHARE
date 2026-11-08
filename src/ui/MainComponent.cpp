@@ -738,6 +738,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
+        detailView->releaseEditor();
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
@@ -1471,6 +1475,8 @@ juce::Rectangle<int> MainComponent::getToolStripAreaForSnapshot (bool playlistSt
 
 keys::Context MainComponent::focusContext() const
 {
+    if (pianoRollKeysHere()) // (round 183a: docked in the Clip-launch workflow's detail view)
+        return keys::Context::pianoRoll;
     switch (workspace.getFocused())
     {
         case Panel::playlist: return keys::Context::playlist;
@@ -1527,10 +1533,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     const auto focused = workspace.getFocused();
     const auto panelShown = workspace.isPanelVisible (focused);
 
-    if (panelShown && focused == Panel::pianoRoll && pianoRoll.handleKey (key))
+    if (((panelShown && focused == Panel::pianoRoll) || pianoRollKeysHere()) && pianoRoll.handleKey (key))
         return true;
 
-    if (panelShown && focused == Panel::playlist && playlist.handleKey (key))
+    if (panelShown && focused == Panel::playlist && ! pianoRollKeysHere() && playlist.handleKey (key))
         return true;
 
     // 4. the key map
@@ -2549,6 +2555,8 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
         playlist.repaint();
     }
 
+    if (! on && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
+        detailView->releaseEditor();
     clipLaunchWorkflow = on;
     playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
     // the detail view docks under the grid and the Playlist (round 183a); Pattern workflow: nothing docked
@@ -2590,6 +2598,17 @@ void MainComponent::makeDetailView()
     h.selectInMixer = [this] (int insert) { mixer.selectTrack (insert); };
     h.instrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); }; // (as on the Mixer)
     h.openClip = [this] (int track, int scene) { openGridClip (track, scene); };
+    h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
+    h.undockPianoRoll = [this] { undockPianoRoll(); };
+    // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
+    workspace.onWillShow = [this] (Panel panel) {
+        if (panel == Panel::pianoRoll && pianoRollDocked)
+        {
+            undockPianoRoll();
+            if (detailView != nullptr)
+                detailView->editorTakenBack();
+        }
+    };
     h.layoutChanged = [this] {
         if (detailView != nullptr)
             detailView->setVisible (clipLaunchWorkflow && DetailView::shownSetting);
@@ -2608,6 +2627,47 @@ void MainComponent::makeDetailView()
     });
     const auto selected = clipGridSelection (*clipGridView);
     detailView->showSelection (selected.first, selected.second);
+}
+
+juce::Component* MainComponent::dockPianoRoll (int pattern)
+{
+    if (pattern >= 0 && pattern < (int) engine.getSong().patterns.size() && pattern != engine.getSong().currentPattern)
+        selectPattern (pattern);
+    if (! pianoRollDocked)
+    {
+        if (workspace.isPanelVisible (Panel::pianoRoll))
+        {
+            workspace.hide (Panel::pianoRoll);
+            refreshPanelButtons();
+        }
+        workspace.releaseContent (Panel::pianoRoll);
+        pianoRollDocked = true;
+        pianoRollDockActive = false;
+        dockClickWatcher.down = [this] (const juce::MouseEvent& e) {
+            pianoRollDockActive = e.eventComponent != nullptr && (e.eventComponent == &pianoRoll || pianoRoll.isParentOf (e.eventComponent));
+        };
+        juce::Desktop::getInstance().addGlobalMouseListener (&dockClickWatcher);
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<PianoRollComponent> (&pianoRoll)] {
+            if (safe != nullptr)
+                safe->scrollToNotes();
+        });
+    }
+    return &pianoRoll;
+}
+
+void MainComponent::undockPianoRoll()
+{
+    if (! pianoRollDocked)
+        return;
+    pianoRollDocked = false;
+    pianoRollDockActive = false;
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
+}
+
+bool MainComponent::pianoRollKeysHere() const
+{
+    return pianoRollDocked && pianoRollDockActive && pianoRoll.isShowing();
 }
 
 bool MainComponent::runDetailAction (const std::string& id)

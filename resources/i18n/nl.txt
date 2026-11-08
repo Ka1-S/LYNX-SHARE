@@ -7881,3 +7881,5 @@ countries: nl be
 "This track plays through {0} inserts" = "Dit spoor speelt via {0} inserts"
 "Unfold" = "Uitvouwen"
 "W shows or hides the selected device's window" = "W toont of verbergt het venster van het geselecteerde apparaat"
+"the piano roll is in its own panel now" = "de piano roll staat nu in een eigen paneel"
+"Dock the piano roll here" = "De piano roll hier vastzetten"

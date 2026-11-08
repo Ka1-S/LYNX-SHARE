@@ -7881,3 +7881,5 @@ countries: cn sg
 "This track plays through {0} inserts" = "此音轨经过 {0} 个插入通道"
 "Unfold" = "展开"
 "W shows or hides the selected device's window" = "W 显示或隐藏选中设备的窗口"
+"the piano roll is in its own panel now" = "钢琴卷帘现在在它自己的面板中"
+"Dock the piano roll here" = "将钢琴卷帘停靠在这里"

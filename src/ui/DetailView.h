@@ -52,6 +52,10 @@ public:
         std::function<void (int insert, ChannelDef)> instrumentDropped; // a generator dropped on the chain
         std::function<void (int track, int scene)> openClip;            // the Clip page's button: the clip in its editor
         std::function<void()> layoutChanged;                            // height, visibility or a setting changed
+        // Slice 2 (D1a): the Clip page docks the existing Piano roll for a pattern clip. `dockPianoRoll` hands it over
+        // (showing `pattern`; its panel lets go of it), `undockPianoRoll` gives it back to its panel.
+        std::function<juce::Component* (int pattern)> dockPianoRoll;
+        std::function<void()> undockPianoRoll;
     };
 
     DetailView (AudioEngine& engine, Hooks hooks);
@@ -62,6 +66,10 @@ public:
     void setPage (Page page);
     Page getPage() const noexcept { return devicesPage ? Page::devices : Page::clip; }
     void togglePage(); // Shift+Tab
+    // The owner took a docked editor back (its panel was shown): the Clip page offers to dock it again.
+    void editorTakenBack();
+    // The Clip page lets go of a docked editor (Pattern workflow chosen, the window closing).
+    void releaseEditor();
 
     // The height the owner gives it out of `available` px (the dock keeps at least half for the grid and Playlist).
     int heightFor (int available) const noexcept;

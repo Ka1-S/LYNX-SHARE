@@ -7881,3 +7881,5 @@ countries: jp
 "This track plays through {0} inserts" = "このトラックは {0} 個のインサートを通ります"
 "Unfold" = "展開"
 "W shows or hides the selected device's window" = "W で選択中のデバイスのウィンドウを表示 / 非表示"
+"the piano roll is in its own panel now" = "ピアノロールは現在専用パネルにあります"
+"Dock the piano roll here" = "ピアノロールをここにドッキング"

@@ -7881,3 +7881,5 @@ countries: fr be ch ca lu
 "This track plays through {0} inserts" = "Cette piste joue par {0} inserts"
 "Unfold" = "Déplier"
 "W shows or hides the selected device's window" = "W affiche ou masque la fenêtre de l'appareil sélectionné"
+"the piano roll is in its own panel now" = "le piano roll est maintenant dans son propre panneau"
+"Dock the piano roll here" = "Ancrer le piano roll ici"

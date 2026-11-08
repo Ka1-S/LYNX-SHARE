@@ -7881,3 +7881,5 @@ countries: pl
 "This track plays through {0} inserts" = "Ta ścieżka gra przez {0} insertów"
 "Unfold" = "Rozwiń"
 "W shows or hides the selected device's window" = "W pokazuje lub ukrywa okno zaznaczonego urządzenia"
+"the piano roll is in its own panel now" = "piano roll jest teraz we własnym panelu"
+"Dock the piano roll here" = "Zadokuj tutaj piano roll"

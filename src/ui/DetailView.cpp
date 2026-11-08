@@ -15,6 +15,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
+#include "ui/EditorTools.h"
 #include "ui/FlMods.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
@@ -1133,35 +1134,121 @@ public:
     {
         addChildComponent (open);
         open.onClick = [this] {
-            if (hooks.openClip != nullptr)
+            if (dockable())
+            {
+                takenBack = false;
+                update();
+            }
+            else if (hooks.openClip != nullptr)
                 hooks.openClip (track, scene);
         };
         engine.addChangeListener (this);
     }
-    ~ClipPage() override { engine.removeChangeListener (this); }
+    ~ClipPage() override
+    {
+        engine.removeChangeListener (this);
+        release();
+    }
 
     void setSlot (int t, int s)
     {
+        if (t != track || s != scene)
+            takenBack = false; // (a new clip docks again)
         track = t;
         scene = s;
         update();
+    }
+    void editorTakenBack()
+    {
+        if (editor != nullptr)
+        {
+            editor = nullptr; // (its panel has it now)
+            dockedTrack = dockedScene = -1;
+            takenBack = true;
+        }
+        update();
+    }
+    void release()
+    {
+        dockedTrack = dockedScene = -1;
+        if (editor != nullptr && hooks.undockPianoRoll != nullptr)
+        {
+            editor = nullptr;
+            hooks.undockPianoRoll();
+        }
+        editor = nullptr;
     }
 
     void paint (juce::Graphics& g) override
     {
         g.fillAll (colour::bg1);
+        if (editor != nullptr)
+            return;
         g.setColour (colour::textSecondary);
         g.setFont (font (type::body));
         g.drawText (text, getLocalBounds().withTrimmedBottom (40), juce::Justification::centred, true);
     }
-    void resized() override { open.setBounds (getLocalBounds().withSizeKeepingCentre (220, 26).translated (0, 16)); }
+    void resized() override
+    {
+        open.setBounds (getLocalBounds().withSizeKeepingCentre (240, 26).translated (0, 16));
+        if (editor != nullptr)
+        {
+            editor->setBounds (getLocalBounds());
+            if (auto* sharer = dynamic_cast<SharesTitleBar*> (editor))
+                sharer->setTitleBarInsets (0, 0); // (its toolbar runs across the top, there is no title bar here)
+        }
+    }
+    void visibilityChanged() override { update(); }
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { update(); }
+
+    // this page and every parent visible (not isShowing(): an off-screen --detailshot has no window, and a minimised
+    // window keeps its dock)
+    bool onScreen() const
+    {
+        for (const juce::Component* c = this; c != nullptr; c = c->getParentComponent())
+            if (! c->isVisible())
+                return false;
+        return getParentComponent() != nullptr;
+    }
+
+    const Clip* clipShown() const
+    {
+        const auto& song = engine.getSong();
+        return song.clipGrid && track >= 0 && scene >= 0 ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+    }
+    bool dockable() const
+    {
+        const auto* clip = clipShown();
+        return clip != nullptr && clip->kind == ClipKind::pattern && hooks.dockPianoRoll != nullptr;
+    }
+
     void update()
     {
         const auto& song = engine.getSong();
-        const Clip* clip = song.clipGrid && track >= 0 && scene >= 0 ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+        const auto* clip = clipShown();
+        // a pattern clip, on screen: the Piano roll docks here (unless its panel took it back since this clip was picked)
+        if (clip != nullptr && clip->kind == ClipKind::pattern && onScreen() && ! takenBack && hooks.dockPianoRoll != nullptr)
+        {
+            if (editor != nullptr && dockedTrack == track && dockedScene == scene)
+                return; // (already showing this clip: the user may have picked another pattern in it meanwhile)
+            dockedTrack = track;
+            dockedScene = scene;
+            auto* e = hooks.dockPianoRoll (clip->pattern);
+            if (e != nullptr && e != editor)
+            {
+                editor = e;
+                addAndMakeVisible (*editor);
+                resized();
+            }
+            open.setVisible (false);
+            repaint();
+            return;
+        }
+        if (editor != nullptr && (! onScreen() || clip == nullptr || clip->kind != ClipKind::pattern))
+            release();
+
         if (clip == nullptr)
         {
             text = tr ("Select a clip in the clip grid to see it here");
@@ -1176,7 +1263,9 @@ private:
         else
         {
             text = clip->pattern >= 0 && clip->pattern < (int) song.patterns.size() ? utf8 (song.patterns[(std::size_t) clip->pattern].name) : tr ("Pattern");
-            open.setButtonText (tr ("Open in the piano roll"));
+            if (takenBack)
+                text << " - " << tr ("the piano roll is in its own panel now");
+            open.setButtonText (takenBack ? tr ("Dock the piano roll here") : tr ("Open in the piano roll"));
             open.setVisible (true);
         }
         repaint();
@@ -1186,6 +1275,9 @@ private:
     Hooks& hooks;
     juce::TextButton open;
     juce::String text;
+    juce::Component* editor = nullptr; // the docked Piano roll (not owned)
+    int dockedTrack = -1, dockedScene = -1;
+    bool takenBack = false;
     int track = -1, scene = -1;
 };
 
@@ -1240,6 +1332,9 @@ void DetailView::setPage (Page page)
 }
 
 void DetailView::togglePage() { setPage (devicesPage ? Page::clip : Page::devices); }
+
+void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
+void DetailView::releaseEditor() { clipPage->release(); }
 
 void DetailView::showPage()
 {

@@ -75,6 +75,14 @@ public:
             content->removeMouseListener (this);
     }
 
+    void releaseContent()
+    {
+        if (content != nullptr)
+            content->removeMouseListener (this);
+        content = nullptr;
+        sharer = nullptr;
+    }
+
     void setContent (juce::Component& c, const juce::String& t, Icon i)
     {
         content = &c;
@@ -632,6 +640,11 @@ void Workspace::setContent (Panel panel, juce::Component& content, const juce::S
     frames[(std::size_t) panel]->setContent (content, title, icon);
 }
 
+void Workspace::releaseContent (Panel panel)
+{
+    frames[(std::size_t) panel]->releaseContent();
+}
+
 void Workspace::setTitle (Panel panel, const juce::String& title)
 {
     frames[(std::size_t) panel]->setTitle (title);
@@ -828,6 +841,9 @@ void Workspace::applyLayout()
         const auto& state = layout[panel];
         auto& frame = *frames[(std::size_t) i];
         auto& window = windows[(std::size_t) i];
+
+        if (state.visible && onWillShow != nullptr) // (round 183a: a docked content comes back first)
+            onWillShow (panel);
 
         if (state.detached)
         {

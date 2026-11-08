@@ -7881,3 +7881,5 @@ countries: ru by kz
 "This track plays through {0} inserts" = "Эта дорожка звучит через {0} инсертов"
 "Unfold" = "Развернуть"
 "W shows or hides the selected device's window" = "W показывает или скрывает окно выбранного устройства"
+"the piano roll is in its own panel now" = "пиано-ролл теперь в своей панели"
+"Dock the piano roll here" = "Закрепить пиано-ролл здесь"

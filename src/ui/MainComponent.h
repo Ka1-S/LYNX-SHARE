@@ -563,6 +563,22 @@ private:
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
     std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
     void makeDetailView();
+    // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)
+    bool pianoRollDocked = false;
+    juce::Component* dockPianoRoll (int pattern);
+    void undockPianoRoll();
+    bool pianoRollKeysHere() const; // the docked Piano roll was clicked last: the keys are its own
+    struct DockClickWatcher final : juce::MouseListener
+    {
+        std::function<void (const juce::MouseEvent&)> down;
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (down != nullptr)
+                down (e);
+        }
+    };
+    DockClickWatcher dockClickWatcher; // a global listener only while the Piano roll is docked
+    bool pianoRollDockActive = false;
     bool runDetailAction (const std::string& id);
     void openGridClip (int track, int scene);
     MixerComponent mixer;
