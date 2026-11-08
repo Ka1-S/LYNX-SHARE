@@ -104,7 +104,8 @@ public:
     // the next audio clip's stretch (FL 2026's clip stretch, round 167l): its audio lasts that many times longer
     virtual void setNextClipStretch (float /*stretch*/) noexcept {}
     virtual void setClipShift (bool) {}
-    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
+    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0,
+                                  float /*inTension*/ = 0.0f, float /*outTension*/ = 0.0f) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
     virtual void setNextNoteExpression (float /*pan*/, float /*cents*/, bool /*porta*/ = false) noexcept {}
