@@ -11,6 +11,7 @@
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/MissingFiles.h"
+#include "core/TimeStretch.h"
 #include "core/XmlLite.h"
 
 // Evidence tags as in docs/analise/ALS_FORMAT.md: [DATA] the sets Live 12 ships, [BIN] Live 12.4's member-name table.
@@ -537,10 +538,13 @@ void applyWarpMode (int mode, SamplerSettings& s)
 
 // `stretchBeats` > 0: the channel plays the file stretched offline to that many beats at the song tempo (the warp
 // modes' own engines, core/TimeStretch); 0: the clips stretch it in real time (their `stretch`)
-int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0)
+int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0,
+                     double beatsPitch = 0.0, const std::vector<WarpPoint>& warp = {})
 {
-    const auto key = path + "|" + std::to_string (mixerTrack) + "|" + std::to_string (warped ? warpMode : -1) + "|"
-                     + std::to_string (std::llround (stretchBeats * 1.0e6));
+    auto key = path + "|" + std::to_string (mixerTrack) + "|" + std::to_string (warped ? warpMode : -1) + "|"
+               + std::to_string (std::llround (stretchBeats * 1.0e6)) + "|" + std::to_string (std::llround (beatsPitch * 100.0));
+    for (const auto& w : warp) // (clips of one file with different markers need channels of their own)
+        key += "|" + std::to_string (std::llround (w.seconds * 1.0e6)) + ":" + std::to_string (std::llround (w.beats * 1.0e6));
     if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
         return it->second;
     ChannelDef c;
@@ -554,6 +558,8 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
     if (warped)
         applyWarpMode (warpMode, c.sampler);
     c.sampler.stretchBeats = (float) stretchBeats;
+    c.sampler.stretchPitch = (float) beatsPitch;
+    c.sampler.warp = warp;
     ctx.song.channels.push_back (std::move (c));
     const auto index = (int) ctx.song.channels.size() - 1;
     ctx.audioChannels[key] = index;
@@ -570,11 +576,12 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     const auto bpm = ctx.song.bpm;
 
     // warp: beats of the clip's content ↔ seconds of the sample, piecewise linear [DATA: WarpMarker SecTime/BeatTime].
-    // LYNX stretches a clip at one rate: the one between the first and the last marker (slice N4 adds the segments).
+    // `rate` is the one between the first and the last marker; a clip stretched offline keeps every segment (round 175a,
+    // M1: the channel's warp markers); one stretched in real time plays at `rate`.
     double rate = bpm / 60.0, beatAtZero = 0.0; // beats per sample second; the content beat at sample time 0
+    std::vector<std::pair<double, double>> marks;
     if (warped)
     {
-        std::vector<std::pair<double, double>> marks;
         for (const auto& m : clip.path ("WarpMarkers").children ("WarpMarker"))
             marks.push_back ({ numberAttr (m, "SecTime"), numberAttr (m, "BeatTime") });
         std::sort (marks.begin(), marks.end());
@@ -582,30 +589,56 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
             rate = (marks.back().second - marks.front().second) / (marks.back().first - marks.front().first);
         if (! marks.empty())
             beatAtZero = marks.front().second - rate * marks.front().first;
-        if (marks.size() > 3 && ctx.report != nullptr)
-        {
-            // more than one segment (Live writes one marker past the end): an approximation until N4
-            double maxDev = 0;
-            for (const auto& [sec, beat] : marks)
-                maxDev = std::max (maxDev, std::abs (beatAtZero + rate * sec - beat));
-            if (maxDev > 1.0 / 64.0)
-                ++ctx.report->partialEffects["Warp markers (one tempo per clip)"];
-        }
     }
-    // content position (beats, or seconds when not warped) → LYNX playback ticks from the sample's start
-    const auto contentTicks = [&] (double v) { return warped ? (v - beatAtZero) * ppq : v * bpm / 60.0 * ppq; };
+    // more than one tempo inside the clip (Live writes one marker past the last real one, so 2 segments can still be one)
+    const auto bends = [&] {
+        double maxDev = 0;
+        for (const auto& [sec, beat] : marks)
+            maxDev = std::max (maxDev, std::abs (beatAtZero + rate * sec - beat));
+        return marks.size() > 2 && maxDev > 1.0 / 64.0;
+    }();
     auto stretch = warped ? std::clamp (rate * 60.0 / bpm, 0.01, 100.0) : 1.0;
     // a warped clip that keeps its pitch, whose file length the set records [DATA: SampleRef DefaultDuration /
     // DefaultSampleRate]: the channel stretches the whole file offline with the clip's warp mode (round 175a, N4:
     // LYNX's Beats engine only runs offline), to the file's length in content beats; the clip then plays it as is
-    const auto fileFrames = clip.number ("SampleRef/DefaultDuration", 0), fileRate = clip.number ("SampleRef/DefaultSampleRate", 0);
-    double fileBeats = 0.0;
-    if (warped && mode != 3 && fileFrames > 0 && fileRate > 0 && std::abs (stretch - 1.0) > 1.0e-9)
+    auto fileFrames = clip.number ("SampleRef/DefaultDuration", 0), fileRate = clip.number ("SampleRef/DefaultSampleRate", 0);
+    // (a set without the file's length, as LYNX writes them: markers that bend the tempo still need it; the file's own)
+    if (bends && ! (fileFrames > 0 && fileRate > 0) && ctx.options.common.sampleSeconds)
+        if (const auto seconds = ctx.options.common.sampleSeconds (path); seconds > 0.0)
+        {
+            fileFrames = seconds;
+            fileRate = 1.0;
+        }
+    // Beats with a transpose: Live resamples each piece (higher and shorter, still on its beat), so the transposition is
+    // rendered offline with the stretch, keyed by the pitch, and the clip itself plays untransposed [LIVE: Beats-up5]
+    const auto transpose = std::clamp (clip.number ("PitchCoarse", 0) + clip.number ("PitchFine", 0) / 100.0, -48.0, 48.0);
+    const auto bakePitch = warped && mode == 0 && transpose != 0.0;
+    double fileBeats = 0.0, beatsPitch = 0.0;
+    std::vector<WarpPoint> warp;
+    if (warped && mode != 3 && fileFrames > 0 && fileRate > 0 && (std::abs (stretch - 1.0) > 1.0e-9 || bakePitch || bends))
     {
-        fileBeats = rate * fileFrames / fileRate;
         stretch = 1.0;
+        beatsPitch = bakePitch ? transpose : 0.0;
+        if (bends)
+        {
+            // every segment: the file from its start to its end, in content beats, with the markers kept for the render
+            StretchMap beatsOf;
+            for (const auto& [sec, beat] : marks)
+                if (beatsOf.empty() || (sec > beatsOf.back().first + 1e-9 && beat > beatsOf.back().second + 1e-9))
+                    beatsOf.push_back ({ sec, beat });
+            beatAtZero = stretchMapOutput (beatsOf, 0.0);
+            fileBeats = stretchMapOutput (beatsOf, fileFrames / fileRate) - beatAtZero;
+            for (const auto& [sec, beat] : beatsOf)
+                warp.push_back ({ sec, beat });
+        }
+        else
+            fileBeats = rate * fileFrames / fileRate;
     }
-    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats);
+    else if (bends && ctx.report != nullptr)
+        ++ctx.report->partialEffects["Warp markers (one tempo per clip)"]; // stretched in real time: one rate
+    // content position (beats, or seconds when not warped) → LYNX playback ticks from the sample's start
+    const auto contentTicks = [&] (double v) { return warped ? (v - beatAtZero) * ppq : v * bpm / 60.0 * ppq; };
+    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp);
     const auto loop = loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way
     auto unwarpedLoop = loop;
@@ -628,8 +661,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         c.gain = (float) clip.number ("SampleVolume", 1);
         // Re-Pitch ignores the clip's transpose: the tempo alone sets the pitch [LIVE: +5 st on a Re-Pitch clip renders
         // at the original pitch, 2026-11-06]
-        c.pitch = warped && mode == 3 ? 0.0f
-                                      : (float) std::clamp (clip.number ("PitchCoarse", 0) + clip.number ("PitchFine", 0) / 100.0, -12.0, 12.0);
+        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) std::clamp (transpose, -12.0, 12.0);
         c.muted = clip.boolean ("Disabled", false);
         if (&pass == &passes.front())
             c.fadeIn = std::clamp (ticksOf (clip.number ("Fades/FadeInLength", 0)), (std::int64_t) 0, c.length);

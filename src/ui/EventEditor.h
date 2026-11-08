@@ -16,6 +16,11 @@ namespace lynx
 {
 // Opens (or brings to front) the event editor of the current pattern, showing `target`.
 void openEventEditor (AudioEngine& engine, const AutomationTarget& target);
+namespace EventEditorHooks
+{
+// File › Browse automations: opens the Browser at the automation scores (set by the main window)
+extern std::function<void()> onBrowseAutomations;
+}
 
 // FL's events-to-automation tool ("Convert to automation"), also opened by the Playlist's lossy automation merge:
 // `pointsFor` says how many points a sensitivity gives (0..1), `onAccept` runs on Accept; Cancel does nothing.

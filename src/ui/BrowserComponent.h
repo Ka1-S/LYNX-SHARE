@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -130,7 +131,7 @@ public:
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
-    void showScores();         // the Piano roll's File › Browse scores: FL's Data/Patches/Scores ("FL MIDI")
+    void showScores (const juce::String& subfolder = {});         // the Piano roll's File › Browse scores: FL's "Scores" (the user's Presets/Scores and Data/Patches/Scores)
     // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
     // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened
     void showPluginDatabase (const juce::String& folder = {}, int generators = -1);
@@ -269,6 +270,9 @@ private:
     juce::Array<juce::File> allRoots; // every folder root (hidden ones too)
     juce::StringArray allRootNames;
     std::vector<browserview::RootKind> allRootKinds;
+    std::map<juce::String, juce::Array<juce::File>> rootAlso; // a merged root's other folders, by its path (round 178a)
+    juce::Array<juce::File> mergedInto (const juce::File& root) const;              // a root's merged folders (none: empty)
+    juce::Array<juce::File> withMerged (const juce::Array<juce::File>& folders) const; // the folders and theirs
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BrowserComponent)
 };

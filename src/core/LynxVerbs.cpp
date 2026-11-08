@@ -1190,8 +1190,19 @@ protected:
             // round 172d: it is darker above 2 kHz than this tank (third octaves 2.5 … 8 kHz −5 … −8 dB, both the impulse
             // and music, the decay per band already matched) and its first 80 ms hold 7 … 10 dB less of the energy
             s.toneHighHz = 2500.0;
-            s.toneHighDb = -5.0;
-            s.outHighCut = std::min (s.outHighCut > 0.0 ? s.outHighCut : 1.0e9, 7000.0); // (and from 8 kHz up −8 … −14 dB)
+            // round 172d slice 10: deeper at short decays (the trial's 2 … 8 kHz octaves, sweep and impulses at Decay 0.5 …
+            // 19 s, refcap0124: this tank was 7 … 9 dB too bright up to 1.7 s, 5 … 7 dB at 3 s, 2 … 3 dB from 5.7 s on). The
+            // shelf goes from −5 dB to −13.5 / −12 / −9 dB and the edge from 7 to 9 kHz (8 … 16 kHz then within 1 … 2.5 dB)
+            static constexpr double darkKnots[] = { -0.301, -13.5, 0.225, -13.0, 0.477, -12.0, 0.753, -9.0, 1.28, -9.0 };
+            s.toneHighDb = knotLaw (std::log10 (infinite ? 30.0 : std::max (0.5, rt)), darkKnots, 5);
+            s.outHighCut = std::min (s.outHighCut > 0.0 ? s.outHighCut : 1.0e9, 9000.0); // (and from 8 kHz up −8 … −14 dB)
+            // round 172d slice 10: the trial's plate has no sub-bass (20 … 32 Hz 11 … 16 dB, 32 … 40 Hz 2 … 8 dB under this tank's,
+            // 50 … 63 Hz level): a 12 dB/oct cut at 55 Hz unless the panel's Low Cut is higher
+            if (s.outLowCut < 55.0)
+            {
+                s.outLowCut = 55.0;
+                s.outLowOrder = 2;
+            }
             s.outHighOrder = 2;
             s.earlyLevel *= 0.35;
         }

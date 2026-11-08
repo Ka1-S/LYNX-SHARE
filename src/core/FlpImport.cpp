@@ -7,6 +7,7 @@
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
+#include "core/EquoFx.h"
 #include "core/TransporterFl.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
@@ -261,7 +262,7 @@ std::optional<EffectKind> effectForFlPlugin (const std::string& name)
 }
 
 // FL's own spelling of a native effect's name (Patcher nodes keep old casings: "Fruity delay 2", REA_rodada14 §1.3)
-static std::string canonicalFlEffectName (const std::string& name)
+std::string canonicalFlEffectName (const std::string& name)
 {
     const auto wanted = lowercase (name);
     for (const auto& entry : flEffectTable)
@@ -3064,6 +3065,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         fx.params[(std::size_t) transporter::sendParam] =
                             send > 0 && send < tracks && send != insert.index ? (float) send / (float) transporter::rawMax[transporter::sendParam] : 0.0f;
                     }
+                }
+                else if (fx.kind == EffectKind::equo)
+                {
+                    // the band sends go to the insert FL's send box names: the plug-in hands them to the host with the
+                    // insert number, the same call as Fruity Send's (round 173d3, REA_rodada61 §2.1)
+                    const auto send = equofx::sendInsert (fx.state);
+                    fx.sendTracks[0] = send > 0 && send < tracks && send != insert.index ? send : 0;
                 }
                 else if (fx.kind == EffectKind::transmitter)
                 {

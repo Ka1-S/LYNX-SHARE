@@ -2760,6 +2760,9 @@ Layout prismMultiband()
     // round 152: the measured model's revision (gain-stage attack, narrow Dynamic-phase bands, 0.8-octave minimum)
     v.push_back (label (620, 736, 76, 22, TR_NOOP ("Model")));
     v.push_back (tabs (700, 736, 180, 22, "Revision", TR_NOOP ("Round 150|Round 152")));
+    // round tp172b6: Audition, off or the band whose detector signal replaces the output (value = band / 6)
+    v.push_back (label (16, 736, 76, 22, TR_NOOP ("Audition")));
+    v.push_back (menuOf (96, 736, 180, 22, "Audition", nullptr, "Off|1|2|3|4|5|6"));
     l.height = 766;
     return l;
 }
@@ -4509,7 +4512,7 @@ bool displayTakesMouse (const char* display)
     if (display == nullptr)
         return false;
     static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
-                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve" };
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve", "equosend", "lpcurve", "cvcurve", "vxcurve", "vxmapsel" };
     for (const auto* id : ids)
         if (std::strcmp (id, display) == 0)
             return true;
@@ -4626,7 +4629,7 @@ int optionAt (const LayoutItem& item, float value)
 
 bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectParams& params, const std::vector<std::uint8_t>* state)
 {
-    if (item.page >= 0 && item.page != page)
+    if (item.page >= 0 && (item.pageModulo > 0 ? (page / std::max (1, item.pageStride)) % item.pageModulo : page) != item.page)
         return false;
     const auto inRange = [&] (const char* param, float lo, float hi) {
         if (param == nullptr)

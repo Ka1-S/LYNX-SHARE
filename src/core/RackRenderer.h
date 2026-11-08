@@ -20,10 +20,12 @@
 #include "core/Effects.h"
 #include "core/HardwareOutput.h"
 #include "core/Instruments.h"
+#include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
 #include "core/Meters.h"
 #include "core/Pdc.h"
+#include "core/ClipLauncher.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
 #include "core/Vfx.h"
@@ -45,6 +47,7 @@ struct LiveLevels
 
     std::vector<std::atomic<float>> mixerVolume, mixerPan, mixerStereo;
     std::vector<std::atomic<float>> channelVolume, channelPan;
+    std::vector<std::atomic<float>> vcaLevel; // VCA faders (round 177a)
 };
 
 // Immutable snapshot published by the UI. Instruments are shared between
@@ -66,6 +69,11 @@ struct RackState
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
+    // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
+    // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
+    // marked as followers: they bind nothing and compute nothing.
+    std::vector<std::vector<int>> automationGroups;
+    std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
@@ -98,6 +106,11 @@ struct RackState
     std::shared_ptr<LiveLevels> live;
     ScheduleIndex schedule; // index to schedule the Playlist without scanning every note
     std::vector<int> performanceZone; // Performance mode: the zone's clips (perf::zoneClips), empty when off
+    // The Clip-launch workflow's grid (core/ClipLauncher.h): the engine's runtime while the song has a grid, else nullptr
+    // (always, in an export). `launchers`: Performance mode has a zone, or there is a grid.
+    launcher::Runtime* clipLauncher = nullptr;
+    launcher::GridIndex gridIndex;
+    bool launchers = false;
     int tempoAutomation = -1; // tempo automation, if any
     bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
@@ -140,6 +153,10 @@ struct RackState
     // Mixer: insert processing order and which ones sound with the current solo.
     std::vector<int> mixerOrder;
     std::vector<char> mixerAudible;
+    // VCA faders (round 177a slice 3): per insert, the VCAs acting on it (members and parents, empty = none: the whole
+    // table is empty while the song has no VCA); per VCA, its automation slot (-1 = none). Built with the mixer graph.
+    std::vector<std::vector<int>> vcaChains;
+    std::vector<int> vcaLevelAuto;
 
     // "Pull" model: each track sums the (post-fader) outputs of the tracks that send to it.
     struct MixerInput
@@ -180,6 +197,7 @@ struct RackState
     std::vector<int> graphRoots;                      // tasks with nothing before them, heaviest kind first
     std::vector<std::vector<int>> trackChannels;      // [track] the channels playing into it, in channel order
     void buildMixerGraph();
+    void applyVcas(); // VCA mutes into mixerAudible, the VCA chains (round 177a)
     void buildTaskGraph (const std::vector<int>& depth);
 
     void buildAutomationTables();
@@ -234,7 +252,9 @@ struct RackState
     using PluginEffectFactory = std::function<std::shared_ptr<Effect> (const PluginRef&, double sampleRate)>;
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
-    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method)>;
+    // `map`: the channel's warp map (core/TimeStretch warpStretchMap; empty = one ratio)
+    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
+                                                                                     double semitones, const StretchMap& map)>;
 
     struct Factories
     {
@@ -242,6 +262,7 @@ struct RackState
         StretchedSampleProvider stretchedSamples;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
     };
 
     // Builds the next state reusing the instruments from `previous` when the
@@ -274,7 +295,7 @@ struct ProcessTimes
     // Live meters of the effects that have them (the mixing suite's gain reduction, REA round 96; LYNX Tune's pitch and
     // Facet EQ's dynamic gains, round 103; the dynamics suite's band gains and levels, round 108), always published:
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
-    static constexpr int meterOutputs = 8;
+    static constexpr int meterOutputs = 14; // (round tp172b6: 8 ... 13 = Prism's band detector levels)
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * meterOutputs> effectMeters {};
     // Round 170c (issue #14, "everything is a shell"): any slot's input and output peaks for an editor's level meter
     // (FL's live meters in Soft Clipper, Multiband Compressor, Transient Processor, Balance...). An open editor counts
@@ -351,6 +372,14 @@ public:
         playTruncatedOnTransport = playTruncated;
         resetPluginsOnTransport = resetPlugins;
         userJumpSerial = userJumps;
+    }
+    // Round 180b (LYNX's effects as VST3 / CLAP): this slot takes its parameters from `params` instead of the snapshot, so
+    // a host's automation reaches it at every block without a rebuild. nullptr = the snapshot's. Same thread as process().
+    void setSlotParamsOverride (const EffectParams* params, int track, int slot) noexcept
+    {
+        overrideParams = params;
+        overrideTrack = track;
+        overrideSlot = slot;
     }
     void setMetronomeInput (const float* left, const float* right, int track) noexcept
     {
@@ -519,12 +548,16 @@ private:
     perf::Player perfPlayer;
     double perfClock = 0.0;      // the Player's steady clock (ticks): the transport's position, never wrapping
     bool perfRunning = false;
+    bool launchersRunning = false;                 // the launchers' branch of the block is on (Performance mode, the grid)
+    launcher::Runtime* runningLauncher = nullptr;  // the grid's runtime while it plays
     std::vector<float> hwScratch; // 2 × blockCapacity
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
     int liveInputOffset = 0; // of the chunk within the process() block
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;
+    const EffectParams* overrideParams = nullptr;
+    int overrideTrack = -1, overrideSlot = -1;
     int metronomeTarget (const RackState& state) const noexcept;
     void mixMetronome (const RackState& state, int track, int n) noexcept;
     void mixLiveInput (const RackState& state, bool playing, int n) noexcept;

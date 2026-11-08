@@ -11,6 +11,8 @@
 #include "core/FlEffects.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
+#include "core/TimeStretch.h"
+#include "core/MixerOps.h"
 #include "core/Transmitter.h"
 #include "core/Vocodex.h"
 
@@ -791,6 +793,10 @@ struct Converter
             if (g > 1.0f)
                 report.notes.push_back (channelLabel (def, index) + ": the Sampler's Gain is above FL's channel volume range (capped at 100%)");
         }
+        // warp markers that bend the tempo inside the file (round 175a, M1): FL's channel stretch has one tempo
+        if (def.sampler.keepPitch && def.sampler.stretchBeats > 0.0f
+            && ! warpStretchMap (def.sampler.warp, 1.0e9, 1000.0, 1.0e9).empty()) // (any file length: do the markers bend)
+            report.notes.push_back (channelLabel (def, index) + ": its warp markers are written as one tempo (FL's sample channels have none)");
         c.hasLevels = true;
         c.volume = std::clamp (iround (volume * 12800.0), 0, 12800);
         c.pan = std::clamp (iround (6400.0 + def.pan * 6400.0), 0, 12800);
@@ -1396,7 +1402,10 @@ struct Converter
 
             // the levels (FL ranges: volume 0..16000 with 12800 = 0 dB, pan ±6400, separation ±64, route levels on the fader curve)
             auto control = [&] (int slot, int param, std::int32_t value) { out.controls.push_back ({ { mixerId (t, slot, param) }, value }); };
-            control (0, flp::ControlId::mixerVolume, std::clamp (iround (track.volume * 16000.0), 0, 16000));
+            // FL has no VCA (round 177a): the VCAs' gain is baked into the member's fader
+            const auto vca = t > 0 ? mixerops::vcaGain (song, t) : 1.0f;
+            const auto volume = vca == 1.0f ? track.volume : std::clamp (faderPosition (faderGain (track.volume) * vca), 0.0f, 1.0f);
+            control (0, flp::ControlId::mixerVolume, std::clamp (iround (volume * 16000.0), 0, 16000));
             control (0, flp::ControlId::mixerPan, std::clamp (iround (track.pan * 6400.0), -6400, 6400));
             control (0, flp::ControlId::mixerStereo, std::clamp (iround (track.stereo * 64.0), -64, 64));
             for (int b = 0; b < 3; ++b)
@@ -1478,6 +1487,8 @@ struct Converter
             out.mixer.push_back (std::move (m));
         }
         fixSideInputs();
+        if (! song.vcas.empty())
+            report.notes.push_back ("VCA faders: FL Studio has none; their levels are baked into the member tracks' faders (their automation and mutes are left out)");
         report.exact.push_back ("Mixer: " + std::to_string (song.mixer.size()) + " tracks (names, colours, routes, sends, levels, EQ)");
     }
 

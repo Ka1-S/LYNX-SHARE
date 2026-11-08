@@ -9,6 +9,7 @@
 //    spliced back unstretched (no smeared or doubled hits, no pre-echo).
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "core/Instruments.h"
@@ -16,7 +17,25 @@
 namespace lynx
 {
 // `ratio` = output duration / input duration (2 = twice as long, same pitch).
-std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general);
+// `semitones` (Beats only, else ignored): each piece is also resampled by that much, offline (Live's clip transpose in
+// Beats mode); the pieces keep their places on the grid.
+std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
+                                         double semitones = 0.0);
+
+// A warp map (round 175a, warp markers M1): source frame → output frame, piecewise linear between its points. Both
+// coordinates increase; the first point is (0, 0) and the last (the source's frames, the output's frames). Each segment
+// is stretched by its own ratio, with no seam between them.
+using StretchMap = std::vector<std::pair<double, double>>;
+// The stretch along a warp map (fewer than 3 points, or a segment outside 0.05…20×: timeStretch with the overall ratio).
+std::shared_ptr<SampleData> timeStretchMapped (const SampleData& input, const StretchMap& map, StretchMethod method = StretchMethod::general,
+                                               double semitones = 0.0);
+// A channel's warp markers (sample seconds ↔ content beats) as the map that stretches a source of `frames` frames at
+// `sampleRate` to `outFrames`: each sample time lands at its beat, scaled so the whole file fills `outFrames` (beats
+// before the first marker and after the last one follow the nearest segment). Empty when the markers give one tempo.
+StretchMap warpStretchMap (const std::vector<WarpPoint>& warp, double frames, double sampleRate, double outFrames);
+// Where source frame `x` lands on a map (and back); outside it the end segments continue.
+double stretchMapOutput (const StretchMap& map, double x) noexcept;
+double stretchMapSource (const StretchMap& map, double y) noexcept;
 
 // FL's stretch mode (channel record 0xD7 +0x6C, REA_rodada3 §5.2) → LYNX's method. 0 (Resample) has no
 // pitch-preserving stretch; callers keep resampling for it.

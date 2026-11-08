@@ -77,6 +77,11 @@ public:
     void togglePluginPickerForSnapshot() { togglePluginPicker(); }
     juce::Component* pluginPickerForSnapshot() const noexcept { return pluginPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
+    // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
+    // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
+    void setClipLaunchWorkflow (bool on, bool swapLayout = true);
+    void setClipGridView (PlaylistArea::GridView view);
+    bool isClipLaunchWorkflow() const noexcept { return clipLaunchWorkflow; }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -282,6 +287,8 @@ private:
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
     void exportMidiFile();
     void switchSmartDisableForAll();
+    void confirmPrepareForMidiExport();
+    void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();
     void updateTitle();
@@ -547,6 +554,10 @@ private:
     PlaylistComponent playlist;
     PatternPicker picker { engine, playlist };
     PlaylistArea playlistArea { picker, playlist };
+    bool clipLaunchWorkflow = false, startInClipLaunchWorkflow = false;
+    bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
+    void addLayoutStyleItems (juce::PopupMenu& menu);
+    std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
     MixerComponent mixer;
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first

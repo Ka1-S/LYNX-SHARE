@@ -74,7 +74,8 @@ bool sameInstrumentSetup (const ChannelDef& a, const ChannelDef& b)
         case InstrumentKind::audioClip:
         case InstrumentKind::flkeys:
             return a.samplePath == b.samplePath && a.zones == b.zones && a.modelParams == b.modelParams && a.sampler.keepPitch == b.sampler.keepPitch
-                   && (! a.sampler.keepPitch || (a.sampler.stretchBeats == b.sampler.stretchBeats && a.sampler.stretchMethod == b.sampler.stretchMethod));
+                   && (! a.sampler.keepPitch || (a.sampler.stretchBeats == b.sampler.stretchBeats && a.sampler.stretchMethod == b.sampler.stretchMethod
+                                                  && a.sampler.stretchPitch == b.sampler.stretchPitch && a.sampler.warp == b.sampler.warp));
         case InstrumentKind::granulizer:
         case InstrumentKind::wavetraveller:
         case InstrumentKind::soundfont: return a.samplePath == b.samplePath;

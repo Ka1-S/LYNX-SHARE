@@ -230,6 +230,13 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
             c.flOrigin.fingerprint = flpexport::fingerprint (c);
         }
     }
+    for (auto& vca : song.vcas) // VCA members (round 177a slice 3)
+    {
+        for (auto& m : vca.members)
+            m = map (m);
+        vca.members.erase (std::remove_if (vca.members.begin(), vca.members.end(), [] (int m) { return m <= 0; }), vca.members.end());
+        std::sort (vca.members.begin(), vca.members.end());
+    }
     for (auto& pt : song.playlistTracks) // audio / instrument tracks (round 146a)
         if (pt.mixerTrack > 0)
         {
@@ -1088,6 +1095,125 @@ int foldAll (Song& song, bool fold)
     return changed;
 }
 
+std::vector<int> vcasOf (const Song& song, int track)
+{
+    std::vector<int> out;
+    const auto n = (int) song.vcas.size();
+    for (int v = 0; v < n; ++v)
+        if (std::binary_search (song.vcas[(std::size_t) v].members.begin(), song.vcas[(std::size_t) v].members.end(), track))
+            for (int p = v, guard = 0; p >= 0 && p < n && guard <= n; p = song.vcas[(std::size_t) p].parent, ++guard) // (a cycle stops)
+                if (std::find (out.begin(), out.end(), p) == out.end())
+                    out.push_back (p);
+    return out;
+}
+
+float vcaGain (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return 1.0f;
+    auto g = 1.0f;
+    for (const auto v : vcasOf (song, track))
+        g *= faderGain (song.vcas[(std::size_t) v].level);
+    return g;
+}
+
+bool vcaMuted (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return false;
+    const auto list = vcasOf (song, track);
+    return std::any_of (list.begin(), list.end(), [&song] (int v) { return song.vcas[(std::size_t) v].muted; });
+}
+
+int assignToVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    int changed = 0;
+    for (const auto t : tracks)
+        if (isInsert (song, t) && ! std::binary_search (members.begin(), members.end(), t))
+        {
+            members.insert (std::lower_bound (members.begin(), members.end(), t), t);
+            ++changed;
+        }
+    return changed;
+}
+
+int removeFromVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    const auto before = members.size();
+    members.erase (std::remove_if (members.begin(), members.end(),
+                                   [&tracks] (int m) { return std::find (tracks.begin(), tracks.end(), m) != tracks.end(); }),
+                   members.end());
+    return (int) (before - members.size());
+}
+
+int createVca (Song& song, const std::vector<int>& tracks, const std::string& name)
+{
+    Vca vca;
+    vca.name = name.empty() ? "VCA " + std::to_string (song.vcas.size() + 1) : name;
+    song.vcas.push_back (vca);
+    const auto index = (int) song.vcas.size() - 1;
+    assignToVca (song, tracks, index);
+    return index;
+}
+
+bool deleteVca (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    song.vcas.erase (song.vcas.begin() + vca);
+    for (auto& v : song.vcas)
+        v.parent = v.parent == vca ? -1 : v.parent > vca ? v.parent - 1 : v.parent;
+    song.forEachTarget ([vca] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::vcaLevel)
+            return;
+        if (t.index == vca)
+            t = AutomationTarget {};
+        else if (t.index > vca)
+            --t.index;
+    });
+    song.removeDeadMidiLinks();
+    return true;
+}
+
+std::vector<int> vcaReach (const Song& song, int vca)
+{
+    std::vector<int> out;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto list = vcasOf (song, t);
+        if (std::find (list.begin(), list.end(), vca) != list.end())
+            out.push_back (t);
+    }
+    return out;
+}
+
+bool mergeVcaIntoMembers (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    const auto gain = faderGain (song.vcas[(std::size_t) vca].level);
+    if (gain == 1.0f)
+        return false;
+    auto scaled = [gain] (float position) { return std::clamp (faderPosition (faderGain (position) * gain), 0.0f, 1.0f); };
+    for (const auto t : vcaReach (song, vca))
+    {
+        auto& m = song.mixer[(std::size_t) t];
+        m.volume = scaled (m.volume);
+        for (auto& a : song.automations) // the member's own volume automation carries the gain too
+            if (a.target.kind == AutomationTargetKind::mixerVolume && a.target.index == t)
+                for (auto& p : a.points)
+                    p.value = scaled (p.value);
+    }
+    song.vcas[(std::size_t) vca].level = unityFader;
+    return true;
+}
+
 void createGroup (Song& song, const std::vector<int>& tracks, int current)
 {
     const auto order = displayOrder (song);
@@ -1124,6 +1250,134 @@ int autoColorGroup (Song& song, int track)
         if (song.mixer[(std::size_t) t].colour != colour)
         {
             song.mixer[(std::size_t) t].colour = colour;
+            ++changed;
+        }
+    return changed;
+}
+
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept
+{
+    if (n < 2)
+        return from;
+    const auto amount = (k << 8) / (n - 1); // FL: shl 8, idiv
+    std::uint32_t out = 0xff000000u;
+    for (int shift = 0; shift <= 16; shift += 8)
+    {
+        const auto a = (int) ((from >> shift) & 0xffu), b = (int) ((to >> shift) & 0xffu);
+        // FL blends with pmulhw on (b - a) * 16 and amount * 16: the high word, an arithmetic shift (floor)
+        const auto c = a + (((b - a) * 16 * (amount * 16)) >> 16);
+        out |= (std::uint32_t) std::clamp (c, 0, 255) << shift;
+    }
+    return out;
+}
+
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&] (int t) { return t < 0 || t >= (int) song.mixer.size(); }),
+                  tracks.end());
+    const auto n = (int) tracks.size();
+    if (n < 2)
+        return 0;
+    int changed = 0;
+    for (int k = 0; k < n; ++k)
+    {
+        auto& colour = song.mixer[(std::size_t) tracks[(std::size_t) k]].colour;
+        const auto next = gradientColourStep (from, to, k, n);
+        if (colour != next)
+        {
+            colour = next;
+            ++changed;
+        }
+    }
+    return changed;
+}
+
+namespace
+{
+constexpr int audioTrackScan = 500; // FL: playlist tracks 1..500
+
+std::vector<int> sortedInserts (const Song& song, std::vector<int> inserts)
+{
+    std::sort (inserts.begin(), inserts.end());
+    inserts.erase (std::unique (inserts.begin(), inserts.end()), inserts.end());
+    inserts.erase (std::remove_if (inserts.begin(), inserts.end(), [&] (int t) { return t <= 0 || t >= (int) song.mixer.size(); }),
+                   inserts.end());
+    return inserts;
+}
+
+// FL skips an insert that any Playlist track already points at (0x12a76e0: any mode), or whose one and only channel
+// already has an instrument track (0x12a7620 with 0xffac90 / 0xffae00; audio clip channels don't count).
+bool hasPlaylistTrack (const Song& song, int insert)
+{
+    for (const auto& pt : song.playlistTracks)
+        if (pt.mode != PlaylistTrackMode::unassigned && pt.mixerTrack == insert)
+            return true;
+    int sole = -1, count = 0;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == insert)
+        {
+            sole = c;
+            ++count;
+        }
+    if (count != 1 || song.channels[(std::size_t) sole].instrument == InstrumentKind::audioClip)
+        return false;
+    return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [sole] (const PlaylistTrack& pt) {
+        return pt.mode == PlaylistTrackMode::instrument && pt.channel == sole;
+    });
+}
+
+int audioTrackOf (const Song& song, int insert)
+{
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) i];
+        if (pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert)
+            return i;
+    }
+    return -1;
+}
+} // namespace
+
+int assignNewAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int assigned = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+    {
+        if (hasPlaylistTrack (song, t))
+            continue;
+        for (int i = 0; i < audioTrackScan; ++i)
+        {
+            const auto untouched = i >= (int) song.playlistTracks.size()
+                                   || (song.playlistTracks[(std::size_t) i].name.empty() && song.playlistTracks[(std::size_t) i].colour == 0
+                                       && song.playlistTracks[(std::size_t) i].mode == PlaylistTrackMode::unassigned);
+            if (! untouched || std::any_of (song.playlist.begin(), song.playlist.end(), [i] (const Clip& c) { return c.track == i; }))
+                continue;
+            if ((int) song.playlistTracks.size() <= i)
+                song.playlistTracks.resize ((std::size_t) i + 1);
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            const auto& insert = song.mixer[(std::size_t) t];
+            pt.mode = PlaylistTrackMode::audio;
+            pt.mixerTrack = t;
+            pt.name = insert.name.empty() ? "Insert " + std::to_string (t) : insert.name;
+            pt.colour = insert.colour;
+            ++assigned;
+            break;
+        }
+    }
+    return assigned;
+}
+
+int unassignAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int changed = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+        if (const auto i = audioTrackOf (song, t); i >= 0)
+        {
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            pt.mode = PlaylistTrackMode::unassigned;
+            pt.mixerTrack = -1;
             ++changed;
         }
     return changed;

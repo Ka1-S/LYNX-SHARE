@@ -1248,6 +1248,13 @@ void PlaylistComponent::resized()
     snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
     followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
     stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
+    // beside the clip grid the Playlist is narrow: what would run under the panel's title buttons goes (the inset keeps
+    // 4 px of air before them). Anywhere else the toolbar stays exactly as it was.
+    const auto toolbarEnd = getWidth() - titleInsetRight + 4;
+    if (toolbarFitsNarrow && tools.getRight() > toolbarEnd)
+        tools.setSize (juce::jmax (0, toolbarEnd - tools.getX()), h);
+    for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
+        c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
     const auto blocks = blocksSectionHeight();
     blocksShown = blocks > 0;

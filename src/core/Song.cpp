@@ -409,7 +409,7 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 
 int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
-    if (slot.kind == EffectKind::transmitter)
+    if (slot.kind == EffectKind::transmitter || (slot.kind == EffectKind::equo && output == 0)) // (EQUO: its band sends, round 173d3)
         return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
     return output == 0 ? fruitySendTarget (slot) : -1;
 }
@@ -424,7 +424,8 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
         for (int o = 0; o < maxSlotSends; ++o)
             if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
-                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter });
+                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter
+                                                                                       || slots[(std::size_t) s].kind == EffectKind::equo });
     return out;
 }
 
@@ -1035,6 +1036,8 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        ? mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].mix
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
+        case AutomationTargetKind::vcaLevel:
+            return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
@@ -1054,6 +1057,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
+        case AutomationTargetKind::vcaLevel:
+            if (t.index < 0 || t.index >= (int) vcas.size())
+                return false;
+            vcas[(std::size_t) t.index].level = v;
+            return true;
         case AutomationTargetKind::mixerSend:
             if (! validTrack || ! routes (t.index, t.slot))
                 return false;
@@ -1127,40 +1135,29 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
     return false;
 }
 
-float Song::automationValueAt (int index, double tick) const
+float Song::targetValueAt (const AutomationTarget& target, double tick) const
 {
-    if (index < 0 || index >= (int) automations.size())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::vector<const Clip*> clips;
-
+    // the same rule as playback (RackRenderer's automationValueAt, issue #97)
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
     for (const auto& c : playlist)
-        if (c.kind == ClipKind::automation && c.automation == index && c.length > 0 && ! c.muted && ! isTrackMuted (c.track))
-            clips.push_back (&c);
-
-    if (clips.empty())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start < b->start; });
-    const auto& automation = automations[(std::size_t) index];
-    const Clip* before = nullptr;
-
-    // same rule as playback: inside a clip the curve; between clips the last value; before, the first
-    for (const auto* c : clips)
     {
-        if (tick < (double) c->start)
-            break;
-
-        if (tick < (double) c->end())
-            return automation.valueAt (tick - (double) c->start + (double) c->offset);
-
-        before = c;
+        if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) automations.size() || c.length <= 0 || c.muted
+            || isTrackMuted (c.track) || ! (automations[(std::size_t) c.automation].target == target) || tick < (double) c.start)
+            continue;
+        if (tick < (double) c.end())
+        {
+            if (playing == nullptr || c.start > playing->start || (c.start == playing->start && c.automation < playing->automation))
+                playing = &c;
+        }
+        else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+            ended = &c;
     }
-
-    if (before != nullptr)
-        return automation.valueAt ((double) (before->length + before->offset));
-
-    return automation.valueAt ((double) clips.front()->offset);
+    if (playing != nullptr)
+        return automations[(std::size_t) playing->automation].valueAt (tick - (double) playing->start + (double) playing->offset);
+    if (ended != nullptr)
+        return automations[(std::size_t) ended->automation].valueAt ((double) (ended->length + ended->offset));
+    return std::numeric_limits<float>::quiet_NaN();
 }
 
 double Song::tempoAt (double tick) const
