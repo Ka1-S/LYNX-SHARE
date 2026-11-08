@@ -1,5 +1,7 @@
 #include "ui/QuickPick.h"
 
+#include "core/Rack.h"
+
 #include <algorithm>
 
 #include "core/ControlSurface.h"
@@ -74,6 +76,9 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     builtIn ("Fruity Video Player", "Fruity Video Player", 1, InstrumentKind::videoplayer,
              [] (ChannelDef& c) { c.pluginState = video::write (video::Settings {}); });
     builtIn ("Patcher", tr ("Patcher"), 2, InstrumentKind::patcher);
+    // round 183c: Live-style Instrument Rack (a Patcher in rack mode, core/Rack.h)
+    builtIn (TR_NOOP ("Instrument Rack"), tr ("Instrument Rack"), 2, InstrumentKind::patcher,
+             [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::instrument); });
     add ("LYNX Soundfont", "LYNX Soundfont", tr ("built-in"), 0, 2, InstrumentKind::soundfont, [] { return std::optional<ChannelDef> (sf::makeChannel()); });
 
     // FL's own instrument engines (round 142)
@@ -128,6 +133,9 @@ std::vector<EffectEntry> effectEntries (AudioEngine& engine, bool withUnavailabl
             out.back().available = available;
             out.back().flPlugin = isFlEffect (kind);
         }
+    // round 183c: Live-style Audio Effect Rack (a Patcher in rack mode, core/Rack.h)
+    out.push_back ({ "lynx:fx:Audio Effect Rack", tr ("Audio Effect Rack"), tr ("built-in"), 0,
+                     [] { return std::optional<EffectSlot> (rack::makeRackSlot (RackDoc::Kind::audioEffect)); } });
 
     auto types = engine.getPluginHost().getKnownPlugins().getTypes();
     std::sort (types.begin(), types.end(), [] (const auto& a, const auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });

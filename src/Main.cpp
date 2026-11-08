@@ -8,6 +8,7 @@
 #include "core/ProjectSafety.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
+#include "ui/RackEditor.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -1271,6 +1272,18 @@ public:
             });
             std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
             setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--rackshot"))
+        {
+            // LYNX.exe --rackshot <folder>: round 183c's Rack view drawn off-screen (no window), for the LYNX | Live pairs:
+            // rack-deviceview.png (an Audio Effect Rack laid out as in Live's reference shot), rack-mapmode.png (Map mode
+            // with the mapping list), rack-instrument.png (an Instrument Rack with its key zones)
+            const auto i = args.indexOf ("--rackshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            setApplicationReturnValue (runRackShots (juce::File (args[i + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -7497,6 +7510,125 @@ private:
         juce::PNGImageFormat png;
         if (auto stream = file.createOutputStream())
             png.writeImageToStream (image, *stream);
+    }
+
+    bool runRackShots (const juce::File& out)
+    {
+        out.createDirectory();
+        lynx::AudioEngine offline (false);
+        auto save = [&] (juce::Component& c, const juce::String& name) {
+            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+            {
+                juce::Graphics g (image);
+                g.fillAll (lynx::theme::panel);
+                c.paintEntireComponent (g, false);
+            }
+            const auto f = out.getChildFile (name);
+            f.deleteFile();
+            juce::PNGImageFormat png;
+            if (auto stream = f.createOutputStream())
+                return png.writeImageToStream (image, *stream);
+            return false;
+        };
+        auto song = lynx::Song::makeDefault();
+        song.mixer.resize (3);
+        song.mixer[1].name = "Vocal Main";
+        // an Audio Effect Rack shaped like Live's reference (REA_rodada183c §8): two chains with chain-select zones and fades,
+        // four named macros (one on a chain's volume, one on two parameters), two variations, every view open
+        auto slot = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
+        auto& doc = slot.patcher;
+        doc.rack[0].chains[0].name = "Vocoder";
+        lynx::PatchNode vocoder, eq, verb;
+        vocoder.effect = lynx::makeEffectSlot (lynx::EffectKind::vocodex);
+        eq.effect = lynx::makeEffectSlot (lynx::EffectKind::parametricEq);
+        verb.effect = lynx::makeEffectSlot (lynx::EffectKind::reeverb2);
+        const auto nVoc = lynx::rack::addDevice (doc, 0, vocoder);
+        const auto nEq = lynx::rack::addDevice (doc, 0, eq);
+        lynx::rack::addChain (doc, "dry bypass");
+        lynx::rack::addDevice (doc, 1, verb);
+        doc.rack[0].chains[0].select = { 0, 79, 0, 63 };
+        doc.rack[0].chains[1].select = { 32, 127, 48, 127 };
+        lynx::rack::setChainVolume (doc, 0, 0.33f);
+        lynx::rack::setChainVolume (doc, 1, 0.5f);
+        const char* names[] { "Sibilance", "Intensity", "Formant Shift", "Bright Level" };
+        for (int m = 0; m < 4; ++m)
+            doc.rack[0].macros[(std::size_t) m].name = names[m];
+        lynx::RackMapping vol;
+        vol.target = lynx::RackMapping::Target::chainVolume, vol.chain = 0, vol.min = 0.0f, vol.max = lynx::rack::unityVolume;
+        lynx::rack::map (doc, 0, vol);
+        lynx::RackMapping a, b, c, d;
+        a.node = nVoc, a.param = 0;
+        b.node = nVoc, b.param = 1, b.min = 0.2f, b.max = 0.8f;
+        c.node = nEq, c.param = 0, c.min = 0.3f, c.max = 0.9f;
+        d.node = nEq, d.param = 1;
+        lynx::rack::map (doc, 1, a);
+        lynx::rack::map (doc, 2, b);
+        lynx::rack::map (doc, 3, c);
+        lynx::rack::map (doc, 3, d);
+        lynx::rack::setMacro (doc, 0, 60.0f);
+        lynx::rack::setMacro (doc, 1, 40.0f);
+        lynx::rack::setMacro (doc, 2, 70.0f);
+        lynx::rack::setMacro (doc, 3, 86.0f);
+        lynx::rack::storeVariation (doc);
+        lynx::rack::renameVariation (doc, 0, "Verse");
+        lynx::rack::setMacro (doc, 3, 120.0f);
+        lynx::rack::storeVariation (doc);
+        lynx::rack::renameVariation (doc, 1, "Drop");
+        lynx::rack::launchVariation (doc, 0);
+        auto& r = doc.rack[0];
+        r.showMacros = r.showChains = r.showDevices = r.showVariations = true;
+        r.zoneEditor = 2;
+        r.selectedChain = 0;
+        lynx::rack::setSelector (doc, 56.0f);
+        lynx::rack::compile (doc);
+        song.mixer[1].effects = { slot };
+        // an Instrument Rack: three chains split over the keyboard
+        lynx::ChannelDef inst;
+        inst.name = "Keys Rack";
+        inst.instrument = lynx::InstrumentKind::patcher;
+        inst.patcher = lynx::rack::makeRack (lynx::RackDoc::Kind::instrument);
+        for (int k = 0; k < 3; ++k)
+        {
+            if (k > 0)
+                lynx::rack::addChain (inst.patcher);
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            synth.channel.name = "Synth";
+            lynx::rack::addDevice (inst.patcher, k, synth);
+        }
+        inst.patcher.rack[0].chains[0].key = { 0, 52, 0, 47 };
+        inst.patcher.rack[0].chains[1].key = { 48, 76, 53, 71 };
+        inst.patcher.rack[0].chains[2].key = { 72, 127, 77, 127 };
+        inst.patcher.rack[0].chains[0].name = "Low";
+        inst.patcher.rack[0].chains[1].name = "Mid";
+        inst.patcher.rack[0].chains[2].name = "High";
+        inst.patcher.rack[0].showChains = inst.patcher.rack[0].showDevices = true;
+        inst.patcher.rack[0].zoneEditor = 0;
+        lynx::rack::compile (inst.patcher);
+        song.channels.push_back (inst);
+        const auto channel = (int) song.channels.size() - 1;
+        offline.setSong (std::move (song));
+        offline.dispatchPendingMessages();
+
+        bool ok = true;
+        {
+            auto view = lynx::RackWindows::makeSlotView (offline, 1, 0, false);
+            view->setSize (view->preferredWidth (206), 206);
+            ok = save (*view, "rack-deviceview.png") && ok;
+        }
+        {
+            auto view = lynx::RackWindows::makeSlotView (offline, 1, 0, true);
+            view->setMapMode (true);
+            view->setSize (view->preferredWidth (228), 228);
+            ok = save (*view, "rack-mapmode.png") && ok;
+        }
+        {
+            auto view = lynx::RackWindows::makeChannelView (offline, channel, true);
+            view->setSize (view->preferredWidth (228), 228);
+            ok = save (*view, "rack-instrument.png") && ok;
+        }
+        return ok;
     }
 
     void runEq166fShots (const juce::String& folder)
