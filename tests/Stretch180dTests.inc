@@ -115,3 +115,67 @@ TEST (render180d_time_stretches_what_the_precomputed_effects_leave)
     s.precompute.fadeOut = 0;
     CHECK (precompute::stretchedFrames (shared, s) == 1000); // another setting, another answer
 }
+
+TEST (render180d_a_stretched_trimmed_clip_starts_as_late_as_before_at_the_same_ratio)
+{
+    // The tone of a stretched trimmed clip starts some frames late: the stretcher smears the edge of the silence before it,
+    // and the trim keeps that smear. That comes with the stretch ratio, not with this round's span: the old rule (ratio
+    // from the whole file) gives the same start at the same ratio. Rendered both ways at ratio 1/0.3 s; the old rule's own
+    // TIME for this clip (1 s for a 1 s file) did not stretch at all, and played 0.3 s where FL plays 1 s.
+    using namespace lynx;
+    constexpr double rate = 44100.0;
+    auto sample = std::make_shared<SampleData>();
+    sample->sampleRate = rate;
+    sample->left.assign (44100, 0.0f);
+    for (int i = 4410; i < 17640; ++i)
+        sample->left[(std::size_t) i] = 0.5f * (float) std::sin (2.0 * 3.141592653589793 * 440.0 * i / rate);
+    const std::shared_ptr<const SampleData> shared = sample;
+
+    auto onset = [&] (float stretchBeats, double forcedRatio) {
+        Song s;
+        s.bpm = 120.0;
+        s.mode = PlayMode::song;
+        s.mixer = Song::defaultMixer (1);
+        ChannelDef c;
+        c.instrument = InstrumentKind::audioClip;
+        c.samplePath = "x.wav";
+        c.mixerTrack = 1;
+        c.sampler.precompute.trim = 256;
+        c.sampler.stretchBeats = stretchBeats;
+        c.sampler.keepPitch = true;
+        s.channels.push_back (c);
+        s.patterns.emplace_back();
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = 0;
+        clip.length = 8 * ppq;
+        s.playlist = { clip };
+        RackState::Factories f;
+        f.samples = [shared] (const std::string&) { return shared; };
+        // forcedRatio > 0: the old rule's ratio, computed by hand (target / whole file)
+        f.stretchedSamples = [shared, forcedRatio] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
+            return std::shared_ptr<const SampleData> (timeStretch (*shared, forcedRatio > 0.0 ? forcedRatio : ratio, m));
+        };
+        auto state = RackState::build (s, nullptr, rate, f);
+        RackRenderer r;
+        r.prepare (rate, 441);
+        std::vector<float> l (441), rr (441);
+        const auto tps = ticksPerSample (s.bpm, rate);
+        long frame = 0;
+        for (double tick = 0.0; tick < 4.0 * ppq; tick += 441 * tps, frame += 441)
+        {
+            r.process (state.get(), true, tick, 441, l.data(), rr.data());
+            for (int i = 0; i < 441; ++i)
+                if (std::abs (l[(std::size_t) i]) > 0.02f)
+                    return frame + i;
+        }
+        return -1L;
+    };
+    const auto ratio = 1.0 / 0.3;
+    const auto now = onset (2.0f, 0.0);                       // this round: TIME 1 s over the 0.3 s tone
+    const auto oldSameRatio = onset (2.0f, ratio);            // the old rule's code path at the same ratio
+    const auto oldOwnTime = onset (2.0f, 1.0);                // the old rule at this TIME: the whole file, no stretch
+    std::fprintf (stderr, "  [r180d] tone onset: now %ld, old rule at the same ratio %ld, old rule at its own TIME %ld frames\n", now,
+                  oldSameRatio, oldOwnTime);
+    CHECK (now >= 0 && oldSameRatio >= 0 && std::labs (now - oldSameRatio) <= 1);
+}
