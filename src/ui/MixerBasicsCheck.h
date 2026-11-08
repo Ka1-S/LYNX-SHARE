@@ -7,6 +7,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "engine/AudioEngine.h"
 #include "ui/MixerComponent.h"
+#include "ui/ValueControl.h"
 
 namespace lynx::mixerbasics
 {
@@ -72,10 +73,12 @@ inline juce::String run()
 
     // the wheel: over a fader it moves that fader one FL step; over the rest of a strip it scrolls the mixer
     engine.editSong ([] (Song& s) { s.mixer[3].volume = unityFader; });
-    const juce::MouseWheelDetails notch { 0.0f, 120.0f * 0.5f / 256.0f, false, false, false };
+    // (one notch as this platform's wheel sends it: macOS deltas are smaller than Windows', CI run 42376114567)
+    const auto notchY = (float) ui::wheelNotchSize();
+    const juce::MouseWheelDetails notch { 0.0f, notchY, false, false, false };
     strips.mouseWheelMove (at (strips, cap, cap, {}), notch);
     check (near (volume (3), unityFader + 0.02f, 1.0e-3f), "the wheel over a fader isn't one step");
-    const juce::MouseWheelDetails down { 0.0f, -120.0f * 0.5f / 256.0f, false, false, false };
+    const juce::MouseWheelDetails down { 0.0f, -notchY, false, false, false };
     view.setViewPosition (0, 0);
     const auto others = volume (3);
     const juce::Point<int> body (rail.getCentreX(), strips.getHeight() - 4);

@@ -2321,6 +2321,48 @@ private:
                         && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
         }
 
+        // round 180d: clip fades take FL's S curve; a project saved before that keeps its straight fades, also after another
+        // save, and a clip made in it takes the S curve. FL's fade tensions and stretch mode and PITCH survive a save.
+        bool clipFades180dOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::Clip faded;
+            faded.kind = lynx::ClipKind::audio;
+            faded.channel = 0;
+            faded.length = lynx::ppq * 8;
+            faded.fadeIn = lynx::ppq;
+            faded.fadeOutTension = -812.933f;
+            faded.fadeOut = lynx::ppq * 2;
+            lynx::Clip plainClip = faded;
+            plainClip.fadeIn = plainClip.fadeOut = 0;
+            plainClip.fadeOutTension = 0.0f;
+            plainClip.start = lynx::ppq * 16;
+            song.playlist = { faded, plainClip };
+            song.channels[0].sampler.flStretchMode = 5;
+            song.channels[0].sampler.flStretchPitch = 247;
+
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto current = lynx::ProjectFile::fromJson (json, error);
+            const auto oldJson = json.replace ("\"clipFadesPerClip\"", "\"clipFadesOther\"");
+            auto old = lynx::ProjectFile::fromJson (oldJson, error);
+            auto resaved = old;
+            if (resaved)
+            {
+                auto added = faded;
+                added.start = lynx::ppq * 32;
+                added.linearFades = 0;
+                resaved->playlist.push_back (added);
+                resaved = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (*resaved), error);
+            }
+            clipFades180dOk = current && old && resaved && json.contains ("clipFadesPerClip") && ! oldJson.contains ("clipFadesPerClip")
+                              && current->playlist.size() == 2 && ! current->playlist[0].linearFades
+                              && current->playlist[0].fadeOutTension == -812.933f && ! current->playlist[1].linearFades
+                              && current->channels[0].sampler.flStretchMode == 5 && current->channels[0].sampler.flStretchPitch == 247
+                              && old->playlist.size() == 2 && old->playlist[0].linearFades && ! old->playlist[1].linearFades
+                              && resaved->playlist.size() == 3 && resaved->playlist[0].linearFades && ! resaved->playlist[1].linearFades
+                              && ! resaved->playlist[2].linearFades && resaved->playlist[0].fadeOutTension == -812.933f;
+        }
+
         // FL's legacy Pattern Blocks (round 170f): the option and every arrangement's blocks are saved; a project without
         // them has neither in its file and loads with the option off
         bool blocksOk = false;
@@ -3062,7 +3104,7 @@ private:
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK";
@@ -3074,6 +3116,7 @@ private:
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
+               << "clip_fades_180d=" << (clipFades180dOk ? "OK" : "ERROR") << "\n"
                << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"

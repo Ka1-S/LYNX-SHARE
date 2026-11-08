@@ -83,6 +83,8 @@ bool isResetClick (const juce::MouseEvent& e) noexcept;
 // Value after a wheel move over the control (nothing if the wheel did not move vertically, or while the wheel is
 // scrolling a view: wheelScrolling).
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec);
+// One wheel notch's deltaY on this platform (what wheelValue counts as one step); offscreen checks send it.
+double wheelNotchSize() noexcept;
 
 // Round 169c (issue #32): a view that scrolled with the wheel calls noteWheelScroll(); while the wheel keeps turning
 // (controls::WheelScrollLatch), wheelScrolling() is true and the controls the pointer passes over keep scrolling the

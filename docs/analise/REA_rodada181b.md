@@ -126,16 +126,17 @@ Static read of FL 2026's `FLEngine_x64.dll` (Ghidra, read-only). Except where ma
 - The action leads to FUN_011f7180 with the menu tag. Six items, tags 0 to 5: "Out only (no bleeding)", "Transient (no bleeding)", "Transient (bleeding)", "Generic (bleeding)", "Smooth (bleeding)", "Crossfade (bleeding)".
 - No audio clip channel in the selection: "No selection" / "There are no audio clip channels selected.".
 - Otherwise it asks "Change declicking mode?" / "Change the declicking mode of all selected audio clip channels? (no undo)", with OK and Cancel (flags 0x21). On OK it sets the mode of every selected audio clip channel. Other channel kinds are left alone.
+- Seen in FL 2026 (session 2026-11-07): the submenu with these six captions, in this order (shot f3.png).
 - LYNX: `setDeclickOfAudioClips` uses the same six modes (`SamplerSettings::declickMode` 0..5). The change can be undone in LYNX, so the text drops "(no undo)".
 
 ## Prepare for MIDI export
 
 - FUN_0122d440 asks "Confirm" / "All of the channels are about to be turned into MIDI Out channels in order to allow output to a MIDI file. (no undo)". In some state the question is skipped (a bitmask on a byte of a global; not traced).
-- It goes through every channel whose byte at +0x890 is 0. What that flag means is not known.
+- It goes through every channel whose byte at +0x890 is 0. **Seen in FL 2026 (session 2026-11-07 11:12–11:14):** with a Layer, an Automation Clip and a Fruity Envelope Controller in the rack, the Layer and the Envelope Controller became MIDI Out (the controller on MIDI channel 7, after five generators and the Layer), and the Automation Clip stayed as it was and took no MIDI channel. So the flag marks automation clip channels (others not tested: Dashboard, Voltage Controller).
 - For each such channel it notes whether the generator is "FPC", keeps the channel name, loads `MIDITrack.fst` and sets +0x7c to 0x60 (meaning not known).
 - If the generator is now "MIDI out", it sets the MIDI channel: 9 for an FPC (MIDI channel 10). The others take a counter that starts at 0 and steps (n+1)&15, jumping from 9 to 10.
 - LYNX: `prepareForMidiExport` uses the same numbering and keeps the names.
-  - Inference, not FL proof: it leaves Controller, Layer, Dashboard and Voltage channels as they are, because they drive other channels and a MIDI Out can't stand in for them.
+  - As in FL, every channel converts, Layer and controllers included. LYNX's automation clips are not channels, so there is nothing to skip.
   - It can be undone, so the text drops "(no undo)".
 
 ## Riff machine (Tools)
@@ -159,5 +160,7 @@ Static read of FL 2026's `FLEngine_x64.dll` (Ghidra, read-only). Except where ma
 - **Save audio / MIDI clipboard to browser** (FUN_00f1cad0 / FUN_00f1cba0 → FUN_0124d070): if the clipboard holds the format (CF_WAVE = 12 for audio, the MIDI format otherwise), FL saves it as "Audio clipboard.wav" / "MIDI clipboard.mid" in Browser folder 0x3f2. FUN_009db5b0 maps that folder to the user data `Presets\Clipboard files` (info `System\Config\Browser\Infos\Clipboard files`).
   - It creates the folder or shows "Error|Unable to create folder:%s%s", then refreshes the Browser at that folder.
   - FUN_00819ca0 is assumed to make the name unique; it was not read.
+  - LYNX (round 181b): saves into `<settings>/Presets/Clipboard files` (Browser root "Clipboard files"), audio from CF_WAVE on Windows and else LYNX's audio editor clipboard, MIDI from the MIDI clipboard; items greyed when empty, as in FL. A taken name gets " (2)", " (3)"... **INFERRED**: FL's naming in FUN_00819ca0 is not read.
 - **Remix a song** (FUN_00f1bd40): posts window message 0x569. The receiver was not read.
-- **Remove all Edison instances:** not added. LYNX has no Edison plugin instances, so the item could do nothing.
+- **Remove all Edison instances:** not added. LYNX's Edison is the audio editor window, not a mixer effect (no `EffectKind`; FLP import drops FL's Edison slots), so the item could do nothing. FL gap: Edison as a mixer effect.
+- **Delete unused files and save project:** greyed in FL 2026's Tools menu in a project that was never saved (seen at runtime, session 2026-11-07 11:12). The enabling condition was not read in the binary. LYNX greys it the same way until the project has a file.
