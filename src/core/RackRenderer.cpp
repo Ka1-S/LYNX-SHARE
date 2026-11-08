@@ -1,5 +1,7 @@
 #include "core/RackRenderer.h"
 #include "core/MixerOps.h"
+
+#include "core/FruitySlicer.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
@@ -232,12 +234,13 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     std::shared_ptr<const SampleData> sample;
 
     if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
-         || kind == InstrumentKind::wavetraveller) && samples
+         || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer) && samples
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
     // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller
+        && kind != InstrumentKind::fruityslicer && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
         && factories.stretchedSamples
         && sample->frames() > 0)
     {
@@ -265,6 +268,25 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         whole.regionEnd = 1.0f;
         if (auto processed = precompute::apply (*sample, whole))
             sample = std::move (processed);
+    }
+
+    // Fruity Slicer (round 180c): FL's edits to the sample (reverse, declick, fades), then the sampler on the slices
+    if (kind == InstrumentKind::fruityslicer)
+    {
+        auto def = channel;
+        if (const auto state = fslicer::parse (channel.pluginState); state && sample != nullptr)
+        {
+            auto prepared = fslicer::prepare (*sample, *state);
+            fslicer::configureSampler (def, *state, (std::int64_t) prepared->frames());
+            sample = std::move (prepared);
+        }
+        else
+            def.sampler.slices.clear();
+        std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
+        instrument->prepare (sampleRate);
+        instrument->configure (def, bpm);
+        instrument->settleNew();
+        return instrument;
     }
 
     const loadtrace::Scope timing ("rack_instruments");
@@ -471,6 +493,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             && previous->song.channels[p].instrument == kind && kind != InstrumentKind::patcher
             && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
                 || previous->song.channels[p].samplePath == channel.samplePath)
+            && (kind != InstrumentKind::fruityslicer
+                || (previous->song.channels[p].samplePath == channel.samplePath
+                    && previous->song.channels[p].pluginState == channel.pluginState))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave

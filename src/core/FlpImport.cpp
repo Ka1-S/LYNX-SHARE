@@ -1,6 +1,8 @@
 #include "core/FlpImport.h"
 #include "core/FlpExport.h"
 
+#include "core/FruitySlicer.h"
+
 #include "core/Dvs.h"
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
@@ -1334,9 +1336,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (frames <= 0 && options.sampleFrames)
                         frames = options.sampleFrames (path);
 
-                    def.instrument = InstrumentKind::sampler;
+                    // Fruity Slicer: its own generator on FL's state (round 180c); Slicex: the sampler
+                    def.instrument = name == "fruity slicer" && fslicer::parse (c.pluginState) ? InstrumentKind::fruityslicer
+                                                                                                : InstrumentKind::sampler;
+                    if (def.instrument == InstrumentKind::fruityslicer)
+                        def.pluginState = c.pluginState;
                     def.samplePath = path;
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
+                    if (def.instrument != InstrumentKind::fruityslicer) // (Fruity Slicer: its state's PS, at the rack)
+                        def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
                     // Slicex: FL's host hands the plugin Init.Vol (REA_rodada170i §6; Fruity Slicer's render test is
                     // ruled by its licensed stretch and does not show it, so it keeps the linear velocity)
                     def.sampler.flVelocityLaw = name == "slicex";
@@ -2170,6 +2177,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
                      || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
+                     || def.instrument == InstrumentKind::fruityslicer
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)

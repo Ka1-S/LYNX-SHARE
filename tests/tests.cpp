@@ -17144,6 +17144,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer177aTests.inc"
 #include "ClipLauncher181aTests.inc"
 #include "Merge180cTests.inc"
+#include "Slicer180cTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
