@@ -7883,3 +7883,5 @@ countries: es mx ar co cl pe ve
 "Rename variation" = "Renombrar variación"
 "Variation morph (LYNX)" = "Morph entre variaciones (LYNX)"
 "Launch glide (LYNX)" = "Deslizamiento al lanzar (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Aún sin hijos: selecciona canales en el Channel Rack y usa Asignar hijos en el menú de la cadena."
+"Plays {0} channels" = "Toca {0} canales"

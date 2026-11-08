@@ -7883,3 +7883,5 @@ countries: jp
 "Rename variation" = "バリエーション名を変更"
 "Variation morph (LYNX)" = "バリエーション間のモーフ (LYNX)"
 "Launch glide (LYNX)" = "起動時のグライド (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "子チャンネルがまだありません: Channel Rack でチャンネルを選び、チェーンメニューの「子を設定」を使ってください。"
+"Plays {0} channels" = "{0} チャンネルを演奏"

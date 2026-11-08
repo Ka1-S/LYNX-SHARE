@@ -387,8 +387,11 @@ struct RackView::Impl
             g.fillRect (header);
             g.setColour (col::textPrimary);
             g.setFont (theme::font (theme::type::small, true));
-            g.drawText (r->kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r->kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack"),
-                        header.reduced (8, 0), juce::Justification::centredLeft);
+            auto title = r->kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r->kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
+            if (r->kind == RackDoc::Kind::midiEffect)
+                title << "  -  " << (r->children.empty() ? tr ("No children yet: select channels in the Channel Rack, then use Set children in the chain menu.")
+                                                          : tr ("Plays {0} channels", { juce::String ((int) r->children.size()) }));
+            g.drawText (title, header.reduced (8, 0), juce::Justification::centredLeft);
             g.setFont (theme::font (theme::type::caption));
         }
 
@@ -1041,6 +1044,21 @@ struct RackView::Impl
             menu.addSeparator();
             menu.addItem (tr ("Move up"), c > 0, false, [this, c] { edit ([c] (PatcherDoc& d) { rack::moveChain (d, c, c - 1); }); });
             menu.addItem (tr ("Move down"), c + 1 < (int) rack()->chains.size(), false, [this, c] { edit ([c] (PatcherDoc& d) { rack::moveChain (d, c, c + 1); }); });
+        }
+        // a standalone MIDI Effect Rack (decision R1): the channels it plays, set from the Channel Rack's selection as a
+        // Layer's children are
+        if (rack()->kind == RackDoc::Kind::midiEffect && automation && automation->kind == AutomationTargetKind::channelParam)
+        {
+            menu.addSeparator();
+            menu.addItem (tr ("Set children"), [this, self = automation->index] {
+                auto selected = engine.getSelectedChannels();
+                std::erase (selected, self);
+                edit ([selected] (PatcherDoc& d) { rack::rackOf (d)->children = std::vector<int> (selected.begin(), selected.end()); });
+            });
+            menu.addItem (tr ("Show children"), ! rack()->children.empty(), false, [this] {
+                const auto children = rack()->children;
+                engine.setChannelSelection (children, children.front());
+            });
         }
         menu.addSeparator();
         menu.addItem (tr ("Chain Selector Filters MIDI Ctrl"), rack()->kind != RackDoc::Kind::audioEffect, rack()->selectorFiltersCtrl, [this] {

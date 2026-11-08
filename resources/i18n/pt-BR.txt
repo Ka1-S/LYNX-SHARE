@@ -7966,3 +7966,5 @@ countries: br
 "Rename variation" = "Renomear variação"
 "Variation morph (LYNX)" = "Morph entre variações (LYNX)"
 "Launch glide (LYNX)" = "Deslizar ao disparar (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Ainda sem filhos: selecione canais no Channel Rack e use Definir filhos no menu da cadeia."
+"Plays {0} channels" = "Toca {0} canais"

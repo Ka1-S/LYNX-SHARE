@@ -7883,3 +7883,5 @@ countries: id
 "Rename variation" = "Ganti nama variasi"
 "Variation morph (LYNX)" = "Morph antarvariasi (LYNX)"
 "Launch glide (LYNX)" = "Glide saat dijalankan (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Belum ada anak: pilih kanal di Channel Rack, lalu gunakan Atur child di menu rantai."
+"Plays {0} channels" = "Memainkan {0} kanal"

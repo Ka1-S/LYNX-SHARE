@@ -7883,3 +7883,5 @@ countries: tw hk mo
 "Rename variation" = "重新命名變體"
 "Variation morph (LYNX)" = "變體之間變形 (LYNX)"
 "Launch glide (LYNX)" = "啟動時滑移 (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "還沒有子通道：在 Channel Rack 中選擇通道，然後在鏈選單中使用「設定子通道」。"
+"Plays {0} channels" = "演奏 {0} 個通道"

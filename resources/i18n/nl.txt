@@ -7883,3 +7883,5 @@ countries: nl be
 "Rename variation" = "Variatie hernoemen"
 "Variation morph (LYNX)" = "Morph tussen variaties (LYNX)"
 "Launch glide (LYNX)" = "Glijden bij starten (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Nog geen kinderen: selecteer kanalen in de Channel Rack en gebruik dan Children instellen in het ketenmenu."
+"Plays {0} channels" = "Speelt {0} kanalen"

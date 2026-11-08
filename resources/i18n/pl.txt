@@ -7883,3 +7883,5 @@ countries: pl
 "Rename variation" = "Zmień nazwę wariacji"
 "Variation morph (LYNX)" = "Morph między wariacjami (LYNX)"
 "Launch glide (LYNX)" = "Płynne przejście przy uruchomieniu (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Brak kanałów podrzędnych: zaznacz kanały w Channel Rack i użyj Ustaw dzieci w menu łańcucha."
+"Plays {0} channels" = "Gra kanały: {0}"

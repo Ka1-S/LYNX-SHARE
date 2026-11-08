@@ -7883,3 +7883,5 @@ countries: tr
 "Rename variation" = "Varyasyonu yeniden adlandır"
 "Variation morph (LYNX)" = "Varyasyonlar arası morph (LYNX)"
 "Launch glide (LYNX)" = "Başlatırken geçiş (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Henüz alt kanal yok: Channel Rack'te kanalları seçin, sonra zincir menüsünde Alt kanalları ata'yı kullanın."
+"Plays {0} channels" = "{0} kanal çalar"

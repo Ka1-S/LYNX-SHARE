@@ -79,6 +79,9 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     // round 183c: Live-style Instrument Rack (a Patcher in rack mode, core/Rack.h)
     builtIn (TR_NOOP ("Instrument Rack"), tr ("Instrument Rack"), 2, InstrumentKind::patcher,
              [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::instrument); });
+    // ...and a standalone MIDI Effect Rack: its chains' notes play its children (decision R1, like a Layer's)
+    builtIn (TR_NOOP ("MIDI Effect Rack"), tr ("MIDI Effect Rack"), 2, InstrumentKind::patcher,
+             [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::midiEffect); });
     add ("LYNX Soundfont", "LYNX Soundfont", tr ("built-in"), 0, 2, InstrumentKind::soundfont, [] { return std::optional<ChannelDef> (sf::makeChannel()); });
 
     // FL's own instrument engines (round 142)

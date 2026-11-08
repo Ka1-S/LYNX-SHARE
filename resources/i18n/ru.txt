@@ -7883,3 +7883,5 @@ countries: ru by kz
 "Rename variation" = "Переименовать вариацию"
 "Variation morph (LYNX)" = "Морфинг между вариациями (LYNX)"
 "Launch glide (LYNX)" = "Плавный переход при запуске (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Дочерних каналов пока нет: выберите каналы в Channel Rack и используйте «Задать дочерние» в меню цепи."
+"Plays {0} channels" = "Играет каналов: {0}"

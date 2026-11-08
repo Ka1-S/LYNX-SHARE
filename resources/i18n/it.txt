@@ -7883,3 +7883,5 @@ countries: it ch sm
 "Rename variation" = "Rinomina variazione"
 "Variation morph (LYNX)" = "Morph tra variazioni (LYNX)"
 "Launch glide (LYNX)" = "Glide all'avvio (LYNX)"
+"No children yet: select channels in the Channel Rack, then use Set children in the chain menu." = "Ancora nessun figlio: seleziona i canali nel Channel Rack, poi usa Imposta figli nel menu della catena."
+"Plays {0} channels" = "Suona {0} canali"

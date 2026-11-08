@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/Rack.h"
 #include "core/MixerOps.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
@@ -1120,6 +1121,13 @@ void RackState::buildMidiRoutes()
         // MIDI Out on MIDI channel 1 would send them (or on the channel of a MIDI Out node on the way, round 162)
         if (song.channels[c].instrument == InstrumentKind::patcher)
         {
+            // a standalone MIDI Effect Rack (round 183c, decision R1): what its chains play goes to its children only
+            if (const auto* rk = rack::rackOf (song.channels[c].patcher); rk != nullptr && rk->kind == RackDoc::Kind::midiEffect)
+            {
+                if (! rk->children.empty() && ! patcher::vfxHostPorts (song.channels[c].patcher).empty())
+                    portEventChannels.push_back ((int) c);
+                continue;
+            }
             for (const auto& r : patcher::midiOutputsOf (song.channels[c].patcher, 0))
                 send (c, r.port, std::max (0, r.midiChannel), 0);
             // its VFX nodes' outputs cabled to "To LYNX" MIDI ports (round 165c): what they play goes out there
@@ -3403,6 +3411,23 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                 e.release = p.release;
                 e.colour = (std::int8_t) (p.channel & 15);
                 e.port = (std::int16_t) p.port;
+                // a standalone MIDI Effect Rack (round 183c): its children play the notes, as a Layer's do
+                if (const auto* rk = (std::size_t) c < state.song.channels.size() ? rack::rackOf (state.song.channels[(std::size_t) c].patcher) : nullptr;
+                    rk != nullptr && rk->kind == RackDoc::Kind::midiEffect)
+                {
+                    for (const auto child : rk->children)
+                        if (const auto* childRack = child >= 0 && child < (int) state.song.channels.size() ? rack::rackOf (state.song.channels[(std::size_t) child].patcher) : nullptr;
+                            child >= 0 && child < (int) state.song.channels.size() && child != c
+                            && (childRack == nullptr || childRack->kind != RackDoc::Kind::midiEffect)) // (no MIDI rack to MIDI rack loops)
+                        {
+                            auto toChild = e;
+                            toChild.channel = child;
+                            toChild.port = -1;
+                            events.add (toChild);
+                            added = true;
+                        }
+                    continue;
+                }
                 events.add (e);
                 added = true;
             }
