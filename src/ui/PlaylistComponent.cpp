@@ -2426,8 +2426,13 @@ double PlaylistComponent::clipFileSeconds (int index) const
     const auto channel = song.playlist[(std::size_t) index].channel;
     if (channel < 0 || channel >= (int) song.channels.size())
         return 0.0;
-    const auto data = engine.getSampleLibrary().findLoaded (juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str()));
-    return data != nullptr && data->sampleRate > 0.0 ? (double) data->frames() / data->sampleRate : 0.0;
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    if (const auto data = engine.getSampleLibrary().findLoaded (path); data != nullptr && data->sampleRate > 0.0)
+        return (double) data->frames() / data->sampleRate;
+    // (not held by the engine: the waveform's own summary, as the clip is painted from it)
+    if (const auto summary = ui::WaveformCache::getInstance()->find (path); summary != nullptr && summary->sampleRate > 0.0)
+        return (double) summary->frames / summary->sampleRate;
+    return 0.0;
 }
 
 std::vector<WarpPoint> PlaylistComponent::clipWarpMarkers (int index) const
