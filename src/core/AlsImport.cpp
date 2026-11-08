@@ -672,9 +672,10 @@ ClipFollow followOf (const Element& f)
     c.b = (FollowKind) std::clamp ((int) f.number ("FollowActionB", 0), 0, 9); // [INFERRED] B uses A's numbers
     c.chanceA = std::clamp ((int) std::lround (f.number ("FollowChanceA", 100)), 0, 100);
     c.chanceB = std::clamp ((int) std::lround (f.number ("FollowChanceB", 0)), 0, 100);
-    // [INFERRED] the jump target is the scene index (LYNX's jump row); not yet read in Live
-    c.jumpA = std::clamp ((int) f.number ("JumpIndexA", 0), 0, launcher::maxScenes - 1);
-    c.jumpB = std::clamp ((int) f.number ("JumpIndexB", 0), 0, launcher::maxScenes - 1);
+    // the jump target: Live shows the stored number itself, 1-based (5 shows "5", 0 an empty field) [LIVE, 181c];
+    // LYNX's jump row counts from 0. [INFERRED] the number counts scenes from the top, not clips of the group
+    c.jumpA = std::clamp ((int) f.number ("JumpIndexA", 1) - 1, 0, launcher::maxScenes - 1);
+    c.jumpB = std::clamp ((int) f.number ("JumpIndexB", 1) - 1, 0, launcher::maxScenes - 1);
     c.linked = f.boolean ("IsLinked", true);
     c.iterations = std::clamp ((int) std::lround (f.number ("LoopIterations", 1)), 1, 999);
     c.ticks = std::max<std::int64_t> (1, ticksOf (f.number ("FollowTime", 4)));

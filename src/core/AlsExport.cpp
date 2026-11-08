@@ -608,8 +608,8 @@ struct Exporter
         c.value ("FollowAction/FollowActionB", num ((int) f.b));
         c.value ("FollowAction/FollowChanceA", num (f.chanceA));
         c.value ("FollowAction/FollowChanceB", num (f.chanceB));
-        c.value ("FollowAction/JumpIndexA", num (f.jumpA)); // [INFERRED] a scene index, as the import reads it
-        c.value ("FollowAction/JumpIndexB", num (f.jumpB));
+        c.value ("FollowAction/JumpIndexA", num (f.jumpA + 1)); // Live's jump number is 1-based [LIVE, 181c]
+        c.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
         c.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
     }
 

@@ -257,7 +257,7 @@ Reference: Live 12.4.16 renders of a test voice (`warp-refs/`, 48 kHz, clip warp
 Launch numbers read in Live 12's own Clip View on a set we wrote [LIVE: docs/analise/REA_rodada181a.md, 181b]:
 - `LaunchQuantisation` 0…14 = Global, None, 8 Bars, 4 Bars, 2 Bars, 1 Bar, 1/2, 1/2T, 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32 = `LaunchQuant`.
 - `LaunchMode` 0…3 = Trigger, Gate, Toggle, Repeat = `LaunchMode`.
-- `FollowActionA` 0…9 = No Action, Stop, Again, Previous, Next, First, Last, Any, Other, Jump = `FollowKind`. [INFERRED] `FollowActionB` uses the same numbers; `JumpIndexA/B` is a scene index.
+- `FollowActionA` 0…9 = No Action, Stop, Again, Previous, Next, First, Last, Any, Other, Jump = `FollowKind`. [INFERRED] `FollowActionB` uses the same numbers. `JumpIndexA/B`: Live shows the stored number itself, 1-based (5 shows "5", 0 an empty field) [LIVE, 181c]; LYNX's jump row = the number − 1. [INFERRED] it counts scenes from the top, not clips of the group.
 - `GlobalQuantisation` (LiveSet) has no Global entry: it is the clip number − 1 (9 = 1/8; the default 4 = 1 Bar).
 
 Import (the default, the user's choice of 2026-11-08; `AlsImportOptions::sessionOnPlaylist`, Settings › General › Workflow › Session clips of Live sets: Playlist, keeps 175a's placement):

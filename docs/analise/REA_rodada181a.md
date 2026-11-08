@@ -60,6 +60,7 @@ Read feature/ableton175a-2 (docs/analise/ALS_FORMAT.md, src/core/AlsImport.cpp).
   - `FollowActionA` 0 No Action, 1 Stop, 2 Again, 3 Previous, 4 Next, 5 First, 6 Last, 7 Any, 8 Other, 9 Jump: exactly `FollowKind`'s order.
   - `GlobalQuantisation` 9 shows "1/8", as clip value 10 does: a set-wide value has no Global entry, so clip n = set-wide n + 1. Default 4 = 1 Bar fits (clip 5 = 1 Bar).
   - Still [INFERRED]: `FollowActionB` uses the same numbers as A (only B = 0 seen); set-wide values other than 9.
+  - [LIVE] 181c, 2026-11-08: LYNX's own export of that set (`--export-als`, every launch value identical to the source) opens in Live 12 with its 15 clips and scenes and the toolbar at 1/8. Clip Q9 with `JumpIndexA` 5 shows Jump "5"; with 0 (181b read) the field is empty: the jump number is stored as shown, 1-based. LYNX's jump row = the number − 1. [INFERRED] it counts scenes from the top, not clips of the group.
   - Evidence: /mnt/e/lynx-work/session181a/rw/C1v…C14v.png and N05c.png (Q0). Live's plugin scan raised one PACE box (Metamorph 1), closed with Quit; no Live preference was changed.
 
 ## Real window session (Windows build, guarded clicks)

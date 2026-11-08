@@ -122,7 +122,8 @@ inline void checkGrid (const lynx::Song& s)
         CHECK (riff->length == 4 * ppq); // the loop region 1…5
         CHECK (a->mode == LaunchMode::toggle && a->quant == LaunchQuant::eighth && a->legato && a->loop);
         CHECK (a->follow.enabled && a->follow.a == FollowKind::next && a->follow.b == FollowKind::jump);
-        CHECK (a->follow.chanceA == 70 && a->follow.chanceB == 30 && a->follow.jumpB == 2);
+        CHECK (a->follow.chanceA == 70 && a->follow.chanceB == 30);
+        CHECK (a->follow.jumpB == 1); // JumpIndexB 2: Live's jump numbers are 1-based [LIVE, 181c]
         CHECK (! a->follow.linked && a->follow.iterations == 3 && a->follow.ticks == 8 * ppq);
         const auto& p = s.patterns[(std::size_t) riff->pattern];
         bool c4 = false, d4 = false;
@@ -277,6 +278,7 @@ TEST (als181c_a_lynx_grid_exports_to_session_view)
     s.clipGrid->globalQuant = LaunchQuant::bars2;
     const auto out = exportAls (s);
     CHECK (out.xml.find ("<GlobalQuantisation Value=\"3\"") != std::string::npos); // 2 Bars: clip number 4 − 1
+    CHECK (out.xml.find ("<JumpIndexB Value=\"1\"") != std::string::npos);        // row 0 = Live's jump number 1
     const auto back = importAls (out.bytes, als181c::options());
     CHECK (back.has_value());
     if (! back)
