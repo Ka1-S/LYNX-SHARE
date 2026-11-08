@@ -689,6 +689,7 @@ public:
         const auto* c = warpChannel();
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
+    void setWarpModeForPanel (bool on) { setWarpMode (on); }
     void setWarpMode (bool on)
     {
         warpMode = on && source.kind == Source::Kind::channel;
@@ -3983,6 +3984,20 @@ void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip)
     auto* editor = openWindow (engine, { Source::Kind::channel, channel, path, clip });
     if (path.isNotEmpty())
         editor->loadFile (juce::File (path));
+}
+
+std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp)
+{
+    const auto& song = engine.getSong();
+    if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+        return {};
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    auto editor = std::make_unique<AudioEditor> (engine, Source { Source::Kind::channel, channel, path, clip });
+    if (path.isNotEmpty())
+        editor->loadFile (juce::File (path));
+    if (showWarp)
+        editor->setWarpModeForPanel (true);
+    return editor;
 }
 
 void openAudioEditorRecording (AudioEngine& engine)

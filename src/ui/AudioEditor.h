@@ -24,6 +24,9 @@ void openAudioEditor (AudioEngine& engine, const juce::File& file);
 // The sample of a channel (a Sampler channel or the channel of a Playlist audio clip); the edit can go back to it.
 // `clip`: the Playlist audio clip it was opened from (its warp markers are then edited for that clip alone).
 void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip = -1);
+// The same editor as a panel, without a window (round 175a, for 183a's Clip View): the sample of `channel`, opened from
+// Playlist audio clip `clip` (-1: none). `showWarp`: the warp markers lane starts open.
+std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp = true);
 // The record button's "Audio, into the audio editor" choice: an empty editor recording the audio input while the
 // song plays (it starts with the playback and stops with it, like FL's Edison record target).
 void openAudioEditorRecording (AudioEngine& engine);
