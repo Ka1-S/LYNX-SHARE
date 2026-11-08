@@ -656,8 +656,6 @@ struct Converter
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
-                if (c.muted)
-                    continue; // (left out)
                 use (c.start);
                 // (an audio clip's length goes unstretched, as playlistItem writes it)
                 use (c.kind == ClipKind::audio && c.stretch > 0.0 && c.stretch != 1.0 ? (std::int64_t) std::llround ((double) c.length / c.stretch)
@@ -1266,10 +1264,7 @@ struct Converter
                 a.markers.push_back (marker (m));
             for (const auto& clip : clips)
                 if (auto item = playlistItem (clip))
-                {
-                    item->flags = clip.muted ? 0x2040 : 0x40; // FL's clip mute (round 177c)
                     a.items.push_back (*item);
-                }
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
                 a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
@@ -1284,6 +1279,8 @@ struct Converter
         item.track = std::clamp (clip.track, 0, 499);
         item.position = ticks (clip.start);
         item.length = std::max<std::uint32_t> (1, ticks (clip.length));
+        // FL's clip mute: bit 0x2000 of the item flags (issue #110, REA round 182e)
+        item.flags = (std::uint16_t) (flp::PlaylistItem::defaultFlags | (clip.muted ? flp::PlaylistItem::mutedFlag : 0));
         switch (clip.kind)
         {
             case ClipKind::pattern:
@@ -1431,7 +1428,8 @@ struct Converter
             for (int b = 0; b < 3; ++b)
             {
                 const auto& eq = track.eq;
-                control (0, flp::ControlId::mixerEqBase + b, std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
+                // (a bypassed EQ, LYNX's own: FL has no bypass, so it goes flat — what is heard stays the same)
+                control (0, flp::ControlId::mixerEqBase + b, eq.bypassed ? 0 : std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
                 const auto hz = std::clamp ((double) eq.hz[(std::size_t) b], 10.0, 16000.0);
                 control (0, flp::ControlId::mixerEqBase + 8 + b, std::clamp (iround (65536.0 * std::log ((hz - 10.0) / 159.9 + 1.0) / std::log (101.0)), 0, 65536));
                 control (0, flp::ControlId::mixerEqBase + 16 + b, std::clamp (iround (eq.width[(std::size_t) b] * 65536.0), 0, 65536));

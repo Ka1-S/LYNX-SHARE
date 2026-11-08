@@ -2408,7 +2408,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     // slots, instruments through a one-channel import), every cable (audio with its gain, notes, control values mapped
     // to LYNX's parameters), the editor positions and the extra outputs
     std::function<std::optional<PatcherDoc> (const std::vector<std::uint8_t>&, const flp::Channel*)> patcherFromFl;
-    int patcherSidechain = -1; // the last converted Patcher's side-chain pin: "7 Sidechain" = insert 7
+    // the last converted Patcher's side-chain pin: its bus k, an index into FL's input list of the insert, as for the
+    // other effects (REA_rodada22 §1.2). The pin's name is only the source track's name when saved (Bien Duro: "7
+    // Sidechain" on bus 1 and 4 is track 81, named "7 Sidechain"; issue #112: "Master"), REA round 182e
+    int patcherSidechain = -1;
     patcherFromFl = [&] (const std::vector<std::uint8_t>& state, const flp::Channel* asChannel) -> std::optional<PatcherDoc> {
         const auto graph = parsePatcher (state);
         if (! graph)
@@ -2593,8 +2596,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 w.kind = PatchWire::Kind::audio;
                 w.fromPort = src->node < 0 ? (src->index > 0 ? 1 : 0) : std::max (0, src->index);
                 if (src->node < 0 && src->index > 0)
-                    if (const auto track = std::atoi (src->name.c_str()); track > 0 && track < maxMixerTracks)
-                        patcherSidechain = track;
+                    patcherSidechain = src->index;
                 w.toPort = dst->node < 0 ? std::max (0, dst->index) : std::min (1, std::max (0, dst->index));
                 if (w.to == patchToHost && w.toPort > 0) // an extra output: "Insert N" names its insert
                 {
@@ -2666,8 +2668,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         if (const auto k = surface::flOutputToLynx (source.effect.state, w.fromPort))
                             w.fromPort = *k;
                 }
-                if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
-                    w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
+                // (a Peak Controller's outputs keep FL's numbers: 0 Peak+LFO, 1 Peak, 2 LFO, as LYNX's and as the mixer links;
+                // REA_rodada17 §5.1, issue #111)
                 if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)
                 {
                     // the source has no such output in LYNX (an X-Y controller, a Control Surface…): its target keeps the
@@ -2819,8 +2821,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 {
                     auto slot = makeEffectSlot (EffectKind::patcher);
                     slot.patcher = std::move (*doc);
-                    if (patcherSidechain > 0 && patcherSidechain < tracks && patcherSidechain != insert.index)
-                        slot.sidechain = patcherSidechain;
+                    if (const auto source = sidechainSource (insert.index, patcherSidechain); source > 0 && source != insert.index)
+                        slot.sidechain = source;
                     effectSlotMap.insert ({ { insert.index, original.index }, { (int) track.effects.size(), original.plugin } });
                     slot.flOrigin = { original.plugin, original.state, 0 }; // (round 171e: Export to FL Studio)
                     track.effects.push_back (std::move (slot));
@@ -3696,7 +3698,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.track = item.track;
                 clip.start = rescale (item.position);
                 clip.length = rescale (item.length);
-                clip.muted = item.muted();
+                clip.muted = item.muted(); // (issue #110)
 
                 // trim in beats (-1 = no trim)
                 if (std::isfinite (item.startOffset) && item.startOffset > 0.0f)
@@ -3787,8 +3789,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             clip.track = item.track;
             clip.start = rescale (item.position);
             clip.length = rescale (item.length);
-            clip.muted = item.muted();
             clip.offset = item.patternStartTick > 0 ? rescale (item.patternStartTick) : 0;
+            clip.muted = item.muted();
             clips.push_back (clip);
         }
 

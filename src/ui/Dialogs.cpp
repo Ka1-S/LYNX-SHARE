@@ -5,6 +5,7 @@
 #include <set>
 
 #include "core/ClipOps.h"
+#include "core/MixerOps.h"
 #include "core/RackOps.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
@@ -498,6 +499,170 @@ void showNameAndColourDialog (const juce::String& title, const juce::String& nam
                              }),
                              true);
     keepAboveMainWindow (*window);
+}
+
+namespace
+{
+// FL's "Gradient editor" (Gradient color..., REA_rodada177a §5 [SHOT pairs/fl-gradient-editor.png]): a First and a Last
+// swatch with the blend between them, buttons to copy First into Last, swap them and copy Last into First, and a colour
+// picker for the swatch being edited. LYNX's picker replaces FL's colour selector.
+class GradientPanel final : public juce::Component
+{
+public:
+    GradientPanel (juce::Colour firstColour, juce::Colour lastColour, int count)
+        : first (firstColour), last (lastColour), steps (juce::jmax (2, count))
+    {
+        const auto setup = [this] (juce::TextButton& b, const juce::String& text, const juce::String& tip) {
+            b.setButtonText (text);
+            b.setTooltip (tip);
+            addAndMakeVisible (b);
+        };
+        setup (toLast, juce::String::fromUTF8 ("\xe2\x86\x92"), tr ("Copy First into Last"));
+        setup (swap, juce::String::fromUTF8 ("\xe2\x87\x84"), tr ("Swap First and Last"));
+        setup (toFirst, juce::String::fromUTF8 ("\xe2\x86\x90"), tr ("Copy Last into First"));
+        toLast.onClick = [this] { last = first; changed (true); };
+        toFirst.onClick = [this] { first = last; changed (true); };
+        swap.onClick = [this] { std::swap (first, last); changed (true); };
+        setSize (360, 132);
+    }
+
+    juce::Colour first, last;
+    bool editingFirst = true;
+    std::function<void (juce::Colour)> onEdit; // the swatch being edited changed: the picker shows this colour
+
+    juce::Colour editing() const { return editingFirst ? first : last; }
+    void setEditing (juce::Colour c)
+    {
+        (editingFirst ? first : last) = c;
+        repaint();
+    }
+
+    void resized() override
+    {
+        const auto row = getLocalBounds().removeFromBottom (28);
+        const auto w = 56;
+        toLast.setBounds (firstArea().getX(), row.getY(), w, row.getHeight());
+        swap.setBounds (previewArea().getCentreX() - w / 2, row.getY(), w, row.getHeight());
+        toFirst.setBounds (lastArea().getRight() - w, row.getY(), w, row.getHeight());
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto swatch = [&g] (juce::Rectangle<int> r, juce::Colour c, const juce::String& label, bool on) {
+            g.setColour (c);
+            g.fillRoundedRectangle (r.toFloat(), 4.0f);
+            g.setColour (on ? theme::colour::accent : theme::colour::borderStrong);
+            g.drawRoundedRectangle (r.toFloat().reduced (on ? 1.0f : 0.5f), 4.0f, on ? 2.0f : 1.0f);
+            g.setColour (c.getPerceivedBrightness() > 0.6f ? juce::Colours::black : juce::Colours::white);
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (label, r, juce::Justification::centred);
+            if (on) // (FL ticks the swatch being edited; the outline alone vanishes on a red swatch)
+                g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), r.reduced (6), juce::Justification::bottomRight);
+        };
+        swatch (firstArea(), first, tr ("First"), editingFirst);
+        swatch (lastArea(), last, tr ("Last"), ! editingFirst);
+        // the blend the tracks will get, one band per selected track
+        const auto p = previewArea();
+        for (int k = 0; k < steps; ++k)
+        {
+            const auto x0 = p.getX() + p.getWidth() * k / steps, x1 = p.getX() + p.getWidth() * (k + 1) / steps;
+            g.setColour (juce::Colour (mixerops::gradientColourStep (first.getARGB(), last.getARGB(), k, steps)));
+            g.fillRect (x0, p.getY(), x1 - x0, p.getHeight());
+        }
+        g.setColour (theme::colour::borderStrong);
+        g.drawRect (p);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (firstArea().contains (e.getPosition()) || lastArea().contains (e.getPosition()))
+        {
+            editingFirst = firstArea().contains (e.getPosition());
+            changed (true);
+        }
+    }
+
+private:
+    juce::Rectangle<int> swatchRow() const { return getLocalBounds().withTrimmedBottom (36); }
+    juce::Rectangle<int> firstArea() const { return swatchRow().withWidth (72); }
+    juce::Rectangle<int> lastArea() const { return swatchRow().withLeft (getWidth() - 72); }
+    juce::Rectangle<int> previewArea() const { return swatchRow().withLeft (82).withRight (getWidth() - 82).reduced (0, 10); }
+
+    void changed (bool tellPicker)
+    {
+        repaint();
+        if (tellPicker && onEdit != nullptr)
+            onEdit (editing());
+    }
+
+    int steps;
+    juce::TextButton toLast, swap, toFirst;
+};
+
+class GradientWindow final : public juce::AlertWindow
+{
+public:
+    GradientWindow (juce::Colour first, juce::Colour last, int count)
+        : juce::AlertWindow (tr ("Gradient editor"), {}, juce::MessageBoxIconType::NoIcon), panel (first, last, count)
+    {
+        addCustomComponent (&panel);
+        hint.setText (tr ("Click First or Last, then pick its color below"), juce::dontSendNotification);
+        hint.setFont (theme::font (theme::type::small));
+        hint.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        hint.setSize (panel.getWidth(), 18);
+        addCustomComponent (&hint);
+        picker.setSize (panel.getWidth(), picker.preferredHeight());
+        picker.setOriginal (first);
+        picker.setColour (first, false);
+        picker.onChange = [this] (juce::Colour c) { panel.setEditing (c); };
+        panel.onEdit = [this] (juce::Colour c) {
+            picker.setOriginal (c);
+            picker.setColour (c, false);
+        };
+        addCustomComponent (&picker);
+        // FL's "Reset all" (ResetAllBtnClick 0x7b60c0: every swatch back to the colour the editor opened with, read
+        // back from its saved "=$hex" list, REA_rodada177a §5); it doesn't close the editor
+        resetAll.setButtonText (tr ("Reset all"));
+        resetAll.onClick = [this, first, last] {
+            panel.first = first;
+            panel.last = last;
+            panel.onEdit (panel.editing());
+            panel.repaint();
+        };
+        resetRow.addAndMakeVisible (resetAll);
+        resetRow.setSize (panel.getWidth(), 28);
+        resetAll.setBounds (0, 0, 96, 28);
+        addCustomComponent (&resetRow);
+        addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    }
+
+    juce::Colour first() const { return panel.first; }
+    juce::Colour last() const { return panel.last; }
+
+private:
+    GradientPanel panel;
+    juce::Label hint;
+    juce::Component resetRow;
+    juce::TextButton resetAll;
+    ui::ColourPicker picker { juce::Colours::red };
+};
+} // namespace
+
+void showGradientColourDialog (juce::Colour first, juce::Colour last, int count, std::function<void (juce::Colour, juce::Colour)> onAccept)
+{
+    auto* window = new GradientWindow (first, last, count);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onAccept] (int result) {
+                                 if (result == 1 && onAccept != nullptr)
+                                     onAccept (window->first(), window->last());
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+}
+
+std::unique_ptr<juce::AlertWindow> makeGradientColourDialog (juce::Colour first, juce::Colour last, int count)
+{
+    return std::make_unique<GradientWindow> (first, last, count);
 }
 
 namespace
