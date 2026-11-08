@@ -446,7 +446,10 @@ void applyFreeze (Song& song, int channel, const std::string& wav, std::int64_t 
     frozen.instrument = InstrumentKind::audioClip;
     frozen.samplePath = wav;
     frozen.mixerTrack = mixerTrack;
-    frozen.volume = 1.0f; // unity: the render holds the channel's level and pan
+    // unity: the render holds the channel's level and pan. A Playlist audio clip plays at unity at FL's default channel
+    // volume (10000 of 12800, Instruments.cpp audioClipUnity), in FL as in LYNX; 100 % played the render 5.2 dB louder
+    // (round 182b: Patience exported from a Live set rendered +4.3 dB in FL and in LYNX)
+    frozen.volume = audioClipUnityVolume;
     frozen.colour = colour;
     frozen.uid = c.uid;
     c = std::move (frozen);
@@ -520,6 +523,7 @@ int applyInsertRender (Song& song, int track, const std::string& wav, std::int64
     const auto added = applyBounce (song, track, wav, length);
     if (added < 0)
         return -1;
+    song.channels.back().volume = audioClipUnityVolume; // the render plays at unity in FL (see applyFreeze)
     std::string list;
     for (const auto& n : names)
         list += (list.empty() ? "" : ", ") + n;
