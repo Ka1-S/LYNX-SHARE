@@ -1,6 +1,7 @@
 #include "engine/AudioEngine.h"
 #include "core/VideoPlayer.h"
 
+#include "core/Comping.h"
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -2546,7 +2547,9 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     }
 
     const auto lengthsBefore = patternLengths (song);
+    const auto auditioned = comp::auditionedTrack (song);
     edit (song);
+    comp::checkAudition (song, auditioned);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
     publishSong();
@@ -2667,6 +2670,7 @@ void AudioEngine::undo()
     redoStack.push_back (std::move (song));
     song = std::move (undoStack.back());
     undoStack.pop_back();
+    comp::setAudition (song, -1); // (not an edit: whatever an old state had auditioned stays out of it)
     modified = true;
     lastUndoPress = {};
     publishSong();
@@ -2682,6 +2686,7 @@ void AudioEngine::redo()
     undoStack.push_back (std::move (song));
     song = std::move (redoStack.back());
     redoStack.pop_back();
+    comp::setAudition (song, -1);
     modified = true;
     lastUndoPress = {};
     publishSong();

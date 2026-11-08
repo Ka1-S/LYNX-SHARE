@@ -297,6 +297,30 @@ void setAudition (Song& song, int lane)
     song.auditionComp = g.comp;
 }
 
+AuditionedTrack auditionedTrack (const Song& song)
+{
+    if (song.auditionLane < 0 || song.auditionLane >= (int) song.playlistTracks.size())
+        return {};
+    return { song.auditionLane, song.playlistTracks[(std::size_t) song.auditionLane].name };
+}
+
+void checkAudition (Song& song, const AuditionedTrack& before)
+{
+    if (before.lane < 0 || song.auditionLane != before.lane)
+        return; // nothing auditioned, or this edit is the one that changed it
+    const auto g = groupOf (song, before.lane);
+    if (! g.isLane (before.lane) || g.comp != song.auditionComp || song.playlistTracks[(std::size_t) before.lane].name != before.name)
+        setAudition (song, -1);
+}
+
+bool swipeSelection (Song& song, int lane)
+{
+    const auto g = groupOf (song, lane);
+    if (! g.isLane (lane) || ! isComp (song, g.comp) || song.loopEnd <= song.loopStart || song.loopStart < 0)
+        return false;
+    return swipe (song, lane, song.loopStart, song.loopEnd);
+}
+
 bool flatten (Song& song, int compTrack)
 {
     const auto g = groupOf (song, compTrack);
@@ -352,24 +376,15 @@ int compTakes (Song& song, int track)
     }
     std::stable_sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
 
-    // the names: the header's, else the insert's (loop passes leave their rows unnamed, as in FL)
+    // the names: the header's when it has one, else its row's, "Track N", as the take rows show it (loop passes leave their
+    // rows unnamed, as in FL). The comp takes the header's row, so N stays the number the user saw there.
     auto base = song.playlistTracks[(std::size_t) g.comp].name;
     if (base.empty())
-        for (const auto i : audioOn (song, rows.front().second))
-        {
-            const auto channel = song.playlist[(std::size_t) i].channel;
-            if (channel >= 0 && channel < (int) song.channels.size())
-            {
-                const auto insert = song.channels[(std::size_t) channel].mixerTrack;
-                if (insert > 0 && insert < (int) song.mixer.size())
-                    base = song.mixer[(std::size_t) insert].name;
-            }
-            break;
-        }
+        base = "Track " + std::to_string (g.comp + 1);
     noteedit::insertTrack (song, g.comp);
     auto& comp = song.playlistTracks[(std::size_t) g.comp];
     comp.compTrack = true;
-    comp.name = base.empty() ? "Comp" : base + " comp";
+    comp.name = base + " comp";
 
     for (auto t = g.comp + 1; t <= g.last + 1; ++t)
     {
@@ -386,7 +401,7 @@ int compTakes (Song& song, int track)
     {
         auto& lane = song.playlistTracks[(std::size_t) rows[k].second + 1];
         if (lane.name.empty() || lane.name == base)
-            lane.name = (base.empty() ? "Take " + std::to_string (k + 1) : base + " (take " + std::to_string (k + 1) + ")");
+            lane.name = base + " (take " + std::to_string (k + 1) + ")";
     }
     for (auto& c : song.playlist)
         if (c.track > g.comp && c.track <= g.last + 1 && isAudio (c))

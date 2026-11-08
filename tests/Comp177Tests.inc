@@ -400,7 +400,7 @@ TEST (comp177_comp_these_takes)
     CHECK (std::string (describeChange (beforeComp, song).text) == "Comp takes");
 
     // one comp track above the group: what is above it stays, the group moves down by one
-    CHECK (song.playlistTracks[1].compTrack && song.playlistTracks[1].name == "Vox comp" && ! song.playlistTracks[1].grouped
+    CHECK (song.playlistTracks[1].compTrack && song.playlistTracks[1].name == "Track 2 comp" && ! song.playlistTracks[1].grouped
            && ! song.playlistTracks[1].collapsed);
     CHECK (comp177::onTrack (song, 0).size() == 1 && comp177::onTrack (song, 6).size() == 1);
     CHECK (song.playlistTracks[0].name == "Drums");
@@ -408,7 +408,7 @@ TEST (comp177_comp_these_takes)
     {
         const auto lane = comp177::onTrack (song, 2 + k);
         CHECK (lane.size() == 1 && lane[0].muted && lane[0].offset == k * 1000);
-        CHECK (song.playlistTracks[(std::size_t) (2 + k)].grouped && song.playlistTracks[(std::size_t) (2 + k)].name == "Vox (take " + std::to_string (k + 1) + ")");
+        CHECK (song.playlistTracks[(std::size_t) (2 + k)].grouped && song.playlistTracks[(std::size_t) (2 + k)].name == "Track 2 (take " + std::to_string (k + 1) + ")");
     }
     const auto c = comp177::onTrack (song, 1);
     CHECK (c.size() == 1 && ! c[0].muted && c[0].offset == 2000 && c[0].length == 900);
@@ -445,7 +445,7 @@ TEST (comp177_comp_these_takes)
     CHECK (comp::compTakes (song, 0) == 0);
     CHECK (comp177::onTrack (song, 0).size() == 1 && comp177::onTrack (song, 0)[0].channel == newest);
     CHECK (comp177::onTrack (song, 1)[0].muted && comp177::onTrack (song, 2)[0].muted);
-    CHECK (song.playlistTracks[0].name == "Comp" && song.playlistTracks[1].name == "Take 1" && song.playlistTracks[2].name == "Take 2");
+    CHECK (song.playlistTracks[0].name == "Track 1 comp" && song.playlistTracks[1].name == "Track 1 (take 1)" && song.playlistTracks[2].name == "Track 1 (take 2)");
 }
 
 TEST (comp177_existing_projects_do_not_change)
@@ -474,7 +474,14 @@ TEST (comp177_existing_projects_do_not_change)
     CHECK (comp177::onTrack (comped, 0).size() == 1 && comp177::onTrack (comped, 0)[0].offset == 2000 && ! comp177::onTrack (comped, 0)[0].muted);
     CHECK (comp177::onTrack (comped, 1)[0].offset == 2000 && comp177::onTrack (comped, 1)[0].muted);
     CHECK (comped.playlistTracks[1].mode == PlaylistTrackMode::unassigned);
+    // (round 163 named the group's header after its insert, "Gtr": a header name is kept, as a user's is)
     CHECK (comped.playlistTracks[1].name == "Gtr (take 3)" && comped.playlistTracks[3].name == "Gtr (take 1)");
+
+    // a header the user named gives its name: "<name> comp", "<name> (take N)"
+    auto named = song;
+    named.playlistTracks[0].name = "Lead";
+    CHECK (comp::compTakes (named, 1) == 0);
+    CHECK (named.playlistTracks[0].name == "Lead comp" && named.playlistTracks[1].name == "Lead (take 3)");
 }
 
 TEST (comp177_a_take_never_replaces_clips_of_an_ordinary_group)
@@ -552,4 +559,137 @@ TEST (comp177_blend_starts_off_only_for_new_installs)
     // from then on, the saved answer is what counts
     CHECK (lynx::startingRecordMode (true, true, true) == RecordMode::overdub);
     CHECK (lynx::startingRecordMode (true, true, false) == RecordMode::replace);
+}
+
+TEST (comp177_audition_ends_when_rows_move_and_before_a_render)
+{
+    using namespace lynx;
+    Song song;
+    song.playlistTracks.resize (4);
+    song.playlistTracks[0].compTrack = true;
+    song.playlistTracks[1].grouped = song.playlistTracks[2].grouped = song.playlistTracks[3].grouped = true;
+    song.playlistTracks[1].name = "take 1";
+    song.playlistTracks[2].name = "take 2";
+    song.playlistTracks[3].name = "take 3";
+
+    comp::setAudition (song, 2);
+    CHECK (song.auditionLane == 2 && song.auditionComp == 0);
+    {
+        // an edit that leaves the rows alone keeps it, one that changes it is not undone
+        auto s = song;
+        auto before = comp::auditionedTrack (s);
+        s.bpm = 90.0;
+        comp::checkAudition (s, before);
+        CHECK (s.auditionLane == 2);
+        before = comp::auditionedTrack (s);
+        comp::setAudition (s, 3);
+        comp::checkAudition (s, before);
+        CHECK (s.auditionLane == 3);
+    }
+    {
+        // a row removed above it: that row now holds another take
+        auto s = song;
+        const auto before = comp::auditionedTrack (s);
+        s.playlistTracks.erase (s.playlistTracks.begin() + 1);
+        comp::checkAudition (s, before);
+        CHECK (s.auditionLane == -1 && s.auditionComp == -1);
+    }
+    {
+        // a row inserted above the comp: the lane's row is another row now
+        auto s = song;
+        const auto before = comp::auditionedTrack (s);
+        s.playlistTracks.insert (s.playlistTracks.begin(), PlaylistTrack {});
+        comp::checkAudition (s, before);
+        CHECK (s.auditionLane == -1);
+    }
+    {
+        // nothing auditioned: nothing to compare
+        Song s;
+        CHECK (comp::auditionedTrack (s).lane == -1);
+        comp::checkAudition (s, comp::auditionedTrack (s));
+        CHECK (s.auditionLane == -1);
+    }
+
+    // a render plays the song, not the audition
+    std::int64_t music = 0, loop = 0;
+    song.playlist.push_back ([] { Clip c; c.kind = ClipKind::audio; c.track = 0; c.length = 960; return c; }());
+    const auto rendered = exportopts::makeRenderSong (song, exportopts::Options {}, 0, music, loop);
+    CHECK (rendered.auditionLane == -1 && rendered.auditionComp == -1);
+}
+
+TEST (comp177_undo_labels_for_the_comp_steps)
+{
+    using namespace lynx;
+    Song before;
+    before.playlistTracks.resize (3);
+    before.playlistTracks[0].compTrack = true;
+    before.playlistTracks[1].grouped = before.playlistTracks[2].grouped = true;
+    for (int t = 0; t < 3; ++t)
+    {
+        Clip c;
+        c.kind = ClipKind::audio;
+        c.track = t;
+        c.length = 960;
+        before.playlist.push_back (c);
+    }
+    auto after = before;
+    CHECK (comp::flatten (after, 0));
+    CHECK (std::string (describeChange (before, after).text) == "Flatten comp");
+
+    // a swipe: only the comp track's clips change
+    auto swiped = before;
+    swiped.playlist[0].length = 480;
+    CHECK (std::string (describeChange (before, swiped).text) == "Swipe to comp");
+    // an edit of a lane clip is an ordinary clip edit
+    auto edited = before;
+    edited.playlist[1].length = 480;
+    CHECK (std::string (describeChange (before, edited).text) == "Edit clips");
+}
+
+TEST (comp177_three_ways_to_swipe)
+{
+    using namespace lynx;
+    // the user's choice (2026-11-07): every way works
+    CHECK (comp::swipeStyle == comp::SwipeStyle::both);
+    // 1. a plain drag (the pencil) and 2. a Draw-mode drag (the brush) both swipe
+    CHECK (comp::dragSwipes (comp::swipeStyle, false) && comp::dragSwipes (comp::swipeStyle, true));
+    // (Live's own way would leave the pencil alone)
+    CHECK (! comp::dragSwipes (comp::SwipeStyle::liveSelectEnter, false) && comp::dragSwipes (comp::SwipeStyle::liveSelectEnter, true));
+    // 3. a time selection sent to the comp, the same edit as a swipe of that range
+    CHECK (comp::selectionSwipes (comp::swipeStyle) && ! comp::selectionSwipes (comp::SwipeStyle::quickSwipe));
+    auto song = comp177::loopTakes(); // comp track 0, lanes 1..3
+    const auto c = 0;
+    CHECK (comp::isComp (song, c));
+    const auto g = comp::groupOf (song, c);
+    auto bySelection = song, bySwipe = song;
+    bySelection.loopStart = 1200;
+    bySelection.loopEnd = 1500;
+    bySwipe.loopStart = 1200;
+    bySwipe.loopEnd = 1500;
+    CHECK (comp::swipeSelection (bySelection, g.first));
+    CHECK (comp::swipe (bySwipe, g.first, 1200, 1500));
+    CHECK (bySelection.playlist.size() == bySwipe.playlist.size());
+    for (std::size_t i = 0; i < bySwipe.playlist.size() && i < bySelection.playlist.size(); ++i)
+        CHECK (bySelection.playlist[i].track == bySwipe.playlist[i].track && bySelection.playlist[i].start == bySwipe.playlist[i].start
+               && bySelection.playlist[i].length == bySwipe.playlist[i].length && bySelection.playlist[i].offset == bySwipe.playlist[i].offset);
+    // no time selection, the comp track itself, an ordinary group: nothing happens
+    auto none = song;
+    none.loopStart = none.loopEnd = 0;
+    CHECK (! comp::swipeSelection (none, g.first));
+    auto onComp = song;
+    onComp.loopStart = 1200;
+    onComp.loopEnd = 1500;
+    CHECK (! comp::swipeSelection (onComp, c));
+    auto plain = song; // the same rows as an ordinary group: no comp mark
+    plain.playlistTracks[0].compTrack = false;
+    plain.loopStart = 1200;
+    plain.loopEnd = 1500;
+    const auto before = plain.playlist.size();
+    CHECK (! comp::swipeSelection (plain, 1) && plain.playlist.size() == before);
+
+    // the command: in the shortcut editor, no default key; Enter stays FL's "Maximize or restore the Playlist"
+    const auto* action = keys::findAction ("playlist.swipeSelectionToComp");
+    CHECK (action != nullptr && action->defaults.empty());
+    keys::KeyMap map;
+    CHECK (map.find ({ keys::enter, keys::none }, keys::Context::global, false) == "panel.maximisePlaylist");
 }

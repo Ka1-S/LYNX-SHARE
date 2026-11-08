@@ -210,6 +210,21 @@ ChangeLabel describeChange (const Song& before, const Song& after)
         };
         if (comps (after) > comps (before))
             return label (TR_NOOP ("Comp takes"));
+        if (comps (after) < comps (before) && after.playlistTracks.size() < before.playlistTracks.size())
+            return label (TR_NOOP ("Flatten comp"));
+        // a swipe changes only the comp tracks' clips
+        if (comps (after) > 0 && comps (after) == comps (before) && after.playlistTracks.size() == before.playlistTracks.size())
+        {
+            const auto onComp = [] (const Song& song, bool comp) {
+                std::vector<Clip> out;
+                for (const auto& c : song.playlist)
+                    if (c.track >= 0 && c.track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) c.track].compTrack == comp)
+                        out.push_back (c);
+                return out;
+            };
+            if (sameClips (onComp (before, false), onComp (after, false)) && ! sameClips (onComp (before, true), onComp (after, true)))
+                return label (TR_NOOP ("Swipe to comp"));
+        }
         if (after.playlist.size() > before.playlist.size())
             return label (TR_NOOP ("Add clips"));
         if (after.playlist.size() < before.playlist.size())

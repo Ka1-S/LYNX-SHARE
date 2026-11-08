@@ -139,6 +139,7 @@ public:
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
+    void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
@@ -179,7 +180,11 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
+                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe };
+    void swipeTimeSelectionToComp (int lane);
+    // a swipe on a take lane (round 177c): the lane and the range so far
+    int swipeLane = -1;
+    std::int64_t swipeAnchor = 0, swipeEnd = 0;
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
     std::int64_t perfClip = -1;
@@ -345,6 +350,7 @@ private:
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.
     juce::Rectangle<int> trackArm (int track) const;
     juce::Rectangle<int> trackInput (int track) const;
+    juce::Rectangle<int> trackAudition (int track) const;
     static constexpr int inputButtonMinHeight = 52; // FL shows the row of buttons from 150 % of its track height
     void editTrack (int track, std::function<void (PlaylistTrack&)> change);
     int currentTrack = -1; // the track selected by a click on its header (FL marks it next to the LED)
@@ -450,7 +456,7 @@ private:
     {
         int clip = -1, track = -1;
         gesture::Target target = gesture::Target::empty;
-        bool header = false, led = false, arrow = false, arm = false, input = false;
+        bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         bool operator== (const Hover& o) const
         {

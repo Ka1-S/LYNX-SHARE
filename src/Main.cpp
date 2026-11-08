@@ -9515,6 +9515,25 @@ private:
                     offline.dispatchPendingMessages();
                     saveSnapshot (ui, prefix + "-swiped.png");
                     listTracks ("after a swipe of the middle of the first lane");
+
+                    // a lane auditioned; the crossfade close up; the comp flattened
+                    offline.editSong ([&g] (lynx::Song& s) { lynx::comp::setAudition (s, g.first); }, false);
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-audition.png");
+                    offline.editSong ([] (lynx::Song& s) { lynx::comp::setAudition (s, -1); }, false);
+
+                    const auto switchAt = from + (to - from) / 4;
+                    playlist.setViewForSnapshot (4.0 * 4.0 * lynx::ppq, 0, 0);
+                    playlist.setScrollTickForSnapshot ((double) (switchAt - 100));
+                    juce::Thread::sleep (1500);
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-crossfade.png");
+                    playlist.setViewForSnapshot (juce::jmax (60.0, (ui.getWidth() - 300.0) / bars), 0, 0);
+
+                    offline.editSong ([comp] (lynx::Song& s) { lynx::comp::flatten (s, comp); });
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-flattened.png");
+                    listTracks ("after Flatten comp");
                 }
             }
             saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getRecordMenuForSnapshot() }, prefix + "-recordmenu.png");
