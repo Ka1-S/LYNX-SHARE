@@ -1562,16 +1562,17 @@ public:
 
         if (args.contains ("--stems"))
         {
-            // LYNX.exe --stems project base.wav: one WAV per insert that has sound (like "Export stems")
+            // LYNX.exe --stems project.(flp|als|lynx) base.wav: one WAV per insert that has sound (like "Export stems")
             const auto i = args.indexOf ("--stems");
             juce::String error, report;
             int written = 0;
             {
                 lynx::AudioEngine loader (false);
                 const juce::File input (args[i + 1].unquoted()), base (args[i + 2].unquoted());
-                auto ok = input.hasFileExtension ("flp") ? loader.importFlpFile (input, error) : false;
+                // an .flp or a Live set (.als) opens through the import, as File › Open does (round 182b)
+                auto ok = input.hasFileExtension ("flp;als") ? loader.importFlpFile (input, error) : false;
 
-                if (! input.hasFileExtension ("flp"))
+                if (! input.hasFileExtension ("flp;als"))
                     if (auto song = lynx::ProjectFile::load (input, error))
                     {
                         loader.setSong (std::move (*song));
@@ -7074,7 +7075,7 @@ private:
         quit();
     }
 
-    // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
+    // LYNX.exe --export-flp project.(lynx|flp|als) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
     // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
     // report goes to output.txt
     void runAlsExport (const juce::String& inputPath, const juce::String& folderPath, bool live11, bool reference)
@@ -7136,7 +7137,8 @@ private:
         {
             lynx::AudioEngine loader (false);
             const juce::File input (inputPath);
-            if (input.hasFileExtension ("flp"))
+            // a Live set opens through the same import as an .flp (as File › Open does, and --export-als accepts an .flp)
+            if (input.hasFileExtension ("flp;als"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
@@ -7177,7 +7179,7 @@ private:
         quit();
     }
 
-    // LYNX.exe --export project.(flp|lynx) output.(wav|flac|ogg|mp3) [--pattern] [--insert N] [--rate N]
+    // LYNX.exe --export project.(flp|als|lynx) output.(wav|flac|ogg|mp3) [--pattern] [--insert N] [--rate N]
     // Same path as "Export" in the UI: the whole song (or the current pattern) with its tail.
     void runExport (const juce::String& inputPath, const juce::String& outputPath, bool patternOnly, int insert)
     {
@@ -7211,7 +7213,7 @@ private:
                     }
             }
 
-            if (input.hasFileExtension ("flp"))
+            if (input.hasFileExtension ("flp;als")) // a Live set opens through the same import (round 182b)
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
