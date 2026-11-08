@@ -4,6 +4,7 @@
 #include "ui/AdrWindow.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
 #include "ui/FileChoosers.h"
@@ -510,6 +511,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
+    playlist.onViewOptionChanged = [this] { saveUiSettings(); };
     playlist.onOpenInSampler = [this] (int channel) {
         // the audio clip's file in a new Sampler channel (to play it from notes), its settings open
         const auto& song = engine.getSong();
@@ -1568,6 +1570,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);
+    // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
+    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (chord).taken, typingIntoText))
+        return keyPressed (key);
     const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
     return ! action.empty() && runAction (action);
 }
@@ -1984,6 +1989,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
+            autolanes::setShown (on);
         else if (key == "alternateUndo")
             alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
@@ -2048,6 +2055,8 @@ void MainComponent::loadUiSettings()
             chordShowNearHint = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
+        else if (key == "autoClipsAtPlayback")
+            autoclipplace::setAtPlayback (on);
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
             startInClipLaunchWorkflow = on;
         else if (key == "lanesBeforeClipLaunch")
@@ -2188,6 +2197,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
@@ -2216,6 +2226,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
+                                      + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
@@ -2726,6 +2737,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
+            action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
             action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
@@ -5393,7 +5405,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.zip;*.lynxpack;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.flm;*.zip;*.lynxpack;*.mid;*.midi");
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -5467,7 +5479,8 @@ void MainComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("flp;als")) // (a Live set takes the .flp import's path, round 175a)
+    // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl"))
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -5516,7 +5529,9 @@ void MainComponent::flpImported (const juce::File& file)
         importedFlpFile = file;
         projectName = file.getFileNameWithoutExtension();
         rememberRecent (file);
-        importedSuffix = " " + (file.hasFileExtension ("als") ? tr ("(imported from .als)") : tr ("(imported from FL Studio)"));
+        importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
+                                : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
+                                                                         : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
 
@@ -5612,6 +5627,7 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
+        o.autoClipsAtPlayback = autoclipplace::atPlayback();
         o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -5690,6 +5706,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
         self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
@@ -5840,6 +5857,56 @@ void MainComponent::showMissingFiles (bool afterOpening)
             if (safe != nullptr && afterOpening && fromFlp)
                 safe->showImportReport();
         });
+}
+
+juce::PopupMenu MainComponent::makeSwitchAudioClipsMenu (bool selectedOnly)
+{
+    // FL's groups where LYNX has a match (Realtime: Resample), LYNX's stretch engine, and its Ableton-style warp modes
+    juce::PopupMenu m;
+    auto item = [this, &m, selectedOnly] (const char* name, bool keepPitch, StretchMethod method) {
+        m.addItem (tr (name), [this, selectedOnly, keepPitch, method, name] { switchAudioClips (selectedOnly, keepPitch, method, tr (name)); });
+    };
+    m.addSectionHeader (tr ("Realtime"));
+    item (TR_NOOP ("Resample"), false, StretchMethod::general);
+    m.addSectionHeader (tr ("Stretch engine"));
+    item (TR_NOOP ("General"), true, StretchMethod::general);
+    item (TR_NOOP ("Drums / transients"), true, StretchMethod::transients);
+    item (TR_NOOP ("Vocal / mono"), true, StretchMethod::mono);
+    m.addSectionHeader (tr ("Warp (Ableton-style)"));
+    item (TR_NOOP ("Beats"), true, StretchMethod::beats);
+    item (TR_NOOP ("Tones"), true, StretchMethod::tones);
+    item (TR_NOOP ("Texture"), true, StretchMethod::texture);
+    item (TR_NOOP ("Complex"), true, StretchMethod::complex);
+    return m;
+}
+
+void MainComponent::switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName)
+{
+    // FL's FUN_01213a20 (REA round 181b): the error when there is none, else a question, then the change (undoable)
+    std::vector<int> channels;
+    if (selectedOnly)
+        channels = engine.getSelectedChannels();
+    else
+        for (int i = 0; i < (int) engine.getSong().channels.size(); ++i)
+            channels.push_back (i);
+    if (audioClipsAmong (engine.getSong(), channels) == 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                selectedOnly ? tr ("No audio clip channels were selected.") : tr ("No audio clip channels were found."));
+        return;
+    }
+    const auto text = selectedOnly ? tr ("Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName })
+                                   : tr ("All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Confirm"))
+                       .withMessage (text)
+                       .withButton (tr ("OK"))
+                       .withButton (tr ("Cancel"));
+    juce::AlertWindow::showAsync (options, [this, channels, keepPitch, method] (int result) {
+        if (result == 1)
+            engine.editSong ([&channels, keepPitch, method] (Song& s) { setStretchOfAudioClips (s, channels, keepPitch, method); });
+    });
 }
 
 void MainComponent::saveClipboardToBrowser (bool midi)
@@ -6239,6 +6306,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             pianoRoll.runAction ("pianoRoll.chordProgression");
         });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
+        menu.addItem (tr ("Modulators..."), [this] { openModulators (engine); }); // round 177b: LYNX's own (FL has none)
         // FL's Clipboard and Score logger sections, in FL's place (round 181b)
         menu.addSectionHeader (tr ("Clipboard"));
         menu.addItem (tr ("Save audio clipboard to browser"), audioclipboard::hasAudio(), false, [this] { saveClipboardToBrowser (false); });
@@ -6281,6 +6349,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
         menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
+        // FL's two Switch items, with LYNX's own modes inside (user's decision, round 181b)
+        menu.addSubMenu (tr ("Switch all audio clip channels to"), makeSwitchAudioClipsMenu (false));
+        menu.addSubMenu (tr ("Switch selected audio clip channels to"), makeSwitchAudioClipsMenu (true));
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });

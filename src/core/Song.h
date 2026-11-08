@@ -134,8 +134,10 @@ enum class InstrumentKind : std::uint8_t
                 // pluginState; plays the video's sound in sync with the song, the video is shown by its editor
     keplerExo,  // FL 2026's Kepler Exo (REA_rodada167d): Kepler's engine with the "Kepler-2" state in pluginState, the user's
                 // Kepler Exo engine_x64.dll in samplePath
-    wavetraveller // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
-                  // the channel's sample in samplePath
+    wavetraveller, // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
+                   // the channel's sample in samplePath
+    fruityslicer   // FL's Fruity Slicer (round 180c, core/FruitySlicer.h): FL's state (slices, fades, declick...) in pluginState,
+                   // the sample in samplePath; the sampler's voices play the slices
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
@@ -331,6 +333,11 @@ struct SamplerSettings
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
                                // the precompute crops it, REA_rodada167h §4)
     std::vector<float> slices; // slices (starts as fractions): key 60 + i plays slice i, at the original pitch
+    // Fruity Slicer (round 180c, set from its state when the rack is built, not saved): the key of slice 1, and "play to
+    // end" (a slice plays on to the sample's end instead of stopping at the next slice)
+    int sliceFirstKey = 60;
+    bool slicesToEnd = false;
+    bool slicesCutAtEnd = false; // Fruity Slicer: a slice's voice stops at its end (no 10 ms end fade; FL render)
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats
     float cutoff = 20000.0f;   // channel filter (Hz); low-pass at 20 kHz with no resonance = off
@@ -1324,11 +1331,56 @@ struct AutomationPoint
     bool operator== (const AutomationPoint&) const = default;
 };
 
+// Value of a point list at `tick` (before the first point = first value; after the last = last; tension bends a segment).
+float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept;
+
+// FL's automation clip LFO ("LFO mode", REA round 177b: TACArticulator's TMLFO, .flp event 0xEA after the points;
+// docs/analise/REA_rodada177b.md §LFO). Off: the clip plays its points only. On: a waveform (triangle bent by tension,
+// skew and pulse width) whose amplitude follows the LFO's own points over the clip's time, added to or multiplying
+// the clip's value.
+struct AutomationLfo
+{
+    bool on = false;        // FL's LFO enabled LongBool (the "LFO" box / the editor's LFO button)
+    int level = 64;         // -128..128 (FL's "LFO level")
+    bool add = false;       // FL's "Multiply" box unchecked: the LFO is added (checked: multiplies the envelope level)
+    int flags = 1;          // FL's bits: 1 tempo, 2 global phase, 4 unipolar tension, 8 frozen
+    int speed = 45819;      // 512..65536 (45819 = one cycle per beat, FL's default for a new clip)
+    int tension = 0, skew = 0; // -128..128
+    int pulseWidth = 0;     // -112..112
+    std::uint32_t phase = 0; // start phase, a fraction of a cycle × 2^32
+    float range = 1.0f;     // the clip's range in the target's 0..1 (an imported FL clip's levels)
+    std::vector<AutomationPoint> amp { { 0, 1.0f, 0.0f } }; // the LFO's amplitude over the clip's time (≥ 1 point)
+
+    // FL's articulator fields LYNX does not use, kept so an imported .flp clip writes back byte for byte
+    struct Fl
+    {
+        bool present = false;
+        std::int32_t mainFlags = 1, mainEnabled = -1;
+        std::array<std::int32_t, 3> mainLoop { -1, -1, -1 };
+        std::array<std::int32_t, 4> adsr { 128, 128, 0, 128 };
+        std::array<std::int32_t, 3> lfoLoop { -1, -1, -1 };
+        std::vector<std::uint8_t> rawPoints;    // the LFO's point records as read (24 B each)
+        std::vector<AutomationPoint> rawAmp;    // `amp` as decoded from them (unchanged = write rawPoints)
+        bool operator== (const Fl&) const = default;
+    } fl;
+
+    bool isDefault() const noexcept;        // what FL writes for a clip whose LFO was never touched
+    // The value played: `value` (the clip's own curve) with the LFO at `clipTick` (ticks from the clip's start, its
+    // offset included) and `songTick` (the global phase).
+    float apply (float value, double clipTick, double songTick) const noexcept;
+    float output (double clipTick, double songTick) const noexcept; // the LFO alone: amplitude × waveform, -1..1
+    static double cyclesPerBeat (int speed) noexcept;               // FL's speed → rate (FUN_00ba03d0)
+    static int speedForBeats (double beatsPerCycle) noexcept;       // the inverse (FUN_00ba0490)
+    static float shape (std::uint32_t phase, int tension, int skew, int pulseWidth, bool unipolar) noexcept;
+    bool operator== (const AutomationLfo&) const = default;
+};
+
 struct Automation
 {
     std::string name;
     AutomationTarget target;
     std::vector<AutomationPoint> points; // sorted by tick (kept by the editor)
+    AutomationLfo lfo;                   // round 177b: FL's clip LFO (off by default: no cost)
 
     // Live source (FL controller link, REA_rodada14 §7): the value comes from output `output` of the
     // controller effect in slot (track, slot), passed through the curve (points evenly spaced over 0..1; empty =
@@ -1346,8 +1398,42 @@ struct Automation
 
     // Value at `tick` (before the first point = first value; after the last = last).
     float valueAt (double tick) const noexcept;
+    // What plays at `tick` of the automation (clip time, offset included) at song position `songTick`: valueAt plus
+    // the LFO when it is on.
+    float playAt (double tick, double songTick) const noexcept { return lfo.on ? lfo.apply (valueAt (tick), tick, songTick) : valueAt (tick); }
     std::int64_t length() const noexcept; // tick of the last point (minimum 1)
     bool operator== (const Automation&) const = default;
+};
+
+// Round 177b: LYNX's modulators (not FL: FL's controllers stay as they are). A modulator moves its targets around their
+// own value (relative, as Bitwig's and Live's "Mod"): the played value = clamp (the knob's value, or its automation, +
+// depth × the modulator's output). Off the audio thread nothing is made until the first modulator exists.
+struct Song;
+enum class ModShape : std::uint8_t { sine, triangle, sawUp, sawDown, square, random, smoothRandom };
+
+struct ModRoute
+{
+    AutomationTarget target;
+    float depth = 0.25f; // -1..1 of the target's whole range
+    bool operator== (const ModRoute&) const = default;
+};
+
+struct Modulator
+{
+    std::string name;            // "LFO 1"
+    ModShape shape = ModShape::sine;
+    bool sync = true;            // tempo-synced: `beats` per cycle; free: `hz`
+    double beats = 4.0;          // cycle length in quarter notes (synced)
+    double hz = 1.0;             // cycles per second (free)
+    float phase = 0.0f;          // start phase, 0..1 of a cycle
+    bool unipolar = false;       // 0..1 instead of -1..1
+    std::uint32_t seed = 1;      // the random shapes' sequence
+    std::vector<ModRoute> routes;
+    bool operator== (const Modulator&) const = default;
+
+    // The output at `cycles` (cycles since the song start, or since the modulator started when free).
+    float output (double cycles) const noexcept;
+    static bool canModulate (const Song& song, const AutomationTarget& target) noexcept; // LYNX's own controls
 };
 
 // A block in the Playlist: a section of a pattern, or a section of an audioClip channel's audio.
@@ -1484,6 +1570,16 @@ struct TrackPerformance
     bool operator== (const TrackPerformance&) const = default;
 };
 
+// Round 177b: an optional automation lane under a Playlist track (Live / Bitwig style, next to FL's clips): the
+// automation's points are in song time and play over the whole song; where an automation clip of the same target
+// plays, the clip wins (Bitwig's rule). Display only: `height` (px, 0 = default).
+struct AutomationLane
+{
+    int automation = -1; // index into Song::automations
+    int height = 0;
+    bool operator== (const AutomationLane&) const = default;
+};
+
 // Header of a Playlist track.
 struct PlaylistTrack
 {
@@ -1512,6 +1608,8 @@ struct PlaylistTrack
     // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
     int lockedHeight = -1;
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
+    std::vector<AutomationLane> lanes {}; // round 177b: optional automation lanes (shared by every arrangement)
+    bool lanesFolded = false;          // the lanes are hidden under the track
     bool operator== (const PlaylistTrack&) const = default;
 };
 
@@ -1734,6 +1832,9 @@ struct Song
         for (auto& p : patterns)
             for (auto& lane : p.events)
                 fn (lane.target);
+        for (auto& m : modulators)
+            for (auto& r : m.routes)
+                fn (r.target);
     }
     void removeDeadMidiLinks();
 
@@ -1853,6 +1954,7 @@ struct Song
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
+    std::vector<Modulator> modulators; // round 177b: LYNX's modulators (empty: no cost)
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
     // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks
     std::vector<VideoTrack> videoTracks;

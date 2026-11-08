@@ -191,7 +191,7 @@ Live crashes on a set that is merely well-formed. It either exits or shows "A se
 3. **`NextPointeeId`.** It must be greater than the largest id in the file, or Live reports "NextPointeeId is too low: X must be bigger than Y".
 4. **Envelopes.** An `AutomationEnvelope` whose `EnvelopeTarget/PointeeId` names a missing id is fatal ("Invalid Pointee ID … in APtr …").
 5. **Sends.** `Mixer/Sends` and the set's `SendsPre` have exactly one entry per ReturnTrack.
-6. **Clip slots.** Each track's `ClipSlotList`, and its `FreezeSequencer` `ClipSlotList`, has exactly one `ClipSlot` per Scene.
+6. **Clip slots.** Each MIDI and audio track's `ClipSlotList`, and its `FreezeSequencer` `ClipSlotList`, has exactly one `ClipSlot` per Scene. Group and return tracks have none: their `FreezeSequencer` `ClipSlotList` is empty, and a return track's own `Mixer/Sends` holders are `EnabledByUser` false, as Live saves them (round 182b: Live 12.4 crashed with an access violation on exports whose return track broke this).
 7. **Saving.** Live saves only inside a project folder: `<name> Project/<name>.als`, next to `Ableton Project Info/`. The exporter writes that layout.
 
 LYNX's exporter (slice N2) therefore emits each element kind from its own generator. The generator writes every member name in Live's order with default values (format facts recorded here), then numbers the ids and sets `NextPointeeId`. It does not ship or copy Live's own files. A prototype (`tools/complete.py`) produced `probe/p1/probeD6.als`, which opens in Live with a MIDI clip, a warped audio clip and a locator.

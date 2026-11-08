@@ -1,3 +1,4 @@
+#include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 
 #include <algorithm>
@@ -79,6 +80,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::midiOut, "MIDI Out", false },        { InstrumentKind::voltage, "Fruity Voltage Controller", false },
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
+    { InstrumentKind::fruityslicer, "Fruity Slicer", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -1235,6 +1237,36 @@ struct Converter
             }
             if (c.automation.empty())
                 c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
+            // FL's clip LFO (round 177b): the fields back as they were read; the level carries the clip's range (FL scales
+            // the LFO by its channel range, written whole here)
+            if (const auto& lfo = src.lfo; ! lfo.isDefault())
+            {
+                auto& f = c.automationLfo;
+                f.present = true;
+                f.enabled = lfo.on ? -1 : 0;
+                f.level = std::abs (lfo.range - 1.0f) < 1.0e-6f ? lfo.level : (int) std::lround (lfo.level * lfo.range);
+                f.mode = lfo.add ? 1 : 0;
+                f.flags = lfo.flags;
+                f.speed = lfo.speed;
+                f.tension = lfo.tension;
+                f.skew = lfo.skew;
+                f.pulseWidth = lfo.pulseWidth;
+                f.phase = lfo.phase;
+                if (lfo.fl.present)
+                {
+                    f.mainFlags = lfo.fl.mainFlags;
+                    f.mainEnabled = lfo.fl.mainEnabled;
+                    f.mainLoop = lfo.fl.mainLoop;
+                    f.adsr = lfo.fl.adsr;
+                    f.lfoLoop = lfo.fl.lfoLoop;
+                }
+                f.points.clear();
+                for (std::size_t i = 0; i < lfo.amp.size(); ++i)
+                    f.points.push_back ({ (double) lfo.amp[i].tick / ppq, (double) std::clamp (lfo.amp[i].value, 0.0f, 1.0f),
+                                          i > 0 ? -lfo.amp[i - 1].tension : 0.0f, 0 });
+                if (lfo.amp == lfo.fl.rawAmp && lfo.fl.rawPoints.size() == lfo.amp.size() * 24)
+                    f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
+            }
             automationChannel[a] = c.index;
             if (id)
                 out.automationLinks.push_back ({ c.index, *id });
@@ -1611,6 +1643,14 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
+    if (const auto n = autolanes::lanesToClips (song); n > 0)
+        report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
+    // modulators (round 177b): FL has none; the modulated controls keep their own values
+    for (const auto& m : song.modulators)
+        if (! m.routes.empty())
+            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
+                                      + " target(s)): FL has no modulators; the targets keep their own values");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);
