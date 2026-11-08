@@ -157,7 +157,7 @@ mapping (macro → chain 1 volume) left in, which silenced chain 1, so the Audio
 
 All three laws are in `core/Rack.cpp` (`fadeGain`, `selectOutputGain`, `panGains`, `volumeGain`) with these values as tests.
 
-## 9. Design proposal (sent to the coordinator 2026-11-08; waiting for the OK)
+## 9. Design (approved by the coordinator 2026-11-08 with R1 and R2 as recommended)
 ### 9.1 Where a Rack lives (add, never remove)
 - **Audio Effect Rack** = a mixer insert slot whose effect is a Patcher in *rack mode* (`EffectKind::patcher` with
   `PatcherDoc::rack`). It shows in the Mixer slot list like any effect, opens in its own window in Pattern workflow, and
@@ -165,9 +165,10 @@ All three laws are in `core/Rack.cpp` (`fadeGain`, `selectOutputGain`, `panGains
 - **Instrument Rack** = a Channel Rack generator, `InstrumentKind::patcher` in rack mode. It plays through its mixer
   insert like any channel; in the Device View it takes the instrument card's place (`instrumentCardFactory`).
 - **MIDI Effect Rack**: (a) the MIDI section at the head of an Instrument Rack chain (VFX nodes and MIDI-effect plugins),
-  and (b) **decision R1**: standalone, as a generator that plays other channels. Recommended: like FL's Layer ("Set
-  children": the selected channels), so FL users find it where they expect a note splitter; alternative: like FL's VFX
-  generators (it sends on a MIDI port the target channels listen to).
+  and (b) **decision R1 (approved)**: standalone, as a generator that plays its child channels, like FL's Layer ("Set
+  children"). The model holds the children (`RackDoc::children`) and the compiled chains end on "To LYNX" MIDI port 0;
+  routing that port to the children is the engine step still open, so the add menus don't offer the standalone MIDI
+  Effect Rack yet.
 - No new `EffectKind` / `InstrumentKind`: save/load, undo, plugin state, automation, FL import/export and the Mixer
   already handle Patchers. A plain Patcher stays FL's Patcher; rack mode only exists when created as a Rack.
 
@@ -209,15 +210,19 @@ channel's window. Left to right, as in Live [SHOT]:
 ```
 - Map mode: Map buttons under the macros; mappable knobs anywhere in the rack get a highlight; the mapping list (Macro,
   Path, Name, Min, Max) opens as a side panel in the rack window and as a pop-up list in the Device View (LYNX has no
-  browser slot to take over in Pattern workflow; **decision R2**: OK as a panel?).
+  browser slot to take over in Pattern workflow; **decision R2 (approved)**). Picking a target: a macro's Map button
+  opens a menu of the rack's chains › devices › parameters, the chains' volume / pan and the chain selector (Live
+  highlights the parameters themselves; LYNX's devices have their own windows, so the menu is the way in).
 - Pattern workflow: nothing changes unless a Rack is added (Mixer slot menu › "Audio Effect Rack", Channel Rack
   › Add › "Instrument Rack"; "Group into Audio Effect Rack" on a multi-selection of slots, Ctrl+G in the Device View).
 - Strings in every language file; the rack window keeps FL-style window behaviour (detach, close, remember position).
 
 ### 9.5 Variations and the morph (slice c)
-Live-exact variations (§5). The LYNX extra (D6, off by default; rack menu › "Variation morph"): a **Morph** knob
-between variation A and B (two pickers) that moves every non-excluded macro linearly from A's value to B's, automatable
-(published parameter 17), and a **Glide** time for launches (0 = Live's instant jump). Off = Live's panel exactly.
+Live-exact variations (§5). The LYNX extras (D6, both off by default, in the variations' right-click menu): "Variation
+morph (LYNX)" shows a **Morph** slider between variation A and B ("Morph from / to this variation") that moves every
+macro both hold and that isn't excluded linearly from A's value to B's; in the graph the morphing macros' cables come
+from the Morph control (automatable: published parameter 17). "Launch glide (LYNX)" (Off, 100 ms … 4 s) moves the
+macros to a launched variation over that time instead of Live's instant jump. Off = Live's panel exactly.
 
 ### 9.6 .als (slice d)
 Import: `AudioEffectGroupDevice` / `InstrumentGroupDevice` / `MidiEffectGroupDevice` → racks with chains, zones,

@@ -105,3 +105,8 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [x] Clips with several warp markers at different rates: kept, rendered segment by segment (round 175a, M1; editing them = M3)
 - [ ] LYNX's built-in instruments and effects in exported sets (N3; listed in the export report for now)
 - [ ] Session view (N5) and an optional Live-style layout (N6)
+- [x] Racks (round 183c, `docs/analise/REA_rodada183c.md`): Audio Effect and Instrument Racks as a Patcher in rack mode,
+      with chains, key / velocity / chain-select zones (Live's measured fade laws), chain volume / pan / solo, 16 macros
+      with Map mode, variations, Randomize; LYNX's optional variation morph and launch glide; .als import / export
+- [ ] Standalone MIDI Effect Rack playing its child channels (decision R1: the engine routing is still open)
+- [ ] VST3 parameter mappings in .als racks (Live stores plain units and parameter ids)

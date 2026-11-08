@@ -1373,12 +1373,71 @@ std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
     return a;
 }
 
+namespace
+{
+// Map mode in a title bar that isn't the rack's own (the Device View card, decision R2): the mapping list as a pop-up
+// next to the rack, drawn and handled by the rack view itself
+struct MapListPopup final : juce::Component, private juce::Timer
+{
+    juce::Component::SafePointer<RackView> view;
+    std::function<void (juce::Graphics&, juce::Rectangle<int>)> paintList;
+    std::function<void (const juce::MouseEvent&, juce::Rectangle<int>, int)> mouse; // (0 down, 1 drag, 2 up)
+    MapListPopup()
+    {
+        setSize (mapListWidth, 220);
+        startTimerHz (15);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        if (view != nullptr)
+            paintList (g, getLocalBounds());
+    }
+    void mouseDown (const juce::MouseEvent& e) override { if (view != nullptr) mouse (e, getLocalBounds(), 0); }
+    void mouseDrag (const juce::MouseEvent& e) override { if (view != nullptr) mouse (e, getLocalBounds(), 1); }
+    void mouseUp (const juce::MouseEvent& e) override { if (view != nullptr) mouse (e, getLocalBounds(), 2); }
+    void timerCallback() override { repaint(); }
+};
+} // namespace
+
 void RackView::setMapMode (bool on)
 {
     mapping = on;
     impl->map.setToggleState (on, juce::dontSendNotification);
     resized();
     repaint();
+    if (on && ! impl->ownHeader && isShowing())
+    {
+        auto popup = std::make_unique<MapListPopup>();
+        popup->view = this;
+        juce::Component::SafePointer<RackView> safe (this);
+        popup->paintList = [safe] (juce::Graphics& g, juce::Rectangle<int> area) {
+            if (safe == nullptr || safe->impl->rack() == nullptr)
+                return;
+            const auto saved = safe->impl->mapList;
+            safe->impl->mapList = area;
+            safe->impl->paintMapList (g, *safe->impl->rack());
+            safe->impl->mapList = saved;
+        };
+        popup->mouse = [safe] (const juce::MouseEvent& e, juce::Rectangle<int> area, int phase) {
+            if (safe == nullptr || safe->impl->rack() == nullptr)
+                return;
+            auto& impl = *safe->impl;
+            const auto saved = impl.mapList;
+            impl.mapList = area;
+            impl.dragStart = phase == 0 ? e.getPosition() : impl.dragStart;
+            if (phase == 0)
+            {
+                impl.drag = Impl::Drag::none;
+                impl.mapListDown (e, *impl.rack());
+            }
+            else if (phase == 1)
+                impl.mouseDrag (e);
+            else
+                impl.mouseUp (e);
+            impl.mapList = saved;
+        };
+        juce::CallOutBox::launchAsynchronously (std::move (popup), getScreenBounds().withWidth (40), nullptr);
+    }
 }
 
 void RackView::paint (juce::Graphics& g) { impl->paint (g); }
