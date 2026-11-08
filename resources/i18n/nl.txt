@@ -7882,3 +7882,4 @@ countries: nl be
 "Rename macro" = "Macro hernoemen"
 "Rename variation" = "Variatie hernoemen"
 "Variation morph (LYNX)" = "Morph tussen variaties (LYNX)"
+"Launch glide (LYNX)" = "Glijden bij starten (LYNX)"

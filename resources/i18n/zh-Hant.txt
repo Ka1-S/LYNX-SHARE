@@ -7882,3 +7882,4 @@ countries: tw hk mo
 "Rename macro" = "重新命名巨集"
 "Rename variation" = "重新命名變體"
 "Variation morph (LYNX)" = "變體之間變形 (LYNX)"
+"Launch glide (LYNX)" = "啟動時滑移 (LYNX)"

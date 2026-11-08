@@ -2925,11 +2925,23 @@ private:
             const auto json = lynx::ProjectFile::toJson (song);
             const auto back = lynx::ProjectFile::fromJson (json, error);
             // (the devices' parameters are stored to 4 decimals: the documents are compared as stored, the rack exactly)
-            if (! back || back->mixer.size() < 2 || back->mixer[1].effects.size() != 1 || back->mixer[1].effects[0].patcher.rack != doc.rack
-                || back->mixer[1].effects[0].patcher.wires != doc.wires || back->mixer[1].effects[0].patcher.zones != doc.zones
-                || back->channels.back().patcher.rack != inst.patcher.rack || back->channels.back().patcher.wires != inst.patcher.wires
-                || back->channels.back().patcher.zones != inst.patcher.zones || lynx::ProjectFile::toJson (*back) != json)
-                rackResult = "ERROR rack save / load";
+            const auto loaded = back && back->mixer.size() >= 2 && back->mixer[1].effects.size() == 1;
+            const auto& got = loaded ? back->mixer[1].effects[0].patcher : doc;
+            if (! loaded)
+                rackResult = "ERROR rack slot not loaded";
+            else if (got.rack != doc.rack)
+                rackResult = "ERROR rack model";
+            else if (got.wires != doc.wires)
+                rackResult = "ERROR rack cables";
+            else if (got.nodes.size() != doc.nodes.size())
+                rackResult = "ERROR rack devices";
+            else if (back->channels.back().patcher.rack != inst.patcher.rack || back->channels.back().patcher.wires != inst.patcher.wires
+                     || back->channels.back().patcher.zones != inst.patcher.zones || back->channels.back().patcher.nodes.size() != inst.patcher.nodes.size())
+                rackResult = "ERROR instrument rack";
+            // the slot's insert as stored, once more: the same text (the stored form is stable)
+            else if (const auto once = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (back->mixer[1]), true);
+                     once != juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (lynx::ProjectFile::mixerTrackFromVar (juce::JSON::parse (once))), true))
+                rackResult = "ERROR rack stored form not stable";
         }
 
         // FL engines in a native project (round 142, issue #5): every engine this PC can make survives save / load and

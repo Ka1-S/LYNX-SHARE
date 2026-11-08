@@ -7882,3 +7882,4 @@ countries: es mx ar co cl pe ve
 "Rename macro" = "Renombrar macro"
 "Rename variation" = "Renombrar variación"
 "Variation morph (LYNX)" = "Morph entre variaciones (LYNX)"
+"Launch glide (LYNX)" = "Deslizamiento al lanzar (LYNX)"

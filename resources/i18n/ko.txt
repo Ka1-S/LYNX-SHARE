@@ -7882,3 +7882,4 @@ countries: kr
 "Rename macro" = "매크로 이름 변경"
 "Rename variation" = "변형 이름 변경"
 "Variation morph (LYNX)" = "변형 간 모프 (LYNX)"
+"Launch glide (LYNX)" = "실행 시 글라이드 (LYNX)"

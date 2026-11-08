@@ -88,6 +88,15 @@ struct RackView::Impl
     float dragStartValue = 0.0f;
     juce::Point<int> dragStart;
     RackZone dragZone;
+    // a variation launched with LYNX's glide (decision D6): the macros move from `from` to `to` over glideMs
+    struct Glide
+    {
+        std::array<float, rackMacroCount> from {}, to {};
+        std::array<bool, rackMacroCount> moves {};
+        double start = 0.0, length = 0.0;
+        int variation = -1;
+    };
+    std::optional<Glide> glide;
 
     Impl (RackView& o, AudioEngine& e, RackLocator l, std::optional<AutomationTarget> a, juce::String k, bool h, std::function<void (int)> open)
         : owner (o), engine (e), locate (std::move (l)), automation (std::move (a)), key (std::move (k)), ownHeader (h), openNode (std::move (open))
@@ -723,7 +732,7 @@ struct RackView::Impl
             if (p.x < row.getX() + 16)
                 return edit ([v] (PatcherDoc& d) { rack::overwriteVariation (d, v); });
             if (p.x > row.getRight() - 16)
-                return edit ([v] (PatcherDoc& d) { rack::launchVariation (d, v); });
+                return launch (v);
             return edit ([v] (PatcherDoc& d) { rack::rackOf (d)->selectedVariation = v; }, false);
         }
         if (e.mods.isPopupMenu())
@@ -1050,7 +1059,7 @@ struct RackView::Impl
         menu.addItem (tr ("New"), [this] { edit ([] (PatcherDoc& d) { rack::storeVariation (d); }); });
         if (v >= 0)
         {
-            menu.addItem (tr ("Launch"), [this, v] { edit ([v] (PatcherDoc& d) { rack::launchVariation (d, v); }); });
+            menu.addItem (tr ("Launch"), [this, v] { launch (v); });
             menu.addItem (tr ("Overwrite"), [this, v] { edit ([v] (PatcherDoc& d) { rack::overwriteVariation (d, v); }); });
             menu.addItem (tr ("Rename"), [this, v] { renameVariation (v); });
             menu.addItem (tr ("Duplicate"), [this, v] { edit ([v] (PatcherDoc& d) { rack::duplicateVariation (d, v); }); });
@@ -1067,12 +1076,57 @@ struct RackView::Impl
                 rack::compile (d);
             });
         });
+        juce::PopupMenu glideMenu; // LYNX's own (decision D6): a launch moves the macros over a time instead of jumping
+        for (const auto ms : { 0, 100, 250, 500, 1000, 2000, 4000 })
+            glideMenu.addItem (ms == 0 ? tr ("Off") : juce::String (ms) + " ms", true, std::abs (r->glideMs - (float) ms) < 0.5f, [this, ms] {
+                edit ([ms] (PatcherDoc& d) { rack::rackOf (d)->glideMs = (float) ms; });
+            });
+        menu.addSubMenu (tr ("Launch glide (LYNX)"), glideMenu);
         if (v >= 0 && r->morphOn)
         {
             menu.addItem (tr ("Morph from this variation (A)"), [this, v] { edit ([v] (PatcherDoc& d) { rack::rackOf (d)->morphA = v; rack::compile (d); }); });
             menu.addItem (tr ("Morph to this variation (B)"), [this, v] { edit ([v] (PatcherDoc& d) { rack::rackOf (d)->morphB = v; rack::compile (d); }); });
         }
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+    }
+
+    // a variation's launch: Live's instant jump, or LYNX's glide when one is set
+    void launch (int v)
+    {
+        const auto* r = rack();
+        if (r == nullptr || v < 0 || v >= (int) r->variations.size())
+            return;
+        if (r->glideMs <= 0.0f)
+            return edit ([v] (PatcherDoc& d) { rack::launchVariation (d, v); });
+        Glide g;
+        const auto& x = r->variations[(std::size_t) v];
+        for (int m = 0; m < rackMacroCount; ++m)
+        {
+            g.from[(std::size_t) m] = r->macros[(std::size_t) m].value;
+            g.to[(std::size_t) m] = x.values[(std::size_t) m];
+            g.moves[(std::size_t) m] = x.has[(std::size_t) m] && ! r->macros[(std::size_t) m].excludeFromVariations;
+        }
+        g.start = juce::Time::getMillisecondCounterHiRes();
+        g.length = r->glideMs;
+        g.variation = v;
+        glide = g;
+    }
+
+    void stepGlide()
+    {
+        if (! glide)
+            return;
+        const auto t = std::clamp ((juce::Time::getMillisecondCounterHiRes() - glide->start) / std::max (1.0, glide->length), 0.0, 1.0);
+        const auto g = *glide;
+        if (t >= 1.0)
+            glide.reset();
+        edit ([g, t] (PatcherDoc& d) {
+            for (int m = 0; m < rackMacroCount; ++m)
+                if (g.moves[(std::size_t) m])
+                    rack::setMacro (d, m, g.from[(std::size_t) m] + (g.to[(std::size_t) m] - g.from[(std::size_t) m]) * (float) t);
+            if (t >= 1.0)
+                rack::rackOf (d)->selectedVariation = g.variation;
+        }, t >= 1.0);
     }
 
     void showMacroMenu (int m)
@@ -1281,7 +1335,7 @@ RackView::RackView (AudioEngine& engine, RackLocator locate, std::optional<Autom
     : impl (std::make_unique<Impl> (*this, engine, std::move (locate), std::move (automation), std::move (key), ownHeader, std::move (openNode)))
 {
     impl->refresh();
-    startTimerHz (15);
+    startTimerHz (30);
 }
 
 RackView::~RackView() = default;
@@ -1334,7 +1388,11 @@ void RackView::mouseDrag (const juce::MouseEvent& e) { impl->mouseDrag (e); }
 void RackView::mouseUp (const juce::MouseEvent& e) { impl->mouseUp (e); }
 void RackView::mouseDoubleClick (const juce::MouseEvent& e) { impl->mouseDoubleClick (e); }
 void RackView::mouseMove (const juce::MouseEvent&) {}
-void RackView::timerCallback() { impl->refresh(); }
+void RackView::timerCallback()
+{
+    impl->stepGlide();
+    impl->refresh();
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 

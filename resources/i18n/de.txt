@@ -7882,3 +7882,4 @@ countries: de at ch li lu
 "Rename macro" = "Makro umbenennen"
 "Rename variation" = "Variation umbenennen"
 "Variation morph (LYNX)" = "Morph zwischen Variationen (LYNX)"
+"Launch glide (LYNX)" = "Gleiten beim Starten (LYNX)"

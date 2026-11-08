@@ -7882,3 +7882,4 @@ countries: id
 "Rename macro" = "Ganti nama makro"
 "Rename variation" = "Ganti nama variasi"
 "Variation morph (LYNX)" = "Morph antarvariasi (LYNX)"
+"Launch glide (LYNX)" = "Glide saat dijalankan (LYNX)"

@@ -7882,3 +7882,4 @@ countries: ru by kz
 "Rename macro" = "Переименовать макрос"
 "Rename variation" = "Переименовать вариацию"
 "Variation morph (LYNX)" = "Морфинг между вариациями (LYNX)"
+"Launch glide (LYNX)" = "Плавный переход при запуске (LYNX)"

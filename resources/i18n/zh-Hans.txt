@@ -7882,3 +7882,4 @@ countries: cn sg
 "Rename macro" = "重命名宏"
 "Rename variation" = "重命名变体"
 "Variation morph (LYNX)" = "变体之间变形 (LYNX)"
+"Launch glide (LYNX)" = "启动时滑移 (LYNX)"

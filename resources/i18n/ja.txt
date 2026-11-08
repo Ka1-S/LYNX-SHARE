@@ -7882,3 +7882,4 @@ countries: jp
 "Rename macro" = "マクロ名を変更"
 "Rename variation" = "バリエーション名を変更"
 "Variation morph (LYNX)" = "バリエーション間のモーフ (LYNX)"
+"Launch glide (LYNX)" = "起動時のグライド (LYNX)"

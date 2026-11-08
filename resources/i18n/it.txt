@@ -7882,3 +7882,4 @@ countries: it ch sm
 "Rename macro" = "Rinomina macro"
 "Rename variation" = "Rinomina variazione"
 "Variation morph (LYNX)" = "Morph tra variazioni (LYNX)"
+"Launch glide (LYNX)" = "Glide all'avvio (LYNX)"

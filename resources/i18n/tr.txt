@@ -7882,3 +7882,4 @@ countries: tr
 "Rename macro" = "Makroyu yeniden adlandır"
 "Rename variation" = "Varyasyonu yeniden adlandır"
 "Variation morph (LYNX)" = "Varyasyonlar arası morph (LYNX)"
+"Launch glide (LYNX)" = "Başlatırken geçiş (LYNX)"

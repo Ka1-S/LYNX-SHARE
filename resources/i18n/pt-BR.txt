@@ -7965,3 +7965,4 @@ countries: br
 "Rename macro" = "Renomear macro"
 "Rename variation" = "Renomear variação"
 "Variation morph (LYNX)" = "Morph entre variações (LYNX)"
+"Launch glide (LYNX)" = "Deslizar ao disparar (LYNX)"
