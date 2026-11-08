@@ -75,6 +75,7 @@ public:
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
     static inline int editPatternsIn = 0;
+    std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
     void paint (juce::Graphics& g) override;
     void paintOverChildren (juce::Graphics& g) override;
@@ -177,7 +178,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
+                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
     std::int64_t perfClip = -1;
@@ -422,6 +423,26 @@ private:
     juce::Point<float> automationHandlePos (int clip, int point) const; // x < 0: no handle
     int automationHandleAt (int clip, juce::Point<int> p) const;
     void showAutomationPointMenu (int clip, int point);
+    // round 177b: optional automation lanes under a track (Playlist › Automation lanes; core autolanes). A track's
+    // lanes sit below its row (heightOf stays the row: clips never draw into lanes); trackTops include them.
+    int laneHeightOf (const AutomationLane& lane) const;
+    int laneBlockHeight (int track) const;                 // 0: none shown
+    struct LaneHit { int track = -1, lane = -1; };
+    LaneHit laneAt (juce::Point<int> p) const;             // a lane row under p (header or grid)
+    juce::Rectangle<int> laneRow (int track, int lane) const; // full width, from x = 0
+    juce::Rectangle<float> laneBody (int track, int lane) const; // the curve's area in the grid
+    int laneAutomation (int track, int lane) const;        // -1: none
+    int lanePointAt (int track, int lane, juce::Point<int> p) const;
+    juce::Rectangle<int> trackLaneArrow (int track) const; // empty: the track has no lanes or lanes are off
+    juce::Rectangle<int> trackAddLane (int track) const;   // "+A": empty when lanes are off or the row is too small
+    void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
+    bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    void showLaneMenu (int track, int lane);
+    void showAddLaneMenu (int track);
+    void toggleAutomationLanes();
+    bool laneButtonHover = false;
+    int laneTrack = -1, laneIndex = -1;                    // the lane a lanePoint / laneTension drag edits
     float tensionStart = 0.0f, tensionSign = 1.0f;
     // hover: what a click would hit (drives the cursor, the highlight and the hint)
     struct Hover

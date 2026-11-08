@@ -2,6 +2,7 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
+#include "core/PlaylistOps.h"
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
@@ -3102,11 +3103,42 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
+        // round 177b: automation lanes come back from a project (track, automation, height, folded)
+        juce::String lanesResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto lane = lynx::autolanes::addLane (song, 3, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Vol", 0.4f);
+            song.playlistTracks[3].lanes[0].height = 72;
+            song.playlistTracks[3].lanesFolded = true;
+            // (the same round's clip LFO and modulators ride along)
+            auto& lfo = song.automations[(std::size_t) lane].lfo;
+            lfo.on = true;
+            lfo.level = -40;
+            lfo.speed = 30000;
+            lfo.flags = 1 | 4;
+            lfo.phase = 123456789u;
+            lfo.amp = { { 0, 0.5f, 0.0f }, { 960, 1.0f, 0.0f } };
+            lynx::Modulator mod;
+            mod.name = "LFO 1";
+            mod.shape = lynx::ModShape::square;
+            mod.sync = false;
+            mod.hz = 2.5;
+            mod.routes = { { { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, -0.5f } };
+            song.modulators.push_back (mod);
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! back || back->playlistTracks.size() < 4 || ! (back->playlistTracks[3].lanes == song.playlistTracks[3].lanes)
+                || ! back->playlistTracks[3].lanesFolded || back->automations.size() != song.automations.size()
+                || ! (back->automations[(std::size_t) lane].points == song.automations[(std::size_t) lane].points)
+                || ! (back->automations[(std::size_t) lane].lfo == lfo) || ! (back->modulators == song.modulators))
+                lanesResult = "ERROR " + why;
+        }
+
         const auto mixerBasics = lynx::mixerbasics::run();
         const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3136,6 +3168,7 @@ private:
                << "driver_panel=" << driverPanel << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
+               << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n"
                << "result=" << (ok ? "OK" : "FAILED") << "\n";
@@ -10112,6 +10145,25 @@ private:
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-playlist-timesel.png");
             ui.getPlaylistForSnapshot().setToolForSnapshot (lynx::EditTool::pencil);
+            // round 177b: automation lanes on (two lanes under track 2: a volume ramp and a pan wobble)
+            {
+                const auto before = offline.getSong();
+                offline.editSong ([] (lynx::Song& s) {
+                    s.loopStart = s.loopEnd = 0; // (no time selection in this one)
+                    const auto bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
+                    const auto vol = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Insert 1 - Volume", 0.3f);
+                    s.automations[(std::size_t) vol].points = { { 0, 0.3f, 0.0f }, { bar * 2, 0.8f, 0.4f }, { bar * 4, 0.6f, 0.0f } };
+                    const auto pan = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, "Insert 1 - Pan", 0.5f);
+                    s.automations[(std::size_t) pan].points = { { 0, 0.5f, 0.0f }, { bar, 0.2f, 0.0f }, { bar * 2, 0.8f, 0.0f }, { bar * 3, 0.5f, 0.0f } };
+                }, false);
+                lynx::autolanes::setShown (true);
+                ui.getPlaylistForSnapshot().resized();
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-playlist-lanes.png");
+                lynx::autolanes::setShown (false);
+                offline.editSong ([before] (lynx::Song& s) { s = before; }, false);
+                offline.dispatchPendingMessages();
+            }
             // round 104: a folded track group (FL's thin member rows) and the Picker's audio tab
             {
                 int header = -1;
@@ -10494,6 +10546,50 @@ private:
                 auto editor = lynx::makeAutomationEditor (offline, 0);
                 editor->setSize (760, 300);
                 saveWindow (std::move (editor), "-automation.png");
+
+                // round 177b: the same clip in FL's LFO mode: FL's defaults, then one shaped state (the UI gate pairs)
+                const auto before = offline.getSong().automations[0].lfo;
+                const auto lfoShot = [&offline, &saveWindow] (std::function<void (lynx::AutomationLfo&)> set, const char* suffix) {
+                    offline.editSong ([&set] (lynx::Song& song) {
+                        auto& lfo = song.automations[0].lfo;
+                        lfo = lynx::AutomationLfo {};
+                        lfo.on = true;
+                        set (lfo);
+                    }, false);
+                    auto lfoEditor = lynx::makeAutomationEditor (offline, 0);
+                    lfoEditor->setSize (760, 346);
+                    saveWindow (std::move (lfoEditor), suffix);
+                };
+                lfoShot ([] (lynx::AutomationLfo&) {}, "-automation-lfo.png");
+                lfoShot ([] (lynx::AutomationLfo& lfo) {
+                    // the state set through FL's own UI for the UI gate (TNS 50 %, SKEW 25 %, PW 25 %, two points), as FL saved it
+                    lfo.tension = 64;
+                    lfo.skew = 32;
+                    lfo.pulseWidth = 28;
+                    lfo.amp = { { 0, 0.6716f, 0.0f }, { (std::int64_t) (lynx::ppq * 1.4128), 0.9204f, 0.0f } };
+                }, "-automation-lfo-shape.png");
+                offline.editSong ([before] (lynx::Song& song) { song.automations[0].lfo = before; }, false);
+            }
+
+            // round 177b: LYNX's modulators window, with one routed modulator
+            {
+                offline.editSong ([] (lynx::Song& song) {
+                    lynx::Modulator m;
+                    m.name = "LFO 1";
+                    m.shape = lynx::ModShape::triangle;
+                    m.routes = { { { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, 0.25f }, { { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, -0.5f } };
+                    song.modulators.push_back (m);
+                    lynx::Modulator r;
+                    r.name = "LFO 2";
+                    r.shape = lynx::ModShape::smoothRandom;
+                    r.sync = false;
+                    r.hz = 0.5;
+                    song.modulators.push_back (r);
+                }, false);
+                auto mods = lynx::makeModulatorsPanel (offline);
+                mods->setSize (720, 360);
+                saveWindow (std::move (mods), "-modulators.png");
+                offline.editSong ([] (lynx::Song& song) { song.modulators.clear(); }, false);
             }
 
             saveWindow (lynx::makeChannelSettingsPanel (offline, 0), "-sampler.png");
