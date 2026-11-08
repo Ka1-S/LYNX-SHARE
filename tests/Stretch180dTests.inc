@@ -84,21 +84,27 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
             r.process (state.get(), true, tick, 441, l.data(), rr.data());
             out.insert (out.end(), l.begin(), l.end());
         }
-        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured by its zero
-        // crossings: after the span the clip holds its last value as DC to the clip's end and then declicks, as FL does
-        // (REA_rodada167l §1; whether FL holds a trimmed span's last value too is not rendered yet)
+        // played: the tone from the clip's start (the leading silence is trimmed), as long as drawn. Measured on 5 ms RMS
+        // windows above 0.1 (the tone is 0.35): after the span the clip holds its last value (0.06 here) as DC to the clip's
+        // end, as FL does (REA_rodada167l §1; whether FL holds a trimmed span's last value too is not rendered yet)
+        constexpr std::size_t window = 220;
         std::size_t firstLoud = out.size(), lastLoud = 0;
-        for (std::size_t i = 1; i < out.size(); ++i)
-            if (out[i] * out[i - 1] < 0.0f && std::max (std::abs (out[i]), std::abs (out[i - 1])) > 0.005f) // a zero crossing of the tone
-                firstLoud = std::min (firstLoud, i - 1), lastLoud = i;
+        for (std::size_t w = 0; w + window <= out.size(); w += window)
+        {
+            double sum = 0.0;
+            for (std::size_t i = w; i < w + window; ++i)
+                sum += (double) out[i] * out[i];
+            if (std::sqrt (sum / window) > 0.1)
+                firstLoud = std::min (firstLoud, w), lastLoud = w + window;
+        }
         const auto playedTicks = (double) (lastLoud - firstLoud) / rate * s.bpm / 60.0 * ppq;
         std::fprintf (stderr, "  [r180d] %s: drawn %lld ticks, played %.0f ticks (first sound at %zu)\n", stretched ? "stretched" : "plain",
                       (long long) drawnTicks, playedTicks, firstLoud);
         std::fprintf (stderr, "  [r180d]   span %ld -> %ld frames; level at 0.5 / 0.9 / 1.1 / 1.4 s: %.3f %.3f %.3f %.3f\n", spanIn, spanOut,
                       std::abs (out[22050]), std::abs (out[39690]), out.size() > 48510 ? std::abs (out[48510]) : -1.0f,
                       out.size() > 61740 ? std::abs (out[61740]) : -1.0f);
-        CHECK (firstLoud < (stretched ? 441u : 120u)); // (the first zero crossing: within about a cycle of 440 Hz)
-        CHECK (std::abs (playedTicks - (double) drawnTicks) < (stretched ? 0.03 : 0.01) * (double) drawnTicks);
+        CHECK (firstLoud == 0);
+        CHECK (std::abs (playedTicks - (double) drawnTicks) < 0.03 * (double) drawnTicks);
     }
 }
 
