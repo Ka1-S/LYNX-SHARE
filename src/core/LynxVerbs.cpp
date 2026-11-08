@@ -1309,9 +1309,10 @@ protected:
         s.lowShelfHz = 220.0;
         s.lowShelfDb = 8.0 * std::min (1.0, dens / 0.15);
         // round 183b: the reference's eight voices fall apart as they modulate (its tail ~9 dB louder and mono at Mod
-        // depth 0: +8.9 dB against 50 %, −3.6 dB at 10 %); this network's lines part less, so the rest comes in here,
-        // and the level is re-measured with the full width (−2 dB)
-        s.gain *= 0.8 * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
+        // depth 0: +8.9 dB against 50 %, −3.6 dB at 10 %); this network's lines part less, so the rest comes in here.
+        // The level is re-measured with the full width: −0.9 dB at Density 0, −4.2 dB from Density 50 % up (the dense
+        // network's sides were nearly mono before)
+        s.gain *= (0.9 - 0.28 * std::min (1.0, dens / 0.5)) * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
     }
 };
 

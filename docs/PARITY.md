@@ -78,7 +78,7 @@ there.
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
 | Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
-| Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (verb 6.05 → 7.25 on the matched settings, bank 6.16 → 7.31; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
+| Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
@@ -251,14 +251,13 @@ Measured on tp172d's 41 probe renders and 19 new captures at Mix 100 %: Mod dept
 
 | LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
 |---|---|---|---|---|
-| Nebula (slice 2) | Valhalla Supermassive | 3.20 → 3.07 / 3.11 → 3.26 | 6.05 → 7.25 / 6.16 → 7.31 | Over the bank, the verb's stereo part goes from 1.8 to 9.3 of 10 and its level part from 7.7 to 8.1. Drums at Density 0 run 2–4 dB low (drums 3.00 → 2.83; music 3.17 → 3.27, impulse 2.90 → 3.19). |
+| Nebula (slice 2) | Valhalla Supermassive | 3.20 → 3.33 / 3.11 → 3.33 | 6.05 → 7.19 / 6.16 → 7.30 | Over the bank, the verb's stereo part goes from 1.8 to 9.3 of 10 and its level part from 7.7 to 8.1; drums 3.00 → 3.17, music 3.17 → 3.33, impulse 2.90 → 3.29. |
 
 - **Stereo.** The reference's tail is decorrelated whenever it modulates: L/R correlation −0.01 at the default Mod depth (50 %), 0.13 at 25 %, 0.34 at 10 %, and 1.0 (mono) at 0. That holds at every Density, and Width 50 % is mono. Nebula played mono at Density 0, because its old per-mode correlations were set from a different measurement. Now the width is the panel's, and this network decorrelates through its modulated lines in the same way (0.06 / 0.08 / 1.0 at 10 / 25 / 0 %). Only the reference's mono modes (five of them, plus one with L = −R) keep a narrow width. Their correlations were re-measured per mode at the defaults.
-- **Level against Mod depth.** The reference's eight voices fall apart as they modulate. Its unmodulated tail is 8.9 dB louder than at 50 %, and 2.4 dB louder at 10 %. This network's lines part less, so a law adds the rest (+5 dB × e^(−depth / 10 %)). The level is −2 dB overall with the full width.
+- **Level against Mod depth.** The reference's eight voices fall apart as they modulate. Its unmodulated tail is 8.9 dB louder than at 50 %, and 2.4 dB louder at 10 %. This network's lines part less, so a law adds the rest (+5 dB × e^(−depth / 10 %)). With the full width, the level is re-measured: −0.9 dB at Density 0 and −4.2 dB from Density 50 % up, where the dense network's sides were nearly mono before.
 - **Open:**
   - Several modes swell up over 1–2 s at Density 0 (the reference's 3rd to 6th modes: −45 → −12 dB over six repeats in the 4th); ours start at full level.
   - The reference smears each repeat over 2–5 ms, with different smears left and right. An in-loop all-pass for that was tried and scored lower, so it was dropped.
-  - Drums at Density 0 run 2–4 dB low.
   - The 4th mode (S2) has its first arrival 300 ms later in the reference.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
