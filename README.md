@@ -446,6 +446,11 @@ docs/         architecture, status, roadmap and the behavioural analysis of FL S
 > [!NOTE]
 > The documentation is being translated from Portuguese to English; some files are still in Portuguese.
 
+## Community
+
+- **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY). Chat, help, feedback and release announcements.
+- **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)): an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It's a separate community project, not an official LYNX SHARE release, and it isn't maintained or reviewed by us.
+
 ## Credits and notice
 
 LYNX SHARE is an independent implementation. FL Studio was studied only to understand its behaviour and file format; no Image-Line code was copied, and no protected content (such as FLEX packs) is ever opened.
