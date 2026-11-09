@@ -90,7 +90,7 @@ normal channel. PROVEN-FILE; the values match the CHNL kind in the same slot.
 |---|---|---|
 | `RHED` | u32 (skipped), u32 next module id, i32, i32 (−1 = none). INFERRED: selected or focused slots | PROVEN-REA 0x18059b100 |
 | `FOUT` | i32, i32 → output routing (the channel's output target) | PROVEN-REA (tag at 0x1809f4f38) |
-| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats (the rack's parameters 0…5; the same ids automation lanes use with module 0):<br>• [0] **volume**, gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB: 0 dB at v ≈ 0.853, +6 dB at 1, silent at 0<br>• [1] **pan** p = 2v − 1 as a balance: p > 0 scales the left side by 1 − p, p < 0 the right side by 1 + p<br>• [4] pitch bend: a ratio of 2^(4v − 2) on the playing voices<br>• [5] is passed on to the modules<br>• [2], [3]: not handled by the setter | PROVEN-REA: setter 0x18059e0c0, fader law 0x1805943b0 (round 182c F2) |
+| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats (the rack's parameters 0…5; the same ids automation lanes use with module 0):<br>• [0] **volume**, gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB: 0 dB at v ≈ 0.853, +6 dB at 1, silent at 0<br>• [1] **pan** p = 2v − 1 as a balance: p > 0 scales the left side by 1 − p, p < 0 the right side by 1 + p<br>• [4] pitch bend: a ratio of 2^(4v − 2) on the playing voices<br>• [5] **Aftertouch**, passed on to the modules<br>• [2] **Mute**, [3] **Solo**: not handled by the setter; 0 in every sample (INFERRED: switches, on above 0.5) | PROVEN-REA: setter 0x18059e0c0, fader law 0x1805943b0 (round 182c F2); the names from the rack's parameter-name function 0x18059eb20 (round 187d, §3.2) |
 | `CCLK` | list of (i32, i32, i32) triples, deduplicated. INFERRED: controller links | PROVEN-REA |
 | `RSMP` | **built-in drum sampler**: magic `10MS` + u32 + `PADS` (22 bytes, pad → sample index; identity by default) + one `SMPl`/`SMPL` per kit sample (section 6). Drum notes use key = sample index | PROVEN-REA (0x18074fcd0), PROVEN-FILE (2404 drum notes, all keys < kit size) |
 | `RMOd` | **one module (instrument or effect)**: u32 module **type id** + u32 module **instance id** + module body (section 3.1). Order = slot order in the rack | PROVEN-REA 0x18059b100 → factory 0x180597870 |
@@ -115,6 +115,26 @@ PROVEN-REA (module loader 0x180796e40):
 
 Parameter values are floats. INFERRED: they are normalized 0…1, because almost every value is in 0…1 and the
 defaults are 0.5/1.0. The value → unit mapping per parameter needs one REA pass per engine (plan slice F4).
+
+### 3.2 The rack's parameter ids (round 187d)
+
+The rack is module instance 0. Its parameter-name function (PROVEN-REA 0x18059eb20) names the ids that automation
+lanes on module 0 use (TRKH `DESc` +4 = 0, +8 = the id):
+
+| Id | Name |
+|---|---|
+| 0 | Level |
+| 1 | Pan |
+| 2 | Mute |
+| 3 | Solo |
+| 4 | Pitch Bend |
+| 5 | Aftertouch |
+| 7…133 | "MIDI CC #n" |
+| 0x1000 + channel id | "Enable Send (to <channel>)" |
+| 0x2000 + channel id | "Send Level (to <channel>)" |
+
+The number after 0x1000/0x2000 is looked up as a channel id among the song's channels, the master's included, and the
+name shows that channel's name.
 
 ## 4. CHNL: a channel's tracks and clips
 
@@ -202,6 +222,18 @@ The record layout is PROVEN-REA. The meanings of bytes 14–19 are INFERRED; the
 and repeat fields fit them (section 9).
 
 On audio lanes `EVN2` holds the clip's envelope points (volume/pan/pitch of the wave editor). INFERRED.
+
+**Automation points (round 187d; PROVEN-FILE over the 20 sample projects, about 50 000 points).** An automation
+clip's `EVN2` is its curve *already sampled*, not a list of control points to interpolate:
+- a positive key marks a control point the user placed, a negative key a sample FLM computed between two control
+  points. |key| stays the same within a segment (1, 2, 4, 5, 10, 20, 29, 37 seen); INFERRED: it names the segment's
+  curve shape;
+- between control points the samples sit one value step of 512 (1/128 of 0…65535) apart, at whatever tick the curve
+  reaches that value, so they follow the curve whatever its shape;
+- a jump is two control points on one tick.
+
+So straight lines through every saved point give FLM's own curve to within 1/128 of the range. A reader needs no
+shape maths; it must keep every point, the two-on-one-tick jumps included.
 
 ## 5. Paths and resources
 
@@ -372,8 +404,9 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
 
 1. EVN2 bytes 14–19 meanings (velocity scale, pan, fine pitch, repeat). Close it with one REA pass on the note loader,
    or by round-tripping a note edited in the plugin UI (GUI turn).
-2. CHHD colour/mute/solo; RPRM [2], [3]; SEND words [1], [3], [4].
-3. The automation point shape codes (negative keys) and their curve maths.
+2. CHHD colour and its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
+   applies them on load is not traced.)
+3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
    TransistorBass first).
 5. HEAD 272/280 (loop range).

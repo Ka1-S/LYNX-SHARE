@@ -376,24 +376,51 @@ void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const s
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip time-stretch (played unstretched)");
     ctx.song.playlist.push_back (c);
 }
-// An automation lane (F6). The rack's own parameters (module 0: [0] level, [1] pan) drive the channel's insert; a
-// module's parameters wait for their engines (F4/F5). Each clip becomes one LYNX automation clip with its points
-// repeated over the clip's loop passes; values are FLM's u16 0…65535; the point shapes (the negative keys) are not
-// decoded yet, so the points join with straight lines. Returns false for a lane it doesn't import.
-bool addAutomationLane (Ctx& ctx, const flm::Lane& lane, int insert, const std::string& owner)
+// An automation lane on the rack itself (module 0) that LYNX has a target for: Level, Pan and the send levels
+// (FLM_FORMAT §3, the rack's parameter names PROVEN-REA 0x18059eb20). A module's parameters wait for their engines
+// (F4/F5); Mute, Solo, Pitch Bend, Aftertouch, the MIDI CCs and the send switches have no LYNX automation target.
+bool importableRackLane (const flm::Lane& lane) noexcept
 {
-    if (lane.targetModule != 0 || (lane.targetParam != 0 && lane.targetParam != 1) || lane.clips.empty())
-        return false;
-    const auto volume = lane.targetParam == 0;
-    PlaylistTrack row;
-    row.name = lane.name.empty() ? owner : owner + " " + lane.name;
-    ctx.song.playlistTracks.push_back (row);
-    const auto rowIndex = (int) ctx.song.playlistTracks.size() - 1;
+    namespace rp = flm::rackparam;
+    return lane.targetModule == 0 && ! lane.clips.empty()
+           && (lane.targetParam == rp::level || lane.targetParam == rp::pan
+               || (lane.targetParam >= rp::sendLevelBase && lane.targetParam < rp::sendLevelBase + 0x1000));
+}
+
+// What the report calls a lane that isn't imported
+std::string skippedLaneLabel (const flm::Lane& lane)
+{
+    namespace rp = flm::rackparam;
+    if (lane.targetModule != 0)
+        return "FL Studio Mobile: automation of module parameters (not imported yet)";
+    const auto p = lane.targetParam;
+    if (p == rp::mute || p == rp::solo)
+        return "FL Studio Mobile: Mute/Solo automation (LYNX automates neither)";
+    if (p == rp::pitchBend || p == rp::aftertouch)
+        return "FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)";
+    if (p >= rp::firstMidiCc && p <= rp::lastMidiCc)
+        return "FL Studio Mobile: MIDI CC automation (not imported)";
+    if (p >= rp::sendEnableBase && p < rp::sendEnableBase + 0x1000)
+        return "FL Studio Mobile: send on/off automation (not imported)";
+    if (p >= rp::sendLevelBase && p < rp::sendLevelBase + 0x1000)
+        return "FL Studio Mobile: send level automation without that route";
+    return "FL Studio Mobile: automation of an unknown rack parameter";
+}
+
+// One importable rack lane (F6) as LYNX automation clips on Playlist row `rowIndex`. `target` is the clip's target;
+// `fader` = the values go through FLM's fader law onto LYNX's fader position (Level, send levels), else they are
+// direct (Pan). Each FLM clip becomes one clip, its points repeated over the clip's loop passes. FLM saves an
+// automation clip as its drawn curve already sampled: a point every value step of 512 (1/128 of the range) or less,
+// the user's control points among them, with two points on one tick for a jump (FLM_FORMAT §4, PROVEN-FILE over the
+// 20 sample projects). Straight lines through those points are FLM's own curve to within that step, so the point
+// shapes need no maths of their own.
+void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget target, bool fader, int rowIndex, const std::string& name)
+{
     for (const auto& clip : lane.clips)
     {
         Automation a;
-        a.name = row.name;
-        a.target = AutomationTarget { volume ? AutomationTargetKind::mixerVolume : AutomationTargetKind::mixerPan, insert, 0, 0 };
+        a.name = name;
+        a.target = target;
         for (const auto& pass : passesOf (clip))
             for (const auto& e : clip.events)
             {
@@ -403,7 +430,7 @@ bool addAutomationLane (Ctx& ctx, const flm::Lane& lane, int insert, const std::
                 const auto v = (float) e.value / 65535.0f;
                 AutomationPoint pt;
                 pt.tick = ticksOf (pass.at + beat - pass.from);
-                pt.value = volume ? faderPosition (std::min (flmGain (v), maxFaderGain)) : std::clamp (v, 0.0f, 1.0f);
+                pt.value = fader ? faderPosition (std::min (flmGain (v), maxFaderGain)) : std::clamp (v, 0.0f, 1.0f);
                 if (! a.points.empty() && pt.tick < a.points.back().tick)
                     continue;
                 a.points.push_back (pt);
@@ -419,8 +446,6 @@ bool addAutomationLane (Ctx& ctx, const flm::Lane& lane, int insert, const std::
         c.length = std::max<std::int64_t> (1, ticksOf (clip.timelineLength()));
         ctx.song.playlist.push_back (c);
     }
-    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: automation point shapes (straight lines)");
-    return true;
 }
 } // namespace
 
@@ -478,7 +503,12 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     });
 
     static const flm::Rack noRack {};
-    int automationLanes = 0;
+    struct RackLane
+    {
+        const flm::Lane* lane;
+        int insert, row;
+    };
+    std::vector<RackLane> rackLanes; // importable rack automation lanes (F6), filled after the routing
     std::map<int, int> insertOfId;                          // FLM channel id → insert
     std::vector<std::pair<int, const flm::Channel*>> routes; // insert, channel (its SEND chunks)
     for (const auto i : order)
@@ -506,6 +536,25 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             m.volume = faderPosition (std::min (gain, maxFaderGain));
             m.pan = std::clamp (rack.params[1] * 2.0f - 1.0f, -1.0f, 1.0f);
         }
+        // [2] Mute and [3] Solo (the names PROVEN-REA; stored as switches, on = above the middle: INFERRED, every sample
+        // has 0); [4] Pitch Bend: FLM's setter plays the rack's voices at a ratio of 2^(4v − 2), i.e. 48·v − 24
+        // semitones (PROVEN-REA 0x18059e0c0), which a LYNX sampler takes on its pitch knob (−24…24); [5] Aftertouch
+        // goes to the modules and isn't imported
+        float bendSemitones = 0.0f;
+        {
+            namespace rp = flm::rackparam;
+            const auto param = [&rack] (int i, float fallback) { return i < (int) rack.params.size() ? rack.params[(std::size_t) i] : fallback; };
+            auto& m = song.mixer[(std::size_t) insert];
+            if (param (rp::mute, 0.0f) >= 0.5f)
+                m.muted = true;
+            if (param (rp::solo, 0.0f) >= 0.5f && insert > 0)
+                m.solo = true;
+            bendSemitones = std::clamp (48.0f * param (rp::pitchBend, 0.5f) - 24.0f, -24.0f, 24.0f);
+            if (std::abs (bendSemitones) < 0.01f)
+                bendSemitones = 0.0f;
+            if (param (rp::aftertouch, 0.0f) > 1e-3f)
+                ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: channel aftertouch (not imported)");
+        }
         if (ch.channelId >= 0)
             insertOfId[ch.channelId] = insert;
         routes.push_back ({ insert, &ch });
@@ -526,6 +575,18 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
         }
 
+        // the rack's held pitch bend on a channel it creates
+        const auto bend = [&] (ChannelDef& c) {
+            if (bendSemitones == 0.0f)
+                return;
+            if (c.instrument == InstrumentKind::sampler)
+            {
+                c.sampler.pitch = std::clamp (c.sampler.pitch + bendSemitones, -24.0f, 24.0f);
+                ctx.note (&FlpImportReport::converted, "FL Studio Mobile: channel pitch bend (on the sampler's pitch)");
+            }
+            else
+                ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: channel pitch bend on an instrument other than a sampler (not imported)");
+        };
         int instrument = -1;          // this channel's instrument (note lanes)
         std::vector<int> kitChannels; // this channel's drum kit (drum lanes)
         const auto instrumentIndex = [&] {
@@ -533,6 +594,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             {
                 song.channels.push_back (instrumentChannel (ctx, rack, ch, insert));
                 instrument = (int) song.channels.size() - 1;
+                bend (song.channels.back());
             }
             return instrument;
         };
@@ -550,6 +612,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     c.samplePath = ctx.resolveSample (s, name + ": " + c.name);
                     c.mixerTrack = insert;
                     c.volume = 1.0f;
+                    bend (c);
                     song.channels.push_back (std::move (c));
                     kitChannels.push_back ((int) song.channels.size() - 1);
                 }
@@ -574,8 +637,18 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             const auto kind = lane.kind();
             if (kind == flm::LaneKind::automation)
             {
-                if (! addAutomationLane (ctx, lane, insert, name))
-                    automationLanes += lane.clips.empty() ? 0 : 1;
+                if (lane.clips.empty())
+                    continue;
+                if (! importableRackLane (lane))
+                {
+                    ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));
+                    continue;
+                }
+                // its row now (FLM's lane order); its clips once every insert and route exists
+                PlaylistTrack row;
+                row.name = lane.name.empty() ? name : name + " " + lane.name;
+                song.playlistTracks.push_back (row);
+                rackLanes.push_back ({ &lane, insert, (int) song.playlistTracks.size() - 1 });
                 continue;
             }
             if (kind == flm::LaneKind::other || lane.clips.empty())
@@ -669,8 +742,34 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         m.toMaster = toMaster;
     }
 
-    if (automationLanes > 0 && ctx.report != nullptr)
-        ctx.report->unsupported["FL Studio Mobile: automation of module parameters (not imported yet)"] += automationLanes;
+    // the rack automation lanes (F6): Level and Pan on the channel's insert (the Master's for the master channel), a
+    // send level on that route's level knob (its destination = the channel id after 0x2000)
+    for (const auto& [lane, insert, row] : rackLanes)
+    {
+        namespace rp = flm::rackparam;
+        const auto& rowName = song.playlistTracks[(std::size_t) row].name;
+        const auto p = lane->targetParam;
+        if (p == rp::level || p == rp::pan)
+        {
+            const auto kind = p == rp::level ? AutomationTargetKind::mixerVolume : AutomationTargetKind::mixerPan;
+            addAutomationClips (ctx, *lane, AutomationTarget { kind, insert, 0, 0 }, p == rp::level, row, rowName);
+            ctx.note (&FlpImportReport::converted, p == rp::level ? "FL Studio Mobile: Level automation" : "FL Studio Mobile: Pan automation");
+            continue;
+        }
+        const auto destinationId = p - rp::sendLevelBase;
+        int destination = -1;
+        if (destinationId == masterId)
+            destination = 0;
+        else if (const auto it = insertOfId.find (destinationId); it != insertOfId.end() && it->second > 0)
+            destination = it->second;
+        if (insert <= 0 || destination < 0 || destination == insert || ! song.routes (insert, destination))
+        {
+            ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (*lane));
+            continue;
+        }
+        addAutomationClips (ctx, *lane, AutomationTarget { AutomationTargetKind::mixerSend, insert, destination, 0 }, true, row, rowName);
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: send level automation");
+    }
 
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())

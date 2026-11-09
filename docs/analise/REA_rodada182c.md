@@ -299,3 +299,30 @@ Shots of the import (`/mnt/e/lynx-work/flm182c/shots/`):
   are u16 / 65535: Level goes through FLM's fader law onto LYNX's fader position, Pan is direct.
 - The point shapes (the negative key codes) are not decoded yet: straight lines, listed in the report.
 - Lanes on module parameters wait for F4/F5 and are listed.
+
+### F2 + F6, round 187d (branch `feature/flm187d`, 0.1.26)
+
+REA: one 13-minute turn on FL Studio Mobile_x64.dll under `~/.cache/lynx-ghidra.lock` (07:50–08:03), plus a survey of
+every EVN2 point in the 20 sample projects and the user's song. Results in FLM_FORMAT §3, §3.2 and §4.
+
+- **Rack parameters (PROVEN-REA 0x18059eb20).** Ids 0 Level, 1 Pan, 2 Mute, 3 Solo, 4 Pitch Bend, 5 Aftertouch,
+  7…133 MIDI CCs, 0x1000 + id "Enable Send (to …)", 0x2000 + id "Send Level (to …)".
+- **Mixer (F2).** On import:
+  - RPRM Mute and Solo set the insert's mute and solo (the master's Mute the Master's);
+  - the held Pitch Bend (2^(4v − 2), round 182c's setter) moves a sampler channel's pitch knob by 48·v − 24 semitones.
+    On another instrument it is reported;
+  - Aftertouch is reported;
+  - the routes from round 182c are unchanged. Channels without SEND chunks (the 4.x demos) keep the route to the
+    master. INFERRED: FLM 5 writes that route out as a SEND to id 0, so its absence means the default route.
+- **Automation (F6).** The point shapes need no maths: FLM saves each clip's curve already sampled at every 1/128 of
+  the value range, with control points marked by a positive key, so straight lines through the saved points are FLM's
+  curve. The "straight lines" approximation note is gone from the report.
+  - Imported: Level → insert volume, Pan → insert pan, Send Level (to X) → that route's level knob (`mixerSend`,
+    FLM's fader law), for the master channel too.
+  - Reported, one line each: Mute/Solo lanes (LYNX automates neither), Pitch Bend/Aftertouch lanes, MIDI CC lanes,
+    send on/off lanes, a send level without that route, and module-parameter lanes. The last group waits for F5/F4:
+    across the 21 projects there are 73 module-parameter lanes against 15 rack lanes. The module lanes are led by
+    FX Filter "Frequency" (32), MiniSynth "FLT Freq" (9) and DirectWave "Pitch" (3).
+- **Tests.** `tests/FlmImport187dTests.inc` writes its own project. The opt-in `flm187d_real_project_reports`
+  (LYNX_FLM_DIR + LYNX_FLM_REPORT) prints each real project's import report. The user's song: Level automation 1,
+  module lanes 1 (Gate Mix, waiting for F5), and no change to its 14 inserts.
