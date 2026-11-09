@@ -560,6 +560,10 @@ public:
     // all edits made while the same mouse click is held down
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
+    // FL's General › "Detach all new plugins" (issue #116; a UI setting, off by default as in FL): the plugins an edit
+    // adds start Detached (detachNewPlugins in core/Song.h)
+    void setDetachNewPlugins (bool on) noexcept { detachNewPluginsOn = on; }
+    bool detachesNewPlugins() const noexcept { return detachNewPluginsOn; }
 
     // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32, PR #37): the live plugin
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
@@ -785,6 +789,7 @@ public:
     const PdcPlan& getPdcPlan() const noexcept { return lastPublishedShape.pdc; }
 
 private:
+    bool detachNewPluginsOn = false;
     void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
                                            int numInputChannels,
                                            float* const* outputChannelData,

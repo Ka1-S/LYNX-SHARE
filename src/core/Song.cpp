@@ -132,6 +132,47 @@ void followPatternLengths (const std::vector<std::int64_t>& before, Song& song)
     }
 }
 
+namespace
+{
+template <typename Song_, typename Fn>
+void forEachHostedPlugin (Song_& song, Fn&& fn)
+{
+    for (auto& c : song.channels)
+        if (c.instrument == InstrumentKind::plugin && ! c.plugin.id.empty())
+            fn (c.plugin);
+    for (auto& track : song.mixer)
+        for (auto& slot : track.effects)
+            if (slot.kind == EffectKind::plugin && ! slot.plugin.id.empty())
+                fn (slot.plugin);
+}
+} // namespace
+
+std::map<std::string, int> pluginIdCounts (const Song& song)
+{
+    std::map<std::string, int> counts;
+    forEachHostedPlugin (song, [&counts] (const PluginRef& ref) { ++counts[ref.id]; });
+    return counts;
+}
+
+int detachNewPlugins (const std::map<std::string, int>& before, Song& song)
+{
+    auto added = pluginIdCounts (song);
+    for (auto& [id, n] : added)
+        if (const auto it = before.find (id); it != before.end())
+            n -= it->second;
+    int marked = 0;
+    forEachHostedPlugin (song, [&] (PluginRef& ref) {
+        auto& left = added[ref.id];
+        if (left > 0 && ref.state.empty() && ! ref.detached)
+        {
+            ref.detached = true;
+            --left;
+            ++marked;
+        }
+    });
+    return marked;
+}
+
 std::vector<std::int64_t> patternLengths (const Song& song)
 {
     std::vector<std::int64_t> lengths;

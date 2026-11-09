@@ -2554,7 +2554,10 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
 
     const auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
+    const auto pluginsBefore = detachNewPluginsOn ? pluginIdCounts (song) : std::map<std::string, int>();
     edit (song);
+    if (detachNewPluginsOn)
+        detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)

@@ -820,6 +820,7 @@ public:
         useClassicRendering();
         setVisible (true);
         toFront (false);
+        nativechild::raiseOverlays();
         startHost();
     }
 
@@ -859,12 +860,14 @@ public:
         if (minimised)
             setMinimisedFrame (false);
         toFront (true);
+        nativechild::raiseOverlays();
         lastUsed() = key();
     }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
         toFront (false);
+        nativechild::raiseOverlays();
         lastUsed() = key();
         if (e.eventComponent != this)
             return;

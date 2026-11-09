@@ -8042,3 +8042,7 @@ countries: de at ch li lu
 "Empty project" = "Leeres Projekt"
 "Last used project" = "Zuletzt verwendetes Projekt"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Die Standardvorlage öffnet sich mit Datei › Neu und beim Start, wenn Projekt beim Start auf „Standardvorlage\" steht, als neues, unbenanntes Projekt, die Vorlage selbst wird also nie überschrieben. Datei › Als Vorlage speichern... fügt eigene hinzu."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Alle neuen Plugins ablösen"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "An: Das Fenster eines hinzugefügten Plugins öffnet sich abgelöst, über den Panels. Aus: Es öffnet sich angedockt im Arbeitsbereich, hinter einem angeklickten Panel. Im Fenstermenü jedes Plugins › Abgelöst lässt sich das pro Plugin ändern"

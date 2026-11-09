@@ -1,4 +1,5 @@
 #include "ui/WindowOwner.h"
+#include "ui/NativeChild.h"
 
 #include "core/WindowFit.h"
 
@@ -732,7 +733,8 @@ void matchWindowOrderToScreen()
     std::vector<juce::Component*> above;
     auto& desktop = juce::Desktop::getInstance();
     for (int i = 0; i < desktop.getNumComponents(); ++i)
-        if (auto* c = desktop.getComponent (i); c != owner && c->isVisible() && ! c->isAlwaysOnTop() && isAboveMainWindow (*c))
+        if (auto* c = desktop.getComponent (i); c != owner && c->isVisible() && ! c->isAlwaysOnTop() && ! nativechild::isAttached (*c)
+                                                 && isAboveMainWindow (*c))
             above.push_back (c);
 
    #if JUCE_WINDOWS
@@ -746,6 +748,14 @@ void matchWindowOrderToScreen()
     };
     std::stable_sort (above.begin(), above.end(), [&] (juce::Component* a, juce::Component* b) { return depthOf (a) > depthOf (b); });
    #endif
+
+    // issue #116: the main window's native child windows (panels, docked plugin windows) first, in their stacking order,
+    // so a drop lands on the one in front (JUCE looks for the target through its list of desktop windows, from the end)
+    {
+        auto children = nativechild::attachedChildren (owner->getWindowHandle());
+        children.erase (std::remove_if (children.begin(), children.end(), [] (juce::Component* c) { return ! c->isVisible(); }), children.end());
+        above.insert (above.begin(), children.begin(), children.end());
+    }
 
     // JUCE's list already in that order after the main window: nothing to do (no window is touched)
     const auto indexOf = [&desktop] (juce::Component* c) {

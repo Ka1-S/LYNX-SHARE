@@ -3720,7 +3720,15 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 5;
+            const int dockSteps = 2 * 4 + 8;
+            lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
+            struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
+            {
+                int calls = 0;
+                double last = 0.0;
+                void nativeScaleFactorChanged (double s) override { ++calls; last = s; }
+            } scaleSpy;
+            juce::ComponentPeer* spiedPeer = nullptr;
 
             void* panelHandle (lynx::workspace::Panel p) const { return workspace->getFrame (p).getWindowHandle(); }
 
@@ -3778,8 +3786,73 @@ private:
                     expect ("mixer_above_plugin_after_show", lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
                 }
                 else if (at == 9)
-                    lynx::PluginWindows::setDetached (*instance, true);
+                {
+                    // the setup wizard (Options › Setup wizard; first start) in front of the native panels and the plugin
+                    ui->showSetupWizard();
+                }
                 else if (at == 10)
+                {
+                    auto* overlay = ui->setupOverlayForTest();
+                    auto* h = overlay != nullptr ? overlay->getWindowHandle() : nullptr;
+                    expect ("setup_overlay_native_child", h != nullptr && h != main && lynx::nativechild::parentOf (h) == main);
+                    expect ("setup_overlay_above_plugin", lynx::nativechild::isAbove (h, plug));
+                    for (auto p : dockPanels)
+                        expect ("setup_overlay_above_" + id (p), lynx::nativechild::isAbove (h, panelHandle (p)));
+                    workspace->activate (Panel::playlist); // (a panel brought in front by code: the overlay stays in front)
+                    lynx::PluginWindows::open ({}, *instance, {});
+                    expect ("setup_overlay_stays_in_front", lynx::nativechild::isAbove (h, plug) && lynx::nativechild::isAbove (h, panelHandle (Panel::playlist)));
+                }
+                else if (at == 11)
+                {
+                    ui->closeSetupWizardForSnapshot();
+                    expect ("setup_overlay_closed", ui->setupOverlayForTest() == nullptr);
+                    // drops: JUCE's list of windows in the native stacking order once a drag starts
+                    workspace->activate (Panel::mixer);
+                    workspace->hide (Panel::browser);
+                    workspace->show (Panel::browser);
+                    lynx::matchWindowOrderToScreen();
+                    auto children = lynx::nativechild::attachedChildren (main);
+                    auto& desktop = juce::Desktop::getInstance();
+                    int last = -1;
+                    bool ordered = children.size() >= 5;
+                    for (auto* c : children)
+                        if (c->isVisible())
+                        {
+                            int at2 = -1;
+                            for (int k = 0; k < desktop.getNumComponents(); ++k)
+                                if (desktop.getComponent (k) == c)
+                                    at2 = k;
+                            ordered = ordered && at2 > last;
+                            last = at2;
+                        }
+                    expect ("drop_order_matches_screen", ordered);
+                }
+                else if (at == 12)
+                {
+                    // the main window's scale changes (a display with another scale): every native child placed again in
+                    // physical pixels, the docked editor's window told (JUCE tells child windows nothing by itself)
+                    for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+                        if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getNativeHandle() == plug)
+                            spiedPeer = peer;
+                    if (spiedPeer != nullptr)
+                        spiedPeer->addScaleFactorListener (&scaleSpy);
+                    lynx::nativechild::notifyScaleListenersForTest (*mainWindow);
+                    juce::Desktop::getInstance().setGlobalScaleFactor (1.25f); // and LYNX's own UI zoom
+                }
+                else if (at == 13)
+                {
+                    bool placed = true;
+                    for (auto* c : lynx::nativechild::attachedChildren (main))
+                        placed = placed && (! c->isVisible() || lynx::nativechild::placedPhysically (*c));
+                    expect ("native_children_placed_at_125", placed);
+                    expect ("docked_editor_told_the_scale", scaleSpy.calls > 0 && spiedPeer != nullptr
+                                                                && std::abs (scaleSpy.last - spiedPeer->getPlatformScaleFactor()) < 0.001);
+                    if (spiedPeer != nullptr && juce::ComponentPeer::isValidPeer (spiedPeer))
+                        spiedPeer->removeScaleFactorListener (&scaleSpy);
+                    juce::Desktop::getInstance().setGlobalScaleFactor (1.0f);
+                    lynx::PluginWindows::setDetached (*instance, true);
+                }
+                else if (at == 14)
                 {
                     expect ("detached_reopened", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance));
                     expect ("detached_owned_by_main", plug != nullptr && lynx::nativechild::ownerOf (plug) == main);
@@ -3787,7 +3860,7 @@ private:
                     for (auto p : dockPanels)
                         workspace->activate (p);
                 }
-                else if (at == 11)
+                else if (at == 15)
                 {
                     // (an owned top-level window: above the main window and so above all its child windows)
                     expect ("detached_stays_above_clicked_panels", plug != nullptr && lynx::nativechild::ownerOf (plug) == main
@@ -3959,6 +4032,7 @@ private:
             test->mainWindow->setContentOwned (ui, false);
             test->mainWindow->setBounds (20, 20, 1500, 900);
             test->workspace = &ui->workspaceForTest();
+            test->ui = ui;
             if (const auto ms = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_STEP_MS", {}).getIntValue(); ms > 0)
                 test->stepMs = ms;
         }

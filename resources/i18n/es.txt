@@ -8042,3 +8042,7 @@ countries: es mx ar co cl pe ve
 "Empty project" = "Proyecto vacío"
 "Last used project" = "Último proyecto usado"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "La plantilla predeterminada se abre con Archivo › Nuevo, y al iniciar cuando Proyecto al iniciar es \"Plantilla predeterminada\", como un proyecto nuevo sin nombre, así que la plantilla nunca se sobrescribe. Archivo › Guardar como plantilla... añade las tuyas."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Separar todos los plugins nuevos"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Activado: la ventana de un plugin que añades se abre separada, encima de los paneles. Desactivado: se abre acoplada en el escritorio, detrás de un panel en el que hagas clic. El menú de la ventana de cada plugin › Separado lo cambia para ese plugin"

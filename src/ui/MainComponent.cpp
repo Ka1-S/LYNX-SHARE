@@ -12,6 +12,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "ui/NativeChild.h"
 #include "core/PlaylistOps.h"
 #include "core/Performance.h"
 
@@ -1234,9 +1235,26 @@ void MainComponent::resized()
     }
     if (setupOverlay != nullptr)
     {
-        setupOverlay->setBounds (getLocalBounds());
+        hostSetupOverlayNatively();
+        nativechild::place (*setupOverlay, *this, getLocalBounds());
         setupOverlay->toFront (false);
     }
+}
+
+void MainComponent::hostSetupOverlayNatively()
+{
+    // issue #116: in front of the native panels and docked plugin windows too (a native child window of its own, showing
+    // what is under it); without a native window yet, a plain overlay until there is one
+    if (setupOverlay == nullptr || ! nativechild::dockingEnabled() || nativechild::isAttached (*setupOverlay) || getPeer() == nullptr)
+        return;
+    removeChildComponent (setupOverlay.get());
+    if (auto host = nativechild::makeOverlayHost (setupOverlay, *this))
+    {
+        nativechild::forwardUnusedKeys (*host);
+        setupOverlay = std::move (host);
+        return;
+    }
+    addAndMakeVisible (*setupOverlay);
 }
 
 // --- toolbar layout ------------------------------------------------------------------------------
@@ -2014,6 +2032,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "detachNewPlugins") // FL's General › "Detach all new plugins" (issue #116)
+            engine.setDetachNewPlugins (on);
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
@@ -2227,6 +2247,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
@@ -5707,6 +5728,7 @@ void MainComponent::openSettings (int page)
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.detachNewPlugins = safe->engine.detachesNewPlugins();
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
@@ -5793,6 +5815,7 @@ void MainComponent::openSettings (int page)
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        self.engine.setDetachNewPlugins (o.detachNewPlugins);
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
@@ -7090,6 +7113,7 @@ void MainComponent::showSetupWizard()
     addAndMakeVisible (*setupOverlay);
     setupOverlay->setBounds (getLocalBounds());
     setupOverlay->toFront (true);
+    hostSetupOverlayNatively();
 }
 
 void MainComponent::showImportReport()

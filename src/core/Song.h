@@ -2068,6 +2068,12 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track);
 // a clip resized or cut by hand keeps its length). `before` = patternLengths (song) before the edit.
 // (Issue #4: a pattern set to 2 bars still looped 1 bar in Song mode.)
 std::vector<std::int64_t> patternLengths (const Song& song);
+
+// FL's General › "Detach all new plugins" (issue #116): how many hosted plugins (Channel rack instruments and mixer
+// effects) of each id the song has, and, after an edit, marking the ones the edit added (an id the song has more of
+// than before, and no saved state yet: a plugin just added, not one loaded or cloned) as Detached. Returns how many.
+std::map<std::string, int> pluginIdCounts (const Song& song);
+int detachNewPlugins (const std::map<std::string, int>& before, Song& song);
 void followPatternLengths (const std::vector<std::int64_t>& before, Song& song);
 
 // Copy of the song ready for export: always in song mode (the current pattern becomes a clip

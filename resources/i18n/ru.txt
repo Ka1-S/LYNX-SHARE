@@ -8042,3 +8042,7 @@ countries: ru by kz
 "Empty project" = "Пустой проект"
 "Last used project" = "Последний проект"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Шаблон по умолчанию открывается по Файл › Новый, а при запуске — если в «Проект при запуске» выбран «Шаблон по умолчанию», как новый проект без имени, поэтому сам шаблон никогда не перезаписывается. Файл › Сохранить как шаблон... добавляет ваши."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Отстыковывать все новые плагины"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Вкл.: окно добавленного плагина открывается отстыкованным, поверх панелей. Выкл.: открывается закреплённым в рабочей области, позади панели, по которой щёлкнули. Меню окна каждого плагина › Отстыкована меняет это для плагина"
