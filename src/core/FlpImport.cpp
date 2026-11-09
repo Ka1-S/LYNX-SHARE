@@ -187,6 +187,11 @@ std::string resolveFlPath (const std::string& flPath, const FlPathRoots& roots)
         { "%FLStudioFactoryData%", &roots.factoryData },
         { "%FLStudioUserData%", &roots.userData },
         { "%FLStudioData%", &roots.data },
+        // FL 2026 [EXEC issue #124, 26.1.7]: a sample under FL's Shared data folder (Documents\Image-Line) is saved as
+        // "%ILSharedData%<rest>" (no separator after the variable), one under its Downloads folder (FL Cloud sounds,
+        // downloaded packs) as "%FLStudioDownloadsData%\<rest>"
+        { "%FLStudioDownloadsData%", &roots.downloadsData },
+        { "%ILSharedData%", &roots.sharedData },
     };
 
     for (const auto& [name, root] : variables)
@@ -197,7 +202,13 @@ std::string resolveFlPath (const std::string& flPath, const FlPathRoots& roots)
         {
             if (root->empty())
                 return {};
-            auto path = *root + flPath.substr (variable.size());
+            auto rest = flPath.substr (variable.size());
+            const auto separator = [] (char c) { return c == '\\' || c == '/'; };
+            if (! rest.empty() && ! separator (rest.front()) && ! separator (root->back()))
+                rest.insert (rest.begin(), '\\'); // %ILSharedData% is the folder with its trailing separator
+            else if (! rest.empty() && separator (rest.front()) && separator (root->back()))
+                rest.erase (rest.begin());
+            auto path = *root + rest;
             // a POSIX root (macOS, Linux, a Wine prefix): FL's backslashes become '/', and FL's file names, written for
             // a case-insensitive file system, are matched ignoring case when the exact spelling does not exist
             if (root->front() == '/')

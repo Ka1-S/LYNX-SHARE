@@ -79,5 +79,6 @@ private:
     std::unique_ptr<Impl> d;
 };
 
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState);
+// `params` (may be null): the slot's parameters, so the mode's latency is known before the first block (issue #113)
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState, const EffectParams* params = nullptr);
 } // namespace lynx::mbdelay

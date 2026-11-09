@@ -43,23 +43,23 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate: case EffectKind::nebula: case EffectKind::halo:
         case EffectKind::horizon:
             return colour::violet;
-        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank:
+        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay:
         case EffectKind::multibandDelay: case EffectKind::echoform: case EffectKind::spiralEcho: case EffectKind::geminiDoubler:
         case EffectKind::newtime:
             return colour::azure;
         case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
         case EffectKind::fruityFlanger: case EffectKind::fruityFlangus: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:
         case EffectKind::orbit: case EffectKind::latticeMod: case EffectKind::autoPan: case EffectKind::fruityPanOMatic:
-        case EffectKind::effector: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
+        case EffectKind::effector: case EffectKind::pocketMultiFx: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
             return colour::teal;
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel:
-        case EffectKind::maximus: case EffectKind::peakController:
+        case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
-        case EffectKind::lofi: case EffectKind::squeeze:
+        case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
         case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:

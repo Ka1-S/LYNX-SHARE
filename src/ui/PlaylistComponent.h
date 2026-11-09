@@ -180,7 +180,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe };
+                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -303,6 +303,13 @@ private:
     void deleteTimeSelection();
     // fade handle of an audio clip under the mouse: 1 = fade-in, 2 = fade-out, 0 = none
     int fadeHandleAt (int clip, juce::Point<int> p) const;
+    // warp markers (round 175a, M3; a LYNX extra, the user's choice: Live edits them only in its Clip View): an audio
+    // clip whose channel has markers that bend the tempo shows them as small flags on its top edge, to drag sideways
+    std::vector<WarpPoint> clipWarpMarkers (int clip) const; // as played (warpedit::playedMarkers); empty: none
+    double clipFileSeconds (int clip) const;
+    int warpMarkerAt (int clip, juce::Point<int> p) const; // the marker's index, or -1
+    int warpClip = -1, warpIndex = -1;
+    double warpBeat = 0.0; // the dragged marker's beat (shown while dragging, applied on release)
     void updateScrollBars();
     bool isSelected (int index) const;
     void setSelection (std::vector<int> indices);
@@ -609,9 +616,24 @@ public:
         resized();
     }
 
+    // The Detail View (Clip-launch workflow, round 183a): not owned, nullptr in Pattern workflow. Docked at the bottom,
+    // under the grid and the Playlist; `heightFor` gives its height out of the panel's.
+    void setDetailView (juce::Component* detail, std::function<int (int)> heightFor)
+    {
+        if (detailView != nullptr && detailView != detail)
+            removeChildComponent (detailView);
+        detailView = detail;
+        detailHeightFor = std::move (heightFor);
+        if (detailView != nullptr)
+            addChildComponent (*detailView);
+        resized();
+    }
+
     void resized() override
     {
         auto area = getLocalBounds();
+        if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
+            detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (clipGrid != nullptr && gridView != GridView::song)
         {
             // (under the band the title bar shares with the Playlist's toolbar)
@@ -653,5 +675,7 @@ private:
     int titleLeft = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
+    juce::Component* detailView = nullptr;
+    std::function<int (int)> detailHeightFor;
 };
 } // namespace lynx

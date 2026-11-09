@@ -18,7 +18,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 | FL Studio installation (factory samples, plugin database) | registry, else `Program Files\Image-Line\FL Studio*` | `/Applications/FL Studio*.app/Contents/Resources/FL` (layout not confirmed) | a Windows FL Studio under Wine: `$WINEPREFIX` or `~/.wine`, `drive_c/Program Files/Image-Line/FL Studio*` |
 
 `LYNX_FL_INSTALL=<folder>` points LYNX SHARE at an FL Studio installation anywhere (the folder that contains `Data`).
-Importing `.flp` projects works everywhere; the installation only adds FL's factory samples and plugin database.
+Importing `.flp`, `.als` and `.flm` projects works everywhere; the FL Studio installation only adds FL's factory samples and plugin database.
 
 ## Platform helpers (`src/platform/`)
 

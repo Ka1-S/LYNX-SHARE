@@ -415,6 +415,14 @@ public:
         clickRight = right != nullptr ? right : left;
         clickTrack = track;
     }
+    // Round 188b (the plugins' side-chain bus): this audio goes into `track`'s input, as the metronome input does into its
+    // own track. nullptr = none. Same thread as process(); the pointers cover the block.
+    void setSideInput (const float* left, const float* right, int track) noexcept
+    {
+        sideLeft = left;
+        sideRight = right != nullptr ? right : left;
+        sideTrack = track;
+    }
 
     // Allocates the mixer buffers: call off the audio thread.
     // Blocks larger than maxBlockSize are processed in pieces.
@@ -463,10 +471,16 @@ public:
     // (RackState::slotsOfTarget) are not driven by automation clips / pattern events; the control's own value
     // plays. UI thread writes, audio thread reads (relaxed: a block late at worst).
     void setOverriddenSlots (const std::vector<int>& slots) noexcept;
+    // FL (issue #125, [EXEC] round 185b): a control the user moves (its knob, a linked controller) is no longer driven by
+    // its automation until playback starts again, stopped or playing. The slots set here are released that way; the
+    // renderer forgets them itself when the transport starts (and the engine its list of moved targets).
+    void setReleasedSlots (const std::vector<int>& slots) noexcept;
     bool isSlotOverridden (int slot) const noexcept
     {
-        return slot >= 0 && slot < RackState::maxAutomations
-            && (overridden[(std::size_t) slot / 32].load (std::memory_order_relaxed) & (1u << ((unsigned) slot % 32))) != 0;
+        if (slot < 0 || slot >= RackState::maxAutomations)
+            return false;
+        const auto bit = 1u << ((unsigned) slot % 32);
+        return ((overridden[(std::size_t) slot / 32].load (std::memory_order_relaxed) | released[(std::size_t) slot / 32].load (std::memory_order_relaxed)) & bit) != 0;
     }
 
     // Tempo used in the last block (changes with tempo automation). The transport advances with it.
@@ -528,6 +542,9 @@ private:
     bool automatedBendReset = false;
     std::array<std::atomic<std::uint32_t>, RackState::maxAutomations / 32> overridden {}; // touched while recording
     std::atomic<bool> anyOverridden { false };
+    std::array<std::atomic<std::uint32_t>, RackState::maxAutomations / 32> released {}; // moved by the user (issue #125)
+    std::atomic<bool> anyReleased { false };
+    bool releaseWasPlaying = false; // (audio thread) the last chunk played: a start clears `released`
     void clearOverriddenValues() noexcept;
     std::array<MixerMatrix, maxMixerTracks> lastTrackGain {}; // the level matrix of the previous block, for the ramp
     // round 168x: the "Post level and panning" recording tap's own ramp (the insert's level matrix without the mute)
@@ -586,10 +603,14 @@ private:
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;
+    const float* sideLeft = nullptr;
+    const float* sideRight = nullptr;
+    int sideTrack = -1;
     const EffectParams* overrideParams = nullptr;
     int overrideTrack = -1, overrideSlot = -1;
     int metronomeTarget (const RackState& state) const noexcept;
     void mixMetronome (const RackState& state, int track, int n) noexcept;
+    void mixSideInput (const RackState& state, int track, int n) noexcept;
     void mixLiveInput (const RackState& state, bool playing, int n) noexcept;
     void mixLiveInputTrack (const RackState& state, int track, bool recording, bool playing, int n) noexcept;
     // the task graph run (RackState::graphOk): per chunk, each task's unfinished predecessors and the ready queue

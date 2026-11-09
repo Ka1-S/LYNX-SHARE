@@ -117,6 +117,10 @@ public:
     // right before it. Ignored if unsupported (hosted plugins: FL's wrapper MIDI options).
     virtual void setNextNoteModulation (float /*modX*/, float /*modY*/) noexcept {}
     virtual void setNextNoteRelease (float /*velocity*/) noexcept {}
+    // The next note's own fine pitch (cents, the piano roll's, without the channel's tuning; issue #63), called right
+    // before noteOn. Hosted plugins send it as FL's wrapper does (core/HostNotePitch.h: the key it rounds to, the rest as
+    // the VST3 note's tuning); native engines take it with the channel's in setNextNoteExpression.
+    virtual void setNextNoteFinePitch (float /*cents*/) noexcept {}
     // Playback stopped: the held notes stop (hosted plugins may send "All Notes Off" or only those notes' note offs:
     // FL's wrapper option). The panic button: everything stops (a hosted plugin may also be reset).
     virtual void transportStopped() noexcept { allNotesOff(); }

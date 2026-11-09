@@ -1926,6 +1926,7 @@ public:
     void prepare (double sr) noexcept override
     {
         take();
+        (void) ladderTable(); // (built here, not by the first render on the audio thread: it allocates)
         rate = sr;
         applySetup();
     }

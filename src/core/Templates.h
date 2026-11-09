@@ -72,4 +72,40 @@ Song makeNewProject (int templateIndex = -1);
 
 // A user template's name from its file name ("Trap kit.lynx" → "Trap kit").
 std::string templateDisplayName (const std::string& fileName);
+
+// The default template (issue #123; FL's Options › General › Miscellaneous › "Default template", REA_rodada186a): what
+// LYNX opens at start-up and what File › New starts from, always as a new untitled project. Saved as one line of text:
+// "" = LYNX's default song, "builtin:<name>" = a built-in template (templateNames), "user:<file name>" = a .lynx file
+// in the user's templates folder. Anything unreadable reads as LYNX's default.
+struct TemplateChoice
+{
+    enum class Kind
+    {
+        lynxDefault,
+        builtIn,
+        user
+    };
+    Kind kind = Kind::lynxDefault;
+    std::string name; // the built-in template's name, or the user template's file name ("Vocal chain.lynx")
+
+    std::string toText() const;
+    static TemplateChoice parse (const std::string& text);
+    bool isLynxDefault() const noexcept { return kind == Kind::lynxDefault; }
+    bool operator== (const TemplateChoice&) const = default;
+};
+
+// What LYNX opens at start-up without a file to open (FL's Options › General › Miscellaneous › "Startup project",
+// REA_rodada186a: Empty project / Default template / Last used project; FL's default is the default template). Saved as
+// "empty" / "template" / "last"; anything else reads as the default template.
+enum class StartupProject
+{
+    emptyProject,
+    defaultTemplate,
+    lastProject
+};
+const char* startupProjectText (StartupProject choice) noexcept;
+StartupProject parseStartupProject (const std::string& text) noexcept;
+
+// The index of a built-in template by its name (templateNames), or -1.
+int builtInTemplateIndex (const std::string& name);
 } // namespace lynx

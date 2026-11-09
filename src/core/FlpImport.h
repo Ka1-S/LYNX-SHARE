@@ -17,6 +17,8 @@ struct FlPathRoots
     std::string factoryData; // %FLStudioFactoryData%  e.g. C:\Program Files\Image-Line\FL Studio 2026
     std::string data;        // %FLStudioData%         e.g. ...\FL Studio 2026\Data
     std::string userData;    // %FLStudioUserData%     e.g. Documents\Image-Line\FL Studio
+    std::string sharedData;  // %ILSharedData%         e.g. Documents\Image-Line (FL's "Shared data" folder)
+    std::string downloadsData; // %FLStudioDownloadsData% e.g. Documents\Image-Line\Downloads (FL Cloud sounds...)
     std::string home;        // this user's profile (C:\Users\name): re-roots paths saved on another account/PC
 };
 
