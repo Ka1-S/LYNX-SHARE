@@ -21,8 +21,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 bin="${1:?usage: run-tests.sh [-j N] [-s M] <lynx_tests> [arguments]}"; shift
-[[ -n "$jobs" ]] || jobs="$(nproc 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 4)"
-[[ "$jobs" -ge 1 ]] 2> /dev/null || { echo "run-tests: -j wants a number" >&2; exit 2; }
+[[ -z "$jobs" || "$jobs" == auto ]] && jobs="$(nproc 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 4)"
+case "$jobs" in '' | *[!0-9]* | 0) echo "run-tests: -j wants a number or auto, not '$jobs'" >&2; exit 2 ;; esac
 (( jobs == 1 )) && exec "$bin" "$@"
 [[ -n "$shards" ]] || shards=$((jobs * 3))
 here="$(cd "$(dirname "$0")/.." && pwd)"
