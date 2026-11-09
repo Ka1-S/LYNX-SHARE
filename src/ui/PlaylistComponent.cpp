@@ -2935,9 +2935,17 @@ juce::Rectangle<float> PlaylistComponent::gainHandle (int index) const
 
 void PlaylistComponent::showGainMenu (int index)
 {
-    const auto& song = engine.getSong();
-    if (index < 0 || index >= (int) song.playlist.size())
+    if (index < 0 || index >= (int) engine.getSong().playlist.size())
         return;
+    gainMenu (index).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu PlaylistComponent::gainMenu (int index)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.playlist.size())
+        return menu;
     std::vector<int> targets;
     for (auto i : isSelected (index) ? selection : std::vector<int> { index })
         if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
@@ -2953,7 +2961,6 @@ void PlaylistComponent::showGainMenu (int index)
     };
 
     // FL 2026's gain handle menu [SHOT round 166e]
-    juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Gain: {0}", { gainText (song.playlist[(std::size_t) index].gain) }));
     menu.addItem (tr ("Reset gain"), [setDb] { setDb (0.0); });
     // FL's popup (FUN_00cfcdf0, handle kind 5): with two or more clips selected and the clicked one among them, Normalize
@@ -2980,7 +2987,7 @@ void PlaylistComponent::showGainMenu (int index)
                                  }),
                                  true);
     });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 // FL's fade handle menu (EventEditForm PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d01bc0; checks from its

@@ -10767,6 +10767,41 @@ private:
                 }
             }
             {
+                // round 189n: FL's gain handle menu with two clips selected (Normalize selection individually / as a group)
+                // and the fade in menu of a clip that overlaps the one before it (Create crossfade enabled)
+                const auto before = offline.getSong();
+                auto song = before;
+                lynx::ChannelDef channel;
+                channel.instrument = lynx::InstrumentKind::audioClip;
+                channel.name = "Audio clip";
+                song.channels.push_back (channel);
+                int lane = 0;
+                for (const auto& c : song.playlist)
+                    lane = std::max (lane, c.track + 1);
+                for (int k = 0; k < 2; ++k)
+                {
+                    lynx::Clip clip;
+                    clip.kind = lynx::ClipKind::audio;
+                    clip.channel = (int) song.channels.size() - 1;
+                    clip.track = lane;
+                    clip.start = k * lynx::ppq * 3;
+                    clip.length = lynx::ppq * 4;
+                    song.playlist.push_back (clip);
+                }
+                const auto second = (int) song.playlist.size() - 1;
+                offline.setSong (song);
+                offline.dispatchPendingMessages();
+                auto& playlist = ui.getPlaylistForSnapshot();
+                playlist.selectForSnapshot ({ second - 1, second });
+                auto gain = playlist.gainMenu (second);
+                playlist.selectForSnapshot ({});
+                auto fadeIn = playlist.fadeHandleMenu (second, 0);
+                saveMenus (juce::StringArray { "Gain handle, 2 selected", "Fade in, overlapping" },
+                           std::vector<juce::PopupMenu> { gain, fadeIn }, prefix + "-fade-gain189n.png");
+                offline.setSong (before);
+                offline.dispatchPendingMessages();
+            }
+            {
                 // REA round 143: the piano roll Tools menu, a Playlist track menu and a mixer insert menu (FL's layouts)
                 std::vector<juce::PopupMenu> menus { ui.getPianoRollForSnapshot().getToolsMenuForSnapshot(),
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),
