@@ -57,3 +57,39 @@ plugin windows, the others keep their place.
 - Idle CPU of the plain app, 30 s after 15 s settling, alternating runs: off 14.1 % / 7.9 %, docked 7.1 % / 14.4 %
   of one core. The spread is between runs, not between modes: no idle cost measured.
 - FL | LYNX sheets: E:\lynx-work\dock188a\shots\116-4…116-11.
+
+## 6. Slice 3: docked by default (coordinator: approved once the visible regressions are fixed)
+- **Default flipped:** `nativechild::dockingEnabled()` is on unless `LYNX_DOCKED_PLUGINS=0` (then every plugin window is
+  detached and the panels are plain components, as before #116).
+- **Setup wizard** (first start, Options › Setup wizard): hosted in a native child window of its own
+  (`nativechild::makeOverlayHost`), opaque, showing a picture of the window as drawn (PrintWindow with the full content, so
+  plugin editors are in it) with the wizard's dimmer and card on top. It stays in front when a panel or plugin is
+  brought forward (`raiseOverlays`). Without docking, or before the main window has a native window, it is the plain
+  overlay as before.
+- **Drops:** `matchWindowOrderToScreen` (called when a drag starts) now orders JUCE's desktop list by the native
+  stacking order of the main window's child windows too, so JUCE's drop target search (from the end of that list)
+  finds the panel or plugin in front.
+- **DPI:** JUCE positions a child window with the scale of the display at its logical position taken as a screen
+  point, and child windows never get WM_DPICHANGED. `nativechild::place` now puts each native child at its bounds in
+  the main window's physical pixels (UI zoom included), and on a main-window scale change (`Workspace::PeerWatch`
+  listens to the main peer) every native child is placed again and its peer's scale listeners are called, which is
+  what JUCE's hosted VST2/VST3 editors listen to (`NativeScaleFactorNotifier`).
+  Machine limit: both monitors here run at 100 %, so a real cross-display DPI change was not reproduced; the test calls
+  the main peer's scale listeners as WM_DPICHANGED does and also switches the UI zoom to 125 %.
+- **FL's "Detach all new plugins"** (FL: General › Miscellaneous, off by default, fl-04-misc.png; renamed from "Detach
+  all plugins" in FL 2025, WhatsNew 16374, so it concerns new plugins only): Settings › General › Editing, off. The
+  engine marks the plugins an edit adds (an id the song has more of than before, with no saved state yet) as Detached
+  (`detachNewPlugins`, core/Song.h); loaded and cloned plugins keep their own flag. Strings in all 14 languages.
+- Proof (cloud build 42618768839 "round build: success", selftest OK): `rep-effD.txt` / `rep-instD.txt` all checks 1,
+  dock_result=OK, result=OK,
+  incl. setup_overlay_* (native child, above plugin and every panel, stays in front), drop_order_matches_screen,
+  native_children_placed_at_125, docked_editor_told_the_scale; `--windowtest` result=OK with docking on by default.
+  Core test `detach_new_plugins_marks_only_the_plugins_an_edit_added`. Idle CPU, plain app, 30 s each, alternating:
+  LYNX_DOCKED_PLUGINS=0 13.8 / 8.8 / 5.9 %, docked (default) 8.7 / 11.9 / 10.8 % of one core: inside the run-to-run
+  spread (no timer was added; the native children only repaint what changes).
+
+### Left open (not visible regressions, can follow)
+- No fade for native panels when they open or close; the .flp Detached bit.
+- The Fruity Dance stage (`DanceStage`, dancers drawn over the workspace by the main component) stays under the native
+  panels: it is transparent and animated, so it needs a layered (per-pixel alpha) window. Only projects with a dance
+  channel see it. Needs a decision (see the round report).
