@@ -298,7 +298,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
     if (fixedBlock > 0)
     {
         // (every output channel goes through the fixed blocks: the other outputs keep their place too)
-        const auto channels = juce::jmax (2, plugin->getTotalNumOutputChannels());
+        const auto channels = juce::jlimit (2, 64, plugin->getTotalNumOutputChannels()); // (64: render()'s pointer array)
         fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), channels);
         pending.ensureSize (8192);
         scratch.assign ((std::size_t) blockSize * (std::size_t) channels, 0.0f);
