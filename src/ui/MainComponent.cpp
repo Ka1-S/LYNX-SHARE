@@ -74,6 +74,7 @@
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
@@ -6730,6 +6731,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                      currentFile != juce::File() ? currentFile.getParentDirectory()
                                                                  : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                      projectStem (projectName));
+            });
+            // Export for other apps (round 184a, S9): stems, MIDI, a Live set, an FL Studio project, the mixdown and a README
+            exports.addItem (tr ("For other apps..."), [this] {
+                engine.capturePluginStates();
+                showOtherAppsExportDialog (engine,
+                                           currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                           projectStem (projectName));
             });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });

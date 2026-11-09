@@ -49,6 +49,7 @@
 #include "platform/Package.h"
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/OtherAppsExport.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/MixerBasicsCheck.h"
 #include "ui/VideoPlayerView.h"
@@ -1642,6 +1643,16 @@ public:
         {
             const auto i = args.indexOf ("--export-als");
             runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
+        // --export-bundle <in.lynx|.flp|.als> <folder> [--zip] [--no-mixdown] [--shot <prefix>] (round 184a, S9): File ›
+        // Export › "For other apps..." without the window; the report goes to "<folder>/export-bundle.txt"
+        if (args.contains ("--export-bundle"))
+        {
+            const auto i = args.indexOf ("--export-bundle");
+            runBundleExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--zip"), ! args.contains ("--no-mixdown"),
+                             args.contains ("--shot") ? args[args.indexOf ("--shot") + 1].unquoted() : juce::String());
             return;
         }
 
@@ -7380,6 +7391,59 @@ private:
         report << (als != juce::File() ? "ok " + als.getFullPathName() : "error=" + error) << "\n" << notes.joinIntoString ("\n") << "\n";
         juce::File (folderPath).getChildFile ("export-als.txt").replaceWithText (report);
         setApplicationReturnValue (als != juce::File() ? 0 : 1);
+        quit();
+    }
+
+    void runBundleExport (const juce::String& inputPath, const juce::String& folderPath, bool zip, bool mixdown, const juce::String& shotPrefix)
+    {
+        juce::String error;
+        bool ok = false;
+        lynx::otherapps::Result result;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            if (input.hasFileExtension ("flp;als"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                loader.capturePluginStates();
+                lynx::otherapps::Context context;
+                context.host = &loader.getPluginHost();
+                context.flOptions = lynx::flstudio::optionsFor (context.host, lynx::flpexport::LynxOnly::renderAudio, loader.getSong());
+                context.render = [] (const lynx::Song& s, const lynx::exportopts::Options& o, const juce::File& file,
+                                     const std::function<bool (double)>& progress, juce::String& err) {
+                    lynx::ExportJob job (s, o, file);
+                    return job.run (progress, err);
+                };
+                context.onMessageThread = [] (std::function<void()> f) { f(); };
+                lynx::exportbundle::Options options;
+                options.zip = zip;
+                options.mixdown = mixdown;
+                const auto name = input.getFileNameWithoutExtension();
+                const auto shot = [&shotPrefix] (juce::Component& c, const juce::String& suffix) {
+                    if (shotPrefix.isNotEmpty())
+                        savePng (c.createComponentSnapshot (c.getLocalBounds()), shotPrefix + suffix);
+                };
+                if (auto panel = lynx::makeOtherAppsExportPanel (loader, name))
+                    shot (*panel, "-panel.png");
+                ok = lynx::otherapps::write (loader.getSong(), name, options, juce::File (folderPath), context, result);
+                if (auto report = lynx::makeOtherAppsReportPanel (result.folder, result.written, result.failed))
+                    shot (*report, "-report.png");
+            }
+        }
+        juce::String report;
+        report << (ok ? "ok " + result.folder.getFullPathName() : "error=" + error) << "\n";
+        for (const auto& w : result.written)
+            report << "written " << w << "\n";
+        for (const auto& f : result.failed)
+            report << "failed " << f << "\n";
+        juce::File (folderPath).getChildFile ("export-bundle.txt").replaceWithText (report);
+        setApplicationReturnValue (ok && result.failed.isEmpty() ? 0 : 1);
         quit();
     }
 
