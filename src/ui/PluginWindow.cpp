@@ -398,7 +398,7 @@ public:
     {
         // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
         // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
-        if (sideTrack >= 0 && sideSlot >= 0 && sideInputChannels (plugin) > 0)
+        if (sideTrack >= 0 && sideSlot >= 0 && hasSideBus (plugin))
         {
             addAndMakeVisible (sidechain);
             sidechain.setTooltip (tr ("Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs"));

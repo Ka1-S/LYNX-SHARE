@@ -753,6 +753,17 @@ bool editorFaultCatchable (std::uint32_t code) noexcept
     }
 }
 
+std::string githubTitle (std::string_view kind, const std::string& lastStep)
+{
+    if (kind == "hang")
+        return "Freeze: " + lastStep;
+    if (kind == "manual")
+        return "Problem: " + lastStep;
+    if (kind == "crash")
+        return "Crash: " + lastStep;
+    return lastStep.empty() ? "Closed unexpectedly (no crash report)" : "Closed unexpectedly (no crash report) after: " + lastStep;
+}
+
 std::string githubKindOption (std::string_view kind)
 {
     if (kind == "crash" || kind == "unclean")

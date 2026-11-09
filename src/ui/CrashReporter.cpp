@@ -290,7 +290,7 @@ juce::String githubUrl (const cr::ReportInput& in)
         f.audio = a (in.audioDriver + " / " + in.audioDevice + ", " + std::to_string ((int) in.sampleRate) + " Hz, " + std::to_string (in.bufferSize) + " samples");
     f.kind = cr::githubKindOption (in.kind);
     const auto last = in.steps.empty() ? std::string() : a (in.steps.back().substr (std::min<std::size_t> (in.steps.back().find (' ') + 1, in.steps.back().size())));
-    f.title = (in.kind == "hang" ? "Freeze: " : in.kind == "manual" ? "Problem: " : "Crash: ") + last;
+    f.title = cr::githubTitle (in.kind, last);
     if (! in.steps.empty())
     {
         std::string steps = "LYNX SHARE's last steps before it closed:\n";

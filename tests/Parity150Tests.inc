@@ -101,13 +101,14 @@ TEST (prism_linear_and_minimum_free_round150)
 {
     using namespace lynx;
     namespace m = dyn::prism;
-    // linear phase: the reference's continuous slopes, 1 / (1 + x^m), m = slope / 6 (9 dB/oct: m = 1.5)
+    // linear phase: the reference's continuous slopes, 1 / (1 + x^m), m = slope / 6 (9 dB/oct: m = 1.5); round tp172b7:
+    // x = f / fc, the analog axis (Pro-MB probes p18b / p19: Linear phase follows it up to Nyquist)
     auto p = p150::freeBands ({ { 30.0, 1000.0, 24, 9, -12 } });
     p[m::processingMode] = 0.0f;
     const auto g = std::pow (10.0, -12.0 / 20.0);
     for (const double hz : { 250.0, 1000.0, 2000.0, 4000.0 })
     {
-        const auto w = std::tan (dyn108::pi * hz / 48000.0), wc = std::tan (dyn108::pi * 1000.0 / 48000.0);
+        const auto w = hz, wc = 1000.0;
         const auto want = 20.0 * std::log10 (1.0 + (g - 1.0) / (1.0 + std::pow (w / wc, 1.5)));
         const auto tone = p147::toneGain (p, hz);
         std::printf ("  Prism linear 9 dB/oct: %.0f Hz %.2f dB (law %.2f)\n", hz, tone, want);
@@ -340,4 +341,28 @@ TEST (compressor_rcomp_ranges_round150)
     const auto s = vm123::wavesSlot ("RComp", "160.31 -15 -4 * * * * * 0.5 2.96 56.23 10 0 0 149.62 120 0 0 1 0.4 0 1.5 0 * * * 100 0", n);
     CHECK (s.params[13] == 1.0f && t (14, s.params[14]) == "2.96:1" && t (16, s.params[16]) == "0.50 ms");
     CHECK (t (17, s.params[17]) == "160 ms" && t (15, s.params[15]) == "-4.0 dB");
+}
+
+// round tp172b7 [EXEC] (Pro-MB, pink noise, band 500 Hz – 8 kHz at −12 dB, 24 dB/oct, 48 kHz; mode set by value): Linear
+// phase follows the analog axis above the high edge (12 kHz −1.2, 16 kHz −0.4 dB), Minimum phase the prewarped one
+// (−0.7 / −0.1 dB); both match LYNX's earlier Minimum phase within 0.1 dB, which stays as it was
+TEST (prism_linear_phase_on_the_analog_axis_round172b7)
+{
+    using namespace lynx;
+    namespace m = dyn::prism;
+    auto p = p150::freeBands ({ { 500.0, 8000.0, 24, 24, -12 } });
+    const double hz[] { 4000.0, 8000.0, 12000.0, 16000.0 };
+    const double linDb[] { -10.6, -4.0, -1.2, -0.4 }, minDb[] { -10.9, -4.1, -0.7, -0.1 };
+    for (int mode = 0; mode < 2; ++mode)
+    {
+        p[m::processingMode] = mode == 0 ? 0.0f : 1.0f;
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto want = mode == 0 ? linDb[k] : minDb[k];
+            const auto tone = p147::toneGain (p, hz[k]), curve = p150::curveDb (p, hz[k]);
+            std::printf ("  [172b7] Prism %s %.0f Hz: tone %.2f curve %.2f dB (Pro-MB %.1f)\n", mode == 0 ? "linear" : "minimum", hz[k], tone, curve, want);
+            CHECK (std::abs (tone - want) < 0.15);
+            CHECK (std::abs (curve - want) < 0.15);
+        }
+    }
 }
