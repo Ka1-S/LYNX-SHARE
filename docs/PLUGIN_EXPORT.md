@@ -166,8 +166,14 @@ Per instance, measured in plugexporttest:
   - the quick scan lists both plugins, and both load, play and open their editors;
   - a saved project reopens with their state;
   - FL exits cleanly.
-- The VST3s are not yet tested in FL, which finds VST3 only in `Common Files\VST3`. Both formats are validated with
-  pluginval, clap-validator and the LYNX host on Windows and Linux.
+- The VST3s were tested in FL from `Common Files\VST3`, the only place FL scans for VST3:
+  - load, play and both editors;
+  - a saved project reopens with its state;
+  - closing the editors with X works;
+  - FL exits in about 1.4 s.
+- Both formats are validated with pluginval, clap-validator and the LYNX host on Windows and Linux.
+- Opening a project and closing it untouched doesn't make FL ask to save. A state load sends the host no edits:
+  `plugexporttest` checks this, and for the CLAP it also checks for no `mark_dirty`.
 - Fixed in this round: FL hung on exit when the host unloaded the plugin DLL. LYNX's static image caches still held JUCE's
   Direct2D device, and freeing it under the loader lock deadlocked in the graphics driver. The last plugin instance
   now empties them (`ui/ImageCaches.h`), and a lint test keeps new static image caches registered.

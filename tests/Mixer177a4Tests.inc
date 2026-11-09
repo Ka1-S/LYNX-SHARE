@@ -92,14 +92,17 @@ TEST (mixer177a_d_assign_skips_inserts_with_a_track_as_fl)
     CHECK (song.playlistTracks.size() == 4 && song.playlistTracks[3].mixerTrack == 3);
 }
 
-TEST (mixer177a_e_a_rail_click_is_one_step_however_long_its_press)
+TEST (mixer177a_e_a_rail_press_steps_by_the_time_held_as_fl)
 {
     using lynx::faderRailStepsForHold;
-    // a click (an injected one holds 50 ms plus jitter; a person's up to ~150 ms) is exactly one step
-    for (int ms : { 0, 50, 64, 80, 130, 200, lynx::faderRailFirstRepeatMs - 1 })
+    // a hold shorter than the first delay is exactly one step (an injected click holds ~50 ms)
+    for (int ms = 0; ms < lynx::faderRailFirstRepeatMs; ms += 7)
         CHECK (faderRailStepsForHold (ms) == 1);
-    CHECK (lynx::faderRailFirstRepeatMs > 2 * lynx::faderRailRepeatMs);
-    // held, it then repeats at FL's rate
-    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs) == 2);
-    CHECK (faderRailStepsForHold (lynx::faderRailFirstRepeatMs + 10 * lynx::faderRailRepeatMs) == 12);
+    // FL, held 50 / 100 / 160 / 250 / 300 / 400 ms: 1 / 2 / 3 / 4 / 5 / 7 steps (REA_rodada177a section 4.2)
+    CHECK (faderRailStepsForHold (50) == 1);
+    CHECK (faderRailStepsForHold (100) == 2);
+    CHECK (faderRailStepsForHold (160) == 3);
+    CHECK (faderRailStepsForHold (250) == 4);
+    CHECK (faderRailStepsForHold (300) == 5);
+    CHECK (faderRailStepsForHold (400) == 7);
 }

@@ -20,6 +20,8 @@ void* mainWindowHandle();
 // had the focus). keepAboveMainWindow installs the forwarding on the window; the main window sets the handler. A window
 // that handles every key itself (a detached panel) sets the property "lynxOwnKeys".
 void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> handler);
+// Runs that handler for a key from elsewhere (a separate-process plugin's window, issue #99); false when none ran.
+bool runSecondaryWindowKey (const juce::KeyPress& key);
 
 // Before a drag (a sample from the Browser...): JUCE finds the drop target in its own list of windows, where the main
 // window comes first after any click in it, while the windows kept above it (channel settings, a plugin...) are on top
