@@ -122,6 +122,10 @@ TEST (rack183c_output_fade_pan_and_volume_match_lives_renders)
     CHECK (approx (rack::volumeGain (0.85f), 1.0f, 1.0e-4f));
     CHECK (approx (20.0f * std::log10 (rack::volumeGain (0.6f)), -10.0f, 0.01f));
     CHECK (approx (20.0f * std::log10 (rack::volumeGain (1.0f)), 6.0f, 0.01f));
+    // 40 dB per unit down to -18 dB (at 0.4), Live's stored points below
+    CHECK (approx (20.0f * std::log10 (rack::volumeGain (0.4f)), -18.0f, 0.01f));
+    CHECK (approx (20.0f * std::log10 (rack::volumeGain (0.5f)), -14.0f, 0.01f));
+    CHECK (20.0f * std::log10 (rack::volumeGain (0.39f)) < -18.0f);
     CHECK (std::abs (20.0f * std::log10 (rack::volumeGain (0.22f)) - (-32.0f)) < 1.0f);
     CHECK (rack::volumeGain (0.0f) == 0.0f);
     for (const float v : { 0.1f, 0.3f, 0.4f, 0.6f, 0.85f, 1.0f })
@@ -706,4 +710,22 @@ TEST (rack183c_group_into_a_rack_keeps_the_sound_and_the_automation)
     plugin.published = { pp };
     CHECK (! rack::fromPatcher (plugin));
     CHECK (rack::fromPatcher (plugin, [] (int, int) { return 0.4f; }) && approx (plugin.rack[0].macros[0].value, 0.4f * 127.0f, 1.0e-3f));
+    // Ungroup gives the slots back: same parameters, the automation on the parameter again, a slot after it shifted
+    song.mixer[1].effects.push_back (makeEffectSlot (EffectKind::fruityLimiter));
+    Automation after;
+    after.target = { AutomationTargetKind::effectParam, 1, 1, 2 };
+    song.automations.push_back (after);
+    CHECK (rack::ungroupSlot (song, 1, 0) == 0);
+    const auto& fx = song.mixer[1].effects;
+    CHECK (fx.size() == 3 && fx[0].kind == EffectKind::utility && fx[1].kind == EffectKind::utility && fx[2].kind == EffectKind::fruityLimiter);
+    if (fx.size() == 3)
+        CHECK (approx (fx[1].params[0], 0.25f, 1.0e-3f));
+    CHECK (song.automations[0].target == (AutomationTarget { AutomationTargetKind::effectParam, 1, 1, 0 }));
+    CHECK (song.automations[1].target == (AutomationTarget { AutomationTargetKind::effectParam, 1, 3, 2 }));
+    // not a one-chain Audio Effect Rack: untouched
+    const auto before = song.mixer[1].effects.size();
+    CHECK (rack::ungroupSlot (song, 1, 0) == -1 && song.mixer[1].effects.size() == before);
+    song.mixer[1].effects.push_back (rack::makeRackSlot());
+    rack::addChain (song.mixer[1].effects.back().patcher);
+    CHECK (rack::ungroupSlot (song, 1, (int) before) == -1);
 }

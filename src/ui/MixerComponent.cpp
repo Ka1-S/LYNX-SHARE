@@ -6411,6 +6411,20 @@ void EffectsPanel::showSlotMenu (int slot)
     // automation of the moved effects' parameters drives the rack's macros
     menu.addItem (tr ("Group into Audio Effect Rack"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] { groupIntoRack (slot, false); });
     menu.addItem (tr ("Group all into Audio Effect Rack"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] { groupIntoRack (slot, true); });
+    // Live's Ungroup: a one-chain Audio Effect Rack's devices back into the slots
+    if (const auto* list = slots(); list != nullptr && slot < (int) list->size() && rack::isRack ((*list)[(std::size_t) slot]))
+    {
+        const auto* r = rack::rackOf ((*list)[(std::size_t) slot].patcher);
+        const auto canUngroup = r != nullptr && r->kind == RackDoc::Kind::audioEffect && r->chains.size() == 1;
+        menu.addItem (tr ("Ungroup"), canUngroup, false, [this, slot] {
+            engine.capturePluginStates();
+            int placed = -1;
+            engine.editSong ([t = track, slot, &placed] (Song& song) { placed = rack::ungroupSlot (song, t, slot); });
+            if (placed >= 0)
+                selectedSlot = placed;
+            repaint();
+        });
+    }
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 

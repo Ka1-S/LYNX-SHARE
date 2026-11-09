@@ -119,6 +119,13 @@ EffectSlot group (const std::vector<EffectSlot>& slots);
 // param)`, 0..1; −1 = unknown → false), so the macro starts where the plugin is and grouping changes no sound.
 bool fromPatcher (PatcherDoc& doc, const std::function<float (int node, int param)>& pluginValue = {});
 std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot);
+// Live's Ungroup (Ctrl+Shift+G) on insert `track`'s slot `slot`: a one-chain Audio Effect Rack's devices take its place,
+// in order. Each native parameter a macro moves keeps the value the macro gives it now (a plugin keeps its own state).
+// Automation of a macro with one full-range mapping onto a device parameter moves onto that parameter, so ungrouping
+// what Group made gives the old slots back (LYNX: Live drops the macro automation); other macro, selector and morph
+// automation is dropped, as the macros go. Later slots' targets shift. Returns the first device's slot (the rack's slot
+// for an empty rack, which just goes), or −1 with the song untouched.
+int ungroupSlot (Song& song, int track, int slot);
 
 // ---------------------------------------------------------------------------------------------------------------
 // Macros

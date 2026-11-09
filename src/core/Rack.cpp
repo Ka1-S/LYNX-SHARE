@@ -855,6 +855,92 @@ std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot)
     return out;
 }
 
+int ungroupSlot (Song& song, int track, int slot)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return -1;
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    if (slot < 0 || slot >= (int) fx.size())
+        return -1;
+    const auto rackSlot = fx[(std::size_t) slot];
+    const auto* r = rackOf (rackSlot.patcher);
+    if (! isRack (rackSlot) || r == nullptr || r->kind != RackDoc::Kind::audioEffect || r->chains.size() != 1)
+        return -1;
+    const auto& nodes = r->chains.front().nodes;
+    auto out = ungroup (rackSlot);
+    std::vector<int> nodeAt; // device k's node
+    for (const auto n : nodes)
+        if (n >= 0 && n < (int) rackSlot.patcher.nodes.size())
+            nodeAt.push_back (n);
+    const auto devicePos = [&] (int node) {
+        const auto it = std::find (nodeAt.begin(), nodeAt.end(), node);
+        return it == nodeAt.end() ? -1 : (int) (it - nodeAt.begin());
+    };
+    // the macros' values onto the native parameters they move; the one-mapping full-range macros' new targets
+    std::array<int, rackMacroCount> moveTo {}, moveParam {};
+    moveTo.fill (-1);
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        const auto& macro = r->macros[(std::size_t) m];
+        const auto u = std::clamp (macro.value / 127.0f, 0.0f, 1.0f);
+        for (const auto& x : macro.mappings)
+        {
+            if (x.target != RackMapping::Target::param)
+                continue;
+            const auto k = devicePos (x.node);
+            if (k < 0 || x.param < 0)
+                continue;
+            auto& dev = out[(std::size_t) k];
+            if (dev.kind != EffectKind::plugin && x.param < maxEffectParams)
+                dev.params[(std::size_t) x.param] = std::clamp (x.min + (x.max - x.min) * u, 0.0f, 1.0f);
+        }
+        if (macro.mappings.size() == 1 && macro.mappings[0].target == RackMapping::Target::param && macro.mappings[0].min == 0.0f &&
+            macro.mappings[0].max == 1.0f && devicePos (macro.mappings[0].node) >= 0)
+        {
+            moveTo[(std::size_t) m] = slot + devicePos (macro.mappings[0].node);
+            moveParam[(std::size_t) m] = macro.mappings[0].param;
+        }
+    }
+    const auto added = (int) out.size() - 1; // later slots move by this much
+    song.forEachTarget ([&] (AutomationTarget& t) {
+        if ((t.kind != AutomationTargetKind::effectParam && t.kind != AutomationTargetKind::effectMix) || t.index != track)
+            return;
+        if (t.slot > slot)
+            t.slot += added;
+        else if (t.slot == slot)
+        {
+            if (t.kind == AutomationTargetKind::effectParam && t.param >= 0 && t.param < rackMacroCount && moveTo[(std::size_t) t.param] >= 0)
+            {
+                const auto m = (std::size_t) t.param;
+                t.slot = moveTo[m];
+                t.param = moveParam[m];
+            }
+            else if (t.kind != AutomationTargetKind::effectMix || out.size() != 1) // (one device keeps the slot's dry/wet)
+                t.kind = AutomationTargetKind::none;
+        }
+    });
+    for (auto& a : song.automations)
+        if (a.source.track == track && a.source.slot >= 0)
+        {
+            if (a.source.slot > slot)
+                a.source.slot += added;
+            else if (a.source.slot == slot)
+            {
+                a.source.track = -1;
+                a.target.kind = AutomationTargetKind::none;
+            }
+        }
+    if (out.size() == 1)
+        out[0].mix = rackSlot.mix * out[0].mix, out[0].enabled = rackSlot.enabled && out[0].enabled;
+    else if (! rackSlot.enabled)
+        for (auto& d : out)
+            d.enabled = false;
+    fx.erase (fx.begin() + slot);
+    fx.insert (fx.begin() + slot, out.begin(), out.end());
+    song.removeDeadMidiLinks();
+    return slot;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Macros
 
