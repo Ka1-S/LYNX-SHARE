@@ -3186,6 +3186,27 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
         menu.addSubMenu (tr ("Track routing"), routing, any);
+        // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
+        if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
+        {
+            juce::PopupMenu lost;
+            const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
+            for (int i = 0; i < (int) lostSends.size(); ++i)
+            {
+                juce::PopupMenu one;
+                juce::PopupMenu to;
+                for (int x = 1; x < (int) song.mixer.size(); ++x)
+                    if (x != t)
+                        to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
+                                    false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
+                one.addSubMenu (tr ("Reconnect to"), to);
+                one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
+                lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
+            }
+            lost.addSeparator();
+            lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
+            menu.addSubMenu (tr ("Disconnected links"), lost);
+        }
     }
     {
         juce::PopupMenu select;
@@ -3337,28 +3358,6 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         vcaMenu.addSubMenu (tr ("Assign to VCA"), assign, assign.getNumItems() > 0);
         vcaMenu.addSubMenu (tr ("Remove from VCA"), remove, remove.getNumItems() > 0);
         menu.addSubMenu (tr ("VCA"), vcaMenu);
-    }
-
-    // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
-    if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
-    {
-        juce::PopupMenu lost;
-        const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
-        for (int i = 0; i < (int) lostSends.size(); ++i)
-        {
-            juce::PopupMenu one;
-            juce::PopupMenu to;
-            for (int x = 1; x < (int) song.mixer.size(); ++x)
-                if (x != t)
-                    to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
-                                false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
-            one.addSubMenu (tr ("Reconnect to"), to);
-            one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
-            lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
-        }
-        lost.addSeparator();
-        lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
-        menu.addSubMenu (tr ("Disconnected links"), lost);
     }
 
     // --- FL's "Layout" section --------------------------------------------------------------------------
