@@ -414,7 +414,7 @@ TEST (nc187c_group_tools)
     p.notes = { note (0, 60, 0.5f, 0.4f), note (0, 64, 0.5f, 0.9f), note (0, 67), note (lynx::ppq, 60) };
     lynx::notetools::groupChance (p, { 0, 1, 2 }, true);
     CHECK (p.notes[0].chanceGroup == 1 && p.notes[1].chanceGroup == 1 && p.notes[2].chanceGroup == 1 && p.notes[3].chanceGroup == 0);
-    CHECK (p.notes[1].chance == 0.4f && p.notes[2].chance == 0.4f && p.notes[2].chanceOne); // the first one's chance
+    CHECK (p.notes[0].chance == 1.0f && p.notes[1].chance == 1.0f && p.notes[2].chanceOne); // a new group is at 100 % (Live)
     p.notes[2].chance = 0.75f;
     lynx::notetools::spreadGroupChance (p, { 2 });
     CHECK (p.notes[0].chance == 0.75f && p.notes[1].chance == 0.75f && p.notes[3].chance == 1.0f);
@@ -427,4 +427,72 @@ TEST (nc187c_group_tools)
     CHECK (p.notes[4].chanceGroup == 2 && p.notes[5].chanceGroup == 2 && p.notes[0].chanceGroup == 1);
     lynx::notetools::ungroupChance (p, { 0, 1, 2 });
     CHECK (p.notes[0].chanceGroup == 0 && ! p.notes[2].chanceOne && p.notes[0].chance == 0.75f);
+}
+
+TEST (nc187c_als_probability_groups)
+{
+    using namespace nc187c;
+    // the test set of round 187c: C/D Play One and E/F# Play All, as Live 12.4 saved it (live/nc-saved Project)
+    auto s = lynx::Song::makeDefault();
+    s.mode = lynx::PlayMode::song;
+    auto& p = s.patterns[0];
+    p.notes.clear();
+    for (int k = 0; k < 8; ++k)
+    {
+        auto n = note ((std::int64_t) k * lynx::ppq / 2, 60 + (k % 4) * 2, (60.0f + 8.0f * k) / 127.0f, k == 5 ? 0.1f : 0.5f);
+        n.chanceGroup = (k % 4) < 2 ? 1 : 2;
+        n.chanceOne = (k % 4) < 2;
+        n.chance = 1.0f;
+        p.notes.push_back (n);
+    }
+    p.notes[2].chance = p.notes[3].chance = p.notes[6].chance = p.notes[7].chance = 0.5f; // the Play All group at 50 %
+    p.lengthTicks = 4 * lynx::ppq;
+    s.playlist.clear();
+    lynx::Clip c;
+    c.pattern = 0;
+    c.length = 4 * lynx::ppq;
+    s.playlist.push_back (c);
+    const auto out = lynx::exportAls (s, {});
+    const auto has = [&out] (const char* text) { return out.xml.find (text) != std::string::npos; };
+    // NoteIds go key by key (C: 1 2, D: 3 4, E: 5 6, F#: 7 8), as Live numbers them
+    CHECK (has ("<NoteProbabilityGroup Id=\"0\">"));
+    CHECK (has ("<GroupType Value=\"1\" />"));
+    CHECK (has ("<GroupType Value=\"0\" />"));
+    CHECK (has ("<NoteId NoteId=\"4\" />"));
+    CHECK (has ("<Probability Value=\"0.5\" />"));
+    CHECK (has ("<GroupId Value=\"2\" />"));
+    std::string error;
+    auto check = [&] (const std::vector<std::uint8_t>& bytes, float allChance) {
+        const auto back = lynx::importAls (bytes, {}, &error);
+        CHECK (back.has_value());
+        if (! back)
+            return;
+        std::vector<lynx::Note> got;
+        for (const auto& pat : back->patterns)
+            got.insert (got.end(), pat.notes.begin(), pat.notes.end());
+        CHECK (got.size() == 8);
+        for (const auto& n : got)
+        {
+            const auto cd = n.key == 60 || n.key == 62;
+            CHECK (n.chanceGroup > 0 && n.chanceOne == cd);
+            CHECK (n.chance == (cd ? 1.0f : allChance));
+        }
+        std::set<int> ids;
+        for (const auto& n : got)
+            ids.insert (n.chanceGroup);
+        CHECK (ids.size() == 2);
+    };
+    check (out.bytes, 0.5f);
+    // Live's own block (12.4 save of this set, groups as above at 100 %), put in place of LYNX's
+    auto xml = out.xml;
+    const auto from = xml.find ("<NoteProbabilityGroups>"), to = xml.find ("</NoteProbabilityGroups>");
+    CHECK (from != std::string::npos && to != std::string::npos);
+    if (from == std::string::npos || to == std::string::npos)
+        return;
+    xml.replace (from, to - from, "<NoteProbabilityGroups><NoteProbabilityGroup Id=\"0\"><GroupType Value=\"1\" /><Notes><NoteId NoteId=\"1\" />"
+                                  "<NoteId NoteId=\"2\" /><NoteId NoteId=\"3\" /><NoteId NoteId=\"4\" /></Notes><Probability Value=\"1\" />"
+                                  "<GroupId Value=\"1\" /></NoteProbabilityGroup><NoteProbabilityGroup Id=\"2\"><GroupType Value=\"0\" /><Notes>"
+                                  "<NoteId NoteId=\"5\" /><NoteId NoteId=\"6\" /><NoteId NoteId=\"7\" /><NoteId NoteId=\"8\" /></Notes>"
+                                  "<Probability Value=\"1\" /><GroupId Value=\"3\" /></NoteProbabilityGroup>");
+    check (std::vector<std::uint8_t> (xml.begin(), xml.end()), 1.0f);
 }

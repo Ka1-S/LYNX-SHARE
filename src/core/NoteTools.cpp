@@ -801,13 +801,12 @@ void groupChance (Pattern& pattern, const std::vector<int>& indices, bool playOn
     auto id = 1;
     for (const auto& n : pattern.notes)
         id = std::max (id, n.chanceGroup + 1);
-    const auto chance = pattern.notes[(std::size_t) list.front()].chance;
     for (auto i : list)
     {
         auto& n = pattern.notes[(std::size_t) i];
         n.chanceGroup = id;
         n.chanceOne = playOne;
-        n.chance = chance;
+        n.chance = 1.0f; // a new group plays at 100 % [LIVE 12.4: grouping notes at 25-90 % showed "Probability: 100 %"]
     }
 }
 

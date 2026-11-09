@@ -1115,14 +1115,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (n.muted)
                 colour = noteMuted;
             const auto hovered = i == hover.note && drag == Drag::none;
-            // the velocity lane shows a note's Velocity Range (round 187c) as a faint bar from its velocity to where the
-            // range reaches, as Live draws it on the velocity marker
+            // the velocity lane shows a note's Velocity Range (round 187c) as a shaded box over the note's length, from
+            // its velocity to where the range reaches, as Live 12 draws it [LIVE 12.4 shot, live-02]
             if (laneBox.getSelectedId() == laneVelocity && n.velocityRange != 0.0f)
             {
                 const auto reach = juce::jlimit (1.0f / 127.0f, 1.0f, n.velocity + n.velocityRange);
                 const auto y2 = (float) lane.getBottom() - 2.0f - usable * reach;
-                g.setColour (colour.withAlpha (0.35f));
-                g.fillRect (juce::Rectangle<float> (x - 2.0f, juce::jmin (top, y2), 6.0f, std::abs (y2 - top)));
+                const auto w = juce::jmax (3.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+                g.setColour (colour.withAlpha (0.22f));
+                g.fillRect (juce::Rectangle<float> (x, juce::jmin (top, y2), w, std::abs (y2 - top)));
+                g.setColour (colour.withAlpha (0.5f));
+                g.drawHorizontalLine ((int) y2, x, x + w);
             }
             // a probability group (round 187c): its members' Chance markers joined by a line (the group has one Chance)
             if (laneIsChance() && n.chanceGroup != 0)

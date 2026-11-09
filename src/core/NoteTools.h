@@ -212,7 +212,7 @@ std::vector<int> selectStacked (const Pattern& pattern, const std::vector<int>& 
 void groupNotes (Pattern& pattern, const std::vector<int>& indices);
 void ungroupNotes (Pattern& pattern, const std::vector<int>& indices);
 // Live 12's probability groups (round 187c, Note::chanceGroup): the notes become one group that draws together, "Play
-// one" (one of them plays) or "Play all"; they take the chance of the first one (Live shows one marker per group).
+// one" (one of them plays) or "Play all", at 100 % as in Live (one Chance marker per group).
 // Ungrouping keeps each note's chance.
 void groupChance (Pattern& pattern, const std::vector<int>& indices, bool playOne);
 void ungroupChance (Pattern& pattern, const std::vector<int>& indices);
