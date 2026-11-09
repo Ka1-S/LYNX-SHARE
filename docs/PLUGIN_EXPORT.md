@@ -215,7 +215,8 @@ The download (round 188b, 1 CLAP + 7 VST3):
 | Archive | Size |
 |---|---|
 | `LYNX-Plugins-<v>-linux-x86_64.tar.xz` (stripped; one xz stream with a 256 MiB dictionary, so the VST3s cost almost nothing next to the CLAP) | 14.9 MB |
-| `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone) | 84.6 MB |
+| `LYNX-Plugins-<v>-macos-universal.tar.xz` (arm64 + x86_64 in each binary; Archive Utility opens it) | 22.2 MB |
+| `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone; each binary 24.9 MB, with section flags) | 84.6 MB |
 
 Per instance, measured in plugexporttest:
 
@@ -246,26 +247,30 @@ calls it an aux input bus, the CLAP a second, non-main audio input port. A silen
 (`plugexporttest` and `pluginexport188b_side_chain_bus_reaches_the_detector` check both). Facet EQ's sidechain
 controls stay hidden in the plugins for now.
 
-## Known gaps
+## Known gaps and test record
 
 - Facet EQ's sidechain controls are still hidden in the plugins (the bus is there; its editor's target menus assume LYNX's
   mixer).
+- The side-chain bus is checked through the VST3 (JUCE's host: a loud side signal into Crest Compressor's external side
+  chain takes its output energy to 0.14 of the quiet case). LYNX's own CLAP host has no side buses, so the CLAP's second
+  port is checked by clap-validator only, not with audio.
 - Ableton Live has not been tested, at the user's request.
-- FL Studio 2026 (Windows) was tested with the CLAP only, found through `CLAP_PATH`:
-  - the quick scan lists both plugins, and both load, play and open their editors;
-  - a saved project reopens with their state;
-  - FL exits cleanly.
-- The VST3s were tested in FL from `Common Files\VST3`, the only place FL scans for VST3:
-  - load, play and both editors;
-  - a saved project reopens with its state;
-  - closing the editors with X works;
-  - FL exits in about 1.4 s.
-- Both formats are validated with pluginval, clap-validator and the LYNX host on Windows and Linux.
+- FL Studio 2026 (Windows), round 180b: Facet EQ and FM10, as CLAP (through `CLAP_PATH`) and as VST3 (from
+  `Common Files\VST3`): load, play, both editors, a saved project reopens with its state, FL exits in about 1.4 s.
+- FL Studio 2026 (Windows), round 188b, the release download from CI: ADD > Refresh plugin list (fast scan) lists all 27
+  effects of the CLAP and the VST3s. Kiln Channel, Halo and Sentry Gate (CLAP) and Apex Limiter and LYNX Tune (VST3) in
+  one insert: each loads and opens its editor (FL shows Apex's 225-sample latency). LYNX Tune's Humanize set to 29 %, the
+  project saved; reopened, every slot and the 29 % come back; reopened and closed untouched, FL asks nothing and exits in
+  1.2 s; with an editor open it exits in 1.5 s. Shots: round 188b's `flshots/`.
+- Every plugin passes `plugexporttest`, pluginval (strictness 10) and clap-validator on Windows and Linux (CI and local);
+  macOS in CI.
 - Opening a project and closing it untouched doesn't make FL ask to save. A state load sends the host no edits:
   `plugexporttest` checks this, and for the CLAP it also checks for no `mark_dirty`.
-- Fixed in this round: FL hung on exit when the host unloaded the plugin DLL. LYNX's static image caches still held JUCE's
+- Fixed in round 180b: FL hung on exit when the host unloaded the plugin DLL. LYNX's static image caches still held JUCE's
   Direct2D device, and freeing it under the loader lock deadlocked in the graphics driver. The last plugin instance
   now empties them (`ui/ImageCaches.h`), and a lint test keeps new static image caches registered.
-- Editors other than Facet EQ and FM10 need to be checked for FL wording before they are exported.
-- The plugins are unsigned.
-- macOS is not built or tested. The app's macOS-only `VideoMediaMac.mm` is not in the shared source list.
+- Fixed in round 188b: a host restart (prepareToPlay) kept the engines of the last build, so a reverb's tail, LYNX Tune's
+  detector history and Quell's state outlived it; it now starts from new engines, as a fresh instance.
+- The editors of all 27 effects were checked for FL wording (round 188b, `plugexporttest` pictures): none; the header no
+  longer prints "Insert 1 - slot 1".
+- The plugins are unsigned (Windows), and signed ad hoc only on macOS (no Apple Developer ID, not notarized).

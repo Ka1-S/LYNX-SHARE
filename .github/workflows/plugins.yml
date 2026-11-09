@@ -248,7 +248,7 @@ jobs:
           LYNX_TEST_MODE: '1'
         run: |
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_macOS.zip" && unzip -q pv.zip -d pv
-          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.tar.xz" && unzip -q cv.zip -d cv
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.zip" && unzip -q cv.zip -d cv
           for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done   # (the zip may hold a tarball)
           mkdir pkg && tar xJf "dist/LYNX-Plugins-$LABEL-macos-universal.tar.xz" -C pkg
           codesign --verify --deep --strict "pkg/LYNX-Plugins-$LABEL/CLAP/LYNX Plugins.clap"
