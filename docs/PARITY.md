@@ -64,8 +64,8 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 4 | 8 | 135 | 183b: sound 2 → 4 (fxparity 3.00 → 3.25, verb 7.84 → 8.35 on the matched settings; 45-setting bank 2.25 → 2.81 / 6.79 → 7.54; music level error 4.2 → 1.2 dB): echo as pre-delay, EQ / colour / mode laws measured |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
-| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | tp172b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis) |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | trial187b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference; trial187b: all 14 styles nulled on programme (5.3 → 5.4), Upward / Classic refitted |
+| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
@@ -75,20 +75,20 @@ there.
 | Atrium | ValhallaRoom | 9 | 8 | 4 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work) |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
-| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
-| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
+| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | trial187b | 8 → 9 / 7 → 9; trial187b: drives 8 / 10 measured, a hot model per style: 4.8 → 5.0 (high-drive bank 3.1 → 3.8) |
+| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release); trial187b: 16 more settings measured (6.8), no change |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
 | Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
-| Foil Plate | ValhallaPlate | 9 | 10 | 3 | 8 | 135 |  |
+| Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
-| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
+| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
 | LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
 
@@ -106,6 +106,34 @@ default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved to
 flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
 Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
 engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
+
+## Round trial187b: captures before the trials end; Apex, Sentry, Crest, Ember, Voice Shift
+
+Captured on 2026-11-09, before the iLok (11-13), FabFilter (~11-16) and Soundtoys (~11-22) trials end: 526 renders
+in /mnt/e/lynx-work/trial187b/cap (report there). They cover Pro-L 2 at 16 more settings (Allround and Bus for the
+first time, every style at +10 dB, timing extremes), Pro-G at 22, Pro-C 3's 14 styles at one common setting plus 7
+knob sweeps, Decapitator's five styles at drive 8 / 10 / 10 with Punish plus tone / mix / filter variants, Little
+AlterBoy at 13 settings on three stereo test signals, and the Slate FG-Stress / FG-MU / FG-Red compressors. All of it
+is black-box, through our own host and the public parameter API.
+
+Mean fxparity, before → after (old bank = tp172b / tp172d settings; new bank = this round's):
+
+| LYNX plugin | Original | Old bank | New bank | What changed |
+|---|---|---|---|---|
+| Apex Limiter | Pro-L 2 | 7.1 → 7.1 | 6.8 → 6.8 | measured only (a Bus / Safe refit and a slower Aggressive fast stage gained nothing overall) |
+| Sentry Gate | Pro-G | 7.2 → 7.2 | 7.3 → 7.6 | Pro-G's Wet / Dry levels and pans act in Expert mode only (with it off, wet −6 / dry −12 passes at 0 dB and closes to −100 dB): the translation follows |
+| Crest Compressor | Pro-C 3 | 6.2 → 6.2 | 5.3 → 5.4 | Upward (it held −6.2 dB over the threshold where the trial holds −2.8; now about −5.3) and Classic (its release was too fast) refitted on tp172b's bank plus the new programme; both smooth the gain |
+| Ember Saturator (Classic) | Decapitator | 4.8 → 5.0 | 3.1 → 3.8 | a hot model per style and per style with Punish, blended in from drive 5 to 10 (at 8 / 10 the original was up to 5 dB quieter than ours: E +5.1, T / P +2.4 dB; now within 0.3 dB); the small-signal drive / Punish laws are unchanged |
+| Voice Shift | Little AlterBoy | 2.8 → 3.0 | 2.8 → 3.1 | each channel shifted on its own (the original is dual mono: a voice on the left leaves the right silent), the right 1.25 ms behind once shifted (the original's L / R correlation drops from 1.0 to about 0), the input itself at Pitch 0 / Formant 0 (the original nulls it to −15 dB; ours drifted up to half a period), the level law against the shift (+3.2·tanh(x/4) dB up, −0.43 dB/st down; was a straight 0.36), the drive's ceiling −2.5 dB at 10 |
+
+Open, all measured:
+- Pro-G's Vocal style turns broadband noise down, by 9 … 15 dB at −30 dBFS and 21 … 28 dB at −13. It leaves
+  low-passed noise and sines alone. The threshold and the side-chain filter don't change it, and Range caps it. It is
+  not built: the trigger isn't simply high-frequency noise, because the drums' hats are not cut.
+- Pro-C 3's TTM and Vari-Mu read 2.5 … 4.5 dB louder than ours on programme. Their refits halve the bank error but
+  lose round 108's own stairs, so they are kept as they were.
+- Voice Shift's spectrum on a shifted voice: the overlap-add leaves energy between the harmonics and under the
+  fundamental. The original's is clean. This is now the main gap, at 4 … 8 dB third-octave distance.
 
 ## Round 183b: the Valhalla reverbs' sound, one engine per slice
 
@@ -337,6 +365,21 @@ analyser), design **1 → 7** (the reference's modules and reading order in
 LYNX's style; the transfer-curve and GR-history displays are bars). Her Vocalstrip 2 state now plays the measured
 model (−60 … −67 dB null on her takes). The other Complete Access plugins (Slate, SSL, LiquidSonics, sonible,
 Harrison) map to LYNX effects by role only.
+
+## Round 183b slice 4: Foil Plate (voicing off) ← ValhallaPlate
+
+Measured on tp172d's settings and 14 new captures, with the impulse at −20 dB (the reference is linear: its 0.5 and −20 dB impulses agree within 0.1 dB): Decay 20 / 80 %, Size 0 / 100 %, Mod depth 50 / 100 %, Low and High EQ gain 0 / 100 %, Width 0 / 100 %, and Pre-delay. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 19 settings.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Foil Plate (slice 4) | ValhallaPlate | 3.13 → 3.73 / 3.03 → 3.64 | 8.15 → 8.49 / 8.13 → 8.48 | Over the bank: drums 3.00 → 3.83, impulse 2.80 → 3.80, −20 dB impulse 2.86 → 3.50; the verb's balance goes from 6.6 to 8.0 and its level from 8.1 to 9.1 |
+
+- **Low EQ gain** spans ±12 dB, as the reference's (it was ±9). Its half-gain point is ~0.47 × the frequency law: −6 dB near 330 Hz at the default 711 Hz.
+- **High EQ gain** boosts up to +12 dB with its half-gain point at ~0.5 × the frequency law (5 kHz at the default), but cuts only −4.5 dB at 0 %, as measured.
+- **Width** keeps the level, as the reference does (−27.4 / −27.5 / −27.2 dB at 0 / 50 / 100 %). Ours moved 4 dB.
+- **Tone:** the reference's tail is fuller below 80 Hz (+5 dB at 28–71 Hz) and less forward at 2.8–7 kHz (−3.5 dB). It sits about 1 dB lower, and its short decays are a little quieter than ours were. The engine gets a second low shelf for this.
+- **Unchanged:** the plate voicing (the Little Plate role); its EQ gains sit at 0 dB there.
+- **Open:** the EDC shape (verb edc part 8.5 → 7.8); music at Decay 20–25 % still runs +1 dB.
 
 ## Round 152: what changed (config / design, after 150 → after 152)
 
@@ -2167,3 +2210,26 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
 | Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
 | .flp import of the mapping | stored in the wrapper data | not yet | open |
+
+# FL Studio Mobile roles: the Pocket effects (round 188h)
+
+FL Studio Mobile's own effect modules, as LYNX engines with LYNX names (the "(FL Mobile)" role). Clean-room: the
+modules' laws were read from FL Studio Mobile's plugin code (REA_rodada182c.md "F5 effects, round 188h") and are
+restated in `src/core/PocketFx.{h,cpp}`, `PocketMultiFx.cpp`, `PocketTape.h`. A `.flm` import puts them on the channel's
+insert with the module's own values; they are also in the mixer's effect list. Editors: LYNX's generated knob page
+for now (FL Studio Mobile reference shots and the matching layouts are the next UI step).
+
+| LYNX effect | Role (FL Mobile) | Sound | Checked against |
+|---|---|---|---|
+| Pocket MultiFX | MultiFX (X/Y pad: Delay, Reverb, LP / HP Filter, Flanger, Phaser, Panner, Vox; song-locked LFO) | FLM-exact laws; the reverb kind uses LYNX's Reeverb 2 at FLM's levels (≤ 0.4 dB diffuser tilt) | hand-worked echo times / levels, filter DC gain, panner delay |
+| Pocket Trance Delay | Trance Delay (beat-synced, Stereo / Ping-Pong / Mirror) | FLM-exact | echo times and levels |
+| Pocket Distortion | Distortion (four curves, bit crush, bias) | FLM-exact | each curve, hold length, DC removal |
+| Pocket Limiter Classic | Limiter (legacy) | FLM-exact | attack, cos² recovery, make-up |
+| Pocket Limiter | Limiter (2 ms look-ahead) | FLM-exact | attack, quarter-sine recovery, latency |
+| Pocket Leveller | Leveller (gain / balance trim) | FLM-exact | gain law, balance |
+| Pocket Gate | Gate (256-sample RMS blocks, curves, hold) | FLM-exact | floor, opening, delay |
+| Pocket Tape Delay | Tape Delay (variable-speed tape) | FLM-exact | echo position and spread |
+
+Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
+Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
+FL Studio Mobile plugin is the open sound check.

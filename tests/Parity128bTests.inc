@@ -236,9 +236,14 @@ TEST (parity128b_translators_read_the_new_controls)
     g.values[21] = -0.5f;
     g.values[27] = 1.0f;
     g.values[28] = 3.0f / 36.0f; // the level law: 36 dB per unit above −0.6
+    namespace s = dyn::sentry;
+    // round trial187b [EXEC trial]: the wet / dry levels and pans only act in Expert mode (26)
     slot = lynx::makeEffectSlot (EffectKind::sentryGate);
     CHECK (fab::fromProG (g, slot) > 20);
-    namespace s = dyn::sentry;
+    CHECK (std::abs (s::panOf (slot.params[s::wetPan])) < 1e-4 && slot.params[s::dry] == 0.0f);
+    g.values[26] = 1.0f;
+    slot = lynx::makeEffectSlot (EffectKind::sentryGate);
+    CHECK (fab::fromProG (g, slot) > 20);
     CHECK (std::abs (s::scGainDb (slot.params[s::scGainL]) + 12.0) < 0.01 && std::abs (s::scGainDb (slot.params[s::scGainR]) - 6.0) < 0.01);
     CHECK (std::abs (s::mixOf (slot.params[s::scMixL]) - 0.5) < 1e-4 && std::abs (s::panOf (slot.params[s::wetPan]) + 0.5) < 1e-4);
     CHECK (slot.params[s::channelMode] > 0.5f && std::abs (slot.params[s::input] - (3.0f + 24.0f) / 48.0f) < 1e-4f);

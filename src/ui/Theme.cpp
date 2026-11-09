@@ -1437,7 +1437,7 @@ void LookAndFeel::drawFileBrowserRow (juce::Graphics& g, int width, int height, 
         iconKind = Icon::folder;
     else if (file.hasFileExtension ("wav;aif;aiff;flac;ogg;mp3;wv"))
         iconKind = Icon::audioFile;
-    else if (file.hasFileExtension ("lynx;flp;dawproj"))
+    else if (file.hasFileExtension ("lynx;flp;als;flm;dawproj"))
         iconKind = Icon::project;
     else if (file.hasFileExtension ("mid;midi"))
         iconKind = Icon::pianoRoll;

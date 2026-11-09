@@ -40,7 +40,14 @@ enum class LinkedPlaylistTracks
     unlink,
     deleteToo
 };
-int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked = LinkedPlaylistTracks::unlink);
+// `keepLostLinks` (LYNX's option, pain point 1; off = FL): every send into a deleted insert also stays as a
+// MixerTrack::lostSends entry, drawn greyed, until reconnectLostSend or removeLostSends.
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked = LinkedPlaylistTracks::unlink, bool keepLostLinks = false);
+// Turns lost send `index` of `track` into a send to insert `to` at its level. False when that route isn't possible
+// (out of range, itself, or a cycle).
+bool reconnectLostSend (Song& song, int track, int index, int to);
+// Removes lost send `index` of `track` (all of them for −1).
+void removeLostSends (Song& song, int track, int index = -1);
 
 // The Playlist audio / instrument tracks linked to one of `tracks` (FL asks "Delete tracks and channels" or
 // "Unlink tracks and channels" when there is one; FUN_012a5b00): an audio track by its mixer track, an instrument

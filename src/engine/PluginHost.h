@@ -16,6 +16,7 @@
 #include "core/PluginCatalog.h"
 #include "core/FixedBlock.h"
 #include "core/FlPluginDb.h"
+#include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
@@ -85,6 +86,8 @@ public:
     void allNotesOff() noexcept override;
     void setNextNoteModulation (float modX, float) noexcept override { nextModX = modX; }
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
+    // issue #63: the note's own fine pitch, sent as FL's wrapper sends it (core/HostNotePitch.h)
+    void setNextNoteFinePitch (float cents) noexcept override { nextFine = cents; }
     void transportStopped() noexcept override;
     void panic() noexcept override;
     void transportReset() noexcept override { panic(); }
@@ -156,7 +159,10 @@ private:
     std::array<MidiOutNote, 256> midiOut {};
     int midiOutCount = 0;
     HostedOptions options;
-    float nextModX = 0.5f, nextRelease = 0.5f;
+    float nextModX = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
+    hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes
+    bool takesTuning = false;     // a VST3 plugin (its note ons carry the tuning)
     bool bendRangeSent = false;
     std::atomic<bool> resetPending { false };     // panic with "Reset plugin": reset at the next render (audio thread)
     HostedKeys heldKeys; // per MIDI channel: the notes on (their note offs on stop / jump, round 169c)

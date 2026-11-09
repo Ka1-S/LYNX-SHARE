@@ -53,6 +53,7 @@ add_library(lynx_core STATIC
     src/core/AlsImport.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
+    src/core/FlmEffects.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
@@ -83,6 +84,7 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/ExportBundle.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -124,6 +126,8 @@ add_library(lynx_core STATIC
     src/core/LowLifterFl.cpp
     src/core/TransporterFl.cpp
     src/core/FlLegacyFx.cpp
+    src/core/PocketFx.cpp
+    src/core/PocketMultiFx.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
@@ -267,6 +271,7 @@ target_sources(lynx_core PRIVATE
     src/core/PlaylistOps.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
+    src/core/AutoWarp.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
     src/core/PatternBlocks.cpp
@@ -439,6 +444,7 @@ if(LYNX_BUILD_APP)
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
+        src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
@@ -473,6 +479,7 @@ if(LYNX_BUILD_APP)
     # workflow shell: workspace desktop, control contract, dialogs
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
+        src/ui/NativeChild.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp

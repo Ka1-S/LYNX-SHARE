@@ -16,6 +16,7 @@
 
 #include "engine/ClapFormat.h"
 #include "engine/Vst2Format.h"
+#include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
 #include "engine/FlStudio.h"
 #include "platform/CrashGuard.h"
@@ -305,11 +306,20 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
     }
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
     producesMidi = plugin->producesMidi(); // only then is what the buffer holds after processing the plugin's output
+    // issue #63: a VST3's note ons carry the note's tuning (FL's wrapper); the patched JUCE host asks for it
+    const auto format = plugin->getPluginDescription().pluginFormatName;
+    noteFormat = format == "VST3" ? hostpitch::Format::vst3 : format == ClapPluginFormat::formatName ? hostpitch::Format::clap : hostpitch::Format::midi;
+    takesTuning = noteFormat == hostpitch::Format::vst3;
+    if (takesTuning)
+        juce::lynxNoteTuningHook = [] (void* context, int channel, int key) noexcept {
+            return channel == 0 ? static_cast<hostpitch::SentKeys*> (context)->takeTuning (key) : 0.0f;
+        };
 }
 
 void PluginInstrument::releaseHeldKeys() noexcept
 {
     heldKeys.releaseAll ([this] (int ch, int key) { midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0); });
+    sentKeys.played = {}; // (their note offs went out with these)
 }
 
 void PluginInstrument::transportStopped() noexcept
@@ -450,7 +460,11 @@ void PluginInstrument::slideTo (int key, float, float samples) noexcept
 
 void PluginInstrument::noteOn (int key, float velocity) noexcept
 {
-    const auto k = juce::jlimit (0, 127, key);
+    // issue #63: key + the note's fine pitch, rounded to the key it goes out on (FL's wrapper); a VST3 also gets the
+    // rest as its note on's tuning (picked up by the patched JUCE VST3 host, engine/Vst3NoteTuning.h)
+    const auto sent = hostpitch::of (juce::jlimit (0, 127, key), std::exchange (nextFine, 0.0f), noteFormat);
+    sentKeys.on (juce::jlimit (0, 127, key), sent);
+    const auto k = sent.key;
     // a new note starts at its own key: a slide's bend is undone before it
     lastKey = k;
     slideNow = slideTarget = slideLeft = 0.0f;
@@ -472,7 +486,7 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
 
 void PluginInstrument::noteOff (int key) noexcept
 {
-    const auto k = juce::jlimit (0, 127, key);
+    const auto k = sentKeys.off (juce::jlimit (0, 127, key)); // (the key its note on went out on, issue #63)
     // FL's "Send note release velocity" (on by default): the note's release velocity, else 0
     if (options.releaseVelocity)
         midi.addEvent (juce::MidiMessage::noteOff (1, k, juce::jlimit (0.0f, 1.0f, nextRelease)), 0);
@@ -547,6 +561,10 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             midi.addEvent (m, 0); // (the first render comes before any note: the plugin is new)
     }
     flushMidiControls();
+    // issue #63: the VST3 host picks up each note on's tuning while this thread runs the plugin's blocks
+    const auto tuningBefore = juce::lynxNoteTuningContext;
+    juce::lynxNoteTuningContext = takesTuning ? &sentKeys : nullptr;
+    const juce::ScopeGuard tuningBack { [tuningBefore] { juce::lynxNoteTuningContext = tuningBefore; } };
     // the play head reports where each block starts in the chunk (round 169c); put back to 0 for the effects after it
     const auto chunkOffset = blockClock.start (hostTimeline().chunk.load (std::memory_order_relaxed));
     blockClock.advance (n);
