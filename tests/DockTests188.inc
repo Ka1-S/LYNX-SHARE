@@ -2,6 +2,7 @@
 
 TEST (detach_new_plugins_marks_only_the_plugins_an_edit_added)
 {
+    using namespace lynx;
     Song song;
     ChannelDef loaded;
     loaded.instrument = InstrumentKind::plugin;
