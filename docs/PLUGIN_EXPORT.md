@@ -67,7 +67,7 @@ Each release has, next to the app, one archive per system and a checksum file. L
 | File | System |
 |---|---|
 | `LYNX-Plugins-<version>-win-x64.zip` | Windows 10 / 11, x64 |
-| `LYNX-Plugins-<version>-macos-universal.zip` | macOS 11 or later, Apple silicon and Intel |
+| `LYNX-Plugins-<version>-macos-universal.tar.xz` | macOS 11 or later, Apple silicon and Intel |
 | `LYNX-Plugins-<version>-linux-x86_64.tar.xz` | Linux x86_64, glibc 2.35 or later (Ubuntu 22.04 and later) |
 | `LYNX-Plugins-<version>-SHA256SUMS.txt` | the SHA-256 of the three archives |
 
@@ -199,21 +199,23 @@ with the same objects, all compiled with `-ffunction-sections -fdata-sections`:
 | with `--gc-sections` | 31.4 MB | 10.4 MB |
 | without `--gc-sections` | 46.3 MB | 16.9 MB |
 
-Garbage collection of unused sections makes the plugin 32 % smaller, so it stays on. The Windows plugins reuse the app's
-objects, which are built without section flags. **Follow-up after 0.1.25:** build the Windows plugins from their own
-objects, compiled with section flags. A similar saving is likely (inferred, not measured), at the cost of a second
-compile of the app.
+Garbage collection of unused sections makes the plugin 32 % smaller, so it stays on. Since round 188b a Windows build
+with `LYNX_BUILD_PLUGINS=1` compiles every object with section flags as well.
 
 Almost all of a plugin's size is the shared app runtime. A CLAP with N plugins stays at about 39 MB. N separate VST3s
-cost about 39 MB each. The options for the user to decide:
+cost about 39 MB each. The user chose option **C** (2026-11-08) from:
 
 - **A.** One VST3 per plugin. This is the simplest, but at 25 effects plus 6 synths it comes to about 1.2 GB.
 - **B.** A JUCE patch for several classes in one VST3 bundle, or a shared runtime DLL next to thin VST3s. This keeps
   everything at about 40 MB, but it means patching and maintaining JUCE's wrapper.
-- **C.** Ship the CLAP with every plugin, plus VST3s for a short list only.
+- **C.** Ship the CLAP with every plugin, plus VST3s for a short list only, as a separate download.
 
-Delivery could be a separate download, or an optional part of the installer. Until the user decides, nothing ships and
-the option stays off.
+The download (round 188b, 1 CLAP + 7 VST3):
+
+| Archive | Size |
+|---|---|
+| `LYNX-Plugins-<v>-linux-x86_64.tar.xz` (stripped; one xz stream with a 256 MiB dictionary, so the VST3s cost almost nothing next to the CLAP) | 14.9 MB |
+| `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone) | 84.6 MB |
 
 Per instance, measured in plugexporttest:
 

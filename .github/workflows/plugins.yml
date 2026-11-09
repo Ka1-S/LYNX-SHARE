@@ -12,7 +12,7 @@
 #   linux           (ubuntu 22.04 container, glibc 2.35)  CMake + GCC 13, glibc check, the same three checks under Xvfb
 #                              with editor pictures, LYNX-Plugins-<label>-linux-x86_64.tar.xz
 #   macos           (macos-15)  CMake universal (arm64 + x86_64), ad hoc signature, the same three checks,
-#                              LYNX-Plugins-<label>-macos-universal.zip
+#                              LYNX-Plugins-<label>-macos-universal.tar.xz
 #   sums            LYNX-Plugins-<label>-SHA256SUMS.txt over the three archives (artifact LYNX-Plugins-<label>-all)
 name: Plugins
 
@@ -248,9 +248,9 @@ jobs:
           LYNX_TEST_MODE: '1'
         run: |
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_macOS.zip" && unzip -q pv.zip -d pv
-          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.zip" && unzip -q cv.zip -d cv
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.tar.xz" && unzip -q cv.zip -d cv
           for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done   # (the zip may hold a tarball)
-          ditto -x -k "dist/LYNX-Plugins-$LABEL-macos-universal.zip" pkg
+          mkdir pkg && tar xJf "dist/LYNX-Plugins-$LABEL-macos-universal.tar.xz" -C pkg
           codesign --verify --deep --strict "pkg/LYNX-Plugins-$LABEL/CLAP/LYNX Plugins.clap"
           cv_bin="$(find cv -name clap-validator -type f | head -1)"; chmod +x "$cv_bin"
           ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest "$(find pv -path '*Contents/MacOS/pluginval' -type f | head -1)" "$cv_bin" reports

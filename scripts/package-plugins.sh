@@ -4,7 +4,7 @@
 # core/UpdateCheck.cpp; tests/PluginExport180bTests.inc checks it):
 #   LYNX-Plugins-<label>-win-x64.zip           (windows)
 #   LYNX-Plugins-<label>-linux-x86_64.tar.xz   (linux)
-#   LYNX-Plugins-<label>-macos-universal.zip   (macos)
+#   LYNX-Plugins-<label>-macos-universal.tar.xz   (macos)
 # Inside: LYNX-Plugins-<label>/{CLAP/LYNX Plugins.clap, VST3/*.vst3, PLUGINS.txt, README.txt, install script, LICENSE,
 # THIRD_PARTY.md}. The plugins come from the build's plugins/ folder (cmake/LynxPlugins.cmake, scripts/build-windows-zig.sh).
 #
@@ -28,7 +28,7 @@ os="$1" plugins="$2" label="$3" dist="$4"
 case "$os" in
     windows) archive="LYNX-Plugins-$label-win-x64.zip" osname="Windows x64" ;;
     linux) archive="LYNX-Plugins-$label-linux-x86_64.tar.xz" osname="Linux x86_64" ;;
-    macos) archive="LYNX-Plugins-$label-macos-universal.zip" osname="macOS, Apple silicon and Intel" ;;
+    macos) archive="LYNX-Plugins-$label-macos-universal.tar.xz" osname="macOS, Apple silicon and Intel" ;;
     *) echo "unknown OS: $os" >&2; exit 2 ;;
 esac
 [[ -e "$plugins/LYNX Plugins.clap" ]] || { echo "no LYNX Plugins.clap in $plugins" >&2; exit 1; }
@@ -83,9 +83,8 @@ fi
 rm -f "${dist:?}/$archive"
 case "$os" in
     windows) ( cd "$work" && zip -q -r -9 -X "$dist/$archive" "$top" ) ;;
-    # (one solid stream with a dictionary larger than a plugin: the VST3s share most of their bytes with the CLAP)
-    linux) tar -C "$work" --owner=0 --group=0 --numeric-owner -cf - "$top" | xz -T0 --lzma2=preset=9e,dict=256MiB > "$dist/$archive" ;;
-    # (ditto keeps the bundles' symbolic links, extended attributes and signatures)
-    macos) ( cd "$work" && ditto -c -k --sequesterRsrc --keepParent "$top" "$dist/$archive" ) ;;
+    # (one solid stream with a dictionary larger than a plugin: the VST3s share most of their bytes with the CLAP; macOS'
+    # Archive Utility opens it too, and the bundles' signatures are files inside them)
+    linux|macos) tar -C "$work" -cf - "$top" | xz -T1 --lzma2=preset=9e,dict=256MiB > "$dist/$archive" ;;
 esac
 ls -la "$dist/$archive"

@@ -38,13 +38,14 @@ vst3=()
 for b in "$pkg"/VST3/*.vst3; do [[ -e "$b" ]] && vst3+=("$b"); done
 [[ -e "${clap[0]}" ]] || { echo "no CLAP in $pkg/CLAP" >&2; exit 1; }
 
-for p in "${clap[@]}" "${vst3[@]}"; do
+# (${a[@]+"${a[@]}"}: macOS' bash 3.2 calls an empty array unbound under set -u)
+for p in "${clap[@]}" ${vst3[@]+"${vst3[@]}"}; do
     name="$(basename "$p")"
     extra=()
     [[ -n "$pictures" && "$p" == *.clap ]] && extra=("$(native "$reports")/editor-")
-    run "plugexporttest $name" "$reports/plugexporttest-$name.log" "$tester" "$(native "$p")" "$(native "$reports")/plugexporttest-$name.txt" "${extra[@]}"
+    run "plugexporttest $name" "$reports/plugexporttest-$name.log" "$tester" "$(native "$p")" "$(native "$reports")/plugexporttest-$name.txt" ${extra[@]+"${extra[@]}"}
 done
-for p in "${vst3[@]}"; do
+for p in ${vst3[@]+"${vst3[@]}"}; do
     name="$(basename "$p")"
     run "pluginval $name" "$reports/pluginval-$name.log" "$pluginval" --validate "$(native "$p")" --strictness-level 10 --skip-gui-tests \
         --validate-in-process --timeout-ms 300000
@@ -56,9 +57,9 @@ done
 echo
 echo "LYNX plugin checks ($pkg):"
 fail=0
-for r in "${results[@]}"; do
+for r in ${results[@]+"${results[@]}"}; do
     echo "  $r"
     [[ "$r" == PASS* ]] || fail=1
 done
-printf '%s\n' "${results[@]}" > "$reports/summary.txt"
+printf '%s\n' ${results[@]+"${results[@]}"} > "$reports/summary.txt"
 exit $fail
