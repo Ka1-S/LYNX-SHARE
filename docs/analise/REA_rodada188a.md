@@ -92,4 +92,4 @@ plugin windows, the others keep their place.
 - No fade for native panels when they open or close; the .flp Detached bit.
 - The Fruity Dance stage (`DanceStage`, dancers drawn over the workspace by the main component) stays under the native
   panels: it is transparent and animated, so it needs a layered (per-pixel alpha) window. Only projects with a dance
-  channel see it. Needs a decision (see the round report).
+  channel see it. Done in round 188j (`REA_rodada188j.md`): each dancer is a layered child window in front of them.
