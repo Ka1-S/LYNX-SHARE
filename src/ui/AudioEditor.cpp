@@ -22,6 +22,7 @@
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
+#include "ui/AudioClipboard.h"
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
@@ -36,11 +37,10 @@ namespace
 {
 namespace ae = audioedit;
 
-// one clipboard for every editor window (copy in one, paste in another)
+// one clipboard for every editor window (copy in one, paste in another); Tools › Clipboard saves it (round 181b)
 ae::Audio& clipboard()
 {
-    static ae::Audio audio;
-    return audio;
+    return audioclipboard::editor();
 }
 
 // an audio file read on a worker thread (an audio script's Sample.LoadFromFile)

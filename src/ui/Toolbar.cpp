@@ -1152,6 +1152,7 @@ Icon EditOverlay::groupIcon (toolbarlayout::Group g)
         case Group::meters: return Icon::settings;
         case Group::output: return Icon::listen;
         case Group::chord: return Icon::pianoRoll;
+        case Group::multilink: return Icon::link;
         case Group::count_: break;
     }
     return Icon::none;

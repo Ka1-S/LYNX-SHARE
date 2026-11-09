@@ -156,16 +156,6 @@ const std::uint8_t channelParamsDefault[168] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f,
 };
 
-// the 112 bytes FL 2026 writes after the points of an automation clip (0xEA) [DATA: every clip of FL 26's demos]
-const std::uint8_t automationTail[112] = {
-    0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,
-    0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0xf0, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfb, 0xb2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-
 std::uint32_t bgr (std::uint32_t rgb) noexcept
 {
     return ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
@@ -439,10 +429,11 @@ void writeChannel (Out& out, const Channel& c)
     out.u32 (evChannelFilterGroup, (std::uint32_t) std::max (0, c.filterGroup));
     if (c.type == ChannelType::automationClip)
     {
+        const auto& lfo = c.automationLfo; // (round 177b: FL's articulator stream, FUN_00fe8640; defaults = an untouched LFO)
         Blob a;
         a.put<std::uint32_t> (1);
-        a.put<std::uint32_t> (0x40);
-        a.b.push_back (0);
+        a.put<std::int32_t> (lfo.level);
+        a.b.push_back (lfo.mode);
         a.put<std::uint32_t> (4);
         a.put<std::uint32_t> (3);
         a.put<std::uint32_t> ((std::uint32_t) c.automation.size());
@@ -458,7 +449,43 @@ void writeChannel (Out& out, const Channel& c)
             a.b.push_back (0);
             a.b.push_back (0);
         }
-        a.b.insert (a.b.end(), std::begin (automationTail), std::end (automationTail));
+        // the main envelope's tail, the A/D/S/R knobs, then the LFO (kind 5, version 3, its points, its knobs)
+        a.put<std::int32_t> (lfo.mainFlags);
+        a.put<std::int32_t> (lfo.mainEnabled);
+        for (const auto v : lfo.mainLoop)
+            a.put<std::int32_t> (v);
+        for (const auto v : lfo.adsr)
+            a.put<std::int32_t> (v);
+        a.put<std::int32_t> (5);
+        a.put<std::int32_t> (3);
+        const auto lfoPoints = lfo.points.empty() ? std::vector<flp::AutomationPoint> { flp::AutomationPoint { 0.0, 1.0, 0.0f, 0 } } : lfo.points;
+        a.put<std::uint32_t> ((std::uint32_t) lfoPoints.size());
+        if (lfo.rawPoints.size() == lfoPoints.size() * 24)
+            a.b.insert (a.b.end(), lfo.rawPoints.begin(), lfo.rawPoints.end()); // as read: byte for byte
+        else
+        {
+            double last = 0.0;
+            for (const auto& p : lfoPoints)
+            {
+                a.put<double> (p.position - last);
+                last = p.position;
+                a.put<double> (p.value);
+                a.put<float> (p.tension);
+                a.b.push_back (p.curve);
+                a.b.push_back (0);
+                a.b.push_back (0);
+                a.b.push_back (0);
+            }
+        }
+        a.put<std::int32_t> (lfo.flags);
+        a.put<std::int32_t> (lfo.enabled);
+        for (const auto v : lfo.lfoLoop)
+            a.put<std::int32_t> (v);
+        a.put<std::int32_t> (lfo.speed);
+        a.put<std::int32_t> (lfo.tension);
+        a.put<std::int32_t> (lfo.skew);
+        a.put<std::int32_t> (lfo.pulseWidth);
+        a.put<std::uint32_t> (lfo.phase);
         out.data (evAutomationPoints, a.b);
     }
     out.u8 (evChannelSoloLock, c.soloLock ? 1 : 0);
@@ -543,11 +570,12 @@ std::vector<std::uint8_t> playlistRecords (const std::vector<PlaylistItem>& item
         }
         b.put<std::uint32_t> (++serial);
         b.put<float> (item.fadeInMs);    // +0x24
-        b.put<std::uint32_t> (0);        // +0x28
+        b.put<float> (item.fadeInTension);  // +0x28
         b.put<float> (item.fadeOutMs);   // +0x2C
-        b.put<std::uint32_t> (0);        // +0x30
+        b.put<float> (item.fadeOutTension); // +0x30
         b.put<float> (item.gain); // +0x34 (FL 26 saves 0 or 1 for pattern clips; the reader keeps what it finds)
-        b.put<std::uint32_t> (0);        // +0x38
+        // +0x38: a written fade is manual; a manual fade of length 0 stays manual (FL plays a sharp cut there, no declick)
+        b.put<std::uint32_t> (item.fadeFlags | (item.fadeInMs > 0.0f ? 1u : 0u) | (item.fadeOutMs > 0.0f ? 2u : 0u));
         b.put<float> (item.pitch);       // +0x3C
         b.put<double> (item.stretch);    // +0x40
         b.put<std::uint32_t> (item.reversed ? 1u : 0u); // +0x48

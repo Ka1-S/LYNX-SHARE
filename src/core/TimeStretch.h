@@ -22,6 +22,12 @@ namespace lynx
 std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
                                          double semitones = 0.0);
 
+// A sample FL's precomputed effects and Trim already cut (core/SamplePrecompute.h) stretched by `ratio`: FL stretches that
+// span to TIME, not the whole file (REA round 180d, FUN_00ff0db0 runs before the stretch). Keeps what the sampler needs to
+// map its knobs (cropped, cropFrom, cropTo) and scales the span's loop.
+std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method = StretchMethod::general,
+                                             double semitones = 0.0);
+
 // A warp map (round 175a, warp markers M1): source frame → output frame, piecewise linear between its points. Both
 // coordinates increase; the first point is (0, 0) and the last (the source's frames, the output's frames). Each segment
 // is stretched by its own ratio, with no seam between them.

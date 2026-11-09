@@ -75,6 +75,7 @@ public:
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
     static inline int editPatternsIn = 0;
+    std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
     void paint (juce::Graphics& g) override;
     void paintOverChildren (juce::Graphics& g) override;
@@ -137,6 +138,8 @@ public:
     const std::vector<int>& getSelectedClips() const noexcept { return selection; }
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
+    void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
+    void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
@@ -191,7 +194,11 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
+                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe };
+    void swipeTimeSelectionToComp (int lane);
+    // a swipe on a take lane (round 177c): the lane and the range so far
+    int swipeLane = -1;
+    std::int64_t swipeAnchor = 0, swipeEnd = 0;
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
     std::int64_t perfClip = -1;
@@ -370,6 +377,7 @@ private:
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.
     juce::Rectangle<int> trackArm (int track) const;
     juce::Rectangle<int> trackInput (int track) const;
+    juce::Rectangle<int> trackAudition (int track) const;
     static constexpr int inputButtonMinHeight = 52; // FL shows the row of buttons from 150 % of its track height
     void editTrack (int track, std::function<void (PlaylistTrack&)> change);
     int currentTrack = -1; // the track selected by a click on its header (FL marks it next to the LED)
@@ -449,19 +457,39 @@ private:
     juce::Point<float> automationHandlePos (int clip, int point) const; // x < 0: no handle
     int automationHandleAt (int clip, juce::Point<int> p) const;
     void showAutomationPointMenu (int clip, int point);
+    // round 177b: optional automation lanes under a track (Playlist › Automation lanes; core autolanes). A track's
+    // lanes sit below its row (heightOf stays the row: clips never draw into lanes); trackTops include them.
+    int laneHeightOf (const AutomationLane& lane) const;
+    int laneBlockHeight (int track) const;                 // 0: none shown
+    struct LaneHit { int track = -1, lane = -1; };
+    LaneHit laneAt (juce::Point<int> p) const;             // a lane row under p (header or grid)
+    juce::Rectangle<int> laneRow (int track, int lane) const; // full width, from x = 0
+    juce::Rectangle<float> laneBody (int track, int lane) const; // the curve's area in the grid
+    int laneAutomation (int track, int lane) const;        // -1: none
+    int lanePointAt (int track, int lane, juce::Point<int> p) const;
+    juce::Rectangle<int> trackLaneArrow (int track) const; // empty: the track has no lanes or lanes are off
+    juce::Rectangle<int> trackAddLane (int track) const;   // "+A": empty when lanes are off or the row is too small
+    void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
+    bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    void showLaneMenu (int track, int lane);
+    void showAddLaneMenu (int track);
+    void toggleAutomationLanes();
+    bool laneButtonHover = false;
+    int laneTrack = -1, laneIndex = -1;                    // the lane a lanePoint / laneTension drag edits
     float tensionStart = 0.0f, tensionSign = 1.0f;
     // hover: what a click would hit (drives the cursor, the highlight and the hint)
     struct Hover
     {
         int clip = -1, track = -1;
         gesture::Target target = gesture::Target::empty;
-        bool header = false, led = false, arrow = false, arm = false, input = false;
+        bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         bool operator== (const Hover& o) const
         {
             return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
-                   && arm == o.arm && input == o.input && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
+                   && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
                    && divider == o.divider;
         }
     };
@@ -531,6 +559,12 @@ public:
     std::function<void()> onPatternMenu; // right click on a pattern (it is the current one by then)
     std::function<void()> onNewPattern;  // the "+" under the pattern list
     static constexpr int width = 150;
+
+    // Round 177d (pain point 31a): FL's Playlist menu › Picker panel › Tools items "Select unused › Patterns" and
+    // "Sort › Patterns › By name / By color" (EEPickerSelectUnusedPatternsMenu, EEPickerSortPatternsBy*Menu; FL's Audio
+    // and Automations entries are left out: the LYNX picker selects patterns only), then LYNX's own "Delete unused
+    // patterns" and "Merge identical patterns".
+    juce::PopupMenu pickerMenu();
 
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
