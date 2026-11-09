@@ -110,7 +110,7 @@ public:
     GamepadHints()
     {
         setInterceptsMouseClicks (false, false);
-        setSize (780, 440);
+        setSize (920, 400);
     }
 
     void paint (juce::Graphics& g) override
@@ -127,7 +127,7 @@ public:
         g.drawText (tr ("Game controller"), r.removeFromTop (44).reduced (20, 0), juce::Justification::centredLeft);
 
         // the pad: a body with two grips, in the middle
-        const auto centre = juce::Point<float> (getWidth() * 0.5f, 230.0f);
+        const auto centre = juce::Point<float> (getWidth() * 0.5f, 190.0f);
         juce::Path body;
         body.addRoundedRectangle (centre.x - 150.0f, centre.y - 70.0f, 300.0f, 120.0f, 48.0f);
         body.addEllipse (centre.x - 165.0f, centre.y - 40.0f, 110.0f, 130.0f);
