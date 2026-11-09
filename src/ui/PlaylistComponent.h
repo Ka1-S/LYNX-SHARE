@@ -614,8 +614,14 @@ public:
     void setTitleBarInsets (int left, int right) override
     {
         titleLeft = left;
-        playlist.setTitleBarInsets (juce::jmax (0, left - PatternPicker::width), right);
+        titleRight = right;
+        applyTitleInsets();
         resized();
+    }
+    // the Playlist's toolbar starts after the window title; the pattern picker column (when shown) sits under the title
+    void applyTitleInsets()
+    {
+        playlist.setTitleBarInsets (juce::jmax (0, titleLeft - (pickerHidden ? 0 : PatternPicker::width)), titleRight);
     }
 
     // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
@@ -645,6 +651,7 @@ public:
             return;
         pickerHidden = hidden;
         picker.setVisible (! hidden && (clipGrid == nullptr || gridView != GridView::grid));
+        applyTitleInsets(); // (round 189k: in Simple the toolbar went under the title bar's tools by the picker's width)
         resized();
         repaint();
     }
@@ -700,8 +707,8 @@ public:
     void layoutChildren()
     {
         auto area = getLocalBounds();
-        if (sideDock != nullptr)
-            sideDock->setBounds (area.removeFromRight (juce::jmin (sideDockWidth, area.getWidth() / 2)));
+        if (sideDock != nullptr) // under the title row (the window's buttons are there)
+            sideDock->setBounds (area.removeFromRight (juce::jmin (sideDockWidth, area.getWidth() / 2)).withTrimmedTop (PlaylistComponent::toolbarHeight));
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
             detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (pickerHidden)
@@ -750,7 +757,7 @@ public:
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
-    int titleLeft = 0;
+    int titleLeft = 0, titleRight = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
