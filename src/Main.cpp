@@ -1000,6 +1000,13 @@ public:
             return;
         }
 
+        if (args.contains ("--wrappershot"))
+        {
+            const auto i = args.indexOf ("--wrappershot");
+            runWrapperShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--multiouttest"))
         {
             const auto i = args.indexOf ("--multiouttest");
@@ -4753,6 +4760,54 @@ private:
             }
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX.exe --wrappershot "LYNX Test Drums.dll" <folder> (round 188d): the wrapper's Processing tab drawn offscreen
+    // (no window, no focus) for the FL | LYNX review: wrap-default.png (a fresh plugin), wrap-automap.png (Auto map
+    // outputs, output 3 off: FL's shot b23), wrap-settings.png. Scale 1.5 (FL's shots are at 150 %).
+    void runWrapperShot (const juce::String& pluginPath, const juce::String& folderPath)
+    {
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        auto ok = false;
+        lynx::AudioEngine engine (false);
+        engine.getPluginHost().addPluginFile (juce::File (pluginPath));
+        std::optional<juce::PluginDescription> vst2;
+        for (const auto& type : engine.getPluginHost().getKnownPlugins().getTypes())
+            if (type.pluginFormatName == "VST")
+                vst2 = type;
+        if (vst2)
+        {
+            auto song = lynx::Song::makeDefault();
+            auto& channel = song.channels[0];
+            channel.instrument = lynx::InstrumentKind::plugin;
+            channel.plugin = {};
+            channel.plugin.id = vst2->createIdentifierString().toStdString();
+            channel.plugin.name = vst2->name.toStdString();
+            channel.mixerTrack = 5;
+            engine.setSong (song);
+            engine.renderOffline (0.05, 48000.0); // (the plugin is hosted by then)
+            if (auto instrument = std::dynamic_pointer_cast<lynx::PluginInstrument> (engine.getChannelInstrument (0)))
+            {
+                auto find = [] (lynx::Song& s) -> lynx::PluginRef* { return s.channels.empty() ? nullptr : &s.channels[0].plugin; };
+                auto save = [&] (const char* name, int tab) {
+                    const auto image = lynx::wrapperSettingsSnapshot (engine, find, instrument->getInstance(), true, tab, 1.5f);
+                    juce::FileOutputStream out (folder.getChildFile (name));
+                    out.setPosition (0);
+                    out.truncate();
+                    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+                };
+                ok = save ("wrap-default.png", 1) && save ("wrap-settings.png", 0);
+                engine.editSong ([] (lynx::Song& s) {
+                    lynx::autoMapOutputs (s.channels[0].plugin.outputs, 8);
+                    s.channels[0].plugin.outputs.resize (8);
+                    s.channels[0].plugin.outputs[2].active = 0;
+                });
+                ok = ok && save ("wrap-automap.png", 1);
+            }
+        }
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }

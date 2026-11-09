@@ -345,6 +345,7 @@ public:
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
     int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
+    void selectTab (int t) { showTab (juce::jlimit (0, 2, t)); }
 
     void paint (juce::Graphics& g) override
     {
@@ -1212,6 +1213,15 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
     });
 }
 } // namespace
+
+juce::Image wrapperSettingsSnapshot (AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
+                                     bool channel, int tab, float scale)
+{
+    WrapperSettingsPage page (engine, std::move (find), plugin, channel);
+    page.setSize (520, page.preferredHeight());
+    page.selectTab (tab);
+    return page.createComponentSnapshot (page.getLocalBounds(), true, scale);
+}
 
 juce::PopupMenu pluginProcessingMenu (AudioEngine& engine, const PluginRef& current, juce::AudioPluginInstance* instance,
                                       std::function<PluginRef* (Song&)> find)
