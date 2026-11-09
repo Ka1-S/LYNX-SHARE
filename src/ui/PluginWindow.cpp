@@ -561,8 +561,8 @@ public:
                 groups.push_back ({ r, tr ("Connections") });
                 auto header = r.removeFromTop (headerHeight + 6).reduced (10, 3);
                 show (refreshIo, header.removeFromRight (26).reduced (4, 3));
-                header.removeFromRight (effectSlot ? 30 : juce::jmax (0, header.getWidth() / 2 - 150));
-                header.removeFromLeft (110); // (the group's caption)
+                header.removeFromRight (effectSlot ? 6 : juce::jmax (0, header.getWidth() / 2 - 150));
+                header.removeFromLeft (100); // (the group's caption)
                 outputsGlyph = header.removeFromRight (22);
                 header.removeFromRight (4);
                 show (autoMap, header.removeFromRight (juce::jmin (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16), header.getWidth())));
