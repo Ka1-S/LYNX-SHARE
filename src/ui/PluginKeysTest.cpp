@@ -176,6 +176,9 @@ bool pluginKeysTestTick (juce::AudioProcessorEditor& editor, const std::function
             check ("native_text_field_option_on", 2, 1, 0);
             SetWindowLongPtrW (state.field, GWLP_WNDPROC, (LONG_PTR) state.proc);
             DestroyWindow (state.field);
+            // LYNX_PLUGWIN_SHOT=<png>: the Wrapper settings page with the option on (FL | LYNX review)
+            if (const auto shot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_SHOT", {}); shot.isNotEmpty())
+                step ("keys_settings_shot=" + juce::String ((int) PluginWindows::saveSettingsPageShot (*editor.getTopLevelComponent(), juce::File (shot))));
             setOption (false);
             setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
             setSecondaryWindowKeyHandler (nullptr);

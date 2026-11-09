@@ -443,6 +443,7 @@ public:
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
+    void showPage (bool showSettings) { show (showSettings); }
 
     // the picker's label follows the slot's side input (the window's timer)
     void refreshSidechain()
@@ -894,6 +895,20 @@ bool letsHostProcessKeys (juce::Component& window)
     auto* w = dynamic_cast<PluginWindow*> (&window);
     auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
     return wrapped != nullptr && wrapped->hostProcessesKeys();
+}
+
+bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    if (wrapped == nullptr)
+        return false;
+    wrapped->showPage (true);
+    const auto image = wrapped->createComponentSnapshot (wrapped->getLocalBounds(), true, 1.0f);
+    wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
 }
 
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
