@@ -14,7 +14,10 @@
 //  - Autoduck legacy (10): the beat-synced duck curve → LYNX's rhythm gain (12 points), the ducking depth on the slot's
 //    mix;
 //  - Reverb legacy (12) and Reverb 2 (35): FLM's copy of the plate reverb that FL's Fruity Reeverb 2 uses → LYNX's
-//    exact Reeverb 2 engine, FLM's integer controls converted into FL's.
+//    exact Reeverb 2 engine, FLM's integer controls converted into FL's (levels corrected in round 188h).
+//  - MultiFX (4), Limiter legacy (5), Distortion (6), Trance Delay (16), Tape Delay (18), Leveller (20), Gate (27) and
+//    Limiter (28): LYNX's Pocket engines (core/PocketFx.h, round 188h), FLM's values copied as they are.
+// Every module: Mix → the slot's mix, Post Gain → a utility after it (round 188h, the module wrapper's laws).
 // Everything else returns no slots and the importer lists it.
 
 #include <cstdint>
