@@ -624,6 +624,19 @@ public:
         resized();
     }
 
+    // The Detail View (Clip-launch workflow, round 183a): not owned, nullptr in Pattern workflow. Docked at the bottom,
+    // under the grid and the Playlist; `heightFor` gives its height out of the panel's.
+    void setDetailView (juce::Component* detail, std::function<int (int)> heightFor)
+    {
+        if (detailView != nullptr && detailView != detail)
+            removeChildComponent (detailView);
+        detailView = detail;
+        detailHeightFor = std::move (heightFor);
+        if (detailView != nullptr)
+            addChildComponent (*detailView);
+        resized();
+    }
+
     void resized() override
     {
         layoutChildren();
@@ -634,6 +647,8 @@ public:
     void layoutChildren()
     {
         auto area = getLocalBounds();
+        if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
+            detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (clipGrid != nullptr && gridView != GridView::song)
         {
             // (under the band the title bar shares with the Playlist's toolbar)
@@ -676,5 +691,7 @@ private:
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
+    juce::Component* detailView = nullptr;
+    std::function<int (int)> detailHeightFor;
 };
 } // namespace lynx

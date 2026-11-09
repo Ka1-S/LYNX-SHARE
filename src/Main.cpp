@@ -1552,6 +1552,17 @@ public:
             return;
         }
 
+        if (args.contains ("--detailshot"))
+        {
+            // LYNX.exe --detailshot prefix: the Clip-launch workflow's detail view off-screen (round 183a): a track's chain
+            // (instrument, effects, one off, one folded), its clip page, and Pattern workflow before / after, at
+            // LYNX_SNAPSHOT_SIZE. Writes prefix-counts.txt with what the chain shows.
+            const auto i = args.indexOf ("--detailshot");
+            runDetailShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--typeaheadtest"))
         {
             // LYNX.exe --typeaheadtest out.txt: issue #64 — a real popup menu (headings, a submenu) driven by key presses
@@ -9817,6 +9828,108 @@ private:
                                                              + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n");
     }
 
+    void runDetailShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui] (const char* name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+        };
+        ui.setVisible (true); // (not on the desktop: only so the Clip page sees itself shown and docks the Piano roll)
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.selectTabForSnapshot (2); // the Playlist panel, maximized
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.channels.size() < 2)
+                s.channels.resize (2);
+            s.channels[0].name = "Bass synth";
+            s.channels[0].mixerTrack = 2;
+            s.channels[1].mixerTrack = 3;
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[2].name = "Bass";
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor, lynx::EffectKind::reverb, lynx::EffectKind::delay })
+            {
+                lynx::EffectSlot fx;
+                fx.kind = kind;
+                const auto& info = lynx::effectInfo (kind);
+                for (std::size_t k = 0; k < info.params.size() && k < fx.params.size(); ++k)
+                    fx.params[k] = info.params[k].defaultValue;
+                fx.enabled = kind != lynx::EffectKind::compressor; // one switched off
+                s.mixer[2].effects.push_back (fx);
+            }
+            while (s.patterns.size() < 2)
+                s.patterns.emplace_back();
+            s.patterns[0].name = "Bass line";
+            s.patterns[0].notes.clear();
+            for (int n = 0; n < 4; ++n)
+            {
+                lynx::Note note;
+                note.channel = 0;
+                note.start = n * lynx::ppq;
+                note.key = 36 + (n % 2) * 7;
+                s.patterns[0].notes.push_back (note);
+            }
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            lynx::PatternEvents lane; // a volume swell for the Envelopes tab (slice 3)
+            lane.target = lynx::AutomationTarget { lynx::AutomationTargetKind::channelVolume, 0 };
+            for (int e = 0; e < 16; ++e)
+                lane.events.push_back ({ e * lynx::ppq / 4, 0.3f + 0.6f * (float) e / 15.0f });
+            s.patterns[0].events = { lane };
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 3));
+            s.playlistTracks[1].name = "Bass";
+        }, false);
+        offline.dispatchPendingMessages();
+        write ("pattern"); // Pattern workflow: no detail view exists
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 1, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        juce::String counts;
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+            write ("devices");
+            counts << "cards " << detail->cardCountForCheck() << ", insert " << detail->chainInsertForCheck() << ", channel " << detail->chainChannelForCheck() << "\n";
+            detail->toggleFoldForCheck (3); // the reverb (card 0 is the instrument)
+            write ("folded");
+            counts << "folded card 3: " << (detail->isFoldedForCheck (3) ? 1 : 0) << "\n";
+            detail->showSelection (2, 0); // an empty track
+            write ("empty-track");
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::clip);
+            offline.dispatchPendingMessages();
+            ui.getPianoRollForSnapshot().scrollToNotes(); // (the app does it on the message loop, which this shot doesn't run)
+            write ("clip"); // slice 2: the Piano roll docked here
+            counts << "piano roll docked: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
+                                                && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() == detail ? 1 : 0) << "\n";
+            detail->setClipTab (true); // slice 3: the pattern's events in the Envelopes tab
+            offline.dispatchPendingMessages();
+            write ("envelopes");
+            detail->setClipTab (false);
+            detail->setPage (lynx::DetailView::Page::devices);
+            counts << "piano roll back in its panel: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
+                                                           && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() != detail ? 1 : 0) << "\n";
+        }
+        else
+            counts << "no detail view\n";
+        ui.setClipLaunchWorkflow (false);
+        offline.dispatchPendingMessages();
+        write ("pattern-after");
+        juce::File (prefix + "-counts.txt").replaceWithText (counts);
+    }
+
     void runPerfShot (const juce::String& prefix, const juce::String& projectPath)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -10760,6 +10873,16 @@ private:
             saveAlert (lynx::makeSamplePitchDialog (7.25f, true, true), "-sample-pitch.png"); // round 163c
             saveAlert (lynx::makeGradientColourDialog (juce::Colour (0xffe5383b), juce::Colour (0xff3a7bd5), 8), "-gradient.png"); // round 177a
             saveAlert (lynx::makeMidiImportDialog(), "-midi-import-dialog.png"); // File › Import › MIDI file (REA round 143)
+            // round 186c: FL's mixer "Delete" questions and its Settings › General › Manage messages menu
+            saveAlert (lynx::makeFlMessageDialog ({ lynx::tr ("Delete tracks"), lynx::tr ("This will |delete| {0} selected mixer track(s). Are you sure?", { "1" }),
+                                                    { lynx::tr ("Yes"), lynx::tr ("No") }, true }),
+                       "-delete-tracks.png");
+            saveAlert (lynx::makeFlMessageDialog ({ lynx::tr ("Playlist tracks"),
+                                                    lynx::tr ("One or more mixer tracks that will be deleted are connected to instrument/audio tracks.") + "\n"
+                                                        + lynx::tr ("Do you want to unlink the tracks and channels or delete them?"),
+                                                    { lynx::tr ("Delete tracks and channels"), lynx::tr ("Unlink tracks and channels"), lynx::tr ("Cancel") }, false }),
+                       "-delete-tracks-linked.png");
+            saveMenus (juce::StringArray { "Manage messages" }, std::vector<juce::PopupMenu> { lynx::messages::manageMenu() }, prefix + "-manage-messages.png");
             saveWindow (lynx::makeSetupWizardContent (offline, {}, {}), "-setup.png");
             saveWindow (lynx::crashreporter::makeDialogForSnapshot (false), "-crash-report.png"); // round 159
             saveWindow (lynx::crashreporter::makeDialogForSnapshot (true), "-report-problem.png");
