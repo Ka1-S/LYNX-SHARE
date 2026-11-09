@@ -1310,7 +1310,7 @@ public:
     MidiPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
     {
         for (auto* c : std::initializer_list<juce::Component*> { &inputsTitle, &notesTitle, &controllersTitle, &inputsNote, &refresh, &noDevices,
-                                                                 &velocityLabel, &velocityBox, &velocityNote, &perfLabel, &perfBox, &perfNote, &typeLabel, &typeValue, &pickup,
+                                                                 &velocityLabel, &velocityBox, &velocityNote, &perfLabel, &perfBox, &perfNote, &typeLabel, &typeValue, &pickup, &footPedal,
                                                                  &pickupNote, &linksLabel, &links, &removeLink, &removeAll, &outputsTitle,
                                                                  &outputsNote, &noOutputs, &syncTitle, &clockLabel, &clockBox, &clockOffsetLabel,
                                                                  &clockOffset, &clockStatusLabel, &clockStatus, &clockNote, &jumpLabel, &jumpBox,
@@ -1406,6 +1406,15 @@ public:
         styleNote (jumpNote, tr ("Notes on this channel move the song to a marker instead of playing: note 0 goes to the first "
                                  "marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)."));
 
+        // FL's MIDI input panel: "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a)
+        styleToggle (footPedal, tr ("Foot pedal controls note off"));
+        footPedal.setTooltip (tr ("Disable to send sustain to plugins"));
+        footPedal.onClick = [this] {
+            auto p = engine.getMidiPrefs();
+            p.footPedalNoteOff = footPedal.getToggleState();
+            set (p);
+        };
+
         styleLabel (typeLabel, tr ("Controller type"));
         typeLabel.setJustificationType (juce::Justification::topLeft);
         styleLabel (typeValue, tr ("Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller."), false);
@@ -1500,6 +1509,7 @@ private:
         r.section (notesTitle);
         velocityBox.setBounds (r.row (velocityLabel, 300));
         velocityNote.setBounds (r.indented (16).translated (0, -3));
+        footPedal.setBounds (r.full (24));
         perfBox.setBounds (r.row (perfLabel, 300));
         perfNote.setBounds (r.indented (32).translated (0, -3));
         jumpBox.setBounds (r.row (jumpLabel, 300));
@@ -1541,6 +1551,7 @@ private:
         const auto& p = engine.getMidiPrefs();
         velocityBox.setSelectedId ((int) p.velocity + 1, juce::dontSendNotification);
         pickup.setToggleState (p.pickup, juce::dontSendNotification);
+        footPedal.setToggleState (p.footPedalNoteOff, juce::dontSendNotification);
         jumpBox.setSelectedId (p.songMarkerJumpChannel + 1, juce::dontSendNotification);
         perfBox.setSelectedId (p.performanceChannel + 1, juce::dontSendNotification);
         {
@@ -1704,7 +1715,7 @@ private:
     juce::Label inputsNote, noDevices, velocityLabel, velocityNote, perfLabel, perfNote, typeLabel, typeValue, pickupNote, linksLabel, jumpLabel, jumpNote;
     juce::TextButton refresh { tr ("Refresh device list") }, removeLink { tr ("Remove link") }, removeAll { tr ("Remove all") };
     juce::ComboBox velocityBox, perfBox, jumpBox;
-    juce::ToggleButton pickup;
+    juce::ToggleButton pickup, footPedal;
     juce::ListBox links;
 };
 } // namespace

@@ -1563,6 +1563,8 @@ countries: tr
 "Controller type" = "Kontrolcü türü"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Genel kontrolcü: bir knob veya fader'ı, kontrolün sağ tık menüsü > MIDI kontrolcüye bağla ile bağlayın."
 "Pickup (takeover mode)" = "Pickup (devralma modu)"
+"Foot pedal controls note off" = "Ayak pedalı nota bırakmayı yönetir"
+"Disable to send sustain to plugins" = "Sustain'i eklentilere göndermek için kapatın"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Kontrolcü bir parametreyi ancak mevcut değerine ulaştıktan sonra hareket ettirir, böylece hiçbir şey sıçramaz."
 "Links in this project" = "Bu projedeki bağlantılar"
 "ch. {0}" = "kn. {0}"

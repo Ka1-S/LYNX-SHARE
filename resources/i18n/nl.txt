@@ -1563,6 +1563,8 @@ countries: nl be
 "Controller type" = "Type controller"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Generieke controller: koppel een knop of fader via het rechtsklikmenu van een regelaar > Koppelen aan MIDI-controller."
 "Pickup (takeover mode)" = "Pickup (takeover-modus)"
+"Foot pedal controls note off" = "Voetpedaal bepaalt het einde van noten"
+"Disable to send sustain to plugins" = "Uitschakelen om sustain naar de plug-ins te sturen"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Een controller beweegt een parameter pas nadat hij de huidige waarde bereikt, zodat er niets verspringt."
 "Links in this project" = "Koppelingen in dit project"
 "ch. {0}" = "kan. {0}"
