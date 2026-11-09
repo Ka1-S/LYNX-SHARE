@@ -261,3 +261,23 @@ Note tools (pattern clips), each the Piano roll's own operation on every note of
 | Add Interval | no parallel-interval tool | **missing** |
 | Velocity: Ramp / Deviation | `scaleLevels` covers a ramp; no deviation | Ramp not wired; Deviation **missing** |
 | Live 12 MIDI Tools tabs (Transform / Generate) | partly FL's Piano roll tools (strum, arpeggiate, chop, riff) | out of this round |
+
+## 10. Round 183a-2 (2026-11-09)
+- Merged origin/main (6f4575a4f, 0.1.25) into the branch: only MainComponent's settings lines (183a's detail keys next to 181c's
+  `alsSessionOnPlaylist`) and the i18n / tests.cpp include lines conflicted; both sides kept, i18n regenerated (0 missing).
+- First 0.1.25-based `--detailshot`: the docked Piano roll's 72 px velocity lane left one key row for the notes, and the
+  one-column clip panel overflowed the 200 px dock (Launch cut off). Fixed:
+  - Velocity lane 30 px while docked (`PianoRollComponent::compactVelocityHeight`), 72 px again when it goes home.
+    The reference's velocity lane in its Clip View is ~30 px [SHOT d08].
+  - The clip column is now three panels side by side under the clip's name, as the reference [SHOT d08, e03]:
+    Clip (Start | End, Loop, Length | Signature), Launch (mode, quantisation, legato), Notes (the note tools, two columns;
+    only for pattern clips, the column narrows for audio clips).
+- Live GUI session 02:35–02:38 (GUI lock holder pid 1144262, idle gate passed, every click through `act.ps1` with a fresh
+  shot; wall: no new drop). Live's demo set again, trial info box → OK (`trialok.ps1`), save prompt → No; Live exited, only the
+  pre-existing AbletonAudioCpl left. No preference touched. Shots `live/e03` (Clip View, Notes), `e04` (Envelopes),
+  `e05` (the second panel icon = Extended clip properties: Bank / Sub / Pgm, not Launch; an Arrangement clip has no Launch
+  panel).
+- [SHOT e04] Envelopes tab in the reference: the note tools stay but dim, the clip panel stays, the lane fills the editor, and
+  the two choosers (device, then control: "MIDI Ctrl" / "Pitch Bend") plus a "Linked" toggle sit along the BOTTOM edge.
+  LYNX's Envelopes tab hosts the existing Event editor: one chooser, at its top, with its own tools row at the bottom.
+  Kept as is (existing component, no new design); noted as a difference for the coordinator.
