@@ -208,6 +208,8 @@ Module readModule (Bytes body)
         }
         else if (c.tag == "PRMS")
             m.params = floatsOf (c.body);
+        else if (c.tag == "SMPR")
+            m.reserved = floatsOf (c.body);
         else if (c.tag == "CSTM")
             m.custom.assign (c.body.begin(), c.body.end());
     }

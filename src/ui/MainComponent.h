@@ -10,6 +10,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/LayoutStyle.h"
 #include "core/Performance.h"
 #include "ui/UiTrace.h"
 #include "core/ToolbarLayout.h"
@@ -24,6 +25,7 @@
 #include "ui/DetailView.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
+#include "ui/SimpleWorkflow.h"
 #include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
@@ -79,6 +81,9 @@ public:
     void confirmDiscard (std::function<void()> then);
     // The main window came up (issue #62): the detached panels restored with the layout go to their saved place, above it.
     void restoreDetachedWindows() { workspace.restoreDetachedWindows(); }
+    // Issue #123: at start-up without a file to open, FL's "Startup project" (Settings › General › Startup): the default
+    // template as a new untitled project (nothing changes while it is LYNX's default), an empty project or the last one.
+    void openStartupProject();
 
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
@@ -90,9 +95,13 @@ public:
     void showDesktopForSnapshot (bool extraPanels);
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
-    void setClipLaunchWorkflow (bool on, bool swapLayout = true);
+    void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
-    bool isClipLaunchWorkflow() const noexcept { return clipLaunchWorkflow; }
+    bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
+    // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
+    void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
+    layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
@@ -587,10 +596,12 @@ private:
     PlaylistComponent playlist;
     PatternPicker picker { engine, playlist };
     PlaylistArea playlistArea { picker, playlist };
-    bool clipLaunchWorkflow = false, startInClipLaunchWorkflow = false;
+    layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
+    layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
     std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
     void makeDetailView();
     // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)

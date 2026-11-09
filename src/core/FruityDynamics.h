@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#include "core/Song.h"
+
 namespace lynx
 {
 class Effect;
@@ -71,6 +73,7 @@ const char* compressorParamName (int index) noexcept;
 std::string limiterParamText (int index, float value);
 std::string compressorParamText (int index, float value);
 
-std::unique_ptr<Effect> makeLimiter();
-std::unique_ptr<Effect> makeCompressor();
+// `initial` (may be null): the slot's parameters, so the latency is known after prepare(), before the first block
+std::unique_ptr<Effect> makeLimiter (const EffectParams* initial = nullptr);
+std::unique_ptr<Effect> makeCompressor (const EffectParams* initial = nullptr);
 } // namespace lynx::fldyn

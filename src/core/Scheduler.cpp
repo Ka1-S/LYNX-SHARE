@@ -1,5 +1,7 @@
 #include "core/Scheduler.h"
 
+#include "core/NoteChance.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -52,23 +54,36 @@ double flSampleOf (double samples) noexcept
 
 // Emits an event for each repetition of tick `t` (within the pattern) whose sample (FL's rounding) falls in the block
 // [start, end).
+// `roll` (a note with Chance or a Velocity Range, round 187c): repetition k is pass k of its draw (core/NoteChance.h), so
+// the "on" and the "off" of one repetition agree; an "on" takes the drawn velocity.
 void emitOccurrences (double t, std::int64_t loopLength, double start, double end, double tps, int numSamples,
-                      NoteEvent event, EventBuffer& out) noexcept
+                      NoteEvent event, EventBuffer& out, const chance::Roll* roll = nullptr) noexcept
 {
     const auto len = (double) loopLength;
     const auto first = std::nearbyint (start / tps); // the block's first sample (start is a whole sample)
     // first repetition k with t + k*len >= start - one sample
     auto k = std::ceil ((start - tps - t) / len);
 
-    for (auto tick = t + k * len; tick < end; tick += len)
+    for (auto tick = t + k * len; tick < end; tick += len, k += 1.0)
     {
         const auto offset = flSampleOf (tick / tps) - first;
         if (offset < 0.0 || offset >= (double) numSamples)
             continue;
         event.sampleOffset = (int) offset;
+        if (roll != nullptr)
+        {
+            auto velocity = 0.0f;
+            if (! chance::plays (*roll, (std::int64_t) k, velocity))
+                continue;
+            if (event.type == NoteEvent::Type::on)
+                event.velocity = velocity;
+        }
         out.add (event);
     }
 }
+
+// The pass of a loop of length `len` that tick `at` is in (the chase of a note crossing the start position)
+std::int64_t passAt (double at, double len) noexcept { return len > 0.0 ? (std::int64_t) std::floor (at / len) : 0; }
 using NoteTiming = PlayedTiming;
 NoteTiming noteTiming (const Note& note, float swing, const ChannelDef* c) noexcept { return playedTiming (note, swing, c); }
 
@@ -115,7 +130,8 @@ void schedulePatternLoop (const Pattern& pattern,
                           float swing,
                           const std::vector<ChannelDef>* channels,
                           bool chase,
-                          double linearOrigin) noexcept
+                          double linearOrigin,
+                          std::uint32_t chanceSeed) noexcept
 {
     if (numSamples <= 0 || patternLength <= 0 || tps <= 0.0)
         return;
@@ -124,9 +140,11 @@ void schedulePatternLoop (const Pattern& pattern,
     const auto endTick = startTick + numSamples * tps;
     const auto position = linear ? startTick - linearOrigin : std::fmod (startTick, (double) patternLength);
     // once (linear): the same sample math as a loop's occurrence, for the single one at the origin
+    const auto place = chance::context (chanceSeed, 0);
+    const chance::Roll* roll = nullptr;
     auto emit = [&] (double t, const NoteEvent& event) {
         if (! linear)
-            return emitOccurrences (t, patternLength, startTick, endTick, tps, numSamples, event, out);
+            return emitOccurrences (t, patternLength, startTick, endTick, tps, numSamples, event, out, roll);
         const auto tick = linearOrigin + t;
         if (tick < startTick - tps || tick >= endTick)
             return;
@@ -135,13 +153,24 @@ void schedulePatternLoop (const Pattern& pattern,
             return;
         auto e = event;
         e.sampleOffset = (int) offset;
+        if (roll != nullptr) // played once: pass 0
+        {
+            auto velocity = 0.0f;
+            if (! chance::plays (*roll, 0, velocity))
+                return;
+            if (e.type == NoteEvent::Type::on)
+                e.velocity = velocity;
+        }
         out.add (e);
     };
 
-    for (const auto& note : pattern.notes)
+    for (std::size_t noteIndex = 0; noteIndex < pattern.notes.size(); ++noteIndex)
     {
+        const auto& note = pattern.notes[noteIndex];
         if ((! linear && note.start >= patternLength) || note.muted)
             continue; // outside the loop / muted note
+        const chance::Roll noteRoll { place, &note, &pattern.notes, noteIndex };
+        roll = note.hasChance() ? &noteRoll : nullptr;
 
         NoteEvent on;
         on.type = NoteEvent::Type::on;
@@ -172,7 +201,13 @@ void schedulePatternLoop (const Pattern& pattern,
         {
             on.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
             on.lengthTicks = (float) ((double) (start + timing.length) - position);
-            out.add (on);
+            auto velocity = on.velocity;
+            if (roll == nullptr || chance::plays (*roll, linear ? 0 : passAt (startTick, (double) patternLength), velocity))
+            {
+                auto chased = on;
+                chased.velocity = velocity;
+                out.add (chased);
+            }
         }
 
         NoteEvent off = on;
@@ -406,11 +441,15 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             last = std::upper_bound (first, notes.end(), to, [] (double t, const Note& n) { return t < (double) n.start; });
         }
 
+        // the draws of this clip's pass (round 187c): its own, apart from the other clips of the pattern
+        const auto place = chance::context (song.chanceSeed, ((std::uint64_t) clip.track << 44) ^ (std::uint64_t) clip.start, shift);
         for (auto it = first; it != last; ++it)
         {
             const auto& note = *it;
             if (repeats && note.start >= period) // a pass is the pattern's length
                 continue;
+            const chance::Roll noteRoll { place, &note, &notes, (std::size_t) (it - notes.begin()) };
+            const auto* roll = note.hasChance() ? &noteRoll : nullptr;
             const auto start = note.start + shift; // where the note is in the clip's passes
 
             if (note.muted || start >= clip.offset + clip.length)
@@ -448,22 +487,28 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             {
                 e.type = NoteEvent::Type::slide;
                 e.slideSamples = (float) ((double) (off - on) / tps);
-                emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
+                emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out, roll);
                 continue;
             }
 
             e.lengthTicks = (float) (off - on);
-            emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
+            emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out, roll);
             if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
             {
                 e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
                 e.lengthTicks = (float) ((double) off - loopStart);
-                out.add (e);
+                auto velocity = e.velocity;
+                if (roll == nullptr || chance::plays (*roll, passAt (startTick, (double) loop), velocity))
+                {
+                    auto chased = e;
+                    chased.velocity = velocity;
+                    out.add (chased);
+                }
             }
 
             e.type = NoteEvent::Type::off;
             e.velocity = 0.0f;
-            emitOccurrences ((double) off, loop, startTick, endTick, tps, numSamples, e, out);
+            emitOccurrences ((double) off, loop, startTick, endTick, tps, numSamples, e, out, roll);
         }
     };
 
