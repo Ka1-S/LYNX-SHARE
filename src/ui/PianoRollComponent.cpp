@@ -539,6 +539,11 @@ void PianoRollComponent::scrollToNotes (bool fitPattern)
         }
 
     refreshChannelBox();
+    if (fitKeysToNotes && high >= 0 && gridArea().getHeight() > 0) // docked: every note's row in the short view, as far as the key height allows
+    {
+        const auto span = std::abs (rowFor (low) - rowFor (high)) + 3;
+        rowHeight = juce::jlimit (gesture::minKeyHeight, undockedRowHeight, gridArea().getHeight() / span);
+    }
     const auto centreKey = high >= 0 ? (low + high) / 2 : 66;
     scrollY = rowFor (centreKey) * rowHeight - gridArea().getHeight() / 2;
     scrollTicks = 0.0;
