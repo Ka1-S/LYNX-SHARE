@@ -133,6 +133,13 @@ public:
     void setVisibleHeight (int height);
 
     int getSelectedTrack() const noexcept { return selected; }
+    // The level a track's meter shows now, 0..1 (side 0 left, 1 right; round 183a: the Device View reads it while the
+    // strips are on screen instead of taking the peaks they need).
+    float shownLevel (int track, int side) const noexcept
+    {
+        const auto i = (std::size_t) (track * 2 + side);
+        return track >= 0 && (side == 0 || side == 1) && i < levels.size() ? levels[i].level : 0.0f;
+    }
     void selectTrack (int track);
     std::function<void (int)> onSelectionChanged;
 
@@ -151,6 +158,10 @@ public:
     bool moveSelected (int delta);           // Alt+Left/Right
     void linkSelectedChannels (bool startingHere); // Ctrl+L / Ctrl+Shift+L
     void selectLinkedChannels();             // Alt+L
+    // FL's "Delete" (round 186c): the confirmation "Delete tracks" (with "Remember my choice"), then, when a Playlist
+    // audio / instrument track is linked to one of them, "Delete tracks and channels" / "Unlink tracks and channels"
+    void deleteTracks (std::vector<int> tracks);
+    void deleteSelectedTracks() { deleteTracks (selection); }
     // The insert's right-click menu (FL's mixer track menu, REA rounds 115/134/143); public for --snapshot and tests.
     juce::PopupMenu buildMenu (int track);
     // runs the selected track's menu item whose caption (before any "\t" key text) is `caption` (translated): the
@@ -396,6 +407,22 @@ public:
     }
     void openSlotEditor (int slot) { openEditor (slot); }
 
+    // Round 183a: the Detail View's device cards use the slots' own menus and windows through these, so the Mixer and
+    // the Device View stay one code path. The menus open over `target` (nullptr: this panel, the Mixer's own case).
+    void setMenuTarget (juce::Component* target) noexcept { menuTarget = target; }
+    void showSlotMenuFor (int slot)
+    {
+        selectedSlot = slot;
+        showSlotMenu (slot);
+    }
+    void showAddMenuFor (int row) { showAddMenu (row); }
+    std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
+    // the knob of parameter `param` of effect `slot` (param -1: the slot's Mix), as the Mixer shows and sets it
+    ui::ValueSpec slotParamSpec (int param, int slot) const { return specFor (param < 0 ? mixParam : param, slot); }
+    double slotParamValue (int param, int slot) const { return valueOf (param < 0 ? mixParam : param, slot); }
+    void setSlotParam (int param, int slot, double value) { setValue (param < 0 ? mixParam : param, slot, value); }
+    void toggleSlotEditor (int slot) { toggleEditor (slot); }
+
     // Sizes the panel for a view of `viewWidth` x `viewHeight` (round 163): when the slots and the EQ don't both fit,
     // the EQ folds to its title bar (click it to unfold); when even that doesn't fit, the panel is taller than the
     // view and the viewport around it scrolls. Nothing overlaps at any height or UI zoom.
@@ -500,8 +527,11 @@ private:
     double wheelAccumulator = 0.0; // a trackpad's small wheel steps over a slot, added up
     int wheelSlot = -1;
     juce::uint32 wheelTime = 0;
-    // A/B compare: a spare state per (insert, slot), swapped with the live one on request (not saved)
-    std::map<std::pair<int, int>, EffectSlot> spare;
+    // A/B compare: a spare state per (insert, slot), swapped with the live one on request (not saved); shared by every
+    // panel (round 183a: the Device View's cards reach the same B as the Mixer)
+    static inline std::map<std::pair<int, int>, EffectSlot> spare;
+    juce::Component* menuTarget = nullptr; // (round 183a) where the slot menus open; nullptr = this panel
+    juce::Component* menuOwner() noexcept { return menuTarget != nullptr ? menuTarget : this; }
     std::unique_ptr<juce::FileChooser> sampleChooser; // Newtone / Newtime source sample
 
     AudioEngine& engine;
@@ -544,6 +574,9 @@ public:
     void selectTrack (int track); // also scrolls the strip into view
     void selectSlot (int slot) { effects.selectSlot (slot); }
     int getSelectedTrack() const noexcept { return strips.getSelectedTrack(); }
+    // Round 183a: the strips' meters run (they are on screen), and the level one shows.
+    bool metersShowing() const { return strips.isShowing(); }
+    float shownLevel (int track, int side) const noexcept { return strips.shownLevel (track, side); }
     // Selects the insert and slot and opens the effect's editor (the Browser's "Current project > Effects")
     void openSlotEditor (int track, int slot)
     {

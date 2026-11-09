@@ -29,6 +29,24 @@ bool insertTrack (Song& song, int at);
 // removed. False for the Master or out of range.
 bool deleteTrack (Song& song, int t);
 
+// FL's "Delete" on the selected mixer tracks (round 186c; REA FUN_012a5b60 / FUN_012a5280, checked in FL 2026):
+// every insert of `tracks` (the Master is skipped) goes. A track that sent into a deleted insert now sends to that
+// insert's own destinations (FL 21's fix 19603), so the signal still reaches where it went. Playlist audio /
+// instrument tracks linked to a deleted insert follow `linked`: `unlink` keeps the Playlist track (and its name) as
+// an unassigned track, `deleteToo` resets it (FL's "Delete tracks and channels": default name, unassigned) and
+// deletes the channel of an instrument track. Returns how many inserts were deleted.
+enum class LinkedPlaylistTracks
+{
+    unlink,
+    deleteToo
+};
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked = LinkedPlaylistTracks::unlink);
+
+// The Playlist audio / instrument tracks linked to one of `tracks` (FL asks "Delete tracks and channels" or
+// "Unlink tracks and channels" when there is one; FUN_012a5b00): an audio track by its mixer track, an instrument
+// track by its channel's mixer track.
+std::vector<int> playlistTracksLinkedTo (const Song& song, const std::vector<int>& tracks);
+
 // Routes `channels` to insert `track` (all of them), or, with `startingHere`, to consecutive inserts from
 // `track` on (adding inserts as needed, up to maxMixerTracks). Returns the insert of each channel.
 std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int track, bool startingHere);

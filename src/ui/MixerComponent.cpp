@@ -2227,6 +2227,69 @@ bool MixerStrips::moveSelected (int delta)
     return ok;
 }
 
+// FL's "Delete" on the selected mixer tracks (round 186c; REA FUN_012a5b60, FL 2026 checked by hand): an error while
+// audio is being recorded; "Delete tracks|This will |delete| %d selected mixer track(s). Are you sure?" (Yes / No and
+// "Remember my choice": a remembered Yes skips it, No is never remembered; Settings › General › Manage messages shows
+// it again); then, when a Playlist audio / instrument track is linked to one of them, "Playlist tracks" with "Delete
+// tracks and channels" / "Unlink tracks and channels" / "Cancel" (nothing remembered). One undo step.
+void MixerStrips::deleteTracks (std::vector<int> tracks)
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count] (int t) { return t < 1 || t >= count; }), tracks.end());
+    if (tracks.empty())
+        return;
+
+    if (engine.isRecording() && ! engine.getArmedInserts().empty())
+    {
+        showFlMessage ({ tr ("Error"), tr ("It isn't possible to delete mixer tracks during audio recording."), { tr ("OK") }, false }, nullptr);
+        return;
+    }
+
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
+        if (safe == nullptr)
+            return;
+        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked); });
+        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        safe->setSelection ({ first }, first);
+    };
+    auto confirmed = [safe, tracks, run] {
+        if (safe == nullptr)
+            return;
+        if (mixerops::playlistTracksLinkedTo (safe->engine.getSong(), tracks).empty())
+        {
+            run (mixerops::LinkedPlaylistTracks::unlink);
+            return;
+        }
+        showFlMessage ({ tr ("Playlist tracks"),
+                         tr ("One or more mixer tracks that will be deleted are connected to instrument/audio tracks.") + "\n"
+                             + tr ("Do you want to unlink the tracks and channels or delete them?"),
+                         { tr ("Delete tracks and channels"), tr ("Unlink tracks and channels"), tr ("Cancel") }, false },
+                       [run] (int button, bool) {
+                           if (button == 1)
+                               run (mixerops::LinkedPlaylistTracks::deleteToo);
+                           else if (button == 2)
+                               run (mixerops::LinkedPlaylistTracks::unlink);
+                       });
+    };
+
+    if (! messages::shown ("DeleteMixerTrack"))
+    {
+        confirmed();
+        return;
+    }
+    // (FL marks "delete" in its accent colour: the |bars| of its own string)
+    showFlMessage ({ tr ("Delete tracks"), tr ("This will |delete| {0} selected mixer track(s). Are you sure?", { juce::String ((int) tracks.size()) }),
+                     { tr ("Yes"), tr ("No") }, true },
+                   [confirmed] (int button, bool remember) {
+                       if (button != 1)
+                           return;
+                       if (remember)
+                           messages::setShown ("DeleteMixerTrack", false);
+                       confirmed();
+                   });
+}
+
 void MixerStrips::linkSelectedChannels (bool startingHere)
 {
     const auto channels = engine.getSelectedChannels();
@@ -3284,10 +3347,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             moveSelected (1);
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete") + "\tDel", [this, t] {
-            engine.editSong ([t] (Song& s) { mixerops::deleteTrack (s, t); });
-            setSelection ({ t }, t);
-        });
+        menu.addItem (tr ("Delete") + "\tDel", [this, targets] { deleteTracks (targets); });
         const auto room = (int) song.mixer.size() < maxMixerTracks;
         menu.addItem (tr ("Insert one"), room, false, [this, t] {
             engine.editSong ([t] (Song& s) { mixerops::insertTrack (s, t); });
@@ -6216,7 +6276,7 @@ void EffectsPanel::showAddMenu (int row)
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
 
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
 }
 
 void EffectsPanel::showSlotMenu (int slot)
@@ -6234,6 +6294,8 @@ void EffectsPanel::showSlotMenu (int slot)
     quickpick::addFolderViewItems (replace, engine);
 
     juce::PopupMenu menu;
+    if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
+        extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
@@ -6336,7 +6398,7 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [this, key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
     if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
@@ -6429,7 +6491,7 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), {},
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {
                              if (! key.isKeyCode (juce::KeyPress::deleteKey) || safe == nullptr)
                                  return false;
@@ -6844,6 +6906,8 @@ bool MixerComponent::runAction (const std::string& id)
         return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
     else if (id == "mixer.renderSelected")
         return strips.runMenuItem (tr ("Render selected tracks to wave file(s)..."));
+    else if (id == "mixer.deleteTracks") // FL's Del: the selected mixer tracks, after its question (round 186c)
+        strips.deleteSelectedTracks();
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
     else
