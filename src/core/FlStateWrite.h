@@ -15,6 +15,7 @@
 #include "core/FruityDynamics.h"
 #include "core/FruityMultiband.h"
 #include "core/FruityShapers.h"
+#include "core/ParametricEqFl.h"
 #include "core/StereoFx.h"
 #include "core/Song.h"
 
@@ -80,5 +81,35 @@ inline std::vector<std::uint8_t> multiband (const EffectParams& p)
     putI32 (d, 4 + 4 * (std::size_t) flmb::controls, 0);
     putI32 (d, 8 + 4 * (std::size_t) flmb::controls, 0);
     return d;
+}
+
+// Fruity Parametric EQ 2 (a slot in FL's law, peqfl): a fresh FL instance's state (version 8, 354 bytes, `base` =
+// FlpExport's parametricEq2DefaultState()) with the 36 controls at 0x04, HQ / design in the word at 0x124, the linear
+// phase and external-HQ bits of the options byte 0x13D, FFT quality (0x135), cross-fade (0x139) and the band mask
+// (0x13E). The A/B copy (0x94) and the display settings stay as a new instance has them. Layout: REA_rodada50 §1.
+inline std::vector<std::uint8_t> parametricEq2 (const EffectParams& p, std::vector<std::uint8_t> base)
+{
+    if (base.size() < 0x142)
+        base.resize (0x142, 0);
+    const auto s = peqfl::fromParams (p);
+    for (int b = 0; b < 7; ++b)
+    {
+        const auto ub = (std::size_t) b;
+        putI32 (base, 4 + 4 * ub, s.gain[ub]);
+        putI32 (base, 4 + 4 * (7 + ub), s.freq[ub]);
+        putI32 (base, 4 + 4 * (14 + ub), s.width[ub]);
+        putI32 (base, 4 + 4 * (21 + ub), s.type[ub]);
+        putI32 (base, 4 + 4 * (28 + ub), s.order[ub]);
+    }
+    putI32 (base, 4 + 4 * 35, s.main);
+    using P = peqfl::Processing;
+    const bool hq = s.processing != P::plain;
+    putI32 (base, 0x124, (hq ? 1 : 0) | (s.processing == P::hqAlternative ? 2 : 0));
+    putI32 (base, 0x135, s.linearQuality);
+    putI32 (base, 0x139, s.linearFade);
+    base[0x13D] = (std::uint8_t) ((base[0x13D] & ~3u) | (s.linearPhase ? 1u : 0u) | (s.processing == P::hqExternal ? 2u : 0u));
+    const auto mask = (std::uint32_t) base[0x13E] | ((std::uint32_t) base[0x13F] << 8) | ((std::uint32_t) base[0x140] << 16) | ((std::uint32_t) base[0x141] << 24);
+    putI32 (base, 0x13E, (int) ((mask & ~0x7Fu) | (s.mask & 0x7Fu)));
+    return base;
 }
 } // namespace lynx::flstate
