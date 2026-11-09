@@ -7996,6 +7996,7 @@ countries: cn sg
 "Save audio clipboard to browser" = "将音频剪贴板保存到浏览器"
 "Save MIDI clipboard to browser" = "将 MIDI 剪贴板保存到浏览器"
 "Stop sound" = "停止声音"
+"Cancel recording" = "取消录音"
 "Delete unused files and save project" = "删除未使用的文件并保存项目"
 "Unable to create folder: {0}" = "无法创建文件夹:{0}"
 "Saved to Clipboard files: {0}" = "已保存到剪贴板文件:{0}"

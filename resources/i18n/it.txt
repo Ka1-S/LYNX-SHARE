@@ -7996,6 +7996,7 @@ countries: it ch sm
 "Save audio clipboard to browser" = "Salva gli appunti audio nel browser"
 "Save MIDI clipboard to browser" = "Salva gli appunti MIDI nel browser"
 "Stop sound" = "Ferma il suono"
+"Cancel recording" = "Annulla registrazione"
 "Delete unused files and save project" = "Elimina i file inutilizzati e salva il progetto"
 "Unable to create folder: {0}" = "Impossibile creare la cartella: {0}"
 "Saved to Clipboard files: {0}" = "Salvato in File degli appunti: {0}"

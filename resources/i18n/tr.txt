@@ -7996,6 +7996,7 @@ countries: tr
 "Save audio clipboard to browser" = "Ses panosunu tarayıcıya kaydet"
 "Save MIDI clipboard to browser" = "MIDI panosunu tarayıcıya kaydet"
 "Stop sound" = "Sesi durdur"
+"Cancel recording" = "Kaydı iptal et"
 "Delete unused files and save project" = "Kullanılmayan dosyaları sil ve projeyi kaydet"
 "Unable to create folder: {0}" = "Klasör oluşturulamadı: {0}"
 "Saved to Clipboard files: {0}" = "Pano dosyalarına kaydedildi: {0}"

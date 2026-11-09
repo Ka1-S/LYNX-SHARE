@@ -2584,6 +2584,27 @@ private:
         offline.undo();
         const auto recordUndoOk = offline.getSong().patterns[0].notes.size() == notesBefore;
 
+        // FL's Tools › Cancel recording (round 187a): the pass's notes go, an edit made before it stays, recording turns
+        // off and playback goes on; nothing to redo
+        bool cancelRecordOk = false;
+        {
+            offline.editSong ([] (lynx::Song& s) { s.bpm = 123.0; });
+            const auto notesThen = offline.getSong().patterns[0].notes.size();
+            offline.setRecording (true);
+            offline.play();
+            offline.getTransport().positionTicks.store (960.0);
+            offline.sendLiveNote (2, 74, 0.9f, true, true);
+            offline.getTransport().positionTicks.store (1920.0);
+            offline.sendLiveNote (2, 74, 0.0f, false, true);
+            offline.sendLiveNote (2, 76, 0.9f, true, true); // (still held when the pass is cancelled)
+            const auto cancelled = offline.cancelRecording();
+            cancelRecordOk = cancelled && ! offline.isRecording() && offline.getTransport().playing.load()
+                             && offline.getSong().patterns[0].notes.size() == notesThen && offline.getSong().bpm == 123.0 && ! offline.canRedo()
+                             && ! offline.cancelRecording(); // (not recording: nothing to cancel)
+            offline.sendLiveNote (2, 76, 0.0f, false, false);
+            offline.stop();
+        }
+
         // MIDI: exporting the pattern and importing it back gives the same notes
         bool midiOk = false;
         {
@@ -3231,7 +3252,7 @@ private:
         }
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3255,6 +3276,7 @@ private:
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
+               << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
                << "projectSave=" << (projectSaveOk ? "OK" : "ERROR") << "\n"

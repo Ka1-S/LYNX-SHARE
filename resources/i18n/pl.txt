@@ -7996,6 +7996,7 @@ countries: pl
 "Save audio clipboard to browser" = "Zapisz schowek audio w przeglądarce"
 "Save MIDI clipboard to browser" = "Zapisz schowek MIDI w przeglądarce"
 "Stop sound" = "Zatrzymaj dźwięk"
+"Cancel recording" = "Anuluj nagrywanie"
 "Delete unused files and save project" = "Usuń nieużywane pliki i zapisz projekt"
 "Unable to create folder: {0}" = "Nie można utworzyć folderu: {0}"
 "Saved to Clipboard files: {0}" = "Zapisano w Pliki schowka: {0}"

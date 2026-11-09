@@ -7996,6 +7996,7 @@ countries: nl be
 "Save audio clipboard to browser" = "Audioklembord opslaan in de browser"
 "Save MIDI clipboard to browser" = "MIDI-klembord opslaan in de browser"
 "Stop sound" = "Geluid stoppen"
+"Cancel recording" = "Opname annuleren"
 "Delete unused files and save project" = "Ongebruikte bestanden verwijderen en project opslaan"
 "Unable to create folder: {0}" = "Kan map niet maken: {0}"
 "Saved to Clipboard files: {0}" = "Opgeslagen in Klembordbestanden: {0}"
