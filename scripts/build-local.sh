@@ -227,7 +227,30 @@ if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
     # 2026-11-04: in parallel the tools deadlocked inside zig's shared object cache (every zig process waiting on a
     # manifest lock another one held, 0 % CPU for hours). One at a time by default; LYNX_TOOLS_JOBS=n to try more.
     tools_jobs=${LYNX_TOOLS_JOBS:-1}
-    xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
-    rm -f "$TOOLS_QUEUE"
+    if [[ "${LYNX_TOOLS_WITH_TESTS:-0}" == 1 ]]; then
+        # (round speed185a) the tests don't use the tools: link them (single-threaded LTO links, ~8 min) while the tests run
+        rm -f build-local/tools.rc
+        ( xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE" > build-local/tools.log 2>&1; echo $? > build-local/tools.rc; rm -f "$TOOLS_QUEUE" ) &
+        tools_pid=$!
+    else
+        xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
+        rm -f "$TOOLS_QUEUE"
+    fi
 fi
-./build-local/lynx_tests "$@"
+# LYNX_TEST_JOBS=<n> (or "auto": the CPUs) runs the tests in parallel shards, then the timing-sensitive ones alone
+# (scripts/run-tests.sh: same tests, same checks, the same "N checks, M failures" line). Unset or 1: one process, as before.
+tests_rc=0
+case "${LYNX_TEST_JOBS:-1}" in
+    1) ./build-local/lynx_tests "$@" || tests_rc=$? ;;
+    auto) scripts/run-tests.sh build-local/lynx_tests "$@" || tests_rc=$? ;;
+    *) scripts/run-tests.sh -j "$LYNX_TEST_JOBS" build-local/lynx_tests "$@" || tests_rc=$? ;;
+esac
+if [[ -n "${tools_pid:-}" ]]; then
+    wait "$tools_pid" || true
+    if [[ "$(cat build-local/tools.rc 2> /dev/null)" != 0 ]]; then
+        grep -v 'glibc version' build-local/tools.log >&2 || true
+        echo "build-local: the tools did not build (build-local/tools.log)" >&2
+        exit 1
+    fi
+fi
+exit $tests_rc
