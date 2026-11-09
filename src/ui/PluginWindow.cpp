@@ -45,6 +45,28 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 class WrapperSettingsPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    // FL's Typing keyboard priority (the window caption's keyboard button, round 187a): on = the plugin gets keys first
+    bool pluginKeysFirst() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref == nullptr || ! ref->hostKeysFirst;
+    }
+    void setPluginKeysFirst (bool on)
+    {
+        engine.editSong ([this, on] (Song& song) {
+            if (auto* ref = find (song))
+                ref->hostKeysFirst = ! on;
+        }, false);
+        engine.markModified();
+    }
+    bool keysReachHost() const { return sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin); }
+
+    bool hostProcessesKeys() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref != nullptr && ref->hostKeysFirst && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
+    }
+
     // The channel whose plugin this is (-1: a mixer slot's, or gone)
     int channelIndex() const
     {
@@ -403,6 +425,35 @@ private:
     std::vector<Label> labels;
 };
 
+// FL's Typing keyboard priority button in the plugin window's caption (FLEngine PluginForm.NewCaption.KeyboardFocusBtn,
+// round 187a [UI shots/fl a00-a06]): a keyboard glyph left of the presets, bright while the plugin handles keys first
+// (FL's default for a new plugin), dim when LYNX goes first; outlined under the mouse.
+class KeyboardPriorityButton final : public juce::Button
+{
+public:
+    KeyboardPriorityButton() : juce::Button ("Typing keyboard priority") { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (1.5f);
+        if (over || down)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.drawRoundedRectangle (r, 4.0f, 1.2f);
+        }
+        const auto on = getToggleState() && isEnabled();
+        g.setColour (on ? theme::colour::textPrimary : theme::colour::textDisabled);
+        const auto side = juce::jmin (r.getWidth(), r.getHeight()) * 0.62f;
+        auto key = juce::Rectangle<float> (side, side).withCentre (r.getCentre());
+        g.drawRoundedRectangle (key, 1.5f, 1.2f);
+        // the 3 x 3 grid of keys
+        const auto cell = (key.getWidth() - 3.0f) / 3.0f;
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                g.fillRect (key.getX() + 1.5f + (float) col * cell + 0.6f, key.getY() + 1.5f + (float) row * cell + 0.6f, cell - 1.2f, cell - 1.2f);
+    }
+};
+
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
 class WrappedEditor final : public juce::Component
 {
@@ -424,6 +475,15 @@ public:
             refreshSidechain();
         }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
+        // FL's Typing keyboard priority, left of the presets (issue #96 slice 2). A plugin in another process has its
+        // own keyboard (FL: bridged plugins always take it), so there it stays greyed.
+        addAndMakeVisible (keyboardPriority);
+        keyboardPriority.setTooltip (tr ("Allow the plugin to handle keystrokes before the host does"));
+        keyboardPriority.onClick = [this] {
+            page.setPluginKeysFirst (! page.pluginKeysFirst());
+            refreshKeyboardPriority();
+        };
+        refreshKeyboardPriority();
         for (auto* b : { &pluginTab, &settingsTab })
         {
             b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
@@ -445,6 +505,15 @@ public:
     }
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
+    bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
+    void showPage (bool showSettings) { show (showSettings); }
+
+    void refreshKeyboardPriority()
+    {
+        keyboardPriority.setEnabled (page.keysReachHost());
+        keyboardPriority.setToggleState (page.pluginKeysFirst(), juce::dontSendNotification);
+    }
+
     // FL's Auto select linked modules (round 187a): the channel and the mixer insert this window belongs to
     std::pair<int, int> linked() const
     {
@@ -490,6 +559,8 @@ public:
             sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
             header.removeFromRight (6);
         }
+        keyboardPriority.setBounds (header.removeFromLeft (26));
+        header.removeFromLeft (4);
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
         if (editor != nullptr && ! settings)
@@ -509,10 +580,11 @@ public:
     }
 
 private:
-    static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 250 + 4;
+    static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 30 + 250 + 4;
     AudioEngine& engineRef;
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
+    KeyboardPriorityButton keyboardPriority;
 
     void fitEditor()
     {
@@ -583,6 +655,13 @@ public:
 
         const auto resizable = editor->isResizable();
         shownEditor = editor;
+        // (issue #96: as in FL, what it leaves unused plays the typing keyboard. A plugin in another process has its
+        // own keyboard: issue #99 is that case, this path stays away from it.)
+        if (sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin))
+        {
+            listenForKeysPluginLeaves (*editor);
+            getProperties().set ("lynxPluginWindow", true);
+        }
         thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
         if (context.engine != nullptr && context.find) // FL's wrapper header and settings page (round 146a)
             setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel, context.track, context.slot), true);
@@ -679,7 +758,10 @@ private:
         const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
         const auto active = isActiveWindow() || (isShowing() && getScreenBounds().contains (mouse));
         if (auto* wrapped = dynamic_cast<WrappedEditor*> (getContentComponent()))
+        {
             wrapped->refreshSidechain();
+            wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
+        }
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
             PluginWindows::onGesture (plugin, moved, true);
@@ -901,6 +983,28 @@ private:
 
 namespace PluginWindows
 {
+bool letsHostProcessKeys (juce::Component& window)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    return wrapped != nullptr && wrapped->hostProcessesKeys();
+}
+
+bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    if (wrapped == nullptr)
+        return false;
+    wrapped->refreshKeyboardPriority(); // (the window's timer may not have run since the change)
+    wrapped->showPage (true);
+    const auto image = wrapped->createComponentSnapshot (wrapped->getLocalBounds(), true, 1.0f);
+    wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();

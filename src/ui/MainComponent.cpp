@@ -768,6 +768,14 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
+    // keys over a focused plugin (rounds 181c/187a, issue #96): what it passes back plays, and with its "Typing keyboard priority" off LYNX goes first
+    setPluginViewPlainKeyHandler ([] (juce::Component& window) { return PluginWindows::letsHostProcessKeys (window); },
+                                  [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
+                                      return safe != nullptr && safe->keyFromPluginView (key, true);
+                                  },
+                                  [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
+                                      return safe != nullptr && safe->keyFromPluginView (key, false);
+                                  });
 }
 
 MainComponent::~MainComponent()
@@ -780,6 +788,7 @@ MainComponent::~MainComponent()
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
+    setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
     setSecondaryWindowKeyHandler (nullptr);
     setLinkedWindowFocusHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
@@ -1618,6 +1627,15 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     return ! action.empty() && runAction (action);
 }
 
+bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
+{
+    // the typing piano as over the main window (its release is polled, MainComponent::keyStateChanged). With the
+    // plugin's "Typing keyboard priority" off (LYNX first) the shortcuts run too; keys that do nothing here stay the plugin's.
+    if (typingKey (chordFromKeyPress (key)).taken)
+        return keyPressed (key);
+    return optionOn && keyFromSecondaryWindow (key);
+}
+
 bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
@@ -2115,6 +2133,8 @@ void MainComponent::loadUiSettings()
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
             autoclipplace::setAtPlayback (on);
+        else if (key == "disableTypingPriority")
+            pluginkeys::newPluginsHostFirst() = on;
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
             startInClipLaunchWorkflow = on;
         else if (key == "lanesBeforeClipLaunch")
@@ -2301,6 +2321,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
+                                      + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
@@ -5875,6 +5896,7 @@ void MainComponent::openSettings (int page)
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
         o.autoClipsAtPlayback = autoclipplace::atPlayback();
+        o.disableTypingPriority = pluginkeys::newPluginsHostFirst().load();
         o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
@@ -5957,6 +5979,7 @@ void MainComponent::openSettings (int page)
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
+        pluginkeys::newPluginsHostFirst() = o.disableTypingPriority;
         self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())
