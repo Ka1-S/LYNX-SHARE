@@ -68,7 +68,7 @@ TEST (fl165_fl_window_keys)
     CHECK (map.find ({ f12 }, Context::global, false) == "view.closeWindows");
     CHECK (map.find ({ f12, alt }, Context::global, false) == "view.closePluginWindows");
     CHECK (map.find ({ f5, ctrl }, Context::global, false) == "view.tempoTapper");
-    CHECK (map.find ({ del }, Context::mixer, false) == "mixer.deleteEffect");
+    CHECK (map.find ({ del }, Context::mixer, false) == "mixer.deleteTracks"); // (FL 2026, round 186c)
     CHECK (map.find ({ f2 }, Context::browser, false) == "browser.rename");
     // a single letter the user assigns (FL users bind M to the Mixer): works, but not while the typing piano is on
     map.setChords ("panel.mixer", { { 'M' } });
