@@ -152,6 +152,13 @@ public:
                 showSlotMenu (hit.track, hit.scene);
             return;
         }
+        if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // a column's title selects its track (round 183a)
+        {
+            selectedTrack = t;
+            repaint();
+            notify (GridPick::select);
+            return;
+        }
         if (hit.scene >= 0 && hit.track < 0)
         {
             if (e.x < cellArea().getRight() + launchZone)
@@ -165,6 +172,7 @@ public:
         selectedTrack = hit.track;
         selectedScene = hit.scene;
         repaint();
+        notify (GridPick::select);
         const auto* grid = gridOf();
         if (grid == nullptr)
             return;
@@ -191,11 +199,26 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // (round 183a: the track's devices)
+        {
+            selectedTrack = t;
+            notify (GridPick::openTrack);
+            return;
+        }
         const auto hit = hitTestCell (e.getPosition());
         if (hit.track >= 0 && hit.scene >= 0 && e.x - columnX (hit.track) >= launchZone)
-            if (const auto* grid = gridOf(); grid != nullptr && launcher::clipAt (*grid, hit.track, hit.scene) == nullptr)
-                putPattern (hit.track, hit.scene, engine.getSong().currentPattern);
+            if (const auto* grid = gridOf(); grid != nullptr)
+            {
+                if (launcher::clipAt (*grid, hit.track, hit.scene) == nullptr)
+                    putPattern (hit.track, hit.scene, engine.getSong().currentPattern);
+                else
+                    notify (GridPick::openClip); // (round 183a: the clip in the Detail View)
+            }
     }
+
+    // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
+    std::function<void (int, int, GridPick)> onPick;
+    std::pair<int, int> selection() const noexcept { return { selectedTrack, selectedScene }; }
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
@@ -220,6 +243,7 @@ public:
             selectedScene = juce::jlimit (0, rowCount() - 1, selectedScene + (code == juce::KeyPress::upKey ? -1 : code == juce::KeyPress::downKey ? 1 : 0));
             revealSelection();
             repaint();
+            notify (GridPick::select);
             return true;
         }
         if (code == juce::KeyPress::returnKey)
@@ -296,6 +320,19 @@ private:
         else if (rowY (selectedScene) + rowHeight > cells.getBottom())
             scrollY = (selectedScene + 1) * rowHeight - cells.getHeight();
         clampScroll();
+    }
+    void notify (GridPick pick)
+    {
+        if (onPick != nullptr)
+            onPick (selectedTrack, selectedScene, pick);
+    }
+    // the track whose column title is at p, or -1
+    int headerTrackAt (juce::Point<int> p) const
+    {
+        if (p.y < 0 || p.y >= headerHeight || p.x < 0 || p.x >= cellArea().getRight())
+            return -1;
+        const auto t = (p.x + scrollX) / columnWidth;
+        return t >= 0 && t < columnCount() ? t : -1;
     }
     Cell hitTestCell (juce::Point<int> p) const
     {
@@ -678,5 +715,18 @@ private:
 std::unique_ptr<juce::Component> makeClipGrid (AudioEngine& engine)
 {
     return std::make_unique<ClipGridComponent> (engine);
+}
+
+void setClipGridPickListener (juce::Component& grid, std::function<void (int, int, GridPick)> listener)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->onPick = std::move (listener);
+}
+
+std::pair<int, int> clipGridSelection (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->selection();
+    return { 0, 0 };
 }
 } // namespace lynx

@@ -62,6 +62,12 @@ constexpr float maxFaderGain = 1.9031f;
 // docs/analise/REA_rodada3.md §2.
 float channelGain (float volume) noexcept;
 
+// The channel volume at which a Playlist audio clip plays its file at unity, in FL and in LYNX: FL's default, 10000 of
+// 12800 (Instruments.cpp audioClipUnity; FL's AudioTrack.fst template holds it). Channels made from a render get it, so
+// the render sounds like what it replaces: Render to audio, FL's pattern render and consolidation (which load
+// AudioTrack.fst and never set the volume, FUN_01188230 / FUN_012fbda0), the FL Studio export's option A (round 182b/186b).
+inline constexpr float audioClipUnityVolume = 10000.0f / 12800.0f;
+
 // Which running instance a channel or mixer effect slot is (round 168s, issue #32): a number given when the channel /
 // slot is made, kept by every copy (snapshots, undo, moving it in its list) and never saved. The renderer keeps an
 // instrument / effect with its channel / slot when the list order changes (inserting a channel, moving an effect up),
@@ -1182,10 +1188,23 @@ struct Note
     bool muted = false;       // disabled note (does not play, stays in the pattern)
     bool slide = false;       // glides the sounding note to this pitch (without retriggering), as in FL
     bool porta = false;       // inverts the channel's porta on this note (the note glides from the previous one; as in FL)
-    float release = 0.5f;     // release velocity 0..1 (Note inspector; stored, not yet used by the instruments)
+    // release velocity 0..1 (FL's "Note release"): the note's "off" carries it to the instruments that take one — hosted
+    // plugins (FL's wrapper "Send note release velocity"), a Patcher's and a VFX's voices
+    float release = 0.5f;
     float modX = 0.5f, modY = 0.5f; // two free per-note modulation values 0..1 (stored, not yet routed)
     int colour = 0;           // note colour group 0..15 (FL's note colours; .flp note byte 'extra' bits 0-3)
     int group = 0;            // note group (FL's Group, Shift+G: clicking one note selects the group); 0 = none
+    // Live 12's note Chance and Velocity Range (round 187c, LYNX additions; FL has neither; core/NoteChance.h): each time
+    // the note comes round it plays with this probability (0..1, .als Probability), at a velocity drawn evenly between
+    // `velocity` and `velocity + velocityRange` (-1..1 = Live's VelocityDeviation / 127). Drawn from Song::chanceSeed,
+    // so a project plays and renders the same way every time; each loop pass draws again.
+    float chance = 1.0f;
+    float velocityRange = 0.0f;
+    // Live 12's probability groups (.als NoteProbabilityGroups): the notes of a pattern with the same chanceGroup (> 0)
+    // draw together — "Play all" (chanceOne false): all of them or none; "Play one": one member picked at random.
+    int chanceGroup = 0;
+    bool chanceOne = false;
+    bool hasChance() const noexcept { return chance < 1.0f || velocityRange != 0.0f || chanceGroup != 0; }
     bool operator== (const Note&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 
@@ -1791,6 +1810,8 @@ struct Song
     double bpm = 130.0;
     int beatsPerBar = 4;
     float swing = 0.0f; // 0..1: delays off-beat sixteenth notes (like the swing of FL's Channel Rack)
+    // the seed of the notes' Chance and Velocity Range draws (round 187c, core/NoteChance.h); saved, "New chance seed"
+    std::uint32_t chanceSeed = 0;
     std::vector<std::string> channelGroups; // the Channel Rack's filter groups (FL's "All" dropdown), by name
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
     ProjectInfo info;
