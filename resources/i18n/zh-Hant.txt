@@ -8041,6 +8041,7 @@ countries: tw hk mo
 "Save audio clipboard to browser" = "將音訊剪貼簿儲存到瀏覽器"
 "Save MIDI clipboard to browser" = "將 MIDI 剪貼簿儲存到瀏覽器"
 "Stop sound" = "停止聲音"
+"Cancel recording" = "取消錄音"
 "Delete unused files and save project" = "刪除未使用的檔案並儲存專案"
 "Unable to create folder: {0}" = "無法建立資料夾:{0}"
 "Saved to Clipboard files: {0}" = "已儲存到剪貼簿檔案:{0}"

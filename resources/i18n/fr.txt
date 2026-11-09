@@ -8041,6 +8041,7 @@ countries: fr be ch ca lu
 "Save audio clipboard to browser" = "Enregistrer le presse-papiers audio dans le navigateur"
 "Save MIDI clipboard to browser" = "Enregistrer le presse-papiers MIDI dans le navigateur"
 "Stop sound" = "Arrêter le son"
+"Cancel recording" = "Annuler l'enregistrement"
 "Delete unused files and save project" = "Supprimer les fichiers inutilisés et enregistrer le projet"
 "Unable to create folder: {0}" = "Impossible de créer le dossier : {0}"
 "Saved to Clipboard files: {0}" = "Enregistré dans Fichiers du presse-papiers : {0}"

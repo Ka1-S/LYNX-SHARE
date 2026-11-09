@@ -8041,6 +8041,7 @@ countries: kr
 "Save audio clipboard to browser" = "오디오 클립보드를 브라우저에 저장"
 "Save MIDI clipboard to browser" = "MIDI 클립보드를 브라우저에 저장"
 "Stop sound" = "소리 멈추기"
+"Cancel recording" = "녹음 취소"
 "Delete unused files and save project" = "사용하지 않는 파일을 삭제하고 프로젝트 저장"
 "Unable to create folder: {0}" = "폴더를 만들 수 없습니다: {0}"
 "Saved to Clipboard files: {0}" = "클립보드 파일에 저장함: {0}"

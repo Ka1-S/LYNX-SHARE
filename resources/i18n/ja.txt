@@ -8041,6 +8041,7 @@ countries: jp
 "Save audio clipboard to browser" = "オーディオクリップボードをブラウザに保存"
 "Save MIDI clipboard to browser" = "MIDI クリップボードをブラウザに保存"
 "Stop sound" = "サウンドを停止"
+"Cancel recording" = "録音をキャンセル"
 "Delete unused files and save project" = "未使用のファイルを削除してプロジェクトを保存"
 "Unable to create folder: {0}" = "フォルダーを作成できません: {0}"
 "Saved to Clipboard files: {0}" = "クリップボードファイルに保存しました: {0}"

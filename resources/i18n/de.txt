@@ -8041,6 +8041,7 @@ countries: de at ch li lu
 "Save audio clipboard to browser" = "Audio-Zwischenablage im Browser speichern"
 "Save MIDI clipboard to browser" = "MIDI-Zwischenablage im Browser speichern"
 "Stop sound" = "Sound stoppen"
+"Cancel recording" = "Aufnahme abbrechen"
 "Delete unused files and save project" = "Unbenutzte Dateien löschen und Projekt speichern"
 "Unable to create folder: {0}" = "Ordner konnte nicht erstellt werden: {0}"
 "Saved to Clipboard files: {0}" = "In Zwischenablage-Dateien gespeichert: {0}"
