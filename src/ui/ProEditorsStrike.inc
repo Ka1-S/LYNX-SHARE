@@ -25,8 +25,8 @@ private:
             case s::attack: return at (149.0f, 172.0f);
             case s::sustain: return at (149.0f, 322.0f);
             case s::output: return at (149.0f, 530.0f);
-            case s::detectHp: return at (431.0f, 342.0f);
-            case s::mix: return at (431.0f, 520.0f);
+            case s::detectHp: return at (431.0f, 358.0f);
+            case s::mix: return at (431.0f, 522.0f);
             default: return {};
         }
     }
@@ -39,9 +39,9 @@ private:
     {
         if (id == idOn) return juce::Rectangle<float> (26.0f, 26.0f).withCentre (at (106.0f, 420.0f));
         if (id == idParam + strike::link) return juce::Rectangle<float> (26.0f, 26.0f).withCentre (at (192.0f, 420.0f));
-        return juce::Rectangle<float> (26.0f, 26.0f).withCentre (at (431.0f, 432.0f)); // GUARD
+        return juce::Rectangle<float> (26.0f, 26.0f).withCentre (at (431.0f, 418.0f)); // GUARD
     }
-    static juce::Point<float> powerCentre() { return at (431.0f, 606.0f); }
+    static juce::Point<float> powerCentre() { return at (431.0f, 594.0f); }
     static float angleOf (float value) { return juce::MathConstants<float>::pi * (-0.75f + 1.5f * value); }
     static juce::Point<float> polar (juce::Point<float> c, float a, float r) { return c + juce::Point<float> { std::sin (a), -std::cos (a) } * r; }
 
@@ -378,7 +378,6 @@ private:
         litKey (g, keyRect (idParam + s::link), v (s::link) >= 0.5f, juce::Colour (0xffffa323));
         text (g, { keyRect (idParam + s::link).getRight() + 8.0f, keyRect (idParam + s::link).getY(), 50.0f, 26.0f }, caps (tr ("Link")), 11.0f, true, kInk,
               juce::Justification::centredLeft);
-        text (g, { 40.0f, y0 + 600.0f, 218.0f, 14.0f }, "STRIKE SHAPER", 10.5f, true, kInk, juce::Justification::centred, 0.18f);
 
         // right: the name plate, the activity rows, the detector, GUARD, MIX, power
         const auto plate = juce::Rectangle<float> (366.0f, y0 + 84.0f, 130.0f, 58.0f);
@@ -399,12 +398,12 @@ private:
         {
             const auto c = knobCentre (s::detectHp);
             const auto r = knobRadius (s::detectHp);
-            text (g, { c.x - 90.0f, c.y - r - 30.0f, 180.0f, 14.0f }, caps (tr ("Detect high-pass")), 10.5f, true, kInk, juce::Justification::centred, 0.05f);
+            text (g, { c.x - 90.0f, c.y - r - 36.0f, 180.0f, 14.0f }, caps (tr ("Detect high-pass")), 10.5f, true, kInk, juce::Justification::centred, 0.05f);
             for (int i = 0; i <= 20; ++i)
                 g.setColour (kDim), g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre (polar (c, angleOf ((float) i / 20.0f), r + 8.0f)));
             text (g, juce::Rectangle<float> (30.0f, 12.0f).withCentre (polar (c, angleOf (0.0f), r + 20.0f)), caps (tr ("Off")), 8.5f, true, kInk);
             text (g, juce::Rectangle<float> (34.0f, 12.0f).withCentre (polar (c, angleOf (1.0f), r + 20.0f)), "1k", 8.5f, true, kInk);
-            text (g, juce::Rectangle<float> (34.0f, 12.0f).withCentre (polar (c, angleOf (s::detectHpValueOf (140.0)), r + 20.0f)), "140", 8.5f, true, kInk);
+            text (g, juce::Rectangle<float> (34.0f, 12.0f).withCentre (polar (c, angleOf (s::detectHpValueOf (100.0)), r + 20.0f)), "100", 8.5f, true, kInk);
             silverKnob (g, c, r, v (s::detectHp), dragging (s::detectHp));
         }
         litKey (g, keyRect (idParam + s::guard), v (s::guard) >= 0.5f, juce::Colour (0xffff3b2a));
@@ -412,7 +411,7 @@ private:
         {
             const auto c = knobCentre (s::mix);
             const auto r = knobRadius (s::mix);
-            text (g, { c.x - 90.0f, c.y - r - 34.0f, 180.0f, 14.0f }, caps (tr ("Mix")), 11.5f, true, kInk, juce::Justification::centred, 0.06f);
+            text (g, { c.x - 90.0f, c.y - r - 28.0f, 180.0f, 14.0f }, caps (tr ("Mix")), 11.5f, true, kInk, juce::Justification::centred, 0.06f);
             for (int i = 0; i <= 20; ++i)
                 g.setColour (kDim), g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre (polar (c, angleOf ((float) i / 20.0f), r + 8.0f)));
             text (g, juce::Rectangle<float> (34.0f, 12.0f).withCentre (polar (c, angleOf (0.0f), r + 22.0f)), caps (tr ("Dry")), 8.5f, true, kInk);
@@ -420,7 +419,7 @@ private:
             silverKnob (g, c, r, v (s::mix), dragging (s::mix));
         }
         led (g, powerCentre(), 7.0f, enabled, juce::Colour (0xff4aa8ff));
-        text (g, { 381.0f, powerCentre().y - 28.0f, 100.0f, 12.0f }, caps (tr ("Power")), 9.0f, true, kInk, juce::Justification::centred, 0.08f);
+        text (g, { 381.0f, powerCentre().y - 24.0f, 100.0f, 12.0f }, caps (tr ("Power")), 9.0f, true, kInk, juce::Justification::centred, 0.08f);
 
         for (const auto p : { s::attack, s::sustain, s::output, s::detectHp, s::mix })
             hoverValue (g, p);
