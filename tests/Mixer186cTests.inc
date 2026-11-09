@@ -102,3 +102,55 @@ TEST (mixer186c_keep_lost_links_option)
     mixerops::deleteTracks (song, { 4 }, mixerops::LinkedPlaylistTracks::unlink, true);
     CHECK (song.mixer[4].lostSends.size() == 1 && song.mixer[4].lostSends[0].to == "Insert 4");
 }
+
+TEST (mixer186c_groups_follow_the_playlist_and_arrange)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.mixer = Song::defaultMixer (8);
+    for (int t = 1; t <= 8; ++t)
+        song.mixer[(std::size_t) t].name = "T" + std::to_string (t);
+    song.mixer[8].separator = true; // a mixer group of the user's own, on an insert no Playlist track names
+    song.playlistTracks.resize (6);
+    auto audio = [&song] (int i, int insert, bool grouped) {
+        auto& pt = song.playlistTracks[(std::size_t) i];
+        pt.mode = PlaylistTrackMode::audio;
+        pt.mixerTrack = insert;
+        pt.grouped = grouped;
+    };
+    // Playlist: [Drums header → 5] [kick → 3] [snare → 6]   [Vox → 2]   [Bass group: 7, 7 again]
+    audio (0, 5, false);
+    audio (1, 3, true);
+    audio (2, 6, true);
+    audio (3, 2, false);
+    audio (4, 7, false);
+    audio (5, 7, true);
+    song.playlistTracks[0].collapsed = true;
+
+    CHECK ((mixerops::playlistOrderInserts (song) == std::vector<int> { 5, 3, 6, 2, 7 }));
+    const auto groups = mixerops::playlistGroupInserts (song);
+    CHECK (groups.size() == 2 && (groups[0].inserts == std::vector<int> { 5, 3, 6 }) && groups[0].collapsed);
+    CHECK ((groups[1].inserts == std::vector<int> { 7 }));
+
+    // 3, 5, 6 aren't side by side: no mixer group yet; nothing else is touched
+    CHECK (! mixerops::followPlaylistGroups (song) && song.mixer[8].separator && mixerops::followsPlaylistGroups (song));
+
+    // Arrange: 5, 3, 6, 2, 7 become inserts 1-5 (by name), the others keep their order after them
+    const auto moved = mixerops::arrangeLikePlaylist (song);
+    CHECK (moved > 0);
+    std::vector<std::string> names;
+    for (int t = 1; t <= 8; ++t)
+        names.push_back (song.mixer[(std::size_t) t].name);
+    CHECK ((names == std::vector<std::string> { "T5", "T3", "T6", "T2", "T7", "T1", "T4", "T8" }));
+    CHECK (song.playlistTracks[0].mixerTrack == 1 && song.playlistTracks[2].mixerTrack == 3 && song.playlistTracks[5].mixerTrack == 5);
+    // the drums are a folded mixer group (separator on 1, closing separator on 4); T8 keeps its own separator
+    CHECK (song.mixer[1].separator && ! song.mixer[2].separator && ! song.mixer[3].separator && song.mixer[4].separator);
+    CHECK (song.mixer[1].folded && (mixerops::groupOf (song, 2) == std::vector<int> { 1, 2, 3 }));
+    CHECK (song.mixer[8].separator && mixerops::followsPlaylistGroups (song));
+
+    // the Playlist header opens and the group breaks up: the mixer follows
+    song.playlistTracks[0].collapsed = false;
+    CHECK (! mixerops::followsPlaylistGroups (song) && mixerops::followPlaylistGroups (song) && ! song.mixer[1].folded);
+    song.playlistTracks[1].grouped = song.playlistTracks[2].grouped = false;
+    CHECK (mixerops::followPlaylistGroups (song) && ! song.mixer[1].separator && ! song.mixer[4].separator && song.mixer[8].separator);
+}

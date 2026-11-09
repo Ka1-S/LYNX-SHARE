@@ -172,7 +172,11 @@ void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
         ref.modXAftertouch = (w.wrapperFlags & 0x20000u) != 0;
         ref.resetOnFlush = (w.wrapperFlags & 0x02000000u) == 0;
         if (w.hasWrapperFlags2)
+        {
             ref.allNotesOffOnStop = (w.wrapperFlags2 & 0x1000u) == 0;
+            // "Allow FL Studio to process keyboard presses when the keyboard focus option is on" [DATA: the same project saved with it off and on, only this bit differs]
+            ref.allowHostKeys = (w.wrapperFlags2 & 0x800u) != 0;
+        }
     }
     if (w.bendRange >= 1 && w.bendRange <= 48)
         ref.bendRange = w.bendRange;

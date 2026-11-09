@@ -241,6 +241,7 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketTranceDelay: return "pocketTranceDelay";
         case EffectKind::pocketTapeDelay: return "pocketTapeDelay";
         case EffectKind::pocketMultiFx: return "pocketMultiFx";
+        case EffectKind::strikeShaper: return "strikeShaper";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -331,6 +332,10 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("resetOnFlush", false);
     if (! p.sendLoopPosition)
         o->setProperty ("sendLoopPosition", false);
+    if (p.allowHostKeys)
+        o->setProperty ("allowHostKeys", true);
+    if (p.hostKeysFirst)
+        o->setProperty ("hostKeysFirst", true);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
     // Processing › Connections (round 188d): [offset, active] per output, up to the last one that is not the default
@@ -375,6 +380,8 @@ PluginRef pluginFromVar (const juce::var& v)
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
+    p.allowHostKeys = (bool) v.getProperty ("allowHostKeys", false);
+    p.hostKeysFirst = (bool) v.getProperty ("hostKeysFirst", false);
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;
@@ -990,7 +997,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper })
         if (id == effectId (k))
             return k;
 
