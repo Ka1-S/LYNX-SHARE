@@ -476,6 +476,62 @@ std::vector<long> matchByInstance (const std::vector<T>& now, const std::vector<
 
 } // namespace
 
+ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampleRate, const RackState::Factories& factories)
+{
+    ClipAudio out;
+    out.sampleRate = sampleRate;
+    if (clipIndex >= song.playlist.size())
+        return out;
+    const auto& clip = song.playlist[clipIndex];
+    if (clip.kind != ClipKind::audio || clip.length <= 0 || clip.channel < 0 || clip.channel >= (int) song.channels.size())
+        return out;
+    const auto channel = (std::size_t) clip.channel;
+    const auto& def = song.channels[channel];
+    if (def.instrument != InstrumentKind::audioClip && def.instrument != InstrumentKind::sampler)
+        return out;
+    auto instrument = buildInstrument (def, sampleRate, song.bpm, factories);
+    if (instrument == nullptr)
+        return out;
+    if (clipShiftWanted (song, channel))
+    {
+        instrument->setClipShift (true);
+        instrument->prepareKeyShift (sampleRate);
+    }
+
+    // the note the Scheduler plays for the clip (Scheduler.cpp, audio clips), without its gain, pan, fades and declick
+    // (fadeShape bits 5 / 6: no declicker at either edge)
+    const auto secondsPerTick = 60.0 / (std::max (song.bpm, 1.0) * ppq);
+    const auto key = audioClipKey (clipIndex);
+    if (clip.pitch != 0.0f)
+        instrument->setNextClipPitch (clip.pitch);
+    if (clip.stretch != 1.0)
+        instrument->setNextClipStretch ((float) clip.stretch);
+    instrument->setNextClipFades (0.0f, (float) ((double) clip.length * secondsPerTick), 0.0f, 0.0f,
+                                  (std::uint16_t) ((clip.reversed ? 4 : 0) | 32 | 64), 0.0f, 0.0f);
+    instrument->noteOnAt (key, 1.0f, std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick));
+
+    const auto frames = (std::size_t) std::ceil ((double) clip.length * secondsPerTick * sampleRate);
+    out.left.assign (frames, 0.0f);
+    out.right.assign (frames, 0.0f);
+    constexpr std::size_t block = 512;
+    for (std::size_t at = 0; at < frames; at += block)
+        instrument->render (out.left.data() + at, out.right.data() + at, (int) std::min (block, frames - at), 1.0f, 1.0f);
+    instrument->noteOff (key);
+
+    // an audio clip voice plays its file at unity at FL's default channel volume (Instruments.cpp audioClipUnity):
+    // undo that so the file holds the clip's audio as it is
+    if (def.instrument == InstrumentKind::audioClip)
+    {
+        const auto unity = channelGain (audioClipUnityVolume);
+        for (std::size_t i = 0; i < frames; ++i)
+        {
+            out.left[i] *= unity;
+            out.right[i] *= unity;
+        }
+    }
+    return out;
+}
+
 std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const RackState* previous,
                                                    double sampleRate,

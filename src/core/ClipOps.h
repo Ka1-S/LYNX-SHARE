@@ -667,6 +667,18 @@ inline std::vector<int> invertedSelection (int clipCount, const std::vector<int>
             out.push_back (i);
     return out;
 }
+// Make unique as sample (round 189l): the clip now plays `channel`, a file holding what it played, from its start; its own
+// pitch, stretch and reverse are in the file, so they are reset
+inline void resetRenderedClip (Clip& c, int channel) noexcept
+{
+    c.channel = channel;
+    c.offset = 0;
+    c.offsetFraction = 0.0f;
+    c.pitch = 0.0f;
+    c.stretch = 1.0;
+    c.reversed = false;
+}
+
 // --- FL's per-clip edge declicker (round 189i, REA FLEngine_x64.dll) --------------------------------------------------------
 // The fade handle menu (PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d02e00 / FUN_00d01bc0) stores, per side,
 // "Manual" (fade flags bit 0 / 1, FUN_00cfbf60: turning it off also zeroes that side's fade) and the Declicker choice

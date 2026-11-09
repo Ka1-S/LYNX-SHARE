@@ -6666,11 +6666,12 @@ void PlaylistComponent::makeSelectionUnique()
 
 void PlaylistComponent::makeSelectionUniqueAsSample()
 {
-    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): the part of
-    // the sample each selected audio clip plays is saved as "<sample> - Part_<n>.wav" (an earlier " - Part_" suffix is
-    // dropped first), in the project's Samples folder, without a file dialog from this menu; a new audio clip channel
-    // copied from the old one plays the file and the clip now starts at the file's start. LYNX writes the file next to
-    // the source sample when the project has no data folder, and keeps the clip's own pitch, stretch and reverse.
+    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): what each
+    // selected audio clip plays is saved as "<sample> - Part_<n>.wav" (an earlier " - Part_" suffix is dropped first), in
+    // the project's Samples folder, without a file dialog from this menu; a new audio clip channel copied from the old one
+    // plays the file, and the clip now starts at the file's start. The clip's own pitch, stretch and reverse are rendered
+    // into the file and reset on the clip (round 189l), so it sounds the same. LYNX writes the file next to the source
+    // sample when the project has no data folder.
     const auto& song = engine.getSong();
     struct Part
     {
@@ -6678,7 +6679,6 @@ void PlaylistComponent::makeSelectionUniqueAsSample()
         std::string path, name;
     };
     std::vector<Part> parts;
-    const auto secondsPerTick = 60.0 / (juce::jmax (1.0, song.bpm) * ppq);
     for (const auto i : selection)
     {
         if (i < 0 || i >= (int) song.playlist.size())
@@ -6687,14 +6687,8 @@ void PlaylistComponent::makeSelectionUniqueAsSample()
         if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
             continue;
         const juce::File source (juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].samplePath.c_str()));
-        const auto data = engine.getSampleLibrary().load (source.getFullPathName());
-        if (data == nullptr || data->frames() == 0)
-            continue;
-        const auto frames = (std::int64_t) data->frames();
-        const auto stretch = c.stretch > 0.0 ? c.stretch : 1.0;
-        const auto from = juce::jlimit<std::int64_t> (0, frames, (std::int64_t) std::floor (((double) c.offset + (double) c.offsetFraction) * secondsPerTick / stretch * data->sampleRate));
-        const auto to = juce::jlimit<std::int64_t> (from, frames, from + (std::int64_t) std::ceil ((double) c.length * secondsPerTick / stretch * data->sampleRate));
-        if (to <= from)
+        const auto audio = engine.renderClipAudio ((std::size_t) i);
+        if (audio.left.empty())
             continue;
 
         auto folder = song.dataFolder.empty() ? source.getParentDirectory() : juce::File (juce::String::fromUTF8 (song.dataFolder.c_str())).getChildFile ("Samples");
@@ -6708,14 +6702,15 @@ void PlaylistComponent::makeSelectionUniqueAsSample()
             if (out = folder.getChildFile (base + " - Part_" + juce::String (n) + ".wav"); ! out.exists())
                 break;
 
-        const auto channels = data->isStereo() ? 2 : 1;
-        juce::AudioBuffer<float> buffer (channels, (int) (to - from));
-        buffer.copyFrom (0, 0, data->leftData() + from, (int) (to - from));
-        if (channels == 2)
-            buffer.copyFrom (1, 0, data->rightData() + from, (int) (to - from));
+        const auto frames = (int) audio.left.size();
+        const auto stereo = audio.left != audio.right;
+        juce::AudioBuffer<float> buffer (stereo ? 2 : 1, frames);
+        buffer.copyFrom (0, 0, audio.left.data(), frames);
+        if (stereo)
+            buffer.copyFrom (1, 0, audio.right.data(), frames);
         juce::WavAudioFormat wav;
         std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
-        std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 32, {}, 0) : nullptr);
+        std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), audio.sampleRate, (unsigned int) buffer.getNumChannels(), 32, {}, 0) : nullptr);
         if (writer == nullptr)
             continue;
         stream.release(); // (the writer owns it now)
@@ -6735,9 +6730,7 @@ void PlaylistComponent::makeSelectionUniqueAsSample()
             copy.samplePath = p.path;
             copy.name = quickrender::uniqueChannelName (s, p.name);
             s.channels.push_back (std::move (copy));
-            clip.channel = (int) s.channels.size() - 1;
-            clip.offset = 0;
-            clip.offsetFraction = 0.0f;
+            clipops::resetRenderedClip (clip, (int) s.channels.size() - 1);
         }
     });
 }
