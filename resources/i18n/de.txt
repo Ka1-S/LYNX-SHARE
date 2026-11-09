@@ -8135,3 +8135,8 @@ countries: de at ch li lu
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Wie wahrscheinlich die Note bei jedem Durchlauf spielt (LYNX; Lives Noten-Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Bei jedem Spielen wird die Velocity zwischen der Velocity der Note und Velocity + diesem Bereich ausgewürfelt (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Release-Velocity: wird mit dem Notenende an die Instrumente gesendet, die sie nutzen (Plugins, Patcher)"
+"Reset crossfade tension" = "Crossfade-Spannung zurücksetzen"
+"Milliseconds" = "Millisekunden"
+"Disabled" = "Deaktiviert"
+"Curve shape" = "Kurvenform"
+"Smooth curve" = "Weiche Kurve"

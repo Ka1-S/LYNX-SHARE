@@ -1476,6 +1476,11 @@ struct SamplerVoice
     int cutShape = 3;            // FL's release shape: 3 raised cosine, 1 the follower declick (mode 1, "no bleeding")
     float cutCurve = 0.0f;       // the release curve (mode 5: 5)
     float cutC = 0.0f, folL = 0.0f, folR = 0.0f; // shape 1: the follower's coefficient and state per side
+    // an audio clip's start declick (round 189i, FL's declicker attack, FUN_00978250): atkShape 2 removes the first frame's
+    // step (out = x - x0 * table), 3 a raised-cosine fade in; over atkFrames frames, atkCurve = FL's curve (mode 5)
+    int atkFrames = 0, atkK = 0, atkShape = 0;
+    float atkCurve = 0.0f, atkX0L = 0.0f, atkX0R = 0.0f;
+    bool clipEndHard = false; // the clip's end is a sharp cut (FL: Disabled, a manual side, a seamless join, a fade out)
     int age = 0;
     int key = 60;
     float env = 1.0f;      // envelope
@@ -1691,7 +1696,7 @@ public:
         const auto noteGain = std::exchange (nextGain, 1.0f);
         // this note's clip fades and flags, taken now so a note that does not sound leaves none to the next one
         const auto clipFades = std::exchange (nextClip, {});
-        const auto clipShape = std::exchange (nextClipShape, (std::uint8_t) 0);
+        const auto clipShape = std::exchange (nextClipShape, (std::uint16_t) 0);
         const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -12.0f, 12.0f) : 0.0;
         // FL 2026's clip stretch (round 167l, FL render of a 2 s 440 Hz ramp: ×2 lasts 4 s at 220 Hz in Resample, at
         // 440 Hz in the stretch modes; ×0.5 lasts 1 s): the clip reads its file `stretch` times slower
@@ -1815,6 +1820,7 @@ public:
         target->fadeIn = clipFades[2];
         target->fadeOut = clipFades[3];
         target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16)); // (bits 3 / 4: a comp crossfade, round 177c)
+        startClipEdges (*target, clipShape, clipFades);
         target->fadeInTension = std::exchange (nextClipTension[0], 0.0f);
         target->fadeOutTension = std::exchange (nextClipTension[1], 0.0f);
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
@@ -2140,7 +2146,7 @@ public:
         nextModY = std::isfinite (modY) ? std::clamp (modY, 0.0f, 1.0f) : 0.5f;
     }
 
-    void setNextClipFades (float elapsed, float remaining, float in, float out, std::uint8_t shape, float inTension, float outTension) noexcept override
+    void setNextClipFades (float elapsed, float remaining, float in, float out, std::uint16_t shape, float inTension, float outTension) noexcept override
     {
         nextClip = { elapsed, remaining, in, out };
         nextClipShape = shape;
@@ -2185,12 +2191,22 @@ public:
         {
             // the clip ended: its voice fades out quickly. A clip carries its own key (audioClipKey), so the next clip
             // of the same channel that already started (a crossfade) keeps playing; other callers stop everything.
+            // FL's per-clip edge declicker (round 189i, FUN_00d253d0 / FUN_00d24400): the channel's declicking release,
+            // or a sharp cut where the clip's end has no declick (Disabled, manual, a seamless join, a fade out)
             if (key < audioClipKeyBase)
                 allNotesOff();
             else
                 for (auto& v : voices)
-                    if (v.active && v.key == key)
-                        v.stolen = true;
+                    if (v.active && v.key == key && ! v.stolen)
+                    {
+                        if (v.clipEndHard)
+                        {
+                            v.stolen = true;
+                            v.fade = 0.0f;
+                        }
+                        else
+                            startCut (v, false);
+                    }
             return;
         }
 
@@ -2289,6 +2305,55 @@ public:
         v.folR += v.cutC * (r - v.folR);
         l -= v.folL;
         r -= v.folR;
+    }
+    // FL's declickers' attacks (FUN_012c6ae0 / FUN_00977870): modes 1, 2 the transient one (4 ms, shape 2), 3 / 4 / 5 a
+    // raised cosine of 20 / 100 / 200 ms (5 with curve 5); mode 0 has none.
+    // An audio clip's edges (round 189i, FL's PLFadeHandleMenu Declicker, FUN_00d27cf0 / FUN_00d253d0): the start takes the
+    // attack unless its declicker choice is Disabled or a seamless join (shape bit 5), or a fade in / manual start
+    // (bits 7) covers it — then only a voice that starts more than 12 frames past that fade still takes it.
+    // The end (bits 6 / 8, a fade out) is a sharp cut instead of the channel's declicking release.
+    void startClipEdges (SamplerVoice& v, std::uint16_t shape, const std::array<float, 4>& fades) const noexcept
+    {
+        v.atkFrames = v.atkK = v.atkShape = 0;
+        v.clipEndHard = false;
+        if (! clipMode)
+            return;
+        v.clipEndHard = (shape & (64 | 256)) != 0 || fades[3] > 0.0f;
+        if ((shape & 32) != 0)
+            return;
+        const auto covered = fades[2] > 0.0f || (shape & 128) != 0;
+        if (covered && fades[0] <= fades[2] + 12.0f)
+            return;
+        static constexpr double attackMs[] = { 0.0, 4.0, 4.0, 20.0, 100.0, 200.0 };
+        const auto mode = std::clamp (declickMode.load (std::memory_order_relaxed), 0, 5);
+        if (mode == 0)
+            return;
+        v.atkFrames = std::max (1, (int) std::nearbyint (attackMs[mode] * 0.001 * sampleRate));
+        v.atkShape = mode <= 2 ? 2 : 3;
+        v.atkCurve = mode == 5 ? 5.0f : 0.0f;
+    }
+    // shape 2: out = x - x0 * T[k], T[k] = (1 + cos((k + 1) pi / (n + 1))) / 2 (x0 = the first frame); shape 3: out = x * g[k],
+    // g[k] = (1 + cos((n - k) pi / (n + 1))) / 2, bent by the curve as the releases are
+    static void clipAttack (SamplerVoice& v, float& l, float& r) noexcept
+    {
+        if (v.atkK >= v.atkFrames)
+            return;
+        const auto n = v.atkFrames;
+        const auto k = v.atkK++;
+        if (v.atkShape == 2)
+        {
+            if (k == 0)
+                v.atkX0L = l, v.atkX0R = r;
+            const auto t = (float) (0.5 * (1.0 + std::cos ((double) (k + 1) * 3.141592653589793 / (double) (n + 1))));
+            l -= v.atkX0L * t;
+            r -= v.atkX0R * t;
+            return;
+        }
+        auto g = 0.5 * (1.0 + std::cos ((double) (n - k) * 3.141592653589793 / (double) (n + 1)));
+        if (v.atkCurve > 0.0f)
+            g = 1.0 - (std::exp ((1.0 - g) * std::log ((double) v.atkCurve + 1.0)) - 1.0) / (double) v.atkCurve;
+        l *= (float) g;
+        r *= (float) g;
     }
     void stepFade (SamplerVoice& v) const noexcept
     {
@@ -2487,6 +2552,7 @@ public:
                     sr = f.process (sr, v.lowR, v.bandR);
                 }
 
+                clipAttack (v, sl, sr);
                 cutFollow (v, sl, sr);
                 auto gain = v.velocity * v.fade * v.env * v.lfoGain * v.zoneGain;
 
@@ -2717,6 +2783,7 @@ public:
                         readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
                     v.holdL = sl, v.holdR = sr;
                 }
+                clipAttack (v, sl, sr);
                 cutFollow (v, sl, sr);
                 auto gain = v.fade * v.zoneGain * outGain.load (std::memory_order_relaxed);
                 if (v.fadeIn > 0.0f || v.fadeOut > 0.0f)
@@ -2959,7 +3026,7 @@ private:
     float nextClipPitch = 0.0f;       // the next clip's own pitch (semitones, audio thread)
     float nextClipStretch = 1.0f;     // the next clip's own stretch (round 167l, audio thread)
     bool clipShift = false;           // pitch shifters for the clips' own pitch (set before prepareKeyShift)
-    std::uint8_t nextClipShape = 0;
+    std::uint16_t nextClipShape = 0;
     std::array<float, 2> nextClipTension {};
 
     struct SliceTable

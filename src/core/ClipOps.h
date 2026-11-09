@@ -667,4 +667,75 @@ inline std::vector<int> invertedSelection (int clipCount, const std::vector<int>
             out.push_back (i);
     return out;
 }
+// --- FL's per-clip edge declicker (round 189i, REA FLEngine_x64.dll) --------------------------------------------------------
+// The fade handle menu (PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d02e00 / FUN_00d01bc0) stores, per side,
+// "Manual" (fade flags bit 0 / 1, FUN_00cfbf60: turning it off also zeroes that side's fade) and the Declicker choice
+// (flags >> 2 & 7 / >> 14 & 7, FUN_00cfc020 via FUN_00d03100): Automatic 0, Enabled 2 ("use channel declicker"),
+// Disabled 3 ("bypass declicker"); 1 is FL's own "Automatic, joined seamlessly" (FUN_00d011a0 resets 0 / 1 and sets 1
+// where two clips continue each other). The voice (FUN_00d27cf0 / FUN_00d253d0 / FUN_00d24400, mask 10 = choices 1 and 3)
+// skips the channel's declicker on a side that is manual, has a fade, or whose choice is 1 or 3.
+enum DeclickChoice
+{
+    declickAutomatic = 0,
+    declickJoined = 1,
+    declickEnabled = 2,
+    declickDisabled = 3
+};
+
+inline int declickChoice (const Clip& c, int side) noexcept
+{
+    return (int) ((c.flFadeFlags >> (side == 0 ? 2 : 14)) & 7u);
+}
+
+inline void setDeclickChoice (Clip& c, int side, int choice) noexcept
+{
+    const auto shift = side == 0 ? 2u : 14u;
+    c.flFadeFlags = (c.flFadeFlags & ~(7u << shift)) | (((std::uint32_t) choice & 7u) << shift);
+}
+
+inline bool manualFade (const Clip& c, int side) noexcept
+{
+    return (c.flFadeFlags & (side == 0 ? 1u : 2u)) != 0;
+}
+
+// FL's Manual item (FUN_00cfbf60): on / off per side; off also zeroes that side's fade (FL keeps only automatic
+// crossfades on a side that isn't manual)
+inline void setManualFade (Clip& c, int side, bool on) noexcept
+{
+    const auto bit = side == 0 ? 1u : 2u;
+    c.flFadeFlags = on ? (c.flFadeFlags | bit) : (c.flFadeFlags & ~bit);
+    if (! on)
+        (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+}
+
+// FUN_00d011a0 (inferred where FL's code was not read: the clips touch in time): an Automatic side has no declick where
+// the clip continues seamlessly into a neighbour on the same track: same audio clip channel, both unmuted, the same gain,
+// pitch, stretch and direction, the first one ending where the second starts, and the source going on where it stopped
+// (FL compares the start / end offsets rounded to whole milliseconds). `side` 0 = the clip's start, 1 = its end.
+inline bool seamlessJoin (const std::vector<Clip>& playlist, std::size_t index, int side, double bpm, int ppq) noexcept
+{
+    if (index >= playlist.size())
+        return false;
+    const auto& c = playlist[index];
+    if (c.kind != ClipKind::audio || c.muted)
+        return false;
+    const auto msPerTick = 60000.0 / (std::max (1.0, bpm) * (double) std::max (1, ppq));
+    const auto srcStart = [msPerTick] (const Clip& x) { return std::llround (((double) x.offset + (double) x.offsetFraction) * msPerTick); };
+    const auto srcEnd = [msPerTick] (const Clip& x) {
+        return std::llround (((double) x.offset + (double) x.offsetFraction + (double) x.length / (x.stretch > 0.0 ? x.stretch : 1.0)) * msPerTick);
+    };
+    for (std::size_t j = 0; j < playlist.size(); ++j)
+    {
+        const auto& o = playlist[j];
+        if (j == index || o.kind != ClipKind::audio || o.muted || o.track != c.track || o.channel != c.channel || o.gain != c.gain
+            || o.pitch != c.pitch || o.stretch != c.stretch || o.reversed != c.reversed)
+            continue;
+        const auto& a = side == 0 ? o : c; // a ends where b starts
+        const auto& b = side == 0 ? c : o;
+        if (a.end() == b.start && srcEnd (a) == srcStart (b))
+            return true;
+    }
+    return false;
+}
+
 } // namespace lynx::clipops

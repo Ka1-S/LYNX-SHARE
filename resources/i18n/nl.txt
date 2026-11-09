@@ -8135,3 +8135,8 @@ countries: nl be
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Hoe waarschijnlijk de noot klinkt telkens als hij aan de beurt is (LYNX; Live's noot-Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Telkens als hij klinkt, wordt de velocity geloot tussen de velocity van de noot en velocity + dit bereik (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Release-velocity: met het einde van de noot verstuurd naar de instrumenten die hem gebruiken (plugins, Patcher)"
+"Reset crossfade tension" = "Crossfadespanning herstellen"
+"Milliseconds" = "Milliseconden"
+"Disabled" = "Uitgeschakeld"
+"Curve shape" = "Curvevorm"
+"Smooth curve" = "Vloeiende curve"

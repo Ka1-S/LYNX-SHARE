@@ -2978,6 +2978,86 @@ void PlaylistComponent::showGainMenu (int index)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+// FL's fade handle menu (EventEditForm PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d01bc0; checks from its
+// popup FUN_00cfcdf0, round 189i): on the clicked clip, or on every selected audio clip when it is selected; `side` 0 = the
+// fade in, 1 = the fade out. Not built yet: Normalize, Normalize selection as a group, Create crossfade.
+void PlaylistComponent::showFadeHandleMenu (int index, int side)
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return;
+    std::vector<int> targets;
+    for (auto i : isSelected (index) ? selection : std::vector<int> { index })
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
+            targets.push_back (i);
+    const auto& clip = song.playlist[(std::size_t) index];
+    const auto msPerTick = 60000.0 / (juce::jmax (1.0, song.bpm) * ppq);
+    const auto lengthMs = (double) (side == 0 ? clip.fadeIn : clip.fadeOut) * msPerTick;
+    auto edit = [this, targets] (std::function<void (Clip&)> change) {
+        engine.editSong ([targets, change] (Song& s) {
+            for (auto i : targets)
+                if (i < (int) s.playlist.size())
+                    change (s.playlist[(std::size_t) i]);
+        });
+        repaint();
+    };
+    auto setMs = [edit, side, msPerTick] (double ms) {
+        edit ([side, ticks = (std::int64_t) std::llround (juce::jmax (0.0, ms) / msPerTick)] (Clip& c) {
+            auto& fade = side == 0 ? c.fadeIn : c.fadeOut;
+            fade = juce::jlimit<std::int64_t> (0, c.length, ticks);
+            if (fade > 0)
+                clipops::setManualFade (c, side, true); // a set fade is a manual one (FL's fade flags bit 0 / 1)
+        });
+    };
+    const auto crossfade = (side == 0 ? clip.crossfadeIn : clip.crossfadeOut) > 0;
+
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Reset"), [edit, side] {
+        edit ([side] (Clip& c) {
+            (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+            (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
+        });
+    });
+    menu.addItem (tr ("Reset crossfade tension"), crossfade, false, [edit, side] {
+        edit ([side] (Clip& c) { (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f; });
+    });
+    menu.addItem (tr ("Copy value"), [lengthMs] { copiedFadeMs = lengthMs; hasCopiedFade = true; });
+    menu.addItem (tr ("Paste value"), hasCopiedFade, false, [setMs] { setMs (copiedFadeMs); });
+    menu.addItem (tr ("Type in value..."), [lengthMs, setMs] {
+        auto* window = new juce::AlertWindow (tr ("Fade"), tr ("Milliseconds"), juce::MessageBoxIconType::NoIcon);
+        window->addTextEditor ("value", juce::String (lengthMs, 1));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([window, setMs] (int result) {
+                                     if (result == 1)
+                                         setMs (window->getTextEditorContents ("value").retainCharacters ("0123456789.,").replaceCharacter (',', '.').getDoubleValue());
+                                 }),
+                                 true);
+    });
+    menu.addItem (tr ("Manual"), true, clipops::manualFade (clip, side), [edit, side, on = ! clipops::manualFade (clip, side)] {
+        edit ([side, on] (Clip& c) { clipops::setManualFade (c, side, on); });
+    });
+    menu.addSectionHeader (tr ("Declicker"));
+    const auto choice = clipops::declickChoice (clip, side);
+    const auto addChoice = [&] (const juce::String& text, int value, bool ticked) {
+        menu.addItem (text, true, ticked, [edit, side, value] { edit ([side, value] (Clip& c) { clipops::setDeclickChoice (c, side, value); }); });
+    };
+    addChoice (tr ("Automatic"), clipops::declickAutomatic, choice == clipops::declickAutomatic || choice == clipops::declickJoined);
+    addChoice (tr ("Disabled"), clipops::declickDisabled, choice == clipops::declickDisabled);
+    addChoice (tr ("Enabled"), clipops::declickEnabled, choice == clipops::declickEnabled);
+    menu.addSectionHeader (tr ("Curve shape"));
+    const auto linear = (clip.linearFades & (side == 0 ? 1 : 2)) != 0;
+    const auto setLinear = [edit, side] (bool on) {
+        edit ([side, on] (Clip& c) {
+            const auto bit = (std::uint8_t) (side == 0 ? 1 : 2);
+            c.linearFades = on ? (std::uint8_t) (c.linearFades | bit) : (std::uint8_t) (c.linearFades & ~bit);
+        });
+    };
+    menu.addItem (tr ("Smooth curve"), true, ! linear, [setLinear] { setLinear (false); });
+    menu.addItem (tr ("Single curve"), true, linear, [setLinear] { setLinear (true); });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
 int PlaylistComponent::clipAt (int x, int y, bool& onRightEdge) const
 {
     bool left = false;
@@ -3123,8 +3203,8 @@ void PlaylistComponent::askToMakeClipsUnique (std::vector<int> placed, std::vect
 
 // FL's Edit › "Create new clips with manual fades" (EECreateNewClipsWithManualFades, off by default): a new audio clip's
 // fades start reset and flagged manual (FUN_010657a0, then FUN_01065830 / FUN_01065840 set bits 0 / 1 of its fade flags),
-// so its edges use its own fade handles instead of the channel's declicker. LYNX keeps FL's bits (flFadeFlags) for the
-// .flp export; its playback has no automatic edge declicker for clips, so they sound the same either way.
+// so its edges use its own fade handles instead of the channel's declicker: with no fade they are sharp cuts (the clip
+// voice skips the declicker on a manual side, round 189i).
 static std::uint32_t newClipFadeFlags() noexcept
 {
     return EditorGlobals::get().manualFades ? 3u : 0u;
@@ -3535,6 +3615,14 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         showGainMenu (hit);
         return;
     }
+
+    // FL's fade handle menu (PLFadeHandleMenu, round 189i)
+    if (e.mods.isRightButtonDown() && hit >= 0)
+        if (const auto fade = fadeHandleAt (hit, e.getPosition()); fade != 0)
+        {
+            showFadeHandleMenu (hit, fade - 1);
+            return;
+        }
 
     if (e.mods.isRightButtonDown())
     {

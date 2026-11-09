@@ -8135,3 +8135,8 @@ countries: ru by kz
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Насколько вероятно, что нота прозвучит при каждом проходе (LYNX; Chance нот в Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "При каждом звучании велосити выбирается случайно между велосити ноты и велосити + этот диапазон (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Велосити отпускания: передаётся с концом ноты инструментам, которые её используют (плагины, Patcher)"
+"Reset crossfade tension" = "Сбросить натяжение кроссфейда"
+"Milliseconds" = "Миллисекунды"
+"Disabled" = "Отключено"
+"Curve shape" = "Форма кривой"
+"Smooth curve" = "Плавная кривая"

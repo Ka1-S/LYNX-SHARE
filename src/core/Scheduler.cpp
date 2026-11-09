@@ -1,5 +1,6 @@
 #include "core/Scheduler.h"
 
+#include "core/ClipOps.h"
 #include "core/NoteChance.h"
 
 #include <algorithm>
@@ -370,19 +371,38 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.pan = clip.pan;
         e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
         e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
-        e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
-                                      | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
-                                      | (clip.reversed ? 4 : 0)
-                                      // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
-                                      | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
+        e.fadeShape = (std::uint16_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
+                                       | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
+                                       | (clip.reversed ? 4 : 0)
+                                       // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
+                                       | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
         // an automatic crossfade, or a comp crossfade, has no tension of its own here
         e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
         e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
         e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
         e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
 
+        // FL's per-clip edge declicker (round 189i, clipops::declickChoice): Disabled, or Automatic where the clip joins
+        // its neighbour seamlessly, plays that edge without the channel's declicker; a manual side neither. Worked out
+        // only for a block where the clip starts (the join looks at the other clips)
+        const auto declickBits = [&]
+        {
+            const auto inPlaylist = clipIndex < song.playlist.size() && &song.playlist[clipIndex] == &clip;
+            std::uint16_t bits = 0;
+            for (int side = 0; side < 2; ++side)
+            {
+                const auto choice = clipops::declickChoice (clip, side);
+                const auto off = choice == clipops::declickDisabled
+                                 || ((choice == clipops::declickAutomatic || choice == clipops::declickJoined) && inPlaylist
+                                     && clipops::seamlessJoin (song.playlist, clipIndex, side, song.bpm, ppq));
+                bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
+            }
+            return bits;
+        };
+
         if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
         {
+            e.fadeShape |= declickBits();
             e.type = NoteEvent::Type::on;
             e.sampleOffset = 0;
             e.startSeconds = ((double) clip.offset + (double) clip.offsetFraction + loopStart - (double) clip.start) * secondsPerTick;
@@ -394,6 +414,8 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
             return;
 
+        if (overlaps ((double) clip.start, (double) clip.start + 1.0))
+            e.fadeShape |= declickBits();
         e.type = NoteEvent::Type::on;
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;

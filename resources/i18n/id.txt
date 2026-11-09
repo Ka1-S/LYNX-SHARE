@@ -8135,3 +8135,8 @@ countries: id
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Seberapa mungkin not berbunyi setiap kali gilirannya tiba (LYNX; Chance not milik Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Setiap kali berbunyi, velocity diundi antara velocity not dan velocity + rentang ini (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity lepas: dikirim bersama akhir not ke instrumen yang memakainya (plugin, Patcher)"
+"Reset crossfade tension" = "Atur ulang tegangan crossfade"
+"Milliseconds" = "Milidetik"
+"Disabled" = "Nonaktif"
+"Curve shape" = "Bentuk kurva"
+"Smooth curve" = "Kurva halus"
