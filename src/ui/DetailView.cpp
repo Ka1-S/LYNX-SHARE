@@ -533,7 +533,7 @@ private:
             });
             if (c.custom != nullptr)
                 c.knobs.clear();
-            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height) : instrumentWidth;
+            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height, x) : instrumentWidth;
             c.bounds = { x, top, w, height };
             x += w + gap;
             cards.push_back (std::move (c));
@@ -558,7 +558,7 @@ private:
                 c.knobs.clear();
             const auto columns = ((int) c.knobs.size() + 1) / 2;
             const auto w = c.folded                ? foldedWidth
-                           : c.custom != nullptr      ? customWidth (*c.custom, height)
+                           : c.custom != nullptr      ? customWidth (*c.custom, height, x)
                            : fx.kind == EffectKind::plugin ? pluginWidth
                                                            : std::max (136, 16 + columns * knobColumn);
             c.bounds = { x, top, w, height };
@@ -611,7 +611,14 @@ private:
         }
         return entry.card.get();
     }
-    static int customWidth (const DetailCard& card, int height) { return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6)); }
+    int customWidth (DetailCard& card, int height, int x) const
+    {
+        // (x: the card's left with the scroll applied; the room is measured with the chain at its start, so the width
+        // doesn't change while it scrolls)
+        const auto area = chainArea();
+        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - gap);
+        return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6));
+    }
     void placeCustomCards()
     {
         std::set<DetailCard*> shown;
