@@ -11,6 +11,7 @@
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
+#include "core/StrikeShaper.h"
 #include "ui/DynamicsDisplays.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/ProEditorBase.h"
@@ -4079,6 +4080,7 @@ private:
 };
 
 #include "ui/ProEditorsStrips.inc"
+#include "ui/ProEditorsStrike.inc" // round trans189d: Strike Shaper
 
 // --- windows -------------------------------------------------------------------------------------------------
 std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool demo)
@@ -4098,6 +4100,7 @@ std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool 
         case EffectKind::kilnChannel: return std::make_unique<KilnEditor> (engine, track, slot, demo);
         case EffectKind::fretChannel: return std::make_unique<FretEditor> (engine, track, slot, demo);
         case EffectKind::shellChannel: return std::make_unique<ShellEditor> (engine, track, slot, demo);
+        case EffectKind::strikeShaper: return std::make_unique<StrikeEditor> (engine, track, slot, demo);
         default: return nullptr;
     }
 }
@@ -4179,7 +4182,7 @@ bool handles (EffectKind kind) noexcept
     return kind == EffectKind::apexLimiter || kind == EffectKind::hushDeEsser || kind == EffectKind::crestCompressor
            || kind == EffectKind::sentryGate || kind == EffectKind::prismMultiband || kind == EffectKind::ember
            || kind == EffectKind::aether || kind == EffectKind::kilnChannel || kind == EffectKind::fretChannel
-           || kind == EffectKind::shellChannel;
+           || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper;
 }
 
 void open (AudioEngine& engine, int track, int slot)
