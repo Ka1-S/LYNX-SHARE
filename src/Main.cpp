@@ -4850,6 +4850,7 @@ private:
                     lynx::autoMapOutputs (s.channels[0].plugin.outputs, 8);
                     s.channels[0].plugin.outputs.resize (8);
                     s.channels[0].plugin.outputs[2].active = 0;
+                    s.channels[0].plugin.processInactive = false; // (as an LED click does, FL's b23)
                 });
                 ok = ok && save ("wrap-automap.png", 1);
             }
