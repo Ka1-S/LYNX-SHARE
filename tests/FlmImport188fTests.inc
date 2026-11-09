@@ -205,9 +205,9 @@ TEST (flm188f_autoduck_and_reverbs)
         const auto t = flmfx::automate (flm188f::moduleOf (10, { 1.0f, 0.8977f, 0.1f, 0.49f }), 1, { 0.0f, 0.5f, 1.0f });
         CHECK (t.size() == 1 && t[0].kind == AutomationTargetKind::effectMix && std::abs (t[0].values[1] - 0.25f) < 1e-6f);
     }
-    // Reverb 2 as the user's song has it → FL Reeverb 2 controls. FLM's engine doubles its wet and early reflections
-    // (its mid/side stage at the default separation); FL's early-reflection control can't reach Reverb 2's default
-    // level, so the three levels are lowered by k = 1.92 and a utility after the reverb gives back +5.7 dB
+    // Reverb 2 as the user's song has it → FL Reeverb 2 controls (round 188h's corrected law: dry 1.25·DRY, wet
+    // 0.375·WET, early reflections 0.625·(ER + WET)); FL's early-reflection control can't reach that level, so the three
+    // levels are lowered by k = 1.674 and a utility after the reverb gives back +4.47 dB
     {
         const auto mapped = flmfx::map (flm188f::moduleOf (35, { 1.0f, 0.16f, 0.0187f, 0.5f, 0.068f, 1.0f, 0.16f, 0.8f, 0.8f, 0.131f, 0.0f, 0.0f,
                                                                   0.0f, 0.0f, 0.28f, 0.5f, 0.33f, 0.2405f, 0.5f }));
@@ -218,12 +218,12 @@ TEST (flm188f_autoduck_and_reverbs)
             CHECK (mapped.slots[0].kind == EffectKind::reeverb2 && mapped.slots[1].kind == EffectKind::utility);
             CHECK (s.p[0] == 75 && s.p[1] == 40 && s.p[2] == 0 && s.p[3] == 51 && s.p[4] == 100 && s.p[5] == 15 && s.p[6] == 40 && s.p[7] == 100
                    && s.p[8] == 500 && s.p[9] == 0 && s.p[14] == 0 && ! s.midSide);
-            CHECK (s.p[10] == 97 && s.p[11] == 160 && s.p[12] == 13);
-            CHECK (std::abs ((mapped.slots[1].params[0] - 0.5f) * 48.0f - 5.68f) < 0.01f);
+            CHECK (s.p[10] == 104 && s.p[11] == 160 && s.p[12] == 27);
+            CHECK (std::abs ((mapped.slots[1].params[0] - 0.5f) * 48.0f - 4.474f) < 0.01f);
         }
     }
-    // the legacy Reverb's default preset: wet only (DRY at its minimum = off), INPUT +6 dB, MIX −19.3 dB (×2 by the
-    // engine's mid/side stage → FL 89), DECAY cubed (0.4 → 14 = 1.4 s), WIDTH 102 (FL separation −1)
+    // the legacy Reverb's default preset: the input passes at unity (DRY at its minimum adds nothing: FL 128), INPUT
+    // +6 dB, MIX −19.3 dB (FL 53), DECAY cubed (0.4 → 14 = 1.4 s), WIDTH 102 (FL separation −1)
     {
         const auto mapped = flmfx::map (flm188f::moduleOf (12, { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5104f, 0.0729f, 1.0f, 1.0f, 0.25f,
                                                                   0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }));
@@ -231,7 +231,7 @@ TEST (flm188f_autoduck_and_reverbs)
         if (! mapped.slots.empty())
         {
             const auto s = reeverb2::fromParams (mapped.slots[0].params);
-            CHECK (s.p[5] == 14 && s.p[10] == 0 && s.p[11] == 76 && s.p[12] == 89 && s.p[3] == 100 && s.p[0] == 236 && s.p[9] == -1);
+            CHECK (s.p[5] == 14 && s.p[10] == 128 && s.p[11] == 45 && s.p[12] == 53 && s.p[3] == 100 && s.p[0] == 236 && s.p[9] == -1);
         }
         // its MIX lane: the wet control and, for the stable layout, the utility (here at 0 dB throughout)
         const auto t = flmfx::automate (flm188f::moduleOf (12, { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5104f, 0.0729f, 1.0f, 1.0f, 0.25f }),
