@@ -17,7 +17,7 @@ run="${LYNX_CXX_ONCE_RUN:?LYNX_CXX_ONCE_RUN is not set}"
 if [[ "${1:-}" == --one ]]; then # --one <flags file> <object> <source>: one compile (through xargs below)
     flagsfile="$2" o="$3" src="$4" flags=()
     while IFS= read -r -d '' f; do flags+=("$f"); done < "$flagsfile"
-    "${real[@]}" "${flags[@]}" -c "$src" -o "$o.tmp" && mv -f "$o.tmp" "$o"
+    "${real[@]}" "${flags[@]}" -c "$src" -o "$o.tmp$$" && mv -f "$o.tmp$$" "$o"
     exit
 fi
 
@@ -47,16 +47,12 @@ objs=() todo=()
 for s in "${srcs[@]}"; do
     o="$dir/$(printf '%s' "$s" | tr '/.' '__').o"
     objs+=("$o")
-    if ! grep -qxF "$s" "$stamp"; then
-        todo+=("$o" "$s")
-        echo "$s" >> "$stamp"
-    fi
+    grep -qxF "$s" "$stamp" || todo+=("$o" "$s")
 done
 if [[ ${#todo[@]} -gt 0 ]]; then
     jobs="${LYNX_BUILD_JOBS:-$(nproc 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 4)}"
-    if ! printf '%s\n' "${todo[@]}" | xargs -n 2 -P "$jobs" "$0" --one "$dir/flags"; then
-        rm -f "$stamp" # (nothing of this run counts as compiled any more: the build stops here anyway)
-        exit 1
-    fi
+    printf '%s\n' "${todo[@]}" | xargs -n 2 -P "$jobs" "$0" --one "$dir/flags" || exit 1
+    # (recorded only once compiled: a stopped or failed compile is done again by the next command)
+    for ((i = 1; i < ${#todo[@]}; i += 2)); do echo "${todo[$i]}" >> "$stamp"; done
 fi
 exec "${real[@]}" "${flags[@]}" "${objs[@]}" ${others[@]+"${others[@]}"} -o "$out"

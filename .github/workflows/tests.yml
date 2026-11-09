@@ -48,7 +48,6 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == Linux ]]; then sudo apt-get install -y -q ccache > /dev/null || { sudo apt-get update -q && sudo apt-get install -y -q ccache; }
           else brew list ccache > /dev/null 2>&1 || brew install ccache; fi
-          ccache --zero-stats > /dev/null
       - uses: actions/cache/restore@v4
         with:
           path: .ccache
@@ -58,7 +57,9 @@ jobs:
         env:
           CXX: ccache ${{ matrix.compiler }}
           LYNX_TEST_JOBS: auto
-        run: ./scripts/build-local.sh
+        run: |
+          ccache --zero-stats > /dev/null # (after the restore: the statistics live in the cache folder)
+          ./scripts/build-local.sh
       - name: ccache statistics
         if: always()
         run: ccache --show-stats || true
