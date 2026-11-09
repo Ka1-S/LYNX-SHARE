@@ -50,6 +50,7 @@ public:
     std::function<PluginOutputRoute (int)> route;
     std::function<void (int, bool)> setActive;
     std::function<void (int, int)> setOffset;
+    std::function<bool()> processInactive; // "Process inactive inputs and outputs": an inactive row is not dimmed
 
     int preferredHeight() const { return (int) outputs.size() * rowHeight + 4; }
 
@@ -60,6 +61,7 @@ public:
         {
             const auto r = route ? route (k) : PluginOutputRoute {};
             const auto active = on (k);
+            const auto plays = active || (processInactive && processInactive()); // (FL [UI fl188d k29])
             const auto rowArea = rowBounds (k);
             // LED: the accent when active (FL's orange LED), hollow grey when not
             const auto led = ledBounds (k).toFloat();
@@ -73,11 +75,11 @@ public:
                 g.drawEllipse (led.expanded (2.0f), 1.0f);
             }
             auto text = rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
-            g.setColour (active ? colour::textPrimary : colour::textDisabled);
+            g.setColour (plays ? colour::textPrimary : colour::textDisabled);
             g.setFont (font (type::body));
             g.drawFittedText (juce::String (k + 1) + ". " + label (k), text, juce::Justification::centredLeft, 1);
             const auto box = wheelBounds (k).toFloat();
-            g.setColour (drawDigitDisplay (g, box, (hot == k && hotPart == Part::wheel) || dragRow == k, ! active, true));
+            g.setColour (drawDigitDisplay (g, box, (hot == k && hotPart == Part::wheel) || dragRow == k, ! plays, true));
             g.setFont (font (type::body, true));
             g.drawText (r.offset == 0 ? juce::String ("---") : juce::String (r.offset),
                         box.withTrimmedRight ((float) digitMarksWidth + 2.0f).toNearestInt(), juce::Justification::centredRight, false);
@@ -303,7 +305,12 @@ public:
         outputRows.setActive = [this] (int k, bool on) {
             // (stored as the plugin's own default when it is one: −1)
             const auto declared = outputRows.outputs[(std::size_t) k].activeByDefault;
-            editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); });
+            editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); },
+                        ! on); // FL [EXEC fl188d a38, b23, k19]: turning an LED off turns "Process inactive inputs and outputs" off
+        };
+        outputRows.processInactive = [this] {
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            return ref != nullptr && ref->processInactive;
         };
         outputRows.setOffset = [this] (int k, int v) { editRoutes ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = v; }); };
         connectionsView.setViewedComponent (&outputRows, false);
@@ -591,16 +598,18 @@ private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
     // Processing › Connections: one edit of the outputs' routes (as many entries as the plugin has outputs)
-    void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change)
+    void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change, bool stopProcessingInactive = false)
     {
         const auto count = outputRows.outputs.size();
-        engine.editSong ([fn = find, count, change = std::move (change)] (Song& song) {
+        engine.editSong ([fn = find, count, change = std::move (change), stopProcessingInactive] (Song& song) {
             if (auto* ref = fn (song); ref != nullptr && count > 0)
             {
                 if (ref->outputs.size() < count)
                     ref->outputs.resize (count);
                 change (ref->outputs);
                 trimOutputRoutes (ref->outputs);
+                if (stopProcessingInactive)
+                    ref->processInactive = false;
             }
         });
         outputRows.repaint();

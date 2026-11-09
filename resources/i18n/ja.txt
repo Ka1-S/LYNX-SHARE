@@ -8093,3 +8093,5 @@ countries: jp
 "Hints and warnings" = "ヒントと警告"
 "Manage messages" = "メッセージの管理"
 "Delete the selected mixer tracks" = "選択したミキサートラックを削除"
+"Process inactive inputs and outputs" = "無効な入力と出力も処理"
+"Process inputs and outputs marked as inactive" = "無効にした入力と出力も処理する"

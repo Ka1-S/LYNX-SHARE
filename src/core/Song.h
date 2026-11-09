@@ -149,6 +149,18 @@ enum class InstrumentKind : std::uint8_t
 // External plugin: format identifier (the app knows how to find the file) + saved state.
 // Third-party plugin coming from an FL project ("Fruity Wrapper"), before finding the same
 // installed plugin (docs/analise/REA_rodada5.md). Not saved in .lynx: the app resolves it on import.
+// One output of a hosted generator in FL's wrapper Processing › Connections (round 188d, issue #114 [UI and audio
+// checked in FL 2026: docs/analise/REA_rodada188d.md]): it plays on the insert `offset` tracks after the channel's
+// own ("---" = 0: the channel's insert, where every active output goes by default); an inactive output is silent.
+struct PluginOutputRoute
+{
+    int offset = 0;          // −999…999, FL's wheel range
+    std::int8_t active = -1; // the row's LED: 1 on, 0 off, −1 as the plugin declares the output (VST2 pin, VST3 bus)
+
+    bool isActive (bool pluginDefault) const noexcept { return active < 0 ? pluginDefault : active != 0; }
+    bool operator== (const PluginOutputRoute&) const = default;
+};
+
 struct ForeignPlugin
 {
     enum class Format : std::uint8_t { none, vst2, vst3, clap, other };
@@ -168,20 +180,12 @@ struct ForeignPlugin
     std::uint32_t wrapperFlags2 = 0;
     bool hasWrapperFlags2 = false;
     int bendRange = -1;
+    // round 188d [DATA: FL 2026 saves, docs/analise/REA_rodada188d.md]: records 0x1E (input / output counts), 0x1F
+    // and 0x20 (per input / output: i32 offset or sidechain index, u32 active, u32 0) — Processing › Connections
+    std::vector<PluginOutputRoute> inputRoutes, outputRoutes;
+    bool hasRoutes = false;
 
     bool operator== (const ForeignPlugin&) const = default;
-};
-
-// One output of a hosted generator in FL's wrapper Processing › Connections (round 188d, issue #114 [UI and audio
-// checked in FL 2026: docs/analise/REA_rodada188d.md]): it plays on the insert `offset` tracks after the channel's
-// own ("---" = 0: the channel's insert, where every active output goes by default); an inactive output is silent.
-struct PluginOutputRoute
-{
-    int offset = 0;          // −999…999, FL's wheel range
-    std::int8_t active = -1; // the row's LED: 1 on, 0 off, −1 as the plugin declares the output (VST2 pin, VST3 bus)
-
-    bool isActive (bool pluginDefault) const noexcept { return active < 0 ? pluginDefault : active != 0; }
-    bool operator== (const PluginOutputRoute&) const = default;
 };
 
 struct PluginRef
@@ -224,6 +228,12 @@ struct PluginRef
     int bitSize = 0;
     // Processing › Connections (round 188d): [plugin output] its route; outputs past the end keep FL's defaults
     std::vector<PluginOutputRoute> outputs;
+    // Processing › Options › "Process inactive inputs and outputs" (on by default; wrapper flag 0x8 [DATA]): an
+    // inactive output still plays on its insert [EXEC fl188d k33]; off: it is silent
+    bool processInactive = true;
+    // an effect's inputs in Processing › Connections (round 188d): `offset` = the sidechain index (0 = the insert's
+    // own audio, k = the k-th insert sending to this one as a sidechain)
+    std::vector<PluginOutputRoute> inputs;
     PluginOutputRoute outputRoute (int index) const noexcept
     {
         return index >= 0 && index < (int) outputs.size() ? outputs[(std::size_t) index] : PluginOutputRoute {};
@@ -237,7 +247,8 @@ struct PluginRef
                && midiInPort == o.midiInPort && midiOutPort == o.midiOutPort && notifyRender == o.notifyRender
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
-               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs;
+               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
+               && processInactive == o.processInactive && inputs == o.inputs;
     }
 };
 

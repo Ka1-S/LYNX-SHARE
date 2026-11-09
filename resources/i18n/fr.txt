@@ -8093,3 +8093,5 @@ countries: fr be ch ca lu
 "Hints and warnings" = "Conseils et avertissements"
 "Manage messages" = "Gérer les messages"
 "Delete the selected mixer tracks" = "Supprimer les pistes de Mixer sélectionnées"
+"Process inactive inputs and outputs" = "Traiter les entrées et sorties inactives"
+"Process inputs and outputs marked as inactive" = "Traiter les entrées et sorties marquées comme inactives"

@@ -4854,6 +4854,7 @@ private:
             { "output 2 inactive", { { 0, 1 }, { 1, 0 } }, false, -1.0f, true, false },
             { "output 1 inactive", { { 0, 0 } }, false, -1.0f, false, true },
             { "auto map, channel volume 0", { { 0, 1 }, { 1, 1 } }, false, 0.0f, false, false },
+            { "output 2 inactive, Process inactive inputs and outputs on", { { 0, 1 }, { 1, 0 } }, false, -1.0f, true, true },
         };
         auto tone = [] (const std::vector<float>& x, double hz) {
             // Goertzel magnitude over the buffer (normalised to a sine's amplitude)
@@ -4881,6 +4882,8 @@ private:
                 channel.plugin.id = vst2->createIdentifierString().toStdString();
                 channel.plugin.name = vst2->name.toStdString();
                 channel.plugin.outputs = c.routes;
+                // (FL's "Process inactive inputs and outputs" plays an inactive output: off but for the case named so)
+                channel.plugin.processInactive = juce::String (c.name).contains ("Process inactive");
                 channel.mixerTrack = 1;
                 if (c.volume >= 0.0f)
                     channel.volume = c.volume;

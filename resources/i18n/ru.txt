@@ -8093,3 +8093,5 @@ countries: ru by kz
 "Hints and warnings" = "Подсказки и предупреждения"
 "Manage messages" = "Управление сообщениями"
 "Delete the selected mixer tracks" = "Удалить выбранные дорожки микшера"
+"Process inactive inputs and outputs" = "Обрабатывать неактивные входы и выходы"
+"Process inputs and outputs marked as inactive" = "Обрабатывать входы и выходы, отмеченные как неактивные"

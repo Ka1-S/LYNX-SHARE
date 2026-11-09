@@ -669,7 +669,8 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
     {
         const auto route = channel.plugin.outputRoute ((int) k);
         routeOffset[k].store (route.offset, std::memory_order_relaxed);
-        const auto on = route.isActive (outs[k].activeByDefault);
+        // ("Process inactive inputs and outputs": an inactive output plays too, FL [EXEC fl188d k33])
+        const auto on = route.isActive (outs[k].activeByDefault) || channel.plugin.processInactive;
         routeActive[k].store (on, std::memory_order_relaxed);
         elsewhere = elsewhere || (on && route.offset != 0);
     }

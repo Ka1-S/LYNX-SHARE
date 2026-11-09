@@ -8176,3 +8176,5 @@ countries: br
 "Hints and warnings" = "Dicas e avisos"
 "Manage messages" = "Gerenciar mensagens"
 "Delete the selected mixer tracks" = "Excluir as faixas do Mixer selecionadas"
+"Process inactive inputs and outputs" = "Processar entradas e saídas inativas"
+"Process inputs and outputs marked as inactive" = "Processar entradas e saídas marcadas como inativas"

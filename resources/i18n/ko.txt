@@ -8093,3 +8093,5 @@ countries: kr
 "Hints and warnings" = "힌트와 경고"
 "Manage messages" = "메시지 관리"
 "Delete the selected mixer tracks" = "선택한 믹서 트랙 삭제"
+"Process inactive inputs and outputs" = "비활성 입력과 출력 처리"
+"Process inputs and outputs marked as inactive" = "비활성으로 표시된 입력과 출력도 처리"
