@@ -73,9 +73,21 @@ public:
         {
             auto& choice = styleChoices[(std::size_t) i];
             choice.setRadioGroupId (184017);
+            choice.getProperties().set ("lynxRadio", true); // drawn as a radio dot (Theme.cpp drawTickBox)
             choice.setToggleState (i == initialStyle, juce::dontSendNotification);
             body.addAndMakeVisible (choice);
             auto& note = styleNotes[(std::size_t) i];
+            // the Settings page's explanation starts with the style's name ("Simple workflow: one window..."); here the
+            // name is the button just above it, so the line keeps only what follows the colon
+            auto text = note.getText();
+            for (const auto* colon : { ":", "\xef\xbc\x9a" }) // (an ASCII or a full-width colon, as the translations use)
+                if (const auto at = text.indexOf (juce::String::fromUTF8 (colon)); at > 0 && at < 40)
+                {
+                    text = text.substring (at + juce::String::fromUTF8 (colon).length()).trim();
+                    text = text.substring (0, 1).toUpperCase() + text.substring (1);
+                    break;
+                }
+            note.setText (text, juce::dontSendNotification);
             note.setColour (juce::Label::textColourId, theme::colour::textSecondary);
             note.setJustificationType (juce::Justification::topLeft);
             note.setMinimumHorizontalScale (1.0f);
