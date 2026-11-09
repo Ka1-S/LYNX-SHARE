@@ -8146,3 +8146,8 @@ countries: id
 "Normalize selection individually" = "Normalisasi pilihan satu per satu"
 "Normalize selection as a group" = "Normalisasi pilihan sebagai grup"
 "Crossfade selected" = "Crossfade yang dipilih"
+"Monophonic painting in piano roll" = "Lukisan monofonik di piano roll"
+"On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round" = "Aktif: alat Lukis mengganti not di bawah setiap not baru, dan Shift melukis di atasnya. Nonaktif: sebaliknya"
+"Limit the number of open plugin editors" = "Batasi jumlah editor plugin yang terbuka"
+"Limit the number of open plugin editor windows to 25" = "Batasi jumlah jendela editor plugin yang terbuka hingga 25"
+"It is recommended to keep this setting turned on for performance reasons. Are you sure you want to turn it off?" = "Pengaturan ini disarankan tetap aktif demi performa. Yakin ingin menonaktifkannya?"

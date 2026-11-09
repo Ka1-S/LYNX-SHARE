@@ -317,4 +317,9 @@ int addPatternAutoMarker (Pattern& pattern, std::int64_t tick);
 void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar);
 // the pattern's signature at `tick`: its last signature marker at or before it, else beatsPerBar / 4
 std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar);
+// FL's Paint tool in the Piano roll (round 189o; FLEngine 2026 [DECOMP] FUN_00e5cd20: mode 0x11 "mono paint" when
+// Shift != General › "Monophonic painting in piano roll", PRPaintMode, off by default): with the option on, a plain
+// stroke paints monophonically and Shift paints chords / layers as before.
+inline bool monophonicPaint (bool shiftDown, bool monophonicOption) noexcept { return shiftDown != monophonicOption; }
+
 } // namespace lynx::noteedit

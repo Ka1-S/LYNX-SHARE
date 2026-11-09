@@ -35,6 +35,7 @@ struct GeneralOptions
     bool autoClipsAtPlayback = true; // FL's General › "Create automation clips at the playback position" (on, round 177b)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
+    bool monophonicPainting = false; // FL's "Monophonic painting in piano roll" (round 189o)
     // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the
     // control under the mouse also shows next to the cursor
     bool hoverValues = false;
@@ -50,6 +51,7 @@ struct GeneralOptions
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
     bool pluginSandbox = false;
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
+    bool limitEditors = true; // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h; on as FL)
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
     bool reducedEffects = false;

@@ -12,6 +12,7 @@
 #endif
 
 #include "core/CrashReport.h"
+#include "core/EditorLimit.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
@@ -595,6 +596,7 @@ public:
 
     ~PluginWindow() override
     {
+        editorlimit::forget (&plugin);
         crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
         // round 165q: closing the active plugin window (its X, F12, Alt+F12, removing the plugin) let Windows hand the
         // activation to another program (seen: a terminal on the second screen) instead of LYNX, so Space and the
@@ -615,7 +617,10 @@ public:
     {
         DocumentWindow::activeWindowStatusChanged();
         if (isActiveWindow())
+        {
             lastUsed() = &plugin;
+            editorlimit::touch (&plugin); // (round 189o: the limit closes the least recently used editors)
+        }
     }
 
     static juce::AudioPluginInstance*& lastUsed()
@@ -875,11 +880,17 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     if (auto it = open.find (&plugin); it != open.end())
     {
         it->second->toFront (true);
+        editorlimit::touch (&plugin);
         return;
     }
 
     installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
     open[&plugin] = std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
+    // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
+    editorlimit::opened (&plugin, [k = &plugin] {
+        editorlimit::forget (k);
+        juce::MessageManager::callAsync ([k] { windows().erase (k); });
+    });
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
 }

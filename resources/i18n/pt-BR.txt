@@ -8229,3 +8229,8 @@ countries: br
 "Normalize selection individually" = "Normalizar seleção individualmente"
 "Normalize selection as a group" = "Normalizar seleção como grupo"
 "Crossfade selected" = "Crossfade nos selecionados"
+"Monophonic painting in piano roll" = "Pintura monofônica no piano roll"
+"On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round" = "Ligado: a ferramenta Pintar substitui as notas sob cada nota nova, e Shift pinta por cima delas. Desligado: o contrário"
+"Limit the number of open plugin editors" = "Limitar o número de editores de plugin abertos"
+"Limit the number of open plugin editor windows to 25" = "Limitar a 25 o número de janelas de editor de plugin abertas"
+"It is recommended to keep this setting turned on for performance reasons. Are you sure you want to turn it off?" = "Recomenda-se manter esta opção ligada por motivos de desempenho. Tem certeza de que deseja desligá-la?"

@@ -8146,3 +8146,8 @@ countries: jp
 "Normalize selection individually" = "選択範囲を個別にノーマライズ"
 "Normalize selection as a group" = "選択範囲をグループとしてノーマライズ"
 "Crossfade selected" = "選択範囲をクロスフェード"
+"Monophonic painting in piano roll" = "ピアノロールでモノフォニックペイント"
+"On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round" = "オン: ペイントツールは新しいノートの下にあるノートを置き換え、Shift で重ねて描きます。オフ: その逆"
+"Limit the number of open plugin editors" = "開いているプラグインエディターの数を制限"
+"Limit the number of open plugin editor windows to 25" = "開いているプラグインエディターウィンドウを 25 個までに制限"
+"It is recommended to keep this setting turned on for performance reasons. Are you sure you want to turn it off?" = "パフォーマンスのため、この設定はオンのままにすることをおすすめします。本当にオフにしますか?"
