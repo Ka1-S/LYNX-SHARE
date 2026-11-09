@@ -22,6 +22,30 @@ std::pair<std::size_t, std::size_t> rowRange (const std::vector<PatternBlock>& b
 }
 
 bool validPattern (const Song& song, int pattern) noexcept { return pattern >= 0 && pattern < (int) song.patterns.size(); }
+
+// Removes every block whose played span meets [fromTick, toTick]: of row `pattern`, or of any row when -1.
+int eraseSpan (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick)
+{
+    if (toTick < fromTick)
+        std::swap (fromTick, toTick);
+    std::vector<std::size_t> gone;
+    if (pattern < 0)
+    {
+        for (std::size_t i = 0; i < song.blocks.size(); ++i)
+            if (song.blocks[i].start <= toTick && fromTick < playedEnd (song, song.blocks, i))
+                gone.push_back (i);
+    }
+    else
+    {
+        const auto [first, last] = rowRange (song.blocks, pattern);
+        for (auto i = first; i < last; ++i)
+            if (song.blocks[i].start <= toTick && fromTick < playedEnd (song, song.blocks, i))
+                gone.push_back (i);
+    }
+    for (auto it = gone.rbegin(); it != gone.rend(); ++it)
+        song.blocks.erase (song.blocks.begin() + (std::ptrdiff_t) *it);
+    return (int) gone.size();
+}
 } // namespace
 
 std::int64_t lengthOf (const Song& song, int pattern) noexcept
@@ -116,18 +140,35 @@ bool erase (Song& song, int pattern, std::int64_t tick)
     return true;
 }
 
+std::int64_t move (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick)
+{
+    const auto index = blockAt (song, pattern, fromTick);
+    if (index < 0)
+        return -1;
+    const auto start = song.blocks[(std::size_t) index].start;
+    const auto to = snapToBar (song, std::max<std::int64_t> (0, toTick));
+    if (to == start)
+        return start;
+    const PatternBlock block = song.blocks[(std::size_t) index];
+    song.blocks.erase (song.blocks.begin() + index); // out first, so it never collides with itself
+    if (! fits (song, pattern, to))
+    {
+        song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), block, before), block);
+        return start;
+    }
+    song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), PatternBlock { pattern, to }, before),
+                        PatternBlock { pattern, to });
+    return to;
+}
+
 int eraseRange (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick)
 {
-    if (toTick < fromTick)
-        std::swap (fromTick, toTick);
-    const auto [first, last] = rowRange (song.blocks, pattern);
-    std::vector<std::size_t> gone;
-    for (auto i = first; i < last; ++i)
-        if (song.blocks[i].start <= toTick && fromTick < playedEnd (song, song.blocks, i))
-            gone.push_back (i);
-    for (auto it = gone.rbegin(); it != gone.rend(); ++it)
-        song.blocks.erase (song.blocks.begin() + (std::ptrdiff_t) *it);
-    return (int) gone.size();
+    return eraseSpan (song, pattern, fromTick, toTick);
+}
+
+int eraseAnyRow (Song& song, std::int64_t fromTick, std::int64_t toTick)
+{
+    return eraseSpan (song, -1, fromTick, toTick);
 }
 
 std::vector<Clip> asClips (const Song& song)

@@ -303,3 +303,114 @@ TEST (pb170f_key_map_actions)
     keys::KeyMap map;
     CHECK (map.conflicts().empty());
 }
+
+TEST (pb170f_move_block_within_its_row)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 0, bar)); // P1 on bars 2 and 4
+    CHECK (patternblocks::place (s, 0, 3 * bar));
+
+    // dragging the bar-2 block to bar 3 moves it there, keeping the row and the order
+    CHECK (patternblocks::move (s, 0, bar, 2 * bar) == 2 * bar);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
+    CHECK (s.blocks[0].pattern == 0 && s.blocks[1].pattern == 0);
+    // the same bar: a no-op returning the current start
+    CHECK (patternblocks::move (s, 0, 2 * bar, 2 * bar + 10) == 2 * bar);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
+    // onto the occupied bar: it stays where it was
+    CHECK (patternblocks::move (s, 0, 2 * bar, 3 * bar) == 2 * bar);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
+    // no block of that row there: -1, and nothing changes
+    CHECK (patternblocks::move (s, 0, 0, bar) == -1);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
+    // not a row at all: -1 as well
+    CHECK (patternblocks::move (s, 7, 2 * bar, bar) == -1);
+    CHECK (patternblocks::move (s, -1, 2 * bar, bar) == -1);
+    // a negative target clamps to bar 1, which is free here
+    CHECK (patternblocks::move (s, 0, 2 * bar, -500) == 0);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 0 && s.blocks[1].start == 3 * bar);
+}
+
+TEST (pb170f_move_cut_blocks_and_order)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 0, 0)); // P1 on bars 1 and 2
+    CHECK (patternblocks::place (s, 0, bar));
+    CHECK (patternblocks::move (s, 0, 0, 2 * bar) == 2 * bar);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == bar && s.blocks[1].start == 2 * bar);
+    CHECK (patternblocks::playedEnd (s, s.blocks, 0) == 2 * bar); // the block left behind still plays its whole bar
+    CHECK (patternblocks::playedEnd (s, s.blocks, 1) == 3 * bar);
+
+    // a grown 2-bar pattern on bars 1 and 3, grown to 3 bars: the first is cut at the second
+    auto grown = pb170f::blockSong();
+    CHECK (patternblocks::place (grown, 1, 0));
+    CHECK (patternblocks::place (grown, 1, 2 * bar));
+    grown.patterns[1].lengthTicks = 12 * ppq; // 3 bars
+    CHECK (patternblocks::playedEnd (grown, grown.blocks, 0) == 2 * bar);
+    CHECK (patternblocks::move (grown, 1, 0, 5 * bar) == 5 * bar); // to bar 6, past the other block's span
+    CHECK (grown.blocks.size() == 2 && grown.blocks[0].start == 2 * bar && grown.blocks[1].start == 5 * bar);
+    CHECK (patternblocks::playedEnd (grown, grown.blocks, 0) == 5 * bar); // whole again: nothing cuts it now
+    CHECK (patternblocks::playedEnd (grown, grown.blocks, 1) == 8 * bar);
+}
+
+TEST (pb170f_erase_any_row)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 0, bar)); // P1 on bar 2, P2 on bars 3–4
+    CHECK (patternblocks::place (s, 1, 2 * bar));
+
+    // a click-width range on bar 3 meets only P2's span (P1 ends where bar 3 starts)
+    CHECK (patternblocks::eraseAnyRow (s, 2 * bar, 2 * bar) == 1);
+    CHECK (s.blocks.size() == 1 && s.blocks[0].pattern == 0 && s.blocks[0].start == bar);
+    // the row-filtered erase removes the same block from the same setup
+    auto row = pb170f::blockSong();
+    CHECK (patternblocks::place (row, 0, bar));
+    CHECK (patternblocks::place (row, 1, 2 * bar));
+    CHECK (patternblocks::eraseRange (row, 1, 2 * bar, 2 * bar) == 1);
+    CHECK (row.blocks.size() == 1 && row.blocks[0].pattern == 0);
+
+    // a range over every row takes them all, whatever the row
+    auto all = pb170f::blockSong();
+    CHECK (patternblocks::place (all, 0, 0));
+    CHECK (patternblocks::place (all, 1, bar));
+    CHECK (patternblocks::place (all, 2, 2 * bar));
+    CHECK (patternblocks::eraseAnyRow (all, 0, 3 * bar) == 3);
+    CHECK (all.blocks.empty());
+
+    // a range over a gap removes nothing and leaves the list bit-identical
+    auto gap = pb170f::blockSong();
+    CHECK (patternblocks::place (gap, 0, bar));
+    const auto kept = gap.blocks;
+    CHECK (patternblocks::eraseAnyRow (gap, 5 * bar, 6 * bar) == 0);
+    CHECK (gap.blocks == kept);
+
+    // a click inside a block erases it, but exactly at its played end there is nothing to erase
+    // (a block meets [from, to] while from < playedEnd: the end itself belongs to the next bar)
+    auto edge = pb170f::blockSong();
+    CHECK (patternblocks::place (edge, 0, 0)); // P1 on [0, bar)
+    CHECK (patternblocks::eraseAnyRow (edge, bar, bar) == 0);
+    CHECK (edge.blocks.size() == 1);
+    CHECK (patternblocks::eraseAnyRow (edge, bar / 2, bar / 2) == 1);
+    CHECK (edge.blocks.empty());
+}
+
+TEST (pb170f_move_erase_labels)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 0, bar));
+    CHECK (patternblocks::place (s, 0, 3 * bar));
+    const auto before = s;
+    CHECK (patternblocks::move (s, 0, bar, 2 * bar) == 2 * bar);
+    CHECK (std::string (describeChange (before, s).text) == "Edit pattern blocks"); // same count: an edit, not a paint
+    const auto moved = s;
+    CHECK (patternblocks::eraseAnyRow (s, 2 * bar, 3 * bar) == 2);
+    CHECK (std::string (describeChange (moved, s).text) == "Erase pattern blocks");
+}
