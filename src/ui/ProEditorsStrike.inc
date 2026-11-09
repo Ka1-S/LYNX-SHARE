@@ -2,7 +2,7 @@
 // from scratch (no bitmaps, logos or fonts of any original): two narrow rack modules side by side, each a brushed
 // silver frame with slotted screws round a black capsule. The left module is the unit itself: SIG / OVL lamps,
 // ATTACK and SUSTAIN on their printed dB scales, ON and LINK lit keys, OUTPUT GAIN. The right module carries LYNX's
-// name plate with its own strike mark, the two activity rows (how far the attack and sustain gains move, live), the
+// name plate with LYNX's logo, the two activity rows (how far the attack and sustain gains move, live), the
 // detector's high-pass, GUARD and the parallel MIX, and the power lamp. Included by ui/ProEditors.cpp.
 
 class StrikeEditor final : public ProEditor
@@ -296,19 +296,6 @@ private:
         g.fillEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
     }
 
-    // LYNX's strike mark: a sharp attack spike over a decaying tail, inside a ring
-    static void strikeMark (juce::Graphics& g, juce::Point<float> c, float r, juce::Colour col)
-    {
-        g.setColour (col);
-        g.drawEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.6f);
-        juce::Path p;
-        p.startNewSubPath (c.x - r * 0.72f, c.y + r * 0.42f);
-        p.lineTo (c.x - r * 0.38f, c.y + r * 0.42f);
-        p.lineTo (c.x - r * 0.22f, c.y - r * 0.66f);
-        p.quadraticTo (c.x + r * 0.02f, c.y + r * 0.30f, c.x + r * 0.72f, c.y + r * 0.40f);
-        g.strokePath (p, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    }
-
     // an activity row: 5 LEDs each side of a centre one; lit up to the gain's |dB| (cut left, boost right)
     void activityRow (juce::Graphics& g, juce::Point<float> c, const juce::String& name, float db) const
     {
@@ -387,7 +374,7 @@ private:
         g.fillRoundedRectangle (plate, 6.0f);
         g.setColour (juce::Colours::white.withAlpha (0.12f));
         g.drawRoundedRectangle (plate.reduced (0.5f), 6.0f, 1.0f);
-        strikeMark (g, { plate.getX() + 30.0f, plate.getCentreY() }, 17.0f, juce::Colour (0xffe8463a));
+        skin::brandMark (g, juce::Rectangle<float> (40.0f, 40.0f).withCentre ({ plate.getX() + 30.0f, plate.getCentreY() })); // LYNX's logo
         text (g, { plate.getX() + 54.0f, plate.getY() + 8.0f, 72.0f, 22.0f }, "LYNX", 19.0f, true, kInk, juce::Justification::centredLeft, 0.12f);
         text (g, { plate.getX() + 55.0f, plate.getY() + 32.0f, 72.0f, 14.0f }, "AUDIO", 8.5f, false, kDim, juce::Justification::centredLeft, 0.4f);
         text (g, { 330.0f, y0 + 154.0f, 202.0f, 26.0f }, "Strike", 24.0f, true, kInk);
