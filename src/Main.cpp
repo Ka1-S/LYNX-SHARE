@@ -4961,10 +4961,206 @@ private:
                         ok = ok && instrument->outputs().size() == 8 && instrument->outputs()[1].name == "Snare";
                     }
             }
+        // round 189j: "LYNX Test SC.dll" next to it (tools/testplugin/lynx_test_sc_vst2.c) as an effect on insert 1
+        const auto sc = juce::File (pluginPath).getSiblingFile ("LYNX Test SC.dll");
+        if (sc.existsAsFile())
+            ok = runEffectConnectionsTest (sc, report) && ok;
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
+    }
+
+    // Round 189j: a hosted effect's Processing › Connections against FL 2026's own renders of the same projects
+    // [EXEC fxconn189j: FL /R renders of LYNX's .flp exports, docs/analise/REA_rodada189j.md]. Insert 1: a 440 Hz
+    // sampler and "LYNX Test SC" (output 1 = input 1, output 2 = input 2); inserts 2 (1000 Hz) and 3 (1500 Hz) routed
+    // to insert 1 at level 0 only; insert 4 a 2500 Hz reference on the Master; insert 1 routed to the Master and at
+    // level 0 to inserts 5 (panned left) and 6 (right). Each tone's level per side, in dB from the reference's, must be
+    // FL's within 0.5 dB (absent: 50 dB under it).
+    bool runEffectConnectionsTest (const juce::File& scFile, juce::String& report)
+    {
+        lynx::AudioEngine scanner (false);
+        scanner.getPluginHost().addPluginFile (scFile);
+        std::optional<juce::PluginDescription> sc;
+        for (const auto& type : scanner.getPluginHost().getKnownPlugins().getTypes())
+            if (type.pluginFormatName == "VST" && juce::File (type.fileOrIdentifier) == scFile)
+                sc = type;
+        report << "effect_plugin=" << (sc ? sc->name : juce::String ("not found")) << "\n";
+        if (! sc)
+            return false;
+        const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-fxconn189j");
+        dir.createDirectory();
+        const double tones[] = { 440.0, 1000.0, 1500.0, 2500.0 };
+        for (const auto hz : tones)
+        {
+            const auto wav = dir.getChildFile ("sine" + juce::String ((int) hz) + ".wav");
+            if (wav.existsAsFile())
+                continue;
+            juce::AudioBuffer<float> sine (1, 44100 * 3);
+            for (int i = 0; i < sine.getNumSamples(); ++i)
+                sine.setSample (0, i, 0.25f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * hz * i / 44100.0));
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+            if (auto* w = format.createWriterFor (out.get(), 44100.0, 1, 16, {}, 0))
+            {
+                out.release();
+                std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                writer->writeFromAudioSampleBuffer (sine, 0, sine.getNumSamples());
+            }
+        }
+        using Route = lynx::PluginOutputRoute;
+        constexpr float none = -999.0f;
+        struct Case
+        {
+            const char* name;
+            std::vector<Route> inputs, outputs;
+            int tweak; // 1 no Master route, 2 insert 1 fader at 0.4, 3 Process inactive off, 4 Master route level 0, 5 route
+                       // to 7 too, 6 insert 2 fader at 0.4, 7 insert 2 muted, 8 insert 2 panned left
+            float level[3][2]; // 440 / 1000 / 1500 Hz, left / right: dB from the reference, FL's
+        };
+        const Route d { 0, 1 };
+        const Case cases[] = {
+            { "e00 FL defaults", { d, d }, {}, 0, { { 6.1f, 6.1f }, { none, none }, { none, none } } },
+            { "e01 input 1 at 1", { { 1, 1 } }, {}, 0, { { 0, 0 }, { 0, 0 }, { none, none } } },
+            { "e02 input 1 at 2", { { 2, 1 } }, {}, 0, { { 0, 0 }, { none, none }, { 0, 0 } } },
+            { "e03 input 2 at 1", { d, { 1, 1 } }, {}, 0, { { 0, 0 }, { 0, 0 }, { none, none } } },
+            { "e04 output 2 at 1 (Master)", { d, { 1, 1 } }, { d, { 1, 1 } }, 0, { { 0, 0 }, { 0, 0 }, { none, none } } },
+            { "e05 output 2 at 2 (insert 5)", { d, { 1, 1 } }, { d, { 2, 1 } }, 0, { { 0, 0 }, { 3.0f, none }, { none, none } } },
+            { "e06 output 1 at 1", {}, { { 1, 1 } }, 0, { { 6.1f, 6.1f }, { none, none }, { none, none } } },
+            { "e07 output 2 at 5 (past the list)", { d, { 1, 1 } }, { d, { 5, 1 } }, 0, { { 0, 0 }, { none, 3.0f }, { none, none } } },
+            { "e08 inputs 1 and 2 at 1", { { 1, 1 }, { 1, 1 } }, {}, 0, { { none, none }, { 6.1f, 6.1f }, { none, none } } },
+            { "e09 output 2 inactive", { d, { 1, 1 } }, { d, { 0, 0 } }, 0, { { 0, 0 }, { 0, 0 }, { none, none } } },
+            { "e10 input 1 at 5 (past the list)", { { 5, 1 } }, {}, 0, { { 6.1f, 6.1f }, { none, none }, { none, none } } },
+            { "e11 output 2 at 3 (insert 6)", { d, { 1, 1 } }, { d, { 3, 1 } }, 0, { { 0, 0 }, { none, 3.0f }, { none, none } } },
+            { "e13 no Master route, output 2 at 1", { d, { 1, 1 } }, { d, { 1, 1 } }, 1, { { none, none }, { 3.0f, none }, { none, none } } },
+            { "e14 insert 1 fader 0.4, output 2 at 1", { d, { 1, 1 } }, { d, { 1, 1 } }, 2, { { -12.7f, -12.7f }, { 0, 0 }, { none, none } } },
+            { "e15 input 2 inactive", { d, { 1, 0 } }, { d, d }, 3, { { 0, 0 }, { none, none }, { none, none } } },
+            { "e16 output 2 inactive", { d, { 1, 1 } }, { d, { 0, 0 } }, 3, { { 0, 0 }, { none, none }, { none, none } } },
+            { "e18 route to 7 too, output 2 at 3", { d, { 1, 1 } }, { d, { 3, 1 } }, 5, { { 0, 0 }, { none, 3.0f }, { none, none } } },
+            { "e19 Master route at 0, output 2 at 1", { d, { 1, 1 } }, { d, { 1, 1 } }, 4, { { none, none }, { 0, 0 }, { none, none } } },
+            { "e22 input 1 at 1 inactive", { { 1, 0 } }, {}, 3, { { 0, 0 }, { none, none }, { none, none } } },
+            { "e23 output 2 at -1, insert 1 fader 0.4", { d, { 1, 1 } }, { d, { -1, 1 } }, 2, { { -12.7f, -12.7f }, { 0, 0 }, { none, none } } },
+            { "e24 input 1 at 1, insert 2 fader 0.4", { { 1, 1 } }, {}, 6, { { 0, 0 }, { -12.7f, -12.7f }, { none, none } } },
+            { "e25 input 1 at 1, insert 2 muted", { { 1, 1 } }, {}, 7, { { 0, 0 }, { none, none }, { none, none } } },
+            { "e26 input 1 at 1, insert 2 panned left", { { 1, 1 } }, {}, 8, { { 0, 0 }, { 3.0f, none }, { none, none } } },
+        };
+        auto goertzel = [] (const std::vector<float>& x, double hz) {
+            const auto w = 2.0 * juce::MathConstants<double>::pi * hz / 44100.0;
+            double s1 = 0.0, s2 = 0.0;
+            for (const auto v : x)
+            {
+                const auto s0 = v + 2.0 * std::cos (w) * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            const auto a = std::sqrt (juce::jmax (0.0, s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2)) * 2.0 / (double) juce::jmax<std::size_t> (1, x.size());
+            return a > 1e-7 ? 20.0 * std::log10 (a) : -140.0;
+        };
+        auto ok = true;
+        for (const auto& c : cases)
+        {
+            lynx::AudioEngine engine (false);
+            engine.getPluginHost().addPluginFile (scFile);
+            auto song = lynx::Song::makeDefault();
+            song.bpm = 120.0;
+            song.channels.clear();
+            song.automations.clear();
+            for (auto& p : song.patterns)
+                p.notes.clear();
+            for (int k = 0; k < 4; ++k)
+            {
+                lynx::ChannelDef ch;
+                ch.name = "S" + std::to_string ((int) tones[k]);
+                ch.instrument = lynx::InstrumentKind::sampler;
+                ch.samplePath = dir.getChildFile ("sine" + juce::String ((int) tones[k]) + ".wav").getFullPathName().toStdString();
+                ch.mixerTrack = k + 1;
+                song.channels.push_back (ch);
+                lynx::Note note;
+                note.start = 0;
+                note.length = 8 * lynx::ppq;
+                note.channel = k;
+                note.key = 60;
+                note.velocity = 0.78f;
+                song.patterns[0].notes.push_back (note);
+            }
+            if (song.mixer.size() < 10)
+                song.mixer.resize (10);
+            for (auto& t : song.mixer)
+            {
+                t.effects.clear();
+                t.sends.clear();
+                t.toMaster = true;
+            }
+            lynx::EffectSlot fx;
+            fx.kind = lynx::EffectKind::plugin;
+            fx.plugin.id = sc->createIdentifierString().toStdString();
+            fx.plugin.name = sc->name.toStdString();
+            fx.plugin.inputs = c.inputs;
+            fx.plugin.outputs = c.outputs;
+            fx.plugin.processInactive = c.tweak != 3;
+            auto& one = song.mixer[1];
+            one.effects.push_back (fx);
+            one.sends = { { 5, 0.0f }, { 6, 0.0f } };
+            for (const int t : { 2, 3 })
+            {
+                song.mixer[(std::size_t) t].toMaster = false;
+                song.mixer[(std::size_t) t].sends = { { 1, 0.0f } };
+            }
+            song.mixer[5].pan = -1.0f;
+            song.mixer[6].pan = 1.0f;
+            one.toMaster = c.tweak != 1;
+            if (c.tweak == 2)
+                one.volume = 0.4f;
+            if (c.tweak == 4)
+                one.masterLevel = 0.0f;
+            if (c.tweak == 6)
+                song.mixer[2].volume = 0.4f;
+            song.mixer[2].muted = c.tweak == 7;
+            song.mixer[2].pan = c.tweak == 8 ? -1.0f : 0.0f;
+            if (c.tweak == 5)
+            {
+                one.sends = { { 7, 0.0f }, { 5, 0.0f }, { 6, 0.0f } };
+                song.mixer[7].pan = 0.5f;
+            }
+            // (input 2's index sets the slot's side input source, as the Connections page and the import do)
+            if (c.inputs.size() > 1 && c.inputs[1].offset > 0)
+                one.effects[0].sidechain = lynx::mixerops::sidechainIndexSource (song, 1, c.inputs[1].offset);
+            engine.setSong (song);
+            std::vector<float> left, right;
+            lynx::AudioEngine::RenderOptions options;
+            options.seconds = 1.2;
+            options.sampleRate = 44100.0;
+            options.capture = [&] (const float* l, const float* r, int n) {
+                left.insert (left.end(), l, l + n);
+                right.insert (right.end(), r, r + n);
+            };
+            engine.renderOffline (options);
+            const auto from = (std::size_t) 22050, to = (std::size_t) 44100;
+            if (right.size() < to)
+            {
+                report << c.name << ": rendered " << (int) right.size() << " samples FAILED\n";
+                ok = false;
+                continue;
+            }
+            const std::vector<float> l (left.begin() + (std::ptrdiff_t) from, left.begin() + (std::ptrdiff_t) to);
+            const std::vector<float> r (right.begin() + (std::ptrdiff_t) from, right.begin() + (std::ptrdiff_t) to);
+            const auto ref = 0.5 * (goertzel (l, 2500.0) + goertzel (r, 2500.0));
+            auto pass = ref > -60.0;
+            report << c.name << ": ref=" << juce::String (ref, 1);
+            for (int k = 0; k < 3; ++k)
+                for (int side = 0; side < 2; ++side)
+                {
+                    const auto got = goertzel (side == 0 ? l : r, tones[k]) - ref;
+                    const auto want = c.level[k][side];
+                    const auto good = want == none ? got < -50.0 : std::abs (got - want) < 0.5;
+                    pass = pass && good;
+                    report << " " << (int) tones[k] << (side == 0 ? "L" : "R") << "=" << (got < -50.0 ? juce::String ("-") : juce::String (got, 1))
+                           << (good ? "" : "(FL " + (want == none ? juce::String ("-") : juce::String (want, 1)) + ")");
+                }
+            report << (pass ? " OK" : " FAILED") << "\n";
+            ok = ok && pass;
+        }
+        return ok;
     }
 
     // LYNX.exe --wrappertest plugin.vst3 report.txt: builds a VST3 state the way FL's Fruity

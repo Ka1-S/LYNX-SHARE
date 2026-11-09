@@ -412,7 +412,7 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
     if (slot.kind == EffectKind::transmitter || (slot.kind == EffectKind::equo && output == 0)) // (EQUO: its band sends, round 173d3)
-        return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
+        return output >= 0 && output < (int) slot.sendTracks.size() && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
     return output == 0 ? fruitySendTarget (slot) : -1;
 }
 
@@ -424,11 +424,95 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
         return out;
     const auto& slots = song.mixer[(std::size_t) track].effects;
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
+    {
+        const auto& slot = slots[(std::size_t) s];
+        if (slot.kind == EffectKind::plugin)
+        {
+            // a hosted effect's output pairs that its Connections send elsewhere (round 189j), after its processing
+            const auto c = slotConnections (song, track, slot);
+            for (int o = 0; o < maxPluginConnections && c.routed; ++o)
+                if (const auto target = c.outputs[(std::size_t) o]; target >= 0 && target < n && target != track)
+                    out.push_back ({ s, target, o, true });
+            continue;
+        }
         for (int o = 0; o < maxSlotSends; ++o)
-            if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
-                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter
-                                                                                       || slots[(std::size_t) s].kind == EffectKind::equo });
+            if (const auto target = slotSendTarget (slot, o); target > 0 && target < n && target != track)
+                out.push_back ({ s, target, o, slot.kind == EffectKind::transmitter || slot.kind == EffectKind::equo });
+    }
     return out;
+}
+
+std::vector<int> insertInputList (const Song& song, int track)
+{
+    std::vector<int> list { track };
+    for (int from = 1; from < (int) song.mixer.size(); ++from)
+        if (from != track && song.routes (from, track))
+            list.push_back (from);
+    return list;
+}
+
+std::vector<int> insertOutputList (const Song& song, int track)
+{
+    std::vector<int> list { track };
+    if (track <= 0 || track >= (int) song.mixer.size())
+        return list;
+    for (int to = 0; to < (int) song.mixer.size(); ++to)
+        if (to != track && song.routes (track, to))
+            list.push_back (to);
+    return list;
+}
+
+SlotConnections slotConnections (const Song& song, int track, const EffectSlot& slot)
+{
+    SlotConnections c;
+    const auto n = (int) song.mixer.size();
+    const auto& ref = slot.plugin;
+    if (slot.kind != EffectKind::plugin || track <= 0 || track >= n || (ref.inputs.empty() && ref.outputs.empty()))
+        return c;
+    c.routed = true;
+    // an inactive input / output: silent, unless "Process inactive inputs and outputs" (on by default) [EXEC]
+    auto on = [&ref] (const PluginOutputRoute& r) { return r.isActive (true) || ref.processInactive; };
+    const auto at = [] (const std::vector<PluginOutputRoute>& list, std::size_t k) { return k < list.size() ? list[k] : PluginOutputRoute {}; };
+
+    // index k = entry k of the inputs list; 0 or past the list = the slot's own input [EXEC e01 e02 e10]
+    std::vector<int> sources;
+    auto source = [&] (int k) {
+        if (k <= 0)
+            return -1;
+        if (sources.empty())
+            sources = insertInputList (song, track);
+        return k < (int) sources.size() ? sources[(std::size_t) k] : -1;
+    };
+    const auto in1 = at (ref.inputs, 0), in2 = at (ref.inputs, 1);
+    c.mainSource = on (in1) ? source (in1.offset) : -2;
+    // input 2: the slot's side input source (LYNX's SC picker, or its index, which sets it: core/MixerOps.h), else
+    // its index; without either the slot's own input [EXEC e00: FL feeds an input at index 0 the insert's audio]
+    if (! on (in2))
+        c.sideSource = -2;
+    else if (slot.sidechain > 0 && slot.sidechain != track && slot.sidechain < n)
+        c.sideSource = slot.sidechain;
+    else
+        c.sideSource = source (in2.offset);
+
+    // outputs: index 0 = into the insert; k = entry k of the outputs list, past its end the last one [EXEC e05 e07 e11
+    // e12 e13 e18 e19]; (a negative index, which FL's wheel never gives, went to the Master past the fader, e17 e23)
+    std::vector<int> targets;
+    for (int o = 0; o < maxPluginConnections; ++o)
+    {
+        const auto r = ref.outputRoute (o);
+        if (! on (r))
+            c.outputs[(std::size_t) o] = -2;
+        else if (r.offset < 0)
+            c.outputs[(std::size_t) o] = 0;
+        else if (r.offset > 0)
+        {
+            if (targets.empty())
+                targets = insertOutputList (song, track);
+            if (targets.size() > 1)
+                c.outputs[(std::size_t) o] = targets[(std::size_t) std::min (r.offset, (int) targets.size() - 1)];
+        }
+    }
+    return c;
 }
 
 bool Song::routes (int from, int to) const noexcept

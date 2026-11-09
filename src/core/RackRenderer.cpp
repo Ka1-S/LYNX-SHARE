@@ -687,7 +687,11 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             if (song.mixer[t].effects[i].kind == EffectKind::plugin && state->effects[t][i] != nullptr)
             {
                 const auto source = song.mixer[t].effects[i].sidechain;
-                state->effects[t][i]->setSideInputActive (source >= 0 && source != (int) t && source < (int) song.mixer.size());
+                // (round 189j: with its Connections set, input 2 is fed unless inactive — its own input by default)
+                const auto connections = lynx::slotConnections (song, (int) t, song.mixer[t].effects[i]);
+                state->effects[t][i]->setConnections (connections);
+                state->effects[t][i]->setSideInputActive ((source >= 0 && source != (int) t && source < (int) song.mixer.size())
+                                                          || (connections.routed && connections.sideSource != -2));
             }
 
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
@@ -805,13 +809,34 @@ void RackState::buildMixerGraph()
     slotTap.assign ((std::size_t) tracks, {});
     std::vector<int> depth ((std::size_t) tracks, 0);
 
+    // the hosted effects' Connections (round 189j): an input 1 taken from another insert orders it like a sidechain
+    slotConnections.assign ((std::size_t) tracks, {});
+    for (int t = 1; t < tracks; ++t)
+    {
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            if (auto c = lynx::slotConnections (song, t, effects[i]); c.routed)
+            {
+                slotConnections[(std::size_t) t].resize (effects.size());
+                slotConnections[(std::size_t) t][i] = c;
+            }
+    }
+    auto sourceOf = [this, tracks] (int t, std::size_t i, bool side) {
+        const auto& list = slotConnections[(std::size_t) t];
+        const auto source = i < list.size() ? (side ? list[i].sideSource : list[i].mainSource) : -1;
+        return source > 0 && source < tracks && source != t ? source : -1;
+    };
+
     // who listens to each track via sidechain (the source goes in an earlier layer)
     std::vector<std::vector<int>> sidechainListeners ((std::size_t) tracks);
     for (int t = 1; t < tracks; ++t)
-        for (const auto& fx : song.mixer[(std::size_t) t].effects)
-            for (const auto source : { fx.sidechain, fx.sidechain2 })
+    {
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            for (const auto source : { effects[i].sidechain, effects[i].sidechain2, sourceOf (t, i, false), sourceOf (t, i, true) })
                 if (source > 0 && source < tracks && source != t)
                     sidechainListeners[(std::size_t) source].push_back (t);
+    }
 
     for (auto t : mixerOrder) // sources before destinations: the depth is already computed
     {
@@ -953,8 +978,11 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
         for (const auto& in : mixerInputs[(std::size_t) t])
             if (in.source > 0 && in.source < tracks && in.source != t)
                 edge (in.source, t);
-        for (const auto& fx : song.mixer[(std::size_t) t].effects)
-            for (const auto source : { fx.sidechain, fx.sidechain2 })
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        const auto& connections = slotConnections[(std::size_t) t];
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            for (const auto source : { effects[i].sidechain, effects[i].sidechain2, i < connections.size() ? connections[i].mainSource : -1,
+                                       i < connections.size() ? connections[i].sideSource : -1 })
                 if (source > 0 && source < tracks && source != t)
                     edge (source, t);
     }
@@ -2541,6 +2569,26 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
     }
 }
 
+void RackRenderer::connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept
+{
+    // a hosted effect's Connections (round 189j [EXEC FL 2026]): input 1 from the insert its index picks (processed
+    // earlier, like a sidechain source; silent when it is), input 2 the slot's own input when no source feeds it
+    auto sounding = [&] (int source) {
+        return source > 0 && source != track && source < (int) state.song.mixer.size() && (std::size_t) source < trackActive.size()
+               && trackActive[(std::size_t) source] != 0;
+    };
+    if (c.mainSource == -2)
+        effect.setMainInput (nullptr, nullptr);
+    else if (c.mainSource > 0)
+        effect.setMainInput (sounding (c.mainSource) ? trackBuffer (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackBuffer (c.mainSource, 1) : nullptr);
+    if (c.sideSource == -1)
+        effect.setSidechain (l, r);
+    else if (c.sideSource == -2)
+        effect.setSidechain (nullptr, nullptr);
+    else // (its index, when no side input source is picked: setSidechain fed the slot's own one, if any)
+        effect.setSidechain (sounding (c.sideSource) ? trackBuffer (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackBuffer (c.sideSource, 1) : nullptr);
+}
+
 void RackRenderer::runEffects (const RackState& state, int track, int n) noexcept
 {
     if (track >= (int) state.effects.size())
@@ -2589,12 +2637,18 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // after 4 s; built-ins after 1 s, which is well beyond their tail)
         const auto key = (std::size_t) track * maxEffectSlots + i;
         const auto isPlugin = slots[i].kind == EffectKind::plugin;
+        const auto* connections = isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
+                                      && state.slotConnections[(std::size_t) track][i].routed
+                                      ? &state.slotConnections[(std::size_t) track][i]
+                                      : nullptr; // (round 189j: a hosted effect's routed Connections)
         const auto hold = (int) (sampleRate * (isPlugin || slots[i].kind == EffectKind::patcher ? 4.0 : 1.0)); // (a Patcher may hold plugins)
 
         // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
         // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
         // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
+        // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
         if (key < smartDisable.size() && slots[i].smartDisable && ! (isPlugin && ! slots[i].plugin.allowSmartDisable)
+            && ! (connections != nullptr && connections->mainSource > 0)
             && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
             && slots[i].kind != EffectKind::newtime
             && slots[i].kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
@@ -2671,7 +2725,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
         // (processed later)
         if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
-            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo)
+            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo || connections != nullptr)
         {
             for (int o = 0; o < maxSlotSends; ++o)
             {
@@ -2725,6 +2779,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
+            if (connections != nullptr)
+                connect (state, *connections, *effects[i], track, l, r);
             timed (key, [&] { effects[i]->process (l, r, n, params, bpm); });
         }
         else
@@ -2733,6 +2789,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
+            if (connections != nullptr)
+                connect (state, *connections, *effects[i], track, l, r);
             const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
             timed (key, [&] { effects[i]->process (l, r, n, shown, bpm); });
         }

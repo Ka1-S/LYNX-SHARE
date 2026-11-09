@@ -725,11 +725,16 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
     sideBus = hasSideBus (*plugin);
     findSideChannel();
+    outs = pluginOutputs (*plugin);
+    for (auto& m : outputMode)
+        m.store (-1, std::memory_order_relaxed);
     if (fixedBlock > 0)
     {
-        // (with a side bus the fixed blocks always carry it, so turning it on later changes nothing here)
-        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), sideBus || sideChannel >= 0 ? 4 : 2);
-        if (sideBus || sideChannel >= 0)
+        // (with a side bus the fixed blocks always carry it, so turning it on later changes nothing here; a second
+        // output pair rides on the same channels back, for its Connections, round 189j)
+        const auto four = sideBus || sideChannel >= 0 || outs.size() > 1;
+        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), four ? 4 : 2);
+        if (four)
             sideScratch.assign ((std::size_t) blockSize * 2, 0.0f);
     }
     options = o;
@@ -996,12 +1001,57 @@ juce::String pluginSidechainSelfTest()
     return "OK";
 }
 
+void PluginEffect::setConnections (const SlotConnections& c)
+{
+    for (int o = 0; o < maxPluginConnections; ++o)
+        outputMode[(std::size_t) o].store (c.routed ? c.outputs[(std::size_t) o] : -1, std::memory_order_relaxed);
+    routed.store (c.routed, std::memory_order_relaxed);
+}
+
+void PluginEffect::routeOutputs (const float* const* ch, int numChannels, int at, int count, float* left, float* right, bool taps) noexcept
+{
+    // FL [EXEC fxconn189j]: the output pairs at index 0 summed into the insert (none: silence), the others to their
+    // track (the renderer's tap; `taps` false: not from here), an inactive one nowhere
+    std::fill (left + at, left + at + count, 0.0f);
+    std::fill (right + at, right + at + count, 0.0f);
+    for (std::size_t k = 0; k < outs.size(); ++k)
+    {
+        const auto& o = outs[k];
+        if (o.channel >= numChannels)
+            continue;
+        const auto mode = k < outputMode.size() ? outputMode[k].load (std::memory_order_relaxed) : -1;
+        float* dl = left;
+        float* dr = right;
+        if (mode >= 0)
+        {
+            dl = taps && k < extraL.size() ? extraL[k] : nullptr;
+            dr = taps && k < extraR.size() ? extraR[k] : nullptr;
+        }
+        if (mode == -2 || dl == nullptr || dr == nullptr)
+            continue;
+        const auto* l = ch[o.channel];
+        const auto* r = o.channels > 1 && o.channel + 1 < numChannels ? ch[o.channel + 1] : l;
+        for (int i = 0; i < count; ++i)
+        {
+            dl[at + i] += l[i];
+            dr[at + i] += r[i];
+        }
+    }
+}
+
 void PluginEffect::process (float* left, float* right, int n, const EffectParams&, double) noexcept
 {
     // this block's sidechain (null = silence); cleared so a slot whose side input is removed hears silence again
     const auto* scL = sideL;
     const auto* scR = sideR != nullptr ? sideR : sideL;
     sideL = sideR = nullptr;
+    // input 1 from another insert (Connections, round 189j): null = silence; cleared like the sidechain
+    const auto replaceMain = mainSet;
+    const auto* inL = mainL;
+    const auto* inR = mainR != nullptr ? mainR : mainL;
+    mainSet = false;
+    mainL = mainR = nullptr;
+    const auto isRouted = routed.load (std::memory_order_relaxed);
     // copies the sidechain into the side bus channels of `view` from sample `from` of the block (silence without one)
     auto feedSide = [this, scL, scR] (juce::AudioBuffer<float>& view, int from, int count) noexcept {
         if (sideChannel < 0 || scL == nullptr)
@@ -1041,7 +1091,20 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
                     std::fill (io[2 + c], io[2 + c] + m, 0.0f);
             }
         }
-        fixed->run (io, n, true, [this] (float* const* ch, int count) {
+        // (input 1 from another insert: after the side input took the slot's own one)
+        if (replaceMain)
+        {
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto* src = c == 0 ? inL : inR;
+                if (src != nullptr)
+                    std::memcpy (io[c], src, sizeof (float) * (size_t) n);
+                else
+                    std::fill (io[c], io[c] + n, 0.0f);
+            }
+        }
+        // routed: output pair 1 / 2 come back on channels 0-1 / 2-3 (pairs past the second are not carried here)
+        fixed->run (io, n, true, [this, isRouted] (float* const* ch, int count) {
             if (crashed.load (std::memory_order_relaxed))
                 return; // (crashed in an earlier block of this call: the input passes through)
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
@@ -1061,9 +1124,37 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
                 return;
             }
             midi.clear();
+            if (isRouted)
+            {
+                // into the insert: the pairs at index 0; pair 2 sent elsewhere rides back on channels 2-3
+                routeOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), 0, count, ch[0], ch[1], false);
+                if (sideScratch.empty())
+                    return;
+                const auto pair2 = outs.size() > 1 && outputMode[1].load (std::memory_order_relaxed) >= 0;
+                if (pair2 && outs[1].channel < view.getNumChannels())
+                {
+                    const auto& o = outs[1];
+                    std::memcpy (ch[2], view.getReadPointer (o.channel), sizeof (float) * (size_t) count);
+                    std::memcpy (ch[3], view.getReadPointer (o.channels > 1 && o.channel + 1 < view.getNumChannels() ? o.channel + 1 : o.channel),
+                                 sizeof (float) * (size_t) count);
+                }
+                else
+                {
+                    std::fill (ch[2], ch[2] + count, 0.0f);
+                    std::fill (ch[3], ch[3] + count, 0.0f);
+                }
+                return;
+            }
             std::memcpy (ch[0], view.getReadPointer (0), sizeof (float) * (size_t) count);
             std::memcpy (ch[1], view.getReadPointer (view.getNumChannels() > 1 ? 1 : 0), sizeof (float) * (size_t) count);
         });
+        if (isRouted && outs.size() > 1 && outputMode[1].load (std::memory_order_relaxed) >= 0 && extraL[1] != nullptr && extraR[1] != nullptr
+            && sideScratch.size() >= (std::size_t) blockSize * 2 && n <= blockSize)
+            for (int i = 0; i < n; ++i)
+            {
+                extraL[1][i] += io[2][i];
+                extraR[1][i] += io[3][i];
+            }
         return;
     }
 
@@ -1072,8 +1163,16 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
         const auto count = juce::jmin (blockSize, n - done);
         juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
         view.clear();
-        view.copyFrom (0, 0, left + done, count);
-        view.copyFrom (1, 0, right + done, count);
+        if (! replaceMain)
+        {
+            view.copyFrom (0, 0, left + done, count);
+            view.copyFrom (1, 0, right + done, count);
+        }
+        else if (inL != nullptr)
+        {
+            view.copyFrom (0, 0, inL + done, count);
+            view.copyFrom (1, 0, inR + done, count);
+        }
         feedSide (view, done, count);
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
         {
@@ -1083,8 +1182,13 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
         }
         midi.clear();
 
-        std::memcpy (left + done, view.getReadPointer (0), sizeof (float) * (size_t) count);
-        std::memcpy (right + done, view.getReadPointer (view.getNumChannels() > 1 ? 1 : 0), sizeof (float) * (size_t) count);
+        if (isRouted)
+            routeOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), done, count, left, right, true);
+        else
+        {
+            std::memcpy (left + done, view.getReadPointer (0), sizeof (float) * (size_t) count);
+            std::memcpy (right + done, view.getReadPointer (view.getNumChannels() > 1 ? 1 : 0), sizeof (float) * (size_t) count);
+        }
         done += count;
     }
 }
