@@ -23,6 +23,38 @@ int clampAutosaveMinutes (int minutes); // the nearest choice
 constexpr int defaultAutosaveMinutes = 2;
 constexpr int defaultAutosaveKeep = 10;
 int clampAutosaveKeep (int keep); // 1..100
+// Round 177d (an FL wishlist item: a backup written while playing made the sound stutter; the user's decision): with
+// "waitForQuiet" on (the default) a due backup also waits while the song plays and until `quietMs` after the last
+// MIDI input, not only while recording (FL postpones it for recording only).
+constexpr double backupQuietMs = 5000.0;
+// The user's decision: after `longestWaitMs` without a backup one is written anyway, playing or not (Settings › General,
+// 10 minutes by default). Never during a recording.
+constexpr int defaultBackupLongestWaitMinutes = 10;
+constexpr int backupLongestWaitChoices[] = { 5, 10, 15, 20, 30, 60 };
+constexpr int clampBackupLongestWait (int minutes) noexcept
+{
+    auto best = defaultBackupLongestWaitMinutes;
+    auto bestGap = 1 << 30;
+    for (const auto c : backupLongestWaitChoices)
+        if (const auto gap = c > minutes ? c - minutes : minutes - c; gap < bestGap)
+        {
+            best = c;
+            bestGap = gap;
+        }
+    return best;
+}
+inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet, double msSinceBackup,
+                          double longestWaitMs) noexcept
+{
+    if (recording)
+        return false;
+    if (msSinceBackup >= longestWaitMs)
+        return true;
+    return ! waitForQuiet || (! playing && msSinceMidi >= backupQuietMs);
+}
+// A MIDI message that means someone is playing: channel messages only. Clock, active sensing and the rest of the
+// system messages (0xF0 and up) run by themselves whenever a device is plugged in.
+constexpr bool midiMeansPlaying (unsigned char status) noexcept { return status >= 0x80 && status < 0xF0; }
 
 // Backup file name (without extension) of project `stem` saved at a date/time: "Night Drive (2026-10-16 19.50.03)".
 // Sorting these names sorts them by time.

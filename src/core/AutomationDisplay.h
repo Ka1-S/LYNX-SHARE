@@ -197,9 +197,9 @@ private:
                     ended = &c;
             }
             if (playing != nullptr)
-                return song.automations[(std::size_t) playing->automation].valueAt (tick - (double) playing->start + (double) playing->offset);
+                return song.automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick);
             if (ended != nullptr)
-                return song.automations[(std::size_t) ended->automation].valueAt ((double) (ended->length + ended->offset));
+                return song.automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end());
             return none; // before the first clip: the control's own value
         }
 

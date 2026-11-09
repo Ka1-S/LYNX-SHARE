@@ -15,6 +15,8 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -519,5 +521,102 @@ inline std::shared_ptr<SampleData> apply (const SampleData& in, const SamplerSet
     out->cropFrom = std::clamp (((double) s0 + (double) std::min (t0, n0 - 1)) / total, 0.0, 1.0);
     out->cropTo = std::clamp (((double) s0 + (double) std::min (t1, span)) / total, out->cropFrom, 1.0);
     return out;
+}
+
+// What of the file a channel plays, in file frames: its Start / Length region (a Playlist audio clip plays the whole file),
+// processed by its precomputed effects and cut by its Trim, as FL measures it after them (REA round 180d, FUN_00ff0db0:
+// the trim scans the processed sample; Thief's Importer Ride, faded out by its Precomputed fade out 807, trims to 0.38 s
+// of its 1.30 s). FL stretches exactly that to TIME, and a clip's offsets count from its first frame.
+struct PlayedSpan
+{
+    std::int64_t first = 0, frames = 0;
+};
+
+inline PlayedSpan playedSpan (const SampleData& in, const SamplerSettings& s, bool wholeRegion)
+{
+    const auto frames = (std::int64_t) in.frames();
+    if (frames < 2)
+        return { 0, frames };
+    auto settings = s;
+    if (wholeRegion)
+        settings.regionStart = 0.0f, settings.regionEnd = 1.0f;
+    if (needed (settings))
+    {
+        if (const auto processed = apply (in, settings))
+            return { (std::int64_t) std::nearbyint (processed->cropFrom * (double) (frames - 1)),
+                     std::max<std::int64_t> (1, (std::int64_t) processed->frames()) };
+        return { 0, frames };
+    }
+    const auto start = (double) std::clamp (std::min (settings.regionStart, settings.regionEnd), 0.0f, 1.0f);
+    const auto end = (double) std::clamp (settings.regionEnd, 0.0f, 1.0f);
+    const auto total = (double) (frames - 1);
+    const auto t0 = (std::int64_t) std::nearbyint (start * total);
+    const auto t1 = std::min<std::int64_t> (frames - 1, t0 + (std::int64_t) std::nearbyint (std::max (0.0, end - start) * total));
+    return { t0, std::max<std::int64_t> (1, t1 - t0 + 1) };
+}
+
+// The same, cached for a shared sample (the Playlist asks on every paint): an entry lives as long as its sample
+inline PlayedSpan playedSpan (const std::shared_ptr<const SampleData>& in, const SamplerSettings& s, bool wholeRegion)
+{
+    if (in == nullptr)
+        return {};
+    if (! needed (s) && ! wholeRegion)
+        return playedSpan (*in, s, wholeRegion);
+    struct Entry
+    {
+        std::weak_ptr<const SampleData> data;
+        float regionStart, regionEnd;
+        bool reverse, loops, whole;
+        std::vector<std::int32_t> flChannel;
+        SamplePrecompute precompute;
+        PlayedSpan span;
+    };
+    static std::mutex lock;
+    static std::vector<Entry> cache;
+    const auto same = [&] (const Entry& e) {
+        return e.data.lock() == in && e.regionStart == s.regionStart && e.regionEnd == s.regionEnd && e.reverse == s.reverse
+               && e.loops == s.useLoopPoints && e.whole == wholeRegion && e.flChannel == s.flChannel && e.precompute == s.precompute;
+    };
+    {
+        const std::scoped_lock l (lock);
+        for (const auto& e : cache)
+            if (same (e))
+                return e.span;
+    }
+    const auto span = playedSpan (*in, s, wholeRegion);
+    const std::scoped_lock l (lock);
+    std::erase_if (cache, [] (const Entry& e) { return e.data.expired(); });
+    if (cache.size() >= 64)
+        cache.erase (cache.begin());
+    cache.push_back ({ in, s.regionStart, s.regionEnd, s.reverse, s.useLoopPoints, wholeRegion, s.flChannel, s.precompute, span });
+    return span;
+}
+
+// What makes two precomputed spans of one file the same (the stretch cache's key for a stretched span)
+inline std::string variantKey (const SamplerSettings& s, bool wholeRegion)
+{
+    const auto& p = s.precompute;
+    std::string k;
+    auto add = [&k] (double v) { k += std::to_string (v); k += ','; };
+    add (wholeRegion ? 0.0 : s.regionStart);
+    add (wholeRegion ? 1.0 : s.regionEnd);
+    for (const auto v : { (int) s.reverse, (int) s.useLoopPoints, (int) p.removeDc, (int) p.normalize, (int) p.reversePolarity,
+                          (int) p.fadeStereo, (int) p.swapStereo, p.fadeIn, p.fadeOut, p.crossfade, p.trim, (int) p.pingPong, p.boost, p.eq,
+                          p.ringMix, p.ringFreq, p.stereoDelay, p.cutoff, p.resonance, p.reverb, p.reverbType, p.pogo, (int) p.clip })
+        add ((double) v);
+    for (const auto v : s.flChannel)
+        add ((double) v);
+    return k;
+}
+
+// The frames TIME stretches to the channel's length (see playedSpan)
+inline std::int64_t stretchedFrames (const SampleData& in, const SamplerSettings& s, bool wholeRegion = false)
+{
+    return playedSpan (in, s, wholeRegion).frames;
+}
+
+inline std::int64_t stretchedFrames (const std::shared_ptr<const SampleData>& in, const SamplerSettings& s, bool wholeRegion = false)
+{
+    return playedSpan (in, s, wholeRegion).frames;
 }
 } // namespace lynx::precompute

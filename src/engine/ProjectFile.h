@@ -15,14 +15,17 @@ namespace ProjectFile
 constexpr const char* extension = ".lynx";
 constexpr int currentVersion = 1;
 
-juce::String toJson (const Song& song);
-std::optional<Song> fromJson (const juce::String& json, juce::String& error);
+// `stampVersion` writes "savedBy"; false when the text is hashed (a new version must not change what a hash says).
+juce::String toJson (const Song& song, bool stampVersion = true);
+// `savedBy` (optional) receives the version of LYNX SHARE that wrote the project ("" for projects from before round
+// 177d, which did not write it): a newer one may hold things this build drops (safety::savedByNewerVersion).
+std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy = nullptr);
 
 // Atomic (temporary file + rename), then read back: false, with `error`, unless the file on disk is what was written.
 bool save (const Song& song, const juce::File& file, juce::String& error);
 // `file` named as a project: "beat.v2" -> "beat.v2.lynx" (File::withFileExtension would make it "beat.lynx").
 juce::File withProjectExtension (const juce::File& file);
-std::optional<Song> load (const juce::File& file, juce::String& error);
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy = nullptr);
 
 // One mixer track as stored in a project (sends, input and effects included).
 juce::var mixerTrackToVar (const MixerTrack& track);

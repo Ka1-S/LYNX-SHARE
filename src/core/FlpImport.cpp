@@ -1,6 +1,8 @@
 #include "core/FlpImport.h"
 #include "core/FlpExport.h"
 
+#include "core/FruitySlicer.h"
+
 #include "core/Dvs.h"
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
@@ -1334,9 +1336,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (frames <= 0 && options.sampleFrames)
                         frames = options.sampleFrames (path);
 
-                    def.instrument = InstrumentKind::sampler;
+                    // Fruity Slicer: its own generator on FL's state (round 180c); Slicex: the sampler
+                    def.instrument = name == "fruity slicer" && fslicer::parse (c.pluginState) ? InstrumentKind::fruityslicer
+                                                                                                : InstrumentKind::sampler;
+                    if (def.instrument == InstrumentKind::fruityslicer)
+                        def.pluginState = c.pluginState;
                     def.samplePath = path;
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
+                    if (def.instrument != InstrumentKind::fruityslicer) // (Fruity Slicer: its state's PS, at the rack)
+                        def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
                     // Slicex: FL's host hands the plugin Init.Vol (REA_rodada170i §6; Fruity Slicer's render test is
                     // ruled by its licensed stretch and does not show it, so it keeps the linear velocity)
                     def.sampler.flVelocityLaw = name == "slicex";
@@ -2170,6 +2177,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
                      || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
+                     || def.instrument == InstrumentKind::fruityslicer
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
@@ -2408,7 +2416,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     // slots, instruments through a one-channel import), every cable (audio with its gain, notes, control values mapped
     // to LYNX's parameters), the editor positions and the extra outputs
     std::function<std::optional<PatcherDoc> (const std::vector<std::uint8_t>&, const flp::Channel*)> patcherFromFl;
-    int patcherSidechain = -1; // the last converted Patcher's side-chain pin: "7 Sidechain" = insert 7
+    // the last converted Patcher's side-chain pin: its bus k, an index into FL's input list of the insert, as for the
+    // other effects (REA_rodada22 §1.2). The pin's name is only the source track's name when saved (Bien Duro: "7
+    // Sidechain" on bus 1 and 4 is track 81, named "7 Sidechain"; issue #112: "Master"), REA round 182e
+    int patcherSidechain = -1;
     patcherFromFl = [&] (const std::vector<std::uint8_t>& state, const flp::Channel* asChannel) -> std::optional<PatcherDoc> {
         const auto graph = parsePatcher (state);
         if (! graph)
@@ -2593,8 +2604,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 w.kind = PatchWire::Kind::audio;
                 w.fromPort = src->node < 0 ? (src->index > 0 ? 1 : 0) : std::max (0, src->index);
                 if (src->node < 0 && src->index > 0)
-                    if (const auto track = std::atoi (src->name.c_str()); track > 0 && track < maxMixerTracks)
-                        patcherSidechain = track;
+                    patcherSidechain = src->index;
                 w.toPort = dst->node < 0 ? std::max (0, dst->index) : std::min (1, std::max (0, dst->index));
                 if (w.to == patchToHost && w.toPort > 0) // an extra output: "Insert N" names its insert
                 {
@@ -2666,8 +2676,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         if (const auto k = surface::flOutputToLynx (source.effect.state, w.fromPort))
                             w.fromPort = *k;
                 }
-                if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
-                    w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
+                // (a Peak Controller's outputs keep FL's numbers: 0 Peak+LFO, 1 Peak, 2 LFO, as LYNX's and as the mixer links;
+                // REA_rodada17 §5.1, issue #111)
                 if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)
                 {
                     // the source has no such output in LYNX (an X-Y controller, a Control Surface…): its target keeps the
@@ -2819,8 +2829,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 {
                     auto slot = makeEffectSlot (EffectKind::patcher);
                     slot.patcher = std::move (*doc);
-                    if (patcherSidechain > 0 && patcherSidechain < tracks && patcherSidechain != insert.index)
-                        slot.sidechain = patcherSidechain;
+                    if (const auto source = sidechainSource (insert.index, patcherSidechain); source > 0 && source != insert.index)
+                        slot.sidechain = source;
                     effectSlotMap.insert ({ { insert.index, original.index }, { (int) track.effects.size(), original.plugin } });
                     slot.flOrigin = { original.plugin, original.state, 0 }; // (round 171e: Export to FL Studio)
                     track.effects.push_back (std::move (slot));
@@ -3565,6 +3575,47 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             a.points.push_back ({ tick, value, 0.0f });
         }
 
+        // FL's clip LFO (round 177b, REA FUN_00fe8640 / FUN_00ba1700): kept whole, so the file writes back byte for byte
+        if (const auto& f = c.automationLfo; f.present || f.level != 64 || f.mode != 0)
+        {
+            auto& lfo = a.lfo;
+            lfo.on = f.enabled != 0;
+            lfo.level = f.level;
+            lfo.add = f.mode == 1;
+            lfo.flags = f.flags;
+            lfo.speed = f.speed;
+            lfo.tension = f.tension;
+            lfo.skew = f.skew;
+            lfo.pulseWidth = f.pulseWidth;
+            lfo.phase = f.phase;
+            lfo.range = (float) (hi - lo);
+            lfo.amp.clear();
+            for (std::size_t i = 0; i < f.points.size(); ++i) // (the same curve rules as the clip's points)
+            {
+                const auto& p = f.points[i];
+                const auto tick = (std::int64_t) std::llround (p.position * ppq);
+                if (i > 0)
+                {
+                    auto& previous = lfo.amp.back();
+                    if (p.curve == 0 || p.curve == 1)
+                        previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
+                    else if (p.curve == 2 && tick - previous.tick > 1)
+                        lfo.amp.push_back ({ tick - 1, previous.value, 0.0f });
+                }
+                lfo.amp.push_back ({ tick, (float) std::clamp (p.value, 0.0, 1.0), 0.0f });
+            }
+            if (lfo.amp.empty())
+                lfo.amp.push_back ({ 0, 1.0f, 0.0f });
+            lfo.fl.present = f.present;
+            lfo.fl.mainFlags = f.mainFlags;
+            lfo.fl.mainEnabled = f.mainEnabled;
+            lfo.fl.mainLoop = f.mainLoop;
+            lfo.fl.adsr = f.adsr;
+            lfo.fl.lfoLoop = f.lfoLoop;
+            lfo.fl.rawPoints = f.rawPoints;
+            lfo.fl.rawAmp = lfo.amp;
+        }
+
         automationMap[c.index] = (int) song.automations.size();
         song.automations.push_back (std::move (a));
     }
@@ -3696,6 +3747,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.track = item.track;
                 clip.start = rescale (item.position);
                 clip.length = rescale (item.length);
+                clip.muted = item.muted(); // (issue #110)
 
                 // trim in beats (-1 = no trim)
                 if (std::isfinite (item.startOffset) && item.startOffset > 0.0f)
@@ -3718,6 +3770,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.track = item.track;
                 clip.start = rescale (item.position);
                 clip.length = rescale (item.length);
+                clip.muted = item.muted();
 
                 // The region start comes in beats or in milliseconds, depending on the clip;
                 // we find out by the unit in which (end - start) matches the length.
@@ -3786,6 +3839,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             clip.start = rescale (item.position);
             clip.length = rescale (item.length);
             clip.offset = item.patternStartTick > 0 ? rescale (item.patternStartTick) : 0;
+            clip.muted = item.muted();
             clips.push_back (clip);
         }
 

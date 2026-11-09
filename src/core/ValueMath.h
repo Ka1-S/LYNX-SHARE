@@ -14,14 +14,22 @@
 namespace lynx::controls
 {
 constexpr double fineFactor = 0.1;      // Ctrl+drag / Ctrl+wheel move 10x less
+constexpr double ultraFineFactor = 0.01; // Ctrl+Shift: 100x less (round 177d, LYNX's own: precise thresholds and gains)
+
+// How much a drag or wheel step is scaled by the modifiers held: Ctrl = fine, Ctrl+Shift = ultra-fine.
+inline double fineScale (bool ctrl, bool shift) noexcept { return ! ctrl ? 1.0 : shift ? ultraFineFactor : fineFactor; }
 constexpr double wheelStep = 1.0 / 50;  // one wheel notch = 2% of the range
 
 // Value after dragging `pixelsUp` pixels (positive = up/right) from `start`; `pixelsForRange` pixels
 // sweep the whole range.
+inline double dragValueScaled (double start, double pixelsUp, double minimum, double maximum, double pixelsForRange, double scale) noexcept
+{
+    const auto perPixel = (maximum - minimum) / std::max (1.0, pixelsForRange) * scale;
+    return std::clamp (start + pixelsUp * perPixel, minimum, maximum);
+}
 inline double dragValue (double start, double pixelsUp, double minimum, double maximum, double pixelsForRange, bool fine) noexcept
 {
-    const auto perPixel = (maximum - minimum) / std::max (1.0, pixelsForRange) * (fine ? fineFactor : 1.0);
-    return std::clamp (start + pixelsUp * perPixel, minimum, maximum);
+    return dragValueScaled (start, pixelsUp, minimum, maximum, pixelsForRange, fine ? fineFactor : 1.0);
 }
 
 // How many wheel notches a wheel event moved (never 0 for a move). `notchSize` is what one notch of a plain mouse wheel
@@ -58,14 +66,18 @@ inline int slotWheelSteps (double& accumulator, double delta, bool smooth, bool 
 }
 
 // Value after `notches` wheel notches (positive = up). `interval` > 0: at least one interval per notch.
-inline double wheelValue (double value, double notches, double minimum, double maximum, bool fine, double interval = 0.0) noexcept
+inline double wheelValueScaled (double value, double notches, double minimum, double maximum, double scale, double interval = 0.0) noexcept
 {
-    auto delta = notches * (maximum - minimum) * wheelStep * (fine ? fineFactor : 1.0);
+    auto delta = notches * (maximum - minimum) * wheelStep * scale;
 
     if (interval > 0.0 && std::abs (delta) < interval && delta != 0.0)
         delta = delta < 0.0 ? -interval : interval;
 
     return std::clamp (value + delta, minimum, maximum);
+}
+inline double wheelValue (double value, double notches, double minimum, double maximum, bool fine, double interval = 0.0) noexcept
+{
+    return wheelValueScaled (value, notches, minimum, maximum, fine ? fineFactor : 1.0, interval);
 }
 
 // A wheel that scrolls a view keeps scrolling it (round 169c, issue #32: "the mixer faders react to the mouse wheel

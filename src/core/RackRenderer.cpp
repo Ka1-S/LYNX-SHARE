@@ -1,8 +1,11 @@
 #include "core/RackRenderer.h"
 #include "core/MixerOps.h"
+
+#include "core/FruitySlicer.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
+#include "core/TimeStretch.h"
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
@@ -232,39 +235,78 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     std::shared_ptr<const SampleData> sample;
 
     if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
-         || kind == InstrumentKind::wavetraveller) && samples
+         || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer) && samples
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
-
-    // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
-        && factories.stretchedSamples
-        && sample->frames() > 0)
-    {
-        const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
-        const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
-
-        const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
-                                         (double) std::llround ((double) sample->frames() * ratio));
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
-            sample = std::move (stretched);
-    }
 
     // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
     // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
     // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
-    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+    const auto clip = kind == InstrumentKind::audioClip;
+    auto spanSettings = channel.sampler;
+    if (clip)
+        spanSettings.regionStart = 0.0f, spanSettings.regionEnd = 1.0f;
+    const auto precomputes = sample != nullptr
+                             && ((kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+                                 || (clip && channel.sampler.precompute.any()));
+    auto precomputed = false;
+
+    // pitch-preserving stretch: the sample comes already stretched to the current tempo
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller
+        && kind != InstrumentKind::fruityslicer && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+        && (factories.stretchedSamples || factories.stretchedSpans)
+        && sample->frames() > 0)
     {
-        if (auto processed = precompute::apply (*sample, channel.sampler))
-            sample = std::move (processed);
+        const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
+        if (precomputes && channel.sampler.warp.empty())
+        {
+            // FL stretches what plays: the region after its precomputed effects and Trim, not the whole file (round 180d:
+            // Thief's Importer Ride, 1.30 s of file faded out to 0.38 s, plays 2x slower in FL at TIME 367). The span is cut
+            // first and only it is stretched, so the stretcher's smear of the silence around it is not kept by the trim.
+            if (std::shared_ptr<const SampleData> span = precompute::apply (*sample, spanSettings); span != nullptr && span->frames() > 0)
+            {
+                const auto ratio = target / ((double) span->frames() / span->sampleRate);
+                auto stretched = factories.stretchedSpans
+                                     ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip), span, ratio,
+                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch)
+                                     : std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, channel.sampler.stretchMethod,
+                                                                                           channel.sampler.stretchPitch));
+                sample = stretched != nullptr ? std::move (stretched) : std::move (span);
+                precomputed = true;
+            }
+        }
+        else if (factories.stretchedSamples)
+        {
+            // the whole file (no precomputed effects; or a warp map, whose markers are in the file's frames)
+            const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, clip) / sample->sampleRate);
+            const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
+                                             (double) std::llround ((double) sample->frames() * ratio));
+            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
+                sample = std::move (stretched);
+        }
     }
-    else if (sample != nullptr && kind == InstrumentKind::audioClip && channel.sampler.precompute.any())
-    {
-        auto whole = channel.sampler;
-        whole.regionStart = 0.0f;
-        whole.regionEnd = 1.0f;
-        if (auto processed = precompute::apply (*sample, whole))
+
+    if (precomputes && ! precomputed)
+        if (auto processed = precompute::apply (*sample, spanSettings))
             sample = std::move (processed);
+
+    // Fruity Slicer (round 180c): FL's edits to the sample (reverse, declick, fades), then the sampler on the slices
+    if (kind == InstrumentKind::fruityslicer)
+    {
+        auto def = channel;
+        if (const auto state = fslicer::parse (channel.pluginState); state && sample != nullptr)
+        {
+            auto prepared = fslicer::prepare (*sample, *state);
+            fslicer::configureSampler (def, *state, (std::int64_t) prepared->frames());
+            sample = std::move (prepared);
+        }
+        else
+            def.sampler.slices.clear();
+        std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
+        instrument->prepare (sampleRate);
+        instrument->configure (def, bpm);
+        instrument->settleNew();
+        return instrument;
     }
 
     const loadtrace::Scope timing ("rack_instruments");
@@ -471,6 +513,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             && previous->song.channels[p].instrument == kind && kind != InstrumentKind::patcher
             && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
                 || previous->song.channels[p].samplePath == channel.samplePath)
+            && (kind != InstrumentKind::fruityslicer
+                || (previous->song.channels[p].samplePath == channel.samplePath
+                    && previous->song.channels[p].pluginState == channel.pluginState))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
@@ -632,6 +677,16 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             state->effects[t].push_back (buildEffect (slots[i], sampleRate, factories));
         }
     }
+
+    // Issue #109: a hosted plugin's side input is on only while its slot has a sidechain source (the same test as
+    // setSidechain below); a running plugin keeps its instance and state
+    for (std::size_t t = 0; t < state->effects.size() && t < song.mixer.size(); ++t)
+        for (std::size_t i = 0; i < state->effects[t].size() && i < song.mixer[t].effects.size(); ++i)
+            if (song.mixer[t].effects[i].kind == EffectKind::plugin && state->effects[t][i] != nullptr)
+            {
+                const auto source = song.mixer[t].effects[i].sidechain;
+                state->effects[t][i]->setSideInputActive (source >= 0 && source != (int) t && source < (int) song.mixer.size());
+            }
 
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
     // playback, the Playlist's pattern clips and export all play them without any cost on the audio thread
@@ -1189,6 +1244,22 @@ void RackState::buildAutomationTables()
         std::sort (clips.begin(), clips.end(),
                    [this] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
 
+    // round 177b: the lanes of unmuted tracks; a lane automation's own clips (if any) don't play as clips
+    laneAutomations.clear();
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        for (const auto& lane : song.playlistTracks[(std::size_t) t].lanes)
+            if (lane.automation >= 0 && lane.automation < count && ! song.isTrackMuted (t)
+                && ! automations[(std::size_t) lane.automation].points.empty())
+            {
+                automationClips[(std::size_t) lane.automation].clear();
+                laneAutomations.push_back ({ lane.automation, {} });
+            }
+    for (auto& lane : laneAutomations)
+        for (int a = 0; a < count; ++a)
+            if (a != lane.automation && ! automationClips[(std::size_t) a].empty()
+                && automations[(std::size_t) a].target == automations[(std::size_t) lane.automation].target)
+                lane.clipPeers.push_back (a);
+
     liveAutomations.clear();
     for (int a = 0; a < count; ++a)
         if (automations[(std::size_t) a].isLive())
@@ -1330,6 +1401,17 @@ void RackState::buildAutomationTables()
             group.push_back (a);
     }
 
+    // a lane takes the value of its peers' group: a follower computes none, the automation that holds the slot does
+    for (auto& lane : laneAutomations)
+        for (auto& peer : lane.clipPeers)
+            if (automationFollowers[(std::size_t) peer] != 0)
+                for (int a = 0; a < count; ++a)
+                    if (std::find (automationGroups[(std::size_t) a].begin(), automationGroups[(std::size_t) a].end(), peer)
+                        != automationGroups[(std::size_t) a].end())
+                    {
+                        lane.clipSlots.push_back ({ peer, a });
+                        break;
+                    }
     // otherwise the last automation of the same target wins (a live controller link, Performance mode clips)
     for (int a = 0; a < count; ++a)
     {
@@ -1339,6 +1421,9 @@ void RackState::buildAutomationTables()
 
         bind (a, automations[(std::size_t) a].target);
     }
+    // a lane binds its target last: it carries the clips of the same target where they play (render)
+    for (const auto& lane : laneAutomations)
+        bind (lane.automation, automations[(std::size_t) lane.automation].target);
 
     // pattern events (event editor): slots after the automations; they win over automation clips of the same
     // target. The tempo is not driven by pattern events.
@@ -1369,6 +1454,51 @@ void RackState::buildAutomationTables()
 
             eventLanes.push_back ({ p, l, slot });
             bind (slot++, lane.target);
+        }
+
+    // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
+    modRoutes.clear();
+    const auto boundSlot = [this] (const AutomationTarget& t) {
+        const auto channelOk = t.index >= 0 && t.index < (int) song.channels.size();
+        const auto trackOk = t.index >= 0 && t.index < (int) song.mixer.size();
+        switch (t.kind)
+        {
+            case AutomationTargetKind::channelVolume: return channelOk ? channelVolumeAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::channelPan: return channelOk ? channelPanAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::mixerVolume: return trackOk ? mixerVolumeAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::mixerPan: return trackOk ? mixerPanAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::effectParam:
+                return trackOk && t.slot >= 0 && t.slot < (int) effectParamAuto[(std::size_t) t.index].size() && t.param >= 0 && t.param < maxEffectParams
+                           ? effectParamAuto[(std::size_t) t.index][(std::size_t) t.slot][(std::size_t) t.param]
+                           : -1;
+            case AutomationTargetKind::effectMix:
+                return trackOk && t.slot >= 0 && t.slot < (int) effectMixAuto[(std::size_t) t.index].size() ? effectMixAuto[(std::size_t) t.index][(std::size_t) t.slot] : -1;
+            case AutomationTargetKind::mixerSend:
+                for (const auto& r : routeAutos)
+                    if (r.from == t.index && r.to == t.slot)
+                        return r.slot;
+                return -1;
+            case AutomationTargetKind::channelParam:
+            {
+                auto found = -1;
+                for (const auto& p : pluginParams)
+                    if (p.channel == t.index && p.param == t.param)
+                        found = p.automation;
+                return found;
+            }
+            case AutomationTargetKind::tempo:
+            case AutomationTargetKind::none: break;
+        }
+        return -1;
+    };
+    for (int m = 0; m < (int) song.modulators.size(); ++m)
+        for (const auto& route : song.modulators[(std::size_t) m].routes)
+        {
+            if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
+                continue;
+            const auto source = boundSlot (route.target);
+            modRoutes.push_back ({ slot, source, std::clamp (song.targetValue (route.target), 0.0f, 1.0f), m, route.depth });
+            bind (slot++, route.target);
         }
 
     // the tempo can move while playing: tempo automation or FL's pattern Tempo events (issue #86)
@@ -1760,9 +1890,9 @@ float automationValueAt (const RackState& state, int slot, double tick) noexcept
             scan (a);
 
     if (playing != nullptr)
-        return song.automations[(std::size_t) playingAutomation].valueAt (tick - (double) playing->start + (double) playing->offset);
+        return song.automations[(std::size_t) playingAutomation].playAt (tick - (double) playing->start + (double) playing->offset, tick); // (+ its LFO: round 177b)
     if (ended != nullptr)
-        return song.automations[(std::size_t) endedAutomation].valueAt ((double) (ended->length + ended->offset));
+        return song.automations[(std::size_t) endedAutomation].playAt ((double) (ended->length + ended->offset), (double) ended->end());
     return std::numeric_limits<float>::quiet_NaN();
 }
 } // namespace
@@ -1875,6 +2005,24 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
             automationValues[a] = automationValueAt (state, (int) a, tick);
 
+    // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays
+    for (const auto& lane : state.laneAutomations)
+    {
+        auto value = std::numeric_limits<float>::quiet_NaN();
+        for (const auto peer : lane.clipPeers)
+            for (const auto i : state.automationClips[(std::size_t) peer])
+                if (const auto& c = song.playlist[(std::size_t) i]; tick >= (double) c.start && tick < (double) c.end())
+                {
+                    auto slot = peer;
+                    for (const auto& held : lane.clipSlots) // (a follower of a group: the slot holder has the value)
+                        if (held.first == peer)
+                            slot = held.second;
+                    value = automationValues[(std::size_t) slot];
+                    break;
+                }
+        automationValues[(std::size_t) lane.automation] = std::isnan (value) ? song.automations[(std::size_t) lane.automation].valueAt (tick) : value;
+    }
+
     // Performance mode: the launched automation clips (the last block's passes) drive their automation
     if (perfRunning)
         for (int i = 0; i < perfPlayer.virtualCount(); ++i)
@@ -1884,7 +2032,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                 || v.automation >= RackState::maxAutomations)
                 continue;
             const auto local = std::clamp (perfClock - (double) v.start, 0.0, (double) v.length);
-            automationValues[(std::size_t) v.automation] = song.automations[(std::size_t) v.automation].valueAt (local + (double) v.offset);
+            automationValues[(std::size_t) v.automation] = song.automations[(std::size_t) v.automation].playAt (local + (double) v.offset, perfClock);
         }
 
     compensateTick = tick;
@@ -1893,6 +2041,24 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                                    : 0.0;
     clearOverriddenValues();
     applyPluginParams (state, 0);
+}
+
+void RackRenderer::updateModulators (const RackState& state, double tick, int numSamples) noexcept
+{
+    const auto& song = state.song;
+    const auto beats = std::max (0.0, tick) / (double) ppq;
+    for (const auto& r : state.modRoutes)
+    {
+        if (r.modulator < 0 || r.modulator >= (int) song.modulators.size())
+            continue;
+        const auto& m = song.modulators[(std::size_t) r.modulator];
+        const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+        const auto source = r.source >= 0 ? automationValues[(std::size_t) r.source] : std::numeric_limits<float>::quiet_NaN();
+        const auto base = std::isnan (source) ? r.base : source;
+        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * m.output (cycles), 0.0f, 1.0f);
+    }
+    if (sampleRate > 0.0)
+        modSeconds += numSamples / sampleRate;
 }
 
 float RackRenderer::compensatedAutomation (const RackState& state, int automation, int track, int slot, float current) const noexcept
@@ -3240,6 +3406,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     const auto& song = state.song;
     const auto tracks = std::max<int> (1, (int) song.mixer.size());
 
+    if (! state.modRoutes.empty()) // round 177b (before the automation applies the plugin-side parameters)
+        updateModulators (state, playing ? startTick : liveTick, numSamples);
     if (state.hasAutomation) // (a hair later: a chunk that starts on a pattern event's sample takes its value)
         updateAutomation (state, startTick + 1.0e-6);
 
