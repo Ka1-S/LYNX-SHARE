@@ -8022,3 +8022,14 @@ countries: jp
 "Swipe to comp" = "コンプへスワイプ"
 "Send the time selection to the comp" = "時間選択をコンプへ送る"
 "Send the time selection of the take lane to its comp" = "テイクレーンの時間選択をそのコンプへ送る"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "デフォルトのテンプレートが見つからないため、代わりに LYNX SHARE のデフォルトのプロジェクトを開きました"
+"{0} could not be opened." = "{0} を開けませんでした。"
+"Change default template..." = "デフォルトのテンプレートを変更..."
+"Use as default template" = "デフォルトのテンプレートとして使用"
+"Default template" = "デフォルトのテンプレート"
+"Default (LYNX SHARE)" = "デフォルト (LYNX SHARE)"
+"{0} (not found)" = "{0} (見つかりません)"
+"Select default project template" = "デフォルトのプロジェクトテンプレートを選択"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "起動時と ファイル › 新規 で、名前のない新しいプロジェクトとして開くため、テンプレート自体が上書きされることはありません。ファイル › テンプレートとして保存... で独自のものを追加できます。"

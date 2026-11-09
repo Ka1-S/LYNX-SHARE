@@ -8022,3 +8022,14 @@ countries: ru by kz
 "Swipe to comp" = "Перенос в комп"
 "Send the time selection to the comp" = "Отправить выделение времени в комп"
 "Send the time selection of the take lane to its comp" = "Отправить выделение времени дорожки дубля в её комп"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Шаблон по умолчанию не найден; вместо него открыт проект LYNX SHARE по умолчанию"
+"{0} could not be opened." = "Не удалось открыть {0}."
+"Change default template..." = "Изменить шаблон по умолчанию..."
+"Use as default template" = "Использовать как шаблон по умолчанию"
+"Default template" = "Шаблон по умолчанию"
+"Default (LYNX SHARE)" = "По умолчанию (LYNX SHARE)"
+"{0} (not found)" = "{0} (не найден)"
+"Select default project template" = "Выбрать шаблон проекта по умолчанию"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Открывается при запуске и по Файл › Новый как новый проект без имени, поэтому сам шаблон никогда не перезаписывается. Файл › Сохранить как шаблон... добавляет ваши."

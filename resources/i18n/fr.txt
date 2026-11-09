@@ -8022,3 +8022,14 @@ countries: fr be ch ca lu
 "Swipe to comp" = "Glisser vers le comp"
 "Send the time selection to the comp" = "Envoyer la sélection temporelle vers le comp"
 "Send the time selection of the take lane to its comp" = "Envoyer la sélection temporelle de la piste de prise vers son comp"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Le modèle par défaut est introuvable ; le projet par défaut de LYNX SHARE a été ouvert à la place"
+"{0} could not be opened." = "Impossible d'ouvrir {0}."
+"Change default template..." = "Changer le modèle par défaut..."
+"Use as default template" = "Utiliser comme modèle par défaut"
+"Default template" = "Modèle par défaut"
+"Default (LYNX SHARE)" = "Par défaut (LYNX SHARE)"
+"{0} (not found)" = "{0} (introuvable)"
+"Select default project template" = "Choisir le modèle de projet par défaut"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "S'ouvre au démarrage et avec Fichier › Nouveau comme un nouveau projet sans titre : le modèle lui-même n'est jamais écrasé. Fichier › Enregistrer comme modèle... ajoute les vôtres."

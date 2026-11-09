@@ -8022,3 +8022,14 @@ countries: tr
 "Swipe to comp" = "Comp'a aktar"
 "Send the time selection to the comp" = "Zaman seçimini comp'a gönder"
 "Send the time selection of the take lane to its comp" = "Kayıt şeridinin zaman seçimini comp'una gönder"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Varsayılan şablon bulunamadı; onun yerine LYNX SHARE'in varsayılan projesi açıldı"
+"{0} could not be opened." = "{0} açılamadı."
+"Change default template..." = "Varsayılan şablonu değiştir..."
+"Use as default template" = "Varsayılan şablon olarak kullan"
+"Default template" = "Varsayılan şablon"
+"Default (LYNX SHARE)" = "Varsayılan (LYNX SHARE)"
+"{0} (not found)" = "{0} (bulunamadı)"
+"Select default project template" = "Varsayılan proje şablonunu seç"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Başlangıçta ve Dosya › Yeni ile adsız yeni bir proje olarak açılır; böylece şablonun kendisinin üzerine asla yazılmaz. Dosya › Şablon olarak kaydet... kendi şablonlarınızı ekler."

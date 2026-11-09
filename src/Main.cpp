@@ -2017,6 +2017,8 @@ public:
         startupFileHandled = true;
         if (fileToOpen != juce::File() && mainWindow != nullptr)
             mainWindow->openFile (fileToOpen);
+        else if (mainWindow != nullptr && openTimeReport == juce::File())
+            mainWindow->getContent().startFromDefaultTemplate(); // issue #123 (FL: the default template at start-up)
     }
 
     void shutdown() override

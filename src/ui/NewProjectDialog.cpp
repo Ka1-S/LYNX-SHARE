@@ -10,6 +10,8 @@
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 
+#include <algorithm>
+
 namespace lynx
 {
 namespace
@@ -26,6 +28,7 @@ struct Remembered
     bool show = true;
     juce::String folder, author;
     bool ownFolder = true;
+    juce::String defaultTemplate; // TemplateChoice::toText (issue #123)
 };
 
 Remembered loadRemembered()
@@ -37,6 +40,7 @@ Remembered loadRemembered()
     r.folder = get ("folder");
     r.author = get ("author");
     r.ownFolder = get ("ownFolder") != "0";
+    r.defaultTemplate = get ("defaultTemplate");
     return r;
 }
 
@@ -44,6 +48,8 @@ void saveRemembered (const Remembered& r)
 {
     juce::String text;
     text << "show=" << (r.show ? 1 : 0) << "\nfolder=" << r.folder << "\nauthor=" << r.author << "\nownFolder=" << (r.ownFolder ? 1 : 0) << "\n";
+    if (r.defaultTemplate.isNotEmpty())
+        text << "defaultTemplate=" << r.defaultTemplate << "\n";
     newProjectSettingsFile().getParentDirectory().createDirectory();
     newProjectSettingsFile().replaceWithText (text);
 }
@@ -53,6 +59,16 @@ struct TemplateItem
     juce::String name, description;
     int builtIn = -2; // -1 = LYNX's default song, 0.. = makeTemplate(index), -2 = a user file
     juce::File file;
+
+    TemplateChoice choice() const
+    {
+        TemplateChoice c;
+        if (builtIn >= 0)
+            c = { TemplateChoice::Kind::builtIn, templateNames()[(std::size_t) builtIn] };
+        else if (builtIn == -2 && file != juce::File())
+            c = { TemplateChoice::Kind::user, file.getFileName().toStdString() };
+        return c;
+    }
 };
 
 std::vector<TemplateItem> templateItems (bool sample)
@@ -88,6 +104,8 @@ public:
     std::vector<TemplateItem> items;
     std::function<void()> onPick;
     std::function<void()> onActivate; // Enter or a double click on a template: create the project (round 170h)
+    std::function<void (int)> onMenu; // a right-click on a template (issue #123: "Use as default template")
+    TemplateChoice defaultChoice;     // the row drawn with the "Default" mark
 
     TemplateList()
     {
@@ -114,7 +132,22 @@ public:
         }
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::body, true));
-        g.drawText (item.name, 12, 4, width - 20, 18, juce::Justification::centredLeft, true);
+        auto nameWidth = width - 20;
+        if (item.choice() == defaultChoice) // issue #123: the template LYNX opens at start-up and with File › New
+        {
+            const auto mark = tr ("Default");
+            g.setFont (theme::font (theme::type::small, true));
+            const auto markWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), mark)) + 12;
+            const auto r = juce::Rectangle<int> (width - 8 - markWidth, 5, markWidth, 15);
+            g.setColour (theme::colour::accent.withAlpha (0.22f));
+            g.fillRoundedRectangle (r.toFloat(), 3.0f);
+            g.setColour (theme::colour::accent);
+            g.drawText (mark, r, juce::Justification::centred, false);
+            nameWidth -= markWidth + 6;
+            g.setFont (theme::font (theme::type::body, true));
+        }
+        g.setColour (theme::colour::textPrimary);
+        g.drawText (item.name, 12, 4, nameWidth, 18, juce::Justification::centredLeft, true);
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::small));
         g.drawText (item.description, 12, 21, width - 20, 15, juce::Justification::centredLeft, true);
@@ -136,6 +169,12 @@ public:
     {
         if (onActivate)
             onActivate();
+    }
+
+    void listBoxItemClicked (int row, const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu() && onMenu)
+            onMenu (row);
     }
 
     void listBoxItemDoubleClicked (int, const juce::MouseEvent&) override
@@ -162,9 +201,14 @@ public:
         infoTitle.setText (tr ("Information"));
 
         templates.items = templateItems (! persistent);
+        templates.defaultChoice = persistent ? defaultTemplate() : TemplateChoice {};
         templates.updateContent();
         templates.selectRow (0);
+        for (int i = 0; i < (int) templates.items.size(); ++i) // the default template is the one picked first (issue #123)
+            if (templates.items[(std::size_t) i].choice() == templates.defaultChoice)
+                templates.selectRow (i);
         templates.onPick = [this] { templateChosen(); };
+        templates.onMenu = [this] (int row) { templateMenu (row); };
         templates.onActivate = [this] { createProject(); };
         addAndMakeVisible (templates);
         templatesFolder.setTooltip (tr ("Templates are .lynx projects in this folder (File › Save as template... puts one there)"));
@@ -347,6 +391,20 @@ public:
     }
 
 private:
+    void templateMenu (int row)
+    {
+        if (! persistent || row < 0 || row >= (int) templates.items.size())
+            return;
+        const auto choice = templates.items[(std::size_t) row].choice();
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Use as default template"), true, choice == templates.defaultChoice, [this, choice] {
+            setDefaultTemplate (choice);
+            templates.defaultChoice = choice;
+            templates.repaint();
+        });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&templates).withMousePosition());
+    }
+
     void templateChosen()
     {
         const auto row = templates.getSelectedRow();
@@ -431,7 +489,7 @@ private:
 
         if (persistent)
             saveRemembered ({ ! dontShow.getToggleState(), saveNow.getToggleState() ? folder.getFullPathName() : juce::String(), author.getText().trim(),
-                              ownFolder.getToggleState() });
+                              ownFolder.getToggleState(), loadRemembered().defaultTemplate });
 
         auto callback = onCreate;
         closeToolWindowOf (*this); // deletes this panel
@@ -465,6 +523,76 @@ juce::File userTemplatesFolder()
 bool newProjectDialogEnabled()
 {
     return loadRemembered().show;
+}
+
+TemplateChoice defaultTemplate()
+{
+    return TemplateChoice::parse (loadRemembered().defaultTemplate.toStdString());
+}
+
+void setDefaultTemplate (const TemplateChoice& choice)
+{
+    auto r = loadRemembered();
+    r.defaultTemplate = juce::String::fromUTF8 (choice.toText().c_str());
+    saveRemembered (r);
+}
+
+std::vector<TemplateChoice> availableTemplates()
+{
+    std::vector<TemplateChoice> out;
+    out.push_back ({});
+    for (const auto& name : templateNames())
+        out.push_back ({ TemplateChoice::Kind::builtIn, name });
+    auto files = userTemplatesFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + ProjectFile::extension);
+    std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
+    for (const auto& f : files)
+        out.push_back ({ TemplateChoice::Kind::user, f.getFileName().toStdString() });
+    return out;
+}
+
+juce::String templateChoiceName (const TemplateChoice& choice)
+{
+    switch (choice.kind)
+    {
+        case TemplateChoice::Kind::builtIn: return tr (juce::String::fromUTF8 (choice.name.c_str()));
+        case TemplateChoice::Kind::user: return juce::String::fromUTF8 (templateDisplayName (choice.name).c_str());
+        case TemplateChoice::Kind::lynxDefault: break;
+    }
+    return tr ("Default");
+}
+
+std::optional<Song> makeFromTemplate (const TemplateChoice& choice)
+{
+    switch (choice.kind)
+    {
+        case TemplateChoice::Kind::builtIn:
+            if (const auto i = builtInTemplateIndex (choice.name); i >= 0)
+                return makeNewProject (i);
+            return std::nullopt;
+        case TemplateChoice::Kind::user:
+        {
+            const auto file = userTemplatesFolder().getChildFile (juce::String::fromUTF8 (choice.name.c_str()));
+            juce::String error;
+            if (! file.existsAsFile())
+                return std::nullopt;
+            if (auto song = ProjectFile::load (file, error)) // (a user's template stays as saved)
+                return song;
+            return std::nullopt;
+        }
+        case TemplateChoice::Kind::lynxDefault: break;
+    }
+    return makeNewProject();
+}
+
+Song makeDefaultTemplateProject (bool* missing)
+{
+    if (missing != nullptr)
+        *missing = false;
+    if (auto song = makeFromTemplate (defaultTemplate()))
+        return std::move (*song);
+    if (missing != nullptr)
+        *missing = true;
+    return makeNewProject();
 }
 
 bool saveUserTemplate (const Song& song, const juce::String& name, juce::String& error)

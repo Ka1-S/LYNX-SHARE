@@ -5323,7 +5323,12 @@ void MainComponent::newProject (bool askAlways)
     confirmDiscard ([this, askAlways] {
         if (! askAlways && ! newProjectDialogEnabled())
         {
-            startNewProject (makeNewProject(), {});
+            // FL's File › New: a new project from the default template (issue #123)
+            bool missing = false;
+            auto song = makeDefaultTemplateProject (&missing);
+            startNewProject (std::move (song), {});
+            if (missing)
+                ui::postHint ({ tr ("The default template was not found; LYNX SHARE's default project opened instead") }, 6000);
             return;
         }
         showNewProjectDialog ([safe = juce::Component::SafePointer<MainComponent> (this)] (Song song, juce::File file) {
@@ -5331,6 +5336,21 @@ void MainComponent::newProject (bool askAlways)
                 safe->startNewProject (std::move (song), file);
         });
     });
+}
+
+void MainComponent::startFromDefaultTemplate()
+{
+    // (only over the untouched start-up song: a file, a resumed session or an edit made meanwhile stays)
+    if (defaultTemplate().isLynxDefault() || currentFile != juce::File() || projectName.isNotEmpty() || engine.isModified())
+        return;
+    bool missing = false;
+    auto song = makeDefaultTemplateProject (&missing);
+    if (missing)
+    {
+        ui::postHint ({ tr ("The default template was not found; LYNX SHARE's default project opened instead") }, 6000);
+        return;
+    }
+    startNewProject (std::move (song), {});
 }
 
 void MainComponent::startNewProject (Song song, const juce::File& file)
@@ -5661,6 +5681,7 @@ void MainComponent::openSettings (int page)
         o.splash = safe->startup.splash;
         o.startupSound = safe->startup.sound;
         o.scanAtStart = backgroundScanAtStart();
+        o.defaultTemplate = juce::String::fromUTF8 (defaultTemplate().toText().c_str());
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
@@ -5735,6 +5756,8 @@ void MainComponent::openSettings (int page)
             self.setTypingPiano (o.typingPiano);
         if (o.scanAtStart != backgroundScanAtStart())
             setBackgroundScanAtStart (o.scanAtStart);
+        if (o.defaultTemplate.toStdString() != defaultTemplate().toText())
+            setDefaultTemplate (TemplateChoice::parse (o.defaultTemplate.toStdString()));
         if (o.pluginSandbox != pluginSandboxEnabled())
             setPluginSandboxEnabled (o.pluginSandbox);
         if (runningAsAppImage() && o.menuEntry != appImageMenuEntryInstalled())
@@ -6422,20 +6445,34 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("New") + shortcutText ("file.new"), [this] { newProject(); });
         menu.addItem (tr ("New project..."), [this] { newProject (true); });
 
+        // FL's File › New from template (REA_rodada186a): the templates, the user's after LYNX's own, then "Change default
+        // template..." (FL's last item; it opens Settings › General where the default is chosen)
         juce::PopupMenu templates;
-        const auto names = templateNames();
-        for (int i = 0; i < (int) names.size(); ++i)
-            templates.addItem (juce::String::fromUTF8 (names[(std::size_t) i].c_str()), [this, i] {
-                confirmDiscard ([this, i] {
-                    engine.stop();
-                    engine.rewind();
-                    engine.setSong (makeNewProject (i));
-                    currentFile = juce::File();
-                    projectName = {};
-                    importedSuffix = {};
-                    updateTitle();
+        bool userSection = false;
+        for (const auto& choice : availableTemplates())
+        {
+            if (choice.isLynxDefault())
+                continue;
+            if (choice.kind == TemplateChoice::Kind::user && ! userSection)
+            {
+                templates.addSeparator();
+                userSection = true;
+            }
+            templates.addItem (templateChoiceName (choice), [this, choice] {
+                confirmDiscard ([this, choice] {
+                    auto song = makeFromTemplate (choice);
+                    if (! song)
+                    {
+                        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("New from template"),
+                                                                tr ("{0} could not be opened.", { templateChoiceName (choice) }));
+                        return;
+                    }
+                    startNewProject (std::move (*song), {});
                 });
             });
+        }
+        templates.addSeparator();
+        templates.addItem (tr ("Change default template..."), [this] { openSettings (3); });
         menu.addSubMenu (tr ("New from template"), templates);
         menu.addItem (tr ("Open...") + shortcutText ("file.open"), [this] { chooseFileToOpen(); });
         menu.addSeparator();

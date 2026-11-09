@@ -8022,3 +8022,14 @@ countries: id
 "Swipe to comp" = "Sapu ke comp"
 "Send the time selection to the comp" = "Kirim pilihan waktu ke comp"
 "Send the time selection of the take lane to its comp" = "Kirim pilihan waktu lajur take ke comp-nya"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Template bawaan tidak ditemukan; proyek bawaan LYNX SHARE dibuka sebagai gantinya"
+"{0} could not be opened." = "{0} tidak dapat dibuka."
+"Change default template..." = "Ubah template bawaan..."
+"Use as default template" = "Gunakan sebagai template bawaan"
+"Default template" = "Template bawaan"
+"Default (LYNX SHARE)" = "Bawaan (LYNX SHARE)"
+"{0} (not found)" = "{0} (tidak ditemukan)"
+"Select default project template" = "Pilih template proyek bawaan"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Terbuka saat mulai dan dengan File › Baru sebagai proyek baru tanpa nama, jadi template itu sendiri tidak pernah tertimpa. File › Simpan sebagai template... menambahkan milik Anda."

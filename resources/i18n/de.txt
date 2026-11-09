@@ -8022,3 +8022,14 @@ countries: de at ch li lu
 "Swipe to comp" = "Zum Comp wischen"
 "Send the time selection to the comp" = "Zeitauswahl in die Comp übernehmen"
 "Send the time selection of the take lane to its comp" = "Zeitauswahl der Take-Spur in ihre Comp übernehmen"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Die Standardvorlage wurde nicht gefunden; stattdessen wurde das Standardprojekt von LYNX SHARE geöffnet"
+"{0} could not be opened." = "{0} konnte nicht geöffnet werden."
+"Change default template..." = "Standardvorlage ändern..."
+"Use as default template" = "Als Standardvorlage verwenden"
+"Default template" = "Standardvorlage"
+"Default (LYNX SHARE)" = "Standard (LYNX SHARE)"
+"{0} (not found)" = "{0} (nicht gefunden)"
+"Select default project template" = "Standard-Projektvorlage wählen"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Öffnet sich beim Start und mit Datei › Neu als neues, unbenanntes Projekt, die Vorlage selbst wird also nie überschrieben. Datei › Als Vorlage speichern... fügt eigene hinzu."

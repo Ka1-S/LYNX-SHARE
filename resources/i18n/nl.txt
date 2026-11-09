@@ -8022,3 +8022,14 @@ countries: nl be
 "Swipe to comp" = "Naar de comp vegen"
 "Send the time selection to the comp" = "Tijdselectie naar de comp sturen"
 "Send the time selection of the take lane to its comp" = "Tijdselectie van de take-baan naar de comp sturen"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Het standaardsjabloon is niet gevonden; in plaats daarvan is het standaardproject van LYNX SHARE geopend"
+"{0} could not be opened." = "{0} kon niet worden geopend."
+"Change default template..." = "Standaardsjabloon wijzigen..."
+"Use as default template" = "Gebruiken als standaardsjabloon"
+"Default template" = "Standaardsjabloon"
+"Default (LYNX SHARE)" = "Standaard (LYNX SHARE)"
+"{0} (not found)" = "{0} (niet gevonden)"
+"Select default project template" = "Standaard projectsjabloon kiezen"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Opent bij het starten en met Bestand › Nieuw als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."

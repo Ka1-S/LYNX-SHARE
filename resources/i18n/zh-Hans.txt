@@ -8022,3 +8022,14 @@ countries: cn sg
 "Swipe to comp" = "划入合成轨"
 "Send the time selection to the comp" = "将时间选区送入合成轨"
 "Send the time selection of the take lane to its comp" = "将录音轨的时间选区送入其合成轨"
+
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "未找到默认模板；已改为打开 LYNX SHARE 的默认工程"
+"{0} could not be opened." = "无法打开 {0}。"
+"Change default template..." = "更改默认模板..."
+"Use as default template" = "用作默认模板"
+"Default template" = "默认模板"
+"Default (LYNX SHARE)" = "默认 (LYNX SHARE)"
+"{0} (not found)" = "{0} (未找到)"
+"Select default project template" = "选择默认工程模板"
+"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "启动时以及“文件 › 新建”时作为未命名的新工程打开，因此模板本身不会被覆盖。“文件 › 另存为模板...”可添加你自己的模板。"
