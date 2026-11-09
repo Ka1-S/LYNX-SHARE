@@ -2529,7 +2529,7 @@ countries: id
 "Echo > Rev|Rev > Echo" = "Echo > Rev|Rev > Echo"
 "Reverb mode" = "Mode reverb"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Terang|Netral|Gelap|Vintage"
+"Bright|Neutral|Dark|Studio" = "Terang|Netral|Gelap|Studio"
 "Damping" = "Redaman"
 "Bass freq" = "Frek bass"
 "Late mix" = "Mix late"
