@@ -8032,8 +8032,13 @@ countries: id
 "Default (LYNX SHARE)" = "Bawaan (LYNX SHARE)"
 "{0} (not found)" = "{0} (tidak ditemukan)"
 "Select default project template" = "Pilih template proyek bawaan"
-"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Terbuka saat mulai dan dengan File › Baru sebagai proyek baru tanpa nama, jadi template itu sendiri tidak pernah tertimpa. File › Simpan sebagai template... menambahkan milik Anda."
 
 # --- Docked plugin windows (issue #116, round 186a)
 "Detached" = "Terlepas"
 "Minimize" = "Minimalkan"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Proyek saat mulai"
+"Empty project" = "Proyek kosong"
+"Last used project" = "Proyek terakhir digunakan"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Template bawaan terbuka dengan File › Baru, dan saat mulai bila Proyek saat mulai adalah \"Template bawaan\", sebagai proyek baru tanpa nama, jadi template itu sendiri tidak pernah tertimpa. File › Simpan sebagai template... menambahkan milik Anda."

@@ -106,7 +106,7 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
@@ -245,8 +245,15 @@ public:
             if (juce::isPositiveAndBelow (index, (int) templateChoices.size()))
                 change ([&] { options.defaultTemplate = juce::String::fromUTF8 (templateChoices[(std::size_t) index].toText().c_str()); });
         };
-        styleNote (templateNote, tr ("Opens at start-up and with File › New as a new untitled project, so the template itself is never "
-                                     "overwritten. File › Save as template... adds your own."));
+        // FL's "Startup project", under it (FL's order)
+        styleLabel (startupProjectLabel, tr ("Startup project"));
+        startupProjectBox.addItem (tr ("Empty project"), 1);
+        startupProjectBox.addItem (tr ("Default template"), 2);
+        startupProjectBox.addItem (tr ("Last used project"), 3);
+        startupProjectBox.setSelectedId (juce::jlimit (0, 2, options.startupProject) + 1, juce::dontSendNotification);
+        startupProjectBox.onChange = [this] { change ([&] { options.startupProject = startupProjectBox.getSelectedId() - 1; }); };
+        styleNote (templateNote, tr ("The default template opens with File › New, and at start-up when Startup project is \"Default template\", "
+                                     "as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own."));
         toggle (splash, tr ("Show the splash screen at startup"), options.splash, [this] (bool on) { options.splash = on; });
         toggle (startupSound, tr ("Play the startup sound"), options.startupSound, [this] (bool on) { options.startupSound = on; });
         toggle (scanAtStart, tr ("Look for new plugins in the background at every start"), options.scanAtStart,
@@ -360,7 +367,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -409,6 +416,7 @@ private:
 
         r.section (startupTitle);
         templateBox.setBounds (r.row (templateLabel, 260));
+        startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indented (32).translated (0, -3));
         for (auto* t : { &splash, &startupSound, &scanAtStart })
             t->setBounds (r.full (24));
@@ -556,8 +564,8 @@ private:
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::Label fontLabel, fontPreview, fontNote;
     juce::ComboBox fontBox;
-    juce::Label templateLabel, templateNote;
-    juce::ComboBox templateBox;
+    juce::Label templateLabel, templateNote, startupProjectLabel;
+    juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
     juce::TextButton fontReset { tr ("Reset to default") };
     juce::StringArray fontNames;

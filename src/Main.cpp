@@ -2020,7 +2020,7 @@ public:
         if (fileToOpen != juce::File() && mainWindow != nullptr)
             mainWindow->openFile (fileToOpen);
         else if (mainWindow != nullptr && openTimeReport == juce::File())
-            mainWindow->getContent().startFromDefaultTemplate(); // issue #123 (FL: the default template at start-up)
+            mainWindow->getContent().openStartupProject(); // issue #123 (FL's Startup project)
     }
 
     void shutdown() override

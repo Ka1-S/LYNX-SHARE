@@ -8115,8 +8115,13 @@ countries: br
 "Default (LYNX SHARE)" = "Padrão (LYNX SHARE)"
 "{0} (not found)" = "{0} (não encontrado)"
 "Select default project template" = "Escolher o modelo padrão de projeto"
-"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Abre ao iniciar e com Arquivo › Novo como um projeto novo sem nome, então o próprio modelo nunca é sobrescrito. Arquivo › Salvar como modelo... adiciona os seus."
 
 # --- Docked plugin windows (issue #116, round 186a)
 "Detached" = "Destacada"
 "Minimize" = "Minimizar"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Projeto ao iniciar"
+"Empty project" = "Projeto vazio"
+"Last used project" = "Último projeto usado"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "O modelo padrão abre com Arquivo › Novo, e ao iniciar quando Projeto ao iniciar é \"Modelo padrão\", como um projeto novo sem nome, então o próprio modelo nunca é sobrescrito. Arquivo › Salvar como modelo... adiciona os seus."

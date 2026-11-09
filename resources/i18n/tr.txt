@@ -8032,8 +8032,13 @@ countries: tr
 "Default (LYNX SHARE)" = "Varsayılan (LYNX SHARE)"
 "{0} (not found)" = "{0} (bulunamadı)"
 "Select default project template" = "Varsayılan proje şablonunu seç"
-"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Başlangıçta ve Dosya › Yeni ile adsız yeni bir proje olarak açılır; böylece şablonun kendisinin üzerine asla yazılmaz. Dosya › Şablon olarak kaydet... kendi şablonlarınızı ekler."
 
 # --- Docked plugin windows (issue #116, round 186a)
 "Detached" = "Ayrılmış"
 "Minimize" = "Simge durumuna küçült"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Başlangıç projesi"
+"Empty project" = "Boş proje"
+"Last used project" = "Son kullanılan proje"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Varsayılan şablon Dosya › Yeni ile, başlangıçta ise Başlangıç projesi \"Varsayılan şablon\" olduğunda, adsız yeni bir proje olarak açılır; böylece şablonun üzerine asla yazılmaz. Dosya › Şablon olarak kaydet... kendi şablonlarınızı ekler."

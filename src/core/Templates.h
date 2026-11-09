@@ -94,6 +94,18 @@ struct TemplateChoice
     bool operator== (const TemplateChoice&) const = default;
 };
 
+// What LYNX opens at start-up without a file to open (FL's Options › General › Miscellaneous › "Startup project",
+// REA_rodada186a: Empty project / Default template / Last used project; FL's default is the default template). Saved as
+// "empty" / "template" / "last"; anything else reads as the default template.
+enum class StartupProject
+{
+    emptyProject,
+    defaultTemplate,
+    lastProject
+};
+const char* startupProjectText (StartupProject choice) noexcept;
+StartupProject parseStartupProject (const std::string& text) noexcept;
+
 // The index of a built-in template by its name (templateNames), or -1.
 int builtInTemplateIndex (const std::string& name);
 } // namespace lynx

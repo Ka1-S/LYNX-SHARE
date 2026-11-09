@@ -8032,8 +8032,13 @@ countries: nl be
 "Default (LYNX SHARE)" = "Standaard (LYNX SHARE)"
 "{0} (not found)" = "{0} (niet gevonden)"
 "Select default project template" = "Standaard projectsjabloon kiezen"
-"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Opent bij het starten en met Bestand › Nieuw als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."
 
 # --- Docked plugin windows (issue #116, round 186a)
 "Detached" = "Losgemaakt"
 "Minimize" = "Minimaliseren"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Project bij het starten"
+"Empty project" = "Leeg project"
+"Last used project" = "Laatst gebruikt project"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Het standaardsjabloon opent met Bestand › Nieuw, en bij het starten als Project bij het starten op \"Standaardsjabloon\" staat, als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."

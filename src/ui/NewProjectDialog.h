@@ -26,6 +26,9 @@ juce::File userTemplatesFolder();
 // File › New starts from, always as a new untitled project. Kept in new-project.txt ("defaultTemplate=").
 TemplateChoice defaultTemplate();
 void setDefaultTemplate (const TemplateChoice& choice);
+// FL's "Startup project" (Settings › General › Startup): an empty project, the default template or the last project.
+StartupProject startupProject();
+void setStartupProject (StartupProject choice);
 // Every template that can be the default: LYNX's default song, the built-in ones, then the user's (by name).
 std::vector<TemplateChoice> availableTemplates();
 // The name shown for a choice (a built-in one translated, a user one without its extension).

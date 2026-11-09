@@ -5340,11 +5340,30 @@ void MainComponent::newProject (bool askAlways)
     });
 }
 
-void MainComponent::startFromDefaultTemplate()
+void MainComponent::openStartupProject()
 {
     // (only over the untouched start-up song: a file, a resumed session or an edit made meanwhile stays)
-    if (defaultTemplate().isLynxDefault() || currentFile != juce::File() || projectName.isNotEmpty() || engine.isModified())
+    if (currentFile != juce::File() || projectName.isNotEmpty() || engine.isModified())
         return;
+    switch (startupProject())
+    {
+        case StartupProject::lastProject:
+            // FL's "Last used project": the project itself (saving goes to it), when it is still there
+            if (const auto last = recent.getFile (0); last.existsAsFile())
+            {
+                openFile (last);
+                return;
+            }
+            break; // (none, or gone: the default template, as FL's default)
+        case StartupProject::emptyProject:
+            if (const auto empty = builtInTemplateIndex ("Empty"); empty >= 0)
+                startNewProject (makeNewProject (empty), {});
+            return;
+        case StartupProject::defaultTemplate:
+            break;
+    }
+    if (defaultTemplate().isLynxDefault())
+        return; // (the start-up song is LYNX's default already)
     bool missing = false;
     auto song = makeDefaultTemplateProject (&missing);
     if (missing)
@@ -5684,6 +5703,7 @@ void MainComponent::openSettings (int page)
         o.startupSound = safe->startup.sound;
         o.scanAtStart = backgroundScanAtStart();
         o.defaultTemplate = juce::String::fromUTF8 (defaultTemplate().toText().c_str());
+        o.startupProject = (int) startupProject();
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
@@ -5760,6 +5780,8 @@ void MainComponent::openSettings (int page)
             setBackgroundScanAtStart (o.scanAtStart);
         if (o.defaultTemplate.toStdString() != defaultTemplate().toText())
             setDefaultTemplate (TemplateChoice::parse (o.defaultTemplate.toStdString()));
+        if (o.startupProject != (int) startupProject())
+            setStartupProject ((StartupProject) juce::jlimit (0, 2, o.startupProject));
         if (o.pluginSandbox != pluginSandboxEnabled())
             setPluginSandboxEnabled (o.pluginSandbox);
         if (runningAsAppImage() && o.menuEntry != appImageMenuEntryInstalled())
@@ -6444,7 +6466,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
 
     if (index == 0)
     {
-        menu.addItem (tr ("New") + shortcutText ("file.new"), [this] { newProject(); });
+        // FL names the default template in the item ("New (Basic with limiter)", REA_rodada186a); LYNX's own default: "New"
+        const auto startTemplate = defaultTemplate();
+        menu.addItem ((startTemplate.isLynxDefault() ? tr ("New") : tr ("New") + " (" + templateChoiceName (startTemplate) + ")") + shortcutText ("file.new"),
+                      [this] { newProject(); });
         menu.addItem (tr ("New project..."), [this] { newProject (true); });
 
         // FL's File › New from template (REA_rodada186a): the templates, the user's after LYNX's own, then "Change default

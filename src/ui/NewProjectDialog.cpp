@@ -29,6 +29,7 @@ struct Remembered
     juce::String folder, author;
     bool ownFolder = true;
     juce::String defaultTemplate; // TemplateChoice::toText (issue #123)
+    juce::String startupProject;  // startupProjectText ("" = the default template)
 };
 
 Remembered loadRemembered()
@@ -41,6 +42,7 @@ Remembered loadRemembered()
     r.author = get ("author");
     r.ownFolder = get ("ownFolder") != "0";
     r.defaultTemplate = get ("defaultTemplate");
+    r.startupProject = get ("startupProject");
     return r;
 }
 
@@ -50,6 +52,8 @@ void saveRemembered (const Remembered& r)
     text << "show=" << (r.show ? 1 : 0) << "\nfolder=" << r.folder << "\nauthor=" << r.author << "\nownFolder=" << (r.ownFolder ? 1 : 0) << "\n";
     if (r.defaultTemplate.isNotEmpty())
         text << "defaultTemplate=" << r.defaultTemplate << "\n";
+    if (r.startupProject.isNotEmpty())
+        text << "startupProject=" << r.startupProject << "\n";
     newProjectSettingsFile().getParentDirectory().createDirectory();
     newProjectSettingsFile().replaceWithText (text);
 }
@@ -489,7 +493,7 @@ private:
 
         if (persistent)
             saveRemembered ({ ! dontShow.getToggleState(), saveNow.getToggleState() ? folder.getFullPathName() : juce::String(), author.getText().trim(),
-                              ownFolder.getToggleState(), loadRemembered().defaultTemplate });
+                              ownFolder.getToggleState(), loadRemembered().defaultTemplate, loadRemembered().startupProject });
 
         auto callback = onCreate;
         closeToolWindowOf (*this); // deletes this panel
@@ -534,6 +538,18 @@ void setDefaultTemplate (const TemplateChoice& choice)
 {
     auto r = loadRemembered();
     r.defaultTemplate = juce::String::fromUTF8 (choice.toText().c_str());
+    saveRemembered (r);
+}
+
+StartupProject startupProject()
+{
+    return parseStartupProject (loadRemembered().startupProject.toStdString());
+}
+
+void setStartupProject (StartupProject choice)
+{
+    auto r = loadRemembered();
+    r.startupProject = choice == StartupProject::defaultTemplate ? juce::String() : juce::String (startupProjectText (choice));
     saveRemembered (r);
 }
 

@@ -429,6 +429,10 @@ TEST (default_template_choice_text_round_trip_and_rejects_paths)
                              "file:x.lynx", "garbage" })
         CHECK (TemplateChoice::parse (bad).isLynxDefault());
     CHECK (builtInTemplateIndex ("Empty") == 0 && builtInTemplateIndex ("House") == 3 && builtInTemplateIndex ("house") == -1);
+    // FL's "Startup project" choice
+    for (auto c : { StartupProject::emptyProject, StartupProject::defaultTemplate, StartupProject::lastProject })
+        CHECK (parseStartupProject (startupProjectText (c)) == c);
+    CHECK (parseStartupProject ("") == StartupProject::defaultTemplate && parseStartupProject ("x") == StartupProject::defaultTemplate);
     // every built-in survives the round trip
     for (const auto& name : templateNames())
         CHECK (TemplateChoice::parse (TemplateChoice { K::builtIn, name }.toText()).name == name);

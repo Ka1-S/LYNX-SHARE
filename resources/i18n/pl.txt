@@ -8032,8 +8032,13 @@ countries: pl
 "Default (LYNX SHARE)" = "Domyślny (LYNX SHARE)"
 "{0} (not found)" = "{0} (nie znaleziono)"
 "Select default project template" = "Wybierz domyślny szablon projektu"
-"Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Otwiera się przy starcie i przez Plik › Nowy jako nowy projekt bez nazwy, więc sam szablon nigdy nie zostaje nadpisany. Plik › Zapisz jako szablon... dodaje własne."
 
 # --- Docked plugin windows (issue #116, round 186a)
 "Detached" = "Odłączony"
 "Minimize" = "Minimalizuj"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Projekt przy starcie"
+"Empty project" = "Pusty projekt"
+"Last used project" = "Ostatnio używany projekt"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Domyślny szablon otwiera się przez Plik › Nowy, a przy starcie, gdy Projekt przy starcie to „Domyślny szablon\", jako nowy projekt bez nazwy, więc sam szablon nigdy nie zostaje nadpisany. Plik › Zapisz jako szablon... dodaje własne."

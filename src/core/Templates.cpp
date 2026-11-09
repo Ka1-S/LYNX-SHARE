@@ -185,6 +185,26 @@ TemplateChoice TemplateChoice::parse (const std::string& text)
     return {};
 }
 
+const char* startupProjectText (StartupProject choice) noexcept
+{
+    switch (choice)
+    {
+        case StartupProject::emptyProject: return "empty";
+        case StartupProject::lastProject: return "last";
+        case StartupProject::defaultTemplate: break;
+    }
+    return "template";
+}
+
+StartupProject parseStartupProject (const std::string& text) noexcept
+{
+    if (text == "empty")
+        return StartupProject::emptyProject;
+    if (text == "last")
+        return StartupProject::lastProject;
+    return StartupProject::defaultTemplate;
+}
+
 int builtInTemplateIndex (const std::string& name)
 {
     const auto names = templateNames();
