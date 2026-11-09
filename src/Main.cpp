@@ -3720,7 +3720,7 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 8;
+            const int dockSteps = 2 * 4 + 9; // (the last one reports dock_result)
             lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
             struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
             {
