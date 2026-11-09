@@ -8142,3 +8142,7 @@ countries: tw hk mo
 "Zipping the folder" = "正在壓縮資料夾"
 "Written:" = "已寫入："
 "Not written:" = "未寫入："
+"Reconnect to" = "重新連接到"
+"Send to {0} (deleted)" = "傳送到 {0}（已刪除）"
+"Disconnected links" = "中斷的連結"
+"Keep links to deleted inserts, greyed (LYNX)" = "保留指向已刪除插入軌的連結（灰色，LYNX）"

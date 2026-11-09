@@ -388,6 +388,32 @@ bool deleteTrack (Song& song, int t)
     return true;
 }
 
+bool reconnectLostSend (Song& song, int track, int index, int to)
+{
+    if (! isInsert (song, track) || index < 0 || index >= (int) song.mixer[(std::size_t) track].lostSends.size() || to < 1
+        || to >= (int) song.mixer.size() || to == track || (! song.routes (track, to) && ! song.canRoute (track, to)))
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto lost = t.lostSends[(std::size_t) index];
+    t.lostSends.erase (t.lostSends.begin() + index);
+    if (const auto it = std::find_if (t.sends.begin(), t.sends.end(), [to] (const MixerSend& s) { return s.target == to; }); it != t.sends.end())
+        it->level = lost.level;
+    else
+        t.sends.push_back ({ to, lost.level });
+    return true;
+}
+
+void removeLostSends (Song& song, int track, int index)
+{
+    if (! isInsert (song, track))
+        return;
+    auto& lost = song.mixer[(std::size_t) track].lostSends;
+    if (index < 0)
+        lost.clear();
+    else if (index < (int) lost.size())
+        lost.erase (lost.begin() + index);
+}
+
 std::vector<int> playlistTracksLinkedTo (const Song& song, const std::vector<int>& tracks)
 {
     const auto among = [&tracks] (int t) { return t > 0 && std::find (tracks.begin(), tracks.end(), t) != tracks.end(); };
@@ -433,7 +459,7 @@ void rerouteFeeders (Song& song, int t)
 }
 } // namespace
 
-int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked)
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked, bool keepLostLinks)
 {
     std::sort (tracks.begin(), tracks.end());
     tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
@@ -463,6 +489,14 @@ int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks link
     int deleted = 0;
     for (auto it = tracks.rbegin(); it != tracks.rend(); ++it) // from the right: the numbers still to delete stay valid
     {
+        if (keepLostLinks) // (round 186c's option) each send into it stays, greyed, under the deleted insert's name
+        {
+            const auto name = song.mixer[(std::size_t) *it].name.empty() ? "Insert " + std::to_string (*it) : song.mixer[(std::size_t) *it].name;
+            for (int x = 1; x < (int) song.mixer.size(); ++x)
+                for (const auto& send : song.mixer[(std::size_t) x].sends)
+                    if (x != *it && send.target == *it)
+                        song.mixer[(std::size_t) x].lostSends.push_back ({ name, send.level });
+        }
         rerouteFeeders (song, *it);
         if (deleteTrack (song, *it))
             ++deleted;
@@ -1006,6 +1040,7 @@ void resetRouting (Song& song, const std::vector<int>& tracks)
         {
             auto& m = song.mixer[(std::size_t) t];
             m.sends.clear();
+            m.lostSends.clear();
             m.toMaster = true;
             m.masterLevel = 1.0f;
         }

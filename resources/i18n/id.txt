@@ -8142,3 +8142,7 @@ countries: id
 "Zipping the folder" = "Mengompres folder"
 "Written:" = "Ditulis:"
 "Not written:" = "Tidak ditulis:"
+"Reconnect to" = "Sambungkan ulang ke"
+"Send to {0} (deleted)" = "Kirim ke {0} (dihapus)"
+"Disconnected links" = "Tautan terputus"
+"Keep links to deleted inserts, greyed (LYNX)" = "Simpan tautan ke insert yang dihapus, berwarna abu-abu (LYNX)"

@@ -8142,3 +8142,7 @@ countries: pl
 "Zipping the folder" = "Pakowanie folderu"
 "Written:" = "Zapisano:"
 "Not written:" = "Nie zapisano:"
+"Reconnect to" = "Połącz ponownie z"
+"Send to {0} (deleted)" = "Wysyłka do {0} (usunięty)"
+"Disconnected links" = "Rozłączone połączenia"
+"Keep links to deleted inserts, greyed (LYNX)" = "Zachowaj połączenia z usuniętymi insertami, wyszarzone (LYNX)"

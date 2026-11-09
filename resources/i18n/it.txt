@@ -8142,3 +8142,7 @@ countries: it ch sm
 "Zipping the folder" = "Compressione della cartella"
 "Written:" = "Scritti:"
 "Not written:" = "Non scritti:"
+"Reconnect to" = "Ricollega a"
+"Send to {0} (deleted)" = "Mandata a {0} (eliminato)"
+"Disconnected links" = "Collegamenti scollegati"
+"Keep links to deleted inserts, greyed (LYNX)" = "Mantieni i collegamenti agli insert eliminati, in grigio (LYNX)"

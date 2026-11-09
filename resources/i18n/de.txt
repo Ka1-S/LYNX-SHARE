@@ -8142,3 +8142,7 @@ countries: de at ch li lu
 "Zipping the folder" = "Ordner wird gezippt"
 "Written:" = "Geschrieben:"
 "Not written:" = "Nicht geschrieben:"
+"Reconnect to" = "Neu verbinden mit"
+"Send to {0} (deleted)" = "Send an {0} (gelöscht)"
+"Disconnected links" = "Getrennte Verbindungen"
+"Keep links to deleted inserts, greyed (LYNX)" = "Verbindungen zu gelöschten Inserts grau behalten (LYNX)"

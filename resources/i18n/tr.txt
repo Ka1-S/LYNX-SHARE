@@ -8142,3 +8142,7 @@ countries: tr
 "Zipping the folder" = "Klasör sıkıştırılıyor"
 "Written:" = "Yazılanlar:"
 "Not written:" = "Yazılamayanlar:"
+"Reconnect to" = "Yeniden bağla"
+"Send to {0} (deleted)" = "{0} kanalına gönderim (silindi)"
+"Disconnected links" = "Kopuk bağlantılar"
+"Keep links to deleted inserts, greyed (LYNX)" = "Silinen insert'lere giden bağlantıları gri olarak koru (LYNX)"

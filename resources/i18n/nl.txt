@@ -8142,3 +8142,7 @@ countries: nl be
 "Zipping the folder" = "Map wordt gezipt"
 "Written:" = "Geschreven:"
 "Not written:" = "Niet geschreven:"
+"Reconnect to" = "Opnieuw verbinden met"
+"Send to {0} (deleted)" = "Send naar {0} (verwijderd)"
+"Disconnected links" = "Verbroken koppelingen"
+"Keep links to deleted inserts, greyed (LYNX)" = "Koppelingen naar verwijderde inserts grijs bewaren (LYNX)"

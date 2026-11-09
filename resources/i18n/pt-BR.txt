@@ -8225,3 +8225,7 @@ countries: br
 "Zipping the folder" = "Compactando a pasta"
 "Written:" = "Gravados:"
 "Not written:" = "Não gravados:"
+"Reconnect to" = "Reconectar a"
+"Send to {0} (deleted)" = "Envio para {0} (excluído)"
+"Disconnected links" = "Ligações desconectadas"
+"Keep links to deleted inserts, greyed (LYNX)" = "Manter ligações para inserts excluídos, em cinza (LYNX)"

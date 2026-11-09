@@ -8142,3 +8142,7 @@ countries: es mx ar co cl pe ve
 "Zipping the folder" = "Comprimiendo la carpeta"
 "Written:" = "Escritos:"
 "Not written:" = "No escritos:"
+"Reconnect to" = "Reconectar a"
+"Send to {0} (deleted)" = "Envío a {0} (eliminado)"
+"Disconnected links" = "Enlaces desconectados"
+"Keep links to deleted inserts, greyed (LYNX)" = "Conservar enlaces a inserts eliminados, en gris (LYNX)"

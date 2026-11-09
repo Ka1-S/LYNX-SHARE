@@ -8142,3 +8142,7 @@ countries: jp
 "Zipping the folder" = "フォルダーを圧縮中"
 "Written:" = "書き出したファイル:"
 "Not written:" = "書き出せなかったファイル:"
+"Reconnect to" = "再接続先"
+"Send to {0} (deleted)" = "{0} へのセンド（削除済み）"
+"Disconnected links" = "切断されたリンク"
+"Keep links to deleted inserts, greyed (LYNX)" = "削除したインサートへのリンクをグレーで残す（LYNX）"

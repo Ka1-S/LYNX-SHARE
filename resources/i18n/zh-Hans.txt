@@ -8142,3 +8142,7 @@ countries: cn sg
 "Zipping the folder" = "正在压缩文件夹"
 "Written:" = "已写入："
 "Not written:" = "未写入："
+"Reconnect to" = "重新连接到"
+"Send to {0} (deleted)" = "发送到 {0}（已删除）"
+"Disconnected links" = "断开的链接"
+"Keep links to deleted inserts, greyed (LYNX)" = "保留指向已删除插入轨的链接（灰色，LYNX）"

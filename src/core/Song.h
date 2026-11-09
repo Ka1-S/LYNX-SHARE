@@ -1022,6 +1022,17 @@ struct MixerSend
     bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level; }
 };
 
+// LYNX's "Keep links to deleted inserts" (round 186c, pain point 1, off by default; FL drops them): a send whose insert
+// was deleted, kept by the deleted insert's name and the send's level. It carries no sound; the mixer draws it greyed
+// until it is reconnected to an insert or removed.
+struct LostSend
+{
+    std::string to;      // the deleted insert's name
+    float level = 1.0f;  // the send's level (0 = a side-chain link)
+
+    bool operator== (const LostSend&) const = default;
+};
+
 // Built-in EQ of each mixer track (FL's 3 bands: low shelf, peak, high shelf),
 // after the effect slots and before the fader (REA_rodada6 §1).
 struct TrackEq
@@ -1110,6 +1121,7 @@ struct MixerTrack
     bool invertPhase = false;
     bool swapChannels = false;
     std::vector<MixerSend> sends;    // to other inserts
+    std::vector<LostSend> lostSends; // sends to deleted inserts, kept greyed (round 186c, an option; saved)
     TrackEq eq;
     // external audio input (FL's "Audio input source"): the device's input channel `inputChannel` (0-based;
     // -1 = none) and, when `inputStereo`, the next one too
