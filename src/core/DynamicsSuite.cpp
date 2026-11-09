@@ -463,7 +463,11 @@ public:
         for (auto& d : gainDelay)
             d.assign ((std::size_t) gainCapacity, 1.0f);
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
@@ -1479,7 +1483,11 @@ public:
     explicit Multiband (const EffectParams* initial)
     {
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
@@ -2409,7 +2417,11 @@ public:
     explicit Gate (const EffectParams* initial)
     {
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
