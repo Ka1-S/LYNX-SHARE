@@ -131,6 +131,18 @@ mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o
 [[ -f "$obj" && "$obj" -nt third_party/monocypher/monocypher.c ]] || $CC -c -O2 -w -Ithird_party/monocypher third_party/monocypher/monocypher.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# g++ / clang++ (not zig, which caches each object itself): every source is compiled once per build, in parallel, and
+# the tests and tools link the objects (scripts/cxx-once.sh; it saves ~90 % of a CI "Core" job). LYNX_COMPILE_ONCE=0: off.
+case "$CXX" in
+    *zig*) ;;
+    *)
+        if [[ "${LYNX_COMPILE_ONCE:-1}" != 0 ]]; then
+            export LYNX_CXX_ONCE_REAL="$CXX" LYNX_CXX_ONCE_RUN="$$-$(date +%s)"
+            mkdir -p build-local/obj
+            rm -f build-local/obj/*/.done-*
+            CXX=scripts/cxx-once.sh
+        fi ;;
+esac
 # The tests: tests/tests.cpp with its .inc files is split at build time into N translation units compiled in parallel
 # (scripts/split-tests.py; same tests, same order, same checks). LYNX_TESTS_SPLIT=0 builds the single TU as before,
 # LYNX_TESTS_SPLIT=<n> sets the number of chunks (default: the CPUs this build may use, 2 to 12).
