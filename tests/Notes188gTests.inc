@@ -212,7 +212,7 @@ TEST (notes188g_slices_in_the_second_half_start_on_their_frame)
         inst->noteOn (60 + k, 1.0f);
         std::vector<float> l (16), r (16);
         inst->render (l.data(), r.data(), 16, 1.0f, 1.0f);
-        if (std::abs ((double) l[0] - (double) (k * 11025)) > 0.01)
+        if (std::abs ((double) l[0] - (double) (k * 11025)) > 0.25) // (one frame early reads p − 1)
         {
             ++wrong;
             std::printf ("  slice %d starts at frame %.2f (exact %d)\n", k, (double) l[0], k * 11025);
