@@ -8143,3 +8143,5 @@ countries: es mx ar co cl pe ve
 "Reset fade in" = "Restablecer fundido de entrada"
 "Reset fade out" = "Restablecer fundido de salida"
 "Create crossfade" = "Crear fundido cruzado"
+"Normalize selection individually" = "Normalizar la selección individualmente"
+"Normalize selection as a group" = "Normalizar la selección como grupo"

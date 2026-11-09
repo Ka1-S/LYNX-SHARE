@@ -8143,3 +8143,5 @@ countries: kr
 "Reset fade in" = "페이드 인 초기화"
 "Reset fade out" = "페이드 아웃 초기화"
 "Create crossfade" = "크로스페이드 만들기"
+"Normalize selection individually" = "선택 항목을 개별적으로 노멀라이즈"
+"Normalize selection as a group" = "선택 항목을 그룹으로 노멀라이즈"

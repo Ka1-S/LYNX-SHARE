@@ -8143,3 +8143,5 @@ countries: de at ch li lu
 "Reset fade in" = "Einblendung zurücksetzen"
 "Reset fade out" = "Ausblendung zurücksetzen"
 "Create crossfade" = "Crossfade erstellen"
+"Normalize selection individually" = "Auswahl einzeln normalisieren"
+"Normalize selection as a group" = "Auswahl als Gruppe normalisieren"

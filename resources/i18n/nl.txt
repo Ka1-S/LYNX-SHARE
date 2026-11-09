@@ -8143,3 +8143,5 @@ countries: nl be
 "Reset fade in" = "Fade-in herstellen"
 "Reset fade out" = "Fade-out herstellen"
 "Create crossfade" = "Crossfade maken"
+"Normalize selection individually" = "Selectie afzonderlijk normaliseren"
+"Normalize selection as a group" = "Selectie als groep normaliseren"

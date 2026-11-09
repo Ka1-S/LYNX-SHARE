@@ -350,7 +350,7 @@ private:
     void deleteSelection();
     void copySelection();
     void pasteClips (std::int64_t at = -1);
-    void normalizeClips (const std::vector<int>& targets);
+    void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)

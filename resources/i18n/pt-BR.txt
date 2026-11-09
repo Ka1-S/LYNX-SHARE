@@ -8226,3 +8226,5 @@ countries: br
 "Reset fade in" = "Redefinir fade in"
 "Reset fade out" = "Redefinir fade out"
 "Create crossfade" = "Criar crossfade"
+"Normalize selection individually" = "Normalizar seleção individualmente"
+"Normalize selection as a group" = "Normalizar seleção como grupo"

@@ -8143,3 +8143,5 @@ countries: pl
 "Reset fade in" = "Resetuj narastanie"
 "Reset fade out" = "Resetuj wyciszanie"
 "Create crossfade" = "Utwórz przenikanie"
+"Normalize selection individually" = "Normalizuj zaznaczenie osobno"
+"Normalize selection as a group" = "Normalizuj zaznaczenie jako grupę"

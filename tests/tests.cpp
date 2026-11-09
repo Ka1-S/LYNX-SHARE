@@ -17372,4 +17372,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Playlist189gTests.inc"
 #include "Playlist189iTests.inc"
 #include "Playlist189lTests.inc"
+#include "Playlist189nTests.inc"
 #include "NoteChance187cTests.inc"
