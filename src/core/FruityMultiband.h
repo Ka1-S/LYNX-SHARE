@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "core/Song.h"
+
 namespace lynx
 {
 class Effect;
@@ -46,8 +48,9 @@ void toParams (const State& s, float* params) noexcept;
 const char* paramName (int index) noexcept;
 std::string paramText (int index, float value);
 
-std::unique_ptr<Effect> make();
+// `params` (may be null): the slot's parameters, so the linear-phase latency is known before the first block (#113)
+std::unique_ptr<Effect> make (const EffectParams* params = nullptr);
 // The same, with FL's raw state kept in the slot (EffectSlot::state): parameters still at their imported value keep
 // FL's exact integer controls even after the project file has rounded them to 4 decimals
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState);
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState, const EffectParams* params = nullptr);
 } // namespace lynx::flmb

@@ -1226,9 +1226,23 @@ namespace
 class PitchShifterEffect final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, loaded in prepare() as process() would on its first block, so
+    // the engine's latency is known before it (issue #113)
+    explicit PitchShifterEffect (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            params0 = *initial;
+        hasParams0 = initial != nullptr;
+    }
+
     void prepare (double sampleRate) noexcept override
     {
         rate = sampleRate;
+        if (hasParams0 && ! loaded)
+        {
+            state = fromParams (params0), loaded = true;
+            engine.setState (state);
+        }
         engine.prepare (sampleRate);
     }
 
@@ -1261,10 +1275,11 @@ public:
 private:
     Engine engine;
     State state;
-    bool loaded = false;
+    EffectParams params0 {};
+    bool loaded = false, hasParams0 = false;
     double rate = 44100.0, tempo = 120.0;
 };
 } // namespace
 
-std::unique_ptr<Effect> make() { return std::make_unique<PitchShifterEffect>(); }
+std::unique_ptr<Effect> make (const EffectParams* params) { return std::make_unique<PitchShifterEffect> (params); }
 } // namespace lynx::psfl

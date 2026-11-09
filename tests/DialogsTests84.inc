@@ -414,6 +414,31 @@ TEST (new_project_setup_and_templates)
     CHECK (templateDisplayName ("C:/T/Trap kit.lynx") == "Trap kit" && templateDisplayName (".hidden") == ".hidden");
 }
 
+// Issue #123: the default template's saved form (FL's Options › General › "Default template")
+TEST (default_template_choice_text_round_trip_and_rejects_paths)
+{
+    using namespace lynx;
+    using K = TemplateChoice::Kind;
+    CHECK (TemplateChoice::parse ("").isLynxDefault());
+    CHECK (TemplateChoice {}.toText().empty());
+    const TemplateChoice house { K::builtIn, "House" };
+    CHECK (house.toText() == "builtin:House" && TemplateChoice::parse ("builtin:House") == house);
+    const TemplateChoice mine { K::user, "Vocal chain.lynx" };
+    CHECK (mine.toText() == "user:Vocal chain.lynx" && TemplateChoice::parse (mine.toText()) == mine);
+    // unknown built-ins, paths, empty names and other prefixes read as LYNX's default
+    for (const char* bad : { "builtin:Nope", "user:../x.lynx", "user:C:\\x.lynx", "user:a/b.lynx", "user:", "builtin:", "user:..",
+                             "file:x.lynx", "garbage" })
+        CHECK (TemplateChoice::parse (bad).isLynxDefault());
+    CHECK (builtInTemplateIndex ("Empty") == 0 && builtInTemplateIndex ("House") == 3 && builtInTemplateIndex ("house") == -1);
+    // FL's "Startup project" choice
+    for (auto c : { StartupProject::emptyProject, StartupProject::defaultTemplate, StartupProject::lastProject })
+        CHECK (parseStartupProject (startupProjectText (c)) == c);
+    CHECK (parseStartupProject ("") == StartupProject::defaultTemplate && parseStartupProject ("x") == StartupProject::defaultTemplate);
+    // every built-in survives the round trip
+    for (const auto& name : templateNames())
+        CHECK (TemplateChoice::parse (TemplateChoice { K::builtIn, name }.toText()).name == name);
+}
+
 TEST (touch_keyboard_geometry_velocity_and_no_stuck_notes)
 {
     using namespace lynx::touchkb;

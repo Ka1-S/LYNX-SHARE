@@ -440,7 +440,17 @@ namespace
 class Tune final : public Effect
 {
 public:
-    Tune() : dry ((std::size_t) (2 * dryRing), 0.0f) {}
+    // `initial` (may be null): the slot's parameters, so the range / low-latency path (the latency) is known after
+    // prepare(), before the first block (issue #113)
+    explicit Tune (const EffectParams* initial = nullptr) : dry ((std::size_t) (2 * dryRing), 0.0f)
+    {
+        if (initial != nullptr)
+        {
+            const auto& p = *initial;
+            curRange = rangeIndex (p[range]);
+            curLow = p[lowLatency] >= 0.5f || p[classicMode] >= 0.5f; // (as process() reads them)
+        }
+    }
 
     void prepare (double sampleRate) noexcept override
     {
@@ -909,9 +919,9 @@ private:
 };
 } // namespace
 
-std::unique_ptr<Effect> make()
+std::unique_ptr<Effect> make (const EffectParams* params)
 {
-    auto e = std::make_unique<Tune>();
+    auto e = std::make_unique<Tune> (params);
     e->prepare (44100.0);
     return e;
 }
