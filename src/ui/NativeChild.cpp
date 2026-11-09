@@ -93,6 +93,17 @@ std::vector<juce::Component::SafePointer<juce::Component>>& overlays()
     return list;
 }
 
+std::vector<juce::Component::SafePointer<juce::Component>>& floaters()
+{
+    static std::vector<juce::Component::SafePointer<juce::Component>> list;
+    return list;
+}
+
+void dropDeleted (std::vector<juce::Component::SafePointer<juce::Component>>& list, const juce::Component* also = nullptr)
+{
+    list.erase (std::remove_if (list.begin(), list.end(), [also] (const auto& p) { return p == nullptr || p.getComponent() == also; }), list.end());
+}
+
 // see makeOverlayHost
 class OverlayHost final : public juce::Component
 {
@@ -379,9 +390,52 @@ std::vector<juce::Component*> attachedChildren (void* parentWindow)
 
 void raiseOverlays()
 {
-    for (auto& o : overlays())
-        if (o != nullptr && o->isVisible() && isAttached (*o))
-            o->toFront (false);
+    for (auto* list : { &floaters(), &overlays() })
+        for (auto& o : *list)
+            if (o != nullptr && o->isVisible() && isAttached (*o))
+                o->toFront (false);
+}
+
+bool supportsFloaters()
+{
+   #if JUCE_WINDOWS || JUCE_MAC
+    return true;
+   #else
+    return false;
+   #endif
+}
+
+void addFloater (juce::Component& c)
+{
+    auto& list = floaters();
+    dropDeleted (list, &c);
+    list.emplace_back (&c);
+}
+
+void removeFloater (juce::Component& c)
+{
+    dropDeleted (floaters(), &c);
+}
+
+void keepFloatersInFront()
+{
+   #if JUCE_WINDOWS
+    dropDeleted (floaters());
+    dropDeleted (overlays());
+    std::vector<HWND> front;
+    for (auto* list : { &floaters(), &overlays() })
+        for (auto& o : *list)
+            if (o->isVisible() && isAttached (*o))
+                if (auto* h = static_cast<HWND> (o->getWindowHandle()))
+                    front.push_back (h);
+    for (auto* h : front)
+        for (auto above = GetWindow (h, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+            if (IsWindowVisible (above) && std::find (front.begin(), front.end(), above) == front.end())
+            {
+                raiseOverlays();
+                return;
+            }
+   #endif
 }
 
 void forwardUnusedKeys (juce::Component& c)
@@ -420,6 +474,34 @@ void* ownerOf (void* window)
    #else
     juce::ignoreUnused (window);
     return nullptr;
+   #endif
+}
+
+void* windowAt (const juce::Component& c, juce::Point<int> localPoint)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return nullptr;
+    const auto scale = peer->getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    const auto inPeer = peer->getComponent().getLocalPoint (&c, localPoint).toDouble() * scale;
+    POINT p { juce::roundToInt (inPeer.x), juce::roundToInt (inPeer.y) };
+    ClientToScreen (hwnd, &p);
+    return (void*) WindowFromPoint (p);
+   #else
+    juce::ignoreUnused (c, localPoint);
+    return nullptr;
+   #endif
+}
+
+bool isLayered (void* window)
+{
+   #if JUCE_WINDOWS
+    return window != nullptr && (GetWindowLongPtr (static_cast<HWND> (window), GWL_EXSTYLE) & WS_EX_LAYERED) != 0;
+   #else
+    juce::ignoreUnused (window);
+    return false;
    #endif
 }
 } // namespace lynx::nativechild

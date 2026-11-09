@@ -49,6 +49,19 @@ void followParentScale (juce::Component& area);
 // of the native children (raiseOverlays).
 std::unique_ptr<juce::Component> makeOverlayHost (std::unique_ptr<juce::Component>& content, juce::Component& over);
 void raiseOverlays();
+
+// Floaters (round 188j, issue #116 slice 4: the Fruity Dance dancers): small attached children with per-pixel
+// transparency (a component that is not opaque becomes a layered child window on Windows, a transparent subview on
+// macOS) that stay in front of the native panels and docked plugin windows, under the overlays. Clicks on their
+// transparent pixels reach the window under them. raiseOverlays raises the floaters first, then the overlays.
+// Elsewhere (Linux: X11 child windows are drawn without blending) supportsFloaters() is false and the caller keeps
+// drawing in the main window's components.
+bool supportsFloaters();
+void addFloater (juce::Component& c);
+void removeFloater (juce::Component& c);
+// A floater or an overlay with an attached sibling above it that is neither: raiseOverlays (Windows; a cheap walk of
+// the siblings above each one). Elsewhere: nothing (raiseOverlays already runs on every stacking change).
+void keepFloatersInFront();
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 
@@ -65,4 +78,8 @@ bool placedPhysically (const juce::Component& c);
 void notifyScaleListenersForTest (juce::Component& top);
 void* parentOf (void* window);
 void* ownerOf (void* window);
+// Tests (Windows; elsewhere false / nullptr): the native window the mouse would reach at `c`'s local point (a layered
+// window's transparent pixels let it through), and whether a native window is layered (per-pixel transparency).
+void* windowAt (const juce::Component& c, juce::Point<int> localPoint);
+bool isLayered (void* window);
 } // namespace lynx::nativechild
