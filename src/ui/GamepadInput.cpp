@@ -103,123 +103,138 @@ void GamepadInput::apply (const gamepad::State& now, double seconds)
 
 namespace
 {
-// The hints overlay: the pad, drawn by LYNX, with each button's action written next to it
+// The hints overlay: the pad, drawn by LYNX, with each control's action written next to it. Every label sits on the
+// side of its control (left half → left column, right half → right column, shoulders and triggers at the top, Back
+// and Start under the pad) with a short leader that crosses no other leader or control.
 class GamepadHints final : public juce::Component
 {
 public:
     GamepadHints()
     {
         setInterceptsMouseClicks (false, false);
-        setSize (920, 400);
+        setSize (1000, 520);
     }
 
     void paint (juce::Graphics& g) override
     {
         using namespace gamepad;
+        using P = juce::Point<float>;
+        using R = juce::Rectangle<float>;
         auto r = getLocalBounds().toFloat();
         g.setColour (theme::colour::bg0.withAlpha (0.94f));
         g.fillRoundedRectangle (r, 10.0f);
         g.setColour (theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), 10.0f, 1.0f);
-
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::title, true));
-        g.drawText (tr ("Game controller"), r.removeFromTop (44).reduced (20, 0), juce::Justification::centredLeft);
+        g.drawText (tr ("Game controller"), R (20.0f, 10.0f, 400.0f, 30.0f), juce::Justification::centredLeft);
 
-        // the pad: a body with two grips, in the middle
-        const auto centre = juce::Point<float> (getWidth() * 0.5f, 190.0f);
-        juce::Path body;
-        body.addRoundedRectangle (centre.x - 150.0f, centre.y - 70.0f, 300.0f, 120.0f, 48.0f);
-        body.addEllipse (centre.x - 165.0f, centre.y - 40.0f, 110.0f, 130.0f);
-        body.addEllipse (centre.x + 55.0f, centre.y - 40.0f, 110.0f, 130.0f);
-        g.setColour (theme::colour::bg2.brighter (0.15f));
-        g.fillPath (body);
-        // shoulders
-        g.setColour (theme::colour::bg2.brighter (0.3f));
-        g.fillRoundedRectangle (centre.x - 140.0f, centre.y - 84.0f, 70.0f, 16.0f, 6.0f);
-        g.fillRoundedRectangle (centre.x + 70.0f, centre.y - 84.0f, 70.0f, 16.0f, 6.0f);
+        // --- the pad (centre 500, 300) ---
+        const auto body = theme::colour::bg2.brighter (0.15f), part = theme::colour::bg0, raised = theme::colour::bg2.brighter (0.35f);
+        const R lt (315.0f, 162.0f, 70.0f, 20.0f), rt (615.0f, 162.0f, 70.0f, 20.0f);    // triggers
+        const R lb (300.0f, 184.0f, 100.0f, 16.0f), rb (600.0f, 184.0f, 100.0f, 16.0f);  // shoulders
+        g.setColour (raised);
+        g.fillRoundedRectangle (lt, 6.0f);
+        g.fillRoundedRectangle (rt, 6.0f);
+        g.setColour (raised.brighter (0.1f));
+        g.fillRoundedRectangle (lb, 6.0f);
+        g.fillRoundedRectangle (rb, 6.0f);
+        juce::Path shape;
+        shape.addRoundedRectangle (280.0f, 196.0f, 440.0f, 160.0f, 70.0f);
+        shape.addEllipse (285.0f, 250.0f, 160.0f, 170.0f);
+        shape.addEllipse (555.0f, 250.0f, 160.0f, 170.0f);
+        g.setColour (body);
+        g.fillPath (shape);
 
-        const auto spot = [&] (Button b) -> juce::Point<float> {
-            switch (b)
-            {
-                case Button::leftShoulder: return { centre.x - 105.0f, centre.y - 76.0f };
-                case Button::rightShoulder: return { centre.x + 105.0f, centre.y - 76.0f };
-                case Button::up: return { centre.x - 70.0f, centre.y + 8.0f };
-                case Button::down: return { centre.x - 70.0f, centre.y + 40.0f };
-                case Button::left: return { centre.x - 86.0f, centre.y + 24.0f };
-                case Button::right: return { centre.x - 54.0f, centre.y + 24.0f };
-                case Button::back: return { centre.x - 26.0f, centre.y - 22.0f };
-                case Button::start: return { centre.x + 26.0f, centre.y - 22.0f };
-                case Button::y: return { centre.x + 105.0f, centre.y - 42.0f };
-                case Button::x: return { centre.x + 83.0f, centre.y - 20.0f };
-                case Button::b: return { centre.x + 127.0f, centre.y - 20.0f };
-                case Button::a: return { centre.x + 105.0f, centre.y + 2.0f };
-                case Button::leftThumb: return { centre.x - 105.0f, centre.y - 22.0f };
-                case Button::rightThumb: return { centre.x + 50.0f, centre.y + 24.0f };
-                case Button::count: break;
-            }
-            return centre;
-        };
-        // sticks
-        g.setColour (theme::colour::bg0);
-        for (auto b : { Button::leftThumb, Button::rightThumb })
-            g.fillEllipse (juce::Rectangle<float> (34.0f, 34.0f).withCentre (spot (b)));
-        // D-pad cross
-        g.setColour (theme::colour::bg0);
-        g.fillRoundedRectangle (juce::Rectangle<float> (16.0f, 48.0f).withCentre (spot (Button::up).translated (0.0f, 16.0f)), 3.0f);
-        g.fillRoundedRectangle (juce::Rectangle<float> (48.0f, 16.0f).withCentre (spot (Button::up).translated (0.0f, 16.0f)), 3.0f);
-        // face buttons
-        for (auto b : { Button::a, Button::b, Button::x, Button::y })
+        const P leftStick (370.0f, 255.0f), rightStick (570.0f, 320.0f), dpad (430.0f, 320.0f);
+        const P back (465.0f, 250.0f), start (535.0f, 250.0f);
+        const P faceY (630.0f, 226.0f), faceX (602.0f, 254.0f), faceB (658.0f, 254.0f), faceA (630.0f, 282.0f);
+        g.setColour (part);
+        for (auto c : { leftStick, rightStick })
+            g.fillEllipse (R (48.0f, 48.0f).withCentre (c));
+        g.setColour (body.brighter (0.2f));
+        for (auto c : { leftStick, rightStick })
+            g.drawEllipse (R (34.0f, 34.0f).withCentre (c), 1.5f);
+        g.setColour (part);
+        g.fillRoundedRectangle (R (18.0f, 56.0f).withCentre (dpad), 3.0f);
+        g.fillRoundedRectangle (R (56.0f, 18.0f).withCentre (dpad), 3.0f);
+        g.fillRoundedRectangle (R (22.0f, 10.0f).withCentre (back), 4.0f);
+        g.fillRoundedRectangle (R (22.0f, 10.0f).withCentre (start), 4.0f);
+        g.setFont (theme::font (theme::type::caption, true));
+        for (auto [c, b] : { std::pair { faceA, Button::a }, std::pair { faceB, Button::b }, std::pair { faceX, Button::x }, std::pair { faceY, Button::y } })
         {
-            g.setColour (b == Button::a ? theme::colour::accent : theme::colour::bg0);
-            g.fillEllipse (juce::Rectangle<float> (20.0f, 20.0f).withCentre (spot (b)));
+            g.setColour (b == Button::a ? theme::colour::accent : part);
+            g.fillEllipse (R (24.0f, 24.0f).withCentre (c));
             g.setColour (theme::colour::textPrimary);
-            g.setFont (theme::font (theme::type::caption, true));
-            g.drawText (buttonName (b), juce::Rectangle<float> (20.0f, 20.0f).withCentre (spot (b)), juce::Justification::centred);
+            g.drawText (buttonName (b), R (24.0f, 24.0f).withCentre (c), juce::Justification::centred);
         }
-        g.setColour (theme::colour::bg0);
-        for (auto b : { Button::back, Button::start })
-            g.fillRoundedRectangle (juce::Rectangle<float> (18.0f, 9.0f).withCentre (spot (b)), 4.0f);
+        g.setFont (theme::font (theme::type::caption, true));
+        g.setColour (theme::colour::textSecondary);
+        g.drawText ("LT", lt, juce::Justification::centred);
+        g.drawText ("RT", rt, juce::Justification::centred);
+        g.drawText ("LB", lb, juce::Justification::centred);
+        g.drawText ("RB", rb, juce::Justification::centred);
 
-        // the labels: left side for the left half of the pad, right side for the right half; a leader line to each
-        struct Row
-        {
-            juce::String text;
-            Button button;
-        };
-        std::vector<Row> left, right;
+        // --- the labels ---
         const auto& map = defaultMap();
-        const auto add = [&] (Button b, const juce::String& text) {
+        const auto line = [&] (Button b) {
             // (the face buttons, shoulders, Back and Start keep the names printed on the pad)
             const auto name = (int) b >= (int) Button::leftThumb ? tr (buttonName (b)) : juce::String (buttonName (b));
-            (spot (b).x < centre.x ? left : right).push_back ({ name + ": " + text, b });
+            return name + ": " + tr (actionName (map[(std::size_t) b]));
         };
-        for (int i = 0; i < buttonCount; ++i)
-            if (map[(std::size_t) i] != Action::none)
-                add ((Button) i, tr (actionName (map[(std::size_t) i])));
-        left.push_back ({ tr ("LT / RT: track volume down / up"), Button::leftShoulder });
-        left.push_back ({ tr ("Left stick: track pan"), Button::leftThumb });
-        right.push_back ({ tr ("Right stick: link it to any knob"), Button::rightThumb });
-        g.setFont (theme::font (theme::type::small));
-        const auto draw = [&] (const std::vector<Row>& rows, bool onLeft) {
-            const auto x = onLeft ? 20.0f : getWidth() - 240.0f;
-            for (std::size_t i = 0; i < rows.size(); ++i)
-            {
-                const auto y = 66.0f + (float) i * 26.0f;
-                const auto box = juce::Rectangle<float> (x, y, 220.0f, 22.0f);
-                g.setColour (theme::colour::textSecondary.withAlpha (0.35f));
-                const auto from = juce::Point<float> (onLeft ? box.getRight() + 4.0f : box.getX() - 4.0f, box.getCentreY());
-                g.drawLine ({ from, spot (rows[i].button) }, 1.0f);
-                g.setColour (theme::colour::textPrimary);
-                g.drawText (rows[i].text, box, onLeft ? juce::Justification::centredRight : juce::Justification::centredLeft, true);
-            }
+        const auto lead = [&g] (P from, P to) {
+            g.setColour (theme::colour::textSecondary.withAlpha (0.55f));
+            g.drawLine ({ from, to }, 1.0f);
+            g.fillEllipse (R (5.0f, 5.0f).withCentre (to));
         };
-        draw (left, true);
-        draw (right, false);
+        const auto text = [&g] (const juce::String& s, R box, juce::Justification j) {
+            g.setColour (theme::colour::textPrimary);
+            g.setFont (theme::font (theme::type::small));
+            g.drawFittedText (s, box.toNearestInt(), j, 4, 0.8f);
+        };
+        constexpr float leftEdge = 20.0f, leftWidth = 250.0f, rightX = 740.0f, rightWidth = 240.0f, rowH = 18.0f;
+        // top: the triggers (one label, two leaders), the shoulders beside their buttons
+        text (tr ("LT / RT: track volume down / up"), R (300.0f, 96.0f, 400.0f, rowH), juce::Justification::centred);
+        lead ({ 450.0f, 116.0f }, { lt.getCentreX(), lt.getY() });
+        lead ({ 550.0f, 116.0f }, { rt.getCentreX(), rt.getY() });
+        text (line (Button::leftShoulder), R (leftEdge, 183.0f, leftWidth, rowH), juce::Justification::centredRight);
+        lead ({ leftEdge + leftWidth + 6.0f, 192.0f }, { lb.getX(), 192.0f });
+        text (line (Button::rightShoulder), R (rightX, 183.0f, rightWidth, rowH), juce::Justification::centredLeft);
+        lead ({ rightX - 6.0f, 192.0f }, { rb.getRight(), 192.0f });
+        // left column: the left stick, then the D-pad's four directions as one group
+        text (tr ("Left stick: track pan"), R (leftEdge, 246.0f, leftWidth, rowH), juce::Justification::centredRight);
+        lead ({ leftEdge + leftWidth + 6.0f, 255.0f }, { leftStick.x - 24.0f, 255.0f });
+        {
+            const R block (leftEdge, 284.0f, leftWidth, rowH * 4.0f);
+            auto row = block;
+            for (auto b : { Button::up, Button::down, Button::left, Button::right })
+                text (line (b), row.removeFromTop (rowH), juce::Justification::centredRight);
+            g.setColour (theme::colour::textSecondary.withAlpha (0.55f));
+            g.drawLine (block.getRight() + 6.0f, block.getY() + 3.0f, block.getRight() + 6.0f, block.getBottom() - 3.0f, 1.0f); // the group's bracket
+            lead ({ block.getRight() + 6.0f, dpad.y }, { dpad.x - 28.0f, dpad.y });
+        }
+        // right column: the four face buttons as one group, then the right stick
+        {
+            const R block (rightX, 218.0f, rightWidth, rowH * 4.0f);
+            auto row = block;
+            for (auto b : { Button::y, Button::x, Button::b, Button::a })
+                text (line (b), row.removeFromTop (rowH), juce::Justification::centredLeft);
+            g.setColour (theme::colour::textSecondary.withAlpha (0.55f));
+            g.drawLine (block.getX() - 6.0f, block.getY() + 3.0f, block.getX() - 6.0f, block.getBottom() - 3.0f, 1.0f);
+            lead ({ block.getX() - 6.0f, faceB.y }, { faceB.x + 12.0f, faceB.y });
+        }
+        text (tr ("Right stick: link it to any knob"), R (rightX, 320.0f, rightWidth, rowH), juce::Justification::centredLeft);
+        lead ({ rightX - 6.0f, 329.0f }, { rightStick.x + 24.0f, 324.0f });
+        // under the pad: Back and Start, straight down from their buttons
+        text (line (Button::back), R (175.0f, 432.0f, 285.0f, rowH), juce::Justification::centredRight);
+        lead ({ back.x, 438.0f }, { back.x, back.y + 5.0f });
+        text (line (Button::start), R (540.0f, 432.0f, 285.0f, rowH), juce::Justification::centredLeft);
+        lead ({ start.x, 438.0f }, { start.x, start.y + 5.0f });
 
         g.setColour (theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::small));
         g.drawText (tr ("Every button and stick can also be linked to a knob: right-click it > Link to MIDI controller, then move the stick."),
-                    getLocalBounds().removeFromBottom (36).reduced (20, 0), juce::Justification::centredLeft, true);
+                    getLocalBounds().removeFromBottom (40).reduced (20, 0), juce::Justification::centredLeft, true);
     }
 };
 } // namespace
