@@ -17350,6 +17350,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Stretch180dTests.inc"
 #include "Timing180dTests.inc"
 #include "FlpPdc182eTests.inc"
+#include "Pdc188eTests.inc"
 #include "Mixer177a2Tests.inc"
 #include "Mixer177a3Tests.inc"
 #include "Mixer177a4Tests.inc"

@@ -554,7 +554,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             const auto* old = previous != nullptr && p < previous->instruments.size() ? previous->instruments[p].get() : nullptr;
             if (old != nullptr && previous->song.channels[p].instrument == kind && previous->sampleRate == sampleRate
-                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher))
+                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher)
+                // a node's latency moved since its delay compensation was planned: build it again (issue #113)
+                && (patcher::graphOf (previous->instruments[p].get()) == nullptr
+                    || ! patcher::graphOf (previous->instruments[p].get())->latencyStale (&channel.patcher)))
             {
                 state->instruments.push_back (previous->instruments[p]);
                 state->instruments.back()->configure (channel, song.bpm);

@@ -203,7 +203,18 @@ private:
 class Compressor final : public Effect
 {
 public:
-    void prepare (double sr) noexcept override { sampleRate = sr; vintage.prepare (sr); reset(); }
+    // `initial` (may be null): the slot's parameters, so the voicing's latency is known after prepare(), before the
+    // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
+    explicit Compressor (const EffectParams* initial = nullptr) : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f) {}
+
+    void prepare (double sr) noexcept override
+    {
+        sampleRate = sr;
+        vintage.prepare (sr);
+        reset();
+        if (vintageAtStart)
+            latency.store (vintage.latency(), std::memory_order_relaxed);
+    }
     void reset() noexcept override
     {
         envelopeDb = 0.0f;
@@ -360,6 +371,7 @@ private:
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
+    bool vintageAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -1964,7 +1976,13 @@ double noteA (float v) { return 55.0 * std::pow (2.0, (2.0 * v - 1.0) / 12.0); }
 class PitchCorrect final : public Effect
 {
 public:
-    PitchCorrect() { dsp.reserve (maxSampleRate); }
+    // `initial` (may be null): the slot's parameters, so the formant path's latency is known before the first block
+    explicit PitchCorrect (const EffectParams* initial = nullptr)
+    {
+        dsp.reserve (maxSampleRate);
+        if (initial != nullptr)
+            latency.store ((*initial)[29] > 0.5f ? 257 : 9, std::memory_order_relaxed); // (pitcher::Pitcher::latency())
+    }
 
     void prepare (double sr) noexcept override { dsp.prepare (sr); }
     void reset() noexcept override
@@ -3950,7 +3968,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::maximus)
         return maximusfx::make (slot.state);
     if (slot.kind == EffectKind::multibandDelay)
-        return mbdelay::make (slot.state);
+        return mbdelay::make (slot.state, &slot.params); // (#113: the mode's latency known at once)
     if (slot.kind == EffectKind::vocoder)
         return std::make_unique<Vocoder> (slot.state);
     if (slot.kind == EffectKind::equo)
@@ -3981,6 +3999,24 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return dyn::make (slot.kind, &slot.params);
     if (slot.kind == EffectKind::apexLimiter) // round 135: the oversampling latency known before the first block
         return apex::make (&slot.params);
+    if (slot.kind == EffectKind::ridgeStrip) // issue #113: its Vocal voicing / DRIVE latency known before the first block
+        return mixsuite::makeRidge (&slot.params);
+    if (slot.kind == EffectKind::aether) // issue #113: its model (the exciter's oversampling latency) known before the first block
+        return mixsuite::makeAether (&slot.params);
+    if (slot.kind == EffectKind::lynxTune) // issue #113: its range / low-latency path known before the first block
+        return lynxtune::make (&slot.params);
+    if (slot.kind == EffectKind::transmitter) // issue #113: its look-ahead (latency) known before the first block
+        return transmitter::make (&slot.params);
+    if (slot.kind == EffectKind::flPitchShifter) // issue #113: its engine (latency) known before the first block
+        return psfl::make (&slot.params);
+    if (slot.kind == EffectKind::compressor) // issue #113: its voicing's latency known before the first block
+        return std::make_unique<Compressor> (&slot.params);
+    if (slot.kind == EffectKind::pitchCorrect) // issue #113: its formant path's latency known before the first block
+        return std::make_unique<PitchCorrect> (&slot.params);
+    if (slot.kind == EffectKind::fruityLimiter) // issue #113: its look-ahead (latency) known before the first block
+        return fldyn::makeLimiter (&slot.params);
+    if (slot.kind == EffectKind::fruityCompressor) // its reported look-ahead known before the first block
+        return fldyn::makeCompressor (&slot.params);
     if (slot.kind == EffectKind::hyperChorus)
         return hyperchorusfx::make (hyperchorusfx::instanceOf (slot.state));
     if (slot.kind == EffectKind::vintageChorus)
@@ -3994,7 +4030,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::fruityDelayBank)
         return fldbank::make (slot.state);
     if (slot.kind == EffectKind::fruityMultiband)
-        return slot.state.empty() ? flmb::make() : flmb::make (slot.state);
+        return slot.state.empty() ? flmb::make (&slot.params) : flmb::make (slot.state, &slot.params); // (#113: latency known at once)
     return makeEffect (slot.kind);
 }
 

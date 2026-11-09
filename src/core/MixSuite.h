@@ -609,6 +609,9 @@ std::unique_ptr<Effect> make (EffectKind kind);
 // Hush with its look-ahead (= latency) known before the first block (round 128)
 std::unique_ptr<Effect> makeHush (const EffectParams* params);
 std::unique_ptr<Effect> makeEmber (const EffectParams* params); // round 152: the processing mode known at once
+// issue #113: the latency known before the first block (Ridge: the Vocal voicing / DRIVE; Aether: the model)
+std::unique_ptr<Effect> makeRidge (const EffectParams* params);
+std::unique_ptr<Effect> makeAether (const EffectParams* params);
 bool isSuiteKind (EffectKind kind) noexcept;
 
 // Meters the editor shows (written by the audio thread, read by the UI): see Effect::controlOutput.
