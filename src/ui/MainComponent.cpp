@@ -4091,7 +4091,7 @@ void MainComponent::setControlHints()
     };
 
     ui::setHint (newButton, with (tr ("New project"), "file.new"));
-    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, MIDI)"), "file.open"));
+    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, Ableton Live .als, FL Studio Mobile .flm, MIDI)"), "file.open"));
     ui::setHint (saveButton, with (tr ("Save the project"), "file.save") + "  " + tr ("save as:") + " " + keyMarkup ("file.saveAs"));
     ui::setHint (exportButton, with (tr ("Export audio: WAV, FLAC or OGG"), "file.export"));
     ui::setHint (undoButton, with (tr ("Undo the last edit"), "edit.undo") + "  " + tr ("[RMB] undo history"), true);
@@ -6708,13 +6708,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     {
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
-        menu.addItem (tr ("Last FL Studio import report"), [this] {
+        menu.addItem (tr ("Last project import report"), [this] {
             const auto& r = engine.getImportReport();
             if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
-                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("FL Studio import"),
-                                                        tr ("Nothing to report (no .flp imported in this session, or everything was converted)."));
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),
+                                                        tr ("Nothing to report (no .flp, .als or .flm project imported in this session, or everything was converted)."));
             else
                 showImportReport();
         });
@@ -6748,8 +6748,8 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
     {
         About()
             : juce::AlertWindow ("LYNX SHARE " JUCE_APPLICATION_VERSION_STRING,
-                                 tr ("Lightweight C++/JUCE DAW with the FL Studio workflow.\n"
-                                     "Independent implementation: no Image-Line code was copied."),
+                                 tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
+                                     "Independent implementation: no Image-Line or Ableton code was copied."),
                                  juce::MessageBoxIconType::NoIcon)
         {
             addCustomComponent (&logo);
@@ -7070,7 +7070,7 @@ void MainComponent::showImportReport()
                     { juce::String (r.relocatedSamples) }) << "\n";
 
     if (text.isNotEmpty())
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("FL Studio import"), text.trimEnd());
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"), text.trimEnd());
 }
 
 void MainComponent::showAudioSettings()

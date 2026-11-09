@@ -76,7 +76,7 @@ public:
             l->setFont (theme::font (theme::type::small));
             addAndMakeVisible (l);
         }
-        ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Projects from FL Studio are converted to it.", { juce::String (ppq) }),
+        ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Imported projects (.flp, .als, .flm) are converted to it.", { juce::String (ppq) }),
                          juce::dontSendNotification);
         signatureText.setText (tr ("Time signature changes along the song: add a time signature marker on the Playlist ruler."),
                                juce::dontSendNotification);
