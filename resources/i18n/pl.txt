@@ -2529,7 +2529,7 @@ countries: pl
 "Echo > Rev|Rev > Echo" = "Echo > Rev|Rev > Echo"
 "Reverb mode" = "Tryb pogłosu"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Jasny|Neutralny|Ciemny|Vintage"
+"Bright|Neutral|Dark|Studio" = "Jasny|Neutralny|Ciemny|Studio"
 "Damping" = "Tłumienie"
 "Bass freq" = "Częst. basu"
 "Late mix" = "Miks późnych"
