@@ -113,7 +113,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         g.fillAll (juce::Colours::black);
-        g.drawImageAt (backdrop, 0, 0);
+        if (backdrop.isValid()) // (the screen's pixels when captured from the window: drawn at the component's size)
+            g.drawImage (backdrop, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
     }
 
     void resized() override
@@ -126,6 +127,10 @@ public:
     {
         if (getWidth() <= 0 || getHeight() <= 0)
             return;
+        if (isOnDesktop())
+            return; // (resized while shown: the picture it has, stretched; capturing now would picture the overlay)
+        if (captureWindow())
+            return;
         backdrop = juce::Image (juce::Image::RGB, getWidth(), getHeight(), true);
         juce::Graphics g (backdrop);
         g.drawImageAt (over.createComponentSnapshot (over.getLocalBounds().withSize (getWidth(), getHeight()), true, 1.0f), 0, 0);
@@ -134,6 +139,66 @@ public:
             if (child->isVisible())
                 g.drawImageAt (child->createComponentSnapshot (child->getLocalBounds(), true, 1.0f),
                                child->getX() - origin.x, child->getY() - origin.y);
+    }
+
+    // The main window's client area as it is drawn, plugin editors included (their own native windows are not in a
+    // component snapshot): PrintWindow with the full content (DirectX / composition surfaces too).
+    bool captureWindow()
+    {
+       #if JUCE_WINDOWS
+        auto* hwnd = static_cast<HWND> (topHandle (over));
+        if (hwnd == nullptr)
+            return false;
+        RECT client {};
+        GetClientRect (hwnd, &client);
+        const auto w = (int) (client.right - client.left), h = (int) (client.bottom - client.top);
+        if (w <= 0 || h <= 0)
+            return false;
+        auto* screen = GetDC (nullptr);
+        auto* dc = CreateCompatibleDC (screen);
+        BITMAPINFO info {};
+        info.bmiHeader.biSize = sizeof (info.bmiHeader);
+        info.bmiHeader.biWidth = w;
+        info.bmiHeader.biHeight = -h; // top-down
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        void* bits = nullptr;
+        auto* bitmap = CreateDIBSection (screen, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+        bool ok = false;
+        if (bitmap != nullptr && bits != nullptr)
+        {
+            auto* old = SelectObject (dc, bitmap);
+            constexpr UINT clientOnly = 0x1, fullContent = 0x2; // PW_CLIENTONLY, PW_RENDERFULLCONTENT (Windows 8.1+)
+            ok = PrintWindow (hwnd, dc, clientOnly | fullContent) != FALSE;
+            if (ok)
+            {
+                // the part of the client area `over` covers, in physical pixels
+                const auto scale = (double) w / juce::jmax (1, over.getTopLevelComponent()->getWidth());
+                const auto origin = originOf (over);
+                const auto area = juce::Rectangle<int> (juce::roundToInt (origin.x * scale), juce::roundToInt (origin.y * scale),
+                                                        juce::roundToInt (getWidth() * scale), juce::roundToInt (getHeight() * scale))
+                                      .getIntersection ({ 0, 0, w, h });
+                backdrop = juce::Image (juce::Image::RGB, juce::jmax (1, area.getWidth()), juce::jmax (1, area.getHeight()), false);
+                juce::Image::BitmapData out (backdrop, juce::Image::BitmapData::writeOnly);
+                const auto* src = static_cast<const juce::uint8*> (bits);
+                for (int y = 0; y < area.getHeight(); ++y)
+                    for (int x = 0; x < area.getWidth(); ++x)
+                    {
+                        const auto* px = src + ((size_t) (y + area.getY()) * (size_t) w + (size_t) (x + area.getX())) * 4; // BGRA
+                        out.setPixelColour (x, y, juce::Colour (px[2], px[1], px[0]));
+                    }
+            }
+            SelectObject (dc, old);
+        }
+        if (bitmap != nullptr)
+            DeleteObject (bitmap);
+        DeleteDC (dc);
+        ReleaseDC (nullptr, screen);
+        return ok;
+       #else
+        return false;
+       #endif
     }
 
     std::unique_ptr<juce::Component> release()
