@@ -8167,3 +8167,5 @@ countries: kr
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "노트 차례가 올 때마다 재생될 확률 (LYNX; Live의 노트 Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "재생될 때마다 벨로시티가 노트의 벨로시티와 벨로시티 + 이 범위 사이에서 뽑힙니다 (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "릴리스 벨로시티: 노트가 끝날 때 이를 사용하는 악기로 보내집니다 (플러그인, Patcher)"
+"For a file with a true-peak ceiling: {0}" = "트루 피크 상한이 있는 파일은: {0}"
+"(look)" = "(룩)"

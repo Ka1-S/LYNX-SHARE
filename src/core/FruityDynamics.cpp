@@ -21,7 +21,7 @@ namespace lynx::fldyn
 {
 const std::array<int, limiterControls> limiterMin { 0, 0, 0, 0, 1, 0, 1, 0, 0, -1000, -1000, 0, 0, 1, 0, 0, 0, 0 };
 const std::array<int, limiterControls> limiterMax { 2000, 1000, 2000, 10000, 8, 10000, 8, 10000, 1000, 1000, 1000, 10000, 10000, 8, 10000, 1000, 1000, 10000 };
-const std::array<int, limiterControls> limiterDefault { 1000, 1000, 1000, 1115, 3, 5000, 3, 2882, 1000, 0, 0, 0, 6666, 1, 650, 1000, 100, 4187 };
+const std::array<int, limiterControls> limiterDefault { 1000, 1000, 1000, 1115, 3, 5000, 3, 2882, 1000, 0, 0, 0, 6666, 1, 650, 1000, 0, 4187 };
 const std::array<int, compressorControls> compressorMin { -600, 4, -300, 0, 1, 0 };
 const std::array<int, compressorControls> compressorMax { 0, 300, 300, 4000, 4000, 7 };
 const std::array<int, compressorControls> compressorDefault { 0, 10, 0, 150, 200, 0 };

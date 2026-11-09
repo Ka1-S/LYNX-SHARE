@@ -8167,3 +8167,5 @@ countries: cn sg
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "每次轮到该音符时它发声的概率（LYNX；Live 的音符 Chance）"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "每次发声时，力度在音符力度与力度 + 此范围之间随机抽取（LYNX）"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "释放力度：随音符结束发送给使用它的乐器（插件、Patcher）"
+"For a file with a true-peak ceiling: {0}" = "需要真峰值上限的文件：{0}"
+"(look)" = "（风格）"

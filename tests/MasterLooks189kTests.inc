@@ -140,3 +140,35 @@ TEST (simple189k_look_exports_fl_plugins)
     // an ordinary slot is not a look's
     CHECK (! flpexport::nativeLookState (makeEffectSlot (EffectKind::fruityLimiter)));
 }
+
+TEST (simple189k_limiter_default_gate_threshold)
+{
+    using namespace lynx;
+    // a new Fruity Limiter has FL's gate threshold (0); a saved project keeps its own value (every control is saved), and
+    // with the gate's gain at 0 dB (the default) the old value 100 sounds the same, sample for sample
+    auto fresh = makeEffectSlot (EffectKind::fruityLimiter);
+    CHECK (fresh.params[16] == 0.0f);
+    auto old = fresh;
+    old.params[16] = fldyn::normalised (100, fldyn::limiterMin[16], fldyn::limiterMax[16]);
+    CHECK (savedEffectParamCount (old) >= 17);
+    auto a = makeEffect (fresh), b = makeEffect (old);
+    a->prepare (44100.0), b->prepare (44100.0);
+    std::uint32_t seed = 1;
+    bool same = true;
+    for (int block = 0; block < 200; ++block)
+    {
+        float l1[256], r1[256], l2[256], r2[256];
+        for (int i = 0; i < 256; ++i)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            const auto burst = (block / 20) % 2 == 0 ? 1.5f : 0.002f; // loud bursts and near-silence (gate territory)
+            l1[i] = l2[i] = burst * ((float) (seed >> 8) / 8388608.0f - 1.0f);
+            r1[i] = r2[i] = 0.5f * l1[i];
+        }
+        a->process (l1, r1, 256, fresh.params, 120.0);
+        b->process (l2, r2, 256, old.params, 120.0);
+        for (int i = 0; i < 256; ++i)
+            same = same && l1[i] == l2[i] && r1[i] == r2[i];
+    }
+    CHECK (same);
+}

@@ -8167,3 +8167,5 @@ countries: jp
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "ノートの順番が来るたびに鳴る確率 (LYNX; Live のノート Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "鳴るたびに、ベロシティはノートのベロシティとベロシティ + この範囲の間で抽選されます (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "リリースベロシティ: ノートの終わりとともに、それを使う楽器へ送られます (プラグイン、Patcher)"
+"For a file with a true-peak ceiling: {0}" = "トゥルーピークの上限付きファイルには: {0}"
+"(look)" = "（ルック）"

@@ -8167,3 +8167,5 @@ countries: tr
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Notanın her sırası geldiğinde çalma olasılığı (LYNX; Live'ın nota Chance'i)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Her çalışta velocity, notanın velocity'si ile velocity + bu aralık arasında rastgele seçilir (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Bırakma velocity'si: notanın sonuyla onu kullanan enstrümanlara gönderilir (eklentiler, Patcher)"
+"For a file with a true-peak ceiling: {0}" = "Gerçek tepe sınırı olan bir dosya için: {0}"
+"(look)" = "(görünüm)"

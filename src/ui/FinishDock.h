@@ -43,7 +43,7 @@ private:
     std::function<void()> onClose;
     MasterLookSettings shown;
     std::unique_ptr<LookTile> tiles[8];
-    juce::Label title, status, intensityLabel, toneLabel, levelInfo;
+    juce::Label title, status, intensityLabel, toneLabel, levelInfo, peakHint;
     juce::TextButton closeButton, hearWithout, autoButton, removeButton;
     juce::Slider intensity, tone[3];
     juce::Label toneNames[3], marks[3];

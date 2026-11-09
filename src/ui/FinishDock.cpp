@@ -229,6 +229,16 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close)
     levelInfo.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (levelInfo);
 
+    // the looks hold sample peaks (FL's Limiter); a release file with a true-peak ceiling comes from the mastering export
+    const auto arrow = juce::String::fromUTF8 (" \xe2\x80\xba ");
+    peakHint.setText (tr ("For a file with a true-peak ceiling: {0}", { tr ("File") + arrow + tr ("Export") + arrow + tr ("Master...") }),
+                      juce::dontSendNotification);
+    peakHint.setFont (theme::font (theme::type::caption));
+    peakHint.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+    peakHint.setJustificationType (juce::Justification::centredLeft);
+    peakHint.setMinimumHorizontalScale (0.8f);
+    addAndMakeVisible (peakHint);
+
     removeButton.setButtonText (tr ("Remove look"));
     removeButton.onClick = [this] {
         engine.editSongStructural ([] (Song& s) { looks::remove (s); });
@@ -410,5 +420,7 @@ void FinishDock::resized()
     hearWithout.setBounds (buttons.removeFromLeft (buttons.getWidth() / 2 - 3));
     buttons.removeFromLeft (6);
     removeButton.setBounds (buttons);
+    r.removeFromTop (8);
+    peakHint.setBounds (r.removeFromTop (32));
 }
 } // namespace lynx

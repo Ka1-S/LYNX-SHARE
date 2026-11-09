@@ -35,34 +35,37 @@ struct Look
     const char* description;
     Finisher finisher;
     Point light, heavy;
+    // the Limiter's ceiling (dB, sample peak): low enough that the peaks between samples stay under −0.5 dBTP on the
+    // tuning songs at every intensity (round 189k §3; FL's Limiter holds sample peaks only)
+    float ceilingDb = -1.0f;
 };
 
 // clang-format off
 const Look table[count] {
     { "Balanced", "Even and polished, a little louder", Finisher::softClipper,
       { 0.5f, -0.5f, 0, 0.5f, 1.0f, { -14, -16, -18 }, 0.25f, 20, 200, { 1, 1, 1 }, 1.0f, 0, 3.0f },
-      { 0.5f, -1.5f, 0, 1.0f, 2.5f, { -18, -20, -22 }, 0.45f, 20, 200, { 2, 2, 2 }, 2.0f, 0, 6.0f } },
+      { 0.5f, -1.5f, 0, 1.0f, 2.5f, { -18, -20, -22 }, 0.45f, 20, 200, { 2, 2, 2 }, 2.0f, 0, 6.0f }, -2.9f },
     { "Loud", "As loud as it gets, still clean", Finisher::softClipper,
       { 1.0f, -1.0f, 0, 1.0f, 1.5f, { -16, -18, -20 }, 0.35f, 15, 150, { 1.5f, 1.5f, 1.5f }, 2.0f, 0, 5.0f },
-      { 1.0f, -2.0f, 0, 1.5f, 3.0f, { -22, -24, -26 }, 0.60f, 10, 120, { 3, 3, 3 }, 4.0f, 0, 9.0f } },
+      { 1.0f, -2.0f, 0, 1.5f, 3.0f, { -22, -24, -26 }, 0.60f, 10, 120, { 3, 3, 3 }, 4.0f, 0, 9.0f }, -3.2f },
     { "Clarity", "Brighter and cleaner, less mud", Finisher::enhancer,
       { -0.5f, -1.5f, 0, 1.5f, 2.0f, { -14, -16, -18 }, 0.20f, 20, 200, { 1, 1, 1 }, 0, -10, 3.0f },
-      { -1.0f, -3.0f, 0, 3.0f, 4.0f, { -18, -20, -22 }, 0.35f, 20, 200, { 1.5f, 1.5f, 1.5f }, 0, -24, 6.5f } },
+      { -1.0f, -3.0f, 0, 3.0f, 4.0f, { -18, -20, -22 }, 0.35f, 20, 200, { 1.5f, 1.5f, 1.5f }, 0, -24, 6.5f }, -3.0f },
     { "Warm tape", "Round lows, soft highs, gentle saturation", Finisher::softClipper,
       { 1.5f, 0.5f, 0, -1.0f, -1.5f, { -14, -16, -18 }, 0.30f, 30, 300, { 1, 1, 1 }, 1.5f, 0, 3.0f },
-      { 3.0f, 1.0f, 0, -2.0f, -3.0f, { -18, -20, -22 }, 0.50f, 30, 300, { 1.5f, 1.5f, 1.5f }, 4.0f, 0, 5.0f } },
+      { 3.0f, 1.0f, 0, -2.0f, -3.0f, { -18, -20, -22 }, 0.50f, 30, 300, { 1.5f, 1.5f, 1.5f }, 4.0f, 0, 5.0f }, -1.9f },
     { "Gentle", "Light touch, keeps the dynamics", Finisher::enhancer,
       { 0.5f, -0.5f, 0, 0, 0.5f, { -12, -14, -16 }, 0.15f, 25, 250, { 0.5f, 0.5f, 0.5f }, 0, 0, 2.5f },
-      { 1.0f, -1.0f, 0, 0.5f, 1.0f, { -16, -18, -20 }, 0.30f, 25, 250, { 1, 1, 1 }, 0, -6, 4.0f } },
+      { 1.0f, -1.0f, 0, 0.5f, 1.0f, { -16, -18, -20 }, 0.30f, 25, 250, { 1, 1, 1 }, 0, -6, 4.0f }, -1.8f },
     { "Punchy", "Tight lows and strong hits", Finisher::softClipper,
       { 2.0f, -1.0f, 0, 1.0f, 1.0f, { -14, -16, -18 }, 0.30f, 30, 120, { 1.5f, 1.5f, 1.5f }, 1.5f, 0, 4.0f },
-      { 3.5f, -2.0f, 0, 2.0f, 1.5f, { -20, -22, -24 }, 0.55f, 30, 100, { 3, 3, 3 }, 3.5f, 0, 7.0f } },
+      { 3.5f, -2.0f, 0, 2.0f, 1.5f, { -20, -22, -24 }, 0.55f, 30, 100, { 3, 3, 3 }, 3.5f, 0, 7.0f }, -2.8f },
     { "Wide", "A wider stereo image", Finisher::enhancer,
       { 0, -1.0f, 0, 0.5f, 1.5f, { -14, -16, -18 }, 0.20f, 20, 200, { 1, 1, 1 }, 0, -18, 3.5f },
-      { 0, -2.0f, 0, 1.0f, 3.0f, { -18, -20, -22 }, 0.35f, 20, 200, { 1.5f, 1.5f, 1.5f }, 0, -36, 7.0f } },
+      { 0, -2.0f, 0, 1.0f, 3.0f, { -18, -20, -22 }, 0.35f, 20, 200, { 1.5f, 1.5f, 1.5f }, 0, -36, 7.0f }, -2.9f },
     { "Cinematic", "Big, deep and open", Finisher::enhancer,
       { 1.5f, -1.0f, -0.5f, 0, 1.5f, { -14, -16, -18 }, 0.25f, 25, 400, { 1, 1, 1 }, 0, -14, 2.5f },
-      { 3.0f, -2.0f, -1.0f, 0.5f, 3.0f, { -18, -20, -22 }, 0.45f, 25, 400, { 2, 2, 2 }, 0, -28, 6.0f } },
+      { 3.0f, -2.0f, -1.0f, 0.5f, 3.0f, { -18, -20, -22 }, 0.45f, 25, 400, { 2, 2, 2 }, 0, -28, 6.0f }, -2.4f },
 };
 // clang-format on
 
@@ -181,10 +184,8 @@ EffectSlot finisherSlot (const Point& p, Finisher finisher)
     return slot;
 }
 
-EffectSlot limiterSlot (const Point& p, Finisher finisher)
+EffectSlot limiterSlot (const Point& p, double ceilingDb)
 {
-    // FL's Limiter holds sample peaks: the soft-clipper looks, the loudest, keep more room for the peaks between samples
-    const auto ceilingDb = finisher == Finisher::softClipper ? -1.5 : -1.0;
     auto slot = makeEffectSlot (EffectKind::fruityLimiter);
     // gain law (7^x − 1) / 6, ceiling law (3^x − 1) / 2, x = raw / 1000 (REA_rodada48)
     const auto gain = clampi (1000.0 * std::log (6.0 * fromDb (p.limiter) + 1.0) / std::log (7.0), 0, 2000);
@@ -229,7 +230,7 @@ std::vector<EffectSlot> chain (const MasterLookSettings& s)
         return {};
     const auto& l = table[s.id - 1];
     const auto p = at (l, s.intensity);
-    std::vector<EffectSlot> out { eqSlot (p, s), multibandSlot (p, l.finisher), finisherSlot (p, l.finisher), limiterSlot (p, l.finisher) };
+    std::vector<EffectSlot> out { eqSlot (p, s), multibandSlot (p, l.finisher), finisherSlot (p, l.finisher), limiterSlot (p, l.ceilingDb) };
     for (auto& slot : out)
         slot.look = (std::uint8_t) s.id;
     return out;

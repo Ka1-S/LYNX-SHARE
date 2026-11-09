@@ -4952,6 +4952,8 @@ void EffectsPanel::paint (juce::Graphics& g)
             // a LYNX substitute shows the plugin it stands in for, with a "LYNX" badge
             const auto substitute = slot.isSubstitute();
             auto name = quickpick::slotName (engine, slot); // (a plugin renamed in the Plugin database: its new name, round 165c)
+            if (slot.look != 0) // part of a Master look (round 189k, the Simple workflow's Finish dock)
+                name << " " << tr ("(look)");
             if (slot.sidechain > 0 && slot.sidechain < (int) engine.getSong().mixer.size())
                 name << juce::String::fromUTF8 (" \xe2\x86\x90 ") << juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) slot.sidechain].name.c_str());
             auto text = textArea;

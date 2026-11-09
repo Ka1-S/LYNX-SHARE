@@ -8167,3 +8167,5 @@ countries: es mx ar co cl pe ve
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "La probabilidad de que la nota suene cada vez que le toca (LYNX; el Chance de nota de Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Cada vez que suena, la velocity se sortea entre la velocity de la nota y la velocity + este rango (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity de liberación: se envía con el final de la nota a los instrumentos que la usan (plugins, Patcher)"
+"For a file with a true-peak ceiling: {0}" = "Para un archivo con techo de pico real: {0}"
+"(look)" = "(look)"
