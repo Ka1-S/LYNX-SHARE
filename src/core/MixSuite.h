@@ -603,6 +603,7 @@ const EffectInfo& emberInfo();
 const EffectInfo& kilnInfo();
 const EffectInfo& fretInfo();
 const EffectInfo& shellInfo();
+const EffectInfo& strikeInfo(); // round trans189d: Strike Shaper (core/StrikeShaper.h)
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

@@ -33,6 +33,7 @@
 #include "core/DrumSynthLive.h"
 #include "core/Effects.h"
 #include "core/MixSuite.h"
+#include "core/StrikeShaper.h"
 #include "core/EmberClassic.h"
 #include "core/Effector.h"
 #include "core/FruityDelayBank.h"
@@ -17368,3 +17369,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ProjectKey184aTests.inc"
 #include "Render186bTests.inc"
 #include "SimpleTracks184aTests.inc"
+#include "Strike189dTests.inc"
