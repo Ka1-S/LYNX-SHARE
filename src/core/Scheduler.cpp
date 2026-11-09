@@ -382,19 +382,15 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
         e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
 
-        // FL's per-clip edge declicker (round 189i, clipops::declickChoice): Disabled, or Automatic where the clip joins
-        // its neighbour seamlessly, plays that edge without the channel's declicker; a manual side neither. Worked out
-        // only for a block where the clip starts (the join looks at the other clips)
+        // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
+        // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
+        // still takes it, so two clips that continue each other crossfade through the release and the attack
         const auto declickBits = [&]
         {
-            const auto inPlaylist = clipIndex < song.playlist.size() && &song.playlist[clipIndex] == &clip;
             std::uint16_t bits = 0;
             for (int side = 0; side < 2; ++side)
             {
-                const auto choice = clipops::declickChoice (clip, side);
-                const auto off = choice == clipops::declickDisabled
-                                 || ((choice == clipops::declickAutomatic || choice == clipops::declickJoined) && inPlaylist
-                                     && clipops::seamlessJoin (song.playlist, clipIndex, side, song.bpm, ppq));
+                const auto off = clipops::declickChoice (clip, side) == clipops::declickDisabled;
                 bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
             }
             return bits;
@@ -414,8 +410,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
             return;
 
-        if (overlaps ((double) clip.start, (double) clip.start + 1.0))
-            e.fadeShape |= declickBits();
+        e.fadeShape |= declickBits();
         e.type = NoteEvent::Type::on;
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;

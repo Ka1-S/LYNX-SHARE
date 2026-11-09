@@ -1,6 +1,6 @@
 // --- Round 189i: FL's per-clip edge declicker (PLFadeHandleMenu: Manual, Declicker Automatic / Disabled / Enabled) ----
 // (FLEngine 2026 [DECOMP] FUN_00d01bc0 / FUN_00cfc020 / FUN_00cfbf60 menu, FUN_00d27cf0 / FUN_00d253d0 / FUN_00d24400
-// voice, FUN_00d011a0 seamless joins, FUN_012c6ae0 / FUN_00977870 declicker tables; notes in /mnt/e/lynx-work/flgap189i)
+// voice, FUN_012c6ae0 / FUN_00977870 declicker tables; notes in /mnt/e/lynx-work/flgap189i; FL /R renders round 189l)
 
 #include "core/ClipOps.h"
 #include "core/Instruments.h"
@@ -46,19 +46,22 @@ int sounding189i (const std::vector<float>& v)
 }
 } // namespace
 
-// The clip's end takes the channel's declicking release (FL: Automatic / Enabled): 10 ms raised cosine for "Out only";
-// Disabled (shape bit 6), a manual end (bit 8) or a fade out end with a sharp cut
+// The clip's end (FL /R renders, round 189l): channels in modes 2 / 3 / 4 take their declicking release (raised cosine of
+// 20 / 20 / 100 ms) when the end is Automatic / Enabled; modes 0 and 1 cut sharply whatever the choice, and so do Disabled
+// (shape bit 6), a manual end (bit 8) and an end with a fade out
 TEST (playlist189i_clip_end_declick)
 {
-    const auto automatic = edge189i (0, 0);
-    const auto level = automatic.head.back();
+    const auto generic = edge189i (3, 0);
+    const auto level = generic.head.back();
     CHECK (level > 0.1f);
-    CHECK (std::abs (sounding189i (automatic.tail) - 441) <= 2);
-    CHECK (std::abs (automatic.tail[220] / level - 0.5f) < 0.02f);
+    CHECK (std::abs (sounding189i (generic.tail) - 882) <= 2);
+    CHECK (std::abs (generic.tail[441] / level - 0.5f) < 0.02f);
     CHECK (std::abs (sounding189i (edge189i (2, 0).tail) - 882) <= 2); // Transient (bleeding): 20 ms
-    CHECK (sounding189i (edge189i (0, 64).tail) == 0);
-    CHECK (sounding189i (edge189i (0, 256).tail) == 0);
-    CHECK (sounding189i (edge189i (0, 0, 0.0f, 100.0f).tail) == 0);
+    CHECK (sounding189i (edge189i (0, 0).tail) == 0); // Out only: sharp
+    CHECK (sounding189i (edge189i (1, 0).tail) == 0); // Transient (no bleeding): sharp
+    CHECK (sounding189i (edge189i (3, 64).tail) == 0);
+    CHECK (sounding189i (edge189i (3, 256).tail) == 0);
+    CHECK (sounding189i (edge189i (3, 0, 0.0f, 100.0f).tail) == 0);
 }
 
 // The clip's start: modes 3 / 4 / 5 fade in with a raised cosine (20 / 100 / 200 ms), modes 1 / 2 remove the first
@@ -81,8 +84,8 @@ TEST (playlist189i_clip_start_declick)
     CHECK (edge189i (3, 128, 0.0f, 0.0f, 500.0f).head[0] < 0.001f * level); // started past its manual start: declicked
 }
 
-// The menu's data: FL's bits (manual 0 / 1, choice >> 2 / >> 14), Manual off zeroes the fade, seamless joins
-TEST (playlist189i_declick_choice_bits_and_joins)
+// The menu's data: FL's bits (manual 0 / 1, choice >> 2 / >> 14), Manual off zeroes the fade
+TEST (playlist189i_declick_choice_bits)
 {
     using namespace lynx;
     Clip a;
@@ -101,21 +104,4 @@ TEST (playlist189i_declick_choice_bits_and_joins)
     CHECK (clipops::manualFade (a, 1) && ! clipops::manualFade (a, 0) && (a.flFadeFlags & 2u) != 0);
     clipops::setManualFade (a, 1, false);
     CHECK (! clipops::manualFade (a, 1) && a.fadeOut == 0);
-
-    Clip b = a;
-    b.flFadeFlags = 0;
-    b.start = 96;
-    b.offset = 144; // the source goes on where a stopped
-    std::vector<Clip> playlist { a, b };
-    CHECK (clipops::seamlessJoin (playlist, 0, 1, 120.0, 96));
-    CHECK (clipops::seamlessJoin (playlist, 1, 0, 120.0, 96));
-    CHECK (! clipops::seamlessJoin (playlist, 0, 0, 120.0, 96));
-    playlist[1].offset = 200; // a jump in the source
-    CHECK (! clipops::seamlessJoin (playlist, 0, 1, 120.0, 96));
-    playlist[1].offset = 144;
-    playlist[1].gain = 0.5f;
-    CHECK (! clipops::seamlessJoin (playlist, 0, 1, 120.0, 96));
-    playlist[1].gain = a.gain;
-    playlist[1].track = 5;
-    CHECK (! clipops::seamlessJoin (playlist, 0, 1, 120.0, 96));
 }

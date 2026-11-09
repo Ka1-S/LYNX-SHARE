@@ -2318,14 +2318,16 @@ public:
         v.clipEndHard = false;
         if (! clipMode)
             return;
-        v.clipEndHard = (shape & (64 | 256)) != 0 || fades[3] > 0.0f;
+        const auto mode = std::clamp (declickMode.load (std::memory_order_relaxed), 0, 5);
+        // FL /R renders (round 189l, the same clip Automatic / Enabled / Disabled on channels in modes 0-4): modes 0 and 1
+        // end the clip with a sharp cut whatever the choice; modes 2, 3 and 4 take the channel's release (20 / 20 / 100 ms)
+        v.clipEndHard = (shape & (64 | 256)) != 0 || fades[3] > 0.0f || mode < 2;
         if ((shape & 32) != 0)
             return;
         const auto covered = fades[2] > 0.0f || (shape & 128) != 0;
         if (covered && fades[0] <= fades[2] + 12.0f)
             return;
         static constexpr double attackMs[] = { 0.0, 4.0, 4.0, 20.0, 100.0, 200.0 };
-        const auto mode = std::clamp (declickMode.load (std::memory_order_relaxed), 0, 5);
         if (mode == 0)
             return;
         v.atkFrames = std::max (1, (int) std::nearbyint (attackMs[mode] * 0.001 * sampleRate));
