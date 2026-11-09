@@ -345,12 +345,12 @@ TEST (toolbar181b_chord_panel_is_on_the_default_toolbar)
     // a customised toolbar keeps its order and what it hides, and doesn't gain the panel (it is in the edit mode)
     Layout custom;
     custom.orderFromString ("transport,-master,snap,record,file,windows,output,meters");
-    CHECK (custom.orderToString() == "transport,-master,snap,record,file,-chord,windows,output,meters");
+    CHECK (custom.orderToString() == "transport,-master,snap,record,file,-chord,windows,-multilink,output,meters"); // (177b-4: Multilink, hidden)
     CHECK (! custom.isShown (Group::chord));
     custom.setShown (Group::chord, true); // and it stays once shown
     Layout again;
     again.orderFromString (custom.orderToString());
-    CHECK (again.isShown (Group::chord) && again.orderToString() == "transport,-master,snap,record,file,chord,windows,output,meters");
+    CHECK (again.isShown (Group::chord) && again.orderToString() == "transport,-master,snap,record,file,chord,windows,-multilink,output,meters");
     // the default order with one panel hidden is customised too
     Layout hidden;
     hidden.orderFromString ("transport,master,record,snap,windows,file,-meters,output");
@@ -512,6 +512,23 @@ TEST (macros181b_prepare_for_midi_export_follows_fl)
     kept.channels.resize (3);
     kept.channels[1].instrument = lynx::InstrumentKind::layer;
     lynx::prepareForMidiExport (kept);
-    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::layer);
-    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 1);
+    // as FL 2026 does (seen at runtime): a Layer becomes a MIDI Out too, and takes its turn
+    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::midiOut);
+    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 2);
+}
+
+TEST (macros181b_switch_audio_clips_sets_the_mode_of_clips_only)
+{
+    lynx::Song song;
+    song.channels.resize (3);
+    song.channels[0].instrument = lynx::InstrumentKind::audioClip;
+    song.channels[2].instrument = lynx::InstrumentKind::audioClip;
+    CHECK (lynx::setStretchOfAudioClips (song, { 0, 1, 2 }, true, lynx::StretchMethod::tones) == 2);
+    CHECK (song.channels[0].sampler.keepPitch && song.channels[0].sampler.stretchMethod == lynx::StretchMethod::tones);
+    CHECK (! song.channels[1].sampler.keepPitch);
+    // Resample: the stretch engine goes off, the method stays for when it comes back on
+    CHECK (lynx::setStretchOfAudioClips (song, { 2 }, false, lynx::StretchMethod::general) == 1);
+    CHECK (! song.channels[2].sampler.keepPitch && song.channels[2].sampler.stretchMethod == lynx::StretchMethod::tones);
+    CHECK (song.channels[0].sampler.keepPitch);
+    CHECK (lynx::setStretchOfAudioClips (song, { 1 }, true, lynx::StretchMethod::beats) == 0);
 }

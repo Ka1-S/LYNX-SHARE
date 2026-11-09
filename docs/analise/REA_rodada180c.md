@@ -99,3 +99,66 @@ detail.
   reproduced in FL or LYNX. LYNX sets the merged clip's length to the span of the selection.
 - **Verdict:** FL-exact default. No alternative proposed. Round 177d's "Merge identical patterns" is a different, complementary
   tool: it merges whole duplicate patterns, whereas this merges groups of clips.
+
+# Slice 2: Fruity Slicer as a LYNX generator
+
+Binary: `Plugins/Fruity/Generators/Fruity Slicer/Fruity Slicer_x64.dll` (sha256 `7616d1f8…`, the one REA_rodada69 used),
+Ghidra project `~/ghproj/r69` program `slicer.dll`; decompiles in `/mnt/e/lynx-work/issues180c/rea/sl*.c` (unit
+`r:765000–76c000` in `slall.c`). Menus from the `TSynthResModule` DFM (`dfm-slicer-menus.txt`), the editor from
+`TSynthEditorForm` (`dfm-slicer.txt`, 377 × 330). Handlers found through the published-method table (Delphi RTTI).
+
+## State (`FUN_00766c40`, refines REA_rodada9 §3.1)
+
+The two slice fields after the position are the slice's **own key** (`+0xC`, −1 = first note + index; the SliceKeyMenu
+sets it) and its **place in beats** (`+0x10`, −1 = from the position; a `.zgr` groove brings it). After the slices:
+ANIMATE (`P+0x141`), first note, PLAY TO END, the sample rate, AUTO-DUMP (`P+0x13F`), DECLICK (`P+0x13C`),
+AUTO-FIT (`P+0x140`), the editor's display mode (v ≥ 14), then the 364-byte voice block (read only when complete).
+Versions < 15 add 2 to a method > 1. FL's six demo states (two projects) read and write back byte for byte
+(test `slicer180c_fl_demo_states_round_trip`, three of them version 16).
+
+## What FL does to the sample (`FUN_007686d0`, in this order)
+
+1. **REV** (`FUN_00769cd0`): the slice's frames reversed in place.
+2. **DECLICK** (`FUN_0076a790` → `FUN_00608530 (…, 1, 0.7)` → `FUN_0060d020` → `FUN_0060cdd0`): per slice, over its
+   last `round(sr · 0.04 · 0.7)` frames (after skipping trailing zeros), a one-pole low-pass whose coefficient climbs as
+   `min(1, 2/sr · exp(i · ln 22050 / n · X))` is subtracted from the sound, and the last `round(sr/1000)` frames fade on
+   a raised cosine. `X` is a global at `0x7db440` filled at start-up; LYNX takes it as ln 2 so the rate reaches
+   22050·2/sr at the end **[HYP, to check against a render]**. FL turns the sample to float here.
+3. **TS / PS** (`FUN_0076aa20`): factor `Exp(Ln 2 · v/10000)` in single precision (`FUN_00766300`). Methods 0/1
+   (Fill gaps, Alternate) with a stretch: the sample goes to 16 bits, every slice moves to `round(pos · factor)`, the
+   total to `round(frames · factor)`; a slice that grows runs `FUN_0075b5d0` (short ones, < 150 frames, with method 0),
+   one that shrinks is cut. `FUN_0075b5d0`: a slice whose last 10 ms are below one step is copied and padded with
+   silence; otherwise, per channel, the part after the first local peak of the slice's second half (from 20 ms before
+   its middle) ping-pongs between that peak and the last one (`|((k − first + span) mod 2·span) − span| + first`),
+   faded from the old end to twice the old length by `(1 − t)³` pulled toward 0.275 after t = 0.5 (Alternate: toward
+   0.1375, times `1 − w³`), silent beyond; method 0 ends with a 2 ms linear fade. Methods ≥ 2 and PS go through
+   `FUN_007520c0` (Elastique, licensed): **not reproduced** — LYNX keeps the length there, and plays PS by resampling.
+4. **ATT / DEC** (`FUN_0076a830`): per slice, `round(ms · (float)(sr/1000))` frames, capped at the slice. Through
+   `FUN_00607ed0`: `t = (k − first + 1)/(n + 1)`; fade in shape 2 (linear), fade out shape 3 with 10:
+   gain `(e^{(1−t)·ln 11} − 1)/10` (single precision steps); both turn into a raised cosine when the faded part is
+   50 ms or less (flag 0x100).
+
+## Notes (`FUN_00768230`, TriggerVoice)
+
+Key = `round(pitch · 0.01)` (0…124) through the 125-entry key table; the voice gets `(60 − key) · 100` cents, so the
+slice keeps its pitch. Length: up to the next slice, or to the sample's end with PLAY TO END (`P+0x13E`), minus one
+frame. LYNX plays it on the sampler's slice mode (first key and PLAY TO END added to it).
+
+## Dump beat to piano roll (`FUN_0076b640`, tags of the DumpToPRMenu)
+
+Times: `pos · ((ppq · P188 · beats / frames) / 4)` (P188 taken as 4), or the slice's beat place · ppq; Original length
+(9) uses real time at the project tempo. Quantize (2) and Swing (3) round to 16ths (swing: odd ones + a third of a
+16th). A note lasts to the next later time (the loop end for the last). Slice per note: Reverse `n−1−i`, Random,
+Flatten (all slice 1), Shift up `i−1`, Shift down `i+1` (mod n). Velocity 100/128; Accentuate 110/128 on the beat
+(from −ppq/8), 95/128 off it; Pitch up beat +300 cents on alternate beats; Widen stereo ∓16 of ±64; Crazy random pan
+±8, velocity (90…109)/128, pitch −200…600 cents; Stutter splits each note in 2 or 4. LYNX runs it at PPQ 96 and
+scales to its 960. Random uses LYNX's generator (Delphi's seed is not shared).
+
+## Differences (LYNX)
+
+1. PS and the Elastique methods (2–7) are not reproduced (above).
+2. Auto-slicing (Dull / Medium / Sharp with LOW / HIGH) uses LYNX's transient detector; FL's detector was not read.
+3. Open (`.zgr` beat grooves) opens samples only; "Open in Edison" and "View › Spectrum" are not there.
+4. A slice's own key is saved and shown; the voices still map the slices from the first note up (the key table is not
+   rebuilt from custom keys).
+5. The editor is LYNX's own drawing in FL's layout, at twice its size.

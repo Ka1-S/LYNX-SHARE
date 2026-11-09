@@ -615,6 +615,36 @@ StretchMethod stretchMethodForFlMode (int flMode) noexcept
     }
 }
 
+std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method, double semitones)
+{
+    auto out = timeStretch (span, ratio, method, semitones);
+    if (out == nullptr)
+        return out;
+    // FL ends a cut span at zero: after a trimmed, stretched span its clip is silent to the clip's end (FL render p62, round
+    // 180d), where the stretcher's last frame is not zero and the clip would hold it as DC. A raised-cosine over 1 ms, as
+    // FL's region declick (FUN_006a0760).
+    const auto fade = std::min<long> ((long) out->frames(), (long) std::llround (out->sampleRate * 0.001));
+    for (long i = 0; i < fade; ++i)
+    {
+        const auto g = (float) (0.5 - 0.5 * std::cos (3.141592653589793 * (double) i / (double) std::max (1L, fade)));
+        const auto at = (std::size_t) ((long) out->frames() - 1 - i);
+        out->left[at] *= g;
+        if (! out->right.empty())
+            out->right[at] *= g;
+    }
+    out->cropped = span.cropped;
+    out->cropFrom = span.cropFrom;
+    out->cropTo = span.cropTo;
+    out->acidBeats = span.acidBeats;
+    if (span.loopStart >= 0 && span.loopEnd > span.loopStart)
+    {
+        const auto scale = (double) out->frames() / (double) std::max<std::size_t> (1, span.frames());
+        out->loopStart = (std::int64_t) std::llround ((double) span.loopStart * scale);
+        out->loopEnd = std::max<std::int64_t> (out->loopStart + 1, (std::int64_t) std::llround ((double) span.loopEnd * scale));
+    }
+    return out;
+}
+
 std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones)
 {
     const auto frames = (long) in.frames();

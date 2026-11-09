@@ -489,7 +489,7 @@ Layout (validated on 10,576 records of 80 B):
 | 0x0C | u16 | Playlist track, inverted: `track = 499 − value` **[HYP from the value; the load adds +100 in files < 9.?]** |
 | 0x0E | u16 | Group |
 | 0x10 | u16 | 120 (default clip fine pitch) |
-| 0x12 | u16 | Flags: 0x0040 default; **0x2000 = muted/disabled** **[HYP]** (205 cases) |
+| 0x12 | u16 | Flags: 0x0040 default; **0x2000 = muted** **[DECOMP, round 182e]** (205 cases); 0x8000 = selected (round 180c) |
 | 0x14 | 4×u8 | 64, 100, 128, 128: default clip pan, vel, modX, modY |
 | 0x18 | f32 | **Offset start** (−1 = none). In automation clips, it is the start point within the envelope |
 | 0x1C | f32 | **Offset end** (−1 = none) |

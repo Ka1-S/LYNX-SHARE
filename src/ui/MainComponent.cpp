@@ -1,7 +1,10 @@
+#include "ui/AudioClipboard.h"
+#include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
 #include "ui/FileChoosers.h"
@@ -278,6 +281,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     metronomeButton.onRightClick = [this] { showMetronomeMenu(); };
 
+    // FL's MultiLinkBtn (round 177b-4): lit while "Multilink to controllers" is on; [RMB] FL's MultilinkMenu
+    multilinkButton.setFlat (true);
+    multilinkButton.setWantsKeyboardFocus (false);
+    multilinkButton.onClick = [this] { runAction ("options.multilink"); };
+    multilinkButton.onRightClick = [this] {
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (false); });
+        menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (true); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
+    };
+
     typingPianoButton.setOnColour (theme::colour::bg6);
     typingPianoButton.setIconColourWhenOn (theme::colour::accent);
     typingPianoButton.onClick = [this] { toggleTypingPiano(); };
@@ -508,6 +522,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
+    playlist.onViewOptionChanged = [this] { saveUiSettings(); };
     playlist.onOpenInSampler = [this] (int channel) {
         // the audio clip's file in a new Sampler channel (to play it from notes), its settings open
         const auto& song = engine.getSong();
@@ -533,7 +548,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
-                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
+                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
+                                                             &multilinkButton })
     {
         addAndMakeVisible (c);
         c->setMouseClickGrabsKeyboardFocus (false); // the PC keyboard stays with the main window
@@ -571,7 +587,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         recordButton.setOnColour (colour::record.withAlpha (0.2f));
         recordButton.setIconColourWhenOn (colour::record);
         for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton,
-                          &patternModeButton, &songModeButton })
+                          &patternModeButton, &songModeButton, &multilinkButton })
         {
             b->setOnColour (onWash);
             b->setIconColourWhenOn (onIcon);
@@ -903,6 +919,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::meters] = 118;
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
+    widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -1090,6 +1107,7 @@ void MainComponent::resized()
                 case Group::meters: hide ({ &perfMeter }); break;
                 case Group::output: hide ({ &output }); break;
                 case Group::chord: hide ({ &chordPanel }); break;
+                case Group::multilink: hide ({ &multilinkButton }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1190,6 +1208,7 @@ void MainComponent::resized()
             case Group::meters: put (perfMeter, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
+            case Group::multilink: put (multilinkButton, panel.withY (row1).withHeight (h)); break;
             case Group::count_: break;
         }
     }
@@ -1566,6 +1585,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);
+    // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
+    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (chord).taken, typingIntoText))
+        return keyPressed (key);
     const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
     return ! action.empty() && runAction (action);
 }
@@ -1591,6 +1613,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("transport.nextMarker")) engine.jumpToNextMarker (true);
     else if (is ("transport.previousMarker")) engine.jumpToNextMarker (false);
     else if (is ("view.typingPiano")) toggleTypingPiano();
+    else if (is ("options.multilink")) engine.setMultilink (! engine.isMultilinkOn());
     else if (is ("view.toolbar"))
     {
         auto layout = toolbarLayout;
@@ -1695,6 +1718,7 @@ bool MainComponent::runAction (const std::string& id)
         saveUiSettings();
     }
     else if (is ("view.audioEditor")) openAudioEditorForSelection();
+    else if (is ("channel.soloSelected")) rack.solo (engine.getSelectedChannel());
     else if (is ("view.tempoTapper")) openTempoTapper (engine);
     else if (is ("view.sampleBrowser")) toggleSampleBrowser();
     else if (is ("view.pluginDatabase"))
@@ -1962,6 +1986,15 @@ void MainComponent::loadUiSettings()
     // the sound in FL's order (0.1.20) wins over the old key, wherever each line is
     const auto flMetronomeSound = std::any_of (lines.begin(), lines.end(), [] (const juce::String& l) { return l.trim().startsWith ("metronomeSoundFl"); });
 
+    // "Blend recorded notes" (round 177c): see startingRecordMode() for who starts with what
+    {
+        const auto saved = std::find_if (lines.begin(), lines.end(), [] (const juce::String& l) { return l.trim().startsWith ("recordBlend="); });
+        auto o = engine.getRecordOptions();
+        o.mode = startingRecordMode (uiSettingsFile().existsAsFile(), saved != lines.end(),
+                                     saved != lines.end() && saved->fromFirstOccurrenceOf ("=", false, false).trim() == "1");
+        engine.setRecordOptions (o);
+    }
+
     for (const auto& line : lines)
     {
         const auto key = line.upToFirstOccurrenceOf ("=", false, false).trim();
@@ -1981,6 +2014,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
+            autolanes::setShown (on);
         else if (key == "alternateUndo")
             alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
@@ -1999,6 +2034,8 @@ void MainComponent::loadUiSettings()
             const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
             ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
         }
+        else if (key == "uiAnimations") // round 179a (ui/Motion.h)
+            ui::motion::enabled() = on;
         else if (key == "artMotion")
             skin::setArtMotion (on);
         else if (key == "waveStereo")
@@ -2021,6 +2058,8 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
+        else if (key == "prSongBars")
+            PianoRollComponent::songBarsRuler = on;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2043,12 +2082,16 @@ void MainComponent::loadUiSettings()
             chordShowNearHint = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
+        else if (key == "autoClipsAtPlayback")
+            autoclipplace::setAtPlayback (on);
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready; "layoutStyle" wins)
             startStyle.legacyFlag (on);
         else if (key == "layoutStyle") // (round 184a)
             startStyle.styleId (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "lanesBeforeClipLaunch")
             lanesBeforeClipLaunch = on;
+        else if (key == "alsSessionOnPlaylist")
+            AudioEngine::alsSessionOnPlaylist = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -2075,6 +2118,12 @@ void MainComponent::loadUiSettings()
             autosaveMinutes = prefs::clampAutosaveMinutes (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askUnusedRecordings")
             askUnusedRecordings = on;
+        else if (key == "backupWaitsForQuiet")
+            backupWaitsForQuiet = on;
+        else if (key == "backupLongestWait")
+            backupLongestWaitMinutes = prefs::clampBackupLongestWait (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "hoverValues")
+            hoverValues = on;
         else if (key == "autosaveKeep")
             autosaveKeep = prefs::clampAutosaveKeep (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "metronomeSound" && ! flMetronomeSound) // (before 0.1.20: 0 LYNX click, 1..5 hi-hat..pulse)
@@ -2132,7 +2181,7 @@ void MainComponent::loadUiSettings()
                 o.compensateOutput = v != 0;
             engine.setRecordOptions (o);
         }
-        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop")
+        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop" || key == "recordLastPassPlays")
         {
             auto o = engine.getRecordOptions();
             const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
@@ -2140,6 +2189,8 @@ void MainComponent::loadUiSettings()
                 o.punchLoopRegion = v != 0;
             else if (key == "recordLoop")
                 o.loopRecord = v != 0;
+            else if (key == "recordLastPassPlays")
+                o.lastLoopPassPlays = v != 0;
             else
                 (key == "recordPreRoll" ? o.preRollBars : o.postRollBars) = juce::jlimit (0, 8, v);
             engine.setRecordOptions (o);
@@ -2177,6 +2228,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
@@ -2190,6 +2242,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
+                                      + "\nuiAnimations=" + juce::String (ui::motion::enabled() ? 1 : 0)
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -2197,6 +2250,7 @@ void MainComponent::saveUiSettings()
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
+                                      + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -2204,9 +2258,11 @@ void MainComponent::saveUiSettings()
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
+                                      + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (layoutstyle::legacyClipLaunchFlag (layoutStyle) ? 1 : 0)
                                       + "\nlayoutStyle=" + layoutstyle::id (layoutStyle)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
+                                      + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -2220,6 +2276,9 @@ void MainComponent::saveUiSettings()
                                       + "\ntoolbarVisible=" + juce::String (toolbarLayout.visible ? 1 : 0)
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
+                                      + "\nbackupWaitsForQuiet=" + juce::String (backupWaitsForQuiet ? 1 : 0)
+                                      + "\nbackupLongestWait=" + juce::String (backupLongestWaitMinutes)
+                                      + "\nhoverValues=" + juce::String (hoverValues ? 1 : 0)
                                       + "\nundoLevels=" + juce::String (engine.getUndoLevels())
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
                                       + "\nmetronomeSoundFl=" + juce::String (metronome::clampSound (engine.getTransport().metronomeSound.load()))
@@ -2246,6 +2305,8 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordQuantiseAutomation=" + juce::String (engine.getRecordOptions().quantiseAutomation ? 1 : 0)
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
                                       + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
+                                      + "\nrecordLastPassPlays=" + juce::String (engine.getRecordOptions().lastLoopPassPlays ? 1 : 0)
+                                      + "\nrecordBlend=" + juce::String (engine.getRecordOptions().mode == RecordMode::overdub ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
@@ -2738,6 +2799,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
+            action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
             action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
@@ -2752,6 +2814,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.mergeSimilarClips", tr ("Merge similar pattern clips"));
             action (menu, "playlist.mergeAutomationClips", tr ("Merge automation clips"));
             action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
+            menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
             action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
             {
@@ -2998,6 +3061,8 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.waitForInput = ! r.waitForInput; }); });
     menu.addItem (tr ("Loop record") + shortcutText ("record.loop"), true, o.loopRecord,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.loopRecord = ! r.loopRecord; }); });
+    menu.addItem (tr ("After loop recording, only the last pass plays"), true, o.lastLoopPassPlays,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.lastLoopPassPlays = ! r.lastLoopPassPlays; }); });
     menu.addItem (tr ("Step edit") + shortcutText ("record.stepEdit"), true, engine.isStepEdit(), [this] { runAction ("record.stepEdit"); });
     // round 170d: notes played during the count-in are kept; the ones just before the start go onto it
     {
@@ -3366,8 +3431,14 @@ void MainComponent::refreshRecordOptionButtons()
                                                          : tr ("Count-in before recording: off"),
                                        "record.countIn"));
     blendButton.setToggleState (o.mode == RecordMode::overdub, juce::dontSendNotification);
-    blendButton.setTooltip (o.mode == RecordMode::overdub ? tr ("Blend recorded notes: on (new notes join the pattern's notes)")
-                                                          : tr ("Blend recorded notes: off (a recorded channel's old notes are replaced)"));
+    {
+        const auto blend = o.mode == RecordMode::overdub;
+        auto tip = blend ? tr ("Blend recorded notes: on (new notes join the pattern's notes)")
+                         : tr ("Blend recorded notes: off (a recorded channel's old notes are replaced)");
+        if (! o.lastLoopPassPlays)
+            tip << "\n" << (blend ? tr ("Loop-recorded audio: every pass plays") : tr ("Loop-recorded audio: every pass is muted"));
+        blendButton.setTooltip (tip);
+    }
     waitInputButton.setToggleState (o.waitForInput, juce::dontSendNotification);
     waitInputButton.setTooltip (withKey (o.waitForInput ? tr ("Recording waits for the first note: on") : tr ("Recording waits for the first note: off"),
                                          "record.waitForInput"));
@@ -3392,7 +3463,7 @@ void MainComponent::clonePatternNow()
 
 void MainComponent::movePatternNow (int delta)
 {
-    engine.editSong ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
+    engine.editSongPatternOrder ([delta] (Song& s) { movePattern (s, s.currentPattern, delta); });
 }
 
 void MainComponent::splitPatternByChannelNow()
@@ -3783,6 +3854,7 @@ void MainComponent::refreshModeButton()
     patternModeButton.setToggleState (! songMode, juce::dontSendNotification);
     songModeButton.setToggleState (songMode, juce::dontSendNotification);
     metronomeButton.setToggleState (engine.getTransport().metronome.load(), juce::dontSendNotification);
+    multilinkButton.setToggleState (engine.isMultilinkOn(), juce::dontSendNotification);
 }
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -4009,6 +4081,10 @@ juce::String MainComponent::idleHint() const
     if (engine.isCountingIn())
         return tr ("Recording: count-in...");
 
+    // FL's text while "Multilink to controllers" is on (round 177b-4); the controls moved show their own hint
+    if (engine.isMultilinkOn())
+        return tr ("Please tweak the controls you want to link...");
+
     if (const auto scan = engine.getPluginHost().backgroundScan(); scan.running)
         return tr ("Scanning for plugins in the background: {0}% {1}", { juce::String (juce::roundToInt (scan.progress * 100.0f)), scan.file });
 
@@ -4144,6 +4220,7 @@ void MainComponent::setQuickTips()
     tip (blendButton, tr ("Blend recorded notes"), "record.blend");
     tip (loopRecordButton, tr ("Loop record"), "record.loop");
     tip (stepEditButton, tr ("Step edit"), "record.stepEdit");
+    tip (multilinkButton, tr ("Multilink to controllers"), "options.multilink"); // (FL's hint: "Ctrl+J Multilink to controllers")
     tip (punchButton, tr ("Punch in/out"), "record.punch");
     tip (tapTempoButton, tr ("Tempo tapper"), "view.tempoTapper");
     tip (typingPianoButton, tr ("Typing keyboard to piano"), "view.typingPiano");
@@ -4441,8 +4518,19 @@ void MainComponent::timerCallback()
                                projectName.isNotEmpty() ? juce::File::createLegalFileName (projectName) : juce::String());
 
     // a backup copy every few minutes (Settings › General) when there are changes
-    // (not in the middle of a recording: FL also postpones the timed backup until the transport is free)
-    if (autosaveMinutes > 0 && ++autosaveTicks >= 30 * 60 * autosaveMinutes && ! engine.isRecording())
+    // (not in the middle of a recording: FL also postpones the timed backup until the transport is free; round 177d:
+    // with "Wait with backups..." on, also while playing and for a few seconds after MIDI input, so writing the plugin
+    // states never stutters the sound, up to the longest wait set there)
+    if (const auto midi = engine.getMidiPlayed(); midi != backupMidiSeen)
+    {
+        backupMidiSeen = midi;
+        backupMidiMs = juce::Time::getMillisecondCounterHiRes();
+    }
+    const auto backupDueTicks = 30 * 60 * autosaveMinutes;
+    if (autosaveMinutes > 0 && ++autosaveTicks >= backupDueTicks
+        && prefs::backupMayRun (engine.isRecording(), engine.getTransport().playing.load(),
+                                juce::Time::getMillisecondCounterHiRes() - backupMidiMs, backupWaitsForQuiet,
+                                autosaveTicks * 1000.0 / 30.0, backupLongestWaitMinutes * 60000.0))
     {
         autosaveTicks = 0;
 
@@ -4521,6 +4609,7 @@ void MainComponent::timerCallback()
         const uitrace::Scope part ("timer: hint", false);
         ui::Hint hint;
         bool live = false;
+        juce::Component* hovered = nullptr;
 
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
@@ -4540,6 +4629,7 @@ void MainComponent::timerCallback()
                 live = source.isDragging();
                 const auto at = live ? source.getLastMouseDownPosition() : source.getScreenPosition();
                 hint = ui::hintFor (under, under->getLocalPoint (nullptr, at).roundToInt());
+                hovered = under;
             }
         }
 
@@ -4550,6 +4640,8 @@ void MainComponent::timerCallback()
         }
 
         hintBar.setHint (hint, live && hint.value.isNotEmpty());
+        if (hoverValues)
+            updateHoverValue (hovered, hint, live);
         if (++tweakTicks >= 3) // 10 times a second
         {
             tweakTicks = 0;
@@ -5381,7 +5473,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.zip;*.lynxpack;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.flm;*.zip;*.lynxpack;*.mid;*.midi");
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -5455,7 +5547,8 @@ void MainComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("flp;als")) // (a Live set takes the .flp import's path, round 175a)
+    // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl"))
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -5504,7 +5597,9 @@ void MainComponent::flpImported (const juce::File& file)
         importedFlpFile = file;
         projectName = file.getFileNameWithoutExtension();
         rememberRecent (file);
-        importedSuffix = " " + (file.hasFileExtension ("als") ? tr ("(imported from .als)") : tr ("(imported from FL Studio)"));
+        importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
+                                : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
+                                                                         : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
 
@@ -5519,8 +5614,8 @@ void MainComponent::flpImported (const juce::File& file)
 
 void MainComponent::openLynxProject (const juce::File& file)
 {
-    juce::String error;
-    auto song = ProjectFile::load (file, error);
+    juce::String error, savedBy;
+    auto song = ProjectFile::load (file, error, &savedBy);
 
     if (! song)
     {
@@ -5541,6 +5636,18 @@ void MainComponent::openLynxProject (const juce::File& file)
     rememberRecent (file);
     updateTitle();
     playlist.showSongAfterOpen();
+
+    // pain point 37 (round 177d): a project from a newer LYNX SHARE opens, but saving it here would drop what that
+    // version added, so say so once (FL warns about a project from a more recent version too)
+    if (safety::savedByNewerVersion (savedBy.toStdString(), JUCE_APPLICATION_VERSION_STRING))
+    {
+        platform::testModeLog ("project saved by newer version " + savedBy);
+        if (! platform::testMode())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Saved by a newer version"),
+                                                    tr ("This project was saved by LYNX SHARE {0}, and this is {1}. What the newer version added may be "
+                                                        "lost if you save it here: use File › Save as... to keep the original.",
+                                                        { savedBy, JUCE_APPLICATION_VERSION_STRING }));
+    }
 
     if (persistent)
     {
@@ -5565,6 +5672,7 @@ void MainComponent::openSettings (int page)
         if (safe == nullptr)
             return o;
         o.language = i18n::saved();
+        o.uiFont = theme::savedUiFont();
         o.uiScale = safe->toolbarLayout.uiScale;
         o.compactMenus = theme::menus::compact();
         o.waveSpectral = ui::WaveformCache::spectral;
@@ -5577,6 +5685,7 @@ void MainComponent::openSettings (int page)
         o.reducedEffects = skin::reducedEffects();
         o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
+        o.uiAnimations = ui::motion::enabled();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
         o.splash = safe->startup.splash;
@@ -5588,12 +5697,17 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
+        o.autoClipsAtPlayback = autoclipplace::atPlayback();
         o.layoutStyle = (int) safe->layoutStyle;
+        o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
         o.autosaveMinutes = safe->autosaveMinutes;
         o.autosaveKeep = safe->autosaveKeep;
         o.askUnusedRecordings = safe->askUnusedRecordings;
+        o.backupWaitsForQuiet = safe->backupWaitsForQuiet;
+        o.backupLongestWaitMinutes = safe->backupLongestWaitMinutes;
+        o.hoverValues = safe->hoverValues;
         o.crossfadesInNewProjects = newProjectDefaults().autoCrossfades;
         o.pluginSandbox = pluginSandboxEnabled();
         o.menuEntry = appImageMenuEntryInstalled();
@@ -5614,6 +5728,7 @@ void MainComponent::openSettings (int page)
         }
         theme::menus::setCompact (o.compactMenus);
         ui::FrameTicker::rateLimit() = o.animationRate; // (the tickers read it every frame)
+        ui::motion::enabled() = o.uiAnimations;
         if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
             skin::setArtMotion (o.artMotion);
@@ -5663,7 +5778,9 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
         self.setLayoutStyle ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, o.layoutStyle));
+        AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
             setStretchedClipsLoop (o.stretchedClipsLoop);
@@ -5676,9 +5793,17 @@ void MainComponent::openSettings (int page)
         self.autosaveMinutes = prefs::clampAutosaveMinutes (o.autosaveMinutes);
         self.autosaveKeep = prefs::clampAutosaveKeep (o.autosaveKeep);
         self.askUnusedRecordings = o.askUnusedRecordings;
+        self.backupWaitsForQuiet = o.backupWaitsForQuiet;
+        self.backupLongestWaitMinutes = prefs::clampBackupLongestWait (o.backupLongestWaitMinutes);
+        if (self.hoverValues && ! o.hoverValues && self.hoverTipShown)
+            ui::hideValueTip();
+        self.hoverValues = o.hoverValues;
+        self.hoverTipShown = false;
         newProjectDefaults().autoCrossfades = o.crossfadesInNewProjects;
         self.autosaveTicks = 0;
         self.saveUiSettings();
+        if (o.uiFont != theme::savedUiFont())
+            theme::saveUiFont (o.uiFont);
         if (o.language != i18n::saved())
             self.showLanguageChoice (o.language);
     };
@@ -5807,6 +5932,85 @@ void MainComponent::showMissingFiles (bool afterOpening)
             if (safe != nullptr && afterOpening && fromFlp)
                 safe->showImportReport();
         });
+}
+
+juce::PopupMenu MainComponent::makeSwitchAudioClipsMenu (bool selectedOnly)
+{
+    // FL's groups where LYNX has a match (Realtime: Resample), LYNX's stretch engine, and its Ableton-style warp modes
+    juce::PopupMenu m;
+    auto item = [this, &m, selectedOnly] (const char* name, bool keepPitch, StretchMethod method) {
+        m.addItem (tr (name), [this, selectedOnly, keepPitch, method, name] { switchAudioClips (selectedOnly, keepPitch, method, tr (name)); });
+    };
+    m.addSectionHeader (tr ("Realtime"));
+    item (TR_NOOP ("Resample"), false, StretchMethod::general);
+    m.addSectionHeader (tr ("Stretch engine"));
+    item (TR_NOOP ("General"), true, StretchMethod::general);
+    item (TR_NOOP ("Drums / transients"), true, StretchMethod::transients);
+    item (TR_NOOP ("Vocal / mono"), true, StretchMethod::mono);
+    m.addSectionHeader (tr ("Warp (Ableton-style)"));
+    item (TR_NOOP ("Beats"), true, StretchMethod::beats);
+    item (TR_NOOP ("Tones"), true, StretchMethod::tones);
+    item (TR_NOOP ("Texture"), true, StretchMethod::texture);
+    item (TR_NOOP ("Complex"), true, StretchMethod::complex);
+    return m;
+}
+
+void MainComponent::switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName)
+{
+    // FL's FUN_01213a20 (REA round 181b): the error when there is none, else a question, then the change (undoable)
+    std::vector<int> channels;
+    if (selectedOnly)
+        channels = engine.getSelectedChannels();
+    else
+        for (int i = 0; i < (int) engine.getSong().channels.size(); ++i)
+            channels.push_back (i);
+    if (audioClipsAmong (engine.getSong(), channels) == 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                selectedOnly ? tr ("No audio clip channels were selected.") : tr ("No audio clip channels were found."));
+        return;
+    }
+    const auto text = selectedOnly ? tr ("Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName })
+                                   : tr ("All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment.", { modeName });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Confirm"))
+                       .withMessage (text)
+                       .withButton (tr ("OK"))
+                       .withButton (tr ("Cancel"));
+    juce::AlertWindow::showAsync (options, [this, channels, keepPitch, method] (int result) {
+        if (result == 1)
+            engine.editSong ([&channels, keepPitch, method] (Song& s) { setStretchOfAudioClips (s, channels, keepPitch, method); });
+    });
+}
+
+void MainComponent::saveClipboardToBrowser (bool midi)
+{
+    // FL's FUN_0124d070 (REA round 181b): the clipboard as "Audio clipboard.wav" / "MIDI clipboard.mid" in the
+    // Browser's Clipboard files
+    juce::File file;
+    if (midi)
+    {
+        if (const auto smf = midiclipboard::get())
+            file = audioclipboard::save ("MIDI clipboard", ".mid", smf->getData(), smf->getSize());
+        else
+            return;
+    }
+    else
+    {
+        const auto data = audioclipboard::wav();
+        if (data.empty())
+            return;
+        file = audioclipboard::save ("Audio clipboard", ".wav", data.data(), data.size());
+    }
+    if (file == juce::File())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                tr ("Unable to create folder: {0}", { audioclipboard::folder().getFullPathName() }));
+        return;
+    }
+    browser.refreshRoots();
+    ui::postHint ({ tr ("Saved to Clipboard files: {0}", { file.getFileName() }), {}, false, false }, 5000);
 }
 
 void MainComponent::confirmPrepareForMidiExport()
@@ -6028,6 +6232,34 @@ void MainComponent::placeHintBar (juce::Rectangle<int> row)
     hintBar.setBounds (row);
 }
 
+// Settings › General › "Show a control's value next to the mouse..." (round 177d, pain point 10; off by default = FL,
+// whose value shows in the hint bar only): the value the hint bar shows for the control under the mouse, in the
+// drag read-out's pill just above the cursor. A drag shows its own read-out, so nothing here while one runs.
+void MainComponent::updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live)
+{
+    if (live)
+    {
+        hoverTipShown = false; // (the drag's read-out owns the pill now)
+        return;
+    }
+    const auto at = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+    const auto show = hovered != nullptr && hint.value.isNotEmpty() && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()
+                      && hovered->getTopLevelComponent() == getTopLevelComponent();
+    if (! show)
+    {
+        if (hoverTipShown)
+            ui::hideValueTip();
+        hoverTipShown = false;
+        return;
+    }
+    if (hoverTipShown && hint.value == hoverTipText && at == hoverTipAt)
+        return;
+    hoverTipShown = true;
+    hoverTipText = hint.value;
+    hoverTipAt = at;
+    ui::showValueTip (*hovered, juce::Rectangle<int> (1, 18).withCentre (hovered->getLocalPoint (nullptr, at)), hint.value);
+}
+
 void MainComponent::refreshTweakReadout()
 {
     const auto had = tweakReadout.hasContent();
@@ -6149,6 +6381,31 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             pianoRoll.runAction ("pianoRoll.chordProgression");
         });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
+        menu.addItem (tr ("Modulators..."), [this] { openModulators (engine); }); // round 177b: LYNX's own (FL has none)
+        // FL's Clipboard and Score logger sections, in FL's place (round 181b)
+        menu.addSectionHeader (tr ("Clipboard"));
+        menu.addItem (tr ("Save audio clipboard to browser"), audioclipboard::hasAudio(), false, [this] { saveClipboardToBrowser (false); });
+        menu.addItem (tr ("Save MIDI clipboard to browser"), midiclipboard::hasMidi(), false, [this] { saveClipboardToBrowser (true); });
+        {
+            // FL's score logger (REA round 165f): the notes played lately, recording or not, into the current pattern
+            menu.addSectionHeader (tr ("Score logger"));
+            juce::PopupMenu dumpMenu;
+            for (const auto minutes : { 2, 5, 10, 20, 30 })
+                dumpMenu.addItem (tr ("Last {0} minutes", { juce::String (minutes) }), [this, minutes] { dumpScoreLog (minutes); });
+            menu.addSubMenu (tr ("Dump score log to selected pattern"), dumpMenu);
+            menu.addItem (tr ("Clear log"), ! engine.scoreLogEmpty(), false, [this] {
+                auto options = juce::MessageBoxOptions()
+                                   .withIconType (juce::MessageBoxIconType::WarningIcon)
+                                   .withTitle (tr ("Score logger"))
+                                   .withMessage (tr ("This will clear all logged notes!"))
+                                   .withButton (tr ("Clear log"))
+                                   .withButton (tr ("Cancel"));
+                juce::AlertWindow::showAsync (options, [this] (int result) {
+                    if (result == 1)
+                        engine.clearScoreLog();
+                });
+            });
+        }
         addAudioLoggerMenu (menu); // FL's Tools menu has it just above "Last tweaked parameters"
         // FL's "Last tweaked parameters" section (LastTweaked1Menu / LastTweaked2Menu → FUN_0123d1d0, REA round 143):
         // the parameter's own menu for the last two moved controls
@@ -6156,7 +6413,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSubMenu (tr ("Last tweaked"), makeLastTweakedMenu (0), engine.getLastTweaked (0).has_value());
         menu.addSubMenu (tr ("Next to last tweaked"), makeLastTweakedMenu (1), engine.getLastTweaked (1).has_value());
         menu.addSectionHeader (tr ("Macros"));
-        menu.addItem (tr ("Stop sound (all notes off)") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
+        menu.addItem (tr ("Stop sound") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
         menu.addSeparator();
         // FL's Macros order (round 181b; [DFM] mainmenu, round 168f)
         menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
@@ -6167,10 +6424,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
         menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
+        // FL's two Switch items, with LYNX's own modes inside (user's decision, round 181b)
+        menu.addSubMenu (tr ("Switch all audio clip channels to"), makeSwitchAudioClipsMenu (false));
+        menu.addSubMenu (tr ("Switch selected audio clip channels to"), makeSwitchAudioClipsMenu (true));
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
-        menu.addItem (tr ("Delete unused recordings and save project..."), [this] { deleteUnusedRecordingsAndSave(); });
+        // greyed until the project has a file, as in FL 2026 (seen in an unsaved project, round 181b)
+        menu.addItem (tr ("Delete unused files and save project"), currentFile != juce::File(), false, [this] { deleteUnusedRecordingsAndSave(); });
         {
             juce::PopupMenu declick;
             int mode = 0;
@@ -6434,6 +6695,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                     g.setFollowingView (v, ! on);
             });
         }
+        // FL's "Multilink to controllers" (Ctrl+J), the last of FL's Switches (after Auto scrolling and Enable groups;
+        // round 177b-4): the controls moved while it is on link, in that order, to the controllers moved next
+        menu.addItem (tr ("Multilink to controllers") + shortcutText ("options.multilink"), true, engine.isMultilinkOn(),
+                      [this] { runAction ("options.multilink"); });
         {
             juce::PopupMenu recording;
             addRecordOptions (recording);
@@ -6463,25 +6728,6 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 const auto folder = AudioLogger::defaultFolder();
                 folder.createDirectory();
                 folder.startAsProcess();
-            });
-        }
-        {
-            // FL's score logger (REA round 165f): the notes played lately, recording or not, into the current pattern
-            juce::PopupMenu dumpMenu;
-            for (const auto minutes : { 2, 5, 10, 20, 30 })
-                dumpMenu.addItem (tr ("Last {0} minutes", { juce::String (minutes) }), [this, minutes] { dumpScoreLog (minutes); });
-            menu.addSubMenu (tr ("Dump score log to selected pattern"), dumpMenu);
-            menu.addItem (tr ("Clear score log"), ! engine.scoreLogEmpty(), false, [this] {
-                auto options = juce::MessageBoxOptions()
-                                   .withIconType (juce::MessageBoxIconType::WarningIcon)
-                                   .withTitle (tr ("Score logger"))
-                                   .withMessage (tr ("This will clear all logged notes!"))
-                                   .withButton (tr ("Clear log"))
-                                   .withButton (tr ("Cancel"));
-                juce::AlertWindow::showAsync (options, [this] (int result) {
-                    if (result == 1)
-                        engine.clearScoreLog();
-                });
             });
         }
         menu.addSubMenu (tr ("Toolbar"), makeToolbarMenu());
