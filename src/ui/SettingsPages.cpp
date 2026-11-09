@@ -1509,7 +1509,6 @@ private:
         r.section (notesTitle);
         velocityBox.setBounds (r.row (velocityLabel, 300));
         velocityNote.setBounds (r.indented (16).translated (0, -3));
-        footPedal.setBounds (r.full (24));
         perfBox.setBounds (r.row (perfLabel, 300));
         perfNote.setBounds (r.indented (32).translated (0, -3));
         jumpBox.setBounds (r.row (jumpLabel, 300));
@@ -1523,6 +1522,7 @@ private:
         }
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.full (16).translated (0, -3));
+        footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
         {
             auto row = r.row (linksLabel, 0, 110);
             linksLabel.setBounds (linksLabel.getBounds().withTrimmedTop (4));
