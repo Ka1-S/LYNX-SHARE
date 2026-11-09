@@ -436,10 +436,10 @@ TEST (flm182c_imports_a_project)
     const auto* lead = flm182c::channelNamed (s, "Lead");
     CHECK (lead != nullptr && lead->instrument == InstrumentKind::synth && lead->mixerTrack == 4);
     CHECK (report.unsupported.count ("FL Studio Mobile: MiniSynth") == 1);
-    // effects: Graphic EQ, Reverb 2 and the legacy Reverb are mapped since round 188f (F5); the Limiter is still listed
+    // effects: Graphic EQ, Reverb 2 and the legacy Reverb are mapped since round 188f (F5), the Limiter since 188h
     CHECK (report.converted.count ("FL Studio Mobile: Reverb 2") == 1 && report.converted.count ("FL Studio Mobile: Graphic EQ") == 1
-           && report.converted.count ("FL Studio Mobile: Reverb (legacy)") == 1 && report.droppedEffects.count ("FL Studio Mobile: Limiter") == 1
-           && report.droppedEffects.size() == 1);
+           && report.converted.count ("FL Studio Mobile: Reverb (legacy)") == 1 && report.converted.count ("FL Studio Mobile: Limiter") == 1
+           && report.droppedEffects.empty());
     // F6: the master's Level lane → a Master volume automation clip (8 beats in, one 16-beat pass, FLM's fader law)
     CHECK (s.automations.size() == 1 && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
     if (s.automations.size() == 1)

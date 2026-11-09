@@ -115,3 +115,109 @@ TEST (flm188h_maps_pocket_modules)
     const auto t = flmfx::automate (flm188f::moduleOf (6, { 1.0f, 0.25f, 0.0f }), 2, { 0.0f, 0.5f, 1.0f });
     CHECK (t.size() == 1 && t[0].kind == AutomationTargetKind::effectParam && t[0].param == 1 && t[0].values[1] == 0.5f);
 }
+
+TEST (flm188h_pocket_limiter_leveller)
+{
+    using namespace lynx;
+    // Limiter: In / Out 0 dB, threshold −12 dB, release 0.2 → 0.2⁴·1.9 + 0.1 s. The output is 2 ms (96 samples at 48 kHz)
+    // late; a full-scale sample sets the floor g₀ = threshold at once, felt from the next sample (the delayed copy of
+    // the peak meets the gain 95 samples into its quarter-sine recovery)
+    {
+        std::vector<std::array<float, 2>> in (20000, { 0.1f, 0.1f });
+        in[0] = { 1.0f, 1.0f };
+        auto fx = makeEffect (EffectKind::pocketLimiter);
+        fx->prepare (48000.0);
+        CHECK (fx->latencySamples() == 96);
+        const auto o = flm188h::run (EffectKind::pocketLimiter, { 0.5f, 0.5f, 0.2f, 0.5f }, in);
+        const auto thr = std::pow (10.0, -0.6), rel = 0.2 * 0.2 * 0.2 * 0.2 * 1.9 + 0.1, dec = 1.0 / (rel * 48000.0);
+        const auto g = [&] (int n) { const auto s = std::sin ((1.0 - (n - 1) * dec) * 1.5707963267948966); return (1.0 - thr) * (1.0 - s) + thr; };
+        CHECK (o[95][0] == 0.0f && flm188h::near (o[96][0], g (96), 1e-4) && flm188h::near (o[200][1], 0.1 * g (200), 1e-4));
+        CHECK (flm188h::near (o.back()[0], 0.1, 1e-6)); // recovered, no make-up
+        CHECK (pocket::limiterParamText (2, 0.2f) == "0.10 s");
+    }
+    // Leveller: Gain 1 = +12 dB, Pan 0 = left only (linear balance); the first block starts on its targets
+    {
+        const auto o = flm188h::run (EffectKind::pocketLeveller, { 1.0f, 0.0f }, { { 0.1f, 0.1f } });
+        CHECK (flm188h::near (o[0][0], 0.1 * std::pow (10.0, 0.6), 1e-6) && o[0][1] == 0.0f);
+        CHECK (pocket::levellerParamText (0, 0.7379573f) == "0 dB" && pocket::levellerParamText (1, 0.25f) == "50.0% L");
+    }
+}
+
+TEST (flm188h_pocket_gate)
+{
+    using namespace lynx;
+    // defaults: threshold −60 dB, attack 10 ms (A. curve −1), release 250 ms, hold 250 ms; 255 samples late. A −20 dB
+    // tone: the gate opens at the first 256-sample block and is fully open well before 0.2 s; its floor is −60 dB
+    std::vector<std::array<float, 2>> in (24000);
+    for (std::size_t i = 0; i < in.size(); ++i)
+        in[i] = { 0.1f * (float) std::sin (0.05 * (double) i), 0.0f };
+    const auto o = flm188h::run (EffectKind::pocketGate, {}, in);
+    CHECK (std::abs (o[200][0]) < 1e-3f);
+    CHECK (flm188h::near (o[12000][0], 0.1 * std::sin (0.05 * (12000 - 255)), 1e-5));
+    // threshold above the tone: stays at the floor (Mix 1 → 0.001)
+    const auto c = flm188h::run (EffectKind::pocketGate, { 1.0f }, in);
+    CHECK (flm188h::near (c[12000][0], 0.001 * 0.1 * std::sin (0.05 * (12000 - 255)), 1e-6));
+    auto fx = makeEffect (EffectKind::pocketGate);
+    CHECK (fx->latencySamples() == 255);
+}
+
+TEST (flm188h_pocket_delays)
+{
+    using namespace lynx;
+    // Trance Delay at 120 BPM, 48 kHz: Time 0.775 = 3/4 beat = 18000 samples; the loop stores fb·(input + echo), so the
+    // first echo is fb (0.4 · 0.99) × Mix² and the second fb²; the dry stays at unity
+    {
+        std::vector<std::array<float, 2>> in (40000, { 0.0f, 0.0f });
+        in[0] = { 1.0f, 0.5f };
+        const auto o = flm188h::run (EffectKind::pocketTranceDelay, {}, in);
+        const auto fb = 0.4 * 0.99;
+        CHECK (o[0][0] == 1.0f && std::abs (o[17999][0]) < 1e-6f && flm188h::near (o[18000][0], fb, 1e-6)
+               && flm188h::near (o[36000][0], fb * fb, 1e-6) && flm188h::near (o[18000][1], 0.5 * fb, 1e-6));
+        // Ping-Pong: the left input comes back on the right first
+        const auto pp = flm188h::run (EffectKind::pocketTranceDelay, { 0.775f, 0.4f, 1.0f, 0.5f, 0.5f, 0.5f, 0.0f }, { in.begin(), in.begin() + 40000 });
+        CHECK (std::abs (pp[18000][0] - 0.5 * fb) < 1e-6 && flm188h::near (pp[18000][1], fb, 1e-6));
+        CHECK (pocket::tranceDelayParamText (0, 0.775f) == "3/4" && pocket::tranceDelayParamText (4, 0.5f) == "Ping-Pong");
+    }
+    // Tape Delay: Time 0.5 = 0.25 s → one loop = 0.25·(48000 − 2) + 2 samples (+1 by the read order); the echo of an
+    // impulse is spread over the two reads around it (linear), × Mix × Feedback = 0.4 · 0.6
+    {
+        std::vector<std::array<float, 2>> in (30000, { 0.0f, 0.0f });
+        in[0] = { 1.0f, 1.0f };
+        const auto o = flm188h::run (EffectKind::pocketTapeDelay, { 0.5f, 0.6f, 0.5f, 0.4f }, in);
+        std::size_t peak = 1;
+        double sum = 0.0;
+        for (std::size_t i = 1; i < 20000; ++i)
+        {
+            if (std::abs (o[i][0]) > std::abs (o[peak][0]))
+                peak = i;
+            sum += o[i][0];
+        }
+        CHECK (peak >= 12001 && peak <= 12004 && std::abs (sum - 0.24) < 0.005);
+        CHECK (pocket::tapeDelayParamText (0, 0.6f) == "360 ms");
+    }
+}
+
+TEST (flm188h_post_gain_and_new_modules)
+{
+    using namespace lynx;
+    // Post Gain 0.75 = +10 dB (40g − 20) on the module's output: a utility after it (Mix 100 %)
+    auto m = flm188f::moduleOf (28, { 1.0f, 0.5f, 0.5f, 0.2f, 0.8f });
+    m.reserved = { 0.75f, 1.0f, 0.5f };
+    const auto mapped = flmfx::map (m);
+    CHECK (mapped.slots.size() == 2 && mapped.partial.empty());
+    if (mapped.slots.size() == 2)
+        CHECK (mapped.slots[0].kind == EffectKind::pocketLimiter && mapped.slots[0].params[3] == 0.8f
+               && mapped.slots[1].kind == EffectKind::utility && std::abs ((mapped.slots[1].params[0] - 0.5f) * 48.0f - 10.0f) < 1e-4f);
+    // with Mix below 100 % it is listed instead
+    m.reserved = { 0.75f, 0.5f, 0.5f };
+    const auto half = flmfx::map (m);
+    CHECK (half.slots.size() == 1 && half.slots[0].mix == 0.5f && half.partial.size() == 1);
+    // Trance Delay: FLM's saved dry-pan byte; a module without one loads with it on
+    auto t = flm188f::moduleOf (16, { 1.0f, 0.775f, 0.845f, 1.0f, 0.71f, 0.5f, 0.703f });
+    CHECK (flmfx::map (t).slots[0].params[6] == 1.0f && flmfx::map (t).slots[0].params[5] == 0.703f);
+    t.custom = { 0 };
+    CHECK (flmfx::map (t).slots[0].params[6] == 0.0f);
+    CHECK (flmfx::map (flm188f::moduleOf (20, { 1.0f, 0.5f })).slots[0].kind == EffectKind::pocketLeveller
+           && flmfx::map (flm188f::moduleOf (27, { 1.0f })).slots[0].kind == EffectKind::pocketGate
+           && flmfx::map (flm188f::moduleOf (18, { 1.0f })).slots[0].kind == EffectKind::pocketTapeDelay);
+}

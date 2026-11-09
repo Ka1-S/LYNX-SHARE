@@ -370,7 +370,7 @@ int rawControl (float v, float lo, float hi) noexcept
     return (int) std::floor ((hi - lo) * c + lo + 0.5f);
 }
 
-Mapped map (const flm::Module& m, bool live)
+Mapped map (const flm::Module& m, bool live, bool postGainLive)
 {
     Mapped out;
     switch (m.type)
@@ -383,11 +383,43 @@ Mapped map (const flm::Module& m, bool live)
         case 35: reverb2 (m, live, out); break;
         case 5: pocket (m, EffectKind::pocketLimiterClassic, "FL Studio Mobile: Limiter (legacy)", out); break;
         case 6: pocket (m, EffectKind::pocketDistortion, "FL Studio Mobile: Distortion", out); break;
+        case 28: pocket (m, EffectKind::pocketLimiter, "FL Studio Mobile: Limiter", out); break;
+        case 20: pocket (m, EffectKind::pocketLeveller, "FL Studio Mobile: Leveller", out); break;
+        case 27: pocket (m, EffectKind::pocketGate, "FL Studio Mobile: Gate", out); break;
+        case 16:
+            pocket (m, EffectKind::pocketTranceDelay, "FL Studio Mobile: Trance Delay", out);
+            // FLM's saved flag "Input pan pans the dry too" (one byte of custom state; a module without it loads as on)
+            out.slots[0].params[6] = m.custom.empty() || m.custom[0] != 0 ? 1.0f : 0.0f;
+            break;
+        case 18: pocket (m, EffectKind::pocketTapeDelay, "FL Studio Mobile: Tape Delay", out); break;
         default: return out;
     }
-    // Enable ([0] below 0.5 = the module is bypassed) and the module's Mix (INFERRED: dry/wet like a LYNX slot's)
+    // FLM's module wrapper (PROVEN, REA_rodada182c "F5 effects, round 188h"): Mix is a linear dry/wet blend (a LYNX
+    // slot's mix); Post Gain = 10^(2g − 1) (40g − 20 dB) on the module's output before the blend; Wet Pan a linear
+    // balance of the wet amount. Enable ([0] below 0.5) bypasses the module.
     const auto enabled = param (m, 0, 1.0f) >= 0.5f;
     const auto mix = std::clamp (reserved (m, 1, 1.0f), 0.0f, 1.0f);
+    const auto postDb = 40.0 * (double) reserved (m, 0, 0.5f) - 20.0;
+    if (std::abs (postDb) > 1e-3 || postGainLive)
+    {
+        if (mix >= 0.9999f)
+        {
+            // a utility after the module's slots (the reverbs' make-up utility takes it as well)
+            if (out.slots.empty() || out.slots.back().kind != EffectKind::utility)
+            {
+                auto gain = makeEffectSlot (EffectKind::utility);
+                gain.params[0] = 0.5f;
+                out.slots.push_back (gain);
+            }
+            auto& g = out.slots.back().params[0];
+            const auto db = ((double) g - 0.5) * 48.0 + postDb;
+            if (std::abs (db) > 24.0)
+                out.partial.push_back ("FL Studio Mobile: effect Post Gain beyond LYNX's range (capped)");
+            g = (float) std::clamp (db / 48.0 + 0.5, 0.0, 1.0);
+        }
+        else
+            out.partial.push_back ("FL Studio Mobile: effect Post Gain with Mix below 100% (not reproduced)");
+    }
     for (auto& s : out.slots)
         s.enabled = enabled;
     if (mix < 0.9999f)
@@ -397,8 +429,8 @@ Mapped map (const flm::Module& m, bool live)
         else
             out.partial.push_back ("FL Studio Mobile: Mix of an effect that takes two LYNX slots (played fully wet)");
     }
-    if (std::abs (reserved (m, 0, 0.5f) - 0.5f) > 1e-4f)
-        out.partial.push_back ("FL Studio Mobile: effect Post Gain (not reproduced)");
+    if (std::abs (reserved (m, 2, 0.5f) - 0.5f) > 1e-4f)
+        out.partial.push_back ("FL Studio Mobile: effect Wet Pan (not reproduced)");
     return out;
 }
 
@@ -423,7 +455,7 @@ std::vector<LaneTarget> automate (const flm::Module& m, int param, const std::ve
                 copy.params.resize ((std::size_t) param + 1, 0.0f);
             copy.params[(std::size_t) param] = v;
         }
-        return map (copy, true);
+        return map (copy, true, param == -3);
     };
     const auto base = at (values.front());
     if (base.slots.empty())
