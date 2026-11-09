@@ -300,6 +300,9 @@ private:
     juce::Rectangle<int> inputArea (int track) const; // the input level bar (inserts with an input source)
     juce::Rectangle<int> stereoArea (int track) const;
     juce::Rectangle<int> meterArea (int track) const;
+    // round 177d: the gain-reduction meter beside the peak meters (only on strips with one of LYNX's own dynamics)
+    juce::Rectangle<int> grArea (int track) const;
+    float gainReduction (int track) const; // 0..1 over mixerops::gainReductionRangeDb, -1: no such effect on the strip
     juce::Rectangle<int> sendArea (int track) const;   // send level knob (routing lane)
     juce::Rectangle<int> headerArea (int track) const;
     juce::Rectangle<int> faderRail (int track) const;  // the fader without the meters
@@ -311,9 +314,12 @@ private:
     static constexpr int railNone = -1000000;
     int railStrip = railNone;
     int railMouseY = 0;
+    double railPressMs = 0.0; // when the rail press began (the steps are counted from it)
+    int railSteps = 0;
     juce::TimedCallback railRepeat { [this] { stepHeldRail(); } };
     void pressRail (int strip, int mouseY);
     float railTarget (int strip) const;
+    void stepRailOnce();
     juce::Rectangle<int> tipArea (Part part, int track) const;
     void setHover (Part part, int track);
     Part hoverPart = Part::none;
@@ -349,6 +355,7 @@ private:
 
     std::vector<meters::PeakHold> levels; // per track*2: bar, peak hold and clip latch
     std::vector<float> inputLevels;       // per track: input level (decaying)
+    std::vector<int> grShown;             // per track: the gain-reduction meter's drawn height (-1: none)
     ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MixerStrips)

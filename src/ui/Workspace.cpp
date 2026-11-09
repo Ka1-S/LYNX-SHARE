@@ -1,4 +1,5 @@
 #include "ui/Workspace.h"
+#include "ui/Motion.h"
 #include "ui/ThemeSettings.h"
 
 #include "engine/PluginHost.h"
@@ -8,6 +9,8 @@
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
+
+#include <vector>
 
 namespace lynx
 {
@@ -670,20 +673,20 @@ bool Workspace::isDetached (Panel panel) const { return layout[panel].detached; 
 bool Workspace::toggle (Panel panel)
 {
     const auto visible = layout.toggle (panel);
-    applyLayout();
+    applyLayout (true);
     return visible;
 }
 
 void Workspace::show (Panel panel)
 {
     layout.show (panel);
-    applyLayout();
+    applyLayout (true);
 }
 
 void Workspace::hide (Panel panel)
 {
     layout.hide (panel);
-    applyLayout();
+    applyLayout (true);
 }
 
 void Workspace::toggleMaximised (Panel panel)
@@ -830,10 +833,17 @@ bool Workspace::isDetachedWindowActive() const
     return false;
 }
 
-void Workspace::applyLayout()
+void Workspace::applyLayout (bool fadePanels)
 {
     if (! layoutReady)
         return;
+
+    struct Fade
+    {
+        PanelFrame* frame;
+        bool in;
+    };
+    std::vector<Fade> fades;
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -871,7 +881,16 @@ void Workspace::applyLayout()
             }
 
             frame.setBounds (state.maximised ? getLocalBounds() : toJuce (state.bounds));
-            frame.setVisible (state.visible);
+            // a panel the user opens or closes fades in or out (Settings › General › Animations, round 179a), after
+            // the stacking order below is set
+            if (fadePanels && ui::motion::enabled() && isShowing() && frame.isVisible() != state.visible)
+                fades.push_back ({ &frame, state.visible });
+            else
+            {
+                if (state.visible && frame.getAlpha() < 1.0f && ! juce::Desktop::getInstance().getAnimator().isAnimating (&frame))
+                    frame.setAlpha (1.0f);
+                frame.setVisible (state.visible);
+            }
         }
 
         frame.refreshButtons();
@@ -880,6 +899,25 @@ void Workspace::applyLayout()
     // stacking order (back to front): the background panels first, then the floating ones
     for (auto panel : layout.stacking())
         frames[(std::size_t) panel]->toFront (false);
+
+    // The animator's timer runs only during a fade. Closing fades a picture of the panel placed right behind it (so
+    // after the stacking above), and the panel itself is hidden at once. Opening: the frame is opaque (it hides what is
+    // under it, round 151), which would show black under a half-transparent frame, so it is not opaque until the fade ends.
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    for (const auto& fade : fades)
+    {
+        if (! fade.in)
+        {
+            animator.fadeOut (fade.frame, ui::motion::panelFadeMs);
+            continue;
+        }
+        fade.frame->setOpaque (false);
+        animator.fadeIn (fade.frame, ui::motion::panelFadeMs);
+        juce::Timer::callAfterDelay (ui::motion::panelFadeMs + 40, [frame = juce::Component::SafePointer<PanelFrame> (fade.frame)] {
+            if (frame != nullptr && ! juce::Desktop::getInstance().getAnimator().isAnimating (frame))
+                frame->setOpaque (true);
+        });
+    }
 
     setFocusedPanel (layout.focused);
     repaint();

@@ -104,7 +104,7 @@ public:
     static constexpr int titleHeight = 32; // round 170e3: room for 20 px tool icons in the editors (was 28)
 
 private:
-    void applyLayout();
+    void applyLayout (bool fadePanels = false); // fadePanels: a panel the user opened or closed fades (round 179a)
     void setFocusedPanel (Panel panel);
 
     workspace::Layout layout;

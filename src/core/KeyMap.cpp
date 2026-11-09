@@ -58,10 +58,15 @@ std::vector<Action> makeActions()
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
         { "view.typingPiano", TR_NOOP ("Typing keyboard to piano on/off"), Context::global, { chord ('T', ctrl) } },
+        // FL's Options › Switches › "Multilink to controllers" (OptionsToggleMultiLinkAction, Ctrl+J; round 177b-4)
+        { "options.multilink", TR_NOOP ("Multilink to controllers on/off"), Context::global, { chord ('J', ctrl) } },
         { "view.toolbar", TR_NOOP ("Show or hide the toolbar panels"), Context::global, { chord (f11, ctrl) } },
         { "view.audioEditor", TR_NOOP ("Open the audio editor"), Context::global, {} },
         { "view.tempoTapper", TR_NOOP ("Tempo tapper (tap the tempo)"), Context::global, { chord (f5, ctrl) } },
         { "view.sampleBrowser", TR_NOOP ("Sample browser (separate window)"), Context::global, {} },
+        // round 177d (an FL wishlist item): solo the selected channel from any window, no key by default (bind one in
+        // the shortcut editor); again = every channel plays (FL's channel solo)
+        { "channel.soloSelected", TR_NOOP ("Solo the selected channel (from any window)"), Context::global, {} },
 
         // workspace panels
         { "panel.playlist", TR_NOOP ("Show, focus or hide the Playlist"), Context::global, { chord (f5) } },
@@ -208,6 +213,7 @@ std::vector<Action> makeActions()
         { "pianoRoll.gridHighlights", TR_NOOP ("Note grid highlights on/off"), Context::pianoRoll, { chord ('B', alt) } },
         { "pianoRoll.backgroundWave", TR_NOOP ("Background waveform on/off"), Context::pianoRoll, { chord ('N', alt) } },
         { "pianoRoll.showChordName", TR_NOOP ("Show chord name for selection on/off"), Context::pianoRoll, {} },
+        { "pianoRoll.songBarsRuler", TR_NOOP ("Piano roll ruler: song bars on/off"), Context::pianoRoll, {} },
         { "pianoRoll.selectRandomOne", TR_NOOP ("Select one at random"), Context::pianoRoll, { chord ('R', shift) }, true },
         { "pianoRoll.selectRandomMore", TR_NOOP ("Select more at random"), Context::pianoRoll, { chord ('M', shift) }, true },
         { "pianoRoll.selectOddSteps", TR_NOOP ("Select odd (swung) notes"), Context::pianoRoll, { chord ('O', shift) }, true },
@@ -261,9 +267,12 @@ std::vector<Action> makeActions()
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
+        { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
+        // comping (round 177c, Live's select + Enter; no key yet: Enter is FL's "Maximize or restore the Playlist")
+        { "playlist.swipeSelectionToComp", TR_NOOP ("Send the time selection of the take lane to its comp"), Context::playlist, {} },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
         { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,

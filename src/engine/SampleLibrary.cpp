@@ -415,6 +415,36 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
     return stretched;
 }
 
+std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::String& path, const std::string& variantKey,
+                                                                   const std::shared_ptr<const SampleData>& span, double ratio,
+                                                                   StretchMethod method, double semitones)
+{
+    if (span == nullptr || span->frames() == 0)
+        return nullptr;
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+    const auto key = path + "|span|" + juce::String::fromUTF8 (variantKey.c_str()) + "|" + juce::String (ratio, 10) + "|"
+                     + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String());
+    auto& shared = sharedCache();
+    {
+        const std::scoped_lock l (shared.stretchLock);
+        if (auto it = shared.stretched.find (key); it != shared.stretched.end())
+            return it->second;
+    }
+    std::shared_ptr<const SampleData> stretched;
+    {
+        const loadtrace::Scope timing ("stretch_compute");
+        stretched = timeStretchSpan (*span, ratio, method, semitones);
+    }
+    if (stretched == nullptr)
+        return nullptr;
+    const std::scoped_lock l (shared.stretchLock);
+    for (auto it = shared.stretched.begin(); it != shared.stretched.end();)
+        it = it->first.startsWith (path + "|") && it->second.use_count() == 1 ? shared.stretched.erase (it) : std::next (it);
+    shared.stretched[key] = stretched;
+    return stretched;
+}
+
 juce::File SampleLibrary::cacheFolder()
 {
     // (under a test profile, LYNX_PROFILE_DIR: inside it)

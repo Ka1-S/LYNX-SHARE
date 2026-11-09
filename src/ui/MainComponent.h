@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Preferences.h"
 #include "core/ChordReadout.h"
 
 #include <atomic>
@@ -27,6 +28,7 @@
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/FrameTicker.h"
+#include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"
@@ -42,6 +44,7 @@ class MainComponent final : public juce::Component,
                             private juce::ChangeListener
 {
 public:
+    void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // `restoreUserSettings`: load/save the workspace layout, key map and UI options from the user
     // settings (off for --snapshot, which must look the same on every machine).
     explicit MainComponent (AudioEngine& engine, bool restoreUserSettings = true);
@@ -291,6 +294,9 @@ private:
     void exportMidiFile();
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
+    void saveClipboardToBrowser (bool midi);
+    juce::PopupMenu makeSwitchAudioClipsMenu (bool selectedOnly);
+    void switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName);
     void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();
@@ -323,6 +329,14 @@ private:
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written
     int autosaveMinutes = 2, autosaveKeep = 10; // Settings › General › Backup
+    bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
+    int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
+    bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
+    bool hoverTipShown = false;                   // ...and it is showing now
+    juce::String hoverTipText;
+    juce::Point<int> hoverTipAt;
+    std::uint32_t backupMidiSeen = 0;
+    double backupMidiMs = -1.0e9;
     bool lastModified = false;
     void openPianoRoll();
     void toggleMode();
@@ -339,6 +353,7 @@ private:
     IconButton recordMenuButton { "recordMenu", Icon::mic };
     IconButton patternModeButton { "patternMode", Icon::pattern }, songModeButton { "songMode", Icon::song };
     IconButton metronomeButton { "metronome", Icon::metronome };
+    IconButton multilinkButton { "multilink", Icon::link }; // FL's MultiLinkBtn (round 177b-4)
     IconButton typingPianoButton { "typingPiano", Icon::keyboard };
     IconButton countInButton { "countIn", Icon::countIn };
     IconButton waitInputButton { "waitInput", Icon::waitInput };
@@ -546,6 +561,7 @@ private:
     ui::HintBar hintBar;
     ui::TweakReadout tweakReadout; // FL's Tools › Last tweaked, at the hint bar's right end (round 162d)
     void refreshTweakReadout();
+    void updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live);
     int tweakTicks = 0;
     void placeHintBar (juce::Rectangle<int> row); // the hint bar and, at its right end, the last-tweaked read-out
     bool hintsFrozen = false; // --snapshot: keep the hint that was set

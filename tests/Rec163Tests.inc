@@ -415,13 +415,16 @@ TEST (rec163_take_lanes_and_comping)
     while (song.mixer.size() < 4)
         song.mixer.emplace_back();
     song.mixer[2].name = "Gtr";
+    song.bpm = 120.0; // comp crossfades: 5 ms = 10 ticks
     song.loopStart = 1000;
     song.loopEnd = 2000;
 
     // three passes of a loop recording on insert 2
     const auto parts = loopPasses (place (1000.0, 2900.0, 0.04, 0), 1000, 2000);
     CHECK (parts.size() == 3);
-    placeTakeClips (song, { { "/rec/Gtr_Take1.wav", "Gtr_Take1", 2 } }, parts);
+    TakeOptions lastPassPlays; // (round 177c: round 163's result is now this option; comp177_fl_loop_take_layout has the default)
+    lastPassPlays.lastPassPlays = true;
+    placeTakeClips (song, { { "/rec/Gtr_Take1.wav", "Gtr_Take1", 2 } }, parts, lastPassPlays);
     CHECK (song.playlist.size() == 3 && song.channels.back().mixerTrack == 2);
     int top = -1;
     for (const auto& c : song.playlist)
@@ -447,13 +450,16 @@ TEST (rec163_take_lanes_and_comping)
         if (c.track == 0)
             comp.push_back (c);
     std::sort (comp.begin(), comp.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
-    // last pass 1000-1200, first pass 1200-1500, last pass 1500-1900 (the last pass is 900 ticks)
+    // last pass 1000-1200, first pass 1200-1500, last pass 1500-1900 (the last pass is 900 ticks). Round 177c: a switch
+    // is an equal-power crossfade of 10 ticks where both takes are known to have audio there; the last pass has no lane
+    // here, so nothing is known past its first piece: short linear fades
     CHECK (comp.size() == 3);
     if (comp.size() == 3)
     {
-        CHECK (comp[0].start == 1000 && comp[0].length == 200 && comp[0].offset == 2000 && comp[0].fadeOut == compFadeTicks);
-        CHECK (comp[1].start == 1200 && comp[1].length == 300 && comp[1].offset == 200 && ! comp[1].muted && comp[1].fadeIn == compFadeTicks);
-        CHECK (comp[2].start == 1500 && comp[2].length == 400 && comp[2].offset == 2500 && comp[2].fadeIn == compFadeTicks);
+        CHECK (comp[0].start == 1000 && comp[0].length == 200 && comp[0].offset == 2000 && comp[0].fadeOut == 5 && comp[0].fadeCurve == 0);
+        CHECK (comp[1].start == 1200 && comp[1].length == 305 && comp[1].offset == 200 && ! comp[1].muted && comp[1].fadeIn == 5
+               && comp[1].fadeOut == 10 && comp[1].fadeCurve == 2);
+        CHECK (comp[2].start == 1495 && comp[2].length == 405 && comp[2].offset == 2495 && comp[2].fadeIn == 10 && comp[2].fadeCurve == 1);
     }
     CHECK (! promoteTake (song, firstPass, 0, 5000, 6000)); // outside the take
 
