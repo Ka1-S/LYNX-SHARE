@@ -4882,7 +4882,7 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Unmute") + key ("playlist.unmuteClips"), [this] { runAction ("playlist.unmuteClips"); });
     m.addSeparator();
     m.addItem (tr ("Insert space") + "\tCtrl+Ins", time, false, [this] { insertTimeSelection(); });
-    m.addItem (tr ("Slice & insert space") + key ("playlist.sliceInsertSpace"), time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
+    m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
     m.addItem (tr ("Delete space") + "\tCtrl+Del", time, false, [this] { deleteTimeSelection(); });
     m.addItem (tr ("Trim selection") + key ("playlist.trimSpace"), time, false, [this] { runAction ("playlist.trimSpace"); });
     m.addSeparator();
