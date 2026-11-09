@@ -433,6 +433,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPresetMenu.cpp
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
+        src/ui/PluginKeysTest.cpp
         src/ui/ParametricEqEditor.cpp
         src/ui/FacetEqEditor.cpp
         src/ui/ProEditors.cpp

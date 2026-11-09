@@ -17277,6 +17277,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Keys117Tests.inc"
 #include "Sc109Tests.inc"
 #include "WrapperMidi181cTests.inc"
+#include "Keys96Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
 #include "Design168rTests.inc"

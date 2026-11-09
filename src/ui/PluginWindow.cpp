@@ -48,6 +48,12 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 class WrapperSettingsPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    bool hostProcessesKeys() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref != nullptr && ref->hostKeysFirst && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
+    }
+
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
         : engine (e), find (std::move (f)), plugin (p)
     {
@@ -432,6 +438,8 @@ public:
     }
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
+    bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
+    void showPage (bool showSettings) { show (showSettings); }
     void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
 
     // the picker's label follows the slot's side input (the window's timer)
@@ -589,6 +597,13 @@ public:
 
         editorResizable = editor->isResizable();
         shownEditor = editor;
+        // (issue #96: as in FL, what it leaves unused plays the typing keyboard. A plugin in another process has its
+        // own keyboard: issue #99 is that case, this path stays away from it.)
+        if (sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin))
+        {
+            listenForKeysPluginLeaves (*editor);
+            keysFromPluginView = true; // (the window marks itself: SecondaryKeyForwarder hands it what the view leaves)
+        }
         thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
         if (c.engine != nullptr && c.find) // FL's wrapper header and settings page (round 146a)
         {
@@ -653,6 +668,7 @@ protected:
     std::unique_ptr<juce::Component> content; // until the host takes it
     juce::Component* shownContent = nullptr;   // the host's content (owned by the host)
     bool editorResizable = false;
+    bool keysFromPluginView = false; // issue #96: the editor's unused keys come back (listenForKeysPluginLeaves)
 
 private:
     // round 162d (issue #8): many plugins move their parameters without begin/end gestures, so their knobs never
@@ -715,6 +731,8 @@ public:
     {
         setUsingNativeTitleBar (true);
         useClassicRendering();
+        if (keysFromPluginView)
+            getProperties().set ("lynxPluginWindow", true);
         shownContent = content.get();
         setContentOwned (content.release(), true);
         setResizable (editorResizable, false);
@@ -1235,6 +1253,27 @@ private:
 
 namespace PluginWindows
 {
+bool letsHostProcessKeys (juce::Component& window)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    return wrapped != nullptr && wrapped->hostProcessesKeys();
+}
+
+bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    if (wrapped == nullptr)
+        return false;
+    wrapped->showPage (true);
+    const auto image = wrapped->createComponentSnapshot (wrapped->getLocalBounds(), true, 1.0f);
+    wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
