@@ -283,10 +283,17 @@ constexpr StyleDef styleDefs[allStyles] {
     { 0.334, 0.850, 1.080, 5.30, 0.607, Curve::downward, 0.0, 1.09, 1.000, 5.68, 0.464, 1.00, 0.00, 0.000 }, // clean
     { 0.796, 0.288, 0.814, 18.87, 0.360, Curve::downward, 0.0, 0.00, 1.000, 2.88, 1.616, 1.00, 0.00, 0.000 }, // allround
     { 0.310, 0.580, 0.722, 6.21, 0.800, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.71 }, // punch
-    { 0.000, 1.547, 0.696, 2.88, 0.000, Curve::upward, 0.0, -5.41, 0.812, 44.32, 0.807, 0.87, -0.80, 0.000 }, // upward
+    // round trial187b [EXEC]: upward and classic refitted (tp172b's crestfit3, 5 ms gain trajectories) on tp172b's bank plus
+    // the trial's new programme captures at threshold −24 / ratio 4 / auto gain off (stair, bursts, drums, music, vocal):
+    // upward 2.85 → 2.60 dB rms over 68 jobs (above the threshold it held −6.2 dB where the trial holds −2.8), classic
+    // 2.28 → 1.67 dB over 80 jobs (its release was too fast: −3.3 dB where the trial is still at −5.4 on the stair's way
+    // down; the attack scale stays round 108's, whose 50 % attack time it measured); both now smooth the gain rather
+    // than the level (gainBlend 1). Two-way and vari-mu refits gained as much on
+    // the bank but lost round 108's own stairs (0.4 → 4.9 / 0.8 → 6.8 dB): kept as they were
+    { 0.000, 1.787, 0.496, 0.96, 0.000, Curve::upward, 0.0, -3.84, 0.812, 0.00, 0.393, 1.00, -0.80, 0.000 }, // upward
     { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWay, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 }, // two-way (round 108's fit: the bank refit lost the −18 dB threshold stairs; recovers within about a millisecond)
     { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMu, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // vari-mu (round 108's fit)
-    { 0.300, 1.570, 0.530, 4.00, 0.170, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // classic (round 108's fit)
+    { 0.300, 0.555, 0.682, 6.11, 0.242, Curve::downward, 0.0, 0.29, 1.000, 5.18, 0.002, 1.00, 0.00, 0.000 }, // classic (round trial187b; attack as round 108 measured it)
     { 0.169, 0.789, 0.880, 7.27, 0.722, Curve::downward, 0.0, 0.77, 1.000, 2.88, 0.750, 0.39 }, // opto
     { 1.611, 0.712, 0.000, 8.40, 0.000, Curve::vocal, 0.0, -0.17, 3.000, 0.00, 0.002, 0.96, 0.00, 0.000 }, // vocal
     { 0.240, 3.570, 0.190, 0.00, 1.000, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // bus (round 108's fit)
