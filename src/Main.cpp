@@ -10769,6 +10769,12 @@ private:
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::info), "-settings-info.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::files), "-settings-files.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::general), "-settings-general.png");
+                {
+                    // the whole General page (round 186a: the Startup section is below the first screen)
+                    auto tall = lynx::makeSettingsPanel (offline, lynx::SettingsPage::general);
+                    tall->setSize (tall->getWidth(), 1500);
+                    saveWindow (std::move (tall), "-settings-general-tall.png");
+                }
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::theme), "-settings-theme.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::audio), "-settings-audio.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi), "-settings-midi.png");

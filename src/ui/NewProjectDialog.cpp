@@ -69,8 +69,8 @@ struct TemplateItem
         TemplateChoice c;
         if (builtIn >= 0)
             c = { TemplateChoice::Kind::builtIn, templateNames()[(std::size_t) builtIn] };
-        else if (builtIn == -2 && file != juce::File())
-            c = { TemplateChoice::Kind::user, file.getFileName().toStdString() };
+        else if (builtIn == -2) // (the --snapshot samples have no file: their name stands for it)
+            c = { TemplateChoice::Kind::user, file != juce::File() ? file.getFileName().toStdString() : (name + ProjectFile::extension).toStdString() };
         return c;
     }
 };
@@ -139,7 +139,7 @@ public:
         auto nameWidth = width - 20;
         if (item.choice() == defaultChoice) // issue #123: the template LYNX opens at start-up and with File › New
         {
-            const auto mark = tr ("Default");
+            const auto mark = tr ("Default template");
             g.setFont (theme::font (theme::type::small, true));
             const auto markWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), mark)) + 12;
             const auto r = juce::Rectangle<int> (width - 8 - markWidth, 5, markWidth, 15);
@@ -205,7 +205,7 @@ public:
         infoTitle.setText (tr ("Information"));
 
         templates.items = templateItems (! persistent);
-        templates.defaultChoice = persistent ? defaultTemplate() : TemplateChoice {};
+        templates.defaultChoice = persistent ? defaultTemplate() : TemplateChoice { TemplateChoice::Kind::user, "Vocal session.lynx" };
         templates.updateContent();
         templates.selectRow (0);
         for (int i = 0; i < (int) templates.items.size(); ++i) // the default template is the one picked first (issue #123)
