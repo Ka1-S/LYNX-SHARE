@@ -178,6 +178,11 @@ public:
     // to show all of it (FL opens a project with the arrangement in view). Waits for a size if not laid out.
     void showSongAfterOpen();
 
+    // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
+    // click on its header does, without the menus (round 184a, S16: the game controller's D-pad).
+    int getCurrentTrack() const noexcept { return currentTrack; }
+    void selectTrack (int track);
+
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };

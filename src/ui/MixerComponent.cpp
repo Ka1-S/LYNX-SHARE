@@ -3506,6 +3506,21 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         return;
     }
     seenPublish = engine.getPublishCount();
+    // "Mixer groups follow the Playlist" (round 186c): a Playlist group edit regroups the mixer, outside the undo history
+    // (an undo of the Playlist edit brings the old groups back through this same path)
+    if (followPlaylist && ! followPending)
+    {
+        if (! mixerops::followsPlaylistGroups (engine.getSong()))
+        {
+            followPending = true;
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MixerStrips> (this)] {
+                if (safe == nullptr)
+                    return;
+                safe->engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); }, false);
+                safe->followPending = false;
+            });
+        }
+    }
     vcaLevelsShown.clear();
     for (const auto& vca : engine.getSong().vcas)
         vcaLevelsShown.push_back (vca.level);
@@ -3833,7 +3848,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
@@ -4401,6 +4416,18 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
     menu.addItem (tr ("Keep links to deleted inserts, greyed (LYNX)"), true, MixerStrips::keepLostLinks, [] {
         MixerStrips::keepLostLinks = ! MixerStrips::keepLostLinks;
         notifyChanged();
+    });
+    // LYNX's addition (round 186c, pain point 4; off by default): the mixer's groups mirror the Playlist's track groups
+    menu.addItem (tr ("Mixer groups follow the Playlist (LYNX)"), true, MixerStrips::followPlaylist, [&engine] {
+        MixerStrips::followPlaylist = ! MixerStrips::followPlaylist;
+        if (MixerStrips::followPlaylist)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        notifyChanged();
+    });
+    menu.addItem (tr ("Arrange inserts like the Playlist"), ! mixerops::playlistOrderInserts (song).empty(), false, [&engine] {
+        int moved = 0;
+        engine.editSongStructural ([&moved] (Song& s) { moved = mixerops::arrangeLikePlaylist (s); });
+        ui::postHint ({ tr ("{0} insert(s) moved to follow the Playlist", { juce::String (moved) }), {}, false, false }, 3000);
     });
 
     if (! newProjects)
