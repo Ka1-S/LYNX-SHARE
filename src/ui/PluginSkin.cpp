@@ -50,12 +50,13 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
         case EffectKind::fruityFlanger: case EffectKind::fruityFlangus: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:
         case EffectKind::orbit: case EffectKind::latticeMod: case EffectKind::autoPan: case EffectKind::fruityPanOMatic:
-        case EffectKind::effector: case EffectKind::pocketMultiFx: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
+        case EffectKind::effector: case EffectKind::pocketMultiFx: case EffectKind::pocketChorus: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
             return colour::teal;
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel:
         case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
+        case EffectKind::pocketAutoduck:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
@@ -66,7 +67,7 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::voiceShift:
             return colour::rose;
         case EffectKind::utility: case EffectKind::stereoShaper: case EffectKind::stereoEnhancer: case EffectKind::spreader:
-        case EffectKind::fruityBalance: case EffectKind::fruitySend:
+        case EffectKind::fruityBalance: case EffectKind::fruitySend: case EffectKind::pocketSpacer: case EffectKind::pocketStereoizer:
             return colour::lime;
         default:
             return colour::crimson;

@@ -127,6 +127,7 @@ add_library(lynx_core STATIC
     src/core/FlLegacyFx.cpp
     src/core/PocketFx.cpp
     src/core/PocketMultiFx.cpp
+    src/core/PocketFxA.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp

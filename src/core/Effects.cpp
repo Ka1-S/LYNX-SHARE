@@ -3037,6 +3037,30 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
             return info;
         }
+        case EffectKind::pocketAutoduck:
+        {
+            static const EffectInfo info { "Pocket Autoduck", { { "Ducking", 0.501f }, { "Attack", 0.1f }, { "Curve", 0.501f }, { "Time", 1.0f },
+                                                                { "Shift", 0.5f }, { "Hold", 0.0f }, { "Shape", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketChorus:
+        {
+            static const EffectInfo info { "Pocket Chorus", { { "Rate", 0.4f }, { "Depth", 0.6f }, { "Stereo", 1.0f }, { "Mix", 0.6f } } };
+            return info;
+        }
+        case EffectKind::pocketSpacer:
+        {
+            static const EffectInfo info { "Pocket Spacer", { { "L/R delay", 0.5f }, { "Pan", 0.5f }, { "Separation", 0.5f },
+                                                              { "L/R inversion", 0.0f }, { "M/S delay", 0.5f }, { "M/S inversion", 0.0f },
+                                                              { "Stereo mode", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketStereoizer:
+        {
+            static const EffectInfo info { "Pocket Stereoizer", { { "Strength", 0.7f }, { "Timbre", 0.52f }, { "Focus", 0.75f },
+                                                                  { "L/R delay", 0.5f }, { "Pan", 0.5f } } };
+            return info;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3334,6 +3358,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, 
         return mixsuite::hush::classicParamText (param, v);
     if (kind == EffectKind::hushDeEsser && ! mixsuite::hush::extended (context)) // round 165x: the old ranges
         return mixsuite::hush::oldLawText (param, v);
+    if (kind == EffectKind::pocketAutoduck && param == 5) // Hold is a share of Time
+        return pocket::autoduckHoldText (v, context[3]);
     if (kind == EffectKind::fruityPhaser && param == 0) // the sweep rate follows the frequency range switch
         return phaserfx::sweepText (v, context[3] > 0.5f);
     if (kind == EffectKind::parametricEq && peq::flLaw (context) && param >= 0 && param < peq::slopeParam + peq::bands)
@@ -3837,6 +3863,14 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::tapeDelayParamText (param, v);
         case EffectKind::pocketMultiFx:
             return pocket::multiFxParamText (param, v);
+        case EffectKind::pocketAutoduck:
+            return pocket::autoduckParamText (param, v, bpm);
+        case EffectKind::pocketChorus:
+            return pocket::chorusParamText (param, v);
+        case EffectKind::pocketSpacer:
+            return pocket::spacerParamText (param, v);
+        case EffectKind::pocketStereoizer:
+            return pocket::stereoizerParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4181,6 +4215,10 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketTranceDelay: return pocket::makeTranceDelay();
         case EffectKind::pocketTapeDelay: return pocket::makeTapeDelay();
         case EffectKind::pocketMultiFx: return pocket::makeMultiFx();
+        case EffectKind::pocketAutoduck: return pocket::makeAutoduck(); // round 189h (FL Studio Mobile)
+        case EffectKind::pocketChorus: return pocket::makeChorus();
+        case EffectKind::pocketSpacer: return pocket::makeSpacer();
+        case EffectKind::pocketStereoizer: return pocket::makeStereoizer();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:
