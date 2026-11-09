@@ -7139,6 +7139,17 @@ void PlaylistComponent::feedMagicLasso (juce::Point<int> p, bool buttonDown)
             }
             if (to > from)
                 zoomToTicks ((double) from, (double) to);
+            // (FL 2026 also fits the used tracks into the view's height: shot g35)
+            auto last = -1;
+            for (const auto& c : song.playlist)
+                last = std::max (last, c.track);
+            if (last >= 0 && last + 1 < (int) trackTops.size() && trackTops[(std::size_t) last + 1] > 0)
+            {
+                setTrackZoom (trackZoom * (double) gridArea().getHeight() / (double) trackTops[(std::size_t) last + 1], tracksTop());
+                scrollY = 0;
+                updateScrollBars();
+                repaint();
+            }
             lassoPath.clear();
             break;
         }
