@@ -82,6 +82,26 @@ struct AutomationPoint
     std::uint8_t curve = 0; // 0 = single curve, 1 = double, 2 = hold, 10 = smooth...
 };
 
+// The rest of event 0xEA after the points (REA round 177b, FL's TACArticulator stream FUN_00fe8640): the header's LFO
+// level and mode, the main envelope's tail and FL's automation clip LFO ("LFO mode"). The defaults are what FL writes
+// for a clip whose LFO was never touched.
+struct AutomationLfo
+{
+    bool present = false;     // the event had the whole layout (else the defaults)
+    std::int32_t level = 64;  // header +4: LFO level -128..128
+    std::uint8_t mode = 0;    // header +8: 0 = multiply ("Multiply" checked), 1 = add
+    std::int32_t mainFlags = 1, mainEnabled = -1;
+    std::array<std::int32_t, 3> mainLoop { -1, -1, -1 };     // decay / loop start / sustain points
+    std::array<std::int32_t, 4> adsr { 128, 128, 0, 128 };   // the articulator's A / D / S / R scale knobs
+    std::vector<AutomationPoint> points { AutomationPoint { 0.0, 1.0, 0.0f, 0 } }; // the LFO's amplitude points (≥ 1)
+    std::vector<std::uint8_t> rawPoints; // the points' records as read (24 B each); written back when its size matches
+    std::int32_t flags = 1;   // 1 tempo, 2 global phase, 4 unipolar tension, 8 frozen
+    std::int32_t enabled = 0; // "LFO mode": 0 off, -1 on
+    std::array<std::int32_t, 3> lfoLoop { -1, -1, -1 };
+    std::int32_t speed = 45819, tension = 0, skew = 0, pulseWidth = 0;
+    std::uint32_t phase = 0;
+};
+
 struct Channel
 {
     int index = 0;
@@ -92,6 +112,7 @@ struct Channel
     int mixerTrack = -1;
     bool enabled = true;         // 0x00: the channel's enabled switch in the Channel Rack (false: its notes don't play)
     std::vector<AutomationPoint> automation; // channels of type automationClip
+    AutomationLfo automationLfo;             // the rest of their 0xEA (round 177b)
 
     // event 0xDB (channel "levels"): pan 0..12800 (6400 = center), volume 0..12800
     // (10000 = 78%, the default), pitch in cents
@@ -309,7 +330,12 @@ struct PlaylistItem
     int track = 0;               // 0 = first playlist track
     Kind kind = Kind::pattern;
     int index = 0;               // pattern index, or channel index (audio/automation clip)
-    std::uint16_t flags = 0;
+    std::uint16_t flags = 0;     // +0x12: 0x40 by default; see mutedFlag
+    // +0x12 bit 13: the clip is muted (the Mute tool / clip menu › Mute). FL keeps the record in memory as it is in the
+    // file and tests bit 0x20 of byte +0x13 (REA round 182e)
+    static constexpr std::uint16_t mutedFlag = 0x2000;
+    static constexpr std::uint16_t defaultFlags = 0x40;
+    bool muted() const noexcept { return (flags & mutedFlag) != 0; }
 
     // The same 8 bytes mean different things per clip type:
     //  - pattern: two int32 in ticks (start/end of the pattern section); -1 = no trimming
@@ -322,6 +348,10 @@ struct PlaylistItem
     // Audio clips, records of 60 B and more (FL 20.99+): fades in milliseconds and the clip gain (linear).
     float fadeInMs = 0.0f;
     float fadeOutMs = 0.0f;
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade curve values (+0x28, +0x30; 0 = its S curve)
+    // +0x38 (FL's own bits, REA round 180d): bit 0 / 1 the fade-in / -out is manual, >> 2 & 7 / >> 14 & 7 their declick
+    // choice, >> 8 & 3 / >> 12 & 3 their shape (1 = linear, else the S curve). The writer sets bit 0 / 1 for a fade it writes.
+    std::uint32_t fadeFlags = 0;
     float gain = 1.0f;
     // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
     float pitch = 0.0f;
