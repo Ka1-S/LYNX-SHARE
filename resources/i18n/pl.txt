@@ -8022,3 +8022,13 @@ countries: pl
 "Swipe to comp" = "Przenieś do compu"
 "Send the time selection to the comp" = "Wyślij zaznaczenie czasu do compu"
 "Send the time selection of the take lane to its comp" = "Wyślij zaznaczenie czasu ścieżki ujęcia do jej compu"
+
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Połączenia"
+"Auto map outputs" = "Automatycznie przypisz wyjścia"
+"Assign all outputs incrementally" = "Przypisz wszystkie wyjścia kolejno"
+"Set all inputs and outputs to their default values" = "Przywróć domyślne wartości wszystkich wejść i wyjść"
+"Refresh inputs and outputs (after a change in the plugin)" = "Odśwież wejścia i wyjścia (po zmianie we wtyczce)"
+"Mixer track offset for output {0}" = "Przesunięcie ścieżki miksera dla wyjścia {0}"
+"Deactivate output {0}" = "Wyłącz wyjście {0}"
+"Activate output {0}" = "Włącz wyjście {0}"

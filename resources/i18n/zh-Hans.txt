@@ -8022,3 +8022,13 @@ countries: cn sg
 "Swipe to comp" = "划入合成轨"
 "Send the time selection to the comp" = "将时间选区送入合成轨"
 "Send the time selection of the take lane to its comp" = "将录音轨的时间选区送入其合成轨"
+
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "连接"
+"Auto map outputs" = "自动映射输出"
+"Assign all outputs incrementally" = "按顺序分配所有输出"
+"Set all inputs and outputs to their default values" = "将所有输入和输出恢复为默认值"
+"Refresh inputs and outputs (after a change in the plugin)" = "刷新输入和输出（插件更改后）"
+"Mixer track offset for output {0}" = "输出 {0} 的混音器轨道偏移"
+"Deactivate output {0}" = "停用输出 {0}"
+"Activate output {0}" = "启用输出 {0}"

@@ -8105,3 +8105,13 @@ countries: br
 "Swipe to comp" = "Enviar ao comp"
 "Send the time selection to the comp" = "Enviar a seleção de tempo ao comp"
 "Send the time selection of the take lane to its comp" = "Enviar a seleção de tempo da trilha de take ao comp"
+
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Conexões"
+"Auto map outputs" = "Mapear saídas automaticamente"
+"Assign all outputs incrementally" = "Atribuir todas as saídas em sequência"
+"Set all inputs and outputs to their default values" = "Voltar todas as entradas e saídas aos valores padrão"
+"Refresh inputs and outputs (after a change in the plugin)" = "Atualizar entradas e saídas (após uma mudança no plugin)"
+"Mixer track offset for output {0}" = "Deslocamento de faixa do mixer da saída {0}"
+"Deactivate output {0}" = "Desativar saída {0}"
+"Activate output {0}" = "Ativar saída {0}"

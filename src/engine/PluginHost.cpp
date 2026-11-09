@@ -61,6 +61,35 @@ void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int bl
     plugin.prepareToPlay (sampleRate, blockSize);
 }
 
+std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& plugin)
+{
+    std::vector<PluginOutputInfo> list;
+    const auto buses = plugin.getBusCount (false);
+    int channel = 0;
+    if (buses > 1)
+    {
+        for (int b = 0; b < buses; ++b)
+            if (const auto* bus = plugin.getBus (false, b); bus != nullptr && bus->isEnabled())
+            {
+                const auto n = bus->getNumberOfChannels();
+                if (n > 0)
+                    list.push_back ({ bus->getName(), channel, n, b == 0 || bus->isEnabledByDefault() });
+                channel += n;
+            }
+        return list;
+    }
+    const auto total = plugin.getTotalNumOutputChannels();
+    if (total <= 2)
+    {
+        if (total > 0)
+            list.push_back ({ buses == 1 ? plugin.getBus (false, 0)->getName() : juce::String(), 0, total });
+        return list;
+    }
+    for (int ch = 0; ch < total; ch += 2)
+        list.push_back ({ "Output " + juce::String (ch / 2 + 1), ch, juce::jmin (2, total - ch) });
+    return list;
+}
+
 void setPluginRenderMode (juce::AudioPluginInstance& plugin, bool offline, int blockSize)
 {
     if (plugin.isNonRealtime() == offline)
@@ -251,11 +280,28 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (8192); // the audio thread only adds events within this capacity
+    outs = pluginOutputs (*plugin);
+    routeOffset = std::make_unique<std::atomic<int>[]> (outs.size() + 1);
+    routeActive = std::make_unique<std::atomic<bool>[]> (outs.size() + 1);
+    for (std::size_t k = 0; k <= outs.size(); ++k)
+    {
+        routeOffset[k].store (0);
+        routeActive[k].store (k >= outs.size() || outs[k].activeByDefault);
+    }
+    if (! outs.empty())
+    {
+        aux.resize (outs.size());
+        for (auto& a : aux)
+            for (auto& side : a)
+                side.assign ((std::size_t) auxCapacity, 0.0f);
+    }
     if (fixedBlock > 0)
     {
-        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), 2);
+        // (every output channel goes through the fixed blocks: the other outputs keep their place too)
+        const auto channels = juce::jmax (2, plugin->getTotalNumOutputChannels());
+        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), channels);
         pending.ensureSize (8192);
-        scratch.assign ((std::size_t) blockSize * 2, 0.0f);
+        scratch.assign ((std::size_t) blockSize * (std::size_t) channels, 0.0f);
     }
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
     producesMidi = plugin->producesMidi(); // only then is what the buffer holds after processing the plugin's output
@@ -475,6 +521,9 @@ void PluginInstrument::setParameter (int index, float value) noexcept
 
 void PluginInstrument::render (float* left, float* right, int n, float gl, float gr) noexcept
 {
+    // (the extra outputs' buffers hold the whole chunk: this render's part starts where the last one ended)
+    chunkBase = auxCursor;
+    auxCursor += n;
     if (crashed.load (std::memory_order_relaxed))
     {
         midi.clear();
@@ -524,22 +573,22 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
                 else
                     collectMidiOutput (pending);
             pending.clear();
-            std::memcpy (ch[0], view.getReadPointer (0), sizeof (float) * (size_t) count);
-            std::memcpy (ch[1], view.getReadPointer (view.getNumChannels() > 1 ? 1 : 0), sizeof (float) * (size_t) count);
+            const auto channels = (int) (scratch.size() / (std::size_t) blockSize);
+            for (int c = 0; c < channels; ++c)
+                std::memcpy (ch[c], view.getReadPointer (c < view.getNumChannels() ? c : (view.getNumChannels() > 1 ? 1 : 0)),
+                             sizeof (float) * (size_t) count);
         };
 
+        const auto channels = (int) (scratch.size() / (std::size_t) blockSize);
+        std::array<float*, 64> io {};
+        for (int c = 0; c < juce::jmin (channels, (int) io.size()); ++c)
+            io[(std::size_t) c] = scratch.data() + (std::size_t) c * (std::size_t) blockSize;
         for (int done = 0; done < n;)
         {
             const auto count = juce::jmin (blockSize, n - done);
-            float* io[2] = { scratch.data(), scratch.data() + blockSize };
             setHostBlockOffset (chunkOffset + done);
-            fixed->run (io, count, false, process);
-
-            for (int i = 0; i < count; ++i)
-            {
-                left[done + i] += io[0][i] * gl;
-                right[done + i] += io[1][i] * gr;
-            }
+            fixed->run (io.data(), count, false, process);
+            mixOutputs (io.data(), juce::jmin (channels, (int) io.size()), done, count, gl, gr, left, right);
             done += count;
         }
         return;
@@ -561,17 +610,93 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         collectMidiOutput (midi);
         midi.clear();
 
-        const auto* l = view.getReadPointer (0);
-        const auto* r = view.getNumChannels() > 1 ? view.getReadPointer (1) : l;
-
-        for (int i = 0; i < count; ++i)
-        {
-            left[done + i] += l[i] * gl;
-            right[done + i] += r[i] * gr;
-        }
-
+        mixOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), done, count, gl, gr, left, right);
         done += count;
     }
+}
+
+void PluginInstrument::mixOutputs (const float* const* ch, int numChannels, int at, int count, float gl, float gr, float* left,
+                                   float* right) noexcept
+{
+    if (numChannels <= 0)
+        return;
+    // no output list (a plugin without outputs): the first channels, as before
+    if (outs.empty())
+    {
+        const auto* l = ch[0];
+        const auto* r = numChannels > 1 ? ch[1] : l;
+        for (int i = 0; i < count; ++i)
+        {
+            left[at + i] += l[i] * gl;
+            right[at + i] += r[i] * gr;
+        }
+        return;
+    }
+    const auto viaAux = anyAux.load (std::memory_order_relaxed) && ! aux.empty();
+    for (std::size_t k = 0; k < outs.size(); ++k)
+    {
+        const auto& o = outs[k];
+        if (o.channel >= numChannels || ! routeActive[k].load (std::memory_order_relaxed))
+            continue; // FL: an inactive output is silent
+        const auto* l = ch[o.channel];
+        const auto* r = o.channels > 1 && o.channel + 1 < numChannels ? ch[o.channel + 1] : l;
+        if (routeOffset[k].load (std::memory_order_relaxed) == 0 || ! viaAux)
+        {
+            if (routeOffset[k].load (std::memory_order_relaxed) != 0)
+                continue; // (routed elsewhere while the aux buffers are not in use yet: dropped for this chunk)
+            for (int i = 0; i < count; ++i)
+            {
+                left[at + i] += l[i] * gl;
+                right[at + i] += r[i] * gr;
+            }
+            continue;
+        }
+        auto& a = aux[k];
+        const auto from = chunkBase + at;
+        for (int i = 0; i < count && from + i < auxCapacity; ++i)
+        {
+            a[0][(std::size_t) (from + i)] += l[i] * gl;
+            a[1][(std::size_t) (from + i)] += r[i] * gr;
+        }
+    }
+}
+
+void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
+{
+    channelTrack.store (channel.mixerTrack, std::memory_order_relaxed);
+    bool elsewhere = false;
+    for (std::size_t k = 0; k < outs.size(); ++k)
+    {
+        const auto route = channel.plugin.outputRoute ((int) k);
+        routeOffset[k].store (route.offset, std::memory_order_relaxed);
+        const auto on = route.isActive (outs[k].activeByDefault);
+        routeActive[k].store (on, std::memory_order_relaxed);
+        elsewhere = elsewhere || (on && route.offset != 0);
+    }
+    anyAux.store (elsewhere && ! aux.empty(), std::memory_order_relaxed);
+}
+
+void PluginInstrument::beginChunk (int n) noexcept
+{
+    auxCursor = 0;
+    if (! anyAux.load (std::memory_order_relaxed))
+        return;
+    for (auto& a : aux)
+        for (auto& side : a)
+            std::fill (side.begin(), side.begin() + juce::jlimit (0, auxCapacity, n), 0.0f);
+}
+
+int PluginInstrument::auxOutputTrack (int k) const noexcept
+{
+    if (k < 0 || k >= (int) outs.size() || ! routeActive[(std::size_t) k].load (std::memory_order_relaxed))
+        return -1;
+    const auto offset = routeOffset[(std::size_t) k].load (std::memory_order_relaxed);
+    return offset == 0 ? -1 : outputTargetTrack (channelTrack.load (std::memory_order_relaxed), { offset, true });
+}
+
+const float* PluginInstrument::auxOutputData (int k, int side) const noexcept
+{
+    return k >= 0 && k < (int) aux.size() ? aux[(std::size_t) k][(std::size_t) (side & 1)].data() : nullptr;
 }
 
 // ---------------------------------------------------------------------------

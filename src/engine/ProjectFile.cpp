@@ -325,6 +325,17 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("sendLoopPosition", false);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
+    // Processing › Connections (round 188d): [offset, active] per output, up to the last one that is not the default
+    auto routes = p.outputs;
+    while (! routes.empty() && routes.back() == PluginOutputRoute {})
+        routes.pop_back();
+    if (! routes.empty())
+    {
+        juce::Array<juce::var> list;
+        for (const auto& r : routes)
+            list.add (juce::Array<juce::var> { r.offset, (int) r.active });
+        o->setProperty ("outputs", list);
+    }
     return juce::var (o.release());
 }
 
@@ -356,6 +367,10 @@ PluginRef pluginFromVar (const juce::var& v)
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;
+    if (const auto* list = v["outputs"].getArray())
+        for (const auto& r : *list)
+            if (p.outputs.size() < 256)
+                p.outputs.push_back ({ juce::jlimit (-999, 999, (int) r[0]), (std::int8_t) (r.size() > 1 ? juce::jlimit (-1, 1, (int) r[1]) : -1) });
     return p;
 }
 

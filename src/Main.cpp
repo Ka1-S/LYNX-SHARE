@@ -1000,6 +1000,13 @@ public:
             return;
         }
 
+        if (args.contains ("--multiouttest"))
+        {
+            const auto i = args.indexOf ("--multiouttest");
+            runMultiOutTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--vst2test"))
         {
             const auto i = args.indexOf ("--vst2test");
@@ -4743,6 +4750,111 @@ private:
                 report << option.name << ": control " << a << " | before " << b << " | after the change " << c << " | same_instance=" << (int) sameInstance
                        << " | test_sees_the_option=" << (int) visible << " | " << (! visible ? "NOT PROVEN" : works ? "acts on the plugin" : "DEAD until re-created") << "\n";
                 ok = ok && visible && works;
+            }
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX.exe --multiouttest "LYNX Test Drums.dll" report.txt (round 188d, issue #114): a multi-output VST2
+    // (tools/testplugin/lynx_test_drums_vst2.c: key 36 = output 1 at 110 Hz, key 37 = output 2 at 220 Hz) on a
+    // channel routed to insert 1; the wrapper's Processing › Connections as FL plays them [EXEC fl188d]: every output
+    // on the channel's insert by default, an offset to another insert, an inactive output silent, the channel's
+    // volume on all of them. Measured on the master with insert 1 muted or not.
+    void runMultiOutTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        juce::String report;
+        auto ok = true;
+        lynx::AudioEngine scanner (false);
+        report << "plugins_in_file=" << scanner.getPluginHost().addPluginFile (juce::File (pluginPath)) << "\n";
+        std::optional<juce::PluginDescription> vst2;
+        for (const auto& type : scanner.getPluginHost().getKnownPlugins().getTypes())
+            if (type.pluginFormatName == "VST")
+                vst2 = type;
+        struct Case
+        {
+            const char* name;
+            std::vector<lynx::PluginOutputRoute> routes;
+            bool muteInsert1;
+            float volume;
+            bool kick, snare; // expected on the master
+        };
+        const Case cases[] = {
+            { "defaults", {}, false, -1.0f, true, true },
+            { "defaults, insert 1 muted", {}, true, -1.0f, false, false },
+            { "auto map, insert 1 muted", { { 0, 1 }, { 1, 1 } }, true, -1.0f, false, true },
+            { "auto map", { { 0, 1 }, { 1, 1 } }, false, -1.0f, true, true },
+            { "output 2 inactive", { { 0, 1 }, { 1, 0 } }, false, -1.0f, true, false },
+            { "output 1 inactive", { { 0, 0 } }, false, -1.0f, false, true },
+            { "auto map, channel volume 0", { { 0, 1 }, { 1, 1 } }, false, 0.0f, false, false },
+        };
+        auto tone = [] (const std::vector<float>& x, double hz) {
+            // Goertzel magnitude over the buffer (normalised to a sine's amplitude)
+            const auto w = 2.0 * juce::MathConstants<double>::pi * hz / 48000.0;
+            double s1 = 0.0, s2 = 0.0;
+            for (const auto v : x)
+            {
+                const auto s0 = v + 2.0 * std::cos (w) * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            return std::sqrt (s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2) * 2.0 / (double) juce::jmax<std::size_t> (1, x.size());
+        };
+        if (! vst2)
+            ok = false;
+        else
+            for (const auto& c : cases)
+            {
+                lynx::AudioEngine engine (false);
+                engine.getPluginHost().addPluginFile (juce::File (pluginPath));
+                auto song = lynx::Song::makeDefault();
+                auto& channel = song.channels[0];
+                channel.instrument = lynx::InstrumentKind::plugin;
+                channel.plugin = {};
+                channel.plugin.id = vst2->createIdentifierString().toStdString();
+                channel.plugin.name = vst2->name.toStdString();
+                channel.plugin.outputs = c.routes;
+                channel.mixerTrack = 1;
+                if (c.volume >= 0.0f)
+                    channel.volume = c.volume;
+                for (std::size_t k = 1; k < song.channels.size(); ++k)
+                    song.channels[k].muted = true;
+                if (song.mixer.size() < 4)
+                    song.mixer.resize (4);
+                song.mixer[1].muted = c.muteInsert1;
+                song.patterns[0].notes.clear();
+                for (const auto key : { 36, 37 })
+                {
+                    lynx::Note note;
+                    note.start = 0;
+                    note.length = lynx::ppq;
+                    note.channel = 0;
+                    note.key = key;
+                    note.velocity = 1.0f;
+                    song.patterns[0].notes.push_back (note);
+                }
+                engine.setSong (song);
+                std::vector<float> master;
+                lynx::AudioEngine::RenderOptions options;
+                options.seconds = 0.25;
+                options.sampleRate = 48000.0;
+                options.capture = [&master] (const float* l, const float*, int n) { master.insert (master.end(), l, l + n); };
+                engine.renderOffline (options);
+                const auto kick = tone (master, 110.0), snare = tone (master, 220.0);
+                const auto pass = (kick > 0.01) == c.kick && (snare > 0.01) == c.snare;
+                report << c.name << ": kick_110Hz=" << juce::String (kick, 4) << " snare_220Hz=" << juce::String (snare, 4) << " expected kick="
+                       << (int) c.kick << " snare=" << (int) c.snare << (pass ? " OK" : " FAILED") << "\n";
+                ok = ok && pass;
+                if (auto instrument = std::dynamic_pointer_cast<lynx::PluginInstrument> (engine.getChannelInstrument (0)))
+                    if (&c == &cases[0])
+                    {
+                        report << "outputs=" << (int) instrument->outputs().size();
+                        for (const auto& o : instrument->outputs())
+                            report << " [" << o.name << " ch" << o.channel << "x" << o.channels << "]";
+                        report << "\n";
+                        ok = ok && instrument->outputs().size() == 8 && instrument->outputs()[1].name == "Snare";
+                    }
             }
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);

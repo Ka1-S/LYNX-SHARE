@@ -8022,3 +8022,13 @@ countries: kr
 "Swipe to comp" = "컴프로 스와이프"
 "Send the time selection to the comp" = "시간 선택을 컴프로 보내기"
 "Send the time selection of the take lane to its comp" = "테이크 레인의 시간 선택을 해당 컴프로 보내기"
+
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "연결"
+"Auto map outputs" = "출력 자동 매핑"
+"Assign all outputs incrementally" = "모든 출력을 차례대로 할당"
+"Set all inputs and outputs to their default values" = "모든 입력과 출력을 기본값으로 되돌리기"
+"Refresh inputs and outputs (after a change in the plugin)" = "입력과 출력 새로 고침(플러그인 변경 후)"
+"Mixer track offset for output {0}" = "출력 {0}의 믹서 트랙 오프셋"
+"Deactivate output {0}" = "출력 {0} 비활성화"
+"Activate output {0}" = "출력 {0} 활성화"

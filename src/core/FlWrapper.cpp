@@ -375,4 +375,34 @@ const std::vector<WrapperOption>& wrapperOptions()
     };
     return options;
 }
+
+void trimOutputRoutes (std::vector<PluginOutputRoute>& routes)
+{
+    while (! routes.empty() && routes.back() == PluginOutputRoute {})
+        routes.pop_back();
+}
+
+void autoMapOutputs (std::vector<PluginOutputRoute>& routes, int count)
+{
+    if (count <= 0)
+        return;
+    if ((int) routes.size() < count)
+        routes.resize ((std::size_t) count);
+    const auto first = routes.front().offset;
+    for (int k = 0; k < count; ++k)
+        routes[(std::size_t) k].offset = std::clamp (first + k, -999, 999);
+    trimOutputRoutes (routes);
+}
+
+void resetOutputOffsets (std::vector<PluginOutputRoute>& routes, int count)
+{
+    for (int k = 0; k < std::min (count, (int) routes.size()); ++k)
+        routes[(std::size_t) k].offset = 0;
+    trimOutputRoutes (routes);
+}
+
+int outputTargetTrack (int channelTrack, const PluginOutputRoute& route, bool pluginDefault) noexcept
+{
+    return route.isActive (pluginDefault) ? channelTrack + route.offset : -1;
+}
 } // namespace lynx

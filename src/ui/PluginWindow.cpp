@@ -38,6 +38,170 @@ namespace
 void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (Song&)>& find, juce::AudioPluginInstance* instance,
                           bool PluginRef::*option, bool recreates);
 
+// FL's wrapper Processing › Connections, the outputs column of a generator (round 188d, issue #114; FL 2026's page
+// [UI fl188d a31, b23], Fruity Wrapper FUN_0078df00 / FUN_00794c70 [DECOMP]): one row per plugin output with its LED
+// (active), "n. name" and the mixer track offset wheel ("---" = 0, the channel's own insert; wheel or vertical drag,
+// double-click types a value). Inactive rows are drawn dimmed.
+class ConnectionRows final : public juce::Component, public juce::TooltipClient
+{
+public:
+    static constexpr int rowHeight = 27;
+    std::vector<PluginOutputInfo> outputs;
+    std::function<PluginOutputRoute (int)> route;
+    std::function<void (int, bool)> setActive;
+    std::function<void (int, int)> setOffset;
+
+    int preferredHeight() const { return (int) outputs.size() * rowHeight + 4; }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        for (int k = 0; k < (int) outputs.size(); ++k)
+        {
+            const auto r = route ? route (k) : PluginOutputRoute {};
+            const auto active = on (k);
+            const auto rowArea = rowBounds (k);
+            // LED: the accent when active (FL's orange LED), hollow grey when not
+            const auto led = ledBounds (k).toFloat();
+            g.setColour (active ? colour::accent : colour::ledOff);
+            g.fillEllipse (led);
+            g.setColour (active ? colour::accentHover : colour::borderStrong);
+            g.drawEllipse (led.reduced (0.5f), 1.0f);
+            if (hot == k && hotPart == Part::led)
+            {
+                g.setColour (colour::textSecondary.withAlpha (0.7f));
+                g.drawEllipse (led.expanded (2.0f), 1.0f);
+            }
+            auto text = rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
+            g.setColour (active ? colour::textPrimary : colour::textDisabled);
+            g.setFont (font (type::body));
+            g.drawFittedText (juce::String (k + 1) + ". " + label (k), text, juce::Justification::centredLeft, 1);
+            const auto box = wheelBounds (k).toFloat();
+            g.setColour (drawDigitDisplay (g, box, (hot == k && hotPart == Part::wheel) || dragRow == k, ! active, true));
+            g.setFont (font (type::body, true));
+            g.drawText (r.offset == 0 ? juce::String ("---") : juce::String (r.offset),
+                        box.withTrimmedRight ((float) digitMarksWidth + 2.0f).toNearestInt(), juce::Justification::centredRight, false);
+        }
+    }
+
+    juce::String getTooltip() override
+    {
+        const auto k = hot;
+        if (k < 0 || k >= (int) outputs.size())
+            return {};
+        const auto n = juce::String (k + 1);
+        if (hotPart == Part::led)
+            return on (k) ? tr ("Deactivate output {0}", { n }) : tr ("Activate output {0}", { n });
+        if (hotPart == Part::wheel)
+            return tr ("Mixer track offset for output {0}", { n });
+        return {};
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override { track (e.getPosition()); }
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        hot = -1;
+        repaint();
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        track (e.getPosition());
+        if (hot < 0)
+            return;
+        if (hotPart == Part::led && setActive && route)
+            setActive (hot, ! on (hot));
+        else if (hotPart == Part::wheel && route)
+        {
+            dragRow = hot;
+            dragStart = route (hot).offset;
+        }
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (dragRow < 0 || ! setOffset)
+            return;
+        // FL's wheel: up = more, one step per 4 pixels (Shift: finer)
+        const auto step = e.mods.isShiftDown() ? 12 : 4;
+        const auto value = juce::jlimit (-999, 999, dragStart - e.getDistanceFromDragStartY() / step);
+        if (route && value != route (dragRow).offset)
+            setOffset (dragRow, value);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        dragRow = -1;
+        repaint();
+    }
+
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        track (e.getPosition());
+        if (hot < 0 || hotPart != Part::wheel || ! setOffset || ! route || w.deltaY == 0.0f)
+        {
+            Component::mouseWheelMove (e, w); // (the list scrolls)
+            return;
+        }
+        setOffset (hot, juce::jlimit (-999, 999, route (hot).offset + (w.deltaY > 0.0f ? 1 : -1)));
+    }
+
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        track (e.getPosition());
+        if (hot < 0 || hotPart != Part::wheel || ! route)
+            return;
+        const auto k = hot;
+        auto* window = new juce::AlertWindow (tr ("Mixer track offset for output {0}", { juce::String (k + 1) }), {}, juce::MessageBoxIconType::NoIcon);
+        window->addTextEditor ("value", juce::String (route (k).offset));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<ConnectionRows> safe (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window, k] (int result) {
+            if (result == 1 && safe != nullptr && safe->setOffset)
+                safe->setOffset (k, juce::jlimit (-999, 999, window->getTextEditorContents ("value").trim().getIntValue()));
+        }), true);
+    }
+
+private:
+    enum class Part { none, led, name, wheel };
+    bool on (int k) const { return route && route (k).isActive (outputs[(std::size_t) k].activeByDefault); }
+    static constexpr int wheelWidth = 42;
+    int hot = -1, dragRow = -1, dragStart = 0;
+    Part hotPart = Part::none;
+
+    juce::String label (int k) const
+    {
+        const auto& name = outputs[(std::size_t) k].name;
+        return name.isNotEmpty() ? name : tr ("Output {0}", { juce::String (k + 1) });
+    }
+    // the outputs column: the right half (FL's inputs column, left, is for effects)
+    juce::Rectangle<int> rowBounds (int k) const
+    {
+        return { getWidth() / 2 - 20, 2 + k * rowHeight, getWidth() - (getWidth() / 2 - 20) - 4, rowHeight };
+    }
+    juce::Rectangle<int> ledBounds (int k) const { return rowBounds (k).removeFromLeft (14).withSizeKeepingCentre (12, 12); }
+    juce::Rectangle<int> wheelBounds (int k) const { return rowBounds (k).removeFromRight (wheelWidth).reduced (0, 3); }
+
+    void track (juce::Point<int> p)
+    {
+        auto k = -1;
+        auto part = Part::none;
+        for (int i = 0; i < (int) outputs.size(); ++i)
+            if (rowBounds (i).contains (p))
+            {
+                k = i;
+                part = ledBounds (i).expanded (4).contains (p) ? Part::led : wheelBounds (i).contains (p) ? Part::wheel : Part::name;
+            }
+        if (k != hot || part != hotPart)
+        {
+            hot = k;
+            hotPart = part;
+            repaint();
+        }
+    }
+};
+
 // FL's plugin wrapper settings page (REA rounds 146a / 149), in LYNX's style with the tabs and groups of FL's wrapper
 // form (Fruity Wrapper's DFM [DATA], FL 2026's page [EXEC]): Settings (Info with the latency, MIDI ports), Processing
 // (Options) and Troubleshooting (Compatibility: the fixed buffers; Location). Options that re-create the plugin keep
@@ -128,6 +292,46 @@ public:
             });
         };
         addChildComponent (bitSize);
+        // Processing › Connections (round 188d): a generator's outputs, each to the insert its offset from the
+        // channel's says. FL's header: Reset, Auto map outputs, the outputs glyph and Refresh at the right [UI fl188d].
+        connections = channel && plugin.getTotalNumOutputChannels() > 0;
+        outputRows.outputs = pluginOutputs (plugin);
+        outputRows.route = [this] (int k) {
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            return ref != nullptr ? ref->outputRoute (k) : PluginOutputRoute {};
+        };
+        outputRows.setActive = [this] (int k, bool on) {
+            // (stored as the plugin's own default when it is one: −1)
+            const auto declared = outputRows.outputs[(std::size_t) k].activeByDefault;
+            editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); });
+        };
+        outputRows.setOffset = [this] (int k, int v) { editRoutes ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = v; }); };
+        connectionsView.setViewedComponent (&outputRows, false);
+        connectionsView.setScrollBarsShown (true, false);
+        connectionsView.setScrollBarThickness (8);
+        addChildComponent (connectionsView);
+        resetIo.setButtonText (tr ("Reset"));
+        resetIo.setTooltip (tr ("Set all inputs and outputs to their default values"));
+        // FL's Reset [EXEC]: every offset back to 0 ("---"); the LEDs stay as they are
+        resetIo.onClick = [this] {
+            editRoutes ([n = (int) outputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { resetOutputOffsets (r, n); });
+        };
+        addChildComponent (resetIo);
+        autoMap.setButtonText (tr ("Auto map outputs"));
+        autoMap.setTooltip (tr ("Assign all outputs incrementally"));
+        // FL's Auto map outputs (FUN_0078aea0 [DECOMP], checked [EXEC]): from the first output's offset, one more for
+        // each next output, inactive ones included
+        autoMap.onClick = [this] {
+            editRoutes ([n = (int) outputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { autoMapOutputs (r, n); });
+        };
+        addChildComponent (autoMap);
+        refreshIo.setButtonText (juce::String::fromUTF8 ("â»"));
+        refreshIo.setTooltip (tr ("Refresh inputs and outputs (after a change in the plugin)"));
+        refreshIo.onClick = [this] {
+            outputRows.outputs = pluginOutputs (plugin);
+            resized();
+        };
+        addChildComponent (refreshIo);
         locate.setButtonText (tr ("Locate"));
         locate.setTooltip (tr ("Show the plugin's file in the file manager"));
         locate.onClick = [this] { juce::File (plugin.getPluginDescription().fileOrIdentifier).revealToUser(); };
@@ -158,6 +362,21 @@ public:
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption, true));
             g.drawText (caps (title), area.withHeight (headerHeight).reduced (10, 0), juce::Justification::centredLeft);
+        }
+        if (tab == 1 && connections && ! outputsGlyph.isEmpty()) // FL's outputs glyph: an arrow leaving a box
+        {
+            const auto b = outputsGlyph.toFloat().withSizeKeepingCentre (14.0f, 12.0f);
+            juce::Path p;
+            p.addRoundedRectangle (b.getX(), b.getY(), b.getWidth() * 0.55f, b.getHeight(), 2.0f);
+            g.setColour (colour::textSecondary);
+            g.strokePath (p, juce::PathStrokeType (1.4f));
+            juce::Path arrow;
+            arrow.startNewSubPath (b.getX() + b.getWidth() * 0.35f, b.getCentreY());
+            arrow.lineTo (b.getRight(), b.getCentreY());
+            g.strokePath (arrow, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path head;
+            head.addTriangle (b.getRight() + 1.0f, b.getCentreY(), b.getRight() - 4.0f, b.getCentreY() - 4.0f, b.getRight() - 4.0f, b.getCentreY() + 4.0f);
+            g.fillPath (head);
         }
         g.setFont (font (type::body));
         for (const auto& [area, text, primary] : labels)
@@ -251,6 +470,26 @@ public:
             for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
                 if (section == wrapperOptions()[i].section && ! hiddenOption (i))
                     show (*toggles[(int) i], box.removeFromTop (rowHeight).withTrimmedLeft (wrapperOptions()[i].needsFixed ? 22 : 0));
+            outputsGlyph = {};
+            if (tab == 1 && connections)
+            {
+                // the group's header line carries the buttons (FL: Reset, Auto map outputs, the glyph; Refresh at
+                // the right); the rows scroll below
+                auto r = area.withTrimmedBottom (2);
+                groups.push_back ({ r, tr ("Connections") });
+                auto header = r.removeFromTop (headerHeight + 6).reduced (10, 3);
+                show (refreshIo, header.removeFromRight (26));
+                header.removeFromRight (juce::jmax (0, header.getWidth() / 2 - 150));
+                outputsGlyph = header.removeFromRight (22);
+                header.removeFromRight (4);
+                show (autoMap, header.removeFromRight (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16)));
+                header.removeFromRight (4);
+                show (resetIo, header.removeFromRight (juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
+                auto list = r.reduced (4, 4);
+                show (connectionsView, list);
+                outputRows.setSize (list.getWidth() - (outputRows.preferredHeight() > list.getHeight() ? 10 : 0), juce::jmax (list.getHeight(), outputRows.preferredHeight()));
+                outputRows.repaint();
+            }
             if (tab == 2)
             {
                 auto where = group (area, headerHeight + rowHeight + 8, tr ("Location"));
@@ -340,6 +579,22 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
+    // Processing › Connections: one edit of the outputs' routes (as many entries as the plugin has outputs)
+    void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change)
+    {
+        const auto count = outputRows.outputs.size();
+        engine.editSong ([fn = find, count, change = std::move (change)] (Song& song) {
+            if (auto* ref = fn (song); ref != nullptr && count > 0)
+            {
+                if (ref->outputs.size() < count)
+                    ref->outputs.resize (count);
+                change (ref->outputs);
+                trimOutputRoutes (ref->outputs);
+            }
+        });
+        outputRows.repaint();
+    }
+
     void refresh()
     {
         auto* ref = find (const_cast<Song&> (engine.getSong()));
@@ -360,6 +615,7 @@ private:
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
         outPort.setSelectedId (ref->midiOutPort + 2, juce::dontSendNotification);
+        outputRows.repaint();
         const auto reported = plugin.getLatencySamples();
         const auto text = ref->latencyOverrideMs >= 0.0f
                               ? tr ("{0} ms (set by hand)", { juce::String (ref->latencyOverrideMs, 2) })
@@ -382,6 +638,12 @@ private:
     juce::OwnedArray<juce::ToggleButton> toggles;
     juce::ComboBox inPort, outPort, bendRange, bitSize;
     juce::TextButton latency, locate;
+    // Processing › Connections (round 188d)
+    bool connections = false;
+    ConnectionRows outputRows;
+    juce::Viewport connectionsView;
+    juce::TextButton resetIo, autoMap, refreshIo;
+    juce::Rectangle<int> outputsGlyph;
     int tab = 0;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groups;
     std::vector<Label> labels;
