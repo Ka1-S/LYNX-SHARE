@@ -82,6 +82,7 @@ add_library(lynx_core STATIC
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
+    src/core/SimpleTracks.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -576,8 +577,13 @@ if(LYNX_BUILD_APP)
             juce::juce_dsp
             juce::juce_opengl
         PUBLIC
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_lto_flags)
+            juce::juce_recommended_config_flags)
+    # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
+    # minutes of a cached CI App build). -DLYNX_LTO=OFF
+    option(LYNX_LTO "Link the app with link-time optimisation" ON)
+    if(LYNX_LTO)
+        target_link_libraries(LYNX PUBLIC juce::juce_recommended_lto_flags)
+    endif()
 endif()
 
 # LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by

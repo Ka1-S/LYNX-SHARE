@@ -153,7 +153,7 @@ TEST (issues173a_write_fl_detune_probes)
 TEST (issues173a_soundfont_player_follows_the_channel_pitch_knob)
 {
     using namespace lynx;
-    const auto folder = std::filesystem::temp_directory_path() / "lynx-173a-sf";
+    const auto folder = std::filesystem::temp_directory_path() / ("lynx-173a-sf-" + processTempTag()); // (per process: shards run at once)
     std::filesystem::create_directories (folder);
     const auto path = (folder / "font.sf2").string();
     {

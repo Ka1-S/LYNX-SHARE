@@ -61,7 +61,7 @@ there.
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
 | Shell Channel (drum channel strip) | SSL Native Drumstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge's gate): gate (open / close, range, attack, hold, release) with its meter, transient shaper (gain, speed, amount, invert, listen; two measured followers), low and high frequency enhancers (frequency, drive, amount), listen-mic compressor (comp, narrow band, make-up, mix), output mix, and the 120 process orders (drag the chevrons); latency 4.1 ms like the original. State translated 1:1. fxparity 4.4 → 6.1 (bank 4.3 → 6.0) |
 | Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
-| Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
+| Horizon | ValhallaFutureVerb | 8 | 9 | 4 | 8 | 135 | 183b: sound 2 → 4 (fxparity 3.00 → 3.25, verb 7.84 → 8.35 on the matched settings; 45-setting bank 2.25 → 2.81 / 6.79 → 7.54; music level error 4.2 → 1.2 dB): echo as pre-delay, EQ / colour / mode laws measured |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
 | Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
@@ -78,7 +78,7 @@ there.
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
 | Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
-| Nebula | Valhalla Supermassive | 9 | 9 | 3 | 8 | 135 |  |
+| Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
@@ -106,6 +106,39 @@ default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved to
 flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
 Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
 engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
+
+## Round 183b: the Valhalla reverbs' sound, one engine per slice
+
+**Method**
+- Black-box only, as round 172d: tp172d's matched settings (D, S1 …) and its probe renders, plus round 183b's own captures (run by round 182a's capture holds: fxmeasure, public parameter API, one process per script). Per pair the captures sweep every main control from the default state at Mix 100 %, and add the impulse at −20 dB, music at −20 dB and a noise burst. Data: /mnt/e/lynx-work/verb183b (cap/, bank.py, hz_before.txt / hz_after.txt).
+- Scores: **fxparity** per setting and signal (impulse file, drums, music), and **verb** on the impulse render's first 3.9 s (tp172d's windowing), both on the matched settings ("main") and on the whole bank. The PARITY "Sound" column follows them.
+- **The reference is not linear in Tape echo mode** (FutureVerb's default; ValhallaDelay's Tape too). Its response to tp172d's 0.5 impulse has 5 dB more below 500 Hz than its response to the same impulse at −20 dB. Its music, drums and noise follow the −20 dB response within ~2 dB, and the excess goes away in its Modern echo mode. So the low end of a 0.5-impulse verb score is partly this artefact. Round 183b fits the −20 dB response and the programme material, and reports verb on both impulses.
+- Valhalla demo dropouts: 2 of the 62 FutureVerb captures (High EQ 0.6, Hall Early/Late 100 %) fade to silence near 2.4 s and are left out of the bank. The Low EQ 0 capture starts 0.7 s late and is left out too. Five music renders (Size 100 %, Dark, the level test, Drive 0, Cathedral) have a 1.5–1.8 s hole at random times, so their music is the demo's. Those stay in both the before and the after bank. The loud-programme figure below is taken without them: music at 0 dB sits 1.05 dB under its −20 dB render.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Horizon (slice 1) | ValhallaFutureVerb | 3.00 → 3.25 / 2.25 → 2.81 | 7.84 → 8.35 / 6.79 → 7.54 | See the list below. Over the bank, the music level error is 4.2 → 1.2 dB (music score 2.3 → 3.2), drums 3.25 → 3.75, the tail balance 4.8 → 6.8 and the level 5.5 → 8.1 of 10. |
+
+**What changed in Horizon (slice 1):**
+- **The echo is the pre-delay.** This follows the reference's manual and was measured. In Echo → Reverb, the reverb hears the echo's output, not the dry input. Echo Level only sets the echo heard beside the reverb, so at Level 0 the echo is still the pre-delay (30 ms by default), and the reference's onset moves with Echo time. Before, the echo was skipped at Level 0 and was never heard directly. Drive works in the plain echo modes and Detune in the granular ones (Tape played 4 cents sharp before).
+- **Low EQ** is a single −6 dB/oct cut, in the echo. Moving it from 100 to 400 Hz takes 11.5 dB at 30 Hz; with the old echo and output cuts together it would be 23.
+- **High EQ** is a −6 dB/oct cut in the echo and in the reverb, and it sets the high decay. RT(8 kHz) / RT(1 kHz) is 0.47 / 0.65 / 0.99 at 1 / 4.5 / 20 kHz; before, it was fixed.
+- A +3 dB shelf below 1.4 kHz: the reference's tail is fuller there, measured on the −20 dB impulse and on music.
+- **Colours** follow the manual and the renders. Bright and Neutral play alike. Dark adds a steep 8 kHz low-pass. The fourth colour, now named Studio as in the reference (it was "Vintage"; saved projects keep it), adds a 12 dB/oct cut at 560 Hz and a steep 12 kHz low-pass. Before, these were first-order cuts at 16, 11 and 9 kHz.
+- **Modes:** RT against Decay, bass decay, the onset after the echo, level and tone are measured per mode (Room, Chamber, Plate, Hall, Cathedral, Space).
+  - Room's lines are 1.6 × longer. Before, a tank mode sat on the stimulus's 48 Hz bass note, and music was 9 dB loud.
+  - Plate feeds its tank at once. Before, its 8 ms build-up taps cancelled each other below 120 Hz.
+  - Nonlin's length follows Size (gated after 0.1 / 0.33 / 1.05 s at Size 0 / 50 / 100 %), and Frozen's RT does too (2 / 15 s at Size 0 / 50 %). Both followed Decay before.
+  - The mode steps switch at the reference's (k + 1) / 24 points (its factory presets): 0.0833 still plays Room and 0.3333 plays Frozen.
+- **Size and Density:** the onset grows with Size (25 / 100 / 139 % of its 50 % value at Size 0 / 50 / 100 %). The level holds over Size and Density as measured. Early/Late barely moves the level (+1.6 / −1.3 dB at 0 / 100 %).
+- **Loud programme:** the reference runs 1–2 dB under its −20 dB response (music, drums, a noise burst; about 1 dB with its clean Modern echo mode). Horizon now has a gentle input compressor: −30 dBFS threshold, 1.25 : 1 ratio, 30 ms.
+
+**Open (Horizon):**
+- The onset. The reference rises 6 dB in 10 ms and then holds flat. Ours has the early taps first, then a 15 ms dip before the tank arrives. A first try made the onset right but moved the level (worse overall), so it was not kept.
+- The reference's loud-burst behaviour: its tail is 5 dB down after a 0.3 s burst at −1.6 dBFS peak. A static compressor cannot match music, drums and that burst at once.
+- Frozen's hold-and-release envelope (about a 4.5 s hold at Size 50 %, then a fade) is not modelled: the tail just decays.
+- Space's attack shapes, and Cathedral's lows below 100 Hz.
+- The tank loses some highs of its own, so RT(8 kHz) reaches 2.75 s at High EQ 20 kHz where the reference has 3.0 s. The mid RT runs ~8 % long at the default (3.27 against 3.01 s at 1 kHz), from the bass-decay crossover.
 
 ## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
 
@@ -140,7 +173,8 @@ Both numbers are given below.
 | Voice Shift | Little AlterBoy | 2.0 → 2.8 | — | measured on refcap0124's Drive, Pitch and Formant sweeps: Drive adds 1.72 dB per step into an output that falls 1.46 dB per step (a soft clipper with a small bias); the wet sits 2.7 dB under the input; the original's voice gets 0.36 dB louder per semitone of pitch against the formants (ours kept the level). Levels now within ~1 dB (they were up to +5.5 dB). Per setting: D 2.7 → 4.0, S1 2.3 → 2.3, S2 2.0 → 2.3, S3 1.0 → 2.7. Open: the original decorrelates L / R in shifted settings; its tracking of polyphonic music differs. |
 | Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
 | Glow Leveler (slice 9) | CLA-2A (Waves) | 4.3 → 5.2 | — | the Compress side chain refitted (black-box: the trial's renders of 11-04 and refcap0124's sweeps at peak reduction 46 / 56 / 100). The original reduces more at both ends of the band than at 750 Hz (−18 dBFS sweep, peak reduction 56: 1.9 dB more at 95 Hz, 5.2 dB more at 6 kHz), so music, drums and pink noise came out about 2 dB too loud while the 1 kHz stairs matched. A low peak (105 Hz, +5 dB) and a wider, stronger high one (8.9 kHz, +11.9 dB, bounded at 12 dB) replace round 123's emphasis; the chain keeps its 1 kHz gain, so the 1 kHz laws of rounds 152 / 165w / 165x hold. Gain error rms 1.54 → 1.02 dB; per setting D 4.0 → 5.5, S1 4.3 → 5.5, S3 3.5 → 4.3. Limit keeps the old side chain (its law was fitted on it; the new one made it worse). Open: a steady 6 kHz sine reduces 7.1 dB more than 750 Hz, the sweep 5.2 |
-| Foil Plate (plate voicing, slice 10) | Little Plate | 2.2 → 3.4 | — | measured on the trial's renders (Decay 1 / 3 / 10 s, impulse, drums, music) and refcap0124's sweeps at Decay 0.5 / 1.7 / 3 / 5.7 / 19 s. The original has no sub-bass: 20 … 32 Hz sat 11 … 16 dB and 32 … 40 Hz 2 … 8 dB above it, which put music 5 dB too loud (its energy is in bass notes at 32 … 48 Hz). The voicing now cuts at 55 Hz, 12 dB/oct, unless the panel's Low Cut is higher (45 Hz scored 3.2). It was also 7 … 9 dB too bright from 2 to 8 kHz up to Decay 1.7 s, 5 … 7 dB at 3 s and 2 … 3 dB from 5.7 s on: the high shelf at 2.5 kHz goes from −5 dB to −13.5 / −12 / −9 dB with Decay, the edge from 7 to 9 kHz. Per setting D 2.0 → 3.7, S1 1.7 → 2.7, S2 3.3 → 3.3, S3 2.0 → 4.0. ValhallaPlate (voicing off) unchanged, 3.1. Open: at Decay 1 s the trial's impulse and music read 4 … 5 dB too loud from 250 Hz to 4 kHz, while its sweeps at 0.5 / 1.7 s do not; not changed |
+| Foil Plate (plate voicing, slice 10) | Little Plate | 2.2 → 3.4 | 8.1 → 8.6 | measured on the trial's renders (Decay 1 / 3 / 10 s, impulse, drums, music) and refcap0124's sweeps at Decay 0.5 / 1.7 / 3 / 5.7 / 19 s. The original has no sub-bass: 20 … 32 Hz sat 11 … 16 dB and 32 … 40 Hz 2 … 8 dB above it, which put music 5 dB too loud (its energy is in bass notes at 32 … 48 Hz). The voicing now cuts at 55 Hz, 12 dB/oct, unless the panel's Low Cut is higher (45 Hz scored 3.2). It was also 7 … 9 dB too bright from 2 to 8 kHz up to Decay 1.7 s, 5 … 7 dB at 3 s and 2 … 3 dB from 5.7 s on: the high shelf at 2.5 kHz goes from −5 dB to −13.5 / −12 / −9 dB with Decay, the edge from 7 to 9 kHz. Per setting D 2.0 → 3.7, S1 1.7 → 2.7, S2 3.3 → 3.3, S3 2.0 → 4.0. ValhallaPlate (voicing off) unchanged, 3.1. Open: at Decay 1 s the trial's impulse and music read 4 … 5 dB too loud from 250 Hz to 4 kHz, while its sweeps at 0.5 / 1.7 s do not; not changed. verb (the shared reverb score on the impulse renders' first 3.9 s, before the stimulus's burst at 4 s): D 8.28 → 8.74, S1 7.25 → 8.10, S2 8.43 → 8.73, S3 8.30 → 8.74; the level part gains most (S1 2.7 → 5.9, D 6.7 → 8.8), the early part drops a little (D 6.8 → 6.6, S2 6.2 → 6.0) |
+| Voice Shift (slice 11) | Little AlterBoy | 2.8 → 2.9 | — | at its default state (Pitch and Formant 0) the original passes a vocal almost untouched: 2.7 dB down, flat within 0.4 dB to 4 kHz, the rest 15.5 dB under it (a sweep 6.4 dB). Voice Shift sent it through the overlap-add anyway and left the rest only 2.2 dB under it (a sweep 0.5 dB). With nothing to shift (Transpose, no MIDI note, Pitch and the formant shift 0) the wet path is now the delayed input, crossfaded over 20 ms (−145 dB residual on a 200 Hz voice at 0 st). fxparity (fxrender16): D_vocal 4 → 5 (ESR −15 dB), the shifted settings unchanged. A probe bank of the original (182a, fresh instances: Formant −12 … +12, Pitch −12 … +12, Link, Quantize, Drive 3 / 5 on a synthetic vowel, a 120 Hz pulse train and the vocal) agrees with Voice Shift on pitch and on where the vowel's formant peaks move. Levels on the vocal are within ±1 dB except Formant −12 (+2.0 dB) and Pitch ±12 (+1.1 / +1.2). The S1–S3 L/R de-correlation of the round's first captures is a history effect: the original keeps a pitch shifter per channel that drifts apart once it has processed stereo input (a reset does not re-align them). A fresh instance keeps a mono voice mono (L = R) as Voice Shift does; not modelled. Open: on the broadband pulse train Voice Shift is 2 … 4.5 dB louder in shifted settings (not on the vocal); above 11 kHz the original adds energy when shifting (+3 … +26 dB against the input on the vocal, likely its own aliasing), where Voice Shift loses 4 … 7 dB |
 
 **Decapitator captures:** the original's Auto moves its Output knob asynchronously after a Drive change made by host automation. The earlier captures had the trim in some settings only, which made styles E / N / T look 8–11 dB too loud and gave a mean of 3.2. All its captures now set Auto off and pin Output at 0 dB first.
 
@@ -244,6 +278,21 @@ Both numbers are given below.
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
 - Ember's VU reads "VU". The original's meter face and logo are not reproduced, as the rules require (the Drive's printed 0 … 10 came in the fifth look slice).
 - Auto-pan has no LFO key: the Rhythm voicing has no free-LFO switch to put there.
+
+## Round 183b slice 2: Nebula ← Valhalla Supermassive
+
+Measured on tp172d's 41 probe renders and 19 new captures at Mix 100 %: Mod depth 0 / 10 / 25 / 50 / 100 %, Mod rate 0 / 100 %, Width 0 / 50 %, Density 50 / 100 %, and the default. Method and scores as in "Round 183b" (slice 1, Horizon) above; a 52-setting bank.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Nebula (slice 2) | Valhalla Supermassive | 3.20 → 3.33 / 3.11 → 3.33 | 6.05 → 7.19 / 6.16 → 7.30 | Over the bank, the verb's stereo part goes from 1.8 to 9.3 of 10 and its level part from 7.7 to 8.1; drums 3.00 → 3.17, music 3.17 → 3.33, impulse 2.90 → 3.29. |
+
+- **Stereo.** The reference's tail is decorrelated whenever it modulates: L/R correlation −0.01 at the default Mod depth (50 %), 0.13 at 25 %, 0.34 at 10 %, and 1.0 (mono) at 0. That holds at every Density, and Width 50 % is mono. Nebula played mono at Density 0, because its old per-mode correlations were set from a different measurement. Now the width is the panel's, and this network decorrelates through its modulated lines in the same way (0.06 / 0.08 / 1.0 at 10 / 25 / 0 %). Only the reference's mono modes (five of them, plus one with L = −R) keep a narrow width. Their correlations were re-measured per mode at the defaults.
+- **Level against Mod depth.** The reference's eight voices fall apart as they modulate. Its unmodulated tail is 8.9 dB louder than at 50 %, and 2.4 dB louder at 10 %. This network's lines part less, so a law adds the rest (+5 dB × e^(−depth / 10 %)). With the full width, the level is re-measured: −0.9 dB at Density 0 and −4.2 dB from Density 50 % up, where the dense network's sides were nearly mono before.
+- **Open:**
+  - Several modes swell up over 1–2 s at Density 0 (the reference's 3rd to 6th modes: −45 → −12 dB over six repeats in the 4th); ours start at full level.
+  - The reference smears each repeat over 2–5 ms, with different smears left and right. An in-loop all-pass for that was tried and scored lower, so it was dropped.
+  - The 4th mode (S2) has its first arrival 300 ms later in the reference.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 

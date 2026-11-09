@@ -6,6 +6,7 @@
 #include "core/MidiOut.h"
 #include "core/PatternBlocks.h"
 #include "core/MidiControls.h"
+#include "core/SessionIds.h"
 
 #include <algorithm>
 #include <iterator>
@@ -1548,14 +1549,31 @@ Song makeBounceSong (const Song& song, int track)
     auto& insert = out.mixer[(std::size_t) track];
     insert.sends.clear();
     insert.toMaster = true;
+    insert.masterLevel = 1.0f; // the insert's own output: its route level to Master is the route's (Render to audio keeps the
+                               // route on the new insert; rendering it too played a route at 50 % at 25 %, round 186b)
     insert.muted = false;
     insert.solo = true; // it and whatever feeds it are audible
 
+    // the Master neutral: the render plays through the song's Master again (Render to audio), so nothing of it may be in
+    // the file — effects, fader, pan, separation, phase / swap, EQ and its automation (round 186b, as StandIns' stems)
     auto& master = out.mixer[0];
     master.effects.clear();
     master.volume = unityFader;
     master.pan = 0.0f;
     master.muted = false;
+    master.stereo = 0.0f;
+    master.invertPhase = master.swapChannels = false;
+    master.eq = {};
+    auto onMaster = [] (const AutomationTarget& t) { return refs::targetsInsert (t) && t.index == 0; };
+    for (auto& a : out.automations)
+        if (onMaster (a.target))
+            a.target = {};
+    for (auto& p : out.patterns)
+        p.events.erase (std::remove_if (p.events.begin(), p.events.end(), [&] (const PatternEvents& lane) { return onMaster (lane.target); }),
+                        p.events.end());
+    out.initialValues.erase (std::remove_if (out.initialValues.begin(), out.initialValues.end(),
+                                             [&] (const Song::InitialValue& v) { return onMaster (v.target); }),
+                             out.initialValues.end());
     out.mode = PlayMode::song;
     return out;
 }
@@ -1580,7 +1598,7 @@ int applyBounce (Song& song, int track, const std::string& samplePath, std::int6
     c.instrument = InstrumentKind::audioClip;
     c.samplePath = samplePath;
     c.mixerTrack = newTrack;
-    c.volume = 1.0f;
+    c.volume = audioClipUnityVolume; // the render plays at the level of what it replaces (1.0 was +5.18 dB, round 186b)
     song.channels.push_back (c);
 
     int lane = 0;

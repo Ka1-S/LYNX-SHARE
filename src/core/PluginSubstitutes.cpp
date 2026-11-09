@@ -175,8 +175,10 @@ map = xml:HighEQFreq -> High EQ freq
 map = xml:EchoSync -> Echo sync | steps 0:0 0.4995:0.3333 0.7495:0.6667 0.9995:1
 map = xml:EchoNote -> Echo note | steps 0:0 0.1662:0.2 0.3328:0.4 0.4995:0.6 0.6662:0.8 0.8328:1
 map = xml:Routing -> Routing | steps 0:0 0.4995:1
-map = xml:EchoMode -> Echo mode | steps 0:0 0.0828:0.0909 0.1245:0.1818 0.1662:0.2727 0.2078:0.3636 0.2495:0.4545 0.2912:0.5455 0.3328:0.6364 0.3745:0.7273 0.4162:0.8182 0.4578:0.9091 0.4995:1 0.5412:0
-map = xml:ReverbMode -> Reverb mode | steps 0:0 0.0828:0.1429 0.1245:0.2857 0.1662:0.4286 0.2078:0.5714 0.2495:0.7143 0.2912:0.8571 0.3328:1 0.3745:0
+# round 183b: its modes sit at (k + 1) / 24 (its factory presets) and switch at those exact points (measured: 0.0833
+# plays Room, 0.08333 Chamber; 0.3333 Frozen, 0.33333 Nonlin)
+map = xml:EchoMode -> Echo mode | steps 0:0 0.083333:0.0909 0.125:0.1818 0.166667:0.2727 0.208333:0.3636 0.25:0.4545 0.291667:0.5455 0.333333:0.6364 0.375:0.7273 0.416667:0.8182 0.458333:0.9091 0.5:1 0.541667:0
+map = xml:ReverbMode -> Reverb mode | steps 0:0 0.083333:0.1429 0.125:0.2857 0.166667:0.4286 0.208333:0.5714 0.25:0.7143 0.291667:0.8571 0.333333:1 0.375:0
 map = xml:Color -> Color | steps 0:0 0.1662:0.3333 0.2495:0.6667 0.3328:1
 
 # ---------------------------------------------------------------- other reverbs -> Reeverb 2 / LuxeVerb
