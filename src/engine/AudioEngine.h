@@ -893,6 +893,11 @@ private:
     int automationPattern = 0;
     int recordedAutomationPoints = 0;
     bool automationOverrideActive = false; // touched targets override their automation in the renderer
+    // FL (issue #125): the targets the user moved since playback last started; their automation does not drive them
+    // until it starts again (RackRenderer::setReleasedSlots). Not while recording automation (the touch rule above).
+    std::vector<AutomationTarget> releasedTargets;
+    bool releasedWasPlaying = false;
+    void publishReleasedTargets();
     // Song mode, no loop region: once a parameter moved while recording, the song plays on past its end (no wrap to
     // the start) until recording stops, and the take's clip grows with the playhead (issue #12: it cut itself)
     bool automationLinear = false;

@@ -2529,7 +2529,7 @@ countries: ru by kz
 "Echo > Rev|Rev > Echo" = "Эхо > Рев.|Рев. > Эхо"
 "Reverb mode" = "Режим реверба"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Ярко|Нейтрально|Темно|Винтаж"
+"Bright|Neutral|Dark|Studio" = "Ярко|Нейтрально|Темно|Студия"
 "Damping" = "Демпфирование"
 "Bass freq" = "Частота баса"
 "Late mix" = "Микс поздних"

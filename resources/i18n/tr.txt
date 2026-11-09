@@ -2529,7 +2529,7 @@ countries: tr
 "Echo > Rev|Rev > Echo" = "Eko > Rev|Rev > Eko"
 "Reverb mode" = "Reverb modu"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Parlak|Nötr|Koyu|Vintage"
+"Bright|Neutral|Dark|Studio" = "Parlak|Nötr|Koyu|Stüdyo"
 "Damping" = "Sönümleme"
 "Bass freq" = "Bas frek"
 "Late mix" = "Geç mix"

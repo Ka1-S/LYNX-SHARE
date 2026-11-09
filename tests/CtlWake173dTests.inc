@@ -181,8 +181,11 @@ TEST (ctlwake173d_generator_controls_rest) { ctlwake173d::auditEngines (ctlwake1
 TEST (ctlwake173d_generator_controls_gms) { ctlwake173d::auditEngines ({ "GMS" }, false); }
 TEST (ctlwake173d_generator_controls_sawer) { ctlwake173d::auditEngines ({ "Sawer" }, false); }
 TEST (ctlwake173d_generator_controls_toxic) { ctlwake173d::auditEngines ({ "Toxic Biohazard" }, false); }
-TEST (ctlwake173d_generator_controls_harmless_sytrus) { ctlwake173d::auditEngines ({ "Harmless", "Sytrus" }, false); }
-TEST (ctlwake173d_generator_controls_kepler_exo_tb) { ctlwake173d::auditEngines ({ "Kepler Exo", "Transistor Bass" }, false); }
+// (round speed185a: one engine per test, so parallel shards can spread them; the same engines and checks)
+TEST (ctlwake173d_generator_controls_harmless) { ctlwake173d::auditEngines ({ "Harmless" }, false); }
+TEST (ctlwake173d_generator_controls_sytrus) { ctlwake173d::auditEngines ({ "Sytrus" }, false); }
+TEST (ctlwake173d_generator_controls_kepler_exo) { ctlwake173d::auditEngines ({ "Kepler Exo" }, false); }
+TEST (ctlwake173d_generator_controls_transistor_bass) { ctlwake173d::auditEngines ({ "Transistor Bass" }, false); }
 TEST (ctlwake173d_generator_controls_drumaxx) { ctlwake173d::auditEngines ({ "Drumaxx" }, false); }
 
 // every editor control reads and writes on the engine's new channel: a state saved before a parameter existed (Slayer's
