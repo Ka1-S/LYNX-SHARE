@@ -8043,3 +8043,6 @@ countries: tw hk mo
 "Send to {0} (deleted)" = "傳送到 {0}（已刪除）"
 "Disconnected links" = "中斷的連結"
 "Keep links to deleted inserts, greyed (LYNX)" = "保留指向已刪除插入軌的連結（灰色，LYNX）"
+"Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
+"Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
+"{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"

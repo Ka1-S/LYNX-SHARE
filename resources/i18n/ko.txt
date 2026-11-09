@@ -8043,3 +8043,6 @@ countries: kr
 "Send to {0} (deleted)" = "{0}(으)로 보내기(삭제됨)"
 "Disconnected links" = "끊어진 링크"
 "Keep links to deleted inserts, greyed (LYNX)" = "삭제된 인서트로 가는 링크를 회색으로 유지(LYNX)"
+"Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
+"Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
+"{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"

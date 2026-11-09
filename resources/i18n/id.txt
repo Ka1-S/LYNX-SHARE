@@ -8043,3 +8043,6 @@ countries: id
 "Send to {0} (deleted)" = "Kirim ke {0} (dihapus)"
 "Disconnected links" = "Tautan terputus"
 "Keep links to deleted inserts, greyed (LYNX)" = "Simpan tautan ke insert yang dihapus, berwarna abu-abu (LYNX)"
+"Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
+"{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"

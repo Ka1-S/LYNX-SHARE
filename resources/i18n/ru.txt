@@ -8043,3 +8043,6 @@ countries: ru by kz
 "Send to {0} (deleted)" = "Посыл на {0} (удалён)"
 "Disconnected links" = "Разорванные связи"
 "Keep links to deleted inserts, greyed (LYNX)" = "Сохранять связи с удалёнными инсертами серыми (LYNX)"
+"Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
+"{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"

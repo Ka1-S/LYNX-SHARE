@@ -8043,3 +8043,6 @@ countries: de at ch li lu
 "Send to {0} (deleted)" = "Send an {0} (gelöscht)"
 "Disconnected links" = "Getrennte Verbindungen"
 "Keep links to deleted inserts, greyed (LYNX)" = "Verbindungen zu gelöschten Inserts grau behalten (LYNX)"
+"Mixer groups follow the Playlist (LYNX)" = "Mixer-Gruppen folgen der Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Inserts wie die Playlist anordnen"
+"{0} insert(s) moved to follow the Playlist" = "{0} Insert(s) verschoben, um der Playlist zu folgen"
