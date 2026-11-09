@@ -1592,6 +1592,23 @@ void MixerStrips::paint (juce::Graphics& g)
             }
         }
 
+        // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
+        // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
+        if (t == selected && t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty() && needs (routeArea (t)))
+        {
+            const auto& lost = song.mixer[(std::size_t) t].lostSends;
+            const auto r = routeArea (t).toFloat().reduced (0.5f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r, radius::sm);
+            const float dashes[] = { 2.5f, 2.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::textDisabled);
+            g.fillPath (dashed);
+            g.setFont (font (10.0f));
+            textcache::drawFittedText (g, juce::String::fromUTF8 ("\xc3\x97 ") + (lost.size() == 1 ? juce::String::fromUTF8 (lost[0].to.c_str()) : juce::String ((int) lost.size())),
+                                       r.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
+        }
+
         // routing lane: send switch from the selected insert to this one, and its level knob
         if (selected > 0 && t != selected && selected < tracks && needs (routeArea (t).getUnion (sendArea (t))))
         {
@@ -1676,22 +1693,6 @@ void MixerStrips::paintRouting (juce::Graphics& g)
     for (const auto& send : from.sends)
         if (send.target > 0 && send.target < tracks)
             wire (selected, send.target, colour::accent.withAlpha (0.5f + 0.5f * juce::jlimit (0.0f, 1.0f, send.level)), 1.8f);
-
-    // sends to deleted inserts (round 186c's option): greyed, dashed, ending in a cross past the strip's right edge
-    for (int i = 0; i < (int) from.lostSends.size(); ++i)
-    {
-        const auto x0 = centre (selected);
-        const auto x1 = (float) (stripX (selected) + stripWidthOf (selected)) + 6.0f + 9.0f * (float) i;
-        juce::Path p, dashed;
-        p.startNewSubPath (x0, top);
-        p.cubicTo (x0, bottom, x1, bottom, x1, top + 4.0f);
-        const float dashes[] = { 3.0f, 3.0f };
-        juce::PathStrokeType (1.2f).createDashedStroke (dashed, p, dashes, 2);
-        g.setColour (colour::textDisabled);
-        g.fillPath (dashed);
-        g.drawLine (x1 - 2.5f, top + 1.5f, x1 + 2.5f, top + 6.5f, 1.2f);
-        g.drawLine (x1 - 2.5f, top + 6.5f, x1 + 2.5f, top + 1.5f, 1.2f);
-    }
 
     g.setColour (colour::accent);
     g.fillEllipse (centre (selected) - 3.0f, top - 3.0f, 6.0f, 6.0f);
