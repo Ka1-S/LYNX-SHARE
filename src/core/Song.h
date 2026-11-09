@@ -217,6 +217,9 @@ struct PluginRef
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64
     int bitSize = 0;
+    // FL's plugin menu › "Detached" (issue #116): the editor opens in a window of its own above the main window instead
+    // of docked in the workspace. LYNX's own field until the .flp bit is found (docking is behind a developer switch)
+    bool detached = false;
 
     bool operator== (const PluginRef& o) const
     {
@@ -227,7 +230,8 @@ struct PluginRef
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
-               && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst;
+               && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
+               && detached == o.detached;
     }
 };
 
@@ -910,10 +914,18 @@ enum class EffectKind : std::uint8_t
     flTransporter,   // FL's Transporter, exact (REA_rodada167f-transporter, core/TransporterFl.h): FL's 22 controls (raw − min) / range + source, stereo, send
     kilnChannel,     // LYNX's console channel (round tp172c7, core/MixSuite.h kiln): six measured console models, drive, noise, group bypass
     fretChannel,     // LYNX's guitar / bass channel strip (round tp172c8, core/MixSuite.h fret): phase correction, EQ, compressor, amp
-    shellChannel     // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    shellChannel,    // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    pocketDistortion,     // Pocket Distortion, FL Studio Mobile's Distortion, exact (round 188h, core/PocketFx.h): FLM's 6 values
+    pocketLimiterClassic, // Pocket Limiter Classic, FL Studio Mobile's Limiter (legacy), exact (round 188h, core/PocketFx.h): FLM's 3 values
+    pocketLimiter,         // Pocket Limiter, FL Studio Mobile's Limiter, exact (round 188h, core/PocketFx.h)
+    pocketLeveller,        // Pocket Leveller, FL Studio Mobile's Leveller, exact (round 188h, core/PocketFx.h)
+    pocketGate,            // Pocket Gate, FL Studio Mobile's Gate, exact (round 188h, core/PocketFx.h)
+    pocketTranceDelay,     // Pocket Trance Delay, FL Studio Mobile's Trance Delay, exact (round 188h, core/PocketFx.h)
+    pocketTapeDelay,       // Pocket Tape Delay, FL Studio Mobile's Tape Delay, exact (round 188h, core/PocketFx.h)
+    pocketMultiFx          // Pocket MultiFX, FL Studio Mobile's MultiFX, exact (round 188h, core/PocketMultiFx.cpp): an X/Y pad over 8 effects
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::shellChannel;
+constexpr EffectKind lastEffectKind = EffectKind::pocketMultiFx;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).
@@ -1026,6 +1038,17 @@ struct MixerSend
     bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level; }
 };
 
+// LYNX's "Keep links to deleted inserts" (round 186c, pain point 1, off by default; FL drops them): a send whose insert
+// was deleted, kept by the deleted insert's name and the send's level. It carries no sound; the mixer draws it greyed
+// until it is reconnected to an insert or removed.
+struct LostSend
+{
+    std::string to;      // the deleted insert's name
+    float level = 1.0f;  // the send's level (0 = a side-chain link)
+
+    bool operator== (const LostSend&) const = default;
+};
+
 // Built-in EQ of each mixer track (FL's 3 bands: low shelf, peak, high shelf),
 // after the effect slots and before the fader (REA_rodada6 §1).
 struct TrackEq
@@ -1114,6 +1137,7 @@ struct MixerTrack
     bool invertPhase = false;
     bool swapChannels = false;
     std::vector<MixerSend> sends;    // to other inserts
+    std::vector<LostSend> lostSends; // sends to deleted inserts, kept greyed (round 186c, an option; saved)
     TrackEq eq;
     // external audio input (FL's "Audio input source"): the device's input channel `inputChannel` (0-based;
     // -1 = none) and, when `inputStereo`, the next one too
@@ -1196,10 +1220,23 @@ struct Note
     bool muted = false;       // disabled note (does not play, stays in the pattern)
     bool slide = false;       // glides the sounding note to this pitch (without retriggering), as in FL
     bool porta = false;       // inverts the channel's porta on this note (the note glides from the previous one; as in FL)
-    float release = 0.5f;     // release velocity 0..1 (Note inspector; stored, not yet used by the instruments)
+    // release velocity 0..1 (FL's "Note release"): the note's "off" carries it to the instruments that take one — hosted
+    // plugins (FL's wrapper "Send note release velocity"), a Patcher's and a VFX's voices
+    float release = 0.5f;
     float modX = 0.5f, modY = 0.5f; // two free per-note modulation values 0..1 (stored, not yet routed)
     int colour = 0;           // note colour group 0..15 (FL's note colours; .flp note byte 'extra' bits 0-3)
     int group = 0;            // note group (FL's Group, Shift+G: clicking one note selects the group); 0 = none
+    // Live 12's note Chance and Velocity Range (round 187c, LYNX additions; FL has neither; core/NoteChance.h): each time
+    // the note comes round it plays with this probability (0..1, .als Probability), at a velocity drawn evenly between
+    // `velocity` and `velocity + velocityRange` (-1..1 = Live's VelocityDeviation / 127). Drawn from Song::chanceSeed,
+    // so a project plays and renders the same way every time; each loop pass draws again.
+    float chance = 1.0f;
+    float velocityRange = 0.0f;
+    // Live 12's probability groups (.als NoteProbabilityGroups): the notes of a pattern with the same chanceGroup (> 0)
+    // draw together — "Play all" (chanceOne false): all of them or none; "Play one": one member picked at random.
+    int chanceGroup = 0;
+    bool chanceOne = false;
+    bool hasChance() const noexcept { return chance < 1.0f || velocityRange != 0.0f || chanceGroup != 0; }
     bool operator== (const Note&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 
@@ -1805,6 +1842,8 @@ struct Song
     double bpm = 130.0;
     int beatsPerBar = 4;
     float swing = 0.0f; // 0..1: delays off-beat sixteenth notes (like the swing of FL's Channel Rack)
+    // the seed of the notes' Chance and Velocity Range draws (round 187c, core/NoteChance.h); saved, "New chance seed"
+    std::uint32_t chanceSeed = 0;
     std::vector<std::string> channelGroups; // the Channel Rack's filter groups (FL's "All" dropdown), by name
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
     ProjectInfo info;

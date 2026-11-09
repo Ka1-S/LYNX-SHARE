@@ -33,3 +33,8 @@ rule of round 146 applies instead. A controller is taken to behave as the mouse 
 FL plays a stretched clip once and a take in it grows the pattern (round 168k). LYNX's loop option had folded the take
 into the pattern's length (281a06893), so a take over an empty clip only filled its first bar; the take now lands where
 it was played in both modes.
+
+Follow-up (the user's hybrid rule, slice issue126b): with the loop option on, a take into a clip that loops a pattern
+which already has notes folds into the loop when its place in the loop falls inside that content (the pattern's notes at
+the take's first note, to their end in whole bars, at most the loop); an empty pattern or a place past the content keeps
+the note where played and the pattern grows. Option off: FL's rule always (`foldedTakeTick`, `RecNoFold126Tests.inc`).
