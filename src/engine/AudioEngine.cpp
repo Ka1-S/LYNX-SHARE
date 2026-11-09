@@ -1,6 +1,7 @@
 #include "engine/AudioEngine.h"
 #include "core/VideoPlayer.h"
 
+#include "core/Comping.h"
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -25,6 +26,7 @@
 
 #include "core/FlpImport.h"
 #include "core/AlsImport.h"
+#include "core/FlmImport.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -39,6 +41,7 @@
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
+#include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
 #include "flp/Flp.h"
 
@@ -1751,7 +1754,9 @@ void AudioEngine::finishAudioTake()
     if (keepPunch.has_value()) // pre-roll / punch in-out: only the range (the rest stays in the file)
         parts = takes::punch (placement, { *keepPunch });
     else if (song.mode == PlayMode::song && song.hasLoop())
-        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, ppq / 4, wraps); // one part per pass of the loop
+        // one part per pass of the loop; FL keeps a pass of any length (REA round 177c: a 1-tick pass got its own track),
+        // round 163's option drops one a 1/16 note long or less
+        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, recordOptions.lastLoopPassPlays ? ppq / 4 : 0, wraps);
     else if (recordOptions.recordingMarkers && song.mode == PlayMode::song)
         parts = takes::punch (placement, punchRanges (song.markers())); // FL's "Enable recording markers"
     else
@@ -1772,7 +1777,10 @@ void AudioEngine::finishAudioTake()
     for (const auto& take : kept)
         made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
 
-    editSong ([made, parts] (Song& s) { takes::placeTakeClips (s, made, parts); });
+    // FL: Loop record over a loop region, without a punch
+    const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.hasLoop();
+    const takes::TakeOptions takeOptions { loopRecorded, recordOptions.mode == RecordMode::overdub, recordOptions.lastLoopPassPlays };
+    editSong ([made, parts, takeOptions] (Song& s) { takes::placeTakeClips (s, made, parts, takeOptions); });
     dropJournals();
 }
 
@@ -2539,7 +2547,9 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     }
 
     const auto lengthsBefore = patternLengths (song);
+    const auto auditioned = comp::auditionedTrack (song);
     edit (song);
+    comp::checkAudition (song, auditioned);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
     publishSong();
@@ -2660,6 +2670,7 @@ void AudioEngine::undo()
     redoStack.push_back (std::move (song));
     song = std::move (undoStack.back());
     undoStack.pop_back();
+    comp::setAudition (song, -1); // (not an edit: whatever an old state had auditioned stays out of it)
     modified = true;
     lastUndoPress = {};
     publishSong();
@@ -2675,6 +2686,7 @@ void AudioEngine::redo()
     undoStack.push_back (std::move (song));
     song = std::move (redoStack.back());
     redoStack.pop_back();
+    comp::setAudition (song, -1);
     modified = true;
     lastUndoPress = {};
     publishSong();
@@ -2862,8 +2874,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         const auto* fileBytes = static_cast<const std::uint8_t*> (data.getData());
         // a Live set (.als, round 175a) takes the same pipeline: samples, plugins, report and Missing files window
         const auto liveSet = file.hasFileExtension ("als");
+        // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
+        const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
         std::optional<flp::Project> project;
-        if (! liveSet)
+        if (! liveSet && ! mobileProject)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -2929,11 +2943,28 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         options.relocations = relocations;
         {
             const auto t = std::chrono::steady_clock::now();
-            if (liveSet)
+            if (mobileProject)
+            {
+                FlmImportOptions flmOptions;
+                flmOptions.common = options;
+                if (! options.roots.factoryData.empty())
+                    if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
+                        flmOptions.resourceRoot = root;
+                std::string flmError;
+                auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
+                if (! song)
+                {
+                    out.error = utf8 (flmError.empty() ? "not a readable FL Studio Mobile project" : flmError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (liveSet)
             {
                 AlsImportOptions alsOptions;
                 alsOptions.common = options;
                 alsOptions.libraryRoots = liveLibraryRoots();
+                alsOptions.sessionOnPlaylist = alsSessionOnPlaylist.load();
                 std::string alsError;
                 auto song = importAls (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), alsOptions, &alsError);
                 if (! song)
@@ -2990,7 +3021,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         for (const auto& c : out.song.channels)
         {
             if (c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip || c.instrument == InstrumentKind::granulizer
-                || c.instrument == InstrumentKind::wavetraveller
+                || c.instrument == InstrumentKind::wavetraveller || c.instrument == InstrumentKind::fruityslicer
                 || c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
                 addPath (c.samplePath);
             for (const auto& z : c.zones)
@@ -3039,6 +3070,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             StretchMethod method;
             double semitones;
             StretchMap map;
+            std::string variant; // non-empty: the precomputed span is stretched (RackRenderer, round 180d)
+            std::shared_ptr<const SampleData> span;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3047,14 +3080,32 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (const auto data = library.load (juce::String::fromUTF8 (c.samplePath.c_str())); data != nullptr && data->frames() > 0)
                 {
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
-                    const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
+                    // the same stretch as RackRenderer: the precomputed span when there is one (round 180d), else the file
+                    const auto clip = c.instrument == InstrumentKind::audioClip;
+                    auto settings = c.sampler;
+                    if (clip)
+                        settings.regionStart = 0.0f, settings.regionEnd = 1.0f;
+                    const auto precomputes = clip ? c.sampler.precompute.any() : precompute::needed (c.sampler);
+                    if (precomputes && c.sampler.warp.empty())
+                    {
+                        if (std::shared_ptr<const SampleData> span = precompute::apply (*data, settings); span != nullptr && span->frames() > 0)
+                        {
+                            const auto ratio = target / ((double) span->frames() / span->sampleRate);
+                            auto variant = precompute::variantKey (settings, clip);
+                            if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
+                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
+                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span) });
+                        }
+                        continue;
+                    }
+                    const auto ratio = target / ((double) precompute::stretchedFrames (data, c.sampler, clip) / data->sampleRate);
                     // (the same map the rack asks for: RackState::build)
                     auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
-                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map) });
+                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {} });
                 }
         if (! stretches.empty())
         {
@@ -3062,7 +3113,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
+                    if (auto stretched = ! stretches[i].variant.empty()
+                                             ? library.loadStretchedSpan (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].variant,
+                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones)
+                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3340,6 +3394,11 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_stretch");
         return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
     };
+    factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
+                                       double ratio, StretchMethod method, double semitones) {
+        const loadtrace::Scope timing ("rack_stretch");
+        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
+    };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
 
@@ -3437,6 +3496,24 @@ void AudioEngine::removeGlobalLink (const AutomationTarget& target)
     setMidiPrefs (p, saveGlobalLinks);
 }
 
+void AudioEngine::setMultilink (bool on)
+{
+    if (on)
+        multilink.emplace();
+    else
+        multilink.reset();
+    sendChangeMessage();
+}
+
+void AudioEngine::multilinkToControllers (bool global)
+{
+    if (! multilink)
+        return;
+    multilink->collecting = false;
+    multilink->global = global;
+    sendChangeMessage();
+}
+
 void AudioEngine::learnMidiController (const AutomationTarget& target)
 {
     learning = target;
@@ -3450,6 +3527,9 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
 {
     if (target.kind == AutomationTargetKind::none)
         return;
+
+    if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
+        multilink->add (target);
 
     if (! (lastTweaked[0] == target))
     {
@@ -3721,6 +3801,36 @@ void AudioEngine::applyControllers()
             learning = {};
             learningGlobal = false;
             setMidiPrefs (p, saveGlobalLinks);
+        }
+        else if (learning.kind == AutomationTargetKind::none && multilink)
+        {
+            // FL's Multilink (round 177b-4): the first message of each controller links the next queued control
+            if (const auto link = multilink->controller (e.cc, e.channel))
+            {
+                if (multilink->global) // "Override global links": as "Override global link...", for every project
+                {
+                    auto p = midiPrefs;
+                    const prefs::GlobalLink g { link->cc, link->channel, (int) link->target.kind, link->target.index, link->target.slot,
+                                                link->target.param };
+                    p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
+                                                         [&] (const prefs::GlobalLink& l) {
+                                                             return l.kind == g.kind && l.index == g.index && l.slot == g.slot && l.param == g.param;
+                                                         }),
+                                         p.globalLinks.end());
+                    p.globalLinks.push_back (g);
+                    setMidiPrefs (p, saveGlobalLinks);
+                }
+                else
+                    editSong ([l = *link] (Song& s) {
+                        s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& m) { return m.target == l.target; }),
+                                           s.midiLinks.end());
+                        s.midiLinks.push_back ({ l.cc, l.channel, l.target });
+                    });
+                if (multilink->complete())
+                    multilink.reset(); // FL: "the process will auto-close once the number of hardware controls tweaked
+                                       // equals the number of software targets"
+                sendChangeMessage();
+            }
         }
         else if (learning.kind != AutomationTargetKind::none)
         {

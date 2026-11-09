@@ -1,4 +1,5 @@
 #include "ui/SettingsDialog.h"
+#include "core/Comping.h"
 #include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
 
@@ -96,6 +97,18 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         addAndMakeVisible (crossfadesNew);
+        // Comping (round 177c): the crossfade at a comp's switches, re-applied to every comp when it changes
+        styleLabel (compFadeLabel, tr ("Comp crossfade"));
+        addAndMakeVisible (compFadeLabel);
+        setup (compFade, 0.0, 100.0, 0.5, " ms", (double) Song::defaultCompCrossfadeMs);
+        compFade.onValueChange = [this] {
+            edit ([v = (float) compFade.getValue()] (Song& s) {
+                s.compCrossfadeMs = v;
+                for (int t = 0; t < (int) s.playlistTracks.size(); ++t)
+                    if (comp::isComp (s, t))
+                        comp::applyCrossfades (s, t, comp::crossfadeTicks (s));
+            });
+        };
         // FL's Project › "Play truncated notes in clips" (round 167g)
         truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
         truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
@@ -151,6 +164,9 @@ public:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        auto compRow = area.removeFromTop (26);
+        compFadeLabel.setBounds (compRow.removeFromLeft (150));
+        compFade.setBounds (compRow.removeFromLeft (180));
         truncated.setBounds (area.removeFromTop (26));
         fastDeclick.setBounds (area.removeFromTop (26));
         area.removeFromTop (4);
@@ -176,6 +192,7 @@ private:
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        compFade.setValue (s.compCrossfadeMs, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
         panLaw.setSelectedId (s.panTriangular ? 2 : 1, juce::dontSendNotification);
@@ -207,6 +224,8 @@ private:
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel, timeModeLabel;
     juce::Slider tempo, beats, swing, pitch;
     juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
+    juce::Label compFadeLabel;
+    juce::Slider compFade;
     juce::ComboBox panLaw, timeMode;
 };
 

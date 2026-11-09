@@ -299,6 +299,10 @@ JUCE reads the button through GetAsyncKeyState. The cause is a JUCE timer whose 
 period. 177a-10 counts the steps from the press time (`faderRailStepsForHold`), polling every 16 ms, so an early
 callback can't add a step. The earlier 300 ms first delay (177a-6, INFERRED) is replaced by FL's measured timing.
 
+**After 177a-10 (real window, 2026-11-08 05:28, the same clicks as the failing run):** ten clicks give -1.6 dB, the same as
+FL (before: -2.4 dB). Four more single clicks went -1.8 / -1.9 / -2.1 / -2.3 dB, one step each within the display's
+±0.05 dB rounding [SHOT pairs/lynx-rail-10clicks-after-177a-10.png].
+
 LYNX (slice 177a-4) now does the same by default, as the coordinator decided: a stray click can't jump a mix.
 `faderRailStep = 0.0056` and `faderRailRepeatMs = 64` are in `Song.h`, and Ctrl+click still resets. The VCA faders
 behave the same. In the real LYNX window one click gave -0.2 dB, as FL. Ten quick clicks first gave -2.1 dB against
@@ -339,6 +343,13 @@ It reads:
 - On the right, FL's full colour selector: a wheel and a palette view, presets 0–9, the named colour (e.g. "Granite Gray
   #636C71"), Hue / Saturation / Luminance and Red / Green / Blue.
 - At the bottom, "Reset all" and "Accept". Escape doesn't close it; its X cancels.
+
+**Reset all [FLEngine_x64.dll, static]:** `ResetAllBtnClick` (0x7b60c0) calls 0x7b5dd0 (self, i) for every swatch,
+then refreshes. 0x7b5dd0 reads swatch i's line from the list the editor saved when it opened (+0x9a4), takes the text
+after "=", prefixes "$" and parses it as a hex colour (StrToIntDef, default 0x808080). So Reset all puts First and Last
+back to the first and last selected tracks' colours, as they were when the editor opened. `ResetBtnClick` (0x7b6120),
+the "Reset" half of the split button, does the same for the swatch being edited. LYNX has "Reset all", which keeps the
+editor open.
 
 LYNX: `mixerops::gradientColourStep` and `mixerops::gradientColour` follow those steps exactly. The test checks the ends,
 amount 85 (0xaa / 0x54) and 128 (0x7f). The menu item waits for FL's dialog shot.

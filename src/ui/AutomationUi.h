@@ -14,6 +14,9 @@ juce::String describeTargetValue (AudioEngine& engine, const AutomationTarget& t
 // Creates an automation for the target, starting at the current value, plus a clip of it in the Playlist
 // (from the start of the song to its end, on a free track), like FL's "Create automation clip".
 void createAutomationClip (AudioEngine& engine, const AutomationTarget& target);
+// Round 177b: a lane for the target under a Playlist track (`track` < 0: autolanes::trackFor), a flat line at the
+// current value; the existing lane when the track has one for it.
+void createAutomationLane (AudioEngine& engine, const AutomationTarget& target, int track = -1);
 // The same with a given name and value (a flat line), for any target (none: an unlinked clip).
 void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value);
 // FL's "Automation Clip" generator (Plugin picker, round 175b): an automation linked to nothing, its clip on a free
@@ -29,6 +32,13 @@ void typeAutomationPointValue (AudioEngine& engine, int automation, int point);
 // Opens (or brings to front) the point editor window of an automation.
 void openAutomationEditor (AudioEngine& engine, int automation);
 void closeAutomationEditors();
+
+// Round 177b: LYNX's modulators window (one list: shape, rate, phase, routes with their depth), and the parameter
+// menu's "Modulate" submenu (LYNX's own controls only; after FL's items).
+void openModulators (AudioEngine& engine);
+void closeModulators();
+std::unique_ptr<juce::Component> makeModulatorsPanel (AudioEngine& engine); // (--snapshot mode)
+void addModulationItems (juce::PopupMenu& menu, AudioEngine& engine, const AutomationTarget& target);
 
 // Just the editor (for --snapshot mode).
 std::unique_ptr<juce::Component> makeAutomationEditor (AudioEngine& engine, int automation);

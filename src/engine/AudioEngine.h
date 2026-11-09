@@ -10,6 +10,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/Multilink.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
 #include "core/RecordLoop.h"
@@ -164,7 +165,7 @@ public:
     {
         int countInBars = 0;            // 0 = off
         bool waitForInput = false;      // playback starts at the first played note
-        RecordMode mode = RecordMode::overdub;
+        RecordMode mode = RecordMode::replace; // "Blend recorded notes" off, FL's factory default (round 177c)
         std::int64_t quantise = 0;      // record quantise in ticks (<= 1: as played); follows the global grid
         bool placeSongClip = true;      // song mode: a take puts a clip of the pattern where recording started
         // recording filter (FL's record button right-click, REA_rodada88): what a take records
@@ -217,6 +218,9 @@ public:
         // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
         // and audio stay where they were played. Pattern mode always loops the pattern in LYNX.
         bool loopRecord = true;
+        // LYNX's own option (off = FL's result, REA round 177c): after loop recording only the last pass plays, on top
+        // of the other passes (muted, newest first, folded). Round 163's behaviour.
+        bool lastLoopPassPlays = false;
         // round 170d (the Busy Works video: the chord on the downbeat after the count-in was lost; Cubase's "MIDI Record
         // Catch Range", Logic keeps count-in notes): notes played during the count-in are recorded, and a note-on at most
         // this many ticks before the take's start goes onto the start (0 = off: they keep their real time)
@@ -493,6 +497,14 @@ public:
     // Global links (FL's "Override global link...", REA round 146): links in the MIDI settings that every project
     // follows unless it links the same target or controller itself. The next CC received becomes `target`'s.
     void learnGlobalLink (const AutomationTarget& target);
+    // FL's "Multilink to controllers" (Options › Switches, Ctrl+J; round 177b-4, core/Multilink.h): the controls moved
+    // while it is on link, in that order, to the controllers moved next; it switches itself off when all are linked
+    void setMultilink (bool on);
+    bool isMultilinkOn() const noexcept { return multilink.has_value(); }
+    int multilinkQueued() const noexcept { return multilink ? (int) multilink->targets.size() : 0; }
+    // the switch's menu: "Link to controller" (false) / "Override global links" (true): no more controls are queued,
+    // the controllers moved next link to the queued ones (as project links / as global links)
+    void multilinkToControllers (bool global);
     void removeGlobalLink (const AutomationTarget& target);
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
     std::vector<MidiLink> getGlobalLinks() const;
@@ -637,6 +649,8 @@ public:
         };
         std::vector<Use> uses;
     };
+    // Settings › General: a Live set's Session clips go to the clip grid (false, the default) or the Playlist (round 181c)
+    static inline std::atomic<bool> alsSessionOnPlaylist { false };
     static void prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                   PreparedFlp& out);
     // one hosted plugin of the queue (message thread); false when the queue is done
@@ -856,6 +870,7 @@ private:
     // selected channel's instrument (round 162); written by applyControllers, read by the MIDI thread
     std::array<std::atomic<std::uint64_t>, 2> linkedCcs {};
     AutomationTarget learning;
+    std::optional<MultilinkSession> multilink;
     bool learningGlobal = false;
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
     void applyControllers();

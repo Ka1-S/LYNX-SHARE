@@ -80,6 +80,216 @@ the renderer, cleared after use); no allocation on the audio thread (the fixed-b
 
 ---
 
+## Slice 2 — "Automate this" in one step
+
+### What LYNX had [CODE]
+- Every LYNX control's right-click menu has FL's parameter menu: Automation › Edit events…, Init song with this
+  position, Delete initial value, **Create automation clip**, Edit automation clip…; Remote control › Link to MIDI
+  controller, Override global link…, Link to internal controller (round 149, `addAutomationItem`).
+- Third-party plugin parameters: Tools › Last tweaked / the toolbar read-out (round 162d) and Add › "Automation for
+  last tweaked parameter" (round 143), as in FL.
+- `addAutomationClip` put the clip on the track **after the last used track**, from the song start (or the time
+  selection), over the whole song.
+
+### FL Studio [DFM] [DECOMP]
+- Options › General › Miscellaneous: **"Create automation clips at the playback position"**
+  (`CreateAutoClipsAtCursorBox`, `"Checked": true` in FL's form, hint "When enabled, automation clips are created at
+  the playback position") [DFM, REA_rodada169k #8; STR 0x0022xxxx forms.options.generalpage.miscpanel].
+- `FUN_01191a50 (param, place, …, undo)` = Create automation clip [DECOMP, string "create automation clip" @
+  0x01192628]. It makes the automation clip channel ("AutoTrack.fst" template, name "Automation"), sets its range,
+  then with `place`:
+  - the Playlist **time selection** (playlist +0xd74 / +0xd78) gives start and end;
+  - else, when the options form's check box (+0x10e0 → +0x49e, read straight from the control) is on: the **song
+    position** when it lies inside the arrangement, otherwise the Playlist's left edge; when it is off: the song start;
+  - end = max(start + a minimum, the arrangement end (+0xb1c));
+  - the track: `FUN_00e50b50` walks the 500 tracks from a start track and takes the **first one whose span is free**
+    (`FUN_01062140` checks the range) [DECOMP].
+- Instrument tracks refuse automation clips: "Instrument tracks are not for audio or automation clips." [STR].
+- **Checked live in FL 2026 (UI gate, round 177b)**, four "Create automation clip" from mixer faders in a new project:
+  playhead 1:01 → Track 1, one bar; 5:02 → Track 2, one bar; 9:02 (past the last clip) → Track 3 at 9:02, one bar;
+  3:02 → Track 4, up to the song end (10:02). So: the clip starts at the song position even past the last clip, an
+  empty Playlist gives one bar, and the track is the **first one with no clips at all** — Track 1 was skipped although
+  it was free over the new clip's span. The decompiled "span" check is read that way (the start track / range it is
+  given cover the whole track); LYNX follows what FL does. [EXEC]
+
+### Is this the best way? — verdict
+- FL's way is already one step from any LYNX control (right-click › Create automation clip). The missing piece was
+  FL's placement: at the playhead, on the first free track. Built **FL-exact**, with FL's option (on by default).
+- Live / Bitwig draw automation straight onto the track's lane: that is slice 3 (optional lanes), not a change to
+  FL's clips.
+- Third-party plugin knobs: FL relies on Last tweaked (kept). Proposal (needs a JUCE patch, not built): VST3 plugins
+  that open a host context menu for a parameter (`IComponentHandler3::createContextMenu`; JUCE hosts it but adds no
+  host items) get LYNX's items at the top — Create automation clip, Link to controller. Bitwig / Cubase / Studio One
+  do this; it is the real one-step for plugin knobs. → asked the coordinator.
+
+### Built (slice 2)
+| Piece | Where |
+|---|---|
+| `autoclipplace::forNewClip(song, atPlayback, playTick)` — FL's placement (selection › playhead › song start; to the song end, ≥ 1 bar; first free track, instrument tracks skipped) and the app setting `atPlayback()` | `core/PlaylistOps` |
+| `addAutomationClip` uses it (Song mode playhead) | `ui/AutomationUi` |
+| Options › General › Editing: "Create automation clips at the playback position" (on), saved with the app settings | `ui/SettingsPages`, `ui/MainComponent` |
+| Test `auto177b_new_automation_clip_place` | `tests/Auto177bTests.inc` |
+
+---
+
+## Slice 3 — optional automation lanes (design approved by the coordinator, 2026-11-06)
+
+User decisions (through the coordinator): (a) **off by default**, FL users see no change; (b) **a clip wins over a
+lane** where it plays (Bitwig 6's rule); (c) the Ableton-style layout mode (round 175a, N6) turns lanes on by
+default (the flag is coordinated with 175a); "lanes follow moved clips" is phase 2 and **open**; the .flp export
+writes lanes as clips on free tracks.
+
+### Research [WEB] (full list: `/mnt/e/lynx-work/177b/research-lanes.md`)
+- Praised: shape stamping and curves (Live; help.ableton.com/hc/en-us/articles/209070629), Simplify Envelope, the "A"
+  automation mode that keeps the view clean (forum.ableton.com p=783744), Studio One's paint shapes and Transform box
+  (soundonsound.com/techniques/paint-points), Bitwig 6's clips + track automation in one lane with the clip winning,
+  pencil curves, spray can, Hold / Spread (soundonsound.com/reviews/bitwig-studio-6).
+- Complaints: clutter and no global hide (Live), lanes reopening, the Re-Enable Automation state (forum.ableton.com
+  p=1766337), jagged or over-smoothed recordings, automation not following moved clips; FL's clips praised exactly
+  for following the arrangement (kvraudio.com p=8381379). FL users ask for optional collapsible lanes that keep clips
+  (forum.image-line.com p=2051841) and complain of "a million automation clips" (r/FL_Studio, snippet).
+- Live [STR, its own binary]: "Automation Lane", "Show Automation", "Draw Mode", "Re-Enable Automation"; the set
+  format stores per-track `AutomationEnvelopes` plus per-clip `ClipEnvelope`s (ALS-FORMAT.md §3).
+
+### Model and engine (built, slice 3a)
+- `AutomationLane { automation, height }` in `PlaylistTrack::lanes` (+ `lanesFolded`). A lane's points are in song
+  time. One lane per target and track (`autolanes::addLane` returns the existing one).
+- Engine (`RackState::laneAutomations`): the lanes of unmuted tracks play their curve; the lane binds its target last
+  and, at a tick where a clip of an automation with the same target plays, takes that clip's value (the clip wins);
+  between clips the lane's own value plays (with clips only, FL holds the last clip value — unchanged). A lane's own
+  automation never also plays as a clip. No lane = no work.
+- Conversions: `clipToLane` (the clip's span, offset applied, replaces the lane there; the clip goes, its automation
+  stays as FL keeps it), `laneToClip` (the lane's automation becomes a clip from 0 on the first free track),
+  `lanesToClips` (the .flp export, with a report note). Project files: `playlistTrackLanes`.
+- Lanes are per track, so they are shared by every arrangement (FL's automation clips are per arrangement) — noted.
+- Not compensated by "Compensate automation" PDC (clips are): logged.
+- Tests: `lanes177b_lane_plays_and_clips_win` (rendered levels: lane between clips, clip inside, muted track),
+  `lanes177b_conversions_and_export`; selftest `lanes_saved` (project round trip).
+
+### UI (slice 3b, built; lands after the UI gate)
+| Piece | Where |
+|---|---|
+| Playlist options menu and the main menu's Playlist part: "Automation lanes" (off; an app setting, `automationLanes` in the UI settings; action `playlist.automationLanes` for a shortcut). `autolanes::shown()` is the flag round 175a's layout mode sets | `ui/PlaylistComponent`, `ui/MainComponent`, `core/KeyMap`, `core/PlaylistOps.h` |
+| Layout: a track's lanes sit under its row (34 px each at 100 %, follow the vertical zoom); `heightOf` stays the row, so clips never draw into lanes; `trackTops` include them | `PlaylistComponent::laneBlockHeight`, `laneRow`, `refreshTrackLayout` |
+| Track header: a fold arrow when the track has lanes; "+A" on hover adds a lane — the picker lists the track's own channel / mixer track volume and pan, then the two last tweaked controls, then Tempo and Master volume | `trackLaneArrow`, `trackAddLane`, `showAddLaneMenu` |
+| Every control's menu: "Automate in lane" under "Create automation clip" (only while lanes are on: FL's menu is unchanged otherwise). The lane goes on `autolanes::trackFor`: the track that has its lane, else the channel's instrument track, else the audio / instrument track of its mixer track, else the first empty track | `ui/AutomationUi` `createAutomationLane`, `core/PlaylistOps` |
+| Lane editing, the same in every tool: [LMB] adds a point and drags it ([Shift]: on the line), drag a point moves it ([Shift] / [Ctrl] after the click keep time / value, as in clips), [RMB] or [Alt]+click on a point deletes it, [Alt]+drag on the line bends the segment (FL's tension), [RMB] elsewhere = lane menu. The hint bar shows the value under the mouse and while dragging | `laneMouseDown`, `mouseDrag` `lanePoint` / `laneTension` |
+| Where a clip of the same target plays, the lane is shaded (the clip wins) | `paintLanes` |
+| Lane header: the target's name; [RMB] menu: Edit points..., To automation clip, Remove the lane, Fold the lanes, Hide all lanes; [2xLMB] opens the point editor | `paintLaneHeaders`, `showLaneMenu` |
+| Clip menu (automation clips, lanes on): "Move into lane" (`clipToLane` on `trackFor`) | `buildClipMenu` |
+| Test: `lanes177b_track_for_a_target` (off by default; where a lane goes) | `tests/Lanes177bTests.inc` |
+
+Not in this slice (open): "Everything" in the "+A" picker (any control reaches a lane through its own menu instead);
+lanes following moved clips (phase 2); lanes in PDC "Compensate automation".
+
+---
+
+## Slice 3c — FL's automation clip LFO ("LFO mode", coordinator: build it FL-exact)
+
+Full REA: `/mnt/e/lynx-work/177b/lfo/FL-AUTOMATION-LFO.md` (headless Ghidra on `FLEngine_x64.dll`, 1,781 0xEA events of
+1,300+ local .flp files).
+
+### FL Studio [DECOMP] [DATA] [DFM]
+- LFO mode is **not** a loop of the clip's points: every automation clip (`TACArticulator`, VMT 0x00FE2580) carries a
+  main envelope (its points) and a `TMLFO` with its own points (the LFO's amplitude over the clip's time) and FL's
+  usual LFO knobs. "LFO mode" = the LFO's enabled LongBool; the editor then edits the LFO's points (FUN_00f6b6a0).
+- .flp: everything is in event 0xEA. The "112-byte trailer" LYNX wrote as a constant is the main envelope's tail
+  (flags, enabled, 3 loop points, A/D/S/R knobs 128/128/0/128) plus the LFO stream (kind 5, version 3, M points,
+  flags, enabled, 3 loop points, speed, tension, skew, pulse width, phase): `112 + 24·(M − 1)` bytes. Header +4 = LFO
+  level (−128…128, 64), +8 = mode (0 multiply, 1 add). Writer FUN_00fe8640 → FUN_00b9fd20 / FUN_00b97c40 /
+  FUN_00ba01a0. Every local file parses with 0 bytes left.
+- Evaluation: `out = base + env·range`; LFO on: add `out += L·level/128·range`, multiply `out *= 1 + 2·L·level/128·range`
+  (FUN_00ba1700, constants 2.0 / 1.0 read from the binary). `L = amp(t)·shape(phase)` (FUN_00ba0710); the phase is a
+  u32 per cycle starting at the middle of the rising ramp + PHASE (FUN_00ba06a0); cycles per beat =
+  `(10001^(speed/65536) − 1)/625` (FUN_00ba03d0; 45819 = 1 beat, 40898 = 2, 26257 = 16 [DATA]); the waveform
+  (FUN_00677660/820) is a triangle bent by tension `T = sign·((1e18)^((21^(|t|/128) − 1)·0.05) − 1)`, skewed, with
+  pulse-width flat zones. Flags: 1 tempo, 2 global phase, 4 unipolar tension ("Bipolar LFO tension" off), 8 frozen
+  (FL sets 2 with it).
+- UI: channel settings "LFO" panel (LFO box, speed / tension / skew / pulse width / level wheels, "Multiply" box) and the
+  automation editor's " LFO" button; menu "Bipolar LFO tension", "Frozen LFO". Delete: the LFO keeps ≥ 1 point.
+
+### Ableton Live 12 / users
+- Live has no LFO inside an automation envelope; it is a device (LFO Max device, Shaper) mapped to a parameter — the
+  modulators slice (4). Bitwig: modulators per device. FL users praise the clip LFO for quick wobbles without a plugin
+  and complain that it is hidden in the channel settings (r/FL_Studio threads on "automation clip LFO", snippet level).
+
+### Is this the best way? — verdict
+FL-exact: the same model (points + LFO), the same math, the same file bytes, and FL 2026's editor layout (checked live
+at the UI gate): the "Automation editor | LFO" row above the grid; in LFO mode the small SPD / TNS / SKEW / PW / AMNT
+knobs, MUL and the options arrow bottom-left under the grid; the wave that plays is the main line. The options menu
+has FL's two flags only (Bipolar LFO tension, Frozen LFO). PHASE and the global-phase flag have no control in FL: LYNX
+keeps them as passthrough values (read, played, written back).
+- Possible option (not built, for the user): draw the LFO's amplitude points as the bold line with the played wave thin
+  behind (LYNX's first draft). It shows the amplitude envelope better, but it is not FL's look; FL's stays the default.
+
+### Built
+| Piece | Where |
+|---|---|
+| `AutomationLfo` (on, level, add, flags, speed, tension, skew, pulse width, phase, range, amplitude points; FL's unused fields + raw point records kept), `shape`, `cyclesPerBeat`, `speedForBeats`, `apply`; `Automation::playAt` | `core/Song` |
+| Playback: clips (and the value between clips), Performance-mode clips, `Song::automationValueAt` use `playAt`; nothing computed while the LFO is off | `core/RackRenderer`, `core/Song.cpp` |
+| .flp read: the whole 0xEA layout; write: from the fields (an untouched clip writes FL's 112 bytes exactly as before), the LFO point records byte for byte while unchanged | `flp/Flp`, `flp/FlpWrite` |
+| Import / export through the song (the clip's range kept: the level is scaled by it on export) | `core/FlpImport`, `core/FlpExport` |
+| Project files: `lfo` / `lfoFl` per automation | `engine/ProjectFile` |
+| Editor (FL 2026's layout): "Automation editor \| LFO" row (the LFO toggle edits the LFO's points while on); bottom-left SPD (shown in beats), TNS, SKEW, PW, AMNT knobs, MUL, options (Bipolar LFO tension, Frozen LFO); the played wave is the main line, the amplitude points small on a thin line; Playlist clips draw the played curve | `ui/AutomationUi`, `ui/PlaylistComponent` |
+| Tests: `lfo177b_untouched_clip_writes_fls_tail`, `lfo177b_flp_round_trip_is_byte_exact` (FL's Astes clip: 136-byte trailer, unknown bytes kept), `lfo177b_rate_and_shape_match_fl` | `tests/Lfo177bTests.inc` |
+
+Export: LYNX always writes a clip at the whole range, so a clip with a partial range gets `level × range` in the header (the played amount is the same; header byte +4 and the points differ from FL's file). Byte-exact holds for whole-range clips. Tests: `lfo177b_flp_round_trip_is_byte_exact`, `lfo177b_export_scales_the_level_by_a_partial_range`.
+
+Open: FL's knobs 0x600–0x604 are automatable channel parameters (not automatable in LYNX yet); FL's rate cap per tick
+(805306368) is not applied (it is above the fastest speed at FL's PPQ); the playlist call site and FL's final clamp
+were not traced (LYNX clamps to 0…1); "Global / retriggered LFO" handler not traced (LYNX: phase from the song start);
+the LFO under a non-linear target map (an imported effect parameter) is applied in LYNX's value space.
+
+## Slice 4 — modulators (proposal, then built as P1 on the user's go for 0.1.25)
+
+### What LYNX and FL have [CODE] [STR]
+- FL-exact controllers: Envelope Controller (channel), Keyboard Controller, Peak Controller and Formula Controller
+  (mixer slots), X-Y / X-Y-Z Controller, Voltage Controller; FL's "Link to controller" maps an output through a curve
+  to one target (`Automation::source` + `curve`, live). Each link is absolute: it replaces the knob's value.
+- Channel LFOs (pan, volume, cutoff, pitch) per sampler channel.
+- **FL-exact gap found:** FL's automation clips have an **LFO mode** ("The selection contains at least one
+  automation clip in LFO mode." [STR]; the clip's channel settings LFO: amount, speed, tension, shape, tempo sync).
+  LYNX's automation clips have no LFO mode → sent to the coordinator.
+- User complaints about FL's modulation [WEB]: "the biggest pain point" — Peak Controller + Formula routing is
+  complicated, the LFO moves the knob's base value, Peak Controller is unipolar, step/bar rates need formulas
+  (forum.image-line.com p=2074232, Sep 2026); Peak Controller needs an extra mixer track (admiralbumblebee 2018).
+- Bitwig (praised as best): click a modulator's routing button, valid targets light up, drag on a knob to set a
+  bipolar depth; the depth shows as a ring on the knob; modulation is relative to the knob's value; modulators work
+  on VST parameters too; an inspector lists routings (bitwig.com/en/bitwig-studio/devices/modulators.html).
+  Live 12: LFO "Mod" (relative) vs "Remote" (absolute).
+
+### Proposal
+1. **Model**: `Song::modulators` — `Modulator { kind (LFO, random / S&H, envelope follower, note envelope, steps),
+   rate (Hz or tempo-synced in steps / beats / bars), shape, phase, retrigger (song / note / free), source insert (for
+   the follower), routings: [{ AutomationTarget, depth −1..1 }] }`. Relative and bipolar: the knob keeps its value; the
+   played value = clamp(base + depth · m(t)). FL's "Link to controller" stays as it is (absolute, FL-exact).
+2. **Engine**: evaluated per block inside `RackRenderer` next to live automation (the same target tables: a modulated
+   target reads base + offset), no allocation, no lock; a modulator without routings is skipped; nothing exists
+   until the first modulator is made. Per-voice modulation only for LYNX's own synths, later.
+3. **UI**: a "Modulators" strip in the channel settings and the mixer insert (folded when empty). Each modulator has
+   a handle; drag it onto any LYNX knob (`ValueControl`) to route it. The knob shows a depth ring; Alt-drag the ring
+   changes the depth; the knob menu gets "Modulation › <source> (depth) / Remove". Plugin parameters: the parameter
+   list / Last tweaked menu "Modulate with…" (and the VST3 host-menu idea from slice 2).
+4. **Reuse**: the envelope follower is the Peak Controller's engine without a mixer slot; note envelopes are the
+   Envelope Controller's; steps are the X-Y / Formula patterns. FL's controllers stay for FL projects.
+5. **.flp export**: FL has no modulators — a modulated target is rendered to an automation clip (lossy; reported), as
+   lanes are.
+6. **Phases**: P1 LFO + random with rings on LYNX knobs; P2 envelope follower from any insert (no extra track); P3 note
+   envelopes and steps; P4 per-voice for LYNX synths. Needs a user decision on the order, and whether FL's automation
+   clip LFO mode (the FL-exact gap) comes first.
+
+### Built (P1; the depth ring on the knobs waits for the UI gate)
+| Piece | Where |
+|---|---|
+| `Modulator` (shape: sine, triangle, saw up / down, square, random, smooth random; synced in beats or free in Hz; phase; unipolar; seed; routes `{target, depth −1..1}`), `Song::modulators`; `canModulate` = LYNX's own controls (not the tempo, not plugin parameters) | `core/Song` |
+| Engine: each route gets its own slot bound after everything (it wins) and plays `clamp (base + depth·m(t))`, base = the automation that drove the target, else the control's value; synced modulators follow the song position (live clock when stopped), the random shapes are a hash of the cycle (the same at the same position); no modulator = nothing bound, nothing computed; no allocation or lock | `core/RackRenderer` `modRoutes`, `updateModulators` |
+| Project files (`modulators`), .flp export: dropped with a report line (FL has none) | `engine/ProjectFile`, `core/FlpExport` |
+| UI: every LYNX control's menu gets "Modulate" after FL's items (each modulator, ticked with its depth when routed; New modulator (LFO); Modulators...); Tools › "Modulators..." window: name, shape, Sync + cycle length or Hz, phase, 0..1, a scope of one cycle, the routes with a depth knob and remove | `ui/AutomationUi`, `ui/MainComponent` |
+| Tests: `mod177b_shapes`, `mod177b_modulates_a_target_around_its_value` (rendered levels: up / down around the value, around an automation, depth 0 and no modulator = nothing bound); selftest `lanes_saved` round-trips modulators | `tests/Mod177bTests.inc`, `Main.cpp` |
+
+Open (phases, as proposed): the depth ring and drag-to-route on knobs (P1b, after the UI gate), plugin parameters
+(their value lives in the plugin: needs a base read from the plugin), envelope follower (P2), note envelopes / steps
+(P3), per-voice (P4).
 ## Issue #97 — several automation clips on one target
 
 **Report** (Disar, 0.1.24): a second automation clip on a plugin's CC silences the first clip.
