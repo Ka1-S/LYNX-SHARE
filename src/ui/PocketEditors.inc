@@ -236,6 +236,8 @@ protected:
         g.setFont (theme::font (size * kScale, bold));
         g.drawText (t, r, j, false);
     }
+    bool upperCaptions = false; // the reference's Trance Delay prints its captions in capitals
+    juce::String caption (const El& e) const { return upperCaptions ? tr (e.caption).toUpperCase() : tr (e.caption); }
     // a value's text as the reference prints it (the parameter's own text; subclasses may shorten it)
     virtual juce::String valueText (const El& e) const { return text (e.p); }
 
@@ -248,6 +250,8 @@ protected:
         g.fillRect (card);
         g.setColour (fx.enabled ? cOrange() : cLine()); // the card's top edge: the module's on state
         g.fillRect (card.withHeight (1.5f));
+        g.setColour (cOrange().withAlpha (fx.enabled ? 1.0f : 0.3f)); // the module's bottom edge, as in the reference rack
+        g.fillRect (card.withTop (card.getBottom() - 1.5f));
         paintCard (g, fx);
         for (int i = 0; i < (int) els.size(); ++i)
             if (els[(std::size_t) i].visible) paintEl (g, els[(std::size_t) i], i, fx.enabled);
@@ -264,7 +268,7 @@ protected:
             case T::ring:
             {
                 const auto capH = e.caption != nullptr ? 14.0f * kScale : 0.0f;
-                if (e.caption != nullptr) label (g, r.withHeight (capH), tr (e.caption), 7.5f, orange);
+                if (e.caption != nullptr) label (g, r.withHeight (capH), caption (e), 9.5f, orange);
                 const auto area = r.withTrimmedTop (capH);
                 const auto rad = juce::jmin (area.getWidth(), area.getHeight()) * 0.5f - 6.0f * kScale;
                 const auto c = area.getCentre();
@@ -272,23 +276,26 @@ protected:
                 juce::Path ring;
                 ring.addCentredArc (c.x, c.y, rad, rad, 0.0f, a0, a1, true);
                 g.setColour (orange);
-                g.strokePath (ring, juce::PathStrokeType (3.2f * kScale, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.strokePath (ring, juce::PathStrokeType (5.0f * kScale, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 const auto a = a0 + (a1 - a0) * juce::jlimit (0.0f, 1.0f, v (e.p));
                 const auto dot = c + juce::Point<float> (std::sin (a), -std::cos (a)) * rad;
+                g.setColour (cCard().darker (0.35f));
+                g.fillEllipse (juce::Rectangle<float> (17.0f * kScale, 17.0f * kScale).withCentre (dot));
+                g.setColour (orange);
                 g.fillEllipse (juce::Rectangle<float> (13.0f * kScale, 13.0f * kScale).withCentre (dot));
                 if (active)
                 {
                     g.setColour (juce::Colours::white.withAlpha (0.35f));
                     g.drawEllipse (juce::Rectangle<float> (17.0f * kScale, 17.0f * kScale).withCentre (dot), 1.2f);
                 }
-                label (g, juce::Rectangle<float> (rad * 1.8f, 16.0f * kScale).withCentre (c), valueText (e), 9.0f, cText());
+                label (g, juce::Rectangle<float> (rad * 1.9f, 18.0f * kScale).withCentre (c), valueText (e), 12.5f, orange, juce::Justification::centred, true);
                 break;
             }
             case T::slider:
             {
                 const auto capH = e.caption != nullptr ? 14.0f * kScale : 0.0f;
                 const auto valH = e.valueBelow ? 14.0f * kScale : 0.0f;
-                if (e.caption != nullptr) label (g, r.withHeight (capH), tr (e.caption), 7.5f, orange);
+                if (e.caption != nullptr) label (g, r.withHeight (capH), caption (e), 9.5f, orange);
                 const auto track = r.withTrimmedTop (capH + 6.0f * kScale).withTrimmedBottom (valH + 4.0f * kScale);
                 const auto w = 5.0f * kScale, hr = 7.0f * kScale;
                 const auto lane = juce::Rectangle<float> (w, track.getHeight() - 2.0f * hr).withCentre (track.getCentre());
@@ -299,13 +306,16 @@ protected:
                 const auto from = e.bipolar ? lane.getCentreY() : lane.getBottom() + hr * 0.5f;
                 g.setColour (orange);
                 g.fillRoundedRectangle (lane.withY (juce::jmin (y, from)).withHeight (std::abs (from - y)), w * 0.5f);
+                g.setColour (cCard().darker (0.35f));
+                g.fillEllipse (juce::Rectangle<float> (2.0f * hr + 4.0f * kScale, 2.0f * hr + 4.0f * kScale).withCentre ({ lane.getCentreX(), y }));
+                g.setColour (orange);
                 g.fillEllipse (juce::Rectangle<float> (2.0f * hr, 2.0f * hr).withCentre ({ lane.getCentreX(), y }));
                 if (active)
                 {
                     g.setColour (juce::Colours::white.withAlpha (0.35f));
                     g.drawEllipse (juce::Rectangle<float> (2.0f * hr + 5.0f, 2.0f * hr + 5.0f).withCentre ({ lane.getCentreX(), y }), 1.2f);
                 }
-                if (e.valueBelow) label (g, r.withTrimmedTop (r.getHeight() - valH), valueText (e), 7.5f, orange);
+                if (e.valueBelow) label (g, r.withTrimmedTop (r.getHeight() - valH), valueText (e), 9.0f, orange);
                 break;
             }
             case T::list: case T::tabs:
@@ -316,7 +326,7 @@ protected:
                 for (int k = 0; k < n; ++k)
                 {
                     const auto cell = optionRect (e, k);
-                    label (g, cell, k < opts.size() ? tr (opts[k]) : juce::String(), 8.0f, k == sel ? cText() : orange);
+                    label (g, cell, k < opts.size() ? tr (opts[k]) : juce::String(), 11.0f, k == sel ? cText() : orange, juce::Justification::centred, k == sel);
                 }
                 g.setColour (cText());
                 const auto cell = optionRect (e, sel);
@@ -331,10 +341,10 @@ protected:
             {
                 // the caption, an up chevron, the value, a down chevron (the reference's LFO Rate / Shape)
                 const auto rowH = r.getHeight() / 4.0f;
-                if (e.caption != nullptr) label (g, r.withHeight (rowH), tr (e.caption), 7.0f, orange);
+                if (e.caption != nullptr) label (g, r.withHeight (rowH), caption (e), 9.0f, orange);
                 const auto chevron = [&] (juce::Rectangle<float> c, bool up)
                 {
-                    const auto w = 9.0f * kScale, h = 4.5f * kScale;
+                    const auto w = 8.0f * kScale, h = 4.0f * kScale;
                     const auto m = c.getCentre();
                     juce::Path p;
                     p.startNewSubPath (m.x - w, m.y + (up ? h : -h));
@@ -344,7 +354,7 @@ protected:
                     g.strokePath (p, juce::PathStrokeType (2.2f * kScale, juce::PathStrokeType::mitered, juce::PathStrokeType::square));
                 };
                 chevron (r.withTrimmedTop (rowH).withHeight (rowH), true);
-                label (g, r.withTrimmedTop (2.0f * rowH).withHeight (rowH), tr (text (e.p)), 8.0f, orange);
+                label (g, r.withTrimmedTop (2.0f * rowH).withHeight (rowH), tr (text (e.p)), 11.0f, orange);
                 chevron (r.withTrimmedTop (3.0f * rowH), false);
                 break;
             }
@@ -473,6 +483,7 @@ public:
         els.push_back (slider (1, { 231.0f, 40.0f, 46.0f, 86.0f }, TR_NOOP ("Feedback")));
         els.push_back (slider (3, { 318.0f, 40.0f, 46.0f, 86.0f }, TR_NOOP ("Filter"), true));
         els.push_back (slider (2, { 405.0f, 40.0f, 46.0f, 86.0f }, TR_NOOP ("Mix")));
+        upperCaptions = true;
         fillDemo();
     }
     juce::String title() const override { return "Pocket Trance Delay"; }
@@ -570,7 +581,7 @@ private:
         {
             const auto x = b.getX() + b.getWidth() * xAt (db);
             label (g, juce::Rectangle<float> (30.0f * kScale, scale.getHeight()).withCentre ({ x, scale.getCentreY() }),
-                   db <= -60.0f ? juce::String ("-inf.") : juce::String ((int) db), 6.5f, cText().withAlpha (0.8f));
+                   db <= -60.0f ? juce::String ("-inf.") : juce::String ((int) db), 8.5f, cText());
         }
         const auto meter = px ({ x0, 18.0f, x1 - x0, 5.0f });
         g.setColour (cDeep());
@@ -582,14 +593,14 @@ private:
             g.fillRect (meter.withWidth (meter.getWidth() * xAt (level)));
         }
         // Gain: its value over the bar, the bar filled to the handle
-        label (g, px ({ x0, 30.0f, x1 - x0, 16.0f }), text (0), 9.0f, orange);
-        const auto lane = b.withSizeKeepingCentre (b.getWidth(), 5.0f * kScale);
+        label (g, px ({ x0, 30.0f, x1 - x0, 18.0f }), text (0), 12.5f, orange, juce::Justification::centred, true);
+        const auto lane = b.withSizeKeepingCentre (b.getWidth(), 7.0f * kScale);
         g.setColour (cTrack());
         g.fillRoundedRectangle (lane, 2.5f * kScale);
         const auto hx = b.getX() + b.getWidth() * v (0);
         g.setColour (orange);
         g.fillRoundedRectangle (lane.withRight (hx), 2.5f * kScale);
-        g.fillEllipse (juce::Rectangle<float> (16.0f * kScale, 16.0f * kScale).withCentre ({ hx, lane.getCentreY() }));
+        g.fillEllipse (juce::Rectangle<float> (20.0f * kScale, 20.0f * kScale).withCentre ({ hx, lane.getCentreY() }));
     }
 };
 
@@ -647,8 +658,8 @@ private:
         for (int side = 0; side < 2; ++side)
         {
             const auto col = px ({ side == 0 ? 196.0f : 262.0f, 40.0f, 46.0f, 106.0f });
-            label (g, col.withHeight (14.0f * kScale), tr (side == 0 ? TR_NOOP ("Left") : TR_NOOP ("Right")), 7.5f, orange);
-            const auto lane = juce::Rectangle<float> (9.0f * kScale, col.getHeight() - 26.0f * kScale).withCentre ({ col.getCentreX(), col.getCentreY() + 6.0f * kScale });
+            label (g, col.withHeight (14.0f * kScale), tr (side == 0 ? TR_NOOP ("Left") : TR_NOOP ("Right")), 9.5f, orange);
+            const auto lane = juce::Rectangle<float> (13.0f * kScale, col.getHeight() - 26.0f * kScale).withCentre ({ col.getCentreX(), col.getCentreY() + 6.0f * kScale });
             g.setColour (cTrack());
             g.fillRect (lane);
             const auto frac = [] (float db) { return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f); };
@@ -660,7 +671,7 @@ private:
             g.setColour (orange);
             g.fillRect (juce::Rectangle<float> (lane.getWidth() + 6.0f * kScale, 2.0f * kScale).withCentre ({ lane.getCentreX(), lane.getBottom() - lane.getHeight() * frac (threshold) }));
         }
-        label (g, px ({ 222.0f, 128.0f, 60.0f, 14.0f }), juce::String (juce::roundToInt (threshold)) + " dB", 7.0f, cText());
+        label (g, px ({ 222.0f, 128.0f, 60.0f, 14.0f }), juce::String (juce::roundToInt (threshold)) + " dB", 8.5f, cText());
     }
 };
 
@@ -734,9 +745,9 @@ private:
         g.fillRect (juce::Rectangle<float> (r.getWidth(), 2.0f).withCentre ({ r.getCentreX(), y }));
         g.fillEllipse (juce::Rectangle<float> (8.0f * kScale, 8.0f * kScale).withCentre ({ x, y }));
         const auto kindNow = pocket::multiFxKind (v (0));
-        label (g, { x + 4.0f, r.getY() + 2.0f, 120.0f * kScale, 12.0f * kScale }, tr (pocket::multiFxAxisName (kindNow, false)), 7.0f, orange,
+        label (g, { x + 4.0f, r.getY() + 2.0f, 120.0f * kScale, 12.0f * kScale }, tr (pocket::multiFxAxisName (kindNow, false)), 9.0f, orange,
                juce::Justification::centredLeft);
-        label (g, { r.getX() + 3.0f, y - 13.0f * kScale, 120.0f * kScale, 12.0f * kScale }, tr (pocket::multiFxAxisName (kindNow, true)), 7.0f, orange,
+        label (g, { r.getX() + 3.0f, y - 13.0f * kScale, 120.0f * kScale, 12.0f * kScale }, tr (pocket::multiFxAxisName (kindNow, true)), 9.0f, orange,
                juce::Justification::centredLeft);
     }
     void padTo (const El& el, juce::Point<float> at) override
