@@ -2529,7 +2529,7 @@ countries: tw hk mo
 "Echo > Rev|Rev > Echo" = "回聲 > 殘響|殘響 > 回聲"
 "Reverb mode" = "殘響模式"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "明亮|中性|暗|復古"
+"Bright|Neutral|Dark|Studio" = "明亮|中性|暗|錄音室"
 "Damping" = "阻尼"
 "Bass freq" = "低音頻率"
 "Late mix" = "後期混合"

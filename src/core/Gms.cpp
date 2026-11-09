@@ -2197,6 +2197,7 @@ public:
     void prepare (double sr) noexcept override
     {
         take();
+        (void) cutoffTable(); // (built here, not by the first render on the audio thread: it allocates)
         rate = sr;
         plugin.init (sr, true);
         applySetup();

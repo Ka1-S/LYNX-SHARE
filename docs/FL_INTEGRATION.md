@@ -43,9 +43,11 @@ then imports. The import report lists every plugin found as `name -> file (how)`
 
 ## Samples (locateFlSample)
 
-The path with `%FLStudioFactoryData%` / `%FLStudioUserData%` / `%FLStudioData%` resolved; if it doesn't exist, the
+The path with `%FLStudioFactoryData%` / `%FLStudioUserData%` / `%FLStudioData%` / `%FLStudioDownloadsData%` (FL's Shared
+data `Downloads`: FL Cloud sounds) / `%ILSharedData%` (FL's Shared data folder, written with no separator after it;
+FL 2026 [EXEC], issue #124) resolved; if it doesn't exist, the
 same file re-rooted from another PC's FL user data (`...\Image-Line\FL Studio\...`), FL install
-(`...\Image-Line\FL Studio <version>\...`) or user profile (`X:\Users\<name>\...`) to this PC's; then next to the
+(`...\Image-Line\FL Studio <version>\...`), FL Shared data (`...\Image-Line\...`) or user profile (`X:\Users\<name>\...`) to this PC's; then next to the
 project (the file name, then with its last folders: `Samples\kick.wav`). The report counts relocated samples.
 
 ## Rules

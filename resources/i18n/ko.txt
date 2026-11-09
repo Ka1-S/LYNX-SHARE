@@ -2529,7 +2529,7 @@ countries: kr
 "Echo > Rev|Rev > Echo" = "에코 > 리버브|리버브 > 에코"
 "Reverb mode" = "리버브 모드"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "브라이트|뉴트럴|다크|빈티지"
+"Bright|Neutral|Dark|Studio" = "브라이트|뉴트럴|다크|스튜디오"
 "Damping" = "댐핑"
 "Bass freq" = "저역 주파수"
 "Late mix" = "후기 믹스"
