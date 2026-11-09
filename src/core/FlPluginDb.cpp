@@ -383,6 +383,14 @@ std::string locateFlSample (const std::string& flPath, const FlPathRoots& roots,
                 candidates.push_back (roots.factoryData + rest);
         }
     }
+    // another machine's FL Shared data folder ("...\Image-Line\Downloads\...", "...\Image-Line\My kicks\..."): this PC's
+    if (const auto il = l.find ("\\image-line\\"); il != std::string::npos && ! roots.sharedData.empty())
+    {
+        auto shared = roots.sharedData;
+        while (! shared.empty() && (shared.back() == '\\' || shared.back() == '/'))
+            shared.pop_back();
+        candidates.push_back (shared + path.substr (il + std::string ("\\image-line").size()));
+    }
     // another user's profile: X:\Users\<name>\rest → this user's profile
     if (! roots.home.empty() && l.size() > 9 && l.compare (1, 8, ":\\users\\") == 0)
         if (const auto end = l.find ('\\', 9); end != std::string::npos)

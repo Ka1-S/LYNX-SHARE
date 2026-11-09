@@ -81,10 +81,10 @@ FlStudioInstall findFlStudio()
         fl.userData = testFolder;
 
     // user data: "Shared data" (e.g. ...\Documents\Image-Line\, possibly under OneDrive) + "FL Studio"
+    fl.sharedData = existingFolder (registryValue ("Software\\Image-Line\\Shared\\Paths\\Shared data"));
     if (! fl.userData.isDirectory())
-        if (const auto shared = existingFolder (registryValue ("Software\\Image-Line\\Shared\\Paths\\Shared data")); shared.exists())
-            if (const auto user = shared.getChildFile ("FL Studio"); user.isDirectory())
-                fl.userData = user;
+        if (const auto user = fl.sharedData.getChildFile ("FL Studio"); fl.sharedData.isDirectory() && user.isDirectory())
+            fl.userData = user;
     if (! fl.userData.isDirectory())
         if (const auto user = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Image-Line/FL Studio"); user.isDirectory())
             fl.userData = user;
@@ -98,6 +98,13 @@ FlStudioInstall findFlStudio()
                 break;
             }
    #endif
+
+    // Shared data without FL's key (a Wine prefix, a test folder): the folder that holds the user data folder
+    if (! fl.sharedData.isDirectory() && fl.userData.isDirectory() && fl.userData.getFileName().equalsIgnoreCase ("FL Studio"))
+        fl.sharedData = fl.userData.getParentDirectory();
+    if (! fl.sharedData.isDirectory())
+        if (const auto shared = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Image-Line"); shared.isDirectory())
+            fl.sharedData = shared;
 
     // plugin folders FL was told about
     for (const auto* key : { "Software\\Image-Line\\Shared\\Paths\\VST plugins", "Software\\Image-Line\\Shared\\Plugins\\FL Studio\\VstDir64",
