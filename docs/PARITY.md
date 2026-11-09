@@ -61,7 +61,7 @@ there.
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
 | Shell Channel (drum channel strip) | SSL Native Drumstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge's gate): gate (open / close, range, attack, hold, release) with its meter, transient shaper (gain, speed, amount, invert, listen; two measured followers), low and high frequency enhancers (frequency, drive, amount), listen-mic compressor (comp, narrow band, make-up, mix), output mix, and the 120 process orders (drag the chevrons); latency 4.1 ms like the original. State translated 1:1. fxparity 4.4 → 6.1 (bank 4.3 → 6.0) |
 | Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
-| Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
+| Horizon | ValhallaFutureVerb | 8 | 9 | 4 | 8 | 135 | 183b: sound 2 → 4 (fxparity 3.00 → 3.25, verb 7.84 → 8.35 on the matched settings; 45-setting bank 2.25 → 2.81 / 6.79 → 7.54; music level error 4.2 → 1.2 dB): echo as pre-delay, EQ / colour / mode laws measured |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
 | Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
@@ -106,6 +106,39 @@ default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved to
 flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
 Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
 engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
+
+## Round 183b: the Valhalla reverbs' sound, one engine per slice
+
+**Method**
+- Black-box only, as round 172d: tp172d's matched settings (D, S1 …) and its probe renders, plus round 183b's own captures (run by round 182a's capture holds: fxmeasure, public parameter API, one process per script). Per pair the captures sweep every main control from the default state at Mix 100 %, and add the impulse at −20 dB, music at −20 dB and a noise burst. Data: /mnt/e/lynx-work/verb183b (cap/, bank.py, hz_before.txt / hz_after.txt).
+- Scores: **fxparity** per setting and signal (impulse file, drums, music), and **verb** on the impulse render's first 3.9 s (tp172d's windowing), both on the matched settings ("main") and on the whole bank. The PARITY "Sound" column follows them.
+- **The reference is not linear in Tape echo mode** (FutureVerb's default; ValhallaDelay's Tape too). Its response to tp172d's 0.5 impulse has 5 dB more below 500 Hz than its response to the same impulse at −20 dB. Its music, drums and noise follow the −20 dB response within ~2 dB, and the excess goes away in its Modern echo mode. So the low end of a 0.5-impulse verb score is partly this artefact. Round 183b fits the −20 dB response and the programme material, and reports verb on both impulses.
+- Valhalla demo dropouts: 2 of the 62 FutureVerb captures (High EQ 0.6, Hall Early/Late 100 %) fade to silence near 2.4 s and are left out of the bank. The Low EQ 0 capture starts 0.7 s late and is left out too. Five music renders (Size 100 %, Dark, the level test, Drive 0, Cathedral) have a 1.5–1.8 s hole at random times, so their music is the demo's. Those stay in both the before and the after bank. The loud-programme figure below is taken without them: music at 0 dB sits 1.05 dB under its −20 dB render.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Horizon (slice 1) | ValhallaFutureVerb | 3.00 → 3.25 / 2.25 → 2.81 | 7.84 → 8.35 / 6.79 → 7.54 | See the list below. Over the bank, the music level error is 4.2 → 1.2 dB (music score 2.3 → 3.2), drums 3.25 → 3.75, the tail balance 4.8 → 6.8 and the level 5.5 → 8.1 of 10. |
+
+**What changed in Horizon (slice 1):**
+- **The echo is the pre-delay.** This follows the reference's manual and was measured. In Echo → Reverb, the reverb hears the echo's output, not the dry input. Echo Level only sets the echo heard beside the reverb, so at Level 0 the echo is still the pre-delay (30 ms by default), and the reference's onset moves with Echo time. Before, the echo was skipped at Level 0 and was never heard directly. Drive works in the plain echo modes and Detune in the granular ones (Tape played 4 cents sharp before).
+- **Low EQ** is a single −6 dB/oct cut, in the echo. Moving it from 100 to 400 Hz takes 11.5 dB at 30 Hz; with the old echo and output cuts together it would be 23.
+- **High EQ** is a −6 dB/oct cut in the echo and in the reverb, and it sets the high decay. RT(8 kHz) / RT(1 kHz) is 0.47 / 0.65 / 0.99 at 1 / 4.5 / 20 kHz; before, it was fixed.
+- A +3 dB shelf below 1.4 kHz: the reference's tail is fuller there, measured on the −20 dB impulse and on music.
+- **Colours** follow the manual and the renders. Bright and Neutral play alike. Dark adds a steep 8 kHz low-pass. The fourth colour, now named Studio as in the reference (it was "Vintage"; saved projects keep it), adds a 12 dB/oct cut at 560 Hz and a steep 12 kHz low-pass. Before, these were first-order cuts at 16, 11 and 9 kHz.
+- **Modes:** RT against Decay, bass decay, the onset after the echo, level and tone are measured per mode (Room, Chamber, Plate, Hall, Cathedral, Space).
+  - Room's lines are 1.6 × longer. Before, a tank mode sat on the stimulus's 48 Hz bass note, and music was 9 dB loud.
+  - Plate feeds its tank at once. Before, its 8 ms build-up taps cancelled each other below 120 Hz.
+  - Nonlin's length follows Size (gated after 0.1 / 0.33 / 1.05 s at Size 0 / 50 / 100 %), and Frozen's RT does too (2 / 15 s at Size 0 / 50 %). Both followed Decay before.
+  - The mode steps switch at the reference's (k + 1) / 24 points (its factory presets): 0.0833 still plays Room and 0.3333 plays Frozen.
+- **Size and Density:** the onset grows with Size (25 / 100 / 139 % of its 50 % value at Size 0 / 50 / 100 %). The level holds over Size and Density as measured. Early/Late barely moves the level (+1.6 / −1.3 dB at 0 / 100 %).
+- **Loud programme:** the reference runs 1–2 dB under its −20 dB response (music, drums, a noise burst; about 1 dB with its clean Modern echo mode). Horizon now has a gentle input compressor: −30 dBFS threshold, 1.25 : 1 ratio, 30 ms.
+
+**Open (Horizon):**
+- The onset. The reference rises 6 dB in 10 ms and then holds flat. Ours has the early taps first, then a 15 ms dip before the tank arrives. A first try made the onset right but moved the level (worse overall), so it was not kept.
+- The reference's loud-burst behaviour: its tail is 5 dB down after a 0.3 s burst at −1.6 dBFS peak. A static compressor cannot match music, drums and that burst at once.
+- Frozen's hold-and-release envelope (about a 4.5 s hold at Size 50 %, then a fade) is not modelled: the tail just decays.
+- Space's attack shapes, and Cathedral's lows below 100 Hz.
+- The tank loses some highs of its own, so RT(8 kHz) reaches 2.75 s at High EQ 20 kHz where the reference has 3.0 s. The mid RT runs ~8 % long at the default (3.27 against 3.01 s at 1 kHz), from the bass-decay crossover.
 
 ## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
 

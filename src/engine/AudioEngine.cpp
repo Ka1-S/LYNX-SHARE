@@ -73,6 +73,12 @@ FlPathRoots findFlStudioRoots()
 
     if (fl.userData.isDirectory())
         roots.userData = fl.userData.getFullPathName().toStdString();
+    // FL's Shared data folder and its Downloads (issue #124: FL Cloud sounds and other samples kept there)
+    if (fl.sharedData.isDirectory())
+    {
+        roots.sharedData = fl.sharedData.getFullPathName().toStdString();
+        roots.downloadsData = fl.sharedData.getChildFile ("Downloads").getFullPathName().toStdString();
+    }
 
     roots.home = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getFullPathName().toStdString();
     return roots;
