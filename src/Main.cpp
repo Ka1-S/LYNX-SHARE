@@ -3731,11 +3731,15 @@ private:
                     expect ("plugin_above_rack_when_opened", lynx::nativechild::isAbove (plug, rack));
                     workspace->activate (Panel::channelRack); // a click on the rack
                     expect ("rack_above_plugin_after_rack_click", lynx::nativechild::isAbove (rack, plug));
-                    lynx::PluginWindows::open ({}, *instance, {}); // (open again = bring the open one in front)
-                    expect ("plugin_above_rack_after_plugin_click", lynx::nativechild::isAbove (plug, rack));
-                    lynx::PluginWindows::setDetached (*instance, true);
                 }
                 else if (at == 1)
+                {
+                    lynx::PluginWindows::open ({}, *instance, {}); // (open again = bring the open one in front)
+                    expect ("plugin_above_rack_after_plugin_click", lynx::nativechild::isAbove (plug, rack));
+                }
+                else if (at == 2)
+                    lynx::PluginWindows::setDetached (*instance, true);
+                else if (at == 3)
                 {
                     expect ("detached_reopened", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance));
                     expect ("detached_owned_by_main", plug != nullptr && lynx::nativechild::ownerOf (plug) == main);
@@ -3846,8 +3850,9 @@ private:
                 }
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
-                if (phase == 1 && workspace != nullptr && (ticks == 30 || ticks == 50 || ticks == 70))
-                    dockCheck ((ticks - 30) / 20);
+                // (3 s apart: time for screenshots of each state)
+                if (phase == 1 && workspace != nullptr && ticks % 60 == 0 && ticks / 60 <= 5)
+                    dockCheck (ticks / 60 - 1);
                 if (phase == 1 && ticks >= seconds * 20) // remove the plugin from the song
                 {
                     engine->editSong ([this] (lynx::Song& song) {
