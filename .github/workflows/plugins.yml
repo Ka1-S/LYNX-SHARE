@@ -137,6 +137,7 @@ jobs:
         run: |
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Windows.zip" && unzip -q pv.zip -d pv
           curl -fsSL -o cv.zip "$CLAP_VALIDATOR-windows.zip" && unzip -q cv.zip -d cv
+          for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done
           unzip -q "dist/LYNX-Plugins-$LABEL-win-x64.zip" -d pkg
           ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" tool/plugexporttest.exe pv/pluginval.exe "$(find cv -name 'clap-validator.exe' | head -1)" reports
 
@@ -197,6 +198,7 @@ jobs:
         run: |
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Linux.zip" && unzip -q pv.zip -d pv
           curl -fsSL -o cv.zip "$CLAP_VALIDATOR-ubuntu-22.04.zip" && unzip -q cv.zip -d cv
+          for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done   # (the Linux zip holds a tarball)
           chmod +x pv/pluginval "$(find cv -name clap-validator -type f | head -1)"
           xvfb-run -a ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest pv/pluginval "$(find cv -name clap-validator -type f | head -1)" reports pictures
 
@@ -247,10 +249,11 @@ jobs:
         run: |
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_macOS.zip" && unzip -q pv.zip -d pv
           curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.zip" && unzip -q cv.zip -d cv
+          for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done   # (the zip may hold a tarball)
           ditto -x -k "dist/LYNX-Plugins-$LABEL-macos-universal.zip" pkg
           codesign --verify --deep --strict "pkg/LYNX-Plugins-$LABEL/CLAP/LYNX Plugins.clap"
           cv_bin="$(find cv -name clap-validator -type f | head -1)"; chmod +x "$cv_bin"
-          ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest pv/pluginval.app/Contents/MacOS/pluginval "$cv_bin" reports
+          ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest "$(find pv -path '*Contents/MacOS/pluginval' -type f | head -1)" "$cv_bin" reports
 
       - uses: actions/upload-artifact@v7
         with:

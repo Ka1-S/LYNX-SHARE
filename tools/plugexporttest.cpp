@@ -64,6 +64,14 @@ struct Audio
         for (auto v : r) p = std::max (p, (double) std::abs (v));
         return p;
     }
+    // the first sample where the two differ by more than `tolerance` (-1 = none)
+    long firstDifference (const Audio& o, double tolerance = 1.0e-5) const
+    {
+        for (std::size_t i = 0; i < std::min (l.size(), o.l.size()); ++i)
+            if (std::abs (l[i] - o.l[i]) > tolerance || std::abs (r[i] - o.r[i]) > tolerance)
+                return (long) i;
+        return -1;
+    }
     double difference (const Audio& o) const
     {
         double p = l.size() == o.l.size() ? 0.0 : 1e9;
@@ -157,6 +165,7 @@ Audio renderWithSide (juce::AudioProcessor& p, float side)
 // The same engine with no plugin between: the effect itself / a rack with the channel
 Audio directEffect (EffectKind kind, const EffectParams& params)
 {
+    const juce::ScopedNoDenormals noDenormals; // (as the plugin's processBlock: denormals flushed)
     Audio out;
     auto effect = makeEffect (kind);
     effect->prepare (rate);
@@ -247,7 +256,11 @@ void writeEditorPicture (const Entry& entry, const juce::String& prefix)
 }
 
 } // namespace
+#if JUCE_MAC
+ #include <CoreFoundation/CoreFoundation.h>
+#else
 namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // (juce_events' native code)
+#endif
 namespace
 {
 // Lets the message loop (and a CLAP plugin's timer) run for a while
@@ -256,8 +269,12 @@ void pump (int ms, const std::function<void()>& tick = {})
     const auto end = juce::Time::getMillisecondCounter() + (juce::uint32) ms;
     while (juce::Time::getMillisecondCounter() < end)
     {
+       #if JUCE_MAC
+        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.005, false); // (JUCE's messages come through the main run loop)
+       #else
         while (juce::detail::dispatchNextMessageOnSystemQueue (true)) {}
         juce::Thread::sleep (5);
+       #endif
         if (tick)
             tick();
     }
@@ -480,7 +497,8 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         }
         const auto wet = render (*instance, false);
         const auto d = wet.difference (direct = directEffect (entry->effect, params));
-        check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8));
+        check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8)
+                               + (d < 1.0e-5 ? juce::String() : ", first at sample " + juce::String (wet.firstDifference (direct))));
         check (wet.difference (sound) > 1.0e-3, "those settings change the sound, difference " + juce::String (wet.difference (sound), 5));
     }
     else
@@ -503,7 +521,8 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         second->setStateInformation (state.getData(), (int) state.getSize());
         const auto first = render (*instance, entry->instrument), restored = render (*second, entry->instrument);
         const auto d = restored.difference (first);
-        check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8));
+        check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8)
+                               + (d < 1.0e-3 ? juce::String() : ", first at sample " + juce::String (restored.firstDifference (first, 1.0e-3))));
     }
     stateLoadIsSilent (format, description, state);
 

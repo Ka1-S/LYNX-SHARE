@@ -182,8 +182,13 @@ public:
         renderer->prepare (sampleRate, juce::jmax (maxBlock, 64));
         inputs.setSize (2, juce::jmax (maxBlock, 64));
         sideInputs.setSize (2, juce::jmax (maxBlock, 64));
+        // a (re)start is a new stream that sounds exactly as a fresh instance's: new engines, not the ones of the last
+        // build (publish reuses them, and a reset leaves some state behind: smoothed settings, a detector's history),
+        // round 188b
+        shape = RackState {};
         publish();
         setLatencySamples (currentLatency());
+        resetWanted.store (true, std::memory_order_relaxed);
     }
 
     void releaseResources() override {}
