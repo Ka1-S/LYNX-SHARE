@@ -525,7 +525,6 @@ int applyInsertRender (Song& song, int track, const std::string& wav, std::int64
     const auto added = applyBounce (song, track, wav, length);
     if (added < 0)
         return -1;
-    song.channels.back().volume = audioClipUnityVolume; // the render plays at unity in FL (see applyFreeze)
     std::string list;
     for (const auto& n : names)
         list += (list.empty() ? "" : ", ") + n;
@@ -581,7 +580,7 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
             set (0x20000u, ref->modXAftertouch);
             set (0x02000000u, ! ref->resetOnFlush);
             fixed = (ref->maxSizeBuffers ? 1u : 0u) | (ref->hostMaxBuffer ? 2u : 0u);
-            flags2 = ref->allNotesOffOnStop ? 0u : 0x1000u;
+            flags2 = (ref->allNotesOffOnStop ? 0u : 0x1000u) | (ref->allowHostKeys ? 0x800u : 0u);
         }
         else if (p.hasWrapperOptions)
         {

@@ -314,6 +314,10 @@ public:
 
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);
+    // FL's Tools › Macros › Cancel recording (MacroCancelRecordingAction, REA round 169k §2.3 [DECOMP 0xf1d7e0]): what this
+    // recording pass wrote is thrown away (its notes, automation and audio takes; the take files are deleted), recording
+    // turns off, the armed inserts stay armed and playback goes on. false: not recording. UI thread.
+    bool cancelRecording();
     bool isRecording() const noexcept { return transport.recording.load(); }
     // Pattern mode, a take with Loop record off (round 170e5): the transport tick the pattern plays once from, < 0: none
     double patternLinearOrigin() const noexcept { return liveInput.patternOrigin.load (std::memory_order_relaxed); }
@@ -893,6 +897,11 @@ private:
     int automationPattern = 0;
     int recordedAutomationPoints = 0;
     bool automationOverrideActive = false; // touched targets override their automation in the renderer
+    // FL (issue #125): the targets the user moved since playback last started; their automation does not drive them
+    // until it starts again (RackRenderer::setReleasedSlots). Not while recording automation (the touch rule above).
+    std::vector<AutomationTarget> releasedTargets;
+    bool releasedWasPlaying = false;
+    void publishReleasedTargets();
     // Song mode, no loop region: once a parameter moved while recording, the song plays on past its end (no wrap to
     // the start) until recording stops, and the take's clip grows with the playhead (issue #12: it cut itself)
     bool automationLinear = false;
@@ -901,6 +910,10 @@ private:
     std::int64_t lastAutomationTick = -1; // the song position of the take's last update (song mode)
     std::vector<AutomationWrite> takeWrites; // per target: where this take writes (its own clip grows)
     bool takeHasUndoStep = false;
+    // Cancel recording (round 187a): the undo depth when this recording pass started, and the steps trimmed off the
+    // stack's bottom since then (the depth then still counts them)
+    bool recordPassActive = false, recordPassMarked = false, discardAudioTakes = false;
+    std::size_t recordPassUndoBase = 0, recordPassTrimmed = 0;
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
     void updateLauncherRecording();

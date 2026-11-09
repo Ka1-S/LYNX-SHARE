@@ -2298,6 +2298,26 @@ Layout fretLayout()
     return l;
 }
 
+// round trans189d (issue #94): Strike Shaper, LYNX's level-independent transient designer. The generic layout keeps the
+// two-knob front panel: ATTACK and SUSTAIN big on either side, Output, Guard and Link between them, Mix and the
+// detector's high-pass small underneath (the editor, ui/ProEditors.cpp StrikeEditor, draws the hardware look)
+Layout strikeLayout()
+{
+    Layout l;
+    l.width = 540;
+    l.height = 300;
+    auto& v = l.items;
+    v.push_back (section (4, 4, 532, 292, TR_NOOP ("Transients")));
+    v.push_back (dial (130, 110, 110, "Attack", TR_NOOP ("Attack"), bipolar | big));
+    v.push_back (dial (410, 110, 110, "Sustain", TR_NOOP ("Sustain"), bipolar | big));
+    v.push_back (dial (270, 76, 44, "Output", TR_NOOP ("Output"), bipolar));
+    v.push_back (toggle (236, 150, 68, 24, "Guard", TR_NOOP ("Guard")));
+    v.push_back (toggle (236, 182, 68, 24, "Link", TR_NOOP ("Link")));
+    v.push_back (dial (200, 250, 28, "Mix", TR_NOOP ("Mix")));
+    v.push_back (dial (340, 250, 28, "Detect high-pass", TR_NOOP ("Detect HP")));
+    return l;
+}
+
 // round tp172c8: Shell Channel, LYNX's drum channel strip (its role: the drum channel strip measured on the SSL Native
 // Drumstrip trial). The generic layout: input column, GATE and TRANSIENT SHAPER on top, the LOW / HIGH FREQ ENHANCERS and
 // the LISTEN MIC COMPRESSOR below, the process order under them, output column
@@ -3458,7 +3478,7 @@ Layout horizonLayout()
     v.push_back (label (428, 264, 92, 24, TR_NOOP ("Reverb mode"), alignLeft));
     v.push_back (choiceMenu (522, 264, 150, 24, "Reverb mode", TR_NOOP ("Reverb mode"), TR_NOOP ("Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated")));
     v.push_back (label (752, 264, 52, 24, TR_NOOP ("Color"), alignLeft));
-    v.push_back (choiceMenu (806, 264, 166, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Neutral|Dark|Vintage")));
+    v.push_back (choiceMenu (806, 264, 166, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Neutral|Dark|Studio")));
     return l;
 }
 
@@ -3935,7 +3955,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -4022,6 +4042,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::kilnChannel: l = kilnLayout(); break;
         case EffectKind::fretChannel: l = fretLayout(); break;
         case EffectKind::shellChannel: l = shellLayout(); break;
+        case EffectKind::strikeShaper: l = strikeLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;

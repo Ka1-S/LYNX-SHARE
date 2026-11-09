@@ -28,6 +28,8 @@ then noticed it did not sound). The user chose to keep LYNX looping, as a LYNX e
   every one of them is the single pass of round 168k.
 - Recording into a clip longer than its pattern keeps 168k's rule in both modes: the notes stay where they were played
   and the pattern grows (FL measured); the grown pattern is what the clip then loops.
+  (Commit 281a06893 later folded the take into the pattern with the option on; issue #126 (0.1.26) showed it filled
+  only the first bar of an empty clip, so it now folds only into existing content (the user's hybrid rule, REA_rodada185b.md), `RecNoFold126Tests.inc`.)
 - [TEST] `mixpre167q_stretched_pattern_clip_loops_its_pattern` / `..._plays_once_with_the_option_off` (events, offsets,
   offset past the pattern, MIDI export, playhead, pattern length 2 bars / half a bar), `mixpre167q_repeats_stress` (80
   random songs, both modes), `polish_clip_ghost_notes` and `rec168k_stretched_pattern_clip_plays_its_pattern_once` (both

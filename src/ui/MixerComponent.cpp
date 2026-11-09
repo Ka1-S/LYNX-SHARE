@@ -1592,6 +1592,23 @@ void MixerStrips::paint (juce::Graphics& g)
             }
         }
 
+        // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
+        // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
+        if (t == selected && t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty() && needs (routeArea (t)))
+        {
+            const auto& lost = song.mixer[(std::size_t) t].lostSends;
+            const auto r = routeArea (t).toFloat().reduced (0.5f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r, radius::sm);
+            const float dashes[] = { 2.5f, 2.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::textDisabled);
+            g.fillPath (dashed);
+            g.setFont (font (10.0f));
+            textcache::drawFittedText (g, juce::String::fromUTF8 ("\xc3\x97 ") + (lost.size() == 1 ? juce::String::fromUTF8 (lost[0].to.c_str()) : juce::String ((int) lost.size())),
+                                       r.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
+        }
+
         // routing lane: send switch from the selected insert to this one, and its level knob
         if (selected > 0 && t != selected && selected < tracks && needs (routeArea (t).getUnion (sendArea (t))))
         {
@@ -2224,6 +2241,69 @@ bool MixerStrips::moveSelected (int delta)
         setSelection (moved, juce::jlimit (1, (int) engine.getSong().mixer.size() - 1, selected + (delta < 0 ? -1 : 1)));
 
     return ok;
+}
+
+// FL's "Delete" on the selected mixer tracks (round 186c; REA FUN_012a5b60, FL 2026 checked by hand): an error while
+// audio is being recorded; "Delete tracks|This will |delete| %d selected mixer track(s). Are you sure?" (Yes / No and
+// "Remember my choice": a remembered Yes skips it, No is never remembered; Settings › General › Manage messages shows
+// it again); then, when a Playlist audio / instrument track is linked to one of them, "Playlist tracks" with "Delete
+// tracks and channels" / "Unlink tracks and channels" / "Cancel" (nothing remembered). One undo step.
+void MixerStrips::deleteTracks (std::vector<int> tracks)
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count] (int t) { return t < 1 || t >= count; }), tracks.end());
+    if (tracks.empty())
+        return;
+
+    if (engine.isRecording() && ! engine.getArmedInserts().empty())
+    {
+        showFlMessage ({ tr ("Error"), tr ("It isn't possible to delete mixer tracks during audio recording."), { tr ("OK") }, false }, nullptr);
+        return;
+    }
+
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
+        if (safe == nullptr)
+            return;
+        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
+        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        safe->setSelection ({ first }, first);
+    };
+    auto confirmed = [safe, tracks, run] {
+        if (safe == nullptr)
+            return;
+        if (mixerops::playlistTracksLinkedTo (safe->engine.getSong(), tracks).empty())
+        {
+            run (mixerops::LinkedPlaylistTracks::unlink);
+            return;
+        }
+        showFlMessage ({ tr ("Playlist tracks"),
+                         tr ("One or more mixer tracks that will be deleted are connected to instrument/audio tracks.") + "\n"
+                             + tr ("Do you want to unlink the tracks and channels or delete them?"),
+                         { tr ("Delete tracks and channels"), tr ("Unlink tracks and channels"), tr ("Cancel") }, false },
+                       [run] (int button, bool) {
+                           if (button == 1)
+                               run (mixerops::LinkedPlaylistTracks::deleteToo);
+                           else if (button == 2)
+                               run (mixerops::LinkedPlaylistTracks::unlink);
+                       });
+    };
+
+    if (! messages::shown ("DeleteMixerTrack"))
+    {
+        confirmed();
+        return;
+    }
+    // (FL marks "delete" in its accent colour: the |bars| of its own string)
+    showFlMessage ({ tr ("Delete tracks"), tr ("This will |delete| {0} selected mixer track(s). Are you sure?", { juce::String ((int) tracks.size()) }),
+                     { tr ("Yes"), tr ("No") }, true },
+                   [confirmed] (int button, bool remember) {
+                       if (button != 1)
+                           return;
+                       if (remember)
+                           messages::setShown ("DeleteMixerTrack", false);
+                       confirmed();
+                   });
 }
 
 void MixerStrips::linkSelectedChannels (bool startingHere)
@@ -3106,6 +3186,27 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
         menu.addSubMenu (tr ("Track routing"), routing, any);
+        // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
+        if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
+        {
+            juce::PopupMenu lost;
+            const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
+            for (int i = 0; i < (int) lostSends.size(); ++i)
+            {
+                juce::PopupMenu one;
+                juce::PopupMenu to;
+                for (int x = 1; x < (int) song.mixer.size(); ++x)
+                    if (x != t)
+                        to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
+                                    false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
+                one.addSubMenu (tr ("Reconnect to"), to);
+                one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
+                lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
+            }
+            lost.addSeparator();
+            lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
+            menu.addSubMenu (tr ("Disconnected links"), lost);
+        }
     }
     {
         juce::PopupMenu select;
@@ -3283,10 +3384,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             moveSelected (1);
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete") + "\tDel", [this, t] {
-            engine.editSong ([t] (Song& s) { mixerops::deleteTrack (s, t); });
-            setSelection ({ t }, t);
-        });
+        menu.addItem (tr ("Delete") + "\tDel", [this, targets] { deleteTracks (targets); });
         const auto room = (int) song.mixer.size() < maxMixerTracks;
         menu.addItem (tr ("Insert one"), room, false, [this, t] {
             engine.editSong ([t] (Song& s) { mixerops::insertTrack (s, t); });
@@ -3408,6 +3506,21 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         return;
     }
     seenPublish = engine.getPublishCount();
+    // "Mixer groups follow the Playlist" (round 186c): a Playlist group edit regroups the mixer, outside the undo history
+    // (an undo of the Playlist edit brings the old groups back through this same path)
+    if (followPlaylist && ! followPending)
+    {
+        if (! mixerops::followsPlaylistGroups (engine.getSong()))
+        {
+            followPending = true;
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MixerStrips> (this)] {
+                if (safe == nullptr)
+                    return;
+                safe->engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); }, false);
+                safe->followPending = false;
+            });
+        }
+    }
     vcaLevelsShown.clear();
     for (const auto& vca : engine.getSong().vcas)
         vcaLevelsShown.push_back (vca.level);
@@ -3735,12 +3848,14 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
                                       EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate, // LYNX's dynamics suite
                                       EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::voiceShift, // LYNX's voice tools
+                                      EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
+                                      EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx, // Pocket: FL Studio Mobile's effects (round 188h)
                                       EffectKind::formulaController, EffectKind::peakController, EffectKind::xyController, EffectKind::xyzController,
                                       EffectKind::controlSurface, // controllers (link their output to any knob)
                                       EffectKind::patcher, // FL's Patcher: a graph of effects / instruments / plugins (REA_rodada141)
@@ -4296,6 +4411,23 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
         ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+    });
+    // LYNX's option (round 186c, pain point 1; off = FL, which drops them): a deleted insert's incoming sends stay greyed
+    menu.addItem (tr ("Keep links to deleted inserts, greyed (LYNX)"), true, MixerStrips::keepLostLinks, [] {
+        MixerStrips::keepLostLinks = ! MixerStrips::keepLostLinks;
+        notifyChanged();
+    });
+    // LYNX's addition (round 186c, pain point 4; off by default): the mixer's groups mirror the Playlist's track groups
+    menu.addItem (tr ("Mixer groups follow the Playlist (LYNX)"), true, MixerStrips::followPlaylist, [&engine] {
+        MixerStrips::followPlaylist = ! MixerStrips::followPlaylist;
+        if (MixerStrips::followPlaylist)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        notifyChanged();
+    });
+    menu.addItem (tr ("Arrange inserts like the Playlist"), ! mixerops::playlistOrderInserts (song).empty(), false, [&engine] {
+        int moved = 0;
+        engine.editSongStructural ([&moved] (Song& s) { moved = mixerops::arrangeLikePlaylist (s); });
+        ui::postHint ({ tr ("{0} insert(s) moved to follow the Playlist", { juce::String (moved) }), {}, false, false }, 3000);
     });
 
     if (! newProjects)
@@ -6182,7 +6314,7 @@ void EffectsPanel::showAddMenu (int row)
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
 
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
 }
 
 void EffectsPanel::showSlotMenu (int slot)
@@ -6200,6 +6332,8 @@ void EffectsPanel::showSlotMenu (int slot)
     quickpick::addFolderViewItems (replace, engine);
 
     juce::PopupMenu menu;
+    if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
+        extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
@@ -6302,7 +6436,7 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [this, key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
     if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
@@ -6377,7 +6511,7 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), {},
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {
                              if (! key.isKeyCode (juce::KeyPress::deleteKey) || safe == nullptr)
                                  return false;
@@ -6792,6 +6926,8 @@ bool MixerComponent::runAction (const std::string& id)
         return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
     else if (id == "mixer.renderSelected")
         return strips.runMenuItem (tr ("Render selected tracks to wave file(s)..."));
+    else if (id == "mixer.deleteTracks") // FL's Del: the selected mixer tracks, after its question (round 186c)
+        strips.deleteSelectedTracks();
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
     else

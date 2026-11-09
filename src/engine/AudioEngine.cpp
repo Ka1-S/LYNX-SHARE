@@ -73,6 +73,12 @@ FlPathRoots findFlStudioRoots()
 
     if (fl.userData.isDirectory())
         roots.userData = fl.userData.getFullPathName().toStdString();
+    // FL's Shared data folder and its Downloads (issue #124: FL Cloud sounds and other samples kept there)
+    if (fl.sharedData.isDirectory())
+    {
+        roots.sharedData = fl.sharedData.getFullPathName().toStdString();
+        roots.downloadsData = fl.sharedData.getChildFile ("Downloads").getFullPathName().toStdString();
+    }
 
     roots.home = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getFullPathName().toStdString();
     return roots;
@@ -1733,7 +1739,7 @@ void AudioEngine::finishAudioTake()
     for (int k = 0, count = takeWrapCount.exchange (0); k < count; ++k)
         wraps.push_back ((double) takeWraps[(std::size_t) k].load() * takeTicksPerSample);
 
-    if (frames <= 0 || startTick < 0.0)
+    if (frames <= 0 || startTick < 0.0 || discardAudioTakes) // (Cancel recording drops the takes, round 187a)
     {
         for (auto& take : done)
         {
@@ -2311,6 +2317,38 @@ void AudioEngine::setRecording (bool shouldRecord)
     sendChangeMessage();
 }
 
+bool AudioEngine::cancelRecording()
+{
+    if (! transport.recording.load())
+        return false;
+    // FL [DECOMP 0xf1d7e0]: the recorded-event buffers are emptied, every disk-recording take is dropped and its track
+    // re-armed, the record button is released; playback is not stopped. LYNX writes a take into the song as it goes, so
+    // the pass's edits are undone instead (one undo step per take; a step the user made while recording goes too).
+    updateRecording(); // (what was played up to now, and the start of this pass if the timer hasn't seen it yet)
+    const auto armed = armedInserts;
+    const auto inPass = recordPassActive && recordPassMarked; // (record on but stopped: the last pass is already kept)
+    discardAudioTakes = true;
+    setRecording (false); // (the takes close here: the notes still held are committed, the audio files deleted)
+    discardAudioTakes = false;
+    for (const auto t : armed)
+        if (std::find (armedInserts.begin(), armedInserts.end(), t) == armedInserts.end())
+            setInsertArmed (t, true);
+    if (inPass && ! sessionHistory)
+    {
+        const auto made = undoStack.size() + recordPassTrimmed;
+        const auto steps = made > recordPassUndoBase ? made - recordPassUndoBase : 0;
+        for (std::size_t i = 0; i < steps && ! undoStack.empty(); ++i)
+        {
+            undo();
+            if (! redoStack.empty())
+                redoStack.pop_back(); // (nothing to redo: the pass is gone)
+        }
+    }
+    recordPassMarked = false;
+    sendChangeMessage();
+    return true;
+}
+
 void AudioEngine::updateRecording()
 {
     const auto playing = transport.playing.load();
@@ -2325,6 +2363,14 @@ void AudioEngine::updateRecording()
     // (round 170d: a take starts with its count-in, so the notes played during it are kept)
     const auto counting = isCountingIn();
     const auto active = transport.recording.load() && (playing || counting);
+    // a recording pass starts: what Cancel recording goes back to (round 187a)
+    if (active && ! recordPassActive)
+    {
+        recordPassMarked = true;
+        recordPassUndoBase = undoStack.size();
+        recordPassTrimmed = 0;
+    }
+    recordPassActive = active;
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
@@ -2524,7 +2570,11 @@ void AudioEngine::saveUndoStep()
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
+        {
             undoStack.pop_front();
+            if (recordPassMarked)
+                ++recordPassTrimmed;
+        }
         if (sessionHistory)
         {
             closeSessionStep();
@@ -3531,6 +3581,15 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
         multilink->add (target);
 
+    // FL [EXEC round 185b, issue #125]: a moved control leaves its automation until playback starts again (stopped: the
+    // value stays; playing: the clip no longer drives it). While recording automation the touch rule applies instead.
+    const auto recordingAutomation = transport.recording.load() && transport.playing.load() && recordOptions.recordAutomation;
+    if (! recordingAutomation && std::find (releasedTargets.begin(), releasedTargets.end(), target) == releasedTargets.end())
+    {
+        releasedTargets.push_back (target);
+        publishReleasedTargets();
+    }
+
     if (! (lastTweaked[0] == target))
     {
         lastTweaked[1] = lastTweaked[0];
@@ -3546,6 +3605,21 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     }
     it->lastMs = now;
     it->held = it->held || held;
+}
+
+void AudioEngine::publishReleasedTargets()
+{
+    if (rackProcessor == nullptr)
+        return;
+    std::vector<int> slots, one;
+    for (const auto& t : releasedTargets)
+    {
+        RackState::slotsOfTarget (song, t, one);
+        for (const auto a : one) // (a link to an internal controller keeps driving it)
+            if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
+                slots.push_back (a);
+    }
+    rackProcessor->getRenderer().setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -3929,6 +4003,11 @@ void AudioEngine::timerCallback()
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     applyControllers();
+    // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
+    if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
+        releasedTargets.clear();
+    else if (! releasedTargets.empty())
+        publishReleasedTargets(); // (the slots follow the song: an automation added or removed renumbers them)
     if (const auto note = pendingMarkerNote.exchange (-1); note >= 0)
         jumpToMarker (note); // FL's "Song marker jump": note 0 = the first marker
     updateRecording();
