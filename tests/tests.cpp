@@ -17366,3 +17366,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ProjectKey184aTests.inc"
 #include "Render186bTests.inc"
 #include "SimpleTracks184aTests.inc"
+#include "Notes188gTests.inc"

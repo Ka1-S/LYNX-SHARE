@@ -46,9 +46,9 @@ COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
         -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
 
 # juce_gui_basics, juce_audio_processors, juce_graphics and juce_events are compiled from patched copies
-# (cmake/LynxPatchJuce.cmake: issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; round 174e2 Direct2D image
-# readback; issue #32 the message dispatch hook of the plugin window crash guard), so the JUCE checkout itself is never
-# modified. The copies are only replaced when their patched sources change (module cache).
+# (cmake/LynxPatchJuce.cmake: issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; issue #63 VST3 note
+# tuning; round 174e2 Direct2D image readback; issue #32 the message dispatch hook of the plugin window crash guard), so
+# the JUCE checkout itself is never modified. The copies are only replaced when their patched sources change (module cache).
 GUI_BASICS_SRC="$JUCE_DIR/modules/juce_gui_basics"
 AUDIO_PROCESSORS_SRC="$JUCE_DIR/modules/juce_audio_processors"
 GRAPHICS_SRC="$JUCE_DIR/modules/juce_graphics"
