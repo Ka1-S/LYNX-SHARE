@@ -325,7 +325,17 @@ public:
             editRoutes ([n = (int) outputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { autoMapOutputs (r, n); });
         };
         addChildComponent (autoMap);
-        refreshIo.setButtonText (juce::String::fromUTF8 ("â»"));
+        {
+            // FL's refresh glyph: a circular arrow
+            juce::Path arrow;
+            arrow.addCentredArc (0.0f, 0.0f, 6.0f, 6.0f, 0.0f, 0.6f, juce::MathConstants<float>::twoPi - 0.2f, true);
+            juce::Path shape;
+            juce::PathStrokeType (1.6f).createStrokedPath (shape, arrow);
+            shape.addTriangle (2.2f, -8.8f, 6.8f, -5.2f, 1.6f, -2.6f);
+            refreshIo.setShape (shape, true, true, false);
+            refreshIo.setOutline (juce::Colours::transparentBlack, 0.0f);
+            refreshIo.setColours (theme::colour::textSecondary, theme::colour::textPrimary, theme::colour::accent);
+        }
         refreshIo.setTooltip (tr ("Refresh inputs and outputs (after a change in the plugin)"));
         refreshIo.onClick = [this] {
             outputRows.outputs = pluginOutputs (plugin);
@@ -479,7 +489,7 @@ public:
                 auto r = area.withTrimmedBottom (2);
                 groups.push_back ({ r, tr ("Connections") });
                 auto header = r.removeFromTop (headerHeight + 6).reduced (10, 3);
-                show (refreshIo, header.removeFromRight (26));
+                show (refreshIo, header.removeFromRight (26).reduced (4, 3));
                 header.removeFromRight (juce::jmax (0, header.getWidth() / 2 - 150));
                 outputsGlyph = header.removeFromRight (22);
                 header.removeFromRight (4);
@@ -643,7 +653,8 @@ private:
     bool connections = false;
     ConnectionRows outputRows;
     juce::Viewport connectionsView;
-    juce::TextButton resetIo, autoMap, refreshIo;
+    juce::TextButton resetIo, autoMap;
+    juce::ShapeButton refreshIo { "refresh", {}, {}, {} };
     juce::Rectangle<int> outputsGlyph;
     int tab = 0;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groups;
