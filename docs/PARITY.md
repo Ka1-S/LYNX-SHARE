@@ -83,7 +83,7 @@ there.
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
 | Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
-| Foil Plate | ValhallaPlate | 9 | 10 | 3 | 8 | 135 |  |
+| Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
@@ -337,6 +337,21 @@ analyser), design **1 → 7** (the reference's modules and reading order in
 LYNX's style; the transfer-curve and GR-history displays are bars). Her Vocalstrip 2 state now plays the measured
 model (−60 … −67 dB null on her takes). The other Complete Access plugins (Slate, SSL, LiquidSonics, sonible,
 Harrison) map to LYNX effects by role only.
+
+## Round 183b slice 4: Foil Plate (voicing off) ← ValhallaPlate
+
+Measured on tp172d's settings and 14 new captures, with the impulse at −20 dB (the reference is linear: its 0.5 and −20 dB impulses agree within 0.1 dB): Decay 20 / 80 %, Size 0 / 100 %, Mod depth 50 / 100 %, Low and High EQ gain 0 / 100 %, Width 0 / 100 %, and Pre-delay. Method and scores as in "Round 183b" (slice 1, Horizon); the bank has 19 settings.
+
+| LYNX engine | Original | fxparity main / bank | verb main / bank | What changed |
+|---|---|---|---|---|
+| Foil Plate (slice 4) | ValhallaPlate | 3.13 → 3.73 / 3.03 → 3.64 | 8.15 → 8.49 / 8.13 → 8.48 | Over the bank: drums 3.00 → 3.83, impulse 2.80 → 3.80, −20 dB impulse 2.86 → 3.50; the verb's balance goes from 6.6 to 8.0 and its level from 8.1 to 9.1 |
+
+- **Low EQ gain** spans ±12 dB, as the reference's (it was ±9). Its half-gain point is ~0.47 × the frequency law: −6 dB near 330 Hz at the default 711 Hz.
+- **High EQ gain** boosts up to +12 dB with its half-gain point at ~0.5 × the frequency law (5 kHz at the default), but cuts only −4.5 dB at 0 %, as measured.
+- **Width** keeps the level, as the reference does (−27.4 / −27.5 / −27.2 dB at 0 / 50 / 100 %). Ours moved 4 dB.
+- **Tone:** the reference's tail is fuller below 80 Hz (+5 dB at 28–71 Hz) and less forward at 2.8–7 kHz (−3.5 dB). It sits about 1 dB lower, and its short decays are a little quieter than ours were. The engine gets a second low shelf for this.
+- **Unchanged:** the plate voicing (the Little Plate role); its EQ gains sit at 0 dB there.
+- **Open:** the EDC shape (verb edc part 8.5 → 7.8); music at Decay 20–25 % still runs +1 dB.
 
 ## Round 152: what changed (config / design, after 150 → after 152)
 
