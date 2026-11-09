@@ -1,0 +1,7 @@
+# The heaviest tests (round speed185a): audits that render every control of every effect / generator, and the real FL
+# projects. They run everywhere by default: on every CI push (main, wip/**, pull requests) and in the merge train.
+# LYNX_TEST_SKIP_HEAVY=1 scripts/run-tests.sh ... skips them for a quick local pass (it says so; never for a landing).
+# One name or name prefix per line.
+fxaudit173d_effect_controls_
+ctlwake173d_generator_controls_
+flp_real_files

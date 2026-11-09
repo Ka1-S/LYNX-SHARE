@@ -192,16 +192,14 @@ bool inCurrentPatternClip (const Song& song, std::int64_t tick)
 
 } // namespace
 
-// Where a take played at song `tick` inside clip `c` lands in its pattern. With LYNX's "Stretched pattern clips loop
-// their pattern" on (stretchedClipsLoop(); 0.1.23, the user's decision) a clip longer than its pattern loops it, so a
-// note played in a repeat folds into the pattern (its place modulo the pattern's length, from the clip's offset): it
-// then plays in every repeat and the pattern does not grow. Off, FL's rule (round 168k [EXEC]: a 1-bar pattern's clip
-// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold.
-std::int64_t clipPatternTick (const Song& song, const Clip& c, std::int64_t tick)
+// Where a take played at song `tick` inside clip `c` lands in its pattern: its place along the clip, never folded by the
+// pattern's length, with LYNX's "Stretched pattern clips loop their pattern" on or off (issue #126; FL's rule, round
+// 168k [EXEC]: a 1-bar pattern's clip stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the
+// pattern became 4 bars). 0.1.23 folded the take into the pattern with the option on, so a take in an empty clip only
+// ever filled its first bar.
+std::int64_t clipPatternTick (const Song&, const Clip& c, std::int64_t tick)
 {
-    if (c.pattern < 0 || c.pattern >= (int) song.patterns.size())
-        return tick - c.start + c.offset;
-    return (std::int64_t) std::floor (patternTickInClip (c, (double) tick, clipLoopLength (song, c)));
+    return tick - c.start + c.offset;
 }
 
 std::int64_t clipLoopLength (const Song& song, const Clip& c)
@@ -294,20 +292,6 @@ void commitNoteBatch (Song& song, const NoteRecorder& recorder, std::vector<Note
     if (pattern < 0 || pattern >= (int) song.patterns.size() || notes.empty())
         return;
     quantizeTake (notes, q);
-    // a take folded into a looping clip (stretchedClipsLoop()): a note quantized onto the pattern's end goes to its start,
-    // the next repeat's first beat, and a note held across the end is cut there (the pattern keeps its length)
-    if (song.mode == PlayMode::song && recorder.originFromClip())
-        for (const auto& c : song.playlist)
-            if (c.kind == ClipKind::pattern && c.pattern == pattern && c.start - c.offset == recorder.songOrigin())
-                if (const auto length = clipLoopLength (song, c); length > 0)
-                {
-                    for (auto& n : notes)
-                    {
-                        n.start %= length;
-                        n.length = std::clamp<std::int64_t> (n.length, 1, length - n.start);
-                    }
-                    break;
-                }
     commitTake (song.patterns[(std::size_t) pattern], notes, mode, 0, clearedChannels);
 
     if (song.mode != PlayMode::song || recorder.songOrigin() < 0)

@@ -29,6 +29,8 @@ CORE="$CORE src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/co
 CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp"
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
+# Simple workflow: adding a track (round 184a)
+CORE="$CORE src/core/SimpleTracks.cpp"
 # start-up sound (procedural)
 CORE="$CORE src/core/StartupSound.cpp"
 # speech synthesizer: .speech files, LYNX voice (round 168b)
@@ -131,6 +133,30 @@ mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o
 [[ -f "$obj" && "$obj" -nt third_party/monocypher/monocypher.c ]] || $CC -c -O2 -w -Ithird_party/monocypher third_party/monocypher/monocypher.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# zig links its compiler_rt, whose archive member also defines WEAK cos/sin/exp/log (double and x87 long double). When a
+# link needs any builtin of that member (128-bit division...), those copies replace glibc's libm, whose last bits the
+# x87 bit-exact goldens hold: the "no-LTO failures" of multiband_delay_exact and the Kepler tests (round speed185a; the
+# LTO links resolve to glibc). So a zig -fno-lto link on Linux puts GCC's libgcc.a ahead of compiler_rt: the builtins
+# come from libgcc and the math from glibc. LYNX_ZIG_LIBGCC=0 turns it off.
+case "$CXX" in
+    *zig*-fno-lto*)
+        if [[ "$(uname -s)" == Linux && "${LYNX_ZIG_LIBGCC:-1}" != 0 ]]; then
+            libgcc="$(gcc -print-libgcc-file-name 2> /dev/null || true)"
+            if [[ -f "$libgcc" ]]; then WAVPACK="$WAVPACK $libgcc"; else echo "note: no libgcc.a: zig's compiler_rt math replaces glibc's libm (x87 goldens may fail)" >&2; fi
+        fi ;;
+esac
+# g++ / clang++ (not zig, which caches each object itself): every source is compiled once per build, in parallel, and
+# the tests and tools link the objects (scripts/cxx-once.sh; it saves ~90 % of a CI "Core" job). LYNX_COMPILE_ONCE=0: off.
+case "$CXX" in
+    *zig*) ;;
+    *)
+        if [[ "${LYNX_COMPILE_ONCE:-1}" != 0 ]]; then
+            export LYNX_CXX_ONCE_REAL="$CXX" LYNX_CXX_ONCE_RUN="$$-$(date +%s)"
+            mkdir -p build-local/obj
+            rm -f build-local/obj/*/.done-*
+            CXX=scripts/cxx-once.sh
+        fi ;;
+esac
 # The tests: tests/tests.cpp with its .inc files is split at build time into N translation units compiled in parallel
 # (scripts/split-tests.py; same tests, same order, same checks). LYNX_TESTS_SPLIT=0 builds the single TU as before,
 # LYNX_TESTS_SPLIT=<n> sets the number of chunks (default: the CPUs this build may use, 2 to 12).
@@ -225,7 +251,30 @@ if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
     # 2026-11-04: in parallel the tools deadlocked inside zig's shared object cache (every zig process waiting on a
     # manifest lock another one held, 0 % CPU for hours). One at a time by default; LYNX_TOOLS_JOBS=n to try more.
     tools_jobs=${LYNX_TOOLS_JOBS:-1}
-    xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
-    rm -f "$TOOLS_QUEUE"
+    if [[ "${LYNX_TOOLS_WITH_TESTS:-0}" == 1 ]]; then
+        # (round speed185a) the tests don't use the tools: link them (single-threaded LTO links, ~8 min) while the tests run
+        rm -f build-local/tools.rc
+        ( xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE" > build-local/tools.log 2>&1; echo $? > build-local/tools.rc; rm -f "$TOOLS_QUEUE" ) &
+        tools_pid=$!
+    else
+        xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
+        rm -f "$TOOLS_QUEUE"
+    fi
 fi
-./build-local/lynx_tests "$@"
+# LYNX_TEST_JOBS=<n> (or "auto": the CPUs) runs the tests in parallel shards, then the timing-sensitive ones alone
+# (scripts/run-tests.sh: same tests, same checks, the same "N checks, M failures" line). Unset or 1: one process, as before.
+tests_rc=0
+case "${LYNX_TEST_JOBS:-1}" in
+    1) ./build-local/lynx_tests "$@" || tests_rc=$? ;;
+    auto) scripts/run-tests.sh build-local/lynx_tests "$@" || tests_rc=$? ;;
+    *) scripts/run-tests.sh -j "$LYNX_TEST_JOBS" build-local/lynx_tests "$@" || tests_rc=$? ;;
+esac
+if [[ -n "${tools_pid:-}" ]]; then
+    wait "$tools_pid" || true
+    if [[ "$(cat build-local/tools.rc 2> /dev/null)" != 0 ]]; then
+        grep -v 'glibc version' build-local/tools.log >&2 || true
+        echo "build-local: the tools did not build (build-local/tools.log)" >&2
+        exit 1
+    fi
+fi
+exit $tests_rc

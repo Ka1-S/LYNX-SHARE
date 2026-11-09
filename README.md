@@ -415,6 +415,8 @@ cmake --build build
 
 More than a million checks, including parsing the 165 `.flp` projects that ship with FL Studio 2026 when that folder is given. It also builds `build-local/flpdump` (dumps a `.flp`) and `build-local/renderwav`.
 
+`LYNX_TEST_JOBS=auto` (or a number) runs the tests in parallel shards (`scripts/run-tests.sh`); the result line is the same. The test binary takes `--list`, `--filter a,b`, `--exclude a,b`, `--shard i/n` and `--times file`, e.g. `build-local/lynx_tests --filter flp_ --no-times`.
+
 ## Under the hood
 
 ```
