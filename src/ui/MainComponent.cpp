@@ -2,6 +2,7 @@
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
+#include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/PlaylistOps.h"
@@ -746,6 +747,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     if (startStyle.style != layoutstyle::Style::pattern)
         setLayoutStyle (startStyle.style, false); // (the saved workspace layout is already this style's)
+    updateGamepad(); // (round 184a, S16: only when the option is on)
     juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
             safe->startLiveFromCommandLine();
@@ -767,6 +769,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    gamepadInput.reset();
     if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
         detailView->releaseEditor();
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
@@ -6062,6 +6065,10 @@ void MainComponent::openSettings (int page)
         if (safe != nullptr)
             safe->showPluginManager();
     };
+    hooks.midiChanged = [safe] {
+        if (safe != nullptr)
+            safe->updateGamepad();
+    };
     showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::theme, page), std::move (hooks)); // (Theme was clamped to MIDI)
 }
 
@@ -7430,4 +7437,120 @@ void MainComponent::prepareForPerformance()
     keepAboveMainWindow (*window);
 }
 
+} // namespace lynx
+
+// --- the game controller (round 184a, S16) ---------------------------------------------------------------------------
+
+namespace lynx
+{
+void MainComponent::updateGamepad()
+{
+    const auto on = engine.getMidiPrefs().gamepad;
+    if (on == (gamepadInput != nullptr))
+        return;
+    if (! on)
+    {
+        gamepadInput.reset();
+        if (gamepadHints != nullptr)
+            removeChildComponent (gamepadHints.get());
+        gamepadHints.reset();
+        return;
+    }
+    gamepadInput = std::make_unique<GamepadInput> ([safe = juce::Component::SafePointer<MainComponent> (this)] (const gamepad::Changes& c,
+                                                                                                             const gamepad::State& s, double dt) {
+        if (safe != nullptr)
+            safe->gamepadChanges (c, s, dt);
+    });
+    if (! gamepadInput->available())
+        ui::postHint ({ tr ("Game controllers are not supported on this system yet."), {} }, 5000);
+}
+
+int MainComponent::gamepadInsert() const
+{
+    const auto& song = engine.getSong();
+    const auto track = playlist.getCurrentTrack();
+    if (track >= 0 && track < (int) song.playlistTracks.size())
+        if (const auto insert = song.playlistTracks[(std::size_t) track].mixerTrack; insert >= 0 && insert < (int) song.mixer.size())
+            return insert;
+    const auto channel = engine.getSelectedChannel();
+    if (channel >= 0 && channel < (int) song.channels.size())
+        if (const auto insert = song.channels[(std::size_t) channel].mixerTrack; insert >= 0 && insert < (int) song.mixer.size())
+            return insert;
+    return -1;
+}
+
+void MainComponent::gamepadChanges (const gamepad::Changes& c, const gamepad::State& s, double seconds)
+{
+    using namespace gamepad;
+    // every change is also a MIDI controller on channel 16, so Link to controller can learn it
+    for (int i = 0; i < c.controllerCount; ++i)
+        engine.injectMidiInput (juce::MidiMessage::controllerEvent (midiChannel, c.controller[(std::size_t) i], c.value[(std::size_t) i]));
+    if (c.connectedChanged)
+        ui::postHint ({ s.connected ? tr ("Game controller connected") : tr ("Game controller disconnected"), {} }, 3000);
+
+    const auto& map = defaultMap();
+    for (int i = 0; i < c.pressedCount; ++i)
+    {
+        const auto action = map[(std::size_t) c.pressed[(std::size_t) i]];
+        switch (action)
+        {
+            case Action::playStop: runAction ("transport.playStop"); break;
+            case Action::record: runAction ("transport.record"); break;
+            case Action::undo: runAction ("edit.undo"); break;
+            case Action::metronome: runAction ("transport.metronome"); break;
+            case Action::previousPattern: runAction ("pattern.previous"); break;
+            case Action::nextPattern: runAction ("pattern.next"); break;
+            case Action::finish: runAction ("file.export"); break;
+            case Action::previousTrack:
+            case Action::nextTrack:
+            {
+                const auto t = playlist.getCurrentTrack();
+                playlist.selectTrack (t < 0 ? 0 : t + (action == Action::nextTrack ? 1 : -1));
+                const auto& song = engine.getSong();
+                const auto now = playlist.getCurrentTrack();
+                if (now >= 0 && now < (int) song.playlistTracks.size())
+                    if (const auto ch = song.playlistTracks[(std::size_t) now].channel; ch >= 0 && ch < (int) song.channels.size())
+                        engine.setSelectedChannel (ch); // an instrument track: its channel plays the keys
+                break;
+            }
+            case Action::barBack:
+            case Action::barForward:
+            {
+                // to the previous / next bar line (from inside a bar, back goes to its start)
+                const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+                const auto at = engine.getTransport().positionTicks.load() / bar;
+                const auto target = action == Action::barForward ? std::floor (at + 1e-6) + 1.0 : std::ceil (at - 1e-6) - 1.0;
+                engine.seek (juce::jmax (0.0, target) * bar);
+                break;
+            }
+            case Action::hints:
+                if (gamepadHints == nullptr)
+                {
+                    gamepadHints = makeGamepadHints();
+                    addChildComponent (*gamepadHints);
+                }
+                gamepadHints->setCentrePosition (getLocalBounds().getCentre());
+                gamepadHints->setVisible (true);
+                gamepadHints->toFront (false);
+                break;
+            case Action::none:
+                break;
+        }
+    }
+    for (int i = 0; i < c.releasedCount; ++i)
+        if (map[(std::size_t) c.released[(std::size_t) i]] == Action::hints && gamepadHints != nullptr)
+            gamepadHints->setVisible (false);
+
+    // the triggers: the selected track's volume; the left stick's X: its pan (only while pushed)
+    const auto insert = gamepadInsert();
+    if (insert < 0)
+        return;
+    if (const auto db = volumeStepDb (s, seconds); db != 0.0)
+        engine.editLevels ([insert, db] (Song& song) {
+            auto& v = song.mixer[(std::size_t) insert].volume;
+            v = juce::jlimit (0.0f, 1.0f, faderPosition (faderGain (v) * juce::Decibels::decibelsToGain ((float) db)));
+        });
+    if (const auto pan = axis (s, Axis::leftX); pan != 0.0f)
+        engine.editLevels ([insert, pan] (Song& song) { song.mixer[(std::size_t) insert].pan = juce::jlimit (-1.0f, 1.0f, pan); });
+}
 } // namespace lynx

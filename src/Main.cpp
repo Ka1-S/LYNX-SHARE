@@ -49,6 +49,8 @@
 #include "platform/Package.h"
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/GamepadInput.h"
+#include "ui/SettingsPages.h"
 #include "ui/OtherAppsExport.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/MixerBasicsCheck.h"
@@ -1655,6 +1657,14 @@ public:
         {
             const auto i = args.indexOf ("--export-als");
             runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
+        // --gamepadshot <prefix> (round 184a, S16): the game controller's hints overlay and the MIDI settings page with
+        // the option on, offscreen, plus the poller fed fake pad states ("<prefix>-gamepad.txt")
+        if (args.contains ("--gamepadshot"))
+        {
+            runGamepadShot (args[args.indexOf ("--gamepadshot") + 1].unquoted());
             return;
         }
 
@@ -7436,6 +7446,60 @@ private:
         report << (als != juce::File() ? "ok " + als.getFullPathName() : "error=" + error) << "\n" << notes.joinIntoString ("\n") << "\n";
         juce::File (folderPath).getChildFile ("export-als.txt").replaceWithText (report);
         setApplicationReturnValue (als != juce::File() ? 0 : 1);
+        quit();
+    }
+
+    void runGamepadShot (const juce::String& prefix)
+    {
+        juce::String report;
+        int failures = 0;
+        {
+            lynx::AudioEngine engine (false);
+            auto hints = lynx::makeGamepadHints();
+            savePng (hints->createComponentSnapshot (hints->getLocalBounds()), prefix + "-hints.png");
+            auto prefs = engine.getMidiPrefs();
+            prefs.gamepad = true;
+            engine.setMidiPrefs (prefs, false);
+            auto page = lynx::makeMidiPage (engine, {}, false);
+            page->setSize (760, 1400);
+            savePng (page->createComponentSnapshot (page->getLocalBounds()), prefix + "-settings.png");
+
+            // the poller with fake states: what the handler gets
+            using namespace lynx::gamepad;
+            std::vector<std::string> got;
+            lynx::GamepadInput input ([&got] (const Changes& c, const State&, double dt) {
+                for (int i = 0; i < c.pressedCount; ++i)
+                    got.push_back (std::string ("press ") + buttonName (c.pressed[(std::size_t) i]));
+                for (int i = 0; i < c.releasedCount; ++i)
+                    got.push_back (std::string ("release ") + buttonName (c.released[(std::size_t) i]));
+                for (int i = 0; i < c.controllerCount; ++i)
+                    got.push_back ("cc " + std::to_string (c.controller[(std::size_t) i]) + "=" + std::to_string (c.value[(std::size_t) i]));
+                if (c.connectedChanged)
+                    got.push_back ("connected changed");
+                got.push_back ("dt " + std::to_string ((int) std::lround (dt * 1000)));
+            });
+            State pad;
+            pad.connected = true;
+            input.inject (pad, 1.0 / 60.0);
+            pad.buttons = mask (Button::a);
+            pad.rightTrigger = 255;
+            input.inject (pad, 1.0 / 60.0);
+            pad.buttons = 0;
+            input.inject (pad, 1.0 / 60.0);
+            const std::vector<std::string> expected { "connected changed", "dt 17", "press A", "cc 102=127", "cc 21=127", "dt 17",
+                                                      "release A", "cc 102=0", "dt 17" };
+            for (const auto& line : got)
+                report << line << "\n";
+            if (got != expected)
+            {
+                ++failures;
+                report << "FAILED: the poller's changes differ from the expected ones\n";
+            }
+            report << "xinput " << (input.available() ? "loaded" : "not available") << "\n";
+        }
+        report << (failures == 0 ? "gamepad OK" : "gamepad FAILED") << "\n";
+        juce::File (prefix + "-gamepad.txt").replaceWithText (report);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
         quit();
     }
 

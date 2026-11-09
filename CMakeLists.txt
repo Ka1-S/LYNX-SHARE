@@ -84,6 +84,7 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/GamepadMap.cpp
     src/core/ExportBundle.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
@@ -445,6 +446,7 @@ if(LYNX_BUILD_APP)
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
+        src/ui/GamepadInput.cpp
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
