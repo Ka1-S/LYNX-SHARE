@@ -2529,7 +2529,7 @@ countries: de at ch li lu
 "Echo > Rev|Rev > Echo" = "Echo > Hall|Hall > Echo"
 "Reverb mode" = "Hall-Modus"
 "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated" = "Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated"
-"Bright|Neutral|Dark|Vintage" = "Hell|Neutral|Dunkel|Vintage"
+"Bright|Neutral|Dark|Studio" = "Hell|Neutral|Dunkel|Studio"
 "Damping" = "Dämpfung"
 "Bass freq" = "Bass-Freq."
 "Late mix" = "Spät-Mix"
