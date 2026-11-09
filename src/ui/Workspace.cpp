@@ -703,6 +703,8 @@ bool Workspace::toggle (Panel panel)
 {
     const auto visible = layout.toggle (panel);
     applyLayout (true);
+    if (visible)
+        nativeToFront (panel);
     return visible;
 }
 
@@ -710,6 +712,15 @@ void Workspace::show (Panel panel)
 {
     layout.show (panel);
     applyLayout (true);
+    nativeToFront (panel);
+}
+
+void Workspace::nativeToFront (Panel panel)
+{
+    // issue #116: a panel called by its key (F5..F9) or maximised comes in front of the docked plugin windows too, as a
+    // click on it does (applyLayout keeps them where they were among the panels)
+    if (auto& frame = *frames[(std::size_t) panel]; isNativePanel (panel) && nativechild::isAttached (frame) && frame.isVisible())
+        frame.toFront (false);
 }
 
 void Workspace::hide (Panel panel)
@@ -722,6 +733,7 @@ void Workspace::toggleMaximised (Panel panel)
 {
     layout.toggleMaximised (panel);
     applyLayout();
+    nativeToFront (panel);
 }
 
 void Workspace::setDetached (Panel panel, bool detached)
@@ -845,7 +857,9 @@ std::vector<juce::Rectangle<int>> Workspace::otherPanelBounds (Panel panel) cons
 
 bool Workspace::isNativePanel (Panel panel) const
 {
-    return nativechild::dockingEnabled() && panel == Panel::channelRack && ! layout[panel].detached;
+    // every floating panel (the Playlist, Channel rack, Piano roll and Mixer, slice 2); the Browser is a background
+    // panel, always below them and the docked plugin windows, so it stays a plain component (REA_rodada181c)
+    return nativechild::dockingEnabled() && ! isBackgroundPanel (panel) && ! layout[panel].detached;
 }
 
 juce::Component& Workspace::getFrame (Panel panel) const
@@ -932,6 +946,7 @@ void Workspace::applyLayout (bool fadePanels)
         bool in;
     };
     std::vector<Fade> fades;
+    std::array<bool, workspace::panelCount> nativeShown {}; // (native panels that were hidden and show now)
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -987,7 +1002,9 @@ void Workspace::applyLayout (bool fadePanels)
             placeFrame (frame, state.maximised ? getLocalBounds() : toJuce (state.bounds));
             if (nativechild::isAttached (frame))
             {
-                frame.setVisible (state.visible && isVisible()); // (no fade: a child window has no transparency)
+                const auto show = state.visible && isVisible();
+                nativeShown[(std::size_t) i] = show && ! frame.isVisible();
+                frame.setVisible (show); // (no fade: a child window has no transparency)
             }
             // a panel the user opens or closes fades in or out (Settings › General › Animations, round 179a), after
             // the stacking order below is set
@@ -1004,9 +1021,25 @@ void Workspace::applyLayout (bool fadePanels)
         frame.refreshButtons();
     }
 
-    // stacking order (back to front): the background panels first, then the floating ones
+    // stacking order (back to front): the background panels first, then the floating ones. Issue #116: native panels
+    // are only moved when they are out of order, and then just above the panel before them, so a docked plugin window
+    // keeps its place among them (a layout change elsewhere doesn't hide it); a panel that shows now comes in front of
+    // everything (F7, F9: as a click on it, FL brings it in front of the docked plugin windows).
+    juce::Component* nativeBelow = nullptr;
     for (auto panel : layout.stacking())
-        frames[(std::size_t) panel]->toFront (false);
+    {
+        auto& frame = *frames[(std::size_t) panel];
+        if (! nativechild::isAttached (frame))
+        {
+            frame.toFront (false);
+            continue;
+        }
+        if (nativeShown[(std::size_t) panel])
+            frame.toFront (false);
+        else
+            nativechild::keepAbove (frame, nativeBelow);
+        nativeBelow = &frame;
+    }
 
     // The animator's timer runs only during a fade. Closing fades a picture of the panel placed right behind it (so
     // after the stacking above), and the panel itself is hidden at once. Opening: the frame is opaque (it hides what is

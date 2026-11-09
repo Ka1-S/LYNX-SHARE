@@ -29,6 +29,11 @@ juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component& 
 // back at the same place in `area`.
 void refresh (juce::Component& c, juce::Component& area);
 
+// Stacking among the attached siblings without disturbing the others: if `c` is not above `below` it goes just above it
+// (under whatever was right above `below`); `below` == nullptr: nothing. Elsewhere than Windows: `c` comes to the front
+// when it has to move.
+void keepAbove (juce::Component& c, juce::Component* below);
+
 // Keys nothing in an attached component used: they don't travel up to the main window by themselves (it is another
 // native window), so `c` hands them to the main window's shortcuts (the secondary windows' route, ui/WindowOwner.h).
 void forwardUnusedKeys (juce::Component& c);

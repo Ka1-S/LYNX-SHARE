@@ -109,6 +109,7 @@ public:
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
+    Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
