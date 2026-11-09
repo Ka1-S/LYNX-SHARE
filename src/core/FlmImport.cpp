@@ -4,10 +4,12 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <set>
 
 #include "core/DirectWave.h"
+#include "core/FlmEffects.h"
 #include "core/MissingFiles.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
@@ -414,7 +416,8 @@ std::string skippedLaneLabel (const flm::Lane& lane)
 // the user's control points among them, with two points on one tick for a jump (FLM_FORMAT §4, PROVEN-FILE over the
 // 20 sample projects). Straight lines through those points are FLM's own curve to within that step, so the point
 // shapes need no maths of their own.
-void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget target, bool fader, int rowIndex, const std::string& name)
+void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget target, const std::function<float (std::uint16_t)>& valueOf, int rowIndex,
+                         const std::string& name)
 {
     for (const auto& clip : lane.clips)
     {
@@ -427,10 +430,9 @@ void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget targe
                 const auto beat = (double) e.tick / flm::ticksPerBeat;
                 if (beat < pass.from - 1e-9 || beat > pass.from + pass.length + 1e-9)
                     continue;
-                const auto v = (float) e.value / 65535.0f;
                 AutomationPoint pt;
                 pt.tick = ticksOf (pass.at + beat - pass.from);
-                pt.value = fader ? faderPosition (std::min (flmGain (v), maxFaderGain)) : std::clamp (v, 0.0f, 1.0f);
+                pt.value = valueOf (e.value);
                 if (! a.points.empty() && pt.tick < a.points.back().tick)
                     continue;
                 a.points.push_back (pt);
@@ -446,6 +448,70 @@ void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget targe
         c.length = std::max<std::int64_t> (1, ticksOf (clip.timelineLength()));
         ctx.song.playlist.push_back (c);
     }
+}
+void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget target, bool fader, int rowIndex, const std::string& name)
+{
+    addAutomationClips (ctx, lane, target, [fader] (std::uint16_t raw) {
+        const auto v = (float) raw / 65535.0f;
+        return fader ? faderPosition (std::min (flmGain (v), maxFaderGain)) : std::clamp (v, 0.0f, 1.0f);
+    }, rowIndex, name);
+}
+
+// An effect module mapped onto LYNX slots (F5): where its slots are on the insert
+struct MappedModule
+{
+    const flm::Module* module = nullptr;
+    int insert = 0, firstSlot = 0, slotCount = 0;
+};
+
+// The automation lanes of an effect module's parameter (F5): one target per LYNX parameter the FLM parameter moves
+// (an EQ band's knobs, every band of a steep Filter), each through FLM's own law (core/FlmEffects.h). The first target
+// takes the lane's row, the others rows of their own right after it.
+bool addEffectLane (Ctx& ctx, const flm::Lane& lane, const MappedModule& mm, int rowIndex)
+{
+    std::vector<std::uint16_t> raws;
+    for (const auto& clip : lane.clips)
+        for (const auto& e : clip.events)
+            raws.push_back (e.value);
+    std::sort (raws.begin(), raws.end());
+    raws.erase (std::unique (raws.begin(), raws.end()), raws.end());
+    if (raws.empty())
+        return false;
+    std::vector<float> values;
+    values.reserve (raws.size());
+    for (const auto r : raws)
+        values.push_back ((float) r / 65535.0f);
+    const auto targets = flmfx::automate (*mm.module, lane.targetParam, values);
+    std::vector<const flmfx::LaneTarget*> kept;
+    for (const auto& t : targets)
+        if (t.slot < mm.slotCount)
+            kept.push_back (&t);
+    // (a knob that reshapes a whole curve, like Autoduck's Curve, would need a row per point: listed instead)
+    if (kept.empty() || kept.size() > 9)
+        return false;
+    auto& song = ctx.song;
+    const auto baseName = song.playlistTracks[(std::size_t) rowIndex].name;
+    for (std::size_t k = 0; k < kept.size(); ++k)
+    {
+        const auto& t = *kept[k];
+        auto row = rowIndex;
+        if (k > 0)
+        {
+            PlaylistTrack extra;
+            extra.name = baseName + " (" + std::to_string (k + 1) + ")";
+            song.playlistTracks.insert (song.playlistTracks.begin() + rowIndex + (int) k, extra);
+            for (auto& c : song.playlist) // rows after it move down
+                if (c.track >= rowIndex + (int) k)
+                    ++c.track;
+            row = rowIndex + (int) k;
+        }
+        AutomationTarget target { t.kind, mm.insert, mm.firstSlot + t.slot, t.param };
+        addAutomationClips (ctx, lane, target, [&raws, &t] (std::uint16_t raw) {
+            const auto it = std::lower_bound (raws.begin(), raws.end(), raw);
+            return t.values[(std::size_t) (it - raws.begin())];
+        }, row, song.playlistTracks[(std::size_t) row].name);
+    }
+    return true;
 }
 } // namespace
 
@@ -559,7 +625,9 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             insertOfId[ch.channelId] = insert;
         routes.push_back ({ insert, &ch });
 
-        // effects (F5) and generators past the first are not imported yet; analysis-only modules change nothing
+        // effects (F5): the mapped ones on the insert, in the rack's order (core/FlmEffects.h); the others are listed.
+        // Generators past the first are not imported yet; analysis-only modules change nothing.
+        std::map<std::uint32_t, MappedModule> mappedModules; // instance id → its slots
         bool firstGenerator = true;
         for (const auto& m : rack.modules)
         {
@@ -572,7 +640,27 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             }
             if (m.type == flm::module::tuner || m.type == flm::module::analyzer)
                 continue;
-            ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
+            const auto live = std::any_of (ch.lanes.begin(), ch.lanes.end(), [&m] (const flm::Lane& l) {
+                return l.kind() == flm::LaneKind::automation && l.targetModule == (int) m.instanceId && ! l.clips.empty();
+            });
+            auto mapped = flmfx::map (m, live);
+            auto& effects = song.mixer[(std::size_t) insert].effects;
+            if (mapped.slots.empty())
+            {
+                ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
+                continue;
+            }
+            if (effects.size() + mapped.slots.size() > (std::size_t) maxEffectSlots)
+            {
+                ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (the insert's effect slots are full)");
+                continue;
+            }
+            mappedModules[m.instanceId] = { &m, insert, (int) effects.size(), (int) mapped.slots.size() };
+            for (auto& slot : mapped.slots)
+                effects.push_back (std::move (slot));
+            ctx.note (&FlpImportReport::converted, mapped.label);
+            for (const auto& what : mapped.partial)
+                ctx.note (&FlpImportReport::partialEffects, what);
         }
 
         // the rack's held pitch bend on a channel it creates
@@ -639,6 +727,27 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             {
                 if (lane.clips.empty())
                     continue;
+                if (lane.targetModule > 0)
+                {
+                    // an effect module's parameter (F5): its LYNX slots exist now
+                    const auto mm = mappedModules.find ((std::uint32_t) lane.targetModule);
+                    if (mm == mappedModules.end())
+                    {
+                        ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));
+                        continue;
+                    }
+                    PlaylistTrack row;
+                    row.name = lane.name.empty() ? name : name + " " + lane.name;
+                    song.playlistTracks.push_back (row);
+                    if (addEffectLane (ctx, lane, mm->second, (int) song.playlistTracks.size() - 1))
+                        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: effect automation");
+                    else
+                    {
+                        song.playlistTracks.pop_back();
+                        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: automation of an effect switch or layout (not imported)");
+                    }
+                    continue;
+                }
                 if (! importableRackLane (lane))
                 {
                     ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));

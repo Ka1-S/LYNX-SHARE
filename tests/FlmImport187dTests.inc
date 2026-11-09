@@ -4,7 +4,27 @@
 
 namespace flm187d
 {
-using namespace flm182c;
+// the flm182c helpers by name (a using-directive would make Bytes ambiguous with tests.cpp's own)
+namespace flm = lynx::flm;
+using flm182c::Bytes;
+using flm182c::put;
+using flm182c::u8;
+using flm182c::u16;
+using flm182c::u32;
+using flm182c::f32;
+using flm182c::f64;
+using flm182c::tag;
+using flm182c::fixed;
+using flm182c::lp32;
+using flm182c::chunk;
+using flm182c::cat;
+using flm182c::head;
+using flm182c::sample;
+using flm182c::module;
+using flm182c::rack;
+using flm182c::clip;
+using flm182c::lane;
+using flm182c::channel;
 
 // a rack with its own RPRM values (flm182c::rack writes FLM's defaults)
 inline Bytes rackWith (std::uint32_t kind, std::initializer_list<float> rprm, std::initializer_list<Bytes> modules)

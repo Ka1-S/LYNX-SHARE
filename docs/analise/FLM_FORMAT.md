@@ -408,5 +408,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    applies them on load is not traced.)
 3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
-   TransistorBass first).
+   TransistorBass first). Done for Equalizer, Graphic EQ, Filter, Autoduck (legacy), Reverb (legacy) and Reverb 2
+   in round 188f (REA_rodada182c.md "F5 effects"). That round also found that parameter 0 is every module's Enable,
+   and that SMPR holds the reserved ids 0x7FC0 Post Gain, 0x7FC1 Mix and 0x7FC2 Wet Pan (automation lanes: −3, −2).
 5. HEAD 272/280 (loop range).

@@ -110,6 +110,7 @@ struct Module
     std::string presetFile; // PRST: the preset or sample file (absolute, as saved)
     std::string presetName; // PRST: its display / relative name
     std::vector<float> params;    // PRMS
+    std::vector<float> reserved;  // SMPR: Post Gain, Mix, Wet Pan (FLM's parameter ids 0x7FC0…0x7FC2, also −3, −2)
     std::vector<std::uint8_t> custom; // CSTM body (the engine's own state)
 };
 
