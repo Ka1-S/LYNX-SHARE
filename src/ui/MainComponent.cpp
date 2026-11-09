@@ -2102,6 +2102,8 @@ void MainComponent::loadUiSettings()
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
             autoclipplace::setAtPlayback (on);
+        else if (key == "disableTypingPriority")
+            pluginkeys::newPluginsHostFirst() = on;
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
             startInClipLaunchWorkflow = on;
         else if (key == "lanesBeforeClipLaunch")
@@ -2275,6 +2277,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
+                                      + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
@@ -5686,6 +5689,7 @@ void MainComponent::openSettings (int page)
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
         o.autoClipsAtPlayback = autoclipplace::atPlayback();
+        o.disableTypingPriority = pluginkeys::newPluginsHostFirst().load();
         o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
@@ -5767,6 +5771,7 @@ void MainComponent::openSettings (int page)
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
+        pluginkeys::newPluginsHostFirst() = o.disableTypingPriority;
         self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
         AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())

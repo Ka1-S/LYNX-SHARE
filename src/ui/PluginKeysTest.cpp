@@ -149,6 +149,9 @@ bool pluginKeysTestTick (juce::AudioProcessorEditor& editor, const std::function
             step ("keys_shortcut_with_repeat shortcuts=" + juce::String (state.shortcutCalls) + " view_down=" + juce::String (state.down)
                   + " view_up=" + juce::String (state.up) + " expected=2/0/0" + (good ? " OK" : " FAILED"));
             state.down = state.up = state.plainCalls = state.leftCalls = state.shortcutCalls = 0;
+            // (round 187a: the header with the Typing keyboard priority button on, FL's default, for the FL | LYNX review)
+            if (const auto shot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_SHOT", {}); shot.isNotEmpty())
+                PluginWindows::saveSettingsPageShot (*editor.getTopLevelComponent(), juce::File (shot.upToLastOccurrenceOf (".", false, false) + "-plugin-first.png"));
             postPress (state.view, 'Q'); // the option off, FL's default
             return true;
         }

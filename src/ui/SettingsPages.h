@@ -32,6 +32,7 @@ struct GeneralOptions
     bool clipLaunchWorkflow = false; // Settings › General › Workflow (round 181a): false = Pattern workflow, the default
     bool alsSessionOnPlaylist = false; // Settings › General › Workflow (round 181c): a Live set's Session clips → the clip grid (default) or the Playlist
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
+    bool disableTypingPriority = false; // FL's General › "Disable typing keyboard priority by default" (off, round 187a)
     bool autoClipsAtPlayback = true; // FL's General › "Create automation clips at the playback position" (on, round 177b)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
