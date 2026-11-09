@@ -58,11 +58,47 @@ inactive inputs and outputs" box showed off (a38, b23) — not modelled (LYNX ha
 - Tests: `tests/MultiOut188dTests.inc`; `LYNX --multiouttest "LYNX Test Drums.dll" report.txt` (real VST2 through the
   engine, master measured per case).
 
+## Second block (coordinator's follow-up, same round)
+
+### .flp records [DATA: FL 2026 saves mo-a.flp, mo-b.flp, mo-c.flp in /mnt/e/lynx-work/multiout188d/fl/]
+
+Wrapper (event 0xD5, version 12) records, written for every hosted plugin:
+
+| Record | Layout | Seen |
+|---|---|---|
+| `0x1E` | 4 × u32: input count, output count, 0, 0 | Drums 2: `0, 8`; LYNX Test SC (2 in / 2 out pairs): `2, 2` |
+| `0x1F` | per input: `i32 index, u32 active, u32 0` | SC2 after Auto map inputs: `{0,1}, {1,1}` |
+| `0x20` | per output: `i32 offset / index, u32 active, u32 0` | Drums 2 after Auto map, Clap off, Hat at −2: `{0,1} {1,1} {2,0} {−2,1} {4,1} {5,1} {6,1} {7,1}` |
+
+Record 0x02's flags word: `0x7D84` in mo-a (after an LED was turned off: "Process inactive inputs and outputs" off)
+and `0x7D8C` in mo-b (turned back on): **bit 0x8 = "Process inactive inputs and outputs"** (on in FL's default
+0xB4007D8C). LYNX reads and writes all three records and the bit (`core/FlWrapper.cpp`, `core/FlpExport.cpp`).
+
+### "Process inactive inputs and outputs" [EXEC k29–k34]
+
+On (default), an output whose LED is off still plays on its insert (Clap off at offset 2 plays on insert 2 again,
+k33); turning any LED off turns the option off on FL's page (a38/b23/k19, mo-a's flags). LYNX: wrapper option in
+Processing › Options, saved, exported; the engine plays inactive outputs while it is on; an LED click off clears it.
+
+### Effects [EXEC k65, n00–n25; DATA mo-c]
+
+An effect's Processing › Connections has two columns: inputs (wheel, "n. name", LED) and outputs (LED, "n. name",
+wheel); header: inputs glyph, **Auto map inputs**, Reset, **Auto map outputs**, outputs glyph, refresh. Hints:
+"Sidechain index for input 1", "Deactivate input 1", "Assign all inputs incrementally", "Sidechain index for output 1".
+With insert 2 sidechained to insert 1 (LYNX Test SC2 on insert 1, whose "Side" output is its side input): input 2 at
+"---" → insert 1 silent (n13); input 2 at 1 → insert 2's audio on insert 1 (n19); input 1 at 1 → the main input is
+insert 2's audio (n06). So index k picks entry k of [the insert itself, the inserts routed to it in ascending order]
+(REA_rodada22 §1's list, which the Fruity effects' sidechain indexes use).
+
+LYNX: the effect's page shows both columns; input 2's index sets the slot's side input source (and LYNX's SC picker
+shows as the matching index); Auto map inputs, Reset as FL; imported projects take the side input from the index.
+
 ## Not done (open)
 
-- Effects' Connections (inputs as sidechain indexes, "Auto map inputs"): LYNX's sidechain picker covers side inputs.
-- Importing / exporting the mapping in .flp (the wrapper data).
-- "Process inactive inputs and outputs".
+- An effect's input 1 with an index other than 0 (main input replaced by another insert) and an effect's output
+  indexes: stored and round-tripped in .flp, not played (LYNX plays an effect's main output on its insert).
+- A side input chosen with LYNX's SC picker is not written back as FL's index on .flp export unless set in
+  Connections.
 
 ## Best way?
 
