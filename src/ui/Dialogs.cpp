@@ -778,7 +778,7 @@ public:
         : juce::AlertWindow (m.title, {}, juce::MessageBoxIconType::QuestionIcon), text (m.text)
     {
         addCustomComponent (&text);
-        if (m.buttons.size() > 2) // FL stacks three or more choices, one under the other ("Playlist tracks")
+        if (m.buttons.size() > 2) // FL stacks three or more choices, one under the other ("Playlist tracks"); Escape = 0
         {
             for (int i = 0; i < m.buttons.size(); ++i)
             {
@@ -791,7 +791,6 @@ public:
                 b->setTopLeftPosition ((row->getWidth() - b->getWidth()) / 2, 2);
                 addCustomComponent (row);
             }
-            addKeyListener (&escape);
         }
         if (m.rememberBox)
         {
@@ -809,16 +808,6 @@ public:
     bool remembered() const { return remember.getToggleState(); }
 
 private:
-    struct Escape final : juce::KeyListener
-    {
-        bool keyPressed (const juce::KeyPress& key, juce::Component* c) override
-        {
-            if (key != juce::KeyPress::escapeKey)
-                return false;
-            c->exitModalState (0);
-            return true;
-        }
-    } escape;
     FlMessageText text;
     juce::OwnedArray<juce::TextButton> stacked;
     juce::OwnedArray<juce::Component> rows;
