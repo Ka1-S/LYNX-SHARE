@@ -54,10 +54,6 @@ struct Report
     std::vector<std::string> notes;       // approximations worth knowing (e.g. a setting FL does not have)
 };
 
-// The channel volume at which a Playlist audio clip plays its file at unity, in FL and in LYNX: FL's default, 10000 of
-// 12800. A rendered channel or insert is written with it (round 182b).
-inline constexpr float audioClipUnityVolume = 10000.0f / 12800.0f;
-
 // --- option A: what has to be rendered before the conversion ---
 struct RenderPlan
 {
