@@ -8039,3 +8039,7 @@ countries: jp
 "Hints and warnings" = "ヒントと警告"
 "Manage messages" = "メッセージの管理"
 "Delete the selected mixer tracks" = "選択したミキサートラックを削除"
+"Reconnect to" = "再接続先"
+"Send to {0} (deleted)" = "{0} へのセンド（削除済み）"
+"Disconnected links" = "切断されたリンク"
+"Keep links to deleted inserts, greyed (LYNX)" = "削除したインサートへのリンクをグレーで残す（LYNX）"

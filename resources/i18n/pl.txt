@@ -8039,3 +8039,7 @@ countries: pl
 "Hints and warnings" = "Wskazówki i ostrzeżenia"
 "Manage messages" = "Zarządzaj komunikatami"
 "Delete the selected mixer tracks" = "Usuń zaznaczone ścieżki miksera"
+"Reconnect to" = "Połącz ponownie z"
+"Send to {0} (deleted)" = "Wysyłka do {0} (usunięty)"
+"Disconnected links" = "Rozłączone połączenia"
+"Keep links to deleted inserts, greyed (LYNX)" = "Zachowaj połączenia z usuniętymi insertami, wyszarzone (LYNX)"

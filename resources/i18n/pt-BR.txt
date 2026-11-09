@@ -8122,3 +8122,7 @@ countries: br
 "Hints and warnings" = "Dicas e avisos"
 "Manage messages" = "Gerenciar mensagens"
 "Delete the selected mixer tracks" = "Excluir as faixas do Mixer selecionadas"
+"Reconnect to" = "Reconectar a"
+"Send to {0} (deleted)" = "Envio para {0} (excluído)"
+"Disconnected links" = "Ligações desconectadas"
+"Keep links to deleted inserts, greyed (LYNX)" = "Manter ligações para inserts excluídos, em cinza (LYNX)"

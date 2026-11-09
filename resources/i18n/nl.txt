@@ -8039,3 +8039,7 @@ countries: nl be
 "Hints and warnings" = "Tips en waarschuwingen"
 "Manage messages" = "Berichten beheren"
 "Delete the selected mixer tracks" = "Geselecteerde mixersporen verwijderen"
+"Reconnect to" = "Opnieuw verbinden met"
+"Send to {0} (deleted)" = "Send naar {0} (verwijderd)"
+"Disconnected links" = "Verbroken koppelingen"
+"Keep links to deleted inserts, greyed (LYNX)" = "Koppelingen naar verwijderde inserts grijs bewaren (LYNX)"

@@ -2008,6 +2008,13 @@ juce::var mixerTrackToVar (const MixerTrack& t)
 
         o->setProperty ("sends", sends);
     }
+    if (! t.lostSends.empty()) // round 186c: [name, level] of each send to a deleted insert
+    {
+        juce::Array<juce::var> lost;
+        for (const auto& l : t.lostSends)
+            lost.add (juce::Array<juce::var> { juce::String::fromUTF8 (l.to.c_str()), juce::roundToInt (l.level * 10000.0f) / 10000.0 });
+        o->setProperty ("lostSends", lost);
+    }
 
     juce::Array<juce::var> effects;
 
@@ -2078,6 +2085,10 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         for (const auto& send : *sends)
             if (send.isArray() && send.size() == 2)
                 track.sends.push_back ({ (int) send[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) send[1]) });
+    if (auto* lost = t["lostSends"].getArray())
+        for (const auto& l : *lost)
+            if (l.isArray() && l.size() == 2)
+                track.lostSends.push_back ({ l[0].toString().toStdString(), juce::jlimit (0.0f, maxFaderGain, (float) (double) l[1]) });
 
     if (auto* effects = t["effects"].getArray())
         for (const auto& e : *effects)
@@ -3357,6 +3368,7 @@ juce::String mixerTrackStateToJson (const MixerTrack& track)
     // the track's own settings and effects; routing, audio input, mute and solo belong to the project
     auto state = track;
     state.sends.clear();
+    state.lostSends.clear();
     state.toMaster = true;
     state.masterLevel = 1.0f;
     state.inputChannel = -1;

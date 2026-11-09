@@ -8039,3 +8039,7 @@ countries: ru by kz
 "Hints and warnings" = "Подсказки и предупреждения"
 "Manage messages" = "Управление сообщениями"
 "Delete the selected mixer tracks" = "Удалить выбранные дорожки микшера"
+"Reconnect to" = "Переподключить к"
+"Send to {0} (deleted)" = "Посыл на {0} (удалён)"
+"Disconnected links" = "Разорванные связи"
+"Keep links to deleted inserts, greyed (LYNX)" = "Сохранять связи с удалёнными инсертами серыми (LYNX)"

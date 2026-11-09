@@ -1677,6 +1677,22 @@ void MixerStrips::paintRouting (juce::Graphics& g)
         if (send.target > 0 && send.target < tracks)
             wire (selected, send.target, colour::accent.withAlpha (0.5f + 0.5f * juce::jlimit (0.0f, 1.0f, send.level)), 1.8f);
 
+    // sends to deleted inserts (round 186c's option): greyed, dashed, ending in a cross past the strip's right edge
+    for (int i = 0; i < (int) from.lostSends.size(); ++i)
+    {
+        const auto x0 = centre (selected);
+        const auto x1 = (float) (stripX (selected) + stripWidthOf (selected)) + 6.0f + 9.0f * (float) i;
+        juce::Path p, dashed;
+        p.startNewSubPath (x0, top);
+        p.cubicTo (x0, bottom, x1, bottom, x1, top + 4.0f);
+        const float dashes[] = { 3.0f, 3.0f };
+        juce::PathStrokeType (1.2f).createDashedStroke (dashed, p, dashes, 2);
+        g.setColour (colour::textDisabled);
+        g.fillPath (dashed);
+        g.drawLine (x1 - 2.5f, top + 1.5f, x1 + 2.5f, top + 6.5f, 1.2f);
+        g.drawLine (x1 - 2.5f, top + 6.5f, x1 + 2.5f, top + 1.5f, 1.2f);
+    }
+
     g.setColour (colour::accent);
     g.fillEllipse (centre (selected) - 3.0f, top - 3.0f, 6.0f, 6.0f);
 }
@@ -2248,7 +2264,7 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
     auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
         if (safe == nullptr)
             return;
-        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked); });
+        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
         const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
         safe->setSelection ({ first }, first);
     };
@@ -3322,6 +3338,28 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addSubMenu (tr ("VCA"), vcaMenu);
     }
 
+    // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
+    if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
+    {
+        juce::PopupMenu lost;
+        const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
+        for (int i = 0; i < (int) lostSends.size(); ++i)
+        {
+            juce::PopupMenu one;
+            juce::PopupMenu to;
+            for (int x = 1; x < (int) song.mixer.size(); ++x)
+                if (x != t)
+                    to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
+                                false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
+            one.addSubMenu (tr ("Reconnect to"), to);
+            one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
+            lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
+        }
+        lost.addSeparator();
+        lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
+        menu.addSubMenu (tr ("Disconnected links"), lost);
+    }
+
     // --- FL's "Layout" section --------------------------------------------------------------------------
     {
         menu.addSectionHeader (tr ("Layout"));
@@ -4356,6 +4394,11 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
         ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+    });
+    // LYNX's option (round 186c, pain point 1; off = FL, which drops them): a deleted insert's incoming sends stay greyed
+    menu.addItem (tr ("Keep links to deleted inserts, greyed (LYNX)"), true, MixerStrips::keepLostLinks, [] {
+        MixerStrips::keepLostLinks = ! MixerStrips::keepLostLinks;
+        notifyChanged();
     });
 
     if (! newProjects)

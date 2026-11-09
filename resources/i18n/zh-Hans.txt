@@ -8039,3 +8039,7 @@ countries: cn sg
 "Hints and warnings" = "提示和警告"
 "Manage messages" = "管理消息"
 "Delete the selected mixer tracks" = "删除选中的混音器轨道"
+"Reconnect to" = "重新连接到"
+"Send to {0} (deleted)" = "发送到 {0}（已删除）"
+"Disconnected links" = "断开的链接"
+"Keep links to deleted inserts, greyed (LYNX)" = "保留指向已删除插入轨的链接（灰色，LYNX）"
