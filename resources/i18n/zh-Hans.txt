@@ -7986,6 +7986,42 @@ countries: cn sg
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "简易工作流程"
 "Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "简易工作流程：音轨和时间线在同一个窗口中；其他窗口一键即可打开。"
+
+# --- Simple workflow: New track chooser (round 184a)
+"@instrument: Bass" = "贝斯"
+"Add a track: voice, instrument, drums, sampler, guitar or bass, or import files" = "添加音轨：人声、乐器、鼓、采样器、吉他或贝斯，或导入文件"
+"Add drums" = "添加鼓"
+"Add track" = "添加音轨"
+"Back" = "返回"
+"Bring in audio or MIDI files: one track each." = "导入音频或 MIDI 文件：每个文件一条音轨。"
+"Browse loops and drag them onto the timeline." = "浏览循环素材并拖到时间线上。"
+"Each track gets its own channel and mixer track." = "每条音轨都有自己的通道和混音器轨道。"
+"Empty grid" = "空网格"
+"Guitar / bass" = "吉他 / 贝斯"
+"Import audio or MIDI" = "导入音频或 MIDI"
+"Loops" = "循环素材"
+"Make a beat on a step grid, or start from a starter beat." = "在步进网格上做节拍，或从起始节拍开始。"
+"New track" = "新音轨"
+"No free Playlist track is left." = "播放列表中已没有空闲轨道。"
+"Play a sound with the computer keys, the mouse or a MIDI keyboard." = "用电脑键盘、鼠标或 MIDI 键盘演奏声音。"
+"Plug in a guitar or a bass and play it through the track's effects." = "接上吉他或贝斯，通过音轨的效果器演奏。"
+"Record your voice or any sound from a microphone." = "用麦克风录制人声或任何声音。"
+"Starter beat" = "起始节拍"
+"This sound can't be played as an instrument." = "此声音无法作为乐器演奏。"
+"Turn any sound into an instrument you play on keys." = "把任何声音变成可用琴键演奏的乐器。"
+"Use the suggested tempo" = "使用建议的速度"
+"Voice / audio" = "人声 / 音频"
+"{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "将循环素材、音频或 MIDI 文件拖放到这里"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "音轨：[LMB] 将其混音器轨道静音 / 取消静音"
+"Track: [LMB] solo its mixer track" = "音轨：[LMB] 独奏其混音器轨道"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "音轨音量：[LMB] 点击或拖动  [Shift] 微调  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "音轨声像：[LMB] 上下拖动  [Shift] 微调  [2xLMB] 居中"
+"Track effects: [LMB] open the effects of its mixer track" = "音轨效果：[LMB] 打开其混音器轨道的效果"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "为此插入通道添加效果（或从浏览器拖入）"
 "Channel on / off (its mute)" = "通道开 / 关（静音）"

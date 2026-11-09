@@ -500,6 +500,7 @@ if(LYNX_BUILD_APP)
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
+        src/ui/SimpleWorkflow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

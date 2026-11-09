@@ -7986,6 +7986,42 @@ countries: de at ch li lu
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "Einfacher Arbeitsablauf"
 "Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Einfacher Arbeitsablauf: ein Fenster mit den Spuren und der Zeitleiste; die anderen Fenster sind einen Klick entfernt."
+
+# --- Simple workflow: New track chooser (round 184a)
+"@instrument: Bass" = "Bass"
+"Add a track: voice, instrument, drums, sampler, guitar or bass, or import files" = "Eine Spur hinzufügen: Stimme, Instrument, Drums, Sampler, Gitarre oder Bass, oder Dateien importieren"
+"Add drums" = "Drums hinzufügen"
+"Add track" = "Spur hinzufügen"
+"Back" = "Zurück"
+"Bring in audio or MIDI files: one track each." = "Audio- oder MIDI-Dateien hereinholen: je eine Spur."
+"Browse loops and drag them onto the timeline." = "Loops durchsuchen und auf die Zeitleiste ziehen."
+"Each track gets its own channel and mixer track." = "Jede Spur bekommt einen eigenen Kanal und eine eigene Mixer-Spur."
+"Empty grid" = "Leeres Raster"
+"Guitar / bass" = "Gitarre / Bass"
+"Import audio or MIDI" = "Audio oder MIDI importieren"
+"Loops" = "Loops"
+"Make a beat on a step grid, or start from a starter beat." = "Einen Beat im Step-Raster bauen oder mit einem Start-Beat beginnen."
+"New track" = "Neue Spur"
+"No free Playlist track is left." = "Es ist keine freie Playlist-Spur mehr übrig."
+"Play a sound with the computer keys, the mouse or a MIDI keyboard." = "Einen Klang mit der Computertastatur, der Maus oder einem MIDI-Keyboard spielen."
+"Plug in a guitar or a bass and play it through the track's effects." = "Eine Gitarre oder einen Bass anschließen und über die Effekte der Spur spielen."
+"Record your voice or any sound from a microphone." = "Deine Stimme oder jeden Klang über ein Mikrofon aufnehmen."
+"Starter beat" = "Start-Beat"
+"This sound can't be played as an instrument." = "Dieser Klang kann nicht als Instrument gespielt werden."
+"Turn any sound into an instrument you play on keys." = "Jeden Klang in ein Instrument verwandeln, das du auf Tasten spielst."
+"Use the suggested tempo" = "Vorgeschlagenes Tempo verwenden"
+"Voice / audio" = "Stimme / Audio"
+"{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Loop, Audio- oder MIDI-Datei hier ablegen"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Spur: [LMB] ihre Mixer-Spur stumm / laut schalten"
+"Track: [LMB] solo its mixer track" = "Spur: [LMB] ihre Mixer-Spur solo schalten"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Spurlautstärke: [LMB] klicken oder ziehen  [Shift] fein  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Spur-Panorama: [LMB] nach oben / unten ziehen  [Shift] fein  [2xLMB] Mitte"
+"Track effects: [LMB] open the effects of its mixer track" = "Spureffekte: [LMB] die Effekte ihrer Mixer-Spur öffnen"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Diesem Insert einen Effekt hinzufügen (oder einen aus dem Browser hierher ziehen)"
 "Channel on / off (its mute)" = "Kanal ein / aus (seine Stummschaltung)"

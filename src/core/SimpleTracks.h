@@ -51,8 +51,17 @@ struct Request
     std::optional<ChannelDef> channel;
     // Drums: the kit's channels (each with its sound), in row order, and the starter beat whose notes' `channel` is the
     // index into `kit` (nullopt: an empty one-bar pattern). Its name becomes the track's.
+    // Instrument / Sampler (slice S3: an imported MIDI track): notes for the channel (their `channel` is ignored),
+    // placed at the song's start as a pattern named after the track; nullopt: nothing placed.
     std::vector<ChannelDef> kit;
     std::optional<Pattern> pattern;
+    double bpm = 0.0; // Drums: > 0 sets the project's tempo too (a starter beat's suggested tempo), in the same edit
+    // Audio (slice S3: an imported file or a dropped loop): the file, played from the song's start by an audio clip
+    // channel routed to the track's insert, `audioLength` ticks long (> 0). Empty: no clip.
+    std::string audioFile;
+    std::int64_t audioLength = 0;
+    // Audio and Instrument with notes (slice S4: a file dropped on the timeline): where the clip starts, in ticks (>= 0)
+    std::int64_t start = 0;
     // Voice, Guitar, Bass: the insert's audio input (the device's input channel, 0-based; -1 none) and whether the
     // next channel is taken too. Audio (imports) has no input.
     int input = 0;
@@ -73,8 +82,8 @@ struct Result
     Error error = Error::none;
     int track = -1;            // the Playlist track
     int insert = -1;           // its mixer insert
-    std::vector<int> channels; // the channels made (Instrument/Sampler: one; Drums: the kit, in row order)
-    int pattern = -1;          // Drums: the pattern placed at the song's start
+    std::vector<int> channels; // the channels made (Instrument/Sampler: one; Drums: the kit, in row order; Audio: the clip's)
+    int pattern = -1;          // Drums, or an Instrument with notes: the pattern placed at the song's start
     int group = -1;            // Drums: the Channel Rack group (index into Song::channelGroups)
 
     bool ok() const noexcept { return error == Error::none; }
@@ -92,6 +101,14 @@ std::string rename (Song& song, int track, const std::string& name);
 // that is none of these (an FL track without a mode, or a mode whose insert or channel is gone).
 std::optional<Kind> kindOf (const Song& song, int track);
 
+// Gives a Simple track, its insert and its channel (Drums: its kit) the colour `colour` (0xFFRRGGBB; 0 = the default).
+void recolour (Song& song, int track, std::uint32_t colour);
+
 // The insert a Simple track plays through, or -1 (the same rule as kindOf).
 int insertOf (const Song& song, int track);
+
+// Whether a project has nothing in it yet (the Simple workflow then opens on the New track chooser, slice S3): no clip
+// in any clip list, no note in any pattern, no Playlist track with a mode or a name. Channels without notes (a
+// template's empty drum rows) and inserts don't count.
+bool isEmptySong (const Song& song);
 } // namespace lynx::simpletracks
