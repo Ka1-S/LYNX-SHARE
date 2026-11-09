@@ -103,7 +103,27 @@ public:
 
     static constexpr int titleHeight = 32; // round 170e3: room for 20 px tool icons in the editors (was 28)
 
+    // Issue #116 (FL's docked plugin windows, developer switch ui/NativeChild.h): a panel that is a native child window
+    // of the main window, so it can come in front of a docked plugin window. Slice 1: the Channel rack only.
+    bool isNativePanel (Panel panel) const;
+    juce::Component& getFrame (Panel panel) const; // (tests: the panel's frame)
+    // A floating panel's frame is placed in the desktop's coordinates whether it is a native child or a child component.
+    void placeFrame (juce::Component& frame, juce::Rectangle<int> bounds);
+    juce::Rectangle<int> frameBounds (const juce::Component& frame) const;
+
+    // Docked plugin windows (issue #116): frames that float in the desktop as native child windows, above the background
+    // panels; a click on a native panel brings that panel in front of them. Not owned; the frame calls removeDockedFrame
+    // before it goes.
+    void addDockedFrame (juce::Component& frame);
+    void removeDockedFrame (juce::Component& frame);
+    // A place for a new docked frame of that size: cascading from the top-left of the desktop's free area.
+    juce::Rectangle<int> placeForDockedFrame (int width, int height) const;
+
 private:
+    struct PeerWatch;
+    std::unique_ptr<PeerWatch> peerWatch;
+    std::vector<juce::Component::SafePointer<juce::Component>> dockedFrames;
+    void rehostNativeFrames(); // the main window's native window was (re)created or the desktop moved in it
     void applyLayout (bool fadePanels = false); // fadePanels: a panel the user opened or closed fades (round 179a)
     void setFocusedPanel (Panel panel);
 
