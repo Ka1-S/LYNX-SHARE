@@ -86,8 +86,8 @@ An effect's Processing › Connections has two columns: inputs (wheel, "n. name"
 wheel); header: inputs glyph, **Auto map inputs**, Reset, **Auto map outputs**, outputs glyph, refresh. Hints:
 "Sidechain index for input 1", "Deactivate input 1", "Assign all inputs incrementally", "Sidechain index for output 1".
 With insert 2 sidechained to insert 1 (LYNX Test SC2 on insert 1, whose "Side" output is its side input): input 2 at
-"---" → insert 1 silent (n13); input 2 at 1 → insert 2's audio on insert 1 (n19); input 1 at 1 → the main input is
-insert 2's audio (n06). So index k picks entry k of [the insert itself, the inserts routed to it in ascending order]
+"---" → insert 1 silent (n13); input 2 at 1 → insert 2's audio on insert 1 (n19); inputs 1 and 2 both at 1 → louder (n06; input 1's own
+effect was not isolated). So index k picks entry k of [the insert itself, the inserts routed to it in ascending order]
 (REA_rodada22 §1's list, which the Fruity effects' sidechain indexes use).
 
 LYNX: the effect's page shows both columns; input 2's index sets the slot's side input source (and LYNX's SC picker
