@@ -95,10 +95,8 @@ shows as the matching index); Auto map inputs, Reset as FL; imported projects ta
 
 ## Not done (open)
 
-- An effect's input 1 with an index other than 0 (main input replaced by another insert) and an effect's output
-  indexes: stored and round-tripped in .flp, not played (LYNX plays an effect's main output on its insert).
-- A side input chosen with LYNX's SC picker is not written back as FL's index on .flp export unless set in
-  Connections.
+- (Done in round 189j, `docs/analise/REA_rodada189j.md`: an effect's input 1 index, its output indexes and the .flp
+  export of a picked side input.)
 
 ## Best way?
 
