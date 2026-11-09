@@ -1,0 +1,18 @@
+# Tests that check wall-clock time (a budget, a deadline, "answers within N ms"): scripts/run-tests.sh runs them alone,
+# after the parallel shards, so a busy machine does not fail them. One name (or name prefix) per line; every test still
+# runs exactly once. lynx_tests itself ignores this file.
+browser162_closing_mid_walk_is_quick
+browser162_search_is_served_before_a_background_pass
+browser162_typing_fast_during_a_slow_first_index
+crash13_serial_jobs_post_returns_while_a_write_waits
+crash169g_message_thread_owned_cancel
+hw164_cost_per_block
+issue12c_display_refresh_is_cheap
+latency165_bench_bypass_cost
+perf167_stopped_vfx_script_costs_the_audio_thread_nothing
+q160_audio_thread_allocations_and_cost_of_builtin_units
+render155_warm_up_
+s166d_idle_inserts_cost_almost_nothing
+s166d_insert_multiple_shifts_every_reference_at_once
+vfx_script_errors_are_reported_and_never_hang
+vfx_sequencer_cost_per_block

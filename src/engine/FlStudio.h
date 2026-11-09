@@ -11,6 +11,8 @@ struct FlStudioInstall
 {
     juce::File installDir;        // e.g. C:\Program Files\Image-Line\FL Studio 2026   (%FLStudioFactoryData%)
     juce::File userData;          // e.g. Documents\Image-Line\FL Studio                (%FLStudioUserData%)
+    juce::File sharedData;        // e.g. Documents\Image-Line (FL's "Shared data")     (%ILSharedData%; Downloads in it =
+                                  // %FLStudioDownloadsData%)
     juce::StringArray vstFolders; // plugin folders FL is configured with (existing ones)
 
     bool found() const { return installDir.isDirectory() || userData.isDirectory(); }
