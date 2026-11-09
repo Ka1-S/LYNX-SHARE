@@ -55,11 +55,11 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel:
-        case EffectKind::maximus: case EffectKind::peakController:
+        case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
-        case EffectKind::lofi: case EffectKind::squeeze:
+        case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
         case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:

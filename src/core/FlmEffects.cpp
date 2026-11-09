@@ -6,6 +6,7 @@
 
 #include "core/Effects.h"
 #include "core/ParametricEqFl.h"
+#include "core/PocketFx.h"
 #include "core/Reeverb2.h"
 
 // The laws below are FLM's, read in round 188f (REA_rodada182c.md "F5, round 188f"); the addresses are in that text.
@@ -346,6 +347,18 @@ void reverb2 (const flm::Module& m, bool live, Mapped& out)
     if (v (10, 0.0f) >= 0.5f) // SIDE INPUT: FLM feeds the plate L − R, as FL's Mid/Side option
         out.slots.front().params[16] = 1.0f;
 }
+// FL Studio Mobile's own effects that LYNX runs exactly as Pocket engines (core/PocketFx.h, round 188h): the slot's
+// parameter k is the module's parameter k + 1 (its Enable is the slot's on switch), copied as it is; a value the file
+// doesn't hold keeps the engine's default (FLM's)
+void pocket (const flm::Module& m, EffectKind kind, const char* label, Mapped& out)
+{
+    out.label = label;
+    auto slot = makeEffectSlot (kind);
+    const auto& info = effectInfo (kind);
+    for (std::size_t k = 0; k < info.params.size(); ++k)
+        slot.params[k] = std::clamp (param (m, (int) k + 1, slot.params[k]), 0.0f, 1.0f);
+    out.slots.push_back (slot);
+}
 } // namespace
 
 double equalizerHz (float v) noexcept { return std::pow (2.0, 9.25 * (double) v + 5.0); }
@@ -368,6 +381,8 @@ Mapped map (const flm::Module& m, bool live)
         case 10: autoduck (m, out); break;
         case 12: reverbLegacy (m, live, out); break;
         case 35: reverb2 (m, live, out); break;
+        case 5: pocket (m, EffectKind::pocketLimiterClassic, "FL Studio Mobile: Limiter (legacy)", out); break;
+        case 6: pocket (m, EffectKind::pocketDistortion, "FL Studio Mobile: Distortion", out); break;
         default: return out;
     }
     // Enable ([0] below 0.5 = the module is bypassed) and the module's Mix (INFERRED: dry/wet like a LYNX slot's)

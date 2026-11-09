@@ -17,6 +17,7 @@
 #include "core/EmphasisFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
+#include "core/PocketFx.h"
 #include "core/FreqShifterFl.h"
 #include "core/LowLifterFl.h"
 #include "core/Vocodex.h"
@@ -2986,6 +2987,19 @@ const EffectInfo& effectInfo (EffectKind kind)
         case EffectKind::kilnChannel: return mixsuite::kilnInfo();
         case EffectKind::fretChannel: return mixsuite::fretInfo();
         case EffectKind::shellChannel: return mixsuite::shellInfo();
+        case EffectKind::pocketDistortion:
+        {
+            // FL Studio Mobile's own values and defaults (round 188h)
+            static const EffectInfo info { "Pocket Distortion", { { "Drive", 0.25f }, { "BitCrush", 0.0f }, { "Gain", 1.0f },
+                                                                  { "Stereo", 0.5f }, { "Kind", 0.0f }, { "Bias", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketLimiterClassic:
+        {
+            static const EffectInfo info { "Pocket Limiter Classic", { { "Threshold", 1.0f }, { "Release", 0.7f },
+                                                                       { "Output gain", 2.0f / 3.0f } } };
+            return info;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3770,6 +3784,10 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return fllegacy::eq7ParamText (param, v);
         case EffectKind::flDelay1:
             return fllegacy::delay1ParamText (param, v);
+        case EffectKind::pocketDistortion:
+            return pocket::distortionParamText (param, v);
+        case EffectKind::pocketLimiterClassic:
+            return pocket::limiterClassicParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4106,6 +4124,8 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::flBassBoost: return fllegacy::makeBassBoost();
         case EffectKind::fl7BandEq: return fllegacy::makeEq7();
         case EffectKind::flDelay1: return fllegacy::makeDelay1();
+        case EffectKind::pocketDistortion: return pocket::makeDistortion(); // round 188h (FL Studio Mobile)
+        case EffectKind::pocketLimiterClassic: return pocket::makeLimiterClassic();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:
