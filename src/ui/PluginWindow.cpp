@@ -962,6 +962,7 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
     auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
     if (wrapped == nullptr)
         return false;
+    wrapped->refreshKeyboardPriority(); // (the window's timer may not have run since the change)
     wrapped->showPage (true);
     const auto image = wrapped->createComponentSnapshot (wrapped->getLocalBounds(), true, 1.0f);
     wrapped->showPage (false);
