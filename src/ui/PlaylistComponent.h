@@ -621,6 +621,21 @@ public:
         resized();
     }
 
+    // A component over everything under the toolbar band (round 184a: the Simple workflow's New track chooser); not
+    // owned, nullptr = none.
+    void setOverlay (juce::Component* c)
+    {
+        if (overlay != nullptr && overlay != c)
+            removeChildComponent (overlay);
+        overlay = c;
+        if (overlay != nullptr)
+        {
+            addAndMakeVisible (*overlay);
+            overlay->toFront (false);
+        }
+        resized();
+    }
+
     // The Detail View (Clip-launch workflow, round 183a): not owned, nullptr in Pattern workflow. Docked at the bottom,
     // under the grid and the Playlist; `heightFor` gives its height out of the panel's.
     void setDetailView (juce::Component* detail, std::function<int (int)> heightFor)
@@ -635,6 +650,13 @@ public:
     }
 
     void resized() override
+    {
+        layoutChildren();
+        if (overlay != nullptr)
+            overlay->setBounds (getLocalBounds().withTrimmedTop (PlaylistComponent::toolbarHeight));
+    }
+
+    void layoutChildren()
     {
         auto area = getLocalBounds();
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
@@ -680,6 +702,7 @@ private:
     int titleLeft = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
+    juce::Component* overlay = nullptr;
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;
 };

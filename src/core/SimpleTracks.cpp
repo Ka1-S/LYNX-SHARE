@@ -66,7 +66,53 @@ Result addAudio (Song& song, int track, const Request& request)
     }
     r.track = track;
     r.insert = insert;
+    if (request.kind == Kind::audio && ! request.audioFile.empty() && request.audioLength > 0)
+    {
+        // the file on the track from the song's start, its channel playing through the track's insert
+        ChannelDef c;
+        const auto slash = request.audioFile.find_last_of ("/\\");
+        auto stem = request.audioFile.substr (slash == std::string::npos ? 0 : slash + 1);
+        if (const auto dot = stem.find_last_of ('.'); dot != std::string::npos && dot > 0)
+            stem.resize (dot);
+        c.name = stem;
+        c.instrument = InstrumentKind::audioClip;
+        c.samplePath = request.audioFile;
+        c.mixerTrack = insert;
+        song.channels.push_back (std::move (c));
+        r.channels = { (int) song.channels.size() - 1 };
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = r.channels[0];
+        clip.track = track;
+        clip.start = 0;
+        clip.length = request.audioLength;
+        song.playlist.push_back (clip);
+        song.mode = PlayMode::song;
+    }
     return r;
+}
+
+// The notes of `request.pattern` on `channel`, placed at the song's start on `track` (an Instrument made from a MIDI track)
+void placeInstrumentNotes (Song& song, int track, int channel, const std::string& name, std::uint32_t colour, Result& r, const Request& request)
+{
+    if (! request.pattern)
+        return;
+    auto pattern = *request.pattern;
+    pattern.name = name;
+    pattern.colour = colour;
+    for (auto& n : pattern.notes)
+        n.channel = channel;
+    pattern.sortNotes();
+    song.patterns.push_back (std::move (pattern));
+    r.pattern = (int) song.patterns.size() - 1;
+    Clip clip;
+    clip.kind = ClipKind::pattern;
+    clip.pattern = r.pattern;
+    clip.track = track;
+    clip.start = 0;
+    clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
+    song.playlist.push_back (clip);
+    song.mode = PlayMode::song;
 }
 
 Result addInstrument (Song& song, int track, const Request& request)
@@ -99,6 +145,7 @@ Result addInstrument (Song& song, int track, const Request& request)
     r.insert = song.channels[(std::size_t) index].mixerTrack;
     r.channels = { index };
     nameInsert (song, r.insert, name, colour);
+    placeInstrumentNotes (song, track, index, name, colour, r, request);
     return r;
 }
 
@@ -158,6 +205,9 @@ Result addDrums (Song& song, int track, const Request& request)
     clip.start = 0;
     clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
     song.playlist.push_back (clip);
+    song.mode = PlayMode::song; // (the Simple workflow plays the song)
+    if (request.bpm > 0.0)
+        song.bpm = std::clamp (request.bpm, 10.0, 999.0);
 
     r.track = track;
     r.insert = insert;
@@ -295,6 +345,21 @@ std::optional<Kind> kindOf (const Song& song, int track)
     if (t.mode == PlaylistTrackMode::audio && validInsert (song, t.mixerTrack))
         return insertHasInstruments (song, t.mixerTrack) ? Kind::drums : Kind::audio;
     return std::nullopt;
+}
+
+bool isEmptySong (const Song& song)
+{
+    bool clips = false;
+    song.forEachClipList ([&clips] (const std::vector<Clip>& list) { clips = clips || ! list.empty(); });
+    if (clips)
+        return false;
+    for (const auto& p : song.patterns)
+        if (! p.notes.empty())
+            return false;
+    for (const auto& t : song.playlistTracks)
+        if (t.mode != PlaylistTrackMode::unassigned || ! t.name.empty())
+            return false;
+    return true;
 }
 
 int insertOf (const Song& song, int track)

@@ -10070,7 +10070,16 @@ private:
         saveStyleMenus ("cliplaunch");
         ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
         offline.dispatchPendingMessages();
-        write ("simple");
+        if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+            simple->showChooser(); // (an empty project opens on it by itself; the offline project may hold the default song)
+        write ("simple"); // the New track chooser (slice S3)
+        if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+        {
+            simple->showStarterPageForSnapshot();
+            write ("simple-starter");
+            simple->hideChooser();
+            write ("simple-closed");
+        }
         saveStyleMenus ("simple");
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");
         ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
