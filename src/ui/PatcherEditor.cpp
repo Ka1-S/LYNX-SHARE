@@ -1,6 +1,7 @@
 #include "ui/VideoPlayerView.h"
 #include "ui/FileChoosers.h"
 #include "ui/WaveTravellerEditor.h"
+#include "ui/FruitySlicerEditor.h"
 #include "ui/PatcherEditor.h"
 
 #include "core/Rack.h"
@@ -1631,7 +1632,7 @@ private:
             case InstrumentKind::boobass: case InstrumentKind::flkeys: case InstrumentKind::soundfont:
                 return "Misc";
             case InstrumentKind::granulizer: case InstrumentKind::directwave: case InstrumentKind::sampler:
-            case InstrumentKind::wavetraveller:
+            case InstrumentKind::wavetraveller: case InstrumentKind::fruityslicer:
                 return "Sampler";
             case InstrumentKind::beepmap: case InstrumentKind::harmor: case InstrumentKind::morphine: case InstrumentKind::ogun:
             case InstrumentKind::autogun: case InstrumentKind::plucked: case InstrumentKind::sakura: case InstrumentKind::slayer:
@@ -2244,6 +2245,11 @@ private:
         if (node.generator && node.channel.instrument == InstrumentKind::wavetraveller) // round 167f
         {
             openToolWindow (makeWaveTravellerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
+            return;
+        }
+        if (node.generator && node.channel.instrument == InstrumentKind::fruityslicer) // round 180c
+        {
+            openToolWindow (makeFruitySlicerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
             return;
         }
         if (node.generator && node.channel.instrument == InstrumentKind::midiOut)

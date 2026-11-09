@@ -293,3 +293,13 @@ TEST (report174a_editor_crash_step)
     CHECK (! editorFaultCatchable (0x406D1388u)); // thread name
     CHECK (! editorFaultCatchable (0x40010006u)); // OutputDebugString
 }
+
+TEST (report115_title_says_crash_only_with_a_crash_file)
+{
+    using namespace lynx::crashreport;
+    // issue #115: a session that ended without a crash file was titled "Crash: UI responding again after 6 s"
+    CHECK (githubTitle ("unclean", "UI responding again after 6 s") == "Closed unexpectedly (no crash report) after: UI responding again after 6 s");
+    CHECK (githubTitle ("unclean", "") == "Closed unexpectedly (no crash report)");
+    CHECK (githubTitle ("crash", "crashed: backtrace in autosave\\crash 1.txt") == "Crash: crashed: backtrace in autosave\\crash 1.txt");
+    CHECK (githubTitle ("hang", "UI not responding") == "Freeze: UI not responding" && githubTitle ("manual", "x") == "Problem: x");
+}

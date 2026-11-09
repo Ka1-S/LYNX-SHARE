@@ -1084,6 +1084,32 @@ juce::Rectangle<int> MixerStrips::meterArea (int t) const
     return faderArea (t).withWidth (spec().meterWidth * 2 + 2);
 }
 
+juce::Rectangle<int> MixerStrips::grArea (int t) const
+{
+    // in the gap between the meters and the fader (compact layouts have none: over the right meter's edge)
+    const auto meters = meterArea (t);
+    return mixerlayout::isCompact (layout) ? meters.withTrimmedLeft (meters.getWidth() - 2) : meters.withX (meters.getRight() + 1).withWidth (3);
+}
+
+float MixerStrips::gainReduction (int t) const
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (t <= 0 || t >= (int) mixer.size())
+        return -1.0f;
+    const auto* times = engine.getProcessTimes();
+    auto gr = -1.0f;
+    const auto& slots = mixer[(std::size_t) t].effects;
+    for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
+    {
+        if (! slots[(std::size_t) s].enabled || ! mixerops::reportsGainReduction (slots[(std::size_t) s].kind))
+            continue;
+        const auto key = (std::size_t) (t * maxEffectSlots + s) * ProcessTimes::meterOutputs;
+        const auto v = times != nullptr && key < times->effectMeters.size() ? times->effectMeters[key].load (std::memory_order_relaxed) : 0.0f;
+        gr = juce::jmax (gr, juce::jlimit (0.0f, 1.0f, v));
+    }
+    return gr;
+}
+
 juce::Rectangle<int> MixerStrips::faderRail (int t) const
 {
     return faderArea (t).withTrimmedLeft (spec().meterWidth * 2 + (mixerlayout::isCompact (layout) ? 3 : 6) + (t == 0 ? masterScaleWidth : 0));
@@ -1488,6 +1514,16 @@ void MixerStrips::paint (juce::Graphics& g)
             {
                 g.setColour (colour::textSecondary.withAlpha (0.5f));
                 g.drawRect (meters.expanded (1), 1);
+            }
+
+            // round 177d: gain reduction of the strip's own dynamics, hanging down from the top (deeper = more)
+            if (const auto gr = gainReduction (t); gr >= 0.0f)
+            {
+                const auto bar = grArea (t);
+                g.setColour (colour::bg0.withAlpha (0.6f));
+                g.fillRect (bar);
+                g.setColour (colour::meterMid);
+                g.fillRect (bar.withHeight (juce::roundToInt (gr * (float) bar.getHeight())));
             }
 
             // the master's dB scale (FL prints it beside the master meter): as many values as fit without overlapping
@@ -1978,8 +2014,10 @@ void MixerStrips::pressRail (int strip, int mouseY)
 {
     railStrip = strip;
     railMouseY = mouseY;
-    stepHeldRail();
-    railRepeat.startTimer (faderRailFirstRepeatMs); // (then faderRailRepeatMs, in stepHeldRail)
+    railPressMs = juce::Time::getMillisecondCounterHiRes();
+    stepRailOnce();
+    railSteps = 1;
+    railRepeat.startTimer (16); // (a poll: the steps themselves follow the time since the press)
 }
 
 float MixerStrips::railTarget (int strip) const
@@ -1990,15 +2028,24 @@ float MixerStrips::railTarget (int strip) const
 
 void MixerStrips::stepHeldRail()
 {
-    // (the repeat stops as soon as the button is up, even before the release reaches us: a busy message thread must not
-    // turn one click into several steps)
-    if (railRepeat.isTimerRunning() && ! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+    if (! railRepeat.isTimerRunning()) // (a direct call, as the offscreen check makes: one step)
+    {
+        stepRailOnce();
+        return;
+    }
+    // the repeat stops as soon as the button is up, even before the release reaches us
+    if (! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
     {
         railRepeat.stopTimer();
         return;
     }
-    if (railRepeat.isTimerRunning() && railRepeat.getTimerInterval() != faderRailRepeatMs)
-        railRepeat.startTimer (faderRailRepeatMs);
+    const auto due = faderRailStepsForHold ((int) (juce::Time::getMillisecondCounterHiRes() - railPressMs));
+    for (int guard = 0; railSteps < due && guard < 64; ++guard, ++railSteps)
+        stepRailOnce();
+}
+
+void MixerStrips::stepRailOnce()
+{
     const auto& song = engine.getSong();
     if (railStrip <= vcaStrip (0))
     {
@@ -2886,7 +2933,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     };
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
-    ui::addItemHeader (menu, t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }), trackName,
+    // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
+    const auto several = targets.size() > 1;
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+                       several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
@@ -2905,6 +2955,23 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+    });
+    // FL's "Gradient color..." (SetGradientColorMenuClick, REA_rodada177a §5): greyed below two selected tracks; the
+    // Gradient editor starts from the first and the last selected track's colours
+    menu.addItem (tr ("Gradient color..."), targets.size() > 1, false, [this, targets] {
+        auto sorted = targets;
+        std::sort (sorted.begin(), sorted.end());
+        const auto& mixer = engine.getSong().mixer;
+        const auto colourOf = [&mixer] (int track) {
+            const auto c = track >= 0 && track < (int) mixer.size() ? mixer[(std::size_t) track].colour : 0u;
+            return c != 0 ? juce::Colour (c) : juce::Colour (lynxPalette()[0]);
+        };
+        showGradientColourDialog (colourOf (sorted.front()), colourOf (sorted.back()), (int) sorted.size(),
+                                  [this, sorted] (juce::Colour first, juce::Colour last) {
+                                      engine.editSong ([sorted, a = first.getARGB(), b = last.getARGB()] (Song& s) {
+                                          mixerops::gradientColour (s, sorted, a, b);
+                                      });
+                                  });
     });
     // FL's "Change icon..." (SetIconMenuClick, REA round 168h: every selected track gets it); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, t, targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t }] {
@@ -3570,6 +3637,23 @@ bool MixerStrips::liveFrame (double nowMs)
         }
     }
 
+    // round 177d: the gain-reduction meters (strips with one of LYNX's own dynamics only; nothing while hidden)
+    if (showing)
+    {
+        grShown.resize (mixer.size(), -1);
+        for (int t = 1; t < (int) mixer.size(); ++t)
+        {
+            const auto gr = gainReduction (t);
+            const auto h = gr < 0.0f ? -1 : juce::roundToInt (gr * (float) grArea (t).getHeight());
+            if (h != grShown[(std::size_t) t])
+            {
+                grShown[(std::size_t) t] = h;
+                repaint (grArea (t).expanded (1));
+            }
+            moving = moving || h > 0;
+        }
+    }
+
     // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
@@ -4068,7 +4152,7 @@ void EffectsPanel::paintEq (juce::Graphics& g)
     if (eqShown())
     {
         const auto bar = eqFoldBounds().toFloat();
-        const auto active = eq.gainDb[0] != 0.0f || eq.gainDb[1] != 0.0f || eq.gainDb[2] != 0.0f;
+        const auto active = eq.active();
         auto chevron = bar.withWidth (14.0f).withSizeKeepingCentre (12.0f, 12.0f);
         {
             juce::Graphics::ScopedSaveState state (g);
@@ -4079,7 +4163,13 @@ void EffectsPanel::paintEq (juce::Graphics& g)
         g.setFont (font (type::small, true));
         g.setColour (colour::textSecondary);
         textcache::drawText (g, tr ("EQ"), bar.withTrimmedLeft (18.0f).toNearestInt(), juce::Justification::centredLeft);
-        if (eqFolded && active) // a folded EQ that still changes the sound says so
+        if (eq.bypassed && eq.hasBoostOrCut()) // round 177d: bypassed, its settings kept
+        {
+            g.setColour (colour::textDisabled);
+            g.setFont (font (type::caption));
+            textcache::drawText (g, tr ("bypassed"), bar.withTrimmedLeft (44.0f).toNearestInt(), juce::Justification::centredLeft);
+        }
+        else if (eqFolded && active) // a folded EQ that still changes the sound says so
         {
             g.setColour (colour::accent);
             g.setFont (font (type::caption));
@@ -5105,6 +5195,21 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // round 177d (LYNX's own; FL's insert EQ has no bypass): right-click the EQ's title bar to bypass it, its settings kept
+    if (eqShown() && eqFoldBounds().contains (e.getPosition()) && flmods::popup (e.mods) && track >= 0 && track < (int) engine.getSong().mixer.size())
+    {
+        const auto bypassed = engine.getSong().mixer[(std::size_t) track].eq.bypassed;
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Bypass the EQ (its settings are kept)"), true, bypassed, [this, t = track] {
+            engine.editSong ([t] (Song& song) {
+                if (t >= 0 && t < (int) song.mixer.size())
+                    song.mixer[(std::size_t) t].eq.bypassed = ! song.mixer[(std::size_t) t].eq.bypassed;
+            });
+            repaint();
+        });
+        menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+        return;
+    }
     if (eqFoldBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown())
     {
         eqFoldChoice = eqFolded ? 1 : 2;
@@ -5509,7 +5614,8 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
     if (slots() != nullptr && eqFoldBounds().contains (p))
     {
         ui::Hint h;
-        h.text = eqFolded ? tr ("Insert EQ (folded): [LMB] unfold it") : tr ("Insert EQ: [LMB] fold it (it folds by itself when the mixer is short)");
+        h.text = (eqFolded ? tr ("Insert EQ (folded): [LMB] unfold it") : tr ("Insert EQ: [LMB] fold it (it folds by itself when the mixer is short)"))
+                 + "  " + tr ("[RMB] bypass");
         return h;
     }
 
