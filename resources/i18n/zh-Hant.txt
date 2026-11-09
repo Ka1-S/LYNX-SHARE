@@ -8038,3 +8038,4 @@ countries: tw hk mo
 "Ticked messages are shown; untick one to skip its question." = "勾選的訊息會顯示；取消勾選即可略過該問題。"
 "Hints and warnings" = "提示和警告"
 "Manage messages" = "管理訊息"
+"Delete the selected mixer tracks" = "刪除選取的混音器軌道"

@@ -8038,3 +8038,4 @@ countries: tr
 "Ticked messages are shown; untick one to skip its question." = "İşaretli mesajlar gösterilir; sorusunu atlamak için işareti kaldırın."
 "Hints and warnings" = "İpuçları ve uyarılar"
 "Manage messages" = "Mesajları yönet"
+"Delete the selected mixer tracks" = "Seçili mikser kanallarını sil"

@@ -8038,3 +8038,4 @@ countries: ru by kz
 "Ticked messages are shown; untick one to skip its question." = "Отмеченные сообщения показываются; снимите отметку, чтобы пропускать вопрос."
 "Hints and warnings" = "Подсказки и предупреждения"
 "Manage messages" = "Управление сообщениями"
+"Delete the selected mixer tracks" = "Удалить выбранные дорожки микшера"

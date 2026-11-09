@@ -8121,3 +8121,4 @@ countries: br
 "Ticked messages are shown; untick one to skip its question." = "As mensagens marcadas aparecem; desmarque uma para pular a pergunta dela."
 "Hints and warnings" = "Dicas e avisos"
 "Manage messages" = "Gerenciar mensagens"
+"Delete the selected mixer tracks" = "Excluir as faixas do Mixer selecionadas"

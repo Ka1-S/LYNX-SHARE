@@ -8038,3 +8038,4 @@ countries: kr
 "Ticked messages are shown; untick one to skip its question." = "체크된 메시지가 표시됩니다. 체크를 해제하면 해당 질문을 건너뜁니다."
 "Hints and warnings" = "힌트와 경고"
 "Manage messages" = "메시지 관리"
+"Delete the selected mixer tracks" = "선택한 믹서 트랙 삭제"

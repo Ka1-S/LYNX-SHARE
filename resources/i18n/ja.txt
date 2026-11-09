@@ -8038,3 +8038,4 @@ countries: jp
 "Ticked messages are shown; untick one to skip its question." = "チェックしたメッセージが表示されます。チェックを外すとその質問を省略します。"
 "Hints and warnings" = "ヒントと警告"
 "Manage messages" = "メッセージの管理"
+"Delete the selected mixer tracks" = "選択したミキサートラックを削除"

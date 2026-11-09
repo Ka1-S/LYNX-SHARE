@@ -8038,3 +8038,4 @@ countries: es mx ar co cl pe ve
 "Ticked messages are shown; untick one to skip its question." = "Los mensajes marcados se muestran; desmarca uno para saltar su pregunta."
 "Hints and warnings" = "Consejos y avisos"
 "Manage messages" = "Gestionar mensajes"
+"Delete the selected mixer tracks" = "Eliminar las pistas del Mixer seleccionadas"

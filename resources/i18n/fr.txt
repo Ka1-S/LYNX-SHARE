@@ -8038,3 +8038,4 @@ countries: fr be ch ca lu
 "Ticked messages are shown; untick one to skip its question." = "Les messages cochés s'affichent ; décochez-en un pour passer sa question."
 "Hints and warnings" = "Conseils et avertissements"
 "Manage messages" = "Gérer les messages"
+"Delete the selected mixer tracks" = "Supprimer les pistes de Mixer sélectionnées"

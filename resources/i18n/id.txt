@@ -8038,3 +8038,4 @@ countries: id
 "Ticked messages are shown; untick one to skip its question." = "Pesan yang dicentang akan ditampilkan; hapus centang untuk melewati pertanyaannya."
 "Hints and warnings" = "Petunjuk dan peringatan"
 "Manage messages" = "Kelola pesan"
+"Delete the selected mixer tracks" = "Hapus trek Mixer yang dipilih"

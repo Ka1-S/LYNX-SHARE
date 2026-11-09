@@ -8038,3 +8038,4 @@ countries: cn sg
 "Ticked messages are shown; untick one to skip its question." = "勾选的消息会显示；取消勾选即可跳过该问题。"
 "Hints and warnings" = "提示和警告"
 "Manage messages" = "管理消息"
+"Delete the selected mixer tracks" = "删除选中的混音器轨道"

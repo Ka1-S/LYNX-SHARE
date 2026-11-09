@@ -8038,3 +8038,4 @@ countries: nl be
 "Ticked messages are shown; untick one to skip its question." = "Aangevinkte berichten worden getoond; vink er een uit om de vraag over te slaan."
 "Hints and warnings" = "Tips en waarschuwingen"
 "Manage messages" = "Berichten beheren"
+"Delete the selected mixer tracks" = "Geselecteerde mixersporen verwijderen"
