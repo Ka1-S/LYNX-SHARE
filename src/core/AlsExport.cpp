@@ -477,6 +477,15 @@ struct Exporter
                 byKey[n.key].push_back (&n);
         auto* keyTracks = c.at ("Notes/KeyTracks");
         int noteId = 1, kt = 0;
+        // Live 12's probability groups (round 187c): each group's notes by NoteId [LIVE 12.4 save: NoteProbabilityGroup
+        // { GroupType 0 = Play All / 1 = Play One, Notes/NoteId, Probability, GroupId }]
+        struct ChanceGroup
+        {
+            bool playOne = false;
+            float chance = 1.0f;
+            std::vector<int> ids;
+        };
+        std::map<int, ChanceGroup> chanceGroups;
         if (keyTracks != nullptr)
         {
             keyTracks->kids.clear();
@@ -497,13 +506,22 @@ struct Exporter
                     e.set ("Duration", num (beats (std::min (n->length, offset + length - n->start))));
                     e.set ("Velocity", num (std::clamp ((double) n->velocity * 127.0, 1.0, 127.0)));
                     // Live 11 writes every attribute; Live 12 leaves out the default ones (same order) [DATA]
-                    if (live11)
-                        e.set ("VelocityDeviation", "0");
+                    // the note's Velocity Range and Chance (round 187c)
+                    const auto deviation = std::round (std::clamp ((double) n->velocityRange * 127.0, -127.0, 127.0) * 1.0e4) / 1.0e4;
+                    if (live11 || deviation != 0.0)
+                        e.set ("VelocityDeviation", num (deviation));
                     e.set ("OffVelocity", num (std::clamp ((double) n->release * 127.0, 0.0, 127.0)));
-                    if (live11)
-                        e.set ("Probability", "1");
+                    if (live11 || n->chance < 1.0f)
+                        e.set ("Probability", num (std::clamp ((double) n->chance, 0.0, 1.0)));
                     if (live11 || n->muted)
                         e.set ("IsEnabled", n->muted ? "false" : "true");
+                    if (n->chanceGroup > 0 && ! live11)
+                    {
+                        auto& g = chanceGroups[n->chanceGroup];
+                        g.playOne = n->chanceOne;
+                        g.chance = n->chance;
+                        g.ids.push_back (noteId);
+                    }
                     e.set ("NoteId", num (noteId++));
                     list->add (std::move (e));
                 }
@@ -511,6 +529,42 @@ struct Exporter
             }
         }
         c.value ("Notes/NoteIdGenerator/NextId", num (noteId));
+        if (auto* groups = c.at ("Notes/NoteProbabilityGroups"); groups != nullptr && ! chanceGroups.empty())
+        {
+            int index = 0;
+            for (const auto& [id, g] : chanceGroups)
+            {
+                if (g.ids.size() < 2)
+                    continue; // (a group cut down to one note by the clip's span plays as that note)
+                Node group;
+                group.name = "NoteProbabilityGroup";
+                group.set ("Id", num (index++));
+                Node type;
+                type.name = "GroupType";
+                type.set ("Value", g.playOne ? "1" : "0");
+                group.add (std::move (type));
+                Node ids;
+                ids.name = "Notes";
+                for (auto noteIdOf : g.ids)
+                {
+                    Node one;
+                    one.name = "NoteId";
+                    one.set ("NoteId", num (noteIdOf));
+                    ids.add (std::move (one));
+                }
+                group.add (std::move (ids));
+                Node probability;
+                probability.name = "Probability";
+                probability.set ("Value", num (std::clamp ((double) g.chance, 0.0, 1.0)));
+                group.add (std::move (probability));
+                Node groupId;
+                groupId.name = "GroupId";
+                groupId.set ("Value", num (index));
+                group.add (std::move (groupId));
+                groups->add (std::move (group));
+            }
+            c.value ("Notes/ProbabilityGroupIdGenerator/NextId", num (index + 1));
+        }
         return c;
     }
 
