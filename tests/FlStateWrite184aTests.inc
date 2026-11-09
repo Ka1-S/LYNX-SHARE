@@ -57,3 +57,23 @@ TEST (simple184a_flstate_limiter)
         CHECK (back->p == s.p && back->exactCeiling == s.exactCeiling && back->sidechain == 0 && back->version == 7);
     }
 }
+
+TEST (simple184a_flstate_multiband)
+{
+    using namespace lynx;
+    auto slot = makeEffectSlot (EffectKind::fruityMultiband);
+    for (int pass = 0; pass < 4; ++pass)
+    {
+        flmb::State s;
+        for (int i = 0; i < flmb::controls; ++i)
+        {
+            const auto lo = flmb::controlMin[(std::size_t) i], hi = flmb::controlMax[(std::size_t) i];
+            s.c[(std::size_t) i] = pass == 0 ? flmb::controlDefault[(std::size_t) i] : pass == 1 ? lo : pass == 2 ? hi : lo + (hi - lo) * (i + 3) / 37;
+        }
+        flmb::toParams (s, slot.params.data());
+        const auto d = flstate::multiband (slot.params);
+        CHECK (d.size() == 124); // FL's size (version 0, 30 words)
+        const auto back = flmb::parse (d);
+        CHECK (back && back->version == 0 && back->c == s.c);
+    }
+}

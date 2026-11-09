@@ -4,7 +4,8 @@
 // looks): the inverse of the readers that import these plugins as LYNX's exact engines (FlEffects.cpp). A slot LYNX
 // makes has no FL state of its own (FlOrigin), so without these the FL export renders it into the insert instead of
 // writing the plugin. Each writer gives the bytes FL itself saves for those control values; the readers' layouts are
-// documented in docs/analise/REA_rodada48 (Limiter), REA_rodada51 (Soft Clipper) and REA_rodada54 (Stereo Enhancer).
+// documented in docs/analise/REA_rodada48 (Limiter), REA_rodada51 (Soft Clipper), REA_rodada54 (Stereo Enhancer) and
+// REA_rodada56 §2.2 (Multiband Compressor).
 // Header only, no JUCE.
 
 #include <cmath>
@@ -12,6 +13,7 @@
 #include <vector>
 
 #include "core/FruityDynamics.h"
+#include "core/FruityMultiband.h"
 #include "core/FruityShapers.h"
 #include "core/StereoFx.h"
 #include "core/Song.h"
@@ -65,5 +67,18 @@ inline std::vector<std::uint8_t> limiter (const EffectParams& p, std::vector<std
     putI32 (base, 0xA4, 0);
     base[0xA8] = (std::uint8_t) ((base[0xA8] & ~1u) | (p[(std::size_t) fldyn::limiterControls] >= 0.5f ? 1u : 0u));
     return base;
+}
+
+// Fruity Multiband Compressor: version 0 and 30 words (124 bytes, what every FL state in the installation is): the 28
+// controls, then the two editor-only words (meter / analyser flags; they never reach the engine), left at 0.
+inline std::vector<std::uint8_t> multiband (const EffectParams& p)
+{
+    std::vector<std::uint8_t> d;
+    putI32 (d, 0, 0);
+    for (int i = 0; i < flmb::controls; ++i)
+        putI32 (d, 4 + 4 * (std::size_t) i, rawOf (p[(std::size_t) i], flmb::controlMin[(std::size_t) i], flmb::controlMax[(std::size_t) i]));
+    putI32 (d, 4 + 4 * (std::size_t) flmb::controls, 0);
+    putI32 (d, 8 + 4 * (std::size_t) flmb::controls, 0);
+    return d;
 }
 } // namespace lynx::flstate
