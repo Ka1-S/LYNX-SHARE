@@ -187,3 +187,19 @@ TEST (multiout188d_flp_connections_records)
     lynx::ForeignPlugin plain;
     CHECK (lynx::parseFlWrapper (lynx::flpexport::writeWrapper (made, true, nullptr), plain) && plain.outputRoutes.size() == 1);
 }
+
+TEST (multiout188d_effect_sidechain_index_picks_the_insert_inputs)
+{
+    // REA_rodada22 §1 + FL [EXEC fl188d n06/n13/n19]: an insert's inputs = [itself, the inserts routed to it in
+    // ascending order]; sidechain index 1 on insert 1 with insert 2 sidechained to it = insert 2
+    auto song = lynx::Song::makeDefault();
+    if (song.mixer.size() < 6)
+        song.mixer.resize (6);
+    lynx::mixerops::sidechainTo (song, 4, 1);
+    lynx::mixerops::sidechainTo (song, 2, 1);
+    const auto inputs = lynx::mixerops::insertInputs (song, 1);
+    CHECK ((inputs == std::vector<int> { 1, 2, 4 }));
+    CHECK (lynx::mixerops::sidechainIndexSource (song, 1, 0) == -1 && lynx::mixerops::sidechainIndexSource (song, 1, 2) == 4);
+    CHECK (lynx::mixerops::sidechainIndexSource (song, 1, 3) == -1);
+    CHECK (lynx::mixerops::sidechainIndexOf (song, 1, 4) == 2 && lynx::mixerops::sidechainIndexOf (song, 1, 5) == 0);
+}

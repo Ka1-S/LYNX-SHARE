@@ -4789,7 +4789,42 @@ private:
         for (const auto& type : engine.getPluginHost().getKnownPlugins().getTypes())
             if (type.pluginFormatName == "VST" && juce::File (type.fileOrIdentifier) == juce::File (pluginPath))
                 vst2 = type; // (the profile may know other test plugins)
-        if (vst2)
+        if (vst2 && ! vst2->isInstrument)
+        {
+            // an effect (round 188d): on insert 1, with insert 2 routed there as a sidechain (FL's k65 / k78 shots):
+            // wrap-fx-default.png, wrap-fx-automap.png (Auto map inputs and outputs)
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 4)
+                song.mixer.resize (4);
+            auto slot = lynx::makeEffectSlot (lynx::EffectKind::plugin);
+            slot.plugin.id = vst2->createIdentifierString().toStdString();
+            slot.plugin.name = vst2->name.toStdString();
+            song.mixer[1].effects = { slot };
+            lynx::mixerops::sidechainTo (song, 2, 1);
+            engine.setSong (song);
+            engine.renderOffline (0.05, 48000.0);
+            if (auto fx = std::dynamic_pointer_cast<lynx::PluginEffect> (engine.getEffect (1, 0)))
+            {
+                auto find = [] (lynx::Song& s) -> lynx::PluginRef* {
+                    return s.mixer.size() < 2 || s.mixer[1].effects.empty() ? nullptr : &s.mixer[1].effects[0].plugin;
+                };
+                auto save = [&] (const char* name) {
+                    const auto image = lynx::wrapperSettingsSnapshot (engine, find, fx->getInstance(), false, 1, 1.5f, 1, 0);
+                    juce::FileOutputStream out (folder.getChildFile (name));
+                    out.setPosition (0);
+                    out.truncate();
+                    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+                };
+                ok = save ("wrap-fx-default.png");
+                engine.editSong ([] (lynx::Song& s) {
+                    lynx::autoMapOutputs (s.mixer[1].effects[0].plugin.inputs, 2);
+                    lynx::autoMapOutputs (s.mixer[1].effects[0].plugin.outputs, 2);
+                    s.mixer[1].effects[0].sidechain = lynx::mixerops::sidechainIndexSource (s, 1, 1);
+                });
+                ok = ok && save ("wrap-fx-automap.png") && engine.getSong().mixer[1].effects[0].sidechain == 2;
+            }
+        }
+        else if (vst2)
         {
             auto song = lynx::Song::makeDefault();
             auto& channel = song.channels[0];

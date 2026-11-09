@@ -13,6 +13,7 @@
 
 #include "core/CrashReport.h"
 #include "core/FlWrapper.h"
+#include "core/MixerOps.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
@@ -38,15 +39,18 @@ namespace
 void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (Song&)>& find, juce::AudioPluginInstance* instance,
                           bool PluginRef::*option, bool recreates);
 
-// FL's wrapper Processing › Connections, the outputs column of a generator (round 188d, issue #114; FL 2026's page
-// [UI fl188d a31, b23], Fruity Wrapper FUN_0078df00 / FUN_00794c70 [DECOMP]): one row per plugin output with its LED
-// (active), "n. name" and the mixer track offset wheel ("---" = 0, the channel's own insert; wheel or vertical drag,
-// double-click types a value). Inactive rows are drawn dimmed.
+// FL's wrapper Processing › Connections, one column (round 188d, issue #114; FL 2026's page [UI fl188d a31, b23, k65],
+// Fruity Wrapper FUN_0078df00 / FUN_00794c70 [DECOMP]): one row per plugin output (or input) with its LED (active),
+// "n. name" and the value wheel ("---" = 0; wheel or vertical drag, double-click types a value) — a generator's
+// output: the mixer track offset from the channel's insert; an effect's input / output: the sidechain index. The
+// outputs column has the LED left and the wheel right; the inputs column is its mirror. Inactive rows are dimmed.
 class ConnectionRows final : public juce::Component, public juce::TooltipClient
 {
 public:
     static constexpr int rowHeight = 27;
-    std::vector<PluginOutputInfo> outputs;
+    bool inputSide = false;  // the inputs column (an effect's)
+    bool generator = true;   // a generator's outputs (mixer track offsets) or an effect's rows (sidechain indexes)
+    std::vector<PluginOutputInfo> outputs; // (the rows: outputs, or the inputs of the inputs column)
     std::function<PluginOutputRoute (int)> route;
     std::function<void (int, bool)> setActive;
     std::function<void (int, int)> setOffset;
@@ -74,7 +78,8 @@ public:
                 g.setColour (colour::textSecondary.withAlpha (0.7f));
                 g.drawEllipse (led.expanded (2.0f), 1.0f);
             }
-            auto text = rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
+            auto text = inputSide ? rowArea.withTrimmedLeft (wheelWidth + 8).withTrimmedRight (24)
+                                  : rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
             g.setColour (plays ? colour::textPrimary : colour::textDisabled);
             g.setFont (font (type::body));
             g.drawFittedText (juce::String (k + 1) + ". " + label (k), text, juce::Justification::centredLeft, 1);
@@ -93,9 +98,13 @@ public:
             return {};
         const auto n = juce::String (k + 1);
         if (hotPart == Part::led)
+        {
+            if (inputSide)
+                return on (k) ? tr ("Deactivate input {0}", { n }) : tr ("Activate input {0}", { n });
             return on (k) ? tr ("Deactivate output {0}", { n }) : tr ("Activate output {0}", { n });
+        }
         if (hotPart == Part::wheel)
-            return tr ("Mixer track offset for output {0}", { n });
+            return wheelHint (k);
         return {};
     }
 
@@ -154,7 +163,7 @@ public:
         if (hot < 0 || hotPart != Part::wheel || ! route)
             return;
         const auto k = hot;
-        auto* window = new juce::AlertWindow (tr ("Mixer track offset for output {0}", { juce::String (k + 1) }), {}, juce::MessageBoxIconType::NoIcon);
+        auto* window = new juce::AlertWindow (wheelHint (k), {}, juce::MessageBoxIconType::NoIcon);
         window->addTextEditor ("value", juce::String (route (k).offset));
         window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
@@ -172,18 +181,28 @@ private:
     int hot = -1, dragRow = -1, dragStart = 0;
     Part hotPart = Part::none;
 
+    juce::String wheelHint (int k) const
+    {
+        const auto n = juce::String (k + 1);
+        if (generator)
+            return tr ("Mixer track offset for output {0}", { n });
+        return inputSide ? tr ("Sidechain index for input {0}", { n }) : tr ("Sidechain index for output {0}", { n });
+    }
     juce::String label (int k) const
     {
         const auto& name = outputs[(std::size_t) k].name;
-        return name.isNotEmpty() ? name : tr ("Output {0}", { juce::String (k + 1) });
+        return name.isNotEmpty() ? name : (inputSide ? tr ("Input {0}", { juce::String (k + 1) }) : tr ("Output {0}", { juce::String (k + 1) }));
     }
-    // the outputs column: the right half (FL's inputs column, left, is for effects)
-    juce::Rectangle<int> rowBounds (int k) const
+    // the column fills this component (the page places the inputs column left, the outputs column right)
+    juce::Rectangle<int> rowBounds (int k) const { return { 4, 2 + k * rowHeight, juce::jmax (0, getWidth() - 8), rowHeight }; }
+    juce::Rectangle<int> ledBounds (int k) const
     {
-        return { getWidth() / 2 - 20, 2 + k * rowHeight, getWidth() - (getWidth() / 2 - 20) - 4, rowHeight };
+        return (inputSide ? rowBounds (k).removeFromRight (14) : rowBounds (k).removeFromLeft (14)).withSizeKeepingCentre (12, 12);
     }
-    juce::Rectangle<int> ledBounds (int k) const { return rowBounds (k).removeFromLeft (14).withSizeKeepingCentre (12, 12); }
-    juce::Rectangle<int> wheelBounds (int k) const { return rowBounds (k).removeFromRight (wheelWidth).reduced (0, 3); }
+    juce::Rectangle<int> wheelBounds (int k) const
+    {
+        return (inputSide ? rowBounds (k).removeFromLeft (wheelWidth) : rowBounds (k).removeFromRight (wheelWidth)).reduced (0, 3);
+    }
 
     void track (juce::Point<int> p)
     {
@@ -211,8 +230,9 @@ private:
 class WrapperSettingsPage final : public juce::Component, private juce::ChangeListener
 {
 public:
-    WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
-        : engine (e), find (std::move (f)), plugin (p)
+    WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel, int track = -1,
+                         int slot = -1)
+        : engine (e), find (std::move (f)), plugin (p), mixerTrack (track), mixerSlot (slot)
     {
         const char* tabNames[] = { TR_NOOP ("Settings"), TR_NOOP ("Processing"), TR_NOOP ("Troubleshooting") };
         for (int t = 0; t < 3; ++t)
@@ -296,7 +316,35 @@ public:
         addChildComponent (bitSize);
         // Processing › Connections (round 188d): a generator's outputs, each to the insert its offset from the
         // channel's says. FL's header: Reset, Auto map outputs, the outputs glyph and Refresh at the right [UI fl188d].
-        connections = channel && plugin.getTotalNumOutputChannels() > 0;
+        // An effect on an insert (FL [UI fl188d k65]): its inputs column too, each input's sidechain index into the
+        // insert's inputs list (core/MixerOps.h insertInputs); input 2 is the side input LYNX feeds from the slot's
+        // sidechain, which the index sets. Header: inputs glyph, Auto map inputs, Reset, Auto map outputs, outputs glyph.
+        effectSlot = ! channel && mixerTrack > 0 && mixerSlot >= 0;
+        connections = (channel && plugin.getTotalNumOutputChannels() > 0) || (effectSlot && plugin.getBusCount (true) > 0);
+        outputRows.generator = channel;
+        inputRows.inputSide = true;
+        inputRows.generator = false;
+        inputRows.outputs = effectSlot ? pluginInputs (plugin) : std::vector<PluginOutputInfo> {};
+        inputRows.route = [this] (int k) { return inputRoute (k); };
+        inputRows.setActive = [this] (int k, bool on) {
+            editInputs ([k, on] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on ? -1 : 0); });
+        };
+        inputRows.setOffset = [this] (int k, int v) {
+            editInputs ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = juce::jmax (0, v); });
+        };
+        inputRows.processInactive = outputRows.processInactive = [this] {
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            return ref != nullptr && ref->processInactive;
+        };
+        columns.addAndMakeVisible (inputRows);
+        columns.addAndMakeVisible (outputRows);
+        autoMapIn.setButtonText (tr ("Auto map inputs"));
+        autoMapIn.setTooltip (tr ("Assign all inputs incrementally"));
+        // (FL's handler is the outputs' one, FUN_0078aea0 with Tag 0)
+        autoMapIn.onClick = [this] {
+            editInputs ([n = (int) inputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { autoMapOutputs (r, n); });
+        };
+        addChildComponent (autoMapIn);
         outputRows.outputs = pluginOutputs (plugin);
         outputRows.route = [this] (int k) {
             auto* ref = find (const_cast<Song&> (engine.getSong()));
@@ -308,12 +356,8 @@ public:
             editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); },
                         ! on); // FL [EXEC fl188d a38, b23, k19]: turning an LED off turns "Process inactive inputs and outputs" off
         };
-        outputRows.processInactive = [this] {
-            auto* ref = find (const_cast<Song&> (engine.getSong()));
-            return ref != nullptr && ref->processInactive;
-        };
         outputRows.setOffset = [this] (int k, int v) { editRoutes ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = v; }); };
-        connectionsView.setViewedComponent (&outputRows, false);
+        connectionsView.setViewedComponent (&columns, false);
         connectionsView.setScrollBarsShown (true, false);
         connectionsView.setScrollBarThickness (8);
         addChildComponent (connectionsView);
@@ -322,6 +366,8 @@ public:
         // FL's Reset [EXEC]: every offset back to 0 ("---"); the LEDs stay as they are
         resetIo.onClick = [this] {
             editRoutes ([n = (int) outputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { resetOutputOffsets (r, n); });
+            if (effectSlot)
+                editInputs ([n = (int) inputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { resetOutputOffsets (r, n); });
         };
         addChildComponent (resetIo);
         autoMap.setButtonText (tr ("Auto map outputs"));
@@ -346,6 +392,8 @@ public:
         refreshIo.setTooltip (tr ("Refresh inputs and outputs (after a change in the plugin)"));
         refreshIo.onClick = [this] {
             outputRows.outputs = pluginOutputs (plugin);
+            if (effectSlot)
+                inputRows.outputs = pluginInputs (plugin);
             resized();
         };
         addChildComponent (refreshIo);
@@ -380,6 +428,22 @@ public:
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption, true));
             g.drawText (caps (title), area.withHeight (headerHeight).reduced (10, 0), juce::Justification::centredLeft);
+        }
+        if (tab == 1 && connections && ! inputsGlyph.isEmpty()) // FL's inputs glyph: an arrow entering a box
+        {
+            const auto b = inputsGlyph.toFloat().withSizeKeepingCentre (14.0f, 12.0f);
+            juce::Path p;
+            p.addRoundedRectangle (b.getRight() - b.getWidth() * 0.55f, b.getY(), b.getWidth() * 0.55f, b.getHeight(), 2.0f);
+            g.setColour (colour::textSecondary);
+            g.strokePath (p, juce::PathStrokeType (1.4f));
+            juce::Path arrow;
+            arrow.startNewSubPath (b.getX(), b.getCentreY());
+            arrow.lineTo (b.getX() + b.getWidth() * 0.62f, b.getCentreY());
+            g.strokePath (arrow, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path head;
+            const auto tip = b.getX() + b.getWidth() * 0.66f;
+            head.addTriangle (tip + 1.0f, b.getCentreY(), tip - 4.0f, b.getCentreY() - 4.0f, tip - 4.0f, b.getCentreY() + 4.0f);
+            g.fillPath (head);
         }
         if (tab == 1 && connections && ! outputsGlyph.isEmpty()) // FL's outputs glyph: an arrow leaving a box
         {
@@ -488,7 +552,7 @@ public:
             for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
                 if (section == wrapperOptions()[i].section && ! hiddenOption (i))
                     show (*toggles[(int) i], box.removeFromTop (rowHeight).withTrimmedLeft (wrapperOptions()[i].needsFixed ? 22 : 0));
-            outputsGlyph = {};
+            outputsGlyph = inputsGlyph = {};
             if (tab == 1 && connections)
             {
                 // the group's header line carries the buttons (FL: Reset, Auto map outputs, the glyph; Refresh at
@@ -503,10 +567,24 @@ public:
                 show (autoMap, header.removeFromRight (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16)));
                 header.removeFromRight (4);
                 show (resetIo, header.removeFromRight (juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
+                if (effectSlot)
+                {
+                    header.removeFromRight (4);
+                    show (autoMapIn, header.removeFromRight (juce::jmax (110, autoMapIn.getBestWidthForHeight (header.getHeight()) + 16)));
+                    header.removeFromRight (4);
+                    inputsGlyph = header.removeFromRight (22);
+                }
                 auto list = r.reduced (4, 4);
                 show (connectionsView, list);
-                outputRows.setSize (list.getWidth() - (outputRows.preferredHeight() > list.getHeight() ? 10 : 0), juce::jmax (list.getHeight(), outputRows.preferredHeight()));
+                const auto rows = juce::jmax (outputRows.preferredHeight(), inputRows.preferredHeight());
+                columns.setSize (list.getWidth() - (rows > list.getHeight() ? 10 : 0), juce::jmax (list.getHeight(), rows));
+                // FL: inputs in the left half, outputs from just left of the middle to the right edge
+                const auto split = columns.getWidth() / 2 - 20;
+                inputRows.setBounds (0, 0, juce::jmax (0, split - 30), columns.getHeight());
+                outputRows.setBounds (split, 0, columns.getWidth() - split, columns.getHeight());
+                inputRows.setVisible (effectSlot);
                 outputRows.repaint();
+                inputRows.repaint();
             }
             if (tab == 2)
             {
@@ -597,6 +675,44 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
+    // An effect's input k as the page shows it: the stored route; input 2 without a stored index shows the slot's
+    // sidechain source (picked with LYNX's "SC" picker) as its index in the insert's inputs list
+    PluginOutputRoute inputRoute (int k) const
+    {
+        const auto& song = engine.getSong();
+        auto* ref = find (const_cast<Song&> (song));
+        auto route = ref != nullptr && k < (int) ref->inputs.size() ? ref->inputs[(std::size_t) k] : PluginOutputRoute {};
+        if (k == 1 && route.offset == 0 && mixerTrack < (int) song.mixer.size() && mixerSlot < (int) song.mixer[(std::size_t) mixerTrack].effects.size())
+            if (const auto source = song.mixer[(std::size_t) mixerTrack].effects[(std::size_t) mixerSlot].sidechain; source > 0)
+                route.offset = mixerops::sidechainIndexOf (song, mixerTrack, source);
+        return route;
+    }
+
+    // One edit of an effect's inputs; input 2's index then sets the slot's sidechain source (FL's index → the insert
+    // it picks; 0 or inactive: none)
+    void editInputs (std::function<void (std::vector<PluginOutputRoute>&)> change)
+    {
+        const auto count = inputRows.outputs.size();
+        std::vector<PluginOutputRoute> shown;
+        for (int k = 0; k < (int) count; ++k)
+            shown.push_back (inputRoute (k));
+        engine.editSong ([fn = find, count, shown, change = std::move (change), t = mixerTrack, s = mixerSlot] (Song& song) {
+            auto* ref = fn (song);
+            if (ref == nullptr || count == 0)
+                return;
+            ref->inputs = shown;
+            change (ref->inputs);
+            if (count > 1 && t > 0 && t < (int) song.mixer.size() && s >= 0 && s < (int) song.mixer[(std::size_t) t].effects.size())
+            {
+                const auto& side = ref->inputs[1];
+                const auto source = side.isActive (true) ? mixerops::sidechainIndexSource (song, t, side.offset) : -1;
+                song.mixer[(std::size_t) t].effects[(std::size_t) s].sidechain = source > 0 && source != t ? source : -1;
+            }
+            trimOutputRoutes (ref->inputs);
+        });
+        inputRows.repaint();
+    }
+
     // Processing › Connections: one edit of the outputs' routes (as many entries as the plugin has outputs)
     void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change, bool stopProcessingInactive = false)
     {
@@ -636,6 +752,7 @@ private:
         bendRange.setEnabled (ref->sendBendRange);
         outPort.setSelectedId (ref->midiOutPort + 2, juce::dontSendNotification);
         outputRows.repaint();
+        inputRows.repaint();
         const auto reported = plugin.getLatencySamples();
         const auto text = ref->latencyOverrideMs >= 0.0f
                               ? tr ("{0} ms (set by hand)", { juce::String (ref->latencyOverrideMs, 2) })
@@ -660,9 +777,13 @@ private:
     juce::TextButton latency, locate;
     // Processing › Connections (round 188d)
     bool connections = false;
-    ConnectionRows outputRows;
+    int mixerTrack = -1, mixerSlot = -1; // an effect's insert and slot (−1: a channel's generator)
+    bool effectSlot = false;
+    ConnectionRows inputRows, outputRows;
+    juce::Component columns; // the two columns side by side, in the viewport
     juce::Viewport connectionsView;
-    juce::TextButton resetIo, autoMap;
+    juce::TextButton resetIo, autoMap, autoMapIn;
+    juce::Rectangle<int> inputsGlyph;
     juce::ShapeButton refreshIo { "refresh", {}, {}, {} };
     juce::Rectangle<int> outputsGlyph;
     int tab = 0;
@@ -677,7 +798,7 @@ public:
     WrappedEditor (juce::AudioProcessorEditor* e, AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
                    bool channel, int scTrack = -1, int scSlot = -1)
         : engineRef (engine), sideTrack (scTrack), sideSlot (scSlot),
-          editor (e), page (engine, std::move (find), plugin, channel), presets (plugin, [&engine] { engine.markModified(); })
+          editor (e), page (engine, std::move (find), plugin, channel, scTrack, scSlot), presets (plugin, [&engine] { engine.markModified(); })
     {
         // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
         // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
@@ -1235,9 +1356,9 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 } // namespace
 
 juce::Image wrapperSettingsSnapshot (AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
-                                     bool channel, int tab, float scale)
+                                     bool channel, int tab, float scale, int track, int slot)
 {
-    WrapperSettingsPage page (engine, std::move (find), plugin, channel);
+    WrapperSettingsPage page (engine, std::move (find), plugin, channel, track, slot);
     page.setSize (520, page.preferredHeight());
     page.selectTab (tab);
     return page.createComponentSnapshot (page.getLocalBounds(), true, scale);

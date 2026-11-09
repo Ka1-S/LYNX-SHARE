@@ -2961,6 +2961,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     made = makeEffectSlot (EffectKind::plugin);
                     made->plugin.name = foreign.name;
                     applyFlWrapperOptions (foreign, made->plugin);
+                    // Processing › Connections (round 188d): the side input (input 2) listens to the insert its
+                    // sidechain index picks in this insert's inputs list
+                    if (made->plugin.inputs.size() > 1 && made->plugin.inputs[1].offset > 0 && made->plugin.inputs[1].isActive (true))
+                        if (const auto source = sidechainSource (insert.index, made->plugin.inputs[1].offset); source > 0 && source != insert.index)
+                            made->sidechain = source;
                     made->plugin.foreign = std::move (foreign);
                 }
                 else

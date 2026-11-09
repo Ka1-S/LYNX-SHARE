@@ -90,6 +90,20 @@ std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& pl
     return list;
 }
 
+std::vector<PluginOutputInfo> pluginInputs (const juce::AudioPluginInstance& plugin)
+{
+    std::vector<PluginOutputInfo> list;
+    int channel = 0;
+    for (int b = 0; b < plugin.getBusCount (true); ++b)
+        if (const auto* bus = plugin.getBus (true, b))
+        {
+            const auto n = bus->getLastEnabledLayout().size();
+            list.push_back ({ bus->getName(), channel, juce::jmax (1, n), b == 0 || bus->isEnabledByDefault() });
+            channel += bus->isEnabled() ? bus->getNumberOfChannels() : 0;
+        }
+    return list;
+}
+
 void setPluginRenderMode (juce::AudioPluginInstance& plugin, bool offline, int blockSize)
 {
     if (plugin.isNonRealtime() == offline)

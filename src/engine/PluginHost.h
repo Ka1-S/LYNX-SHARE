@@ -57,6 +57,9 @@ struct PluginOutputInfo
     bool activeByDefault = true; // what the plugin declares (VST3 bus kDefaultActive, VST2 pin kVstPinIsActive)
 };
 std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& plugin);
+// The same for the inputs (an effect's: input 1 = its main input, input 2 = the side input), every bus listed whether
+// enabled or not (LYNX turns a side bus on only while it is fed)
+std::vector<PluginOutputInfo> pluginInputs (const juce::AudioPluginInstance& plugin);
 
 // FL's wrapper options a hosted plugin follows while it runs (REA round 151; PluginRef has them, saved per plugin)
 struct HostedOptions
