@@ -1219,20 +1219,21 @@ struct NebulaMode
     const char* name;
     double dm0, dm100, mult0, mult100, corr, gain;
 };
-// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (measured, §4),
+// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (round 183b: the
+// reference's tail at its defaults, Mod depth 50 %; mono modes 1.0, one mode −1),
 // wet gain (round 172d: the reference's wet level per mode at Mix 100 %, impulse / bursts / music, defaults otherwise)
 LYNX_FIT_TABLE NebulaMode nebulaModes[nebula::modeCount] = {
-    { "Ripple", 1.03, 1.26, 1, 1, 0.93, 2.41 },        { "Swell", 3.43, 3.82, 1, 2, -0.31, 1.60 },
-    { "Fold", 1.33, 1.39, 1, 2, -0.25, 1.79 },       { "Drift", 2.56, 2.67, 1, 1, 0.25, 1.12 },
-    { "Abyss", 3.64, 3.97, 1, 2, -0.21, 1.26 },      { "Vortex", 7.04, 6.77, 2, 2, 0.29, 1.05 },
-    { "Glint", 1.03, 1.17, 1, 1, 0.77, 1.67 },        { "Pulse", 1.03, 1.22, 1, 1, 0.87, 1.93 },
-    { "Expanse", 4.29, 12.8, 8, 1, 0.39, 3.57 },       { "Haze", 2.14, 12.3, 4, 1, 0.63, 3.87 },
-    { "Veil", 2.02, 5.04, 2, 1, 0.72, 1.43 },  { "Mist", 1.00, 1.01, 1, 1, 0.47, 1.49 },
-    { "Monolith", 2.16, 16.3, 4, 1, 1.0, 3.84 },       { "Eternity", 20.0, 20.7, 8, 1, -0.30, 2.06 },
-    { "Tide", 1.00, 1.12, 1, 1, 0.54, 1.50 },      { "Shoal", 1.03, 1.30, 1, 1, 0.37, 1.51 },
-    { "Spark", 1.00, 1.05, 1, 1, 0.95, 2.43 },       { "Plateau", 2.10, 9.65, 4, 1, 0.0, 3.62 },
-    { "Dusk", 4.15, 12.65, 8, 1, 0.31, 2.86 },       { "Mirage", 1.00, 1.35, 1, 2, -0.43, 1.50 },
-    { "Cluster", 1.02, 1.01, 1, 1, -0.10, 2.56 },    { "Beacon", 1.16, 1.04, 1, 1, 0.84, 2.27 },
+    { "Ripple", 1.03, 1.26, 1, 1, 0.0, 2.41 },        { "Swell", 3.43, 3.82, 1, 2, 0.04, 1.60 },
+    { "Fold", 1.33, 1.39, 1, 2, 0.04, 1.79 },       { "Drift", 2.56, 2.67, 1, 1, 0.09, 1.12 },
+    { "Abyss", 3.64, 3.97, 1, 2, -0.01, 1.26 },      { "Vortex", 7.04, 6.77, 2, 2, 0.02, 1.05 },
+    { "Glint", 1.03, 1.17, 1, 1, 0.07, 1.67 },        { "Pulse", 1.03, 1.22, 1, 1, 0.0, 1.93 },
+    { "Expanse", 4.29, 12.8, 8, 1, 1, 3.57 },       { "Haze", 2.14, 12.3, 4, 1, 1, 3.87 },
+    { "Veil", 2.02, 5.04, 2, 1, 0.0, 1.43 },  { "Mist", 1.00, 1.01, 1, 1, 0.0, 1.49 },
+    { "Monolith", 2.16, 16.3, 4, 1, 1, 3.84 },       { "Eternity", 20.0, 20.7, 8, 1, -1, 2.06 },
+    { "Tide", 1.00, 1.12, 1, 1, 0.0, 1.50 },      { "Shoal", 1.03, 1.30, 1, 1, -0.04, 1.51 },
+    { "Spark", 1.00, 1.05, 1, 1, -0.02, 2.43 },       { "Plateau", 2.10, 9.65, 4, 1, 0.95, 3.62 },
+    { "Dusk", 4.15, 12.65, 8, 1, 0.99, 2.86 },       { "Mirage", 1.00, 1.35, 1, 2, 0.0, 1.50 },
+    { "Cluster", 1.02, 1.01, 1, 1, 0.02, 2.56 },    { "Beacon", 1.16, 1.04, 1, 1, -0.01, 2.27 },
 };
 double nebulaDelayMs (float v) { return knotLaw (v, nebulaDelayKnots, nebulaDelayCount); }
 const char* const syncNames[4] = { "ms", "Note", "Dotted", "Triplet" };
@@ -1284,8 +1285,11 @@ protected:
         s.loopDiffusion = 0.85 * dens;
         s.crossFeed = 0.3 + 0.7 * dens;
         s.parallelLines = dens < 0.02; // density 0: plain repeats of the delay
-        // stereo: plain echoes are mono (density 0); the shape's correlation at full density; warp decorrelates
-        const auto corr = (1.0 + (m.corr - 1.0) * dens) * (1.0 - std::min (1.0, 2.0 * warp));
+        // round 183b: stereo. The reference's tail is decorrelated whenever it modulates (L/R correlation −0.01 at the
+        // default Mod depth, 0.13 / 0.34 at 25 / 10 %, 1.0 at 0, at any Density) and this network decorrelates the
+        // same way through its modulated lines, so the width is the panel's; only the reference's mono modes (its
+        // correlation, measured per mode at the defaults) narrow it. Before, Density 0 played mono
+        const auto corr = m.corr;
         const auto w = std::sqrt ((1.0 - corr) / (1.0 + corr + 1e-3));
         s.width = (-1.0 + 2.0 * p[7]) * std::min (2.0, w);
         // round 172d: both cuts are first order in the reference (Mix 100 %, cuts at 5 … 70 % / 10 … 75 %: −3 dB at the
@@ -1304,6 +1308,11 @@ protected:
         s.gain = m.gain * std::pow (10.0, fbDb / 20.0);
         s.lowShelfHz = 220.0;
         s.lowShelfDb = 8.0 * std::min (1.0, dens / 0.15);
+        // round 183b: the reference's eight voices fall apart as they modulate (its tail ~9 dB louder and mono at Mod
+        // depth 0: +8.9 dB against 50 %, −3.6 dB at 10 %); this network's lines part less, so the rest comes in here.
+        // The level is re-measured with the full width: −0.9 dB at Density 0, −4.2 dB from Density 50 % up (the dense
+        // network's sides were nearly mono before)
+        s.gain *= (0.9 - 0.28 * std::min (1.0, dens / 0.5)) * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
     }
 };
 
