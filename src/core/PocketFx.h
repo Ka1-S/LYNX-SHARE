@@ -24,6 +24,10 @@
 //     pan (0.5, Ping-Pong), [6] Dry pan (0; FLM's saved flag: Input pan also pans the dry in Ping-Pong).
 //   Pocket Tape Delay (EffectKind::pocketTapeDelay, FLM module 18): [0] Time (0.6; v² s), [1] Feedback (0.6), [2] Async
 //     (0.5; shortens one side by up to half), [3] Mix (0.4; the echo is × Mix × Feedback). A variable-speed tape loop.
+//   Pocket MultiFX (EffectKind::pocketMultiFx, FLM module 4): [0] FX Kind (0: Delay, Reverb, LP Filter, HP Filter,
+//     Flanger, Phaser, Panner, Vox), [1] Axis X (0.5), [2] Axis Y (0.5), [3] LFO Rate (0.61: 1/8 beat … 4 bars in 10
+//     steps), [4] LFO Amount (0; squared), [5] LFO Shape (0: Sine / Saw / Square). An X/Y pad over eight effects with
+//     a song-locked LFO; a kind change cross-fades (core/PocketMultiFx.cpp).
 
 #include <memory>
 #include <string>
@@ -32,7 +36,7 @@
 
 namespace lynx::pocket
 {
-constexpr int distortionParams = 6, limiterClassicParams = 3, limiterParams = 4, levellerParams = 2, gateParams = 8, tranceDelayParams = 7, tapeDelayParams = 4;
+constexpr int distortionParams = 6, limiterClassicParams = 3, limiterParams = 4, levellerParams = 2, gateParams = 8, tranceDelayParams = 7, tapeDelayParams = 4, multiFxParams = 6;
 
 // Distortion's curves: soft knee x/(k|x| + 1), tanh, exponential, hard clip
 const char* distortionKindName (int kind) noexcept;
@@ -45,6 +49,7 @@ std::unique_ptr<Effect> makeLeveller();
 std::unique_ptr<Effect> makeGate();
 std::unique_ptr<Effect> makeTranceDelay();
 std::unique_ptr<Effect> makeTapeDelay();
+std::unique_ptr<Effect> makeMultiFx(); // core/PocketMultiFx.cpp
 
 std::string distortionParamText (int param, float v);
 std::string limiterClassicParamText (int param, float v);
@@ -53,5 +58,9 @@ std::string levellerParamText (int param, float v);
 std::string gateParamText (int param, float v);
 std::string tranceDelayParamText (int param, float v);
 std::string tapeDelayParamText (int param, float v);
+std::string multiFxParamText (int param, float v);
+const char* multiFxKindName (int kind) noexcept;            // "Delay", "Reverb", … "Vox"
+int multiFxKind (float v) noexcept;                          // ⌊7v⌋
+const char* multiFxAxisName (int kind, bool yAxis) noexcept; // the pad's axis labels per kind
 const char* tranceTimeName (float v) noexcept; // "1/4" … "1/1" (of a beat)
 } // namespace lynx::pocket

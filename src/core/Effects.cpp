@@ -3031,6 +3031,12 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                   { "Mix", 0.4f } } };
             return info;
         }
+        case EffectKind::pocketMultiFx:
+        {
+            static const EffectInfo info { "Pocket MultiFX", { { "FX kind", 0.0f }, { "X", 0.5f }, { "Y", 0.5f }, { "LFO rate", 0.61f },
+                                                               { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
+            return info;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3829,6 +3835,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::tranceDelayParamText (param, v);
         case EffectKind::pocketTapeDelay:
             return pocket::tapeDelayParamText (param, v);
+        case EffectKind::pocketMultiFx:
+            return pocket::multiFxParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4172,6 +4180,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketGate: return pocket::makeGate();
         case EffectKind::pocketTranceDelay: return pocket::makeTranceDelay();
         case EffectKind::pocketTapeDelay: return pocket::makeTapeDelay();
+        case EffectKind::pocketMultiFx: return pocket::makeMultiFx();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

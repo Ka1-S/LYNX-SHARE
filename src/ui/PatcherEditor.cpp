@@ -1668,7 +1668,7 @@ private:
                 return "Filter";
             case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
             case EffectKind::fruityFlangus: case EffectKind::fruityFlanger: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:
-            case EffectKind::orbit: case EffectKind::latticeMod:
+            case EffectKind::orbit: case EffectKind::latticeMod: case EffectKind::pocketMultiFx:
                 return "Flanger";
             case EffectKind::patcher:
                 return "Patcher";

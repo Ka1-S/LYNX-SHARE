@@ -221,3 +221,60 @@ TEST (flm188h_post_gain_and_new_modules)
            && flmfx::map (flm188f::moduleOf (27, { 1.0f })).slots[0].kind == EffectKind::pocketGate
            && flmfx::map (flm188f::moduleOf (18, { 1.0f })).slots[0].kind == EffectKind::pocketTapeDelay);
 }
+
+TEST (flm188h_pocket_multifx)
+{
+    using namespace lynx;
+    const auto K = EffectKind::pocketMultiFx;
+    // Delay (kind 0), LFO Rate 1 beat → the delay runs at twice it: 2 beats at 120 BPM = 1 s, × ⅓ → (72000 − 1)·⅓ =
+    // 23999 samples; Y 0.5 = an open loop filter (one sample later); X 0.7 → feedback and echo level 0.49
+    {
+        std::vector<std::array<float, 2>> in (50000, { 0.0f, 0.0f });
+        in[0] = { 1.0f, 1.0f };
+        const auto o = flm188h::run (K, { 0.0f, 0.7f, 0.5f, 0.61f, 0.0f, 0.0f }, in);
+        CHECK (o[0][0] == 1.0f && std::abs (o[23999][0]) < 1e-7f && flm188h::near (o[24000][0], 0.49, 1e-5) && flm188h::near (o[24000][1], 0.49, 1e-5)
+               && flm188h::near (o[48000][0], 0.49 * 0.49, 1e-5));
+    }
+    // LP Filter (kind 2): four equal biquads; at DC each passes (1 + s/Q)/(1 + s/2Q) (FLM's gain normalisation)
+    {
+        std::vector<std::array<float, 2>> in (40000, { 0.5f, 0.5f });
+        const auto o = flm188h::run (K, { 2.0f / 7.0f + 1e-4f, 0.5f, 0.5f, 0.61f, 0.0f, 0.0f }, in);
+        const auto hz = std::pow (2.0, 8.28 * 0.5 + 6.0), q = 1.5, s = std::sin (6.283185307179586 * hz / 48000.0);
+        const auto dc = std::pow ((1.0 + s / q) / (1.0 + s / (2.0 * q)), 4.0);
+        CHECK (flm188h::near (o.back()[0], 0.5 * dc, 1e-3));
+    }
+    // Panner (kind 6) at the centre: a one-sample delay
+    {
+        std::vector<std::array<float, 2>> in (64, { 0.0f, 0.0f });
+        in[0] = { 1.0f, -1.0f };
+        const auto o = flm188h::run (K, { 6.0f / 7.0f + 1e-4f, 0.5f, 0.5f, 0.61f, 0.0f, 0.0f }, in);
+        CHECK (std::abs (o[0][0]) < 1e-7f && flm188h::near (o[1][0], 1.0, 1e-6) && flm188h::near (o[1][1], -1.0, 1e-6));
+    }
+    // Reverb (kind 1): the dry passes, the plate adds a tail
+    {
+        std::vector<std::array<float, 2>> in (24000, { 0.0f, 0.0f });
+        in[0] = { 1.0f, 1.0f };
+        const auto o = flm188h::run (K, { 1.0f / 7.0f + 1e-4f, 1.0f, 0.5f, 0.61f, 0.0f, 0.0f }, in);
+        double tail = 0.0;
+        for (std::size_t i = 4800; i < o.size(); ++i)
+            tail += std::abs (o[i][0]);
+        CHECK (flm188h::near (o[0][0], 1.0, 0.05) && tail > 1.0);
+    }
+    // the other kinds run and stay finite
+    for (int k = 0; k < 8; ++k)
+    {
+        std::vector<std::array<float, 2>> in (9600);
+        for (std::size_t i = 0; i < in.size(); ++i)
+            in[i] = { 0.3f * (float) std::sin (0.03 * (double) i), 0.3f * (float) std::cos (0.017 * (double) i) };
+        const auto o = flm188h::run (K, { (float) k / 7.0f + 1e-4f, 0.8f, 0.7f, 0.3f, 0.5f, 0.0f }, in);
+        bool finite = true;
+        for (const auto& f : o)
+            finite = finite && std::isfinite (f[0]) && std::isfinite (f[1]) && std::abs (f[0]) < 10.0f;
+        CHECK (finite);
+    }
+    CHECK (pocket::multiFxParamText (0, 1.0f / 7.0f + 1e-4f) == "Reverb" && pocket::multiFxParamText (3, 0.61f) == "beat"
+           && std::string (pocket::multiFxAxisName (7, true)) == "Size");
+    // the import copies FLM's values
+    const auto mapped = flmfx::map (flm188f::moduleOf (4, { 1.0f, 0.1429f, 0.3f, 0.6f, 0.61f, 0.25f, 0.5f }));
+    CHECK (mapped.slots.size() == 1 && mapped.slots[0].kind == K && mapped.slots[0].params[0] == 0.1429f && mapped.slots[0].params[5] == 0.5f);
+}

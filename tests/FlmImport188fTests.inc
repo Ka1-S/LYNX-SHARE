@@ -238,8 +238,8 @@ TEST (flm188f_autoduck_and_reverbs)
                                         3, { 0.0f, 0.4f, 0.6f });
         CHECK (t.size() == 1 && t[0].slot == 0 && t[0].param == 12);
     }
-    // MultiFX: no LYNX equivalent
-    CHECK (flmfx::map (flm188f::moduleOf (4, { 1.0f, 0.1429f, 0.5f, 0.5f, 0.61f, 0.0f, 0.0f })).slots.empty());
+    // MultiFX: Pocket MultiFX since round 188h
+    CHECK (flmfx::map (flm188f::moduleOf (4, { 1.0f, 0.1429f, 0.5f, 0.5f, 0.61f, 0.0f, 0.0f })).slots.size() == 1);
 }
 
 namespace flm188f
@@ -292,13 +292,13 @@ TEST (flm188f_imports_effects_and_their_lanes)
     CHECK (s.mixer.size() == 2);
     if (s.mixer.size() != 2)
         return;
-    // the Pad insert: the Equalizer, then the Filter (one slot each); the master's MultiFX is listed
+    // the Pad insert: the Equalizer, then the Filter (one slot each); the master's MultiFX: Pocket MultiFX (round 188h)
     const auto& fx = s.mixer[1].effects;
-    CHECK (fx.size() == 2 && s.mixer[0].effects.empty());
+    CHECK (fx.size() == 2 && s.mixer[0].effects.size() == 1 && s.mixer[0].effects[0].kind == EffectKind::pocketMultiFx);
     if (fx.size() == 2)
         CHECK (fx[0].kind == EffectKind::parametricEq && fx[1].kind == EffectKind::parametricEq && fx[0].enabled);
     CHECK (report.converted.count ("FL Studio Mobile: Equalizer") == 1 && report.converted.count ("FL Studio Mobile: Filter") == 1
-           && report.droppedEffects.count ("FL Studio Mobile: MultiFX") == 1);
+           && report.converted.count ("FL Studio Mobile: MultiFX") == 1 && report.droppedEffects.empty());
     // the Filter's frequency lane: both bands and the output level of slot 1, on three rows; the MultiFX lane is listed
     std::set<int> params;
     for (const auto& a : s.automations)
