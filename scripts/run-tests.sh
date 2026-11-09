@@ -10,6 +10,9 @@
 # so the scripts that read it work unchanged. A shard that crashes adds a "  FAILED" line under the test it was running.
 # Exit status: 0 only if every shard ran to its end with 0 failures. -j 1: the plain single run of lynx_tests.
 # The shard logs stay in <lynx_tests>.shards/ (LYNX_TEST_LOGS=<dir> to choose).
+# tests/test-weights.txt ("<name> <ms>", the slowest tests of a CI run and of a local run with FL's Data, the larger of
+# the two) balances the shards, heaviest first; refresh it with: cat <lynx_tests>.shards/*.times. It only changes which
+# shard runs a test, never whether it runs.
 set -u
 jobs="${LYNX_TEST_JOBS:-}" shards=""
 while [[ $# -gt 0 ]]; do
@@ -27,6 +30,12 @@ case "$jobs" in '' | *[!0-9]* | 0) echo "run-tests: -j wants a number or auto, n
 [[ -n "$shards" ]] || shards=$((jobs * 3))
 here="$(cd "$(dirname "$0")/.." && pwd)"
 serial="$(grep -v '^ *#' "$here/tests/serial-tests.txt" 2> /dev/null | tr -d ' \r' | grep . | paste -sd, -)"
+heavy=""
+if [[ "${LYNX_TEST_SKIP_HEAVY:-0}" == 1 ]]; then
+    heavy="$(grep -v '^ *#' "$here/tests/heavy-tests.txt" 2> /dev/null | tr -d ' \r' | grep . | paste -sd, -)"
+    [[ -n "$heavy" ]] && echo "run-tests: LYNX_TEST_SKIP_HEAVY=1: the tests of tests/heavy-tests.txt do NOT run"
+fi
+skip=(); [[ -n "$heavy" ]] && skip=(--exclude "$heavy")
 logs="${LYNX_TEST_LOGS:-$bin.shards}"
 mkdir -p "$logs" && rm -f "$logs"/*.log "$logs"/*.times "$logs"/*.rc
 weights=()
@@ -35,11 +44,11 @@ started=$(date +%s)
 echo "run-tests: $shards shards, $jobs at a time$([[ -n "$serial" ]] && echo ", then the serial tests alone") (logs in $logs)"
 
 # one shard: <k> [arguments]; writes <k>.log, <k>.times and <k>.rc (xargs runs N at a time; works with macOS' bash 3.2)
-export bin logs shards serial
+export bin logs shards serial heavy
 runshard() {
     local k="$1"; shift
-    local ex=(); [[ -n "$serial" ]] && ex=(--exclude "$serial")
-    "$bin" "$@" ${ex[@]+"${ex[@]}"} --shard "$k/$shards" --times "$logs/$k.times" > "$logs/$k.log" 2>&1
+    local ex=() skip=(); [[ -n "$serial" ]] && ex=(--exclude "$serial"); [[ -n "$heavy" ]] && skip=(--exclude "$heavy")
+    "$bin" "$@" ${ex[@]+"${ex[@]}"} ${skip[@]+"${skip[@]}"} --shard "$k/$shards" --times "$logs/$k.times" > "$logs/$k.log" 2>&1
     echo $? > "$logs/$k.rc"
 }
 export -f runshard
@@ -47,7 +56,7 @@ for ((k = 1; k <= shards; ++k)); do echo "$k"; done |
     xargs -P "$jobs" -I{} bash -c 'runshard "$@"' runshard {} "$@" ${weights[@]+"${weights[@]}"}
 para=$(( $(date +%s) - started ))
 if [[ -n "$serial" ]]; then
-    "$bin" "$@" --filter "$serial" --times "$logs/serial.times" > "$logs/serial.log" 2>&1
+    "$bin" "$@" ${skip[@]+"${skip[@]}"} --filter "$serial" --times "$logs/serial.times" > "$logs/serial.log" 2>&1
     echo $? > "$logs/serial.rc"
 fi
 
