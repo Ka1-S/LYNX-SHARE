@@ -15,7 +15,8 @@
 //   params <out.tsv> [steps]          parameter table: index, id, name, label, default, steps, texts at k/steps
 //   texts <name|#index> <out.tsv> [steps]   value -> text for one parameter at a finer grid
 //   set <name|#index> <normalized>    set a parameter (normalized 0..1)
-//   settext <name|#index> <text>      set a parameter from its text (plugin's own text -> value)
+//   settext <name|#index> <text>      set a parameter from its text (plugin's own text -> value); a text that no value
+//                                     shows (or an unknown parameter in set/settext) stops the script, exit code 3
 //   get <name|#index>                 print value and text
 //   defaults                          every parameter back to its default value
 //   reset                             AudioProcessor::reset
@@ -51,6 +52,7 @@ struct Host
 {
     juce::AudioPluginFormatManager formats;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
+    bool failed = false; // a set/settext the script cannot apply: the run stops, exit code 3
     double rate = 48000.0;
     int block = 512;
     bool sidechain = false;
@@ -503,8 +505,20 @@ struct Host
         log ("texts " + p->getName (256) + " -> " + out.getFileName());
     }
 
+    // whether a parameter text shows the asked text: names equal (case ignored), numbers within 0.1 % ("12.0 kHz" = 12000)
+    static bool shows (const juce::String& shown, const juce::String& text)
+    {
+        const auto first = text.trimStart()[0];
+        if (! ((first >= '0' && first <= '9') || first == '-' || first == '+' || first == '.'))
+            return shown.trim().equalsIgnoreCase (text.trim());
+        const double want = text.getDoubleValue();
+        const double got = shown.getDoubleValue() * (shown.containsIgnoreCase ("khz") && ! text.containsIgnoreCase ("k") ? 1000.0 : 1.0);
+        return std::abs (got - want) <= 1e-3 * juce::jmax (1.0, std::abs (want));
+    }
+
     // text -> normalized value: numbers go through the plugin's own parser; names (enumerations) are found by scanning
-    // the value -> text mapping (the middle of the range that shows the text)
+    // the value -> text mapping (the middle of the range that shows the text). −1 when no value shows the text (round
+    // tp172b7: Pro-MB's "Minimum Phase" was not a text of its mode; the old fallback set 0 = Linear Phase silently)
     static float textToValue (juce::AudioProcessorParameter* p, const juce::String& text)
     {
         const auto first = text.trimStart()[0];
@@ -513,20 +527,19 @@ struct Host
         {
             const double want = text.getDoubleValue();
             const float v = p->getValueForText (text);
-            const double got = p->getText (v, 256).getDoubleValue();
-            if (std::abs (got - want) <= 1e-3 * juce::jmax (1.0, std::abs (want)))
+            if (v >= 0.0f && v <= 1.0f && shows (p->getText (v, 256), text)) // (a parser may return an unnormalized value)
                 return v;
             int lo = -1, hi = -1; // stepped numbers the parser does not take: scan for the value
             for (int k = 0; k <= n; ++k)
                 if (std::abs (p->getText ((float) k / n, 256).getDoubleValue() - want) <= 1e-6 * juce::jmax (1.0, std::abs (want))) { if (lo < 0) lo = k; hi = k; }
                 else if (lo >= 0) break;
-            return lo < 0 ? v : (float) (lo + hi) / (2.0f * n);
+            return lo < 0 ? -1.0f : (float) (lo + hi) / (2.0f * n);
         }
         int lo = -1, hi = -1;
         for (int k = 0; k <= n; ++k)
             if (p->getText ((float) k / n, 256).trim().equalsIgnoreCase (text.trim())) { if (lo < 0) lo = k; hi = k; }
             else if (lo >= 0) break;
-        return lo < 0 ? p->getValueForText (text) : (float) (lo + hi) / (2.0f * n);
+        return lo < 0 ? -1.0f : (float) (lo + hi) / (2.0f * n);
     }
 
     void setParam (juce::AudioProcessorParameter* p, float v)
@@ -660,11 +673,24 @@ struct Host
             else if (cmd == "set" || cmd == "settext")
             {
                 auto* p = find (a[1]);
-                if (p == nullptr) { log ("error: no parameter " + a[1]); continue; }
+                if (p == nullptr) { log ("error: no parameter " + a[1] + " (script stopped)"); failed = true; return; }
                 const auto valueText = line.fromFirstOccurrenceOf (a[1], false, false).trim().unquoted();
                 const float v = cmd == "set" ? valueText.getFloatValue() : textToValue (p, valueText);
+                if (cmd == "settext" && v < 0.0f)
+                {
+                    log ("error: no value of " + p->getName (256) + " shows the text \"" + valueText + "\" (script stopped)");
+                    failed = true;
+                    return;
+                }
                 setParam (p, juce::jlimit (0.0f, 1.0f, v));
                 log ("set " + p->getName (256) + " = " + norm (p->getValue()) + " (" + p->getCurrentValueAsText() + ")");
+                if (cmd == "settext" && ! shows (p->getCurrentValueAsText(), valueText))
+                {
+                    // round tp172b7: the plugin now shows another text than asked (its value -> text scan misled us)
+                    log ("error: " + p->getName (256) + " shows \"" + p->getCurrentValueAsText() + "\", not \"" + valueText + "\" (script stopped)");
+                    failed = true;
+                    return;
+                }
             }
             else if (cmd == "get")
             {
@@ -756,6 +782,6 @@ int main (int argc, char** argv)
     std::printf ("%d lines\n", lines.size()); std::fflush (stdout);
     host.run (lines);
     host.plugin.reset();
-    std::printf ("done\n"); std::fflush (stdout);
-    std::_Exit (0); // skip global teardown (some plugins hang there)
+    std::printf (host.failed ? "FAILED\n" : "done\n"); std::fflush (stdout);
+    std::_Exit (host.failed ? 3 : 0); // skip global teardown (some plugins hang there)
 }

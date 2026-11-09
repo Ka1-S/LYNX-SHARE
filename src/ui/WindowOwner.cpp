@@ -541,6 +541,11 @@ void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> h
    #endif
 }
 
+bool runSecondaryWindowKey (const juce::KeyPress& key)
+{
+    return keyForwarder().handler != nullptr && keyForwarder().handler (key);
+}
+
 void keepAboveMainWindow (juce::Component& window)
 {
     window.addKeyListener (&keyForwarder()); // (JUCE adds it once)

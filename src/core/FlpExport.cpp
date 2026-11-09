@@ -1,3 +1,4 @@
+#include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 
 #include <algorithm>
@@ -79,6 +80,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::midiOut, "MIDI Out", false },        { InstrumentKind::voltage, "Fruity Voltage Controller", false },
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
+    { InstrumentKind::fruityslicer, "Fruity Slicer", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -446,7 +448,10 @@ void applyFreeze (Song& song, int channel, const std::string& wav, std::int64_t 
     frozen.instrument = InstrumentKind::audioClip;
     frozen.samplePath = wav;
     frozen.mixerTrack = mixerTrack;
-    frozen.volume = 1.0f; // unity: the render holds the channel's level and pan
+    // unity: the render holds the channel's level and pan. A Playlist audio clip plays at unity at FL's default channel
+    // volume (10000 of 12800, Instruments.cpp audioClipUnity), in FL as in LYNX; 100 % played the render 5.2 dB louder
+    // (round 182b: Patience exported from a Live set rendered +4.3 dB in FL and in LYNX)
+    frozen.volume = audioClipUnityVolume;
     frozen.colour = colour;
     frozen.uid = c.uid;
     c = std::move (frozen);
@@ -520,6 +525,7 @@ int applyInsertRender (Song& song, int track, const std::string& wav, std::int64
     const auto added = applyBounce (song, track, wav, length);
     if (added < 0)
         return -1;
+    song.channels.back().volume = audioClipUnityVolume; // the render plays at unity in FL (see applyFreeze)
     std::string list;
     for (const auto& n : names)
         list += (list.empty() ? "" : ", ") + n;
@@ -656,8 +662,6 @@ struct Converter
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
-                if (c.muted)
-                    continue; // (left out)
                 use (c.start);
                 // (an audio clip's length goes unstretched, as playlistItem writes it)
                 use (c.kind == ClipKind::audio && c.stretch > 0.0 && c.stretch != 1.0 ? (std::int64_t) std::llround ((double) c.length / c.stretch)
@@ -1237,6 +1241,36 @@ struct Converter
             }
             if (c.automation.empty())
                 c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
+            // FL's clip LFO (round 177b): the fields back as they were read; the level carries the clip's range (FL scales
+            // the LFO by its channel range, written whole here)
+            if (const auto& lfo = src.lfo; ! lfo.isDefault())
+            {
+                auto& f = c.automationLfo;
+                f.present = true;
+                f.enabled = lfo.on ? -1 : 0;
+                f.level = std::abs (lfo.range - 1.0f) < 1.0e-6f ? lfo.level : (int) std::lround (lfo.level * lfo.range);
+                f.mode = lfo.add ? 1 : 0;
+                f.flags = lfo.flags;
+                f.speed = lfo.speed;
+                f.tension = lfo.tension;
+                f.skew = lfo.skew;
+                f.pulseWidth = lfo.pulseWidth;
+                f.phase = lfo.phase;
+                if (lfo.fl.present)
+                {
+                    f.mainFlags = lfo.fl.mainFlags;
+                    f.mainEnabled = lfo.fl.mainEnabled;
+                    f.mainLoop = lfo.fl.mainLoop;
+                    f.adsr = lfo.fl.adsr;
+                    f.lfoLoop = lfo.fl.lfoLoop;
+                }
+                f.points.clear();
+                for (std::size_t i = 0; i < lfo.amp.size(); ++i)
+                    f.points.push_back ({ (double) lfo.amp[i].tick / ppq, (double) std::clamp (lfo.amp[i].value, 0.0f, 1.0f),
+                                          i > 0 ? -lfo.amp[i - 1].tension : 0.0f, 0 });
+                if (lfo.amp == lfo.fl.rawAmp && lfo.fl.rawPoints.size() == lfo.amp.size() * 24)
+                    f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
+            }
             automationChannel[a] = c.index;
             if (id)
                 out.automationLinks.push_back ({ c.index, *id });
@@ -1264,19 +1298,9 @@ struct Converter
             a.name = arrangement.name;
             for (const auto& m : current ? song.markers() : arrangement.markers)
                 a.markers.push_back (marker (m));
-            int muted = 0;
             for (const auto& clip : clips)
-            {
-                if (clip.muted)
-                {
-                    ++muted; // (FL's clip mute is not in the model: a muted clip is left out, as it is heard)
-                    continue;
-                }
                 if (auto item = playlistItem (clip))
                     a.items.push_back (*item);
-            }
-            if (muted > 0)
-                report.notes.push_back ("Arrangement '" + a.name + "': " + std::to_string (muted) + " muted clip(s) left out");
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
                 a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
@@ -1291,6 +1315,8 @@ struct Converter
         item.track = std::clamp (clip.track, 0, 499);
         item.position = ticks (clip.start);
         item.length = std::max<std::uint32_t> (1, ticks (clip.length));
+        // FL's clip mute: bit 0x2000 of the item flags (issue #110, REA round 182e)
+        item.flags = (std::uint16_t) (flp::PlaylistItem::defaultFlags | (clip.muted ? flp::PlaylistItem::mutedFlag : 0));
         switch (clip.kind)
         {
             case ClipKind::pattern:
@@ -1438,7 +1464,8 @@ struct Converter
             for (int b = 0; b < 3; ++b)
             {
                 const auto& eq = track.eq;
-                control (0, flp::ControlId::mixerEqBase + b, std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
+                // (a bypassed EQ, LYNX's own: FL has no bypass, so it goes flat — what is heard stays the same)
+                control (0, flp::ControlId::mixerEqBase + b, eq.bypassed ? 0 : std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
                 const auto hz = std::clamp ((double) eq.hz[(std::size_t) b], 10.0, 16000.0);
                 control (0, flp::ControlId::mixerEqBase + 8 + b, std::clamp (iround (65536.0 * std::log ((hz - 10.0) / 159.9 + 1.0) / std::log (101.0)), 0, 65536));
                 control (0, flp::ControlId::mixerEqBase + 16 + b, std::clamp (iround (eq.width[(std::size_t) b] * 65536.0), 0, 65536));
@@ -1620,6 +1647,14 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
+    if (const auto n = autolanes::lanesToClips (song); n > 0)
+        report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
+    // modulators (round 177b): FL has none; the modulated controls keep their own values
+    for (const auto& m : song.modulators)
+        if (! m.routes.empty())
+            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
+                                      + " target(s)): FL has no modulators; the targets keep their own values");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);

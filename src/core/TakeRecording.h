@@ -82,17 +82,27 @@ int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t en
 void linkTakeTrack (Song& song, int track, int insert);
 
 // Puts recorded takes on the Playlist: one audio channel per file (through its insert; 0 = a new free insert) and a
-// clip per part. Several parts that cover the same song range (loop passes) are take lanes: the last pass plays on
-// the take's track, the earlier ones go muted on the tracks below it, grouped under it (folded), newest first.
+// clip per part. Loop passes land as FL 26 leaves them (observed, REA round 177c): one track per pass, each on the next track
+// with no clip in its range. The first keeps what it was, usually the header of a new open group; the others join it and take
+// its name if it has one, else they stay "Track N". With Blend off every pass is muted, with Blend on every pass plays.
+// Comping is a later, explicit step (comp::compTakes).
 struct TakeFile
 {
     std::string path, name;
     int insert = 0;
 };
-void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::vector<Part>& parts);
+struct TakeOptions
+{
+    bool loopRecord = false;    // recorded with Loop record on, over a loop region: a lone pass follows `blend` too
+    bool blend = false;         // "Blend recorded notes"
+    // LYNX's own option (round 163's result): the last pass on top, playing, the earlier ones muted below it, newest
+    // first, folded
+    bool lastPassPlays = false;
+};
+void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::vector<Part>& parts, TakeOptions options = {});
 
-// Comping (round 163): the comp track of a take lane = the group header above a grouped Playlist track (-1: the track
-// is not a lane). promoteTake() puts [from, to) of audio clip `clipIndex` (a lane's take) on `compTrack`, replacing
+// Comping (round 163): the comp track of a take lane = the header of its group, when that is a comp track or has round
+// 163's shape: the header plays and everything under it is muted (-1: the track is not a lane). promoteTake() puts [from, to) of audio clip `clipIndex` (a lane's take) on `compTrack`, replacing
 // what plays there in that range (the comp's clips are split at the range's edges); the promoted piece plays, with
 // short fades where it was cut out of the take. The range is clamped to the clip. Returns false when nothing changed.
 int compTrackOf (const Song& song, int track);

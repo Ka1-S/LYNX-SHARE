@@ -506,6 +506,24 @@ bool listensToSidechain (EffectKind kind) noexcept
            || kind == EffectKind::vocoder;
 }
 
+bool reportsGainReduction (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor:
+        case EffectKind::apexLimiter:
+        case EffectKind::crestCompressor:
+        case EffectKind::sentryGate:
+        case EffectKind::quellDenoiser:
+        case EffectKind::ridgeStrip:
+        case EffectKind::glowLeveler:
+        case EffectKind::hushDeEsser:
+            return true;
+        default:
+            return false;
+    }
+}
+
 int soleSidechainSender (const Song& song, int to)
 {
     if (! isInsert (song, to))
