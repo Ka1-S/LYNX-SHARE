@@ -28,6 +28,18 @@
 //     Flanger, Phaser, Panner, Vox), [1] Axis X (0.5), [2] Axis Y (0.5), [3] LFO Rate (0.61: 1/8 beat … 4 bars in 10
 //     steps), [4] LFO Amount (0; squared), [5] LFO Shape (0: Sine / Saw / Square). An X/Y pad over eight effects with
 //     a song-locked LFO; a kind change cross-fades (core/PocketMultiFx.cpp).
+//   Pocket Waveshaper (EffectKind::pocketWaveshaper, FLM module 41, core/PocketFxC.cpp): [0] Shape (0: Soft, Tanh,
+//     Crossover, Fold, Octaver, Rectify, CrossFold), [1] Auto-Gain (0), [2] X (0.5), [3] Y (0.5), [4] Drive (0; 0…40 dB),
+//     [5] Post Gain (0.5 = 0 dB; ±18 dB), [6] Stereo Spread (0), [7] Mix (1), [8] High Cut (1 = 20 kHz), [9] Low Cut (0 =
+//     20 Hz), [10] Bass (0.5), [11] Mid Freq (0.5 = 1 kHz), [12] Mid Gain (0.5), [13] Treble (0.5), [14] LFO Shape (0),
+//     [15] LFO Sync (0), [16] LFO Rate (0.5; 1/8 beat … 4 bars), [17] LFO Rate Free (0; 0.02…9.92 Hz), [18] LFO to X
+//     (0), [19] LFO to Y (0). Every control glides (1 − 44.1/fs per sample); the LFO and X / Y move once per song tick.
+//   Pocket Compressor (EffectKind::pocketCompressor, FLM module 8): [0] Thresh (0.499; −40…0 dB), [1] Ratio (0; 19v² + 1,
+//     20 = ∞), [2] Attack (0.6; 0…50 ms), [3] Release (0.6; 10…500 ms), [4] Level (0.5001), [5] Hold (0; 0…50 ms), [6]
+//     Auto gain (1), [7] Input gain (0.5; ±20 dB on the detector only), [8] RMS (0; FLM never turns it on).
+//   Pocket Spreader (EffectKind::pocketSpreader, FLM module 44): [0] Width (0; 0…2), [1] Low Bypass (0; 10 Hz…10 kHz),
+//     [2] Mono Bass (0), [3] Separation (0.5). FL's Spreader engine (core/SpreaderEngine.h) behind FLM's mapping;
+//     reports FLM's latency (the engine's longest delay, 6.35 ms), which FL compensates.
 
 #include <memory>
 #include <string>
@@ -37,6 +49,7 @@
 namespace lynx::pocket
 {
 constexpr int distortionParams = 6, limiterClassicParams = 3, limiterParams = 4, levellerParams = 2, gateParams = 8, tranceDelayParams = 7, tapeDelayParams = 4, multiFxParams = 6;
+constexpr int waveshaperParams = 20, compressorParams = 9, spreaderParams = 4;
 
 // Distortion's curves: soft knee x/(k|x| + 1), tanh, exponential, hard clip
 const char* distortionKindName (int kind) noexcept;
@@ -63,4 +76,22 @@ const char* multiFxKindName (int kind) noexcept;            // "Delay", "Reverb"
 int multiFxKind (float v) noexcept;                          // ⌊7v⌋
 const char* multiFxAxisName (int kind, bool yAxis) noexcept; // the pad's axis labels per kind
 const char* tranceTimeName (float v) noexcept; // "1/4" … "1/1" (of a beat)
+
+// core/PocketFxC.cpp (round 189h)
+std::unique_ptr<Effect> makeWaveshaper();
+std::unique_ptr<Effect> makeCompressor();
+std::unique_ptr<Effect> makeSpreader();
+std::string waveshaperParamText (int param, float v);
+std::string compressorParamText (int param, float v);
+std::string spreaderParamText (int param, float v);
+std::string compressorLevelText (float level, bool autoGain); // Level's dB: 40v, or 40v − 20 with Auto gain
+const char* waveshaperShapeName (int shape) noexcept; // round(6v): "Soft" … "CrossFold"
+// a shape's curve at input x once its X / Y (the knobs' 0…1 values) have settled (tests, editors)
+float waveshaperCurve (int shape, float x, float xKnob, float yKnob) noexcept;
+// the Compressor's curve from Thresh and Ratio: g(env) = ((env − T)·slope + T)/env above T; makeup = 1/t2
+struct CompressorTransfer
+{
+    float thresholdDb = 0.0f, threshold = 1.0f, ratio = 1.0f, slope = 1.0f, makeup = 1.0f;
+};
+CompressorTransfer compressorTransfer (float thresh, float ratio) noexcept;
 } // namespace lynx::pocket

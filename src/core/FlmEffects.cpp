@@ -399,6 +399,9 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
             break;
         case 18: pocket (m, EffectKind::pocketTapeDelay, "FL Studio Mobile: Tape Delay", out); break;
         case 4: pocket (m, EffectKind::pocketMultiFx, "FL Studio Mobile: MultiFX", out); break;
+        case 41: pocket (m, EffectKind::pocketWaveshaper, "FL Studio Mobile: Waveshaper", out); break;
+        case 8: pocket (m, EffectKind::pocketCompressor, "FL Studio Mobile: Compressor", out); break;
+        case 44: pocket (m, EffectKind::pocketSpreader, "FL Studio Mobile: Spreader", out); break;
         default: return out;
     }
     // FLM's module wrapper (PROVEN, REA_rodada182c "F5 effects, round 188h"): Mix is a linear dry/wet blend (a LYNX
