@@ -561,16 +561,17 @@ public:
                 groups.push_back ({ r, tr ("Connections") });
                 auto header = r.removeFromTop (headerHeight + 6).reduced (10, 3);
                 show (refreshIo, header.removeFromRight (26).reduced (4, 3));
-                header.removeFromRight (juce::jmax (0, header.getWidth() / 2 - 150));
+                header.removeFromRight (effectSlot ? 30 : juce::jmax (0, header.getWidth() / 2 - 150));
+                header.removeFromLeft (110); // (the group's caption)
                 outputsGlyph = header.removeFromRight (22);
                 header.removeFromRight (4);
-                show (autoMap, header.removeFromRight (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16)));
+                show (autoMap, header.removeFromRight (juce::jmin (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16), header.getWidth())));
                 header.removeFromRight (4);
                 show (resetIo, header.removeFromRight (juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
                 if (effectSlot)
                 {
                     header.removeFromRight (4);
-                    show (autoMapIn, header.removeFromRight (juce::jmax (110, autoMapIn.getBestWidthForHeight (header.getHeight()) + 16)));
+                    show (autoMapIn, header.removeFromRight (juce::jmin (juce::jmax (110, autoMapIn.getBestWidthForHeight (header.getHeight()) + 16), juce::jmax (0, header.getWidth() - 26))));
                     header.removeFromRight (4);
                     inputsGlyph = header.removeFromRight (22);
                 }
