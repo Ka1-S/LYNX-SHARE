@@ -233,6 +233,14 @@ const char* effectId (EffectKind k)
         case EffectKind::kilnChannel: return "kilnChannel";
         case EffectKind::fretChannel: return "fretChannel";
         case EffectKind::shellChannel: return "shellChannel";
+        case EffectKind::pocketDistortion: return "pocketDistortion";
+        case EffectKind::pocketLimiterClassic: return "pocketLimiterClassic";
+        case EffectKind::pocketLimiter: return "pocketLimiter";
+        case EffectKind::pocketLeveller: return "pocketLeveller";
+        case EffectKind::pocketGate: return "pocketGate";
+        case EffectKind::pocketTranceDelay: return "pocketTranceDelay";
+        case EffectKind::pocketTapeDelay: return "pocketTapeDelay";
+        case EffectKind::pocketMultiFx: return "pocketMultiFx";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -962,6 +970,8 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
                     EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::formulaController, EffectKind::voiceShift, EffectKind::patcher, EffectKind::emphasizer, EffectKind::flFrequencyShifter, EffectKind::flLowLifter, EffectKind::waveCandy, EffectKind::visualizer,
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
+                    EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
+                    EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,

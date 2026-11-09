@@ -17,6 +17,7 @@
 #include "core/EmphasisFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
+#include "core/PocketFx.h"
 #include "core/FreqShifterFl.h"
 #include "core/LowLifterFl.h"
 #include "core/Vocodex.h"
@@ -2986,6 +2987,56 @@ const EffectInfo& effectInfo (EffectKind kind)
         case EffectKind::kilnChannel: return mixsuite::kilnInfo();
         case EffectKind::fretChannel: return mixsuite::fretInfo();
         case EffectKind::shellChannel: return mixsuite::shellInfo();
+        case EffectKind::pocketDistortion:
+        {
+            // FL Studio Mobile's own values and defaults (round 188h)
+            static const EffectInfo info { "Pocket Distortion", { { "Drive", 0.25f }, { "BitCrush", 0.0f }, { "Gain", 1.0f },
+                                                                  { "Stereo", 0.5f }, { "Kind", 0.0f }, { "Bias", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketLimiterClassic:
+        {
+            static const EffectInfo info { "Pocket Limiter Classic", { { "Threshold", 1.0f }, { "Release", 0.7f },
+                                                                       { "Output gain", 2.0f / 3.0f } } };
+            return info;
+        }
+        case EffectKind::pocketLimiter:
+        {
+            static const EffectInfo info { "Pocket Limiter", { { "In gain", 0.5f }, { "Out gain", 0.5f }, { "Release", 0.2f },
+                                                               { "Threshold", 1.0f } } };
+            return info;
+        }
+        case EffectKind::pocketLeveller:
+        {
+            static const EffectInfo info { "Pocket Leveller", { { "Gain", 0.7379573f }, { "Pan", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketGate:
+        {
+            static const EffectInfo info { "Pocket Gate", { { "Threshold", 0.0f }, { "Asymmetry", 0.0f }, { "Attack", 0.01f },
+                                                            { "Attack curve", 0.0f }, { "Release", 0.25f }, { "Release curve", 1.0f },
+                                                            { "Mix", 1.0f }, { "Hold", 0.25f } } };
+            return info;
+        }
+        case EffectKind::pocketTranceDelay:
+        {
+            static const EffectInfo info { "Pocket Trance Delay", { { "Time", 0.775f }, { "Feedback", 0.4f }, { "Mix", 1.0f },
+                                                                    { "Filter", 0.5f }, { "Mode", 0.0f }, { "Input pan", 0.5f },
+                                                                    { "Dry pan", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketTapeDelay:
+        {
+            static const EffectInfo info { "Pocket Tape Delay", { { "Time", 0.6f }, { "Feedback", 0.6f }, { "Async", 0.5f },
+                                                                  { "Mix", 0.4f } } };
+            return info;
+        }
+        case EffectKind::pocketMultiFx:
+        {
+            static const EffectInfo info { "Pocket MultiFX", { { "FX kind", 0.0f }, { "X", 0.5f }, { "Y", 0.5f }, { "LFO rate", 0.61f },
+                                                               { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
+            return info;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3770,6 +3821,22 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return fllegacy::eq7ParamText (param, v);
         case EffectKind::flDelay1:
             return fllegacy::delay1ParamText (param, v);
+        case EffectKind::pocketDistortion:
+            return pocket::distortionParamText (param, v);
+        case EffectKind::pocketLimiterClassic:
+            return pocket::limiterClassicParamText (param, v);
+        case EffectKind::pocketLimiter:
+            return pocket::limiterParamText (param, v);
+        case EffectKind::pocketLeveller:
+            return pocket::levellerParamText (param, v);
+        case EffectKind::pocketGate:
+            return pocket::gateParamText (param, v);
+        case EffectKind::pocketTranceDelay:
+            return pocket::tranceDelayParamText (param, v);
+        case EffectKind::pocketTapeDelay:
+            return pocket::tapeDelayParamText (param, v);
+        case EffectKind::pocketMultiFx:
+            return pocket::multiFxParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4106,6 +4173,14 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::flBassBoost: return fllegacy::makeBassBoost();
         case EffectKind::fl7BandEq: return fllegacy::makeEq7();
         case EffectKind::flDelay1: return fllegacy::makeDelay1();
+        case EffectKind::pocketDistortion: return pocket::makeDistortion(); // round 188h (FL Studio Mobile)
+        case EffectKind::pocketLimiterClassic: return pocket::makeLimiterClassic();
+        case EffectKind::pocketLimiter: return pocket::makeLimiter();
+        case EffectKind::pocketLeveller: return pocket::makeLeveller();
+        case EffectKind::pocketGate: return pocket::makeGate();
+        case EffectKind::pocketTranceDelay: return pocket::makeTranceDelay();
+        case EffectKind::pocketTapeDelay: return pocket::makeTapeDelay();
+        case EffectKind::pocketMultiFx: return pocket::makeMultiFx();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

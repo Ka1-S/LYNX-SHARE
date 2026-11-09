@@ -6,6 +6,7 @@
 
 #include "core/Effects.h"
 #include "core/ParametricEqFl.h"
+#include "core/PocketFx.h"
 #include "core/Reeverb2.h"
 
 // The laws below are FLM's, read in round 188f (REA_rodada182c.md "F5, round 188f"); the addresses are in that text.
@@ -240,12 +241,13 @@ struct Plate
 
 double tenthsDb (int t) noexcept { return t <= -361 ? 0.0 : std::pow (10.0, t / 200.0); }
 
-// FLM's engine ends with a mid/side stage on its wet and early-reflection outputs (0x1807383d0):
-// L = (l + r) + (r − l)·σ, R = (l + r) − (r − l)·σ, σ = separation/100. At the default σ = 1 that is 2r / 2l: the
-// two outputs swapped (not reproduced: a plate's two sides are alike) at twice the level. FL's matrix gives the same
-// blend with its gain at 2× FLM's and f = 1 − σ (FL: f = (5^s − 1)/4 for s > 0, f = s below; s = control/64).
-// FL's controls can't reach every FLM level: the three gains are then lowered together and a LYNX utility after the
-// reverb gives the difference back.
+// FLM feeds its plate 0.5·(L + R) where FL feeds L + R, and ends with a mid/side stage on the wet and early-reflection
+// outputs (0x1807383d0): L = (l + r) + (l − r)·σ, R = (l + r) − (l − r)·σ, σ = separation/100; at the default σ = 1
+// that is 2l / 2r, which cancels the input's ½ (round 188h, REA_rodada182c "F5 effects, round 188h", which corrects
+// 188f's side swap and 2× gains). So FL's gains are FLM's, with FL's f = 1 − σ (FL: f = (5^s − 1)/4 for s > 0, f = s
+// below; s = control/64). FLM's input diffusers 2 and 4 differ slightly from FL's (a tilt of at most ~0.4 dB, not
+// reproduced). FL's controls can't reach every FLM level: the three gains are then lowered together and a LYNX utility
+// after the reverb gives the difference back.
 void plateSlots (const Plate& p, bool live, Mapped& out)
 {
     reeverb2::Settings s;
@@ -260,7 +262,7 @@ void plateSlots (const Plate& p, bool live, Mapped& out)
     s.p[8] = std::clamp (p.crossover, 25, 2000);
     const auto f = 1.0 - std::clamp (p.separation / 100.0, 0.0, 2.0);
     s.p[9] = f > 0.0 ? (int) std::lround (64.0 * std::log (4.0 * f + 1.0) / std::log (5.0)) : (int) std::lround (64.0 * f);
-    auto dry = p.dry, early = 2.0 * p.early, wet = 2.0 * p.wet;
+    auto dry = p.dry, early = p.early, wet = p.wet;
     constexpr double maxDry = 1.9031, maxSend = 0.34759; // FL's gains at control 160
     const auto k = std::max ({ 1.0, dry / maxDry, early / maxSend, wet / maxSend });
     auto makeup = 20.0 * std::log10 (k);
@@ -307,7 +309,8 @@ void reverbLegacy (const flm::Module& m, bool live, Mapped& out)
     p.bass = rawControl (v (17, 0.0f), 2, 30);
     p.crossover = rawControl (v (18, 0.0f), 25, 2000);
     const auto in = off (13) ? 0.0 : tenthsDb (input);
-    p.dry = off (14) ? 0.0 : tenthsDb (dry);
+    // the legacy wrapper runs the engine in place and the engine adds onto its buffer: the input always passes at unity
+    p.dry = 1.0 + (off (14) ? 0.0 : in * tenthsDb (dry));
     p.early = off (15) ? 0.0 : in * 0.5 * tenthsDb (early);
     p.wet = off (16) ? 0.0 : in * 0.3 * tenthsDb (wet);
     if (v (20, 0.0f) > 1e-4f)
@@ -329,11 +332,12 @@ void reverb2 (const flm::Module& m, bool live, Mapped& out)
     p.predelayMs = rawControl (v (11, 0.0f), 0, 1000);
     p.bass = rawControl (v (14, 0.28f), 2, 30);
     p.crossover = rawControl (v (17, 0.2405f), 25, 2000);
-    // Reverb 2 mixes the plate's outputs itself: 1.25 × DRY / ER / WET, on the engine's own early-reflection (−3.5 dB,
-    // ×0.5) and wet (−12 dB, ×0.3) levels; SEPARATION 0.5 and PAN 0.5 leave them as they are
+    // Reverb 2 sets the engine's input / ER / wet to 0 dB and mixes two of its outputs itself, × 1.25: the full output
+    // (wet × 0.3 + early reflections × 0.5) × WET and the raw early reflections × ER (0x18073a430); SEPARATION 0.5 and
+    // PAN 0.5 leave them as they are. In FL's plate units: 0.375·WET wet, 0.625·(ER + WET) early reflections
     p.dry = 1.25 * v (7, 0.8f);
-    p.early = 1.25 * v (8, 0.8f) * 0.5 * tenthsDb (-35);
-    p.wet = 1.25 * v (9, 0.56f) * 0.3 * tenthsDb (-120);
+    p.wet = 0.375 * v (9, 0.56f);
+    p.early = 0.625 * ((double) v (8, 0.8f) + (double) v (9, 0.56f));
     if (std::abs (v (15, 0.5f) - 0.5f) > 0.01f)
         out.partial.push_back ("FL Studio Mobile: reverb width / separation (played at FL's normal width)");
     if (std::abs (v (18, 0.5f) - 0.5f) > 0.01f)
@@ -343,8 +347,23 @@ void reverb2 (const flm::Module& m, bool live, Mapped& out)
     if (v (12, 0.0f) >= 0.5f)
         out.partial.push_back ("FL Studio Mobile: Reverb 2 tempo-synced predelay (played free)");
     plateSlots (p, live, out);
-    if (v (10, 0.0f) >= 0.5f) // SIDE INPUT: FLM feeds the plate L − R, as FL's Mid/Side option
+    if (v (10, 0.0f) >= 0.5f) // SIDE INPUT: FLM feeds the plate L − R, as FL's Mid/Side option (which also inverts the
+    {                         // right wet output; FLM's doesn't)
         out.slots.front().params[16] = 1.0f;
+        out.partial.push_back ("FL Studio Mobile: Reverb 2 side input (right reverb output inverted)");
+    }
+}
+// FL Studio Mobile's own effects that LYNX runs exactly as Pocket engines (core/PocketFx.h, round 188h): the slot's
+// parameter k is the module's parameter k + 1 (its Enable is the slot's on switch), copied as it is; a value the file
+// doesn't hold keeps the engine's default (FLM's)
+void pocket (const flm::Module& m, EffectKind kind, const char* label, Mapped& out)
+{
+    out.label = label;
+    auto slot = makeEffectSlot (kind);
+    const auto& info = effectInfo (kind);
+    for (std::size_t k = 0; k < info.params.size(); ++k)
+        slot.params[k] = std::clamp (param (m, (int) k + 1, slot.params[k]), 0.0f, 1.0f);
+    out.slots.push_back (slot);
 }
 } // namespace
 
@@ -357,7 +376,7 @@ int rawControl (float v, float lo, float hi) noexcept
     return (int) std::floor ((hi - lo) * c + lo + 0.5f);
 }
 
-Mapped map (const flm::Module& m, bool live)
+Mapped map (const flm::Module& m, bool live, bool postGainLive)
 {
     Mapped out;
     switch (m.type)
@@ -368,11 +387,46 @@ Mapped map (const flm::Module& m, bool live)
         case 10: autoduck (m, out); break;
         case 12: reverbLegacy (m, live, out); break;
         case 35: reverb2 (m, live, out); break;
+        case 5: pocket (m, EffectKind::pocketLimiterClassic, "FL Studio Mobile: Limiter (legacy)", out); break;
+        case 6: pocket (m, EffectKind::pocketDistortion, "FL Studio Mobile: Distortion", out); break;
+        case 28: pocket (m, EffectKind::pocketLimiter, "FL Studio Mobile: Limiter", out); break;
+        case 20: pocket (m, EffectKind::pocketLeveller, "FL Studio Mobile: Leveller", out); break;
+        case 27: pocket (m, EffectKind::pocketGate, "FL Studio Mobile: Gate", out); break;
+        case 16:
+            pocket (m, EffectKind::pocketTranceDelay, "FL Studio Mobile: Trance Delay", out);
+            // FLM's saved flag "Input pan pans the dry too" (one byte of custom state; a module without it loads as on)
+            out.slots[0].params[6] = m.custom.empty() || m.custom[0] != 0 ? 1.0f : 0.0f;
+            break;
+        case 18: pocket (m, EffectKind::pocketTapeDelay, "FL Studio Mobile: Tape Delay", out); break;
+        case 4: pocket (m, EffectKind::pocketMultiFx, "FL Studio Mobile: MultiFX", out); break;
         default: return out;
     }
-    // Enable ([0] below 0.5 = the module is bypassed) and the module's Mix (INFERRED: dry/wet like a LYNX slot's)
+    // FLM's module wrapper (PROVEN, REA_rodada182c "F5 effects, round 188h"): Mix is a linear dry/wet blend (a LYNX
+    // slot's mix); Post Gain = 10^(2g − 1) (40g − 20 dB) on the module's output before the blend; Wet Pan a linear
+    // balance of the wet amount. Enable ([0] below 0.5) bypasses the module.
     const auto enabled = param (m, 0, 1.0f) >= 0.5f;
     const auto mix = std::clamp (reserved (m, 1, 1.0f), 0.0f, 1.0f);
+    const auto postDb = 40.0 * (double) reserved (m, 0, 0.5f) - 20.0;
+    if (std::abs (postDb) > 1e-3 || postGainLive)
+    {
+        if (mix >= 0.9999f)
+        {
+            // a utility after the module's slots (the reverbs' make-up utility takes it as well)
+            if (out.slots.empty() || out.slots.back().kind != EffectKind::utility)
+            {
+                auto gain = makeEffectSlot (EffectKind::utility);
+                gain.params[0] = 0.5f;
+                out.slots.push_back (gain);
+            }
+            auto& g = out.slots.back().params[0];
+            const auto db = ((double) g - 0.5) * 48.0 + postDb;
+            if (std::abs (db) > 24.0)
+                out.partial.push_back ("FL Studio Mobile: effect Post Gain beyond LYNX's range (capped)");
+            g = (float) std::clamp (db / 48.0 + 0.5, 0.0, 1.0);
+        }
+        else
+            out.partial.push_back ("FL Studio Mobile: effect Post Gain with Mix below 100% (not reproduced)");
+    }
     for (auto& s : out.slots)
         s.enabled = enabled;
     if (mix < 0.9999f)
@@ -382,8 +436,8 @@ Mapped map (const flm::Module& m, bool live)
         else
             out.partial.push_back ("FL Studio Mobile: Mix of an effect that takes two LYNX slots (played fully wet)");
     }
-    if (std::abs (reserved (m, 0, 0.5f) - 0.5f) > 1e-4f)
-        out.partial.push_back ("FL Studio Mobile: effect Post Gain (not reproduced)");
+    if (std::abs (reserved (m, 2, 0.5f) - 0.5f) > 1e-4f)
+        out.partial.push_back ("FL Studio Mobile: effect Wet Pan (not reproduced)");
     return out;
 }
 
@@ -408,7 +462,7 @@ std::vector<LaneTarget> automate (const flm::Module& m, int param, const std::ve
                 copy.params.resize ((std::size_t) param + 1, 0.0f);
             copy.params[(std::size_t) param] = v;
         }
-        return map (copy, true);
+        return map (copy, true, param == -3);
     };
     const auto base = at (values.front());
     if (base.slots.empty())

@@ -439,7 +439,8 @@ was report-only: it stays listed in the report, and no new LYNX effect is made f
   - Reported, not reproduced: Reverb 2's own SEPARATION other than 0.5, its wet PAN, modulation and tempo-synced
     predelay.
   - INFERRED, to confirm by a render: that FLM's plate outputs (before its gains) equal FL's. The structure and
-    constants are the same; the level scaling between the two builds is not proven.
+    constants are the same; the level scaling between the two builds is not proven. (Settled in round 188h: the
+    levels, the mid/side law and the Reverb 2 mix above are corrected there.)
 - **Automation (F6 for modules).** A lane on a mapped module's parameter is imported through the same mapping:
   - per saved point, the module is mapped again with that value, and every LYNX parameter that moves becomes its own
     automation clip (`effectParam`, or `effectMix` for Autoduck's Ducking and the module Mix);
@@ -461,3 +462,98 @@ was report-only: it stays listed in the report, and no new LYNX effect is made f
 Open (next rounds): render A/B of the reverbs and the Equalizer against FL Studio Mobile in FL (GUI/FL locks) to
 settle the reverb level scaling; Mix/Post Gain application; the rest of the effects (Limiter, Distortion, Leveller,
 Trance Delay, Tape Delay, Compressor, Spacer, …); F4 engines.
+
+### F5 effects, round 188h (branch `feature/flm188h`, 0.1.26)
+
+REA: the same Ghidra project and lock as 188f. Classes by RTTI: FXPad (MultiFX) 0x1809fca98, FXTranceDelay 0x1809fee28,
+FXDistort 0x1809fa060, FXLimiter (legacy) 0x1809fbfb0, FXLimiter2 (Limiter) 0x1809fc2f8, FXLeveller 0x1809fbcc0,
+FXGate 0x1809fb798, FXTapeDelay 0x1809feae0 (engine CTapeDelay 0x180a16d88). Formula specs (study notes, no code)
+are in `/mnt/e/lynx-work/flm188h/rea/spec-*.md`. None of these effects is reproduced exactly by an existing LYNX
+effect, so each became a **Pocket** engine (`src/core/PocketFx.{h,cpp}`, `PocketMultiFx.cpp`, `PocketTape.h`): LYNX
+names, FL Studio Mobile's role, parameters = the module's own 0…1 values in its order (LYNX k = FLM k + 1; Enable is
+the slot's switch), so the import copies them.
+
+**Module wrapper: Mix, Post Gain, Wet Pan (PROVEN, 0x180799750, its only caller 0x18059d3b0).** The two 188f
+assumptions are settled:
+- Mix is a linear dry/wet crossfade, out = (1 − a)·dry + a·wet (a LYNX slot's mix). Mix exactly 0, or the module off,
+  skips the module.
+- Post Gain is 10^(2g − 1) = 40g − 20 dB (±20 dB, 0.5 = 0 dB) on the module's output before the blend. The import puts
+  it on a LYNX utility after the module (exact at Mix 100 %, which every Post Gain in the 21 projects has; with a lower
+  Mix it is reported).
+- Wet Pan is a linear balance of the wet amount (never off-centre in the 21 projects; reported).
+- The three are smoothed per sample (Mix and Pan 0.001, Post Gain 0.01); the dry is not delay-compensated.
+
+**Reverb levels (PROVEN, corrects 188f).** FLM's plate is fed 0.5·(L + R) where FL's is fed L + R; its mid/side output
+stage is L = (l + r) + (l − r)·σ, R = (l + r) − (l − r)·σ (no side swap): at σ = 1 that is 2l / 2r, which cancels the
+½. So FL's gains equal FLM's, and 188f's slots were 6 dB too hot. The legacy Reverb runs the engine in place and the
+engine adds onto its buffer, so its dry is 1 + input·DRY (188f gave none). Reverb 2 sets the engine's levels to 0 dB and
+mixes two of its outputs × 1.25: in FL plate units wet 0.375·WET, early reflections 0.625·(ER + WET), dry 1.25·DRY.
+FLM's input diffusers 2 and 4 use a second feed-forward coefficient and its early reflections are taken after the
+second diffuser: a tilt of at most ~0.4 dB that a gain can't match (not reproduced). FL's Mid/Side input also inverts
+the right output, FLM's SIDE INPUT doesn't (reported).
+
+**Pocket Distortion (module 6).** Drive d, BitCrush, Gain (24v − 24 dB), Stereo s, Kind ⌊3v⌋, Bias b. Per side
+x = in + (2(b − 0.5))⁵, the drive × min(1, 2s) left / × min(1, 2(1 − s)) right:
+- Soft: g = 10^(5d·f), k = g − 1, y = gx/(k|x| + 1);
+- Tanh: k = 10^(4d·f) − 0.99, y = tanh(kx)/tanh(k);
+- Exponential: k = 20d²f, y = 1 − 10^(−kx)(1 − x) (x ≥ 0), 10^(kx)(x + 1) − 1 (x < 0);
+- Hard clip: clamp(x·10^(3d²f), ±1).
+Then a sample-and-hold every crush⁴·256 + 1 samples, × Gain, and with a bias a one-pole high-pass at 220.5/fs.
+
+**Pocket Limiter Classic (module 5, "Limiter (legacy)").** Peak max(|L|, |R|); above the threshold (−24…0 dB) the
+gain drops at once to threshold/peak and recovers along 1 − cos²(πt/2)(1 − g₀), t advancing by
+(100(0.2 − 0.2v)² + 1)/fs; output × out/threshold (out −24…+12 dB): automatic make-up.
+
+**Pocket Limiter (module 28).** In Gain and Out Gain ±24 dB, Release v⁴·1.9 + 0.1 s, Threshold −24…0 dB. A 2 ms
+delay line (reported as latency); the floor threshold/peak is taken at once and recovers along 1 − cos(πt/2)(1 − g₀)
+in exactly Release seconds (sin in double precision); no make-up.
+
+**Pocket Leveller (module 20).** Not a compressor: gain 72·v^0.6 − 60 dB (−60…+12), linear balance pan, both
+gliding by 1 % per sample.
+
+**Pocket Gate (module 27).** Two 256-sample rings; when they wrap, the RMS (dB) of each side decides: open above
+66v − 60 dB, close (after Hold v s) when both are under threshold − 66v² dB (not below −60). The envelope ramps
+linearly (Attack / Release 1000v ms), shaped by its direction's curve (2v − 1: −1 = 1 + log₁₀₀₀ x, +1 = 0.001^(1 − x),
+1024-point tables through a Catmull-Rom-form cubic whose "previous" point is the point itself, PROVEN from the
+instruction bytes at 0x180476a5f); Mix sets the floor 10^(−3|2v − 1|), below 0.5 inverted; the gain glides by 10 %
+per sample. The output is the ring's oldest sample: 255 samples late (FLM reports 256; LYNX reports the 255 it plays).
+
+**Pocket Trance Delay (module 16).** Time ⌊4v⌋ → 1/4, 3/8, 1/2, 3/4, 1/1 beat (D = beats·fs·60/BPM samples, whole,
+up to 2 s); the loop stores 0.99·Fdbk·(input + echo); the echo is heard × Mix²; the loop filter is a one-pole low-pass
+(k = 2v) below Filter 0.5 and a high-pass (k = (2v − 1)⁴) above. Modes ⌊2v + ½⌋: Stereo; Ping-Pong (the lines cross,
+an input balance smoothed by 1 %); Mirror (lines of 2D, the dry left delayed by D). A Time or Mode change clears the
+lines. A one-byte saved flag (CSTM; a module without it loads as on) makes Ping-Pong pan the dry too: LYNX parameter 6.
+
+**Pocket Tape Delay (module 18).** Time v² s, Async shortens one side by up to half, the loop holds input + echo ×
+Fdbk, the echo is heard × Mix × Fdbk. FLM's "tape": a loop whose phase advances by a speed 1/(t(N − 2) + 2)
+(N = fs), each sample recorded with its time stamp, the previous loop read back by linear interpolation between stamps,
+the speed gliding by 0.1 % per sample (a Time change bends the pitch). A new tape runs 10 s of silence first: LYNX
+replays only the stamps (same result, no reads).
+
+**Pocket MultiFX (module 4).** FX Kind ⌊7v⌋, Axis X / Y, LFO Rate ⌊9v⌋ → 1/8, 1/4, 3/8, 1/2, 3/4 beat, 1, 2 beats,
+1, 2, 4 bars, LFO Amount v², LFO Shape ⌊2v⌋ (Sine, Saw, Square). Ten effect objects; the kind selects one (Delay,
+Reverb, LP Filter, HP Filter, Flanger, Phaser, Panner, Vox), each fades to its target by 0.5 % per sample and all that
+sound run in series (FLM's order: Flanger, Phaser, LP, HP, Delay, Reverb, Panner, Vox). The LFO phase is the song
+position over the rate, set every block; most kinds read one LFO value per block.
+- Delay: a line of (1.5 fs − 1)·(the doubled rate's seconds/3, halved until ≤ 1) samples ≈ the LFO Rate; X² is the
+  feedback and the echo level; Y < 0.5 a one-pole low-pass in the loop, > 0.5 a high-pass; the LFO pans the echoes.
+- Reverb: FLM's plate (LYNX's Reeverb 2 at FLM's levels), wet only: decay 0.75·X³, damping Y², wet 0.5 + 0.2·decay,
+  room and diffusion full, low cut 317 Hz.
+- LP / HP: four equal biquads (the Filter module's design), each fed by the previous one's output of the sample
+  before; LP 2^(8.28v + 6) Hz, HP 2^(7.424v + 5) Hz, v = X + LFO, Q = 2Y² + 1.
+- Flanger: −(L + R)/2 through the tape engine above (up to 5 ms, feedback −0.96·Y), added to both sides.
+- Phaser: six first-order allpasses, 50 Hz…20 kHz by X²(LFO + 1), feedback 0.98·(0.6Y)^⅓.
+- Panner: a Haas delay up to 2 ms and √Y attenuation on the far side.
+- Vox: eight band-passes (Q 12) on formants blended across three vowels, × 2^(1.7(Y − 0.5)).
+The silence logic (an effect that has been quiet for its limit is skipped; a deselected one that faded out is reset)
+follows FLM's; "input active" = the block has a non-zero sample.
+
+**Real projects** (`/mnt/e/lynx-work/flm188h/demo-reports.txt`): all 21 import; the user's MONTAGEM XONADA now has no
+dropped effect (its 2 MultiFX, 2 Leveller and the Gate are mapped). Still listed: Chorus,
+Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader, Stereoizer, Flanger, Autoduck (new), Tremolo, and the
+silent Analyzer and Tuner.
+
+**Tests** (`tests/FlmImport188hTests.inc`): each engine against values worked by hand from the laws above (curves,
+crush hold, bias, the limiters' attack and recovery, the gate's floor and delay, the delays' echo times and levels,
+the tape's interpolated echo, MultiFX's delay / filter / panner / reverb), the Post Gain utility and the imports.
+No per-effect FLM render exists yet; an A/B in FL's FL Studio Mobile plugin (GUI + FL locks) is the next check.
