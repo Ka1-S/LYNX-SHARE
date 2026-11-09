@@ -16426,6 +16426,7 @@ TEST (plugin_layout_options_match_the_engine_values)
 #include "Parity150bTests.inc"
 #include "Parity152Tests.inc"
 #include "Tp172dTests.inc"
+#include "Verb183bTests.inc"
 #include "Parity152aTests.inc"
 #include "Parity152bTests.inc"
 #include "Parity152cTests.inc"

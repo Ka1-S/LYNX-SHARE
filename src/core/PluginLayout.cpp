@@ -3458,7 +3458,7 @@ Layout horizonLayout()
     v.push_back (label (428, 264, 92, 24, TR_NOOP ("Reverb mode"), alignLeft));
     v.push_back (choiceMenu (522, 264, 150, 24, "Reverb mode", TR_NOOP ("Reverb mode"), TR_NOOP ("Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated")));
     v.push_back (label (752, 264, 52, 24, TR_NOOP ("Color"), alignLeft));
-    v.push_back (choiceMenu (806, 264, 166, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Neutral|Dark|Vintage")));
+    v.push_back (choiceMenu (806, 264, 166, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Neutral|Dark|Studio")));
     return l;
 }
 
