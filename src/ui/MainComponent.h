@@ -35,6 +35,13 @@
 
 namespace lynx
 {
+class GamepadInput;
+namespace gamepad
+{
+struct Changes;
+struct State;
+} // namespace gamepad
+
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
                             public ui::HintSource,
@@ -275,6 +282,13 @@ private:
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
+    // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer
+    // otherwise); the hints overlay while Back is held
+    std::unique_ptr<GamepadInput> gamepadInput;
+    std::unique_ptr<juce::Component> gamepadHints;
+    void updateGamepad();
+    void gamepadChanges (const gamepad::Changes& changes, const gamepad::State& state, double seconds);
+    int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)

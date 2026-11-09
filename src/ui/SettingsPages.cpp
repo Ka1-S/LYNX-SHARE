@@ -1299,7 +1299,7 @@ public:
                                                                  &pickupNote, &linksLabel, &links, &removeLink, &removeAll, &outputsTitle,
                                                                  &outputsNote, &noOutputs, &syncTitle, &clockLabel, &clockBox, &clockOffsetLabel,
                                                                  &clockOffset, &clockStatusLabel, &clockStatus, &clockNote, &jumpLabel, &jumpBox,
-                                                                 &jumpNote })
+                                                                 &jumpNote, &gamepadToggle, &gamepadNote })
             add (*c);
         styleNote (outputsNote, tr ("Send master sync drives drum machines, synths and other software from LYNX SHARE's transport: MIDI clock "
                                     "with Song Position Pointer, or MIDI Time Code."));
@@ -1403,6 +1403,15 @@ public:
             set (p);
         };
         styleNote (pickupNote, tr ("A controller moves a parameter only after reaching its current value, so nothing jumps."));
+        // round 184a, S16: a game controller as one more controller (core/GamepadMap.h)
+        styleToggle (gamepadToggle, tr ("Use a game controller"));
+        gamepadToggle.onClick = [this] {
+            auto p = engine.getMidiPrefs();
+            p.gamepad = gamepadToggle.getToggleState();
+            set (p);
+        };
+        styleNote (gamepadNote, tr ("A plays and stops, B records, X undoes, the D-pad picks the track and moves by bars, the triggers set the "
+                                    "track's volume. Hold Back to see the whole map. Every button and stick can be linked like a MIDI control."));
 
         styleLabel (linksLabel, tr ("Links (this project, then global)"));
         linksLabel.setJustificationType (juce::Justification::topLeft);
@@ -1498,6 +1507,8 @@ private:
         }
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.full (16).translated (0, -3));
+        gamepadToggle.setBounds (r.full (24));
+        gamepadNote.setBounds (r.full (32).translated (0, -3));
         {
             auto row = r.row (linksLabel, 0, 110);
             linksLabel.setBounds (linksLabel.getBounds().withTrimmedTop (4));
@@ -1526,6 +1537,7 @@ private:
         const auto& p = engine.getMidiPrefs();
         velocityBox.setSelectedId ((int) p.velocity + 1, juce::dontSendNotification);
         pickup.setToggleState (p.pickup, juce::dontSendNotification);
+        gamepadToggle.setToggleState (p.gamepad, juce::dontSendNotification);
         jumpBox.setSelectedId (p.songMarkerJumpChannel + 1, juce::dontSendNotification);
         perfBox.setSelectedId (p.performanceChannel + 1, juce::dontSendNotification);
         {
@@ -1689,7 +1701,8 @@ private:
     juce::Label inputsNote, noDevices, velocityLabel, velocityNote, perfLabel, perfNote, typeLabel, typeValue, pickupNote, linksLabel, jumpLabel, jumpNote;
     juce::TextButton refresh { tr ("Refresh device list") }, removeLink { tr ("Remove link") }, removeAll { tr ("Remove all") };
     juce::ComboBox velocityBox, perfBox, jumpBox;
-    juce::ToggleButton pickup;
+    juce::ToggleButton pickup, gamepadToggle;
+    juce::Label gamepadNote;
     juce::ListBox links;
 };
 } // namespace
