@@ -8145,3 +8145,4 @@ countries: ru by kz
 "Create crossfade" = "Создать кроссфейд"
 "Normalize selection individually" = "Нормализовать выделение по отдельности"
 "Normalize selection as a group" = "Нормализовать выделение как группу"
+"Crossfade selected" = "Кроссфейд для выделенного"

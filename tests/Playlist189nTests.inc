@@ -101,3 +101,29 @@ TEST (playlist189n_normalize_gains_follow_fl)
     CHECK (clipops::groupNormalizeGain ({ 0.0f, 0.0f }) == 0.0f);
     CHECK (std::abs (clipops::groupNormalizeGain ({ 1.0e-6f }) - 1.0e6f) < 1.0f);
 }
+
+// --- Round 189o: FL's audio clip menu › Fades › "Crossfade selected" (Tag 100; [DECOMP] FUN_012447a0 -> FUN_00d01bc0
+// action 0x15 -> FUN_00d02580 with handle kind 0; shown per FUN_01236e30 / FUN_00cfc9b0) ----
+TEST (playlist189o_crossfade_selected_follows_fl)
+{
+    using namespace lynx;
+    // 0: 0..1000, 1: 800..1800 (overlaps 0 by 200), 2: 1700..2300 (overlaps 1 by 100), 3: 5000..5500 (alone)
+    std::vector<Clip> clips { audio189n (0, 1000), audio189n (800, 1000), audio189n (1700, 600), audio189n (5000, 500) };
+    // shown only when the clicked clip is selected...
+    CHECK (! clipops::showCrossfadeSelected (clips, 1, {}));
+    CHECK (! clipops::showCrossfadeSelected (clips, 1, { 0, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 1, { 0, 1, 2 }));
+    // ...and a selected clip has a selected neighbour: alone, or next to unselected clips only, it is hidden
+    CHECK (! clipops::showCrossfadeSelected (clips, 3, { 3 }));
+    CHECK (! clipops::showCrossfadeSelected (clips, 0, { 0 }));
+    // FL looks before first: clip 1's neighbour before is 0 (unselected), so 1 alone doesn't count; 2's (1) does
+    CHECK (! clipops::canCreateCrossfade (clips, { 1 }, -1, { 1, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 1, { 1, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 0, { 0, 1 })); // 0 has none before, 1 after it is selected
+
+    // the action: every selected clip with the clip after it, else the one before it
+    CHECK (clipops::createCrossfades (clips, 1, 0, { 0, 1, 2 }) == 3); // pairs 0|1, 1|2 and (2 has none after) 1|2 again
+    CHECK (clips[0].fadeOut == 200 && clips[1].fadeIn == 200);
+    CHECK (clips[1].fadeOut == 100 && clips[2].fadeIn == 100);
+    CHECK (clips[3].fadeIn == 0 && clips[3].fadeOut == 0);
+}

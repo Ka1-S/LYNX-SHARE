@@ -8145,3 +8145,4 @@ countries: it ch sm
 "Create crossfade" = "Crea dissolvenza incrociata"
 "Normalize selection individually" = "Normalizza la selezione singolarmente"
 "Normalize selection as a group" = "Normalizza la selezione come gruppo"
+"Crossfade selected" = "Dissolvenza incrociata sulla selezione"

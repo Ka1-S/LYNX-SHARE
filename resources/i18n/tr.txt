@@ -8145,3 +8145,4 @@ countries: tr
 "Create crossfade" = "Çapraz geçiş oluştur"
 "Normalize selection individually" = "Seçimi tek tek normalleştir"
 "Normalize selection as a group" = "Seçimi grup olarak normalleştir"
+"Crossfade selected" = "Seçilenlere çapraz geçiş"

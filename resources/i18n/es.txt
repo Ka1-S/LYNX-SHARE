@@ -8145,3 +8145,4 @@ countries: es mx ar co cl pe ve
 "Create crossfade" = "Crear fundido cruzado"
 "Normalize selection individually" = "Normalizar la selección individualmente"
 "Normalize selection as a group" = "Normalizar la selección como grupo"
+"Crossfade selected" = "Fundido cruzado en la selección"

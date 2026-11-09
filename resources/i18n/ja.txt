@@ -8145,3 +8145,4 @@ countries: jp
 "Create crossfade" = "クロスフェードを作成"
 "Normalize selection individually" = "選択範囲を個別にノーマライズ"
 "Normalize selection as a group" = "選択範囲をグループとしてノーマライズ"
+"Crossfade selected" = "選択範囲をクロスフェード"

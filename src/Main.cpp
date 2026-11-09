@@ -10799,6 +10799,14 @@ private:
                 playlist.selectForSnapshot ({});
                 saveMenus (juce::StringArray { "Gain handle, 2 selected", "Fade in, overlapping" },
                            std::vector<juce::PopupMenu> { gain, fadeIn }, prefix + "-fade-gain189n.png");
+                // round 189o: the audio clip menu with both overlapping clips selected (FL's Fades › Crossfade selected
+                // shown) and with none selected (hidden)
+                playlist.selectForSnapshot ({ second - 1, second });
+                auto clipSelected = playlist.getClipMenuForSnapshot (second);
+                playlist.selectForSnapshot ({});
+                auto clipAlone = playlist.getClipMenuForSnapshot (second);
+                saveMenus (juce::StringArray { "Audio clip, 2 selected", "Audio clip, none selected" },
+                           std::vector<juce::PopupMenu> { clipSelected, clipAlone }, prefix + "-xfadesel189o.png");
                 offline.setSong (before);
                 offline.dispatchPendingMessages();
             }

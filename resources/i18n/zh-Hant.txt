@@ -8145,3 +8145,4 @@ countries: tw hk mo
 "Create crossfade" = "建立交叉淡化"
 "Normalize selection individually" = "分別標準化所選內容"
 "Normalize selection as a group" = "將所選內容作為一組標準化"
+"Crossfade selected" = "交叉淡化所選內容"

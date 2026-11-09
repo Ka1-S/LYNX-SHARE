@@ -8145,3 +8145,4 @@ countries: cn sg
 "Create crossfade" = "创建交叉淡化"
 "Normalize selection individually" = "分别标准化所选内容"
 "Normalize selection as a group" = "将所选内容作为一组标准化"
+"Crossfade selected" = "交叉淡化所选内容"

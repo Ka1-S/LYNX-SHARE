@@ -8145,3 +8145,4 @@ countries: de at ch li lu
 "Create crossfade" = "Crossfade erstellen"
 "Normalize selection individually" = "Auswahl einzeln normalisieren"
 "Normalize selection as a group" = "Auswahl als Gruppe normalisieren"
+"Crossfade selected" = "Crossfade für die Auswahl"

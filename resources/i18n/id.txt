@@ -8145,3 +8145,4 @@ countries: id
 "Create crossfade" = "Buat crossfade"
 "Normalize selection individually" = "Normalisasi pilihan satu per satu"
 "Normalize selection as a group" = "Normalisasi pilihan sebagai grup"
+"Crossfade selected" = "Crossfade yang dipilih"

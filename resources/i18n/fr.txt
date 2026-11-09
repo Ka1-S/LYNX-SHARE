@@ -8145,3 +8145,4 @@ countries: fr be ch ca lu
 "Create crossfade" = "Créer un fondu enchaîné"
 "Normalize selection individually" = "Normaliser la sélection individuellement"
 "Normalize selection as a group" = "Normaliser la sélection en groupe"
+"Crossfade selected" = "Fondu enchaîné sur la sélection"

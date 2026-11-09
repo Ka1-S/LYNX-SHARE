@@ -8145,3 +8145,4 @@ countries: pl
 "Create crossfade" = "Utwórz przenikanie"
 "Normalize selection individually" = "Normalizuj zaznaczenie osobno"
 "Normalize selection as a group" = "Normalizuj zaznaczenie jako grupę"
+"Crossfade selected" = "Przenikanie zaznaczonych"

@@ -8145,3 +8145,4 @@ countries: nl be
 "Create crossfade" = "Crossfade maken"
 "Normalize selection individually" = "Selectie afzonderlijk normaliseren"
 "Normalize selection as a group" = "Selectie als groep normaliseren"
+"Crossfade selected" = "Crossfade op selectie"

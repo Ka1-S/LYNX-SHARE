@@ -8228,3 +8228,4 @@ countries: br
 "Create crossfade" = "Criar crossfade"
 "Normalize selection individually" = "Normalizar seleção individualmente"
 "Normalize selection as a group" = "Normalizar seleção como grupo"
+"Crossfade selected" = "Crossfade nos selecionados"

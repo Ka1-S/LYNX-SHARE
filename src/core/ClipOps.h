@@ -830,14 +830,36 @@ inline int createCrossfades (std::vector<Clip>& clips, int clicked, int side, co
 }
 
 // The fade handle menu's "Create crossfade" is enabled (FUN_00d023d0) when one of the menu's clips has a neighbour on
-// that side that is as selected as it is (both selected or both not).
+// that side that is as selected as it is (both selected or both not). Side -1 = no handle (FL's handle kind 0, the audio
+// clip menu): FUN_00d02310 takes the neighbour before, else the one after.
 inline bool canCreateCrossfade (const std::vector<Clip>& clips, const std::vector<int>& targets, int side, const std::vector<int>& selection)
 {
     const auto isSelected = [&selection] (int i) { return std::find (selection.begin(), selection.end(), i) != selection.end(); };
     for (auto i : targets)
-        if (const auto other = crossfadeNeighbour (clips, i, side); other >= 0 && isSelected (other) == isSelected (i))
+    {
+        auto other = crossfadeNeighbour (clips, i, side < 0 ? 0 : side);
+        if (side < 0 && other < 0)
+            other = crossfadeNeighbour (clips, i, 1);
+        if (other >= 0 && isSelected (other) == isSelected (i))
             return true;
+    }
     return false;
+}
+
+// FL's audio clip menu › Fades › "Crossfade selected" (Tag 100, round 189o; [DECOMP] EEAUFadesComputeCrossfadesMenuClick
+// FUN_012447a0 -> FUN_00d01bc0 action 0x15 = the same FUN_00d02580 as Create crossfade, with no handle). FL shows the
+// item (FUN_01236e30 -> FUN_00cfc9b0, FUN_00840720 = Visible) only when the clicked clip is selected and one selected
+// clip has a selected neighbour (before it, else after it). It then crossfades every selected clip with the clip after
+// it, or else with the one before it (createCrossfades on a selected clip).
+inline bool showCrossfadeSelected (const std::vector<Clip>& clips, int clicked, const std::vector<int>& selection)
+{
+    if (std::find (selection.begin(), selection.end(), clicked) == selection.end())
+        return false;
+    std::vector<int> targets;
+    for (auto i : selection)
+        if (i >= 0 && i < (int) clips.size())
+            targets.push_back (i);
+    return canCreateCrossfade (clips, targets, -1, selection);
 }
 
 // --- FL's Normalize on the gain handle (Tags 110 / 111, round 189n; [DECOMP] FUN_00d029b0) ----
