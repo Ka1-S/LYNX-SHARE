@@ -65,6 +65,7 @@
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
+#include "core/ClipLauncher.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
 #include "ui/EventEditor.h"
@@ -753,6 +754,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
+        detailView->releaseEditor();
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
@@ -1489,6 +1494,8 @@ juce::Rectangle<int> MainComponent::getToolStripAreaForSnapshot (bool playlistSt
 
 keys::Context MainComponent::focusContext() const
 {
+    if (pianoRollKeysHere()) // (round 183a: docked in the Clip-launch workflow's detail view)
+        return keys::Context::pianoRoll;
     switch (workspace.getFocused())
     {
         case Panel::playlist: return keys::Context::playlist;
@@ -1545,10 +1552,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     const auto focused = workspace.getFocused();
     const auto panelShown = workspace.isPanelVisible (focused);
 
-    if (panelShown && focused == Panel::pianoRoll && pianoRoll.handleKey (key))
+    if (((panelShown && focused == Panel::pianoRoll) || pianoRollKeysHere()) && pianoRoll.handleKey (key))
         return true;
 
-    if (panelShown && focused == Panel::playlist && playlist.handleKey (key))
+    if (panelShown && focused == Panel::playlist && ! pianoRollKeysHere() && playlist.handleKey (key))
         return true;
 
     // 4. the key map
@@ -1595,6 +1602,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
 bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
+
+    if (id.rfind ("view.detail", 0) == 0) // round 183a: Clip-launch workflow only (false: the chord falls through as before)
+        return runDetailAction (id);
 
     if (id == "rack.follow")
     {
@@ -2088,6 +2098,16 @@ void MainComponent::loadUiSettings()
             startInClipLaunchWorkflow = on;
         else if (key == "lanesBeforeClipLaunch")
             lanesBeforeClipLaunch = on;
+        else if (key == "detailHeight") // round 183a: the Clip-launch workflow's detail view
+            DetailView::preferredHeight = juce::jlimit (DetailView::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "detailShown")
+            DetailView::shownSetting = on;
+        else if (key == "detailDevices")
+            DetailView::devicesPage = on;
+        else if (key == "detailExtraWindowKey")
+            DetailView::extraWindowKey = on;
+        else if (key == "detailExtraSelectInMixer")
+            DetailView::extraSelectInMixer = on;
         else if (key == "alsSessionOnPlaylist")
             AudioEngine::alsSessionOnPlaylist = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -2259,6 +2279,11 @@ void MainComponent::saveUiSettings()
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
+                                      + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
+                                      + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
+                                      + "\ndetailDevices=" + juce::String (DetailView::devicesPage ? 1 : 0)
+                                      + "\ndetailExtraWindowKey=" + juce::String (DetailView::extraWindowKey ? 1 : 0)
+                                      + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
@@ -2560,6 +2585,7 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
     {
         clipGridView = makeClipGrid (engine);
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
+        makeDetailView();
     }
     if (clipGridView == nullptr)
         return;
@@ -2590,8 +2616,15 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
         playlist.repaint();
     }
 
+    if (! on && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
+        detailView->releaseEditor();
     clipLaunchWorkflow = on;
     playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+    // the detail view docks under the grid and the Playlist (round 183a); Pattern workflow: nothing docked
+    if (detailView != nullptr)
+        detailView->setVisible (on && DetailView::shownSetting);
+    playlistArea.setDetailView (on ? detailView.get() : nullptr,
+                                [this] (int available) { return detailView != nullptr ? detailView->heightFor (available) : 0; });
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
         flip->show (PlaylistArea::GridView::beside);
     workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
@@ -2603,6 +2636,144 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
     styles.addItem (tr ("Pattern workflow (default)"), true, ! clipLaunchWorkflow, [this] { setClipLaunchWorkflow (false); saveUiSettings(); });
     styles.addItem (tr ("Clip-launch workflow"), true, clipLaunchWorkflow, [this] { setClipLaunchWorkflow (true); saveUiSettings(); });
     menu.addSubMenu (tr ("Layout style"), styles);
+    // round 183a: the detail view's items, only in Clip-launch workflow (the reference DAW's View menu [SHOT] d05)
+    if (clipLaunchWorkflow && detailView != nullptr)
+    {
+        menu.addItem (tr ("Detail view") + shortcutText ("view.detailToggle"), true, DetailView::shownSetting, [this] { runAction ("view.detailToggle"); });
+        menu.addItem (tr ("Clip view") + shortcutText ("view.detailClip"), true, DetailView::shownSetting && ! DetailView::devicesPage,
+                      [this] { runAction ("view.detailClip"); });
+        menu.addItem (tr ("Device view") + shortcutText ("view.detailDevices"), true, DetailView::shownSetting && DetailView::devicesPage,
+                      [this] { runAction ("view.detailDevices"); });
+        menu.addItem (tr ("Switch between clip view and device view") + shortcutText ("view.detailSwitch"), [this] { runAction ("view.detailSwitch"); });
+    }
+}
+
+void MainComponent::makeDetailView()
+{
+    DetailView::Hooks h;
+    // the out meter: the Mixer's own level while its strips are on screen (they take the peaks), else the peaks
+    h.levelOf = [this] (int insert, int side) {
+        return mixer.metersShowing() ? mixer.shownLevel (insert, side) : engine.getMeters().takePeak (insert, side);
+    };
+    h.toggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); };
+    h.selectInMixer = [this] (int insert) { mixer.selectTrack (insert); };
+    h.instrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); }; // (as on the Mixer)
+    h.openClip = [this] (int track, int scene) { openGridClip (track, scene); };
+    h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
+    h.undockPianoRoll = [this] { undockPianoRoll(); };
+    h.selectPattern = [this] (int pattern) { selectPattern (pattern); };
+    // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
+    workspace.onWillShow = [this] (Panel panel) {
+        if (panel == Panel::pianoRoll && pianoRollDocked)
+        {
+            undockPianoRoll();
+            if (detailView != nullptr)
+                detailView->editorTakenBack();
+        }
+    };
+    h.layoutChanged = [this] {
+        if (detailView != nullptr)
+            detailView->setVisible (clipLaunchWorkflow && DetailView::shownSetting);
+        playlistArea.resized();
+        saveUiSettings();
+    };
+    detailView = std::make_unique<DetailView> (engine, std::move (h));
+    setClipGridPickListener (*clipGridView, [this] (int track, int scene, GridPick pick) {
+        if (detailView == nullptr)
+            return;
+        detailView->showSelection (track, scene);
+        if (pick == GridPick::openClip)
+            detailView->setPage (DetailView::Page::clip);
+        else if (pick == GridPick::openTrack)
+            detailView->setPage (DetailView::Page::devices);
+    });
+    const auto selected = clipGridSelection (*clipGridView);
+    detailView->showSelection (selected.first, selected.second);
+}
+
+juce::Component* MainComponent::dockPianoRoll (int pattern)
+{
+    if (pattern >= 0 && pattern < (int) engine.getSong().patterns.size() && pattern != engine.getSong().currentPattern)
+        selectPattern (pattern);
+    if (! pianoRollDocked)
+    {
+        if (workspace.isPanelVisible (Panel::pianoRoll))
+        {
+            workspace.hide (Panel::pianoRoll);
+            refreshPanelButtons();
+        }
+        workspace.releaseContent (Panel::pianoRoll);
+        pianoRollDocked = true;
+        pianoRollDockActive = false;
+        pianoRoll.setDocked (true); // (a short velocity lane and the keys fitted to the notes in the short dock)
+        dockClickWatcher.down = [this] (const juce::MouseEvent& e) {
+            pianoRollDockActive = e.eventComponent != nullptr && (e.eventComponent == &pianoRoll || pianoRoll.isParentOf (e.eventComponent));
+        };
+        juce::Desktop::getInstance().addGlobalMouseListener (&dockClickWatcher);
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<PianoRollComponent> (&pianoRoll)] {
+            if (safe != nullptr)
+                safe->scrollToNotes();
+        });
+    }
+    return &pianoRoll;
+}
+
+void MainComponent::undockPianoRoll()
+{
+    if (! pianoRollDocked)
+        return;
+    pianoRollDocked = false;
+    pianoRollDockActive = false;
+    pianoRoll.setDocked (false);
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
+}
+
+bool MainComponent::pianoRollKeysHere() const
+{
+    return pianoRollDocked && pianoRollDockActive && pianoRoll.isShowing();
+}
+
+bool MainComponent::runDetailAction (const std::string& id)
+{
+    if (! clipLaunchWorkflow || detailView == nullptr) // (Pattern workflow: the keys keep their old meaning)
+        return false;
+    if (id == "view.detailToggle")
+    {
+        DetailView::shownSetting = ! DetailView::shownSetting;
+        detailView->setVisible (DetailView::shownSetting);
+        playlistArea.resized();
+        saveUiSettings();
+    }
+    else if (id == "view.detailClip")
+        detailView->setPage (DetailView::Page::clip);
+    else if (id == "view.detailDevices")
+        detailView->setPage (DetailView::Page::devices);
+    else if (id == "view.detailSwitch")
+        detailView->togglePage();
+    else
+        return false;
+    return true;
+}
+
+void MainComponent::openGridClip (int track, int scene)
+{
+    const auto& song = engine.getSong();
+    if (! song.clipGrid)
+        return;
+    const auto* clip = launcher::clipAt (*song.clipGrid, track, scene);
+    if (clip == nullptr)
+        return;
+    if (clip->kind == ClipKind::audio)
+    {
+        if (clip->channel >= 0 && clip->channel < (int) song.channels.size())
+            openAudioEditorForChannel (engine, clip->channel);
+    }
+    else if (clip->kind == ClipKind::pattern && clip->pattern >= 0 && clip->pattern < (int) song.patterns.size())
+    {
+        selectPattern (clip->pattern);
+        openPianoRoll();
+    }
 }
 
 void MainComponent::setClipGridView (PlaylistArea::GridView view)

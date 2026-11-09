@@ -6182,7 +6182,7 @@ void EffectsPanel::showAddMenu (int row)
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
 
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
 }
 
 void EffectsPanel::showSlotMenu (int slot)
@@ -6200,6 +6200,8 @@ void EffectsPanel::showSlotMenu (int slot)
     quickpick::addFolderViewItems (replace, engine);
 
     juce::PopupMenu menu;
+    if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
+        extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
@@ -6302,7 +6304,7 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [this, key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
     if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
@@ -6377,7 +6379,7 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), {},
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {
                              if (! key.isKeyCode (juce::KeyPress::deleteKey) || safe == nullptr)
                                  return false;
