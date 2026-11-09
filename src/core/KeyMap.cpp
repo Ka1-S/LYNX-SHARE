@@ -331,6 +331,15 @@ std::vector<Action> makeActions()
         { "playlist.deselect", TR_NOOP ("Deselect (clips and time)"), Context::playlist, { chord ('D', ctrl) } },
         { "playlist.selectBySource", TR_NOOP ("Select by selected source"), Context::playlist, { chord ('C', shift) } },
         { "playlist.invertSelection", TR_NOOP ("Invert selection"), Context::playlist, { chord ('I', shift) } },
+        // round 189g: FL's Edit / Select options ([DFM ShortcutsModule] EEMakeUniqueAsSampleAction, EELeftResizingAction
+        // ShortCut 49188 = Ctrl+Alt+Home, EEShiftMouseWheelNudgeAction, EECreateNewClipsWithManualFadesAction,
+        // EESnapFadeHandlesAction, EESelMagicAction)
+        { "playlist.makeUniqueAsSample", TR_NOOP ("Make the selected audio clips unique as samples"), Context::playlist, {} },
+        { "playlist.leftResizing", TR_NOOP ("Allow resizing clips from the left on/off"), Context::playlist, { chord (home, ctrl | alt) } },
+        { "playlist.wheelNudging", TR_NOOP ("Nudge clips with Shift+mouse wheel on/off"), Context::playlist, {} },
+        { "playlist.manualFades", TR_NOOP ("Create new clips with manual fades on/off"), Context::playlist, {} },
+        { "playlist.snapFadeHandles", TR_NOOP ("Snap fade handles on/off"), Context::playlist, {} },
+        { "playlist.magicLasso", TR_NOOP ("Magic lasso (circle clips with the mouse to select them) on/off"), Context::playlist, {} },
 
         // Browser (focused)
         { "browser.previous", TR_NOOP ("Previous file (preview)"), Context::browser, { chord (up) } },

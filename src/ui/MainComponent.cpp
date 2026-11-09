@@ -2069,6 +2069,16 @@ void MainComponent::loadUiSettings()
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
             EditorGlobals::get().createVariants = on;
+        else if (key == "plLeftResizing") // round 189g: FL's Playlist Edit / Select options
+            EditorGlobals::get().leftResizing = on;
+        else if (key == "plWheelNudging")
+            EditorGlobals::get().wheelNudging = on;
+        else if (key == "plManualFades")
+            EditorGlobals::get().manualFades = on;
+        else if (key == "plSnapFadeHandles")
+            EditorGlobals::get().snapFadeHandles = on;
+        else if (key == "plMagicLasso")
+            EditorGlobals::get().magicLasso = on;
         else if (key == "dropAudioOnHeaders") // round 189e: FL's Edit › Drop audio on track headers (DropAudioToPLMode)
         {
             const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
@@ -2282,6 +2292,11 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
+                                      + "\nplLeftResizing=" + juce::String (EditorGlobals::get().leftResizing ? 1 : 0)
+                                      + "\nplWheelNudging=" + juce::String (EditorGlobals::get().wheelNudging ? 1 : 0)
+                                      + "\nplManualFades=" + juce::String (EditorGlobals::get().manualFades ? 1 : 0)
+                                      + "\nplSnapFadeHandles=" + juce::String (EditorGlobals::get().snapFadeHandles ? 1 : 0)
+                                      + "\nplMagicLasso=" + juce::String (EditorGlobals::get().magicLasso ? 1 : 0)
                                       + "\ndropAudioOnHeaders=" + juce::String ((int) trackmodes::headerDropOptions().mode)
                                       + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
                                       + "\nselectTracksOnDrop=" + juce::String (trackmodes::headerDropOptions().selectTracks ? 1 : 0)

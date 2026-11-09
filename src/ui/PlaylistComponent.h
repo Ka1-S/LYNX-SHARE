@@ -8,6 +8,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/MagicLasso.h"
 #include "core/PickerSelection.h"
 #include "core/PlaylistOps.h"
 #include "engine/AudioEngine.h"
@@ -313,6 +314,8 @@ private:
     void sliceInsertTimeSelection(); // round 189e: FL's Slice & insert space / Trim selection
     void trimTimeSelection();
     void shiftSelectedClips (int steps, int tracks); // FL's Shift left / right / up / down
+    void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
+    void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
     void selectBySelectedSource();
     // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is
     // "Always ask"
@@ -490,6 +493,9 @@ private:
     void postDragHint (); // what the gesture in progress does (hint bar)
     juce::Rectangle<int> clipMenuButton (int clip) const; // the menu button in a clip's title strip (empty if too narrow)
     juce::uint32 lastWheelEdit = 0;
+    magiclasso::Trail lassoPath; // FL's Magic lasso (round 189g): the mouse trail while the option is on
+    void feedMagicLasso (juce::Point<int> p, bool buttonDown);
+    bool nudgeWithWheel (juce::Point<int> p, float deltaY); // FL's Shift+wheel nudge (round 189g); true = handled
     double zoomBeforeAll = 0.0, scrollBeforeAll = 0.0; // Ctrl+right-click: zoom to everything and back
 
     // smooth wheel scrolling

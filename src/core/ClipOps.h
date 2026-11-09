@@ -592,6 +592,20 @@ inline std::int64_t shiftClipsInTime (std::vector<Clip>& playlist, const std::ve
     return delta;
 }
 
+// Playlist › Edit › "Nudge clips with mouse wheel" (Shift+wheel, FUN_00e82270, round 189g; checked in FL 2026: the clips
+// stay, their content moves, "playlist shift clip"): the content of the chosen clips moves `delta` ticks earlier (their
+// offset grows; negative = later), held so that no offset goes below 0. Returns the shift applied.
+inline std::int64_t shiftClipContent (std::vector<Clip>& playlist, const std::vector<int>& clips, std::int64_t delta)
+{
+    for (auto i : clips)
+        if (i >= 0 && i < (int) playlist.size())
+            delta = std::max (delta, -playlist[(std::size_t) i].offset);
+    for (auto i : clips)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].offset += delta;
+    return delta;
+}
+
 // Playlist › Edit › Shift up / down (Shift+Up / Shift+Down; EEShiftU/DAction Tag 1 / -1 → FUN_00eb3300 → FUN_00e51730
 // (editor, 0, Tag); checked live in FL 2026, round 189e shot f11: every selected clip moves one track down): the
 // selected clips move `tracks` tracks (negative = up), held inside tracks 1..500. Returns the move applied.
