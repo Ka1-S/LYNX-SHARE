@@ -48,7 +48,7 @@ public:
     bool hostProcessesKeys() const
     {
         const auto* ref = find (const_cast<Song&> (engine.getSong()));
-        return ref != nullptr && ref->allowHostKeys && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
+        return ref != nullptr && ref->hostKeysFirst && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
     }
 
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
@@ -274,10 +274,6 @@ private:
     // A 32-bit plugin always runs bridged: FL's Processing page has no "Make bridged" for it [UI fl25c vs fl34c]
     bool hiddenOption (std::size_t i) const
     {
-       #if ! JUCE_WINDOWS
-        if (wrapperOptions()[i].member == &PluginRef::allowHostKeys) // (the keyboard hook is Windows' only)
-            return true;
-       #endif
         return wrapperOptions()[i].member == &PluginRef::separateProcess && isBridged32 (plugin);
     }
 
@@ -360,9 +356,6 @@ private:
         {
             toggles[(int) i]->setToggleState (ref->*(options[i].member), juce::dontSendNotification);
             toggles[(int) i]->setEnabled (! options[i].needsFixed || ref->fixedBuffers);
-            // a plugin in another process has its own keyboard: the option can't reach it (issue #99 is that case)
-            if (options[i].member == &PluginRef::allowHostKeys && (ref->separateProcess || pluginSandboxEnabled() || isBridged32 (plugin)))
-                toggles[(int) i]->setEnabled (false);
         }
         // with Options › "Run plugins in a separate process" every plugin already runs bridged
         for (std::size_t i = 0; i < options.size(); ++i)

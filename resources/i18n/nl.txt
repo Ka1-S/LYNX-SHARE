@@ -4198,8 +4198,6 @@ countries: nl be
 "Reset plugin when LYNX SHARE resets" = "Plugin resetten wanneer LYNX SHARE reset"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "De plugin resetten vóór een export en bij paniek (wist de staarten en aangehouden noten)"
 "Send loop position" = "Loop-positie versturen"
-"Allow LYNX to process keyboard presses" = "LYNX toetsaanslagen laten verwerken"
-"Plain keys go to the typing keyboard and LYNX's shortcuts before this plugin gets them; its text fields keep typing" = "Gewone toetsen gaan naar het typtoetsenbord en de sneltoetsen van LYNX voordat deze plug-in ze krijgt; de tekstvelden ervan blijven typen"
 "Let the plugin know about loop start and end points" = "De plugin laten weten waar de loop begint en eindigt"
 
 # --- Patcher Surface (REA round 151)

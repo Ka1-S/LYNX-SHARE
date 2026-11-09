@@ -69,26 +69,21 @@ TEST (keys187a_a_taken_key_repeats_for_the_host)
     CHECK (asked == 2 && again == 2);
 }
 
-TEST (keys96_option_is_fl_exact_off_and_saved_only_when_on)
+TEST (keys96_options_off_for_a_new_plugin)
 {
-    // FL: Troubleshooting's last option, off for a new plugin [UI: E:\lynx-work\pain181c\shots\d21.png]
+    // FL: the Troubleshooting box is off for a new plugin [UI: E:\lynx-work\pain181c\shots\d21.png]; the plugin gets
+    // keys first ("Typing keyboard priority" on: FL's General option "Disable typing keyboard priority by default" is
+    // off, its registry value 0 on the study install, 2026-11-09)
     lynx::PluginRef ref;
     CHECK (! ref.allowHostKeys);
-
-    const auto& o = lynx::wrapperOptions();
-    bool found = false;
-    for (const auto& option : o)
-        if (option.member == &lynx::PluginRef::allowHostKeys)
-        {
-            found = true;
-            CHECK (std::string (option.section) == "Compatibility");
-            CHECK (! option.recreates && ! option.needsFixed); // never re-creates the plugin
-        }
-    CHECK (found);
+    CHECK (! ref.hostKeysFirst);
 
     auto other = ref;
     other.allowHostKeys = true;
     CHECK (! (ref == other)); // a project with it on differs (undo, modified)
+    other = ref;
+    other.hostKeysFirst = true;
+    CHECK (! (ref == other));
 }
 
 TEST (keys96_option_reads_from_fl_wrapper_flags)

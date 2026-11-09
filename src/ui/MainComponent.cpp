@@ -749,7 +749,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
-    // FL's per-plugin "Allow ... to process keyboard presses" (round 181c, issue #96)
+    // keys over a focused plugin (rounds 181c/187a, issue #96): what it passes back plays, and with its "Typing keyboard priority" off LYNX goes first
     setPluginViewPlainKeyHandler ([] (juce::Component& window) { return PluginWindows::letsHostProcessKeys (window); },
                                   [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
                                       return safe != nullptr && safe->keyFromPluginView (key, true);
@@ -1604,7 +1604,7 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
 bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
 {
     // the typing piano as over the main window (its release is polled, MainComponent::keyStateChanged). With the
-    // plugin's option on the shortcuts run too; keys that do nothing here stay the plugin's.
+    // plugin's "Typing keyboard priority" off (LYNX first) the shortcuts run too; keys that do nothing here stay the plugin's.
     if (typingKey (chordFromKeyPress (key)).taken)
         return keyPressed (key);
     return optionOn && keyFromSecondaryWindow (key);

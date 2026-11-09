@@ -206,7 +206,13 @@ struct PluginRef
     bool modXAftertouch = false;    // "Send MOD X as polyphonic aftertouch": each note's Mod X follows its note on
     bool allNotesOffOnStop = true;  // "Send All Notes Off when playback stops" (off: only the held notes are released)
     bool resetOnFlush = true;       // Troubleshooting › "Reset plugin when FL Studio resets": before an export, on panic
-    bool allowHostKeys = false;     // "Allow FL Studio to process keyboard presses": the typing keyboard and shortcuts with this plugin's view focused (issue #96)
+    // FL's Troubleshooting box "Allow FL Studio to process keyboard presses when the keyboard focus option is on"
+    // (wrapper flags2 bit 0x800, off for a new plugin): kept from and written back to FL projects (round 181c/187a);
+    // what it changes in LYNX comes with the Typing keyboard priority button (issue #96 slice 2)
+    bool allowHostKeys = false;
+    // FL's plugin-window "Typing keyboard priority" button turned off: LYNX takes the keys it uses (typing piano,
+    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96)
+    bool hostKeysFirst = false;
     bool sendLoopPosition = true;   // "Send loop position": the play head reports the loop's start and end
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64
@@ -221,7 +227,7 @@ struct PluginRef
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
-               && allowHostKeys == o.allowHostKeys;
+               && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst;
     }
 };
 

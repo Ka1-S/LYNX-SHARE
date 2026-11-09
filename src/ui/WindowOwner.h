@@ -26,7 +26,7 @@ bool runSecondaryWindowKey (const juce::KeyPress& key);
 // Plain keys (letters, digits, punctuation) with the focus in a hosted plugin's own view (round 181c, issue #96). As in
 // FL, a key the plugin leaves unused goes on to the typing keyboard: `left` gets what comes back from the plugin's view
 // (listenForKeysPluginLeaves on its editor). The plugin gets the key first, unless `allows` says that window's plugin
-// lets the host process them (FL's per-plugin option; Windows): then `first` gets it before the plugin, and what it
+// lets the host take them first (FL's per-plugin "Typing keyboard priority" button off; Windows): then `first` gets it before the plugin, and what it
 // takes never reaches the plugin, repeats and key-up included. A native text field in the plugin always keeps its keys.
 void setPluginViewPlainKeyHandler (std::function<bool (juce::Component& window)> allows, std::function<bool (const juce::KeyPress&)> first,
                                    std::function<bool (const juce::KeyPress&)> left);

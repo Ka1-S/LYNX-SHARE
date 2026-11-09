@@ -179,8 +179,8 @@ TEST (rea146a_wrapper_settings_page_options)
     // FL's wrapper settings (round 149: in its form's order): Processing options, then Compatibility; the buffer
     // sub-options need fixed buffers
     const auto& o = lynx::wrapperOptions();
-    CHECK (o.size() == 14); // round 151 added the MIDI ones and two Compatibility ones (indices 4-9), #96 the last one
-    if (o.size() == 14)
+    CHECK (o.size() == 13); // round 151 added the MIDI ones and two Compatibility ones (indices 4-9)
+    if (o.size() == 13)
     {
         CHECK (std::string (o[0].label) == "Notify about rendering mode" && o[0].member == &lynx::PluginRef::notifyRender && ! o[0].recreates);
         CHECK (std::string (o[10].label) == "Use fixed size buffers" && o[10].member == &lynx::PluginRef::fixedBuffers && o[10].recreates);

@@ -2306,11 +2306,13 @@ private:
             const auto channel = song.channels.size() - 1;
             const auto off = lynx::ProjectFile::toJson (song);
             song.channels[channel].plugin.allowHostKeys = true;
+            song.channels[channel].plugin.hostKeysFirst = true;
             const auto on = lynx::ProjectFile::toJson (song);
             const auto offBack = lynx::ProjectFile::fromJson (off, error);
             const auto onBack = lynx::ProjectFile::fromJson (on, error);
             hostKeysOk = ! off.contains ("allowHostKeys") && on.contains ("allowHostKeys") && offBack && onBack
-                         && ! offBack->channels[channel].plugin.allowHostKeys && onBack->channels[channel].plugin.allowHostKeys;
+                         && ! offBack->channels[channel].plugin.allowHostKeys && onBack->channels[channel].plugin.allowHostKeys
+                         && ! off.contains ("hostKeysFirst") && ! offBack->channels[channel].plugin.hostKeysFirst && onBack->channels[channel].plugin.hostKeysFirst;
         }
 
         // hardware output targets (REA round 156): saved only when set; old projects (no field) keep the defaults
@@ -3818,7 +3820,7 @@ private:
                     keysDone = ! lynx::pluginKeysTestTick (*instance->getActiveEditor(),
                                                            [this] (bool on) {
                                                                engine->editSong ([this, on] (lynx::Song& song) {
-                                                                   (instrument ? song.channels.back().plugin : song.mixer[1].effects[0].plugin).allowHostKeys = on;
+                                                                   (instrument ? song.channels.back().plugin : song.mixer[1].effects[0].plugin).hostKeysFirst = on;
                                                                });
                                                            },
                                                            [this] (const juce::String& line) { step (line); });

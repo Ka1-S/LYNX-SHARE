@@ -174,7 +174,7 @@ void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
         if (w.hasWrapperFlags2)
         {
             ref.allNotesOffOnStop = (w.wrapperFlags2 & 0x1000u) == 0;
-            // "Allow FL Studio to process keyboard presses" [DATA: the same project saved with it off and on, only this bit differs]
+            // "Allow FL Studio to process keyboard presses when the keyboard focus option is on" [DATA: the same project saved with it off and on, only this bit differs]
             ref.allowHostKeys = (w.wrapperFlags2 & 0x800u) != 0;
         }
     }
@@ -376,7 +376,6 @@ const std::vector<WrapperOption>& wrapperOptions()
         { "Compatibility", "Use fixed size buffers", "Constant 2 ms blocks, for plugins that need equal buffers (adds latency)", &PluginRef::fixedBuffers, true, false },
         { "Compatibility", "Process maximum size buffers", "With fixed size buffers: the whole device buffer instead of 2 ms blocks", &PluginRef::maxSizeBuffers, true, true },
         { "Compatibility", "Use maximum buffer size from host", "With fixed size buffers: prepare the plugin for the host's largest block", &PluginRef::hostMaxBuffer, true, true },
-        { "Compatibility", "Allow LYNX to process keyboard presses", "Plain keys go to the typing keyboard and LYNX's shortcuts before this plugin gets them; its text fields keep typing", &PluginRef::allowHostKeys, false, false },
     };
     return options;
 }

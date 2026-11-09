@@ -4198,8 +4198,6 @@ countries: tr
 "Reset plugin when LYNX SHARE resets" = "LYNX SHARE sıfırlanınca plugin'i sıfırla"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "Dışa aktarmadan önce ve panikte plugin'i sıfırla (kuyruklarını ve basılı notalarını temizler)"
 "Send loop position" = "Döngü konumunu gönder"
-"Allow LYNX to process keyboard presses" = "LYNX'in tuş basışlarını işlemesine izin ver"
-"Plain keys go to the typing keyboard and LYNX's shortcuts before this plugin gets them; its text fields keep typing" = "Düz tuşlar bu eklentiye ulaşmadan önce yazma klavyesine ve LYNX kısayollarına gider; eklentinin metin alanları yazmaya devam eder"
 "Let the plugin know about loop start and end points" = "Döngü başlangıç ve bitiş noktalarını plugin'e bildir"
 
 # --- Patcher Surface (REA round 151)

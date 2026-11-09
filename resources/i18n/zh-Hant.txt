@@ -4198,8 +4198,6 @@ countries: tw hk mo
 "Reset plugin when LYNX SHARE resets" = "LYNX SHARE重設時重設外掛"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "匯出前和緊急停止時重設外掛（清除其尾音和按住的音符）"
 "Send loop position" = "傳送循環位置"
-"Allow LYNX to process keyboard presses" = "允許 LYNX 處理按鍵"
-"Plain keys go to the typing keyboard and LYNX's shortcuts before this plugin gets them; its text fields keep typing" = "一般按鍵會先交給打字鍵盤和 LYNX 快捷鍵，再交給此外掛；外掛的文字欄位仍可輸入"
 "Let the plugin know about loop start and end points" = "告知外掛循環的起點和終點"
 
 # --- Patcher Surface (REA round 151)
