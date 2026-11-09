@@ -4,6 +4,8 @@
 // played the look-ahead late. Fixed at the root (the latency is known after prepare()) and in the graph (a node whose
 // latency moves later makes the rack build the graph again, as the mixer does for its slots).
 
+#include "core/DynamicsSuite.h"
+
 namespace pdc188e
 {
 // where an impulse put in at `at` comes out (the largest |sample|), through `fx` in blocks of 512
@@ -313,4 +315,44 @@ TEST (pdc188e_patcher_replans_when_a_node_reports_its_latency_late)
     // nothing moved since: the next build keeps the running graph
     const auto third = RackState::build (song, next.get(), 48000.0, f);
     CHECK (third->effects[1][0] == next->effects[1][0]);
+}
+
+TEST (pdc188e_dynamics_suite_sound_unchanged_by_the_early_latency)
+{
+    // Crest / Prism / Sentry now keep the slot's settings through prepare() (their latency is known before the first
+    // block). The sound must not move: an instance built with the settings renders bit-identical to one built without
+    // them that gets them on its first block (what every slot did before)
+    using namespace lynx;
+    std::uint32_t seed = 0x188e0d1u;
+    auto next = [&seed] {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        return (float) (seed >> 8) * (1.0f / 16777216.0f);
+    };
+    for (const auto kind : { EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate })
+        for (int variant = 0; variant < 6; ++variant)
+        {
+            auto slot = makeEffectSlot (kind);
+            if (variant > 0)
+                for (auto& v : slot.params)
+                    v = next();
+            auto early = dyn::make (kind, &slot.params);
+            auto late = dyn::make (kind, nullptr);
+            early->prepare (44100.0);
+            late->prepare (44100.0);
+            std::vector<float> a (4096), b (4096), c (4096), d (4096);
+            for (int i = 0; i < 4096; ++i)
+            {
+                a[(std::size_t) i] = c[(std::size_t) i] = 0.6f * std::sin ((float) i * 0.05f) * (i % 900 < 450 ? 1.0f : 0.1f);
+                b[(std::size_t) i] = d[(std::size_t) i] = 0.5f * std::sin ((float) i * 0.031f);
+            }
+            for (int done = 0; done < 4096; done += 512)
+            {
+                early->process (a.data() + done, b.data() + done, 512, slot.params, 120.0);
+                late->process (c.data() + done, d.data() + done, 512, slot.params, 120.0);
+            }
+            CHECK (early->latencySamples() == late->latencySamples());
+            CHECK (std::memcmp (a.data(), c.data(), a.size() * sizeof (float)) == 0 && std::memcmp (b.data(), d.data(), b.size() * sizeof (float)) == 0);
+        }
 }
