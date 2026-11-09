@@ -160,7 +160,17 @@ public:
     static constexpr int timelineHeight = 22;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int velocityHeight = 72;
+    static constexpr int defaultVelocityHeight = 72;
+    static constexpr int compactVelocityHeight = 30; // docked in the Clip-launch detail view (round 183a): the reference's lane is ~30 px
+    int velocityHeight = defaultVelocityHeight;
+    void setVelocityLaneHeight (int h)
+    {
+        if (velocityHeight == h)
+            return;
+        velocityHeight = h;
+        resized();
+        repaint();
+    }
     int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 

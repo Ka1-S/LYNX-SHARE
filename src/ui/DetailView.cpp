@@ -1204,7 +1204,8 @@ public:
         addAndMakeVisible (signature);
         loop.setButtonText (tr ("Loop"));
         loop.onClick = [this] { editSlot ([on = loop.getToggleState()] (ClipGridSlot& slot) { slot.loop = on; }); };
-        legato.setButtonText (tr ("Legato (keep the position)"));
+        legato.setButtonText (tr ("Legato"));
+        legato.setTooltip (tr ("Legato (keep the position)"));
         legato.onClick = [this] { editSlot ([on = legato.getToggleState()] (ClipGridSlot& slot) { slot.legato = on; }); };
         for (auto* b : { &loop, &legato })
             addAndMakeVisible (*b);
@@ -1254,7 +1255,9 @@ public:
     }
     ~ClipColumn() override { engine.removeChangeListener (this); }
 
-    static constexpr int width = 236;
+    // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
+    static constexpr int clipPanel = 164, launchPanel = 136, notesPanel = 172, gap = 8;
+    int preferredWidth() const { return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap : 0); }
 
     void setSlot (int t, int s)
     {
@@ -1272,35 +1275,46 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (8, 4).withTrimmedRight (1);
-        const auto row = [&r] (int h = 20) { auto x = r.removeFromTop (h); r.removeFromTop (3); return x; };
-        const auto pair = [&] (juce::Label& l, juce::Component& c) {
-            auto x = row();
-            l.setBounds (x.removeFromLeft (76));
-            c.setBounds (x);
+        auto r = getLocalBounds().reduced (gap, 4).withTrimmedRight (1);
+        const auto take = [] (juce::Rectangle<int>& area, int h) { auto x = area.removeFromTop (h); area.removeFromTop (3); return x; };
+        clipTitle.setBounds (take (r, 16));
+        auto top = take (r, 20);
+        nameLabel.setBounds (top.removeFromLeft (44));
+        name.setBounds (top);
+        r.removeFromTop (2);
+
+        // Clip: Start | End, Loop, Length | Signature
+        auto c = r.removeFromLeft (clipPanel);
+        r.removeFromLeft (gap);
+        const auto halves = [] (juce::Rectangle<int> row, juce::Component& a, juce::Component& b) {
+            const auto w = (row.getWidth() - 6) / 2;
+            a.setBounds (row.removeFromLeft (w));
+            row.removeFromLeft (6);
+            b.setBounds (row);
         };
-        clipTitle.setBounds (row (16));
-        pair (nameLabel, name);
-        pair (startLabel, start);
-        pair (endLabel, end);
-        pair (lengthLabel, length);
-        loop.setBounds (row());
-        pair (signatureLabel, signature);
-        r.removeFromTop (4);
-        launchTitle.setBounds (row (16));
-        pair (modeLabel, mode);
-        pair (quantLabel, quant);
-        legato.setBounds (row());
-        r.removeFromTop (4);
-        notesTitle.setBounds (row (16));
-        auto grid = r;
+        halves (take (c, 14), startLabel, endLabel);
+        halves (take (c, 20), start, end);
+        loop.setBounds (take (c, 20));
+        halves (take (c, 14), lengthLabel, signatureLabel);
+        halves (take (c, 20), length, signature);
+
+        // Launch: mode, quantisation, legato
+        auto l = r.removeFromLeft (launchPanel);
+        r.removeFromLeft (gap);
+        launchTitle.setBounds (take (l, 14));
+        modeLabel.setBounds (take (l, 12));
+        mode.setBounds (take (l, 20));
+        quantLabel.setBounds (take (l, 12));
+        quant.setBounds (take (l, 20));
+        legato.setBounds (take (l, 20));
+
+        // Notes: the note tools, two columns
+        auto n = r.removeFromLeft (notesPanel);
+        notesTitle.setBounds (take (n, 14));
         const juce::TextButton* order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize };
+        const auto w = (n.getWidth() - 4) / 2;
         for (int i = 0; i < 7; ++i)
-        {
-            auto* b = const_cast<juce::TextButton*> (order[i]);
-            const auto w = (grid.getWidth() - 4) / 2;
-            b->setBounds (grid.getX() + (i % 2) * (w + 4), grid.getY() + (i / 2) * 24, i == 6 ? grid.getWidth() : w, 21);
-        }
+            const_cast<juce::TextButton*> (order[i])->setBounds (n.getX() + (i % 2) * (w + 4), n.getY() + (i / 2) * 24, i == 6 ? n.getWidth() : w, 21);
     }
 
 private:
@@ -1340,6 +1354,9 @@ private:
             quant.setSelectedId ((int) slot->quant + 1, n);
         }
         const bool pattern = c->kind == ClipKind::pattern;
+        if (std::exchange (hasNotes, pattern) != pattern)
+            if (auto* parent = getParentComponent())
+                parent->resized();
         for (auto* b : { &notesTitle })
             b->setVisible (pattern);
         for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize })
@@ -1407,6 +1424,7 @@ private:
 
     AudioEngine& engine;
     int track = -1, scene = -1;
+    bool hasNotes = true;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, length;
     juce::ToggleButton loop, legato;
@@ -1498,14 +1516,14 @@ public:
             return;
         g.setColour (colour::textSecondary);
         g.setFont (font (type::body));
-        g.drawText (text, getLocalBounds().withTrimmedLeft (column.isVisible() ? ClipColumn::width : 0).withTrimmedBottom (40),
+        g.drawText (text, getLocalBounds().withTrimmedLeft (column.isVisible() ? column.preferredWidth() : 0).withTrimmedBottom (40),
                     juce::Justification::centred, true);
     }
     void resized() override
     {
         auto area = getLocalBounds();
         if (column.isVisible())
-            column.setBounds (area.removeFromLeft (ClipColumn::width));
+            column.setBounds (area.removeFromLeft (column.preferredWidth()));
         open.setBounds (area.withSizeKeepingCentre (240, 26).translated (0, 16));
         if (notesTab.isVisible())
         {
