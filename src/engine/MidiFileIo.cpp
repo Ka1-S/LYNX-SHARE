@@ -1,5 +1,7 @@
 #include "engine/MidiFileIo.h"
 
+#include "core/NoteChance.h"
+
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -228,7 +230,8 @@ std::optional<midiimport::ParsedMidi> parseBytes (const void* data, std::size_t 
 juce::MemoryBlock writeNotes (const Song& song, const std::vector<Note>& notes, const std::string& trackName)
 {
     juce::MidiMessageSequence seq;
-    for (const auto& n : notes)
+    // notes with Chance or a Velocity Range: as they play (round 187c, core/NoteChance.h)
+    for (const auto& n : chance::realised (notes, song.chanceSeed))
     {
         if (n.muted)
             continue;
@@ -297,7 +300,7 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
     const auto& pattern = song.patterns[(std::size_t) patternIndex];
     std::map<int, juce::MidiMessageSequence> byChannel;
 
-    for (const auto& n : pattern.notes)
+    for (const auto& n : chance::realised (pattern.notes, song.chanceSeed))
     {
         auto& seq = byChannel[n.channel];
         const auto velocity = (juce::uint8) juce::jlimit (1, 127, juce::roundToInt (n.velocity * 127.0f));
