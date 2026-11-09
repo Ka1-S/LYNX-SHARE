@@ -2167,6 +2167,22 @@ the dynamics before the EQ (S5, +0.5 dB).
 
 FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.
 
+## Round 186c: mixer Delete, links to deleted inserts, groups that follow the Playlist
+
+Proof: `docs/analise/REA_rodada186c.md` (REA of FL 2026 + a hand check in FL).
+
+| Item | FL Studio | LYNX | Status |
+|---|---|---|---|
+| Delete (menu, Del) on the selected inserts | "Delete tracks" question with Yes / No and "Remember my choice" (Yes is remembered, No asks again) | same | ✅ |
+| Delete when a Playlist audio / instrument track is linked | "Playlist tracks": Delete tracks and channels / Unlink tracks and channels / Cancel | same; for an audio track "Delete" resets the Playlist track only | ⚠️ |
+| Delete during audio recording | error, nothing deleted | same | ✅ |
+| Tracks that sent into a deleted insert | sent on to its destinations | same | ✅ |
+| Settings › General › Hints and warnings › Manage messages | ~50 messages by category | the messages LYNX has (Delete mixer track) | ⚠️ |
+| Del in the mixer | deletes the selected tracks; never an effect (except with the slot menu open) | same (Del was "delete the effect"; that action stays, unbound) | ✅ |
+| Mixer count after Delete | the mixer shrinks | a blank insert takes the last place | ⚠️ |
+| Links to deleted inserts (pain point 1) | dropped | Mixer menu option, off: kept as a greyed dashed chip, "Disconnected links" in the Routing section reconnects or removes them | LYNX extra |
+| Mixer groups that follow the Playlist (pain point 4) | none | Mixer menu option, off, + "Arrange inserts like the Playlist" | LYNX extra |
+
 ## Round 177b: workflow extras beyond FL (FL's own way stays unchanged)
 
 | Feature | FL Studio | LYNX | Status |

@@ -8187,3 +8187,6 @@ countries: nl be
 "HP Filter" = "Hoogdoorlaatfilter"
 "Vox" = "Vox"
 "bar" = "maat"
+"Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
+"{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"

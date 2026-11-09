@@ -8187,3 +8187,6 @@ countries: id
 "HP Filter" = "Filter HP"
 "Vox" = "Vox"
 "bar" = "bar"
+"Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
+"{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"

@@ -8187,3 +8187,6 @@ countries: pl
 "HP Filter" = "Filtr HP"
 "Vox" = "Vox"
 "bar" = "takt"
+"Mixer groups follow the Playlist (LYNX)" = "Grupy miksera podążają za Playlistą (LYNX)"
+"Arrange inserts like the Playlist" = "Ułóż inserty jak w Playliście"
+"{0} insert(s) moved to follow the Playlist" = "Przeniesiono inserty, by podążały za Playlistą: {0}"

@@ -8187,3 +8187,6 @@ countries: tw hk mo
 "HP Filter" = "高通濾波"
 "Vox" = "Vox"
 "bar" = "小節"
+"Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
+"Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
+"{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"

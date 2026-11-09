@@ -8270,3 +8270,6 @@ countries: br
 "HP Filter" = "Filtro passa-alta"
 "Vox" = "Vox"
 "bar" = "compasso"
+"Mixer groups follow the Playlist (LYNX)" = "Grupos do Mixer seguem a Playlist (LYNX)"
+"Arrange inserts like the Playlist" = "Organizar inserts como a Playlist"
+"{0} insert(s) moved to follow the Playlist" = "{0} insert(s) movido(s) para seguir a Playlist"
