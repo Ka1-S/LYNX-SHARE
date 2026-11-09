@@ -211,6 +211,13 @@ std::vector<int> selectStacked (const Pattern& pattern, const std::vector<int>& 
 // pasted get new group numbers (each group of the copies its own), so copies never join the originals' groups.
 void groupNotes (Pattern& pattern, const std::vector<int>& indices);
 void ungroupNotes (Pattern& pattern, const std::vector<int>& indices);
+// Live 12's probability groups (round 187c, Note::chanceGroup): the notes become one group that draws together, "Play
+// one" (one of them plays) or "Play all"; they take the chance of the first one (Live shows one marker per group).
+// Ungrouping keeps each note's chance.
+void groupChance (Pattern& pattern, const std::vector<int>& indices, bool playOne);
+void ungroupChance (Pattern& pattern, const std::vector<int>& indices);
+// The groups of the `edited` notes take their chance (a group has one Chance marker, as in Live)
+void spreadGroupChance (Pattern& pattern, const std::vector<int>& edited);
 std::vector<int> groupOf (const Pattern& pattern, int index);
 void regroup (Pattern& pattern, const std::vector<int>& indices);
 

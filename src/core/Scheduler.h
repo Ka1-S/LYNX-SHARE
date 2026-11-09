@@ -157,7 +157,9 @@ void schedulePatternLoop (const Pattern& pattern,
                           float swing = 0.0f,
                           const std::vector<ChannelDef>* channels = nullptr,
                           bool chase = false,
-                          double linearOrigin = -1.0) noexcept;
+                          double linearOrigin = -1.0,
+                          std::uint32_t chanceSeed = 0) noexcept;
+// `chanceSeed` (round 187c): Song::chanceSeed, for the notes with Chance or a Velocity Range (core/NoteChance.h).
 // `linearOrigin` >= 0 (round 170e5, Loop record off in Pattern mode): the pattern plays once from that transport tick,
 // every note (also those past `patternLength`) and no repeat; before it nothing plays.
 // `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on

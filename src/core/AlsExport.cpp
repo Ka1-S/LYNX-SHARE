@@ -497,11 +497,13 @@ struct Exporter
                     e.set ("Duration", num (beats (std::min (n->length, offset + length - n->start))));
                     e.set ("Velocity", num (std::clamp ((double) n->velocity * 127.0, 1.0, 127.0)));
                     // Live 11 writes every attribute; Live 12 leaves out the default ones (same order) [DATA]
-                    if (live11)
-                        e.set ("VelocityDeviation", "0");
+                    // the note's Velocity Range and Chance (round 187c)
+                    const auto deviation = std::round (std::clamp ((double) n->velocityRange * 127.0, -127.0, 127.0) * 1.0e4) / 1.0e4;
+                    if (live11 || deviation != 0.0)
+                        e.set ("VelocityDeviation", num (deviation));
                     e.set ("OffVelocity", num (std::clamp ((double) n->release * 127.0, 0.0, 127.0)));
-                    if (live11)
-                        e.set ("Probability", "1");
+                    if (live11 || n->chance < 1.0f)
+                        e.set ("Probability", num (std::clamp ((double) n->chance, 0.0, 1.0)));
                     if (live11 || n->muted)
                         e.set ("IsEnabled", n->muted ? "false" : "true");
                     e.set ("NoteId", num (noteId++));

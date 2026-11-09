@@ -10373,6 +10373,24 @@ private:
             // the editors' mouse feel: the hovered note / clip edge (grip, outline) and its hint in the hint bar
             ui.setHintForSnapshot (ui.getPianoRollForSnapshot().hoverForSnapshot());
             saveSnapshot (ui, prefix + "-pianoroll-hover.png");
+            {
+                // a pattern with note Chance or a Velocity Range (round 187c): the Piano roll with those lanes
+                const auto& song = offline.getSong();
+                const auto& notes = song.patterns[(std::size_t) std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1)].notes;
+                if (std::any_of (notes.begin(), notes.end(), [] (const lynx::Note& n) { return n.hasChance(); }))
+                {
+                    auto& roll = ui.getPianoRollForSnapshot();
+                    ui.setHintForSnapshot ({});
+                    for (const auto& [lane, name] : { std::pair { lynx::PianoRollComponent::laneChance, "chance" },
+                                                      { lynx::PianoRollComponent::laneVelocityRange, "velrange" },
+                                                      { lynx::PianoRollComponent::laneVelocity, "velocity" } })
+                    {
+                        roll.setLaneForSnapshot (lane);
+                        offline.dispatchPendingMessages();
+                        saveSnapshot (ui, prefix + "-pianoroll-" + name + ".png");
+                    }
+                }
+            }
             ui.selectTabForSnapshot (2);
             saveSnapshot (ui, prefix + "-playlist.png");
             if (const auto strip = ui.getToolStripAreaForSnapshot (true); ! strip.isEmpty())

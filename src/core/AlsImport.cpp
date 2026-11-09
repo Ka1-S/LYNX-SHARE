@@ -519,6 +519,9 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
                 note.velocity = (float) std::clamp (numberAttr (n, "Velocity", 100) / 127.0, 0.0, 1.0);
                 note.release = (float) std::clamp (numberAttr (n, "OffVelocity", 64) / 127.0, 0.0, 1.0);
                 note.muted = n.hasAttr ("IsEnabled") && n.attr ("IsEnabled") == "false";
+                // Live's note Chance and Velocity Range (round 187c; Live 12 leaves out the defaults 1 and 0 [DATA])
+                note.chance = (float) std::clamp (numberAttr (n, "Probability", 1), 0.0, 1.0);
+                note.velocityRange = (float) std::clamp (numberAttr (n, "VelocityDeviation", 0) / 127.0, -1.0, 1.0);
                 p.notes.push_back (note);
             }
         }
