@@ -163,14 +163,23 @@ public:
     static constexpr int defaultVelocityHeight = 72;
     static constexpr int compactVelocityHeight = 30; // docked in the Clip-launch detail view (round 183a): the reference's lane is ~30 px
     int velocityHeight = defaultVelocityHeight;
-    void setVelocityLaneHeight (int h)
+    // docked in the Clip-launch detail view (round 183a): a short lane, and the keys fitted to the notes when it scrolls to them;
+    // the floating panel's key height comes back when it goes home
+    void setDocked (bool docked)
     {
-        if (velocityHeight == h)
+        if (fitKeysToNotes == docked)
             return;
-        velocityHeight = h;
+        fitKeysToNotes = docked;
+        velocityHeight = docked ? compactVelocityHeight : defaultVelocityHeight;
+        if (docked)
+            undockedRowHeight = rowHeight;
+        else
+            rowHeight = undockedRowHeight;
         resized();
         repaint();
     }
+    bool fitKeysToNotes = false;
+    int undockedRowHeight = 14;
     int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 

@@ -2705,7 +2705,7 @@ juce::Component* MainComponent::dockPianoRoll (int pattern)
         workspace.releaseContent (Panel::pianoRoll);
         pianoRollDocked = true;
         pianoRollDockActive = false;
-        pianoRoll.setVelocityLaneHeight (PianoRollComponent::compactVelocityHeight); // (more rows for the notes in the short dock)
+        pianoRoll.setDocked (true); // (a short velocity lane and the keys fitted to the notes in the short dock)
         dockClickWatcher.down = [this] (const juce::MouseEvent& e) {
             pianoRollDockActive = e.eventComponent != nullptr && (e.eventComponent == &pianoRoll || pianoRoll.isParentOf (e.eventComponent));
         };
@@ -2724,7 +2724,7 @@ void MainComponent::undockPianoRoll()
         return;
     pianoRollDocked = false;
     pianoRollDockActive = false;
-    pianoRoll.setVelocityLaneHeight (PianoRollComponent::defaultVelocityHeight);
+    pianoRoll.setDocked (false);
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
     workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
 }
