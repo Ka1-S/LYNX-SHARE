@@ -321,6 +321,16 @@ std::vector<Action> makeActions()
         { "playlist.collapseAllGroups", TR_NOOP ("Collapse all grouped tracks"), Context::playlist, {} },
         { "playlist.expandAllGroups", TR_NOOP ("Expand all grouped tracks"), Context::playlist, {} },
         { "playlist.purgeUnusedAudio", TR_NOOP ("Purge unused audio clips"), Context::playlist, {} },
+        // round 189e: FL's Playlist Edit / Select items it lacked (EEMenu as the Playlist enables it, FL 2026 shots f04/f06)
+        { "playlist.shiftLeft", TR_NOOP ("Shift the selected clips left (one snap step)"), Context::playlist, { chord (left, shift) } },
+        { "playlist.shiftRight", TR_NOOP ("Shift the selected clips right (one snap step)"), Context::playlist, { chord (right, shift) } },
+        { "playlist.shiftUp", TR_NOOP ("Shift the selected clips up (one track)"), Context::playlist, { chord (up, shift) } },
+        { "playlist.shiftDown", TR_NOOP ("Shift the selected clips down (one track)"), Context::playlist, { chord (down, shift) } },
+        { "playlist.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::playlist, { chord (insert, ctrl | alt) } },
+        { "playlist.trimSpace", TR_NOOP ("Trim selection (keep only the time selection)"), Context::playlist, {} },
+        { "playlist.deselect", TR_NOOP ("Deselect (clips and time)"), Context::playlist, { chord ('D', ctrl) } },
+        { "playlist.selectBySource", TR_NOOP ("Select by selected source"), Context::playlist, { chord ('C', shift) } },
+        { "playlist.invertSelection", TR_NOOP ("Invert selection"), Context::playlist, { chord ('I', shift) } },
 
         // Browser (focused)
         { "browser.previous", TR_NOOP ("Previous file (preview)"), Context::browser, { chord (up) } },

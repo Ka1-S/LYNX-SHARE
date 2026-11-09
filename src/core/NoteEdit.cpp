@@ -467,6 +467,39 @@ void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::in
             m.tick += length;
 }
 
+void sliceInsertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length)
+{
+    if (length <= 0)
+        return;
+
+    const auto count = clips.size();
+    for (std::size_t i = 0; i < count; ++i)
+        if (clips[i].start < at && clips[i].end() > at)
+        {
+            auto rest = splitClip (clips[i], at);
+            clampFades (clips[i]);
+            clampFades (rest);
+            clips.push_back (rest);
+        }
+
+    insertTime (clips, markers, at, length);
+}
+
+void trimTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to)
+{
+    if (to <= from)
+        return;
+
+    std::int64_t end = to;
+    for (const auto& c : clips)
+        end = std::max (end, c.end());
+    for (const auto& m : markers)
+        end = std::max (end, m.tick + 1);
+
+    deleteTime (clips, markers, to, end);
+    deleteTime (clips, markers, 0, from);
+}
+
 void deleteTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to)
 {
     const auto length = to - from;

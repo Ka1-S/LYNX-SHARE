@@ -10710,6 +10710,11 @@ private:
                 menus.push_back (ui.getToolbarMenuForSnapshot());
                 saveMenus (names, menus, prefix + "-panel-menus.png");
             }
+            // round 189e: the Playlist menu's Edit and Select submenus (FL's items and order) and the header drop question
+            saveMenus (juce::StringArray { "Playlist: Edit", "Playlist: Select" },
+                       std::vector<juce::PopupMenu> { ui.getPlaylistForSnapshot().editMenu(), ui.getPlaylistForSnapshot().selectMenu() },
+                       prefix + "-playlist-edit189e.png");
+            saveWindow (lynx::PlaylistComponent::makeHeaderDropDialog(), "-header-drop189e.png");
             {
                 // REA round 143: the piano roll Tools menu, a Playlist track menu and a mixer insert menu (FL's layouts)
                 std::vector<juce::PopupMenu> menus { ui.getPianoRollForSnapshot().getToolsMenuForSnapshot(),

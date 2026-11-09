@@ -145,6 +145,15 @@ void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::in
 // and everything after `to` (clips and markers) moves left.
 void deleteTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
 
+// Playlist › Edit › "Slice & insert space" (Ctrl+Alt+Ins; EESliceInsSpaceAction, Tag 0 → FUN_00eb35f0 / FUN_00e3b2b0,
+// round 189e): the clips crossing `at` are cut there first, then `length` ticks are inserted as insertTime does.
+void sliceInsertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length);
+
+// Playlist › Edit › "Trim selection" (EETrimSpaceAction → FUN_00eb35f0, its "trim space" branch, round 189e): the space
+// after `to` (to the end of the song) and then the space before `from` are deleted as deleteTime does, so only the time
+// selection is left, at the song start.
+void trimTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
+
 // Indices of the clips that overlap [from, to).
 std::vector<int> clipsInTime (const std::vector<Clip>& clips, std::int64_t from, std::int64_t to);
 

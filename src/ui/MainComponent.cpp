@@ -180,6 +180,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    PlaylistComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
     pianoRoll.onNoteNamesChanged = [this] { saveUiSettings(); };
     // FL's EEPlayBtnClick (FLEngine 0xe4bd40, REA round 169f): Pattern mode first (also while the song plays), then the
     // play / pause of the transport. EEPlayBtnMouseDown (0xe4bda0), right button: FL's Stop (FUN_011ca520 (0, 0), the very
@@ -774,6 +775,7 @@ MainComponent::~MainComponent()
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;
+    PlaylistComponent::shortcutText = nullptr;
     saveUiSettings();
     workspace.saveState();
     ui::uninstallSliderContract();
@@ -2067,6 +2069,15 @@ void MainComponent::loadUiSettings()
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
             EditorGlobals::get().createVariants = on;
+        else if (key == "dropAudioOnHeaders") // round 189e: FL's Edit › Drop audio on track headers (DropAudioToPLMode)
+        {
+            const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
+            trackmodes::headerDropOptions().mode = v == 256 || v == 257 || v == 258 ? (trackmodes::HeaderDrop) v : trackmodes::HeaderDrop::ask;
+        }
+        else if (key == "dropLocksToContent")
+            trackmodes::headerDropOptions().lockToContent = on;
+        else if (key == "selectTracksOnDrop")
+            trackmodes::headerDropOptions().selectTracks = on;
         else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
@@ -2271,6 +2282,9 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
+                                      + "\ndropAudioOnHeaders=" + juce::String ((int) trackmodes::headerDropOptions().mode)
+                                      + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
+                                      + "\nselectTracksOnDrop=" + juce::String (trackmodes::headerDropOptions().selectTracks ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
@@ -2940,30 +2954,21 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 refreshPanelButtons();
             });
             menu.addSeparator();
+            // FL's Playlist menu › Edit and › Select (round 189e: FL's items and order; the clip items below moved there)
+            menu.addSubMenu (tr ("Edit"), playlist.editMenu());
+            menu.addSubMenu (tr ("Select"), playlist.selectMenu());
+            menu.addSeparator();
             action (menu, "playlist.ripple", tr ("Ripple editing (resizing and deleting move the later clips)"), true, playlist.isRippleOn());
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
-            action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
             // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
-            action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
-            action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
-            action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
-            // round 168f: FL's Playlist Edit / Tools items ([DFM] EEMenu)
-            action (menu, "playlist.muteClips", tr ("Mute"));     // FL's Alt+M / Shift+Alt+M (issue #53)
-            action (menu, "playlist.unmuteClips", tr ("Unmute"));
-            action (menu, "playlist.makeUnique", tr ("Make unique"));
-            action (menu, "playlist.mergePatternClips", tr ("Merge pattern clips"));
-            action (menu, "playlist.mergeSimilarClips", tr ("Merge similar pattern clips"));
-            action (menu, "playlist.mergeAutomationClips", tr ("Merge automation clips"));
-            action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
             menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
-            action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
             {
                 juce::PopupMenu trackTools;
                 action (trackTools, "playlist.cloneTracks", tr ("Clone selected playlist track(s)"));

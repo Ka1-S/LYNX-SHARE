@@ -147,6 +147,31 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
 // (see above), each once, in clip order.
 std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& touched);
 
+// Playlist › Edit › "Drop audio on track headers" (round 189e; FLEngine 2026 [DECOMP] FUN_00e71980 places one file, FUN_00e71430
+// asks, FUN_00e79d60 walks the dropped files; EEDropAudioToPL1..4Action Tags 256..258 / none, saved as DropAudioToPLMode).
+// FL acts only on an unassigned track; each further file goes to the next track. `Ask` (FL's default, "Always ask") shows
+// "Dropped sample(s)": Audio clip(s) / Audio track(s) / Instrument track(s) / Cancel, once for the whole drop.
+enum class HeaderDrop : int { ask = 0, audioClips = 256, audioTracks = 257, instrumentTracks = 258 };
+// FL's mode and its two Edit-menu companions, app settings (FL: registry, not the project): "Dropping on track header
+// locks to content" (AutoLockWhenDropping, off) and "Select tracks when samples are dropped" (SelectPLTracksOnSampleDrop, off).
+struct HeaderDropOptions
+{
+    HeaderDrop mode = HeaderDrop::ask;
+    bool lockToContent = false;
+    bool selectTracks = false;
+};
+HeaderDropOptions& headerDropOptions() noexcept;
+// One dropped sample (`path`, shown as `name`, `lengthTicks` long) on header `track` as `how` (not `ask`), FL's results
+// checked live in FL 2026 (round 189e shots f15/f21/f24): audio clips = a clip at the song start (an audio-clip channel
+// of the same file is reused), the track named and coloured after it; audio track = a new audio-clip channel (FL's
+// "<name> #2" when the name is taken), the track linked to a free mixer track and named after the channel, its clip at the
+// song start; instrument track = a new Sampler channel of the file, the track becomes its instrument track (a free mixer
+// track) with its pattern at the song start. `lock`: the track is locked to content. Returns false when `track` is not
+// an unassigned track or no mixer track is free (FL: "Can't create instrument/audio track|No available mixer track was
+// found.") — then nothing changes.
+bool dropOnHeader (Song& song, int track, const std::string& path, const std::string& name, std::int64_t lengthTicks, HeaderDrop how,
+                   bool lock);
+
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
 
