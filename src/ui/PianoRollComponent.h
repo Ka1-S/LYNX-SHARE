@@ -153,6 +153,11 @@ public:
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
+    // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
+    static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
+                         laneVelocityRange = 8, laneLast = 8;
+    // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
+    void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
 
     static constexpr int keyboardWidth = 72;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
@@ -160,7 +165,26 @@ public:
     static constexpr int timelineHeight = 22;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int velocityHeight = 72;
+    static constexpr int defaultVelocityHeight = 72;
+    static constexpr int compactVelocityHeight = 30; // docked in the Clip-launch detail view (round 183a): the reference's lane is ~30 px
+    int velocityHeight = defaultVelocityHeight;
+    // docked in the Clip-launch detail view (round 183a): a short lane, and the keys fitted to the notes when it scrolls to them;
+    // the floating panel's key height comes back when it goes home
+    void setDocked (bool docked)
+    {
+        if (fitKeysToNotes == docked)
+            return;
+        fitKeysToNotes = docked;
+        velocityHeight = docked ? compactVelocityHeight : defaultVelocityHeight;
+        if (docked)
+            undockedRowHeight = rowHeight;
+        else
+            rowHeight = undockedRowHeight;
+        resized();
+        repaint();
+    }
+    bool fitKeysToNotes = false;
+    int undockedRowHeight = 14;
     int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 
@@ -234,6 +258,8 @@ private:
     float laneValue (const Note& n) const;          // 0..1 of the chosen property
     void setLaneValue (Note& n, float value) const; // inverse
     bool laneIsBipolar() const;
+    bool laneIsChance() const;
+    void addNoteLanes();
     void setNotesMuted (bool mute); // the selection (or all notes)
     void togglePorta(); // porta notes glide from the previous note (toggles the channel's porta)
 

@@ -1,6 +1,7 @@
 #include "core/MixerOps.h"
 #include "core/ClipOps.h"
 #include "core/FlpExport.h"
+#include "core/RackOps.h"
 #include "core/Transmitter.h"
 #include "core/SoundFont.h"
 #include "core/TransporterFl.h"
@@ -385,6 +386,124 @@ bool deleteTrack (Song& song, int t)
     renumberDefaultNames (song, t, -1);
     song.mixer.back().name = "Insert " + std::to_string (count - 1);
     return true;
+}
+
+bool reconnectLostSend (Song& song, int track, int index, int to)
+{
+    if (! isInsert (song, track) || index < 0 || index >= (int) song.mixer[(std::size_t) track].lostSends.size() || to < 1
+        || to >= (int) song.mixer.size() || to == track || (! song.routes (track, to) && ! song.canRoute (track, to)))
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto lost = t.lostSends[(std::size_t) index];
+    t.lostSends.erase (t.lostSends.begin() + index);
+    if (const auto it = std::find_if (t.sends.begin(), t.sends.end(), [to] (const MixerSend& s) { return s.target == to; }); it != t.sends.end())
+        it->level = lost.level;
+    else
+        t.sends.push_back ({ to, lost.level });
+    return true;
+}
+
+void removeLostSends (Song& song, int track, int index)
+{
+    if (! isInsert (song, track))
+        return;
+    auto& lost = song.mixer[(std::size_t) track].lostSends;
+    if (index < 0)
+        lost.clear();
+    else if (index < (int) lost.size())
+        lost.erase (lost.begin() + index);
+}
+
+std::vector<int> playlistTracksLinkedTo (const Song& song, const std::vector<int>& tracks)
+{
+    const auto among = [&tracks] (int t) { return t > 0 && std::find (tracks.begin(), tracks.end(), t) != tracks.end(); };
+    std::vector<int> result;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) i];
+        auto insert = -1;
+        if (pt.mode == PlaylistTrackMode::audio)
+            insert = pt.mixerTrack;
+        else if (pt.mode == PlaylistTrackMode::instrument) // (FL: the channel's own mixer track)
+            insert = pt.channel >= 0 && pt.channel < (int) song.channels.size() ? song.channels[(std::size_t) pt.channel].mixerTrack : pt.mixerTrack;
+        if (among (insert))
+            result.push_back (i);
+    }
+    return result;
+}
+
+namespace
+{
+// FL 21 (fix 19603): the tracks that sent into `t` send to `t`'s destinations instead (at their send's level)
+void rerouteFeeders (Song& song, int t)
+{
+    const auto& gone = song.mixer[(std::size_t) t];
+    const auto destinations = gone.sends;
+    const auto toMaster = gone.toMaster;
+    for (int x = 1; x < (int) song.mixer.size(); ++x)
+    {
+        if (x == t)
+            continue;
+        auto& track = song.mixer[(std::size_t) x];
+        const auto it = std::find_if (track.sends.begin(), track.sends.end(), [t] (const MixerSend& s) { return s.target == t; });
+        if (it == track.sends.end() || it->level <= 0.0f) // (a level-0 sidechain link carries no signal)
+            continue;
+        const auto level = it->level;
+        if (toMaster)
+            track.toMaster = true;
+        for (const auto& d : destinations)
+            if (d.target != x && d.target != t
+                && std::none_of (track.sends.begin(), track.sends.end(), [&d] (const MixerSend& s) { return s.target == d.target; }))
+                track.sends.push_back ({ d.target, level });
+    }
+}
+} // namespace
+
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked, bool keepLostLinks)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&song] (int t) { return t < 1 || t >= (int) song.mixer.size(); }), tracks.end());
+    if (tracks.empty())
+        return 0;
+
+    const auto playlist = playlistTracksLinkedTo (song, tracks);
+    std::vector<int> channels; // instrument tracks' channels, for "Delete tracks and channels"
+    for (const auto i : playlist)
+    {
+        auto& pt = song.playlistTracks[(std::size_t) i];
+        if (linked == LinkedPlaylistTracks::deleteToo && pt.mode == PlaylistTrackMode::instrument && pt.channel >= 0
+            && pt.channel < (int) song.channels.size())
+            channels.push_back (pt.channel);
+        if (linked == LinkedPlaylistTracks::deleteToo) // FL resets the track: "Track N", unassigned
+        {
+            pt.name.clear();
+            pt.colour = 0;
+            pt.icon = 0;
+        }
+        pt.mode = PlaylistTrackMode::unassigned; // (FL "Unlink": the track keeps its name)
+        pt.mixerTrack = -1;
+        pt.channel = -1;
+    }
+
+    int deleted = 0;
+    for (auto it = tracks.rbegin(); it != tracks.rend(); ++it) // from the right: the numbers still to delete stay valid
+    {
+        if (keepLostLinks) // (round 186c's option) each send into it stays, greyed, under the deleted insert's name
+        {
+            const auto name = song.mixer[(std::size_t) *it].name.empty() ? "Insert " + std::to_string (*it) : song.mixer[(std::size_t) *it].name;
+            for (int x = 1; x < (int) song.mixer.size(); ++x)
+                for (const auto& send : song.mixer[(std::size_t) x].sends)
+                    if (x != *it && send.target == *it)
+                        song.mixer[(std::size_t) x].lostSends.push_back ({ name, send.level });
+        }
+        rerouteFeeders (song, *it);
+        if (deleteTrack (song, *it))
+            ++deleted;
+    }
+    if (! channels.empty() && channels.size() < song.channels.size()) // (at least one channel stays, as in the Channel rack)
+        removeChannels (song, channels);
+    return deleted;
 }
 
 std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int track, bool startingHere)
@@ -921,6 +1040,7 @@ void resetRouting (Song& song, const std::vector<int>& tracks)
         {
             auto& m = song.mixer[(std::size_t) t];
             m.sends.clear();
+            m.lostSends.clear();
             m.toMaster = true;
             m.masterLevel = 1.0f;
         }

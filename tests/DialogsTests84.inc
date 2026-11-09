@@ -417,6 +417,7 @@ TEST (new_project_setup_and_templates)
 // Issue #123: the default template's saved form (FL's Options › General › "Default template")
 TEST (default_template_choice_text_round_trip_and_rejects_paths)
 {
+    using namespace lynx;
     using K = TemplateChoice::Kind;
     CHECK (TemplateChoice::parse ("").isLynxDefault());
     CHECK (TemplateChoice {}.toText().empty());

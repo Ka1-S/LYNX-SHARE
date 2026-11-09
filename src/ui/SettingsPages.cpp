@@ -3,11 +3,13 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/LayoutStyle.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/LinuxRealtime.h"
 #include "ui/AutomationUi.h"
+#include "ui/Dialogs.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
@@ -108,23 +110,26 @@ public:
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues, &editInLabel, &editInBox, &undoLabel,
-                                                                 &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
+                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
         setupFontRow();
         styleLabel (layoutStyleLabel, tr ("Layout style"));
-        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), 1);
-        layoutStyleBox.addItem (tr ("Clip-launch workflow"), 2);
-        layoutStyleBox.setSelectedId (options.clipLaunchWorkflow ? 2 : 1, juce::dontSendNotification);
+        layoutStyleBox.setComponentID ("layoutStyle"); // (--simpleshot finds it)
+        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), layoutstyle::comboId (layoutstyle::Style::pattern));
+        layoutStyleBox.addItem (tr ("Clip-launch workflow"), layoutstyle::comboId (layoutstyle::Style::clipLaunch));
+        layoutStyleBox.addItem (tr ("Simple workflow"), layoutstyle::comboId (layoutstyle::Style::simple));
+        layoutStyleBox.setSelectedId (layoutstyle::comboId ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, options.layoutStyle)), juce::dontSendNotification);
         layoutStyleBox.onChange = [this] {
-            options.clipLaunchWorkflow = layoutStyleBox.getSelectedId() == 2;
+            options.layoutStyle = (int) layoutstyle::fromComboId (layoutStyleBox.getSelectedId());
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
         styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
-                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away."));
+                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.") + "\n"
+                                        + tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."));
         styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
         alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
         alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
@@ -339,6 +344,11 @@ public:
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        // FL's "Manage messages" (round 186c): which questions are asked; a ticked "Remember my choice" unticks its message
+        manageMessages.onClick = [this] {
+            messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
+        };
+        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
         managePlugins.onClick = [this] {
             if (hooks.managePlugins)
                 hooks.managePlugins();
@@ -378,7 +388,7 @@ private:
         Rows r (width);
         r.section (workflowTitle, true);
         layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
-        layoutStyleNote.setBounds (r.indented (48).translated (0, -3));
+        layoutStyleNote.setBounds (r.indented (66).translated (0, -3));
         alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
@@ -429,6 +439,14 @@ private:
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
         alternateUndo.setBounds (r.full (24));
+
+        r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
+        {
+            auto row = r.full();
+            manageMessages.setBounds (row.removeFromLeft (180));
+            row.removeFromLeft (12);
+            messagesNote.setBounds (row.withTrimmedTop (6));
+        }
 
         r.section (backupTitle);
         {
@@ -560,7 +578,7 @@ private:
     juce::Label alsSessionLabel;
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
-        backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
+        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::Label fontLabel, fontPreview, fontNote;
     juce::ComboBox fontBox;
@@ -573,7 +591,8 @@ private:
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
     juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
-        checkNow { tr ("Check now") };
+        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
+    juce::Label messagesNote;
 };
 
 // ================================================================================================================
