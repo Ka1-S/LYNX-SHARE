@@ -2983,9 +2983,17 @@ void PlaylistComponent::showGainMenu (int index)
 // fade in, 1 = the fade out. Not built yet: Normalize, Normalize selection as a group, Create crossfade.
 void PlaylistComponent::showFadeHandleMenu (int index, int side)
 {
-    const auto& song = engine.getSong();
-    if (index < 0 || index >= (int) song.playlist.size())
+    if (index < 0 || index >= (int) engine.getSong().playlist.size())
         return;
+    fadeHandleMenu (index, side).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.playlist.size())
+        return menu;
     std::vector<int> targets;
     for (auto i : isSelected (index) ? selection : std::vector<int> { index })
         if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
@@ -3011,7 +3019,6 @@ void PlaylistComponent::showFadeHandleMenu (int index, int side)
     };
     const auto crossfade = (side == 0 ? clip.crossfadeIn : clip.crossfadeOut) > 0;
 
-    juce::PopupMenu menu;
     menu.addItem (tr ("Reset"), [edit, side] {
         edit ([side] (Clip& c) {
             (side == 0 ? c.fadeIn : c.fadeOut) = 0;
@@ -3055,7 +3062,7 @@ void PlaylistComponent::showFadeHandleMenu (int index, int side)
     };
     menu.addItem (tr ("Smooth curve"), true, ! linear, [setLinear] { setLinear (false); });
     menu.addItem (tr ("Single curve"), true, linear, [setLinear] { setLinear (true); });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 int PlaylistComponent::clipAt (int x, int y, bool& onRightEdge) const

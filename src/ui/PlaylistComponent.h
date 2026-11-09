@@ -115,6 +115,8 @@ public:
     // FL's Playlist menu › Edit and › Select submenus (round 189e: the items of FL's shared EEMenu the Playlist enables,
     // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
     juce::PopupMenu editMenu();
+    // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
+    juce::PopupMenu fadeHandleMenu (int index, int side);
     juce::PopupMenu selectMenu();
     // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
