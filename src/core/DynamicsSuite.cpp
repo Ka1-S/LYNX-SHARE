@@ -1219,6 +1219,17 @@ double linearShare (double wl, double wh, double ml, double mh, double w) noexce
     return a;
 }
 
+// round tp172b7 [EXEC] Pro-MB's Linear phase puts that shape on the analog axis x = f / fc, not the prewarped one: a
+// −12 dB band from 500 Hz to 8 kHz (24 dB/oct, 48 kHz) leaves 12 kHz at −1.2 dB and 16 kHz at −0.4 dB (analog: −1.14 /
+// −0.39; prewarped: −0.67 / −0.08); Minimum and Dynamic phase follow the prewarped curve within 0.1 dB (probe p18b).
+// analogBin: the frequency (radians / sample) where a bilinear crossover at fcHz shows its analog prototype's value at
+// w / wc, so the same LrSplit gives the analog magnitude of any slope.
+double analogBin (double w, double fcHz, double sr) noexcept
+{
+    const auto wc = 2.0 * pi * std::min (fcHz, sr * 0.45) / sr;
+    return 2.0 * std::atan (w / wc * std::tan (0.5 * wc));
+}
+
 using Split = LrSplit;
 
 } // namespace
@@ -1275,13 +1286,15 @@ double responseDb (const EffectParams& p, const double* bandGainDb, double sampl
     const auto wOf = [&] (double edge) { return edge > 0.0 ? minphase::warp (std::min (edge, sampleRate * 0.45), sampleRate) : 0.0; };
     if (mode == Phase::linear && freeLayout (p))
     {
-        // round 150: each band's own linear-phase shape (Pro-MB's 1 / (1 + x^m), m = slope / 6, continuous)
+        // round 150: each band's own linear-phase shape (Pro-MB's 1 / (1 + x^m), m = slope / 6, continuous); round
+        // tp172b7: on the analog axis
+        const auto aOf = [&] (double edge) { return edge > 0.0 ? edge : 0.0; };
         std::complex<double> y = solo ? std::complex<double> {} : std::complex<double> { 1.0, 0.0 };
         for (int b = 0; b < nb; ++b)
         {
             if (L.segmentOf[(std::size_t) b] < 0)
                 continue;
-            const auto a = linearShare (wOf (L.loHz[(std::size_t) b]), wOf (L.hiHz[(std::size_t) b]), L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, om);
+            const auto a = linearShare (aOf (L.loHz[(std::size_t) b]), aOf (L.hiHz[(std::size_t) b]), L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, hz);
             const auto g = dbToGain (bandGainDb[b]);
             if (solo)
             {
@@ -1294,8 +1307,19 @@ double responseDb (const EffectParams& p, const double* bandGainDb, double sampl
         return gainToDb (std::abs (y)) + trimDb (p[output]);
     }
     if (mode == Phase::linear)
-        for (auto& b : band)
-            b = std::abs (b);
+    {
+        // the segments' magnitudes (zero phase), round tp172b7: each crossover on the analog axis, as the FIRs
+        double rest = 1.0;
+        for (int k = 0; k < ns - 1; ++k)
+        {
+            Split s;
+            s.design (sampleRate, L.xoverHz[(std::size_t) k], iirSlope (L.xoverSlope[(std::size_t) k]));
+            const auto wk = analogBin (w, L.xoverHz[(std::size_t) k], sampleRate);
+            band[(std::size_t) k] = rest * std::abs (s.response (false, wk));
+            rest *= std::abs (s.response (true, wk));
+        }
+        band[(std::size_t) (ns - 1)] = rest;
+    }
     else if (mode == Phase::minimum)
         for (int k = 0; k < ns - 2; ++k)
             for (int j = k + 1; j < ns - 1; ++j)
@@ -1603,7 +1627,7 @@ private:
             if (freeLin)
                 designFreeKernels (L, nb);
             else
-                designKernels (ns);
+                designKernels (L, ns);
         }
         // the units the output sums: the segments, or (free linear phase) the bands' own FIR outputs
         const int nu = freeLin ? nb : ns;
@@ -2124,8 +2148,8 @@ private:
     }
 
     // the FIR of each segment below the top one: the magnitude of the segment in the IIR tree (the same crossovers),
-    // zero phase
-    void designKernels (int nb) noexcept
+    // zero phase; round tp172b7: each crossover read on the analog axis (analogBin), as the reference's Linear phase
+    void designKernels (const Layout& L, int nb) noexcept
     {
         kernelsDirty = false;
         if (linSize <= 0)
@@ -2139,8 +2163,8 @@ private:
                 const auto w = pi * (double) i / (double) (bins - 1);
                 double m = 1.0;
                 for (int j = 0; j < k; ++j)
-                    m *= std::abs (split[(std::size_t) j].response (true, w));
-                m *= std::abs (split[(std::size_t) k].response (false, w));
+                    m *= std::abs (split[(std::size_t) j].response (true, analogBin (w, L.xoverHz[(std::size_t) j], sr)));
+                m *= std::abs (split[(std::size_t) k].response (false, analogBin (w, L.xoverHz[(std::size_t) k], sr)));
                 t[(std::size_t) i] = (float) m;
             }
             lin[(std::size_t) k].setKernel (t);
@@ -2158,12 +2182,13 @@ private:
         {
             if (L.segmentOf[(std::size_t) b] < 0)
                 continue;
-            const auto wl = L.loHz[(std::size_t) b] > 0.0 ? minphase::warp (L.loHz[(std::size_t) b], sr) : 0.0;
-            const auto wh = L.hiHz[(std::size_t) b] > 0.0 ? minphase::warp (L.hiHz[(std::size_t) b], sr) : 0.0;
+            // round tp172b7: the analog axis (Hz), as the reference's Linear phase
+            const auto wl = std::max (L.loHz[(std::size_t) b], 0.0);
+            const auto wh = std::max (L.hiHz[(std::size_t) b], 0.0);
             auto& t = linTable[(std::size_t) b];
             for (int i = 0; i < bins; ++i)
             {
-                const auto w = std::tan (0.5 * pi * std::min ((double) i / (double) (bins - 1), 0.9999));
+                const auto w = 0.5 * sr * (double) i / (double) (bins - 1);
                 t[(std::size_t) i] = (float) linearShare (wl, wh, L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, w);
             }
             lin[(std::size_t) b].setKernel (t);

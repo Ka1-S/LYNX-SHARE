@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <cerrno>
 #include <cstring>
 #include <ctime>
 #include <deque>
@@ -648,6 +649,79 @@ void watchLoop()
     }
 }
 } // namespace
+
+#if ! defined(_WIN32)
+namespace
+{
+int endSignalPipe[2] = { -1, -1 };
+
+void onEndSignal (int sig)
+{
+    // async-signal-safe: only write(); the thread below notes it (the note takes a lock and allocates)
+    const auto byte = (unsigned char) sig;
+    if (endSignalPipe[1] >= 0)
+        (void) ::write (endSignalPipe[1], &byte, 1);
+}
+
+std::string endSignalStep (int sig)
+{
+    return sig == SIGTERM ? "ended by SIGTERM (the system or another program asked LYNX to close)"
+         : sig == SIGHUP  ? "ended by SIGHUP (the terminal or session that started LYNX closed)"
+                          : "ended by signal " + std::to_string (sig);
+}
+} // namespace
+#endif
+
+void hardenSignals() noexcept
+{
+#if ! defined(_WIN32)
+    try
+    {
+        // the alternate stack (the handler writes files and a backtrace: generous)
+        static std::vector<char> altStack (std::max<std::size_t> (2u << 20, (std::size_t) SIGSTKSZ));
+        stack_t ss {};
+        ss.ss_sp = altStack.data();
+        ss.ss_size = altStack.size();
+        ss.ss_flags = 0;
+        if (sigaltstack (&ss, nullptr) == 0)
+            for (const auto sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGSYS })
+            {
+                struct sigaction action {};
+                if (sigaction (sig, nullptr, &action) == 0 && action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN)
+                {
+                    action.sa_flags |= SA_ONSTACK;
+                    sigaction (sig, &action, nullptr);
+                }
+            }
+
+        if (endSignalPipe[0] < 0 && ::pipe (endSignalPipe) == 0)
+        {
+            std::thread ([] {
+                unsigned char byte = 0;
+                while (::read (endSignalPipe[0], &byte, 1) != 1)
+                    if (errno != EINTR)
+                        return;
+                const int sig = byte;
+                note (endSignalStep (sig)); // (the session file is written and closed here)
+                ::signal (sig, SIG_DFL);
+                ::raise (sig); // ends as before
+            }).detach();
+            for (const auto sig : { SIGTERM, SIGHUP })
+            {
+                struct sigaction action {};
+                if (sigaction (sig, nullptr, &action) == 0 && action.sa_handler == SIG_IGN)
+                    continue; // (started with it ignored, e.g. nohup: keep that)
+                action = {};
+                action.sa_handler = onEndSignal;
+                sigemptyset (&action.sa_mask);
+                action.sa_flags = SA_RESTART;
+                sigaction (sig, &action, nullptr);
+            }
+        }
+    }
+    catch (...) {}
+#endif
+}
 
 void startHangWatch (const std::string& folderUtf8, int stallMs) noexcept
 {

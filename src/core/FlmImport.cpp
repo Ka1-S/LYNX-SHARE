@@ -1,0 +1,638 @@
+#include "core/FlmImport.h"
+
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstring>
+#include <map>
+#include <set>
+
+#include "core/DirectWave.h"
+#include "core/MissingFiles.h"
+
+// FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
+// count 128 ticks per beat and their lengths in beats; LYNX counts `ppq` (960) ticks per beat.
+
+namespace lynx
+{
+namespace
+{
+std::int64_t ticksOf (double beats) noexcept { return (std::int64_t) std::llround (beats * ppq); }
+
+std::string joinPath (const std::string& folder, const std::string& rel)
+{
+    if (folder.empty())
+        return rel;
+    const auto sep = folder.find ('\\') != std::string::npos && folder.find ('/') == std::string::npos ? '\\' : '/';
+    auto out = folder;
+    if (out.back() != '/' && out.back() != '\\')
+        out += sep;
+    for (const auto c : rel)
+        out += (c == '/' || c == '\\') ? sep : c;
+    return out;
+}
+
+std::string fileStem (const std::string& path)
+{
+    auto name = pathFileName (path);
+    if (const auto dot = name.find_last_of ('.'); dot != std::string::npos && dot > 0)
+        name.resize (dot);
+    return name;
+}
+
+bool isAudioFile (const std::string& path)
+{
+    auto lower = path;
+    std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char c) { return (char) std::tolower (c); });
+    for (const auto* ext : { ".wav", ".mp3", ".ogg", ".flac", ".aif", ".aiff" })
+        if (lower.size() > std::strlen (ext) && lower.compare (lower.size() - std::strlen (ext), std::string::npos, ext) == 0)
+            return true;
+    return false;
+}
+
+std::string moduleLabel (std::uint32_t type)
+{
+    const auto* name = flm::moduleName (type);
+    return name != nullptr ? std::string (name) : "Module #" + std::to_string (type);
+}
+
+struct Ctx
+{
+    const FlmImportOptions& options;
+    FlpImportReport* report;
+    Song song;
+    std::map<std::string, int> audioChannels; // resolved path | pitch | insert → audioClip channel
+    std::set<std::string> missingSeen;
+
+    explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report) {}
+
+    void note (std::map<std::string, int> FlpImportReport::* list, const std::string& what)
+    {
+        if (report != nullptr)
+            ++(report->*list)[what];
+    }
+
+    // The file a sample reference points at on this PC, or "" (reported as missing, under its expected path).
+    // Candidates: the root's folder + the relative path, the PRST relative name next to the project, the path saved on
+    // the device, the file name next to the project.
+    std::string resolve (const std::vector<std::string>& candidates, const std::string& user)
+    {
+        const auto& o = options.common;
+        std::string shown;
+        for (const auto& c : candidates)
+            if (! c.empty())
+            {
+                shown = c;
+                break;
+            }
+        if (shown.empty())
+            return {};
+        if (const auto it = o.relocations.find (shown); it != o.relocations.end() && o.fileExists && o.fileExists (it->second))
+            return it->second;
+        if (o.fileExists)
+            for (const auto& c : candidates)
+                if (! c.empty() && o.fileExists (c))
+                {
+                    if (report != nullptr && c != shown)
+                    {
+                        ++report->relocatedSamples;
+                        report->relocatedFiles.push_back ({ shown, c });
+                    }
+                    return c;
+                }
+        if (report != nullptr)
+        {
+            if (missingSeen.insert (shown).second)
+                ++report->missingSamples;
+            addMissingFile (report->missingFiles, shown, user);
+        }
+        return {};
+    }
+
+    // a path saved on the device mapped onto this PC: below the app's "Resources" folder → FL's copy of them; below
+    // the app's user files (Android "…/com.imageline.FLM/files/", Windows "…/LocalState/") → the project's folder
+    std::vector<std::string> deviceCandidates (const std::string& saved) const
+    {
+        std::vector<std::string> out;
+        auto p = "/" + saved; // (FLM also saves "Resources/…" without a leading folder)
+        std::replace (p.begin(), p.end(), '\\', '/');
+        const auto below = [&p] (const std::string& marker) -> std::string {
+            const auto at = p.find (marker);
+            return at == std::string::npos ? std::string() : p.substr (at + marker.size());
+        };
+        if (const auto r = below ("/Resources/"); ! r.empty() && ! options.resourceRoot.empty())
+            out.push_back (joinPath (options.resourceRoot, r));
+        for (const auto* marker : { "/com.imageline.FLM/files/", "/LocalState/" })
+            if (const auto r = below (marker); ! r.empty())
+                out.push_back (joinPath (options.common.projectFolder, r));
+        return out;
+    }
+
+    std::string resolveSample (const flm::SampleRef& s, const std::string& user)
+    {
+        const auto& folder = options.common.projectFolder;
+        std::vector<std::string> candidates;
+        if (! s.path.empty())
+        {
+            if (s.root == "@R@")
+                candidates.push_back (options.resourceRoot.empty() ? std::string() : joinPath (options.resourceRoot, s.path));
+            else
+                candidates.push_back (joinPath (folder, s.path)); // "@L@" (and a file without a root)
+        }
+        if (! s.relName.empty() && s.root != "@R@")
+            candidates.push_back (joinPath (folder, s.relName));
+        for (const auto& c : deviceCandidates (s.savedPath))
+            candidates.push_back (c);
+        candidates.push_back (s.savedPath);
+        if (const auto name = pathFileName (s.path.empty() ? s.savedPath : s.path); ! name.empty())
+            candidates.push_back (joinPath (folder, name));
+        return resolve (candidates, user);
+    }
+};
+
+// One pass of a looped clip: at `at` beats into the clip, the content from `from` for `length` beats.
+struct Pass
+{
+    double at, from, length;
+};
+
+std::vector<Pass> passesOf (const flm::Clip& clip)
+{
+    std::vector<Pass> out;
+    const auto total = clip.timelineLength();
+    const auto loop = clip.loopLength;
+    if (total <= 1e-9)
+        return out;
+    if (loop <= 1e-9)
+    {
+        out.push_back ({ 0.0, std::max (0.0, clip.offset), total });
+        return out;
+    }
+    double at = 0.0, from = std::fmod (std::max (0.0, clip.offset), loop);
+    for (int guard = 0; at < total - 1e-9 && guard < 4096; ++guard)
+    {
+        const auto take = std::min (loop - from, total - at);
+        if (take <= 1e-9)
+        {
+            from = 0.0;
+            continue;
+        }
+        out.push_back ({ at, from, take });
+        at += take;
+        from = 0.0;
+    }
+    return out;
+}
+
+// FLM's fader law (FLM_FORMAT §3, PROVEN-REA 0x1805943b0): gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB; 0 dB at
+// v ≈ 0.853, +6 dB at the top
+float flmGain (float v) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (v <= 0.0f)
+        return 0.0f;
+    return (float) std::pow (10.0, 3.3 * std::pow ((double) v, 0.6) - 3.0);
+}
+
+float velocityOf (const flm::Event& e) noexcept { return std::clamp ((float) e.velocity / 255.0f, 0.0f, 1.0f); }
+
+// The pattern holding one content of a note or drum lane: `channelFor(key)` is the channel and key a note plays on
+// (channel < 0 = dropped).
+template <typename ChannelFor>
+int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, ChannelFor channelFor)
+{
+    Pattern p;
+    p.name = name;
+    const auto lengthBeats = clip.loopLength > 1e-9 ? clip.loopLength : clip.timelineLength();
+    p.lengthTicks = std::max<std::int64_t> (1, ticksOf (lengthBeats));
+    for (const auto& e : clip.events)
+    {
+        const auto [channel, key] = channelFor (e.key);
+        if (channel < 0)
+            continue;
+        Note n;
+        n.channel = channel;
+        n.key = std::clamp (key, 0, 127);
+        n.start = ticksOf ((double) e.tick / flm::ticksPerBeat);
+        if (n.start >= p.lengthTicks)
+            continue;
+        n.length = std::clamp<std::int64_t> (ticksOf (e.length), 1, p.lengthTicks - n.start);
+        n.velocity = velocityOf (e);
+        p.notes.push_back (n);
+    }
+    p.sortNotes();
+    ctx.song.patterns.push_back (std::move (p));
+    return (int) ctx.song.patterns.size() - 1;
+}
+
+void addPatternClips (Ctx& ctx, const flm::Clip& clip, int pattern, int row)
+{
+    const auto start = (double) clip.startTick / flm::ticksPerBeat;
+    for (const auto& pass : passesOf (clip))
+    {
+        Clip c;
+        c.kind = ClipKind::pattern;
+        c.pattern = pattern;
+        c.track = row;
+        c.start = ticksOf (start + pass.at);
+        c.length = std::max<std::int64_t> (1, ticksOf (pass.length));
+        c.offset = ticksOf (pass.from);
+        ctx.song.playlist.push_back (c);
+    }
+}
+
+// FLM's DW Sampler playing a DirectWave program (.dwp: "DwPr" + DirectWave's own saved state, FLM_FORMAT §7) → LYNX's
+// DirectWave engine (slice F3). The program is looked for in FL's copy of FLM's resources ("DirectWave Samples…") and
+// next to the project; its zones' files ("%ILSharedData%\DirectWave\<program>\<file>.wav") in the program's folder.
+bool directWaveProgram (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    const auto& o = ctx.options.common;
+    if (! o.readFile || ! o.fileExists)
+        return false;
+    auto lower = m.presetFile;
+    std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
+    if (lower.size() < 4 || lower.compare (lower.size() - 4, 4, ".dwp") != 0)
+        return false;
+    std::vector<std::string> candidates = ctx.deviceCandidates (m.presetFile);
+    if (! m.presetName.empty())
+    {
+        if (! ctx.options.resourceRoot.empty())
+            for (const auto* folder : { "DirectWave Samples", "DirectWave Samples EXP" })
+                candidates.push_back (joinPath (joinPath (ctx.options.resourceRoot, folder), m.presetName + ".dwp"));
+        candidates.push_back (joinPath (o.projectFolder, m.presetName + ".dwp"));
+    }
+    candidates.push_back (m.presetFile);
+    const auto program = ctx.resolve (candidates, c.name);
+    if (program.empty())
+        return false;
+    const auto bytes = o.readFile (program);
+    if (bytes.size() < 8 || std::memcmp (bytes.data(), "DwPr", 4) != 0)
+        return false;
+    const std::vector<std::uint8_t> state (bytes.begin() + 4, bytes.end());
+    const auto slash = program.find_last_of ("/\\");
+    const auto folder = slash == std::string::npos ? std::string() : program.substr (0, slash);
+    const auto existing = [&] (const std::string& zonePath) -> std::string {
+        auto p = zonePath;
+        std::replace (p.begin(), p.end(), '\\', '/');
+        const auto file = pathFileName (p);
+        const auto parentEnd = p.find_last_of ('/');
+        const auto parentStart = parentEnd == std::string::npos || parentEnd == 0 ? std::string::npos : p.find_last_of ('/', parentEnd - 1);
+        std::vector<std::string> zoneCandidates;
+        if (parentEnd != std::string::npos)
+            zoneCandidates.push_back (joinPath (folder, p.substr (parentStart == std::string::npos ? 0 : parentStart + 1)));
+        zoneCandidates.push_back (joinPath (folder, file));
+        return ctx.resolve (zoneCandidates, c.name);
+    };
+    if (! dw::importChannel (c, state, existing, o.readFile, o.saveEmbedded))
+        return false;
+    c.keyLow = m.keyLow;
+    c.keyHigh = m.keyHigh;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: DW Sampler (DirectWave program)");
+    return true;
+}
+
+// The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
+// generator → the built-in synth, listed in the report until its engine is mapped, F4).
+ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
+{
+    ChannelDef c;
+    c.name = ch.name.empty() ? ch.typeName : ch.name;
+    c.mixerTrack = insert;
+    c.volume = 1.0f; // 0 dB: FLM's level is the rack's, on the channel's insert (F2)
+    const auto gen = std::find_if (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) { return flm::isGenerator (m.type); });
+    if (gen == rack.modules.end())
+    {
+        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: channel without an instrument");
+        return c;
+    }
+    if (gen->type == flm::module::dwSampler && isAudioFile (gen->presetFile.empty() ? gen->presetName : gen->presetFile))
+    {
+        // a single sample (a .dwp multisample program is DirectWave's, F4): the module's file, saved on the device;
+        // its relative name is relative to the user library, the .flm's folder in a share-zip
+        const auto& folder = ctx.options.common.projectFolder;
+        std::vector<std::string> candidates;
+        if (! gen->presetName.empty() && isAudioFile (gen->presetName))
+            candidates.push_back (joinPath (folder, gen->presetName));
+        for (const auto& c : ctx.deviceCandidates (gen->presetFile))
+            candidates.push_back (c);
+        candidates.push_back (gen->presetFile);
+        if (const auto name = pathFileName (gen->presetName.empty() ? gen->presetFile : gen->presetName); ! name.empty())
+            candidates.push_back (joinPath (folder, name));
+        c.instrument = InstrumentKind::sampler;
+        c.samplePath = ctx.resolve (candidates, c.name);
+        c.keyLow = gen->keyLow;
+        c.keyHigh = gen->keyHigh;
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: DW Sampler (one sample)");
+        return c;
+    }
+    if (gen->type == flm::module::dwSampler && directWaveProgram (ctx, *gen, c))
+        return c;
+    ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
+    return c;
+}
+
+int audioChannelFor (Ctx& ctx, const std::string& path, int insert, const std::string& name)
+{
+    const auto key = path + "|" + std::to_string (insert);
+    if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
+        return it->second;
+    ChannelDef c;
+    c.name = name.empty() ? fileStem (path) : name;
+    c.instrument = InstrumentKind::audioClip;
+    c.samplePath = path;
+    c.volume = 10000.0f / 12800.0f; // a Playlist audio clip at unity (as the .als import, Instruments.cpp audioClipUnity)
+    c.mixerTrack = insert;
+    ctx.song.channels.push_back (std::move (c));
+    const auto index = (int) ctx.song.channels.size() - 1;
+    ctx.audioChannels[key] = index;
+    return index;
+}
+
+void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const std::string& user)
+{
+    if (! clip.sample)
+        return;
+    const auto& s = *clip.sample;
+    const auto path = ctx.resolveSample (s, "Audio clip: " + user);
+    if (path.empty())
+        return;
+    const auto length = clip.timelineLength();
+    if (length <= 1e-9)
+        return;
+    Clip c;
+    c.kind = ClipKind::audio;
+    c.channel = audioChannelFor (ctx, path, insert, fileStem (path));
+    c.track = row;
+    c.start = ticksOf ((double) clip.startTick / flm::ticksPerBeat);
+    c.length = std::max<std::int64_t> (1, ticksOf (length));
+    c.offset = std::max<std::int64_t> (0, ticksOf (clip.offset));
+    if (std::abs (s.pitch) > 1e-9)
+    {
+        c.pitch = (float) std::clamp (s.pitch, -12.0, 12.0);
+        if (std::abs (s.pitch) > 12.0)
+            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip pitch beyond ±12 semitones");
+    }
+    if (std::abs (s.stretch - 1.0) > 1e-6)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip time-stretch (played unstretched)");
+    ctx.song.playlist.push_back (c);
+}
+} // namespace
+
+std::string flmResourceRootIn (const std::string& flInstallFolder)
+{
+    if (flInstallFolder.empty())
+        return {};
+    return joinPath (flInstallFolder, "Plugins/Fruity/Generators/FL Studio Mobile/Installed");
+}
+
+bool isFlmData (const std::uint8_t* data, std::size_t size) { return flm::isFlmData (data, size); }
+
+std::optional<Song> importFlm (const std::vector<std::uint8_t>& fileBytes, const FlmImportOptions& options, std::string* error)
+{
+    auto project = flm::parse ({ fileBytes.data(), fileBytes.size() }, error);
+    if (! project)
+        return std::nullopt;
+    return importFlmProject (*project, options);
+}
+
+std::optional<Song> importFlmProject (const flm::Project& project, const FlmImportOptions& options)
+{
+    Ctx ctx (options);
+    auto& song = ctx.song;
+    song.channels.clear();
+    song.patterns.clear();
+    song.playlist.clear();
+    song.mixer = Song::defaultMixer (0);
+    song.mode = PlayMode::song;
+    song.arrangements = { Arrangement { "Arrangement", {}, 0, 0, {} } };
+    song.info.title = project.title;
+    song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
+    if (project.denominator == 4)
+        song.beatsPerBar = std::clamp (project.numerator, 1, 32);
+    else
+    {
+        Marker m;
+        m.tick = 0;
+        m.numerator = project.numerator;
+        m.denominator = project.denominator;
+        m.action = Marker::timeSignature;
+        song.addMarker (m);
+    }
+
+    // channels in FLM's display order (the master first), each with its rack
+    std::vector<std::size_t> order (project.channels.size());
+    for (std::size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+    std::stable_sort (order.begin(), order.end(), [&] (std::size_t a, std::size_t b) {
+        const auto& ca = project.channels[a];
+        const auto& cb = project.channels[b];
+        if ((ca.kind == flm::kindMaster) != (cb.kind == flm::kindMaster))
+            return ca.kind == flm::kindMaster;
+        return ca.order < cb.order;
+    });
+
+    static const flm::Rack noRack {};
+    int automationLanes = 0;
+    std::map<int, int> insertOfId;                          // FLM channel id → insert
+    std::vector<std::pair<int, const flm::Channel*>> routes; // insert, channel (its SEND chunks)
+    for (const auto i : order)
+    {
+        const auto& ch = project.channels[i];
+        const auto& rack = i < project.racks.size() ? project.racks[i] : noRack;
+        const auto name = ch.name.empty() ? ch.typeName : ch.name;
+
+        // the insert: FLM's master is LYNX's Master; every other channel (bus/AUX tracks too) gets one
+        int insert = 0;
+        if (ch.kind != flm::kindMaster && (int) song.mixer.size() < maxMixerTracks)
+        {
+            MixerTrack m;
+            m.name = name;
+            song.mixer.push_back (std::move (m));
+            insert = (int) song.mixer.size() - 1;
+        }
+        // the rack's level and pan on it (F2: RPRM [0] volume with FLM's fader law, [1] pan 0…1 → −1…1)
+        if (rack.params.size() >= 2)
+        {
+            auto& m = song.mixer[(std::size_t) insert];
+            const auto gain = flmGain (rack.params[0]);
+            if (gain > maxFaderGain * 1.0001f)
+                ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: level above +5.6 dB (capped)");
+            m.volume = faderPosition (std::min (gain, maxFaderGain));
+            m.pan = std::clamp (rack.params[1] * 2.0f - 1.0f, -1.0f, 1.0f);
+        }
+        if (ch.channelId >= 0)
+            insertOfId[ch.channelId] = insert;
+        routes.push_back ({ insert, &ch });
+
+        // effects (F5) and generators past the first are not imported yet; analysis-only modules change nothing
+        bool firstGenerator = true;
+        for (const auto& m : rack.modules)
+        {
+            if (flm::isGenerator (m.type))
+            {
+                if (! firstGenerator)
+                    ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (m.type) + " (second instrument in a rack)");
+                firstGenerator = false;
+                continue;
+            }
+            if (m.type == flm::module::tuner || m.type == flm::module::analyzer)
+                continue;
+            ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
+        }
+
+        int instrument = -1;          // this channel's instrument (note lanes)
+        std::vector<int> kitChannels; // this channel's drum kit (drum lanes)
+        const auto instrumentIndex = [&] {
+            if (instrument < 0)
+            {
+                song.channels.push_back (instrumentChannel (ctx, rack, ch, insert));
+                instrument = (int) song.channels.size() - 1;
+            }
+            return instrument;
+        };
+        const auto kitIndex = [&] {
+            if (kitChannels.empty())
+            {
+                for (std::size_t k = 0; k < rack.kit.size(); ++k)
+                {
+                    const auto& s = rack.kit[k];
+                    ChannelDef c;
+                    c.name = ! s.name.empty() ? s.name : fileStem (s.path.empty() ? s.savedPath : s.path);
+                    if (c.name.empty())
+                        c.name = name + " " + std::to_string (k + 1);
+                    c.instrument = InstrumentKind::sampler;
+                    c.samplePath = ctx.resolveSample (s, name + ": " + c.name);
+                    c.mixerTrack = insert;
+                    c.volume = 1.0f;
+                    song.channels.push_back (std::move (c));
+                    kitChannels.push_back ((int) song.channels.size() - 1);
+                }
+                if (! rack.kit.empty())
+                    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum kit (one sampler channel per sample)");
+            }
+            return kitChannels;
+        };
+
+        // the channel's instruments exist even without clips (an empty track, a new-song template's kit)
+        if (ch.kind == flm::kindNormal)
+        {
+            if (! rack.kit.empty())
+                kitIndex();
+            if (std::any_of (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) { return flm::isGenerator (m.type); })
+                || std::any_of (ch.lanes.begin(), ch.lanes.end(), [] (const flm::Lane& l) { return l.kind() == flm::LaneKind::notes && ! l.clips.empty(); }))
+                instrumentIndex();
+        }
+
+        for (const auto& lane : ch.lanes)
+        {
+            const auto kind = lane.kind();
+            if (kind == flm::LaneKind::automation)
+            {
+                automationLanes += lane.clips.empty() ? 0 : 1;
+                continue;
+            }
+            if (kind == flm::LaneKind::other || lane.clips.empty())
+                continue;
+
+            PlaylistTrack row;
+            row.name = lane.name.empty() ? name : lane.name;
+            row.mixerTrack = insert;
+            row.mode = kind == flm::LaneKind::audio ? PlaylistTrackMode::audio : PlaylistTrackMode::instrument;
+            song.playlistTracks.push_back (row);
+            const auto rowIndex = (int) song.playlistTracks.size() - 1;
+
+            if (kind == flm::LaneKind::audio)
+            {
+                for (const auto& clip : lane.clips)
+                    addAudioClip (ctx, clip, rowIndex, insert, row.name);
+                continue;
+            }
+
+            // note / drum lanes: one pattern per content id, each clip's loop passes on the Playlist
+            std::map<std::uint32_t, int> patternOf;
+            int dropped = 0;
+            for (const auto& clip : lane.clips)
+            {
+                auto it = patternOf.find (clip.contentId);
+                if (it == patternOf.end())
+                {
+                    const auto pname = patternOf.empty() ? row.name : row.name + " (" + std::to_string (patternOf.size() + 1) + ")";
+                    int pattern;
+                    if (kind == flm::LaneKind::drums)
+                    {
+                        const auto kit = kitIndex();
+                        pattern = addPattern (ctx, clip, pname, [&] (int key) -> std::pair<int, int> {
+                            if (key < 0 || key >= (int) kit.size())
+                            {
+                                ++dropped;
+                                return { -1, 0 };
+                            }
+                            return { kit[(std::size_t) key], 60 };
+                        });
+                    }
+                    else
+                    {
+                        const auto channel = instrumentIndex();
+                        pattern = addPattern (ctx, clip, pname, [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
+                    }
+                    it = patternOf.emplace (clip.contentId, pattern).first;
+                }
+                addPatternClips (ctx, clip, it->second, rowIndex);
+            }
+            if (kind == flm::LaneKind::drums)
+            {
+                song.playlistTracks[(std::size_t) rowIndex].channel = kitChannels.empty() ? -1 : kitChannels.front();
+                if (dropped > 0)
+                    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum notes without a kit sample (dropped)");
+            }
+            else
+                song.playlistTracks[(std::size_t) rowIndex].channel = instrument;
+        }
+    }
+    // routing (F2): a SEND is (target channel id, …, linear gain capped at 1, …, …, level 0…1 on FLM's fader law)
+    // [FLM_FORMAT §4]; the master's id is its route to the Master, another channel's a send to that insert. A channel
+    // with SENDs but none to the master doesn't reach it directly; one without any keeps LYNX's default route.
+    int masterId = -1;
+    for (const auto& c : project.channels)
+        if (c.kind == flm::kindMaster)
+            masterId = c.channelId < 0 ? 0 : c.channelId;
+    for (const auto& [insert, ch] : routes)
+    {
+        if (insert <= 0 || ch->sends.empty())
+            continue;
+        auto& m = song.mixer[(std::size_t) insert];
+        bool toMaster = false;
+        for (const auto& w : ch->sends)
+        {
+            if (w.empty())
+                continue;
+            const auto target = (int) w[0];
+            float level = 0.853f;
+            if (w.size() >= 6)
+                std::memcpy (&level, &w[5], 4);
+            const auto gain = std::min (flmGain (level), maxFaderGain);
+            if (target == masterId)
+            {
+                toMaster = true;
+                m.masterLevel = gain;
+            }
+            else if (const auto it = insertOfId.find (target); it != insertOfId.end() && it->second > 0 && it->second != insert)
+                m.sends.push_back ({ it->second, gain });
+        }
+        m.toMaster = toMaster;
+    }
+
+    if (automationLanes > 0 && ctx.report != nullptr)
+        ctx.report->unsupported["FL Studio Mobile: automation lanes (not imported yet)"] += automationLanes;
+
+    std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    if (song.patterns.empty())
+    {
+        Pattern first;
+        first.name = "Pattern 1";
+        song.patterns.push_back (std::move (first));
+    }
+    song.currentPattern = 0;
+    return std::move (ctx.song);
+}
+} // namespace lynx

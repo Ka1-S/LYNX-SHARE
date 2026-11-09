@@ -155,11 +155,11 @@ inline double tempoAt (const Song& song, double tick) noexcept
                 ended = &c;
         }
         if (inside != nullptr)
-            return tempoFromValue (song.automations[(std::size_t) inside->automation].valueAt (tick - (double) inside->start + (double) inside->offset));
+            return tempoFromValue (song.automations[(std::size_t) inside->automation].playAt (tick - (double) inside->start + (double) inside->offset, tick));
         if (ended != nullptr)
-            automation = { (double) ended->end(), song.automations[(std::size_t) ended->automation].valueAt ((double) (ended->length + ended->offset)) };
+            automation = { (double) ended->end(), song.automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end()) };
         else if (first != nullptr)
-            automation.value = song.automations[(std::size_t) first->automation].valueAt ((double) first->offset);
+            automation.value = song.automations[(std::size_t) first->automation].playAt ((double) first->offset, (double) first->start);
     }
 
     Write events;
