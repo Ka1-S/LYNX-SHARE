@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "core/PocketGrid.h"
 #include "core/PocketTape.h"
 #include "core/Reeverb2.h"
 
@@ -67,8 +68,7 @@ public:
     {
         for (int t = 0; t < 10; ++t)
             resetSub (t);
-        freeSamples = 0.0;
-        wasPlaying = false;
+        grid.reset();
     }
     void setSongPosition (double ticks) noexcept override { songBeats = ticks / (double) ppq; }
 
@@ -81,28 +81,8 @@ public:
         setParams (p);
         // FLM inside FL runs in chunks of one song tick (1/96 beat) cut on the song's tick grid: each chunk reads its
         // own LFO value at its own song position (A/B, round 189h: the LFO settings went from 6 / 7 / 4 to 9 / 10 / 9)
-        const auto tickLen = bpm >= 1.0 ? fs * 60.0 / (bpm * 96.0) : 0.0;
-        if (tickLen < 1.0)
-        {
-            for (int t = 1; t < 10; ++t)
-                if (gateOpen (t) && prepSub (t, songBeats, bpm, false))
-                    runSub (t, left, right, n, true);
-            return;
-        }
-        // A chunk that a host block boundary cuts goes on with the LFO value it started with (FL's chunks follow the
-        // grid only); a chunk that starts on the grid gets its tick's exact position, so a square LFO's edge at a half
-        // beat waits one chunk, as in FL.
-        const auto playing = songBeats >= 0.0;
-        auto start = playing ? songBeats * 96.0 * tickLen : freeSamples; // the block's first sample on the grid
-        if (std::abs (start - std::round (start)) < 1e-6)
-            start = std::round (start); // a whole sample (the grid's half-sample ties must not flip on a rounding error)
-        const auto kHere = (long long) std::floor (start / tickLen + 0.5);
-        const auto onGrid = (long long) std::floor ((double) kHere * tickLen + 0.5 - start) == 0;
-        const auto contiguous = playing ? wasPlaying && std::abs (start - expected) < 0.25 : ! wasPlaying && started;
-        const auto firstBeats = ! playing ? -1.0 : onGrid ? (double) kHere / 96.0 : songBeats;
-        freeSamples = playing ? 0.0 : std::fmod (freeSamples + n, tickLen);
-        expected = start + n;
-        wasPlaying = playing;
+        // (core/PocketGrid.h; A/B, round 189h: the LFO settings went from 6 / 7 / 4 to 9 / 10 / 9)
+        const auto block = grid.begin (songBeats, bpm, fs, n);
         // The effects run one after the other and each only hears the one before it, so each can take the whole block
         // chunk by chunk before the next one starts (the same samples as chunk by chunk through all of them).
         for (int t = 1; t < 10; ++t)
@@ -116,22 +96,10 @@ public:
                     runSub (t, left, right, n, true);
                 continue;
             }
-            auto beats = firstBeats;
-            auto continuing = ! onGrid && contiguous;
-            for (int done = 0; done < n;)
-            {
-                auto k = (long long) std::floor ((start + done) / tickLen);
-                auto next = (int) std::floor ((double) k * tickLen + 0.5 - start);
-                while (next <= done)
-                    next = (int) std::floor ((double) ++k * tickLen + 0.5 - start);
-                const auto m = std::min (next, n) - done;
+            block.forEach ([&] (int at, int m, double beats, bool continuing) {
                 if (prepSub (t, beats, bpm, continuing) && gateOpen (t))
-                    runSub (t, left + done, right + done, m, true);
-                done += m;
-                continuing = false;
-                if (playing)
-                    beats = (double) k / 96.0;
-            }
+                    runSub (t, left + at, right + at, m, true);
+            });
         }
     }
 
@@ -602,8 +570,9 @@ public:
         }
     }
 
-    double fs = 44100.0, songBeats = -1.0, rateBeats = 1.0, freeSamples = 0.0, expected = 0.0;
-    bool wasPlaying = false, held = false;
+    double fs = 44100.0, songBeats = -1.0, rateBeats = 1.0;
+    bool held = false;
+    TickGrid grid;
     float x = 0.5f, y = 0.5f, amount = 0.0f;
     int shape = 0, lastKind = -1;
     bool started = false;
