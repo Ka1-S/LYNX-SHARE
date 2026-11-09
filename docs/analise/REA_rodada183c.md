@@ -233,6 +233,16 @@ generators in Live's member order (round 175a's method), plugins as `PluginDevic
 LYNX → .als → LYNX equal; Live-saved fixtures (made in session 2) → LYNX → .als → Live opens it.
 Bonus later: FL export writes a rack as FL's Patcher (the compiled graph, macros as Surface knobs).
 
+### 9.7 Round 183c-2 additions
+- **Ungroup** (Live's Ungroup on a rack): mixer slot menu › "Ungroup" on a one-chain Audio Effect Rack (`rack::ungroupSlot`).
+  The devices take the rack's slot; each native parameter a macro moves keeps the macro's current value. LYNX extra: a macro
+  with exactly one full-range mapping hands its automation back to that parameter, so Group → Ungroup restores the old
+  slots and their automation (Live deletes macro automation with the macros). Other macro / selector automation goes.
+- **.als zone editor**: Live stores only `IsRangesEditorVisible` [DATA: rackshot.als]; which editor shows is not in the set.
+  Import: visible → the Chain editor for an Audio Effect Rack (its only one), Key for the others; export writes it back.
+- **Macro names on dropped devices**: Live stores "Macro 3" and shows "Formant Shift" (the one mapped parameter of its
+  Vocoder) [DATA + SHOT s08]. When LYNX drops the device, such a macro keeps the shown name (from the parameter's member name).
+
 ## 10. Best way?
 - **FL:** FL has no rack-with-macros device. Its pieces are the Patcher (a free graph with a Surface tab of controls),
   the Layer channel (stacks whole channels, with key split, crossfade and round robin) and the Control Surface /
