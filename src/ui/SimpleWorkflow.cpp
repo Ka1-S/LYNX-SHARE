@@ -7,6 +7,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
+#include "ui/FinishDock.h"
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/QuickPick.h"
@@ -415,13 +416,68 @@ public:
 };
 } // namespace
 
+// the Playlist title bar's tools: "+ Add track" and "Finish" side by side
+class SimpleTitleTools final : public juce::Component
+{
+public:
+    SimpleTitleTools (juce::Component& a, juce::Component& b) : add (a), finish (b)
+    {
+        addAndMakeVisible (add);
+        addAndMakeVisible (finish);
+    }
+    static constexpr int width = 110 + 6 + 80;
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        add.setBounds (r.removeFromLeft (110));
+        r.removeFromLeft (6);
+        finish.setBounds (r);
+    }
+
+private:
+    juce::Component& add;
+    juce::Component& finish;
+};
+
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
 {
     instances.fetch_add (1, std::memory_order_relaxed);
     auto button = std::make_unique<AddTrackButton>();
     button->onClick = [this] { showChooser(); };
     addButton = std::move (button);
+    auto finish = std::make_unique<juce::TextButton> (tr ("Finish"));
+    finish->setTooltip (tr ("Master looks: give the whole song a finished sound"));
+    finish->setClickingTogglesState (false);
+    finish->onClick = [this] {
+        if (isFinishShowing())
+            hideFinish();
+        else
+            showFinish();
+    };
+    finishButton = std::move (finish);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton);
 }
+
+void SimpleWorkflow::showFinish()
+{
+    if (finishDock == nullptr)
+        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); });
+    static_cast<FinishDock&> (*finishDock).refresh();
+    if (host.setSideDock)
+        host.setSideDock (finishDock.get(), FinishDock::width);
+    if (auto* b = dynamic_cast<juce::Button*> (finishButton.get()))
+        b->setToggleState (true, juce::dontSendNotification);
+}
+
+void SimpleWorkflow::hideFinish()
+{
+    if (isFinishShowing() && host.setSideDock)
+        host.setSideDock (nullptr, 0);
+    if (auto* b = dynamic_cast<juce::Button*> (finishButton.get()))
+        b->setToggleState (false, juce::dontSendNotification);
+}
+
+bool SimpleWorkflow::isFinishShowing() const noexcept { return finishDock != nullptr && finishDock->getParentComponent() != nullptr; }
 
 SimpleWorkflow::~SimpleWorkflow()
 {
@@ -433,7 +489,7 @@ void SimpleWorkflow::entered()
 {
     active = true;
     if (host.setTitleAccessory)
-        host.setTitleAccessory (addButton.get(), 110);
+        host.setTitleAccessory (titleTools.get(), SimpleTitleTools::width);
     songChanged();
 }
 
@@ -441,6 +497,7 @@ void SimpleWorkflow::left()
 {
     active = false;
     hideChooser();
+    hideFinish();
     if (host.setTitleAccessory)
         host.setTitleAccessory (nullptr, 0);
 }
@@ -449,6 +506,8 @@ void SimpleWorkflow::songChanged()
 {
     if (! active)
         return;
+    if (isFinishShowing())
+        static_cast<FinishDock&> (*finishDock).refresh();
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {

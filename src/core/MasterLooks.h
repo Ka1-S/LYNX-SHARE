@@ -17,7 +17,7 @@
 
 namespace lynx::looks
 {
-enum Id : int { none = 0, balanced, loud, clear, warmTape, gentle, punchy, wide, cinematic };
+enum Id : int { none = 0, balanced, loud, clarity, warmTape, gentle, punchy, wide, cinematic };
 constexpr int count = 8;     // ids 1…8
 constexpr int chainSlots = 4;
 

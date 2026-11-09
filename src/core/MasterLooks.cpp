@@ -45,7 +45,7 @@ const Look table[count] {
     { "Loud", "As loud as it gets, still clean", Finisher::softClipper,
       { 1.0f, -1.0f, 0, 1.0f, 1.5f, { -16, -18, -20 }, 0.35f, 15, 150, { 1.5f, 1.5f, 1.5f }, 2.0f, 0, 5.0f },
       { 1.0f, -2.0f, 0, 1.5f, 3.0f, { -22, -24, -26 }, 0.60f, 10, 120, { 3, 3, 3 }, 4.0f, 0, 9.0f } },
-    { "Clear", "Brighter and cleaner, less mud", Finisher::enhancer,
+    { "Clarity", "Brighter and cleaner, less mud", Finisher::enhancer,
       { -0.5f, -1.5f, 0, 1.5f, 2.0f, { -14, -16, -18 }, 0.20f, 20, 200, { 1, 1, 1 }, 0, -10, 3.0f },
       { -1.0f, -3.0f, 0, 3.0f, 4.0f, { -18, -20, -22 }, 0.35f, 20, 200, { 1.5f, 1.5f, 1.5f }, 0, -24, 6.5f } },
     { "Warm tape", "Round lows, soft highs, gentle saturation", Finisher::softClipper,

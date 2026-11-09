@@ -677,6 +677,19 @@ public:
         resized();
     }
 
+    // A dock on the right, beside the Playlist (round 189k: the Simple workflow's Finish dock); not owned, nullptr = none.
+    void setSideDock (juce::Component* c, int width)
+    {
+        if (sideDock != nullptr && sideDock != c)
+            removeChildComponent (sideDock);
+        sideDock = c;
+        sideDockWidth = width;
+        if (sideDock != nullptr)
+            addAndMakeVisible (*sideDock);
+        resized();
+    }
+    juce::Component* getSideDock() const noexcept { return sideDock; }
+
     void resized() override
     {
         layoutChildren();
@@ -687,6 +700,8 @@ public:
     void layoutChildren()
     {
         auto area = getLocalBounds();
+        if (sideDock != nullptr)
+            sideDock->setBounds (area.removeFromRight (juce::jmin (sideDockWidth, area.getWidth() / 2)));
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
             detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (pickerHidden)
@@ -739,6 +754,8 @@ private:
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
+    juce::Component* sideDock = nullptr; // (not owned)
+    int sideDockWidth = 0;
     bool pickerHidden = false;
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;
