@@ -3531,6 +3531,15 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
         multilink->add (target);
 
+    // FL [EXEC round 185b, issue #125]: a moved control leaves its automation until playback starts again (stopped: the
+    // value stays; playing: the clip no longer drives it). While recording automation the touch rule applies instead.
+    const auto recordingAutomation = transport.recording.load() && transport.playing.load() && recordOptions.recordAutomation;
+    if (! recordingAutomation && std::find (releasedTargets.begin(), releasedTargets.end(), target) == releasedTargets.end())
+    {
+        releasedTargets.push_back (target);
+        publishReleasedTargets();
+    }
+
     if (! (lastTweaked[0] == target))
     {
         lastTweaked[1] = lastTweaked[0];
@@ -3546,6 +3555,21 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     }
     it->lastMs = now;
     it->held = it->held || held;
+}
+
+void AudioEngine::publishReleasedTargets()
+{
+    if (rackProcessor == nullptr)
+        return;
+    std::vector<int> slots, one;
+    for (const auto& t : releasedTargets)
+    {
+        RackState::slotsOfTarget (song, t, one);
+        for (const auto a : one) // (a link to an internal controller keeps driving it)
+            if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
+                slots.push_back (a);
+    }
+    rackProcessor->getRenderer().setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -3929,6 +3953,11 @@ void AudioEngine::timerCallback()
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     applyControllers();
+    // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
+    if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
+        releasedTargets.clear();
+    else if (! releasedTargets.empty())
+        publishReleasedTargets(); // (the slots follow the song: an automation added or removed renumbers them)
     if (const auto note = pendingMarkerNote.exchange (-1); note >= 0)
         jumpToMarker (note); // FL's "Song marker jump": note 0 = the first marker
     updateRecording();
