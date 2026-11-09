@@ -3703,7 +3703,8 @@ private:
             juce::String reportPath, report;
             std::unique_ptr<lynx::AudioEngine> engine;
             bool instrument = false;
-            int phase = 0, ticks = 0, seconds = 15;
+            int phase = 0, ticks = 0, seconds = 15, dockStep = 0;
+            juce::uint32 phaseStartMs = 0; // (phase 1 counts real time: the timer's ticks ran faster than 20 Hz here)
             juce::AudioPluginInstance* instance = nullptr;
             juce::AudioProcessorParameter* checked = nullptr;
             std::unique_ptr<juce::DocumentWindow> mainWindow; // stands for LYNX's main window (window ownership)
@@ -3846,14 +3847,16 @@ private:
                     step ("window_open=" + juce::String ((int) lynx::PluginWindows::isOpen (*instance)));
                     phase = 1;
                     ticks = 0;
+                    phaseStartMs = juce::Time::getMillisecondCounter();
                     return;
                 }
+                const auto elapsedMs = (int) (juce::Time::getMillisecondCounter() - phaseStartMs);
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
                 // (3 s apart: time for screenshots of each state)
-                if (phase == 1 && workspace != nullptr && ticks % 60 == 0 && ticks / 60 <= 5)
-                    dockCheck (ticks / 60 - 1);
-                if (phase == 1 && ticks >= seconds * 20) // remove the plugin from the song
+                if (phase == 1 && workspace != nullptr && dockStep < 5 && elapsedMs >= (dockStep + 1) * 3000)
+                    dockCheck (dockStep++);
+                if (phase == 1 && elapsedMs >= seconds * 1000 && (workspace == nullptr || dockStep >= 5)) // remove the plugin from the song
                 {
                     engine->editSong ([this] (lynx::Song& song) {
                         if (instrument)
