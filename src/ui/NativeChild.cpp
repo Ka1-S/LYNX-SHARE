@@ -116,6 +116,24 @@ void refresh (juce::Component& c, juce::Component& area)
     place (c, area, bounds);
 }
 
+void keepAbove (juce::Component& c, juce::Component* below)
+{
+    if (below == nullptr || ! isAttached (c) || ! isAttached (*below))
+        return;
+    auto* self = c.getWindowHandle();
+    auto* under = below->getWindowHandle();
+    if (self == nullptr || under == nullptr || self == under || isAbove (self, under))
+        return;
+   #if JUCE_WINDOWS
+    // SetWindowPos puts a window just below its "insert after" window: the one right above `below`, or the top
+    const auto above = GetWindow (static_cast<HWND> (under), GW_HWNDPREV);
+    SetWindowPos (static_cast<HWND> (self), above != nullptr ? above : HWND_TOP, 0, 0, 0, 0,
+                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+   #else
+    c.toFront (false);
+   #endif
+}
+
 void forwardUnusedKeys (juce::Component& c)
 {
     c.addKeyListener (&keyForwarder()); // (JUCE adds a listener once)

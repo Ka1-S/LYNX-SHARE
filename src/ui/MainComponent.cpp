@@ -6261,7 +6261,8 @@ void MainComponent::updateHoverValue (juce::Component* hovered, const ui::Hint& 
     }
     const auto at = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
     const auto show = hovered != nullptr && hint.value.isNotEmpty() && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()
-                      && hovered->getTopLevelComponent() == getTopLevelComponent();
+                      && (hovered->getTopLevelComponent() == getTopLevelComponent()
+                          || (bool) hovered->getTopLevelComponent()->getProperties().getWithDefault ("lynxNativeChild", false));
     if (! show)
     {
         if (hoverTipShown)
