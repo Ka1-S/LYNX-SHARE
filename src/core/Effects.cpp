@@ -3037,6 +3037,36 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
             return info;
         }
+        case EffectKind::pocketWowFlutter:
+        {
+            // FL Studio Mobile's own values and defaults (round 189h); FLM names each rate knob and its sync menu alike
+            static const EffectInfo info { "Pocket Wow & Flutter", { { "Wow rate", 0.184564f }, { "Wow sync", 0.2f }, { "Wow amount", 0.25f },
+                                                                     { "Flutter rate", 0.066818f }, { "Flutter sync", 0.1f },
+                                                                     { "Flutter amount", 0.25f }, { "Sync", 0.0f }, { "Random rate", 0.08952f },
+                                                                     { "Random sync", 0.8f }, { "Random amount", 0.25f } } };
+            return info;
+        }
+        case EffectKind::pocketPhaser:
+        {
+            static const EffectInfo info { "Pocket Phaser", { { "LFO rate", 0.112222f }, { "LFO amount", 0.25f }, { "Feedback", 0.1f },
+                                                              { "Frequency", 0.25f }, { "Mix", 1.0f }, { "Sync", 1.0f }, { "LFO speed", 0.0f },
+                                                              { "LFO shape", 0.0f }, { "Stereo", 1.0f } } };
+            return info;
+        }
+        case EffectKind::pocketFlanger:
+        {
+            static const EffectInfo info { "Pocket Flanger", { { "LFO rate", 0.4f }, { "Sync", 0.0f }, { "LFO speed", 0.55f }, { "LFO shape", 0.0f },
+                                                               { "LFO amount", 1.0f }, { "Delay", 0.25f }, { "Feedback", 0.75f },
+                                                               { "Invert feedback", 1.0f }, { "Stereo", 0.0f }, { "Mix", 1.0f }, { "Invert mix", 1.0f } } };
+            return info;
+        }
+        case EffectKind::pocketTremolo:
+        {
+            static const EffectInfo info { "Pocket Tremolo", { { "Rate", 0.045467f }, { "Rate sync", 0.0f }, { "Amount max", 1.0f },
+                                                               { "Amount min", 0.0f }, { "Phase offset", 0.0f }, { "Stereo offset", 0.0f },
+                                                               { "Sync", 0.0f }, { "Shape", 0.5f }, { "Smooth", 1.0f }, { "Skew", 0.5f }, { "Width", 0.5f } } };
+            return info;
+        }
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3837,6 +3867,14 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::tapeDelayParamText (param, v);
         case EffectKind::pocketMultiFx:
             return pocket::multiFxParamText (param, v);
+        case EffectKind::pocketWowFlutter:
+            return pocket::wowFlutterParamText (param, v);
+        case EffectKind::pocketPhaser:
+            return pocket::phaserParamText (param, v);
+        case EffectKind::pocketFlanger:
+            return pocket::flangerParamText (param, v);
+        case EffectKind::pocketTremolo:
+            return pocket::tremoloParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4181,6 +4219,10 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketTranceDelay: return pocket::makeTranceDelay();
         case EffectKind::pocketTapeDelay: return pocket::makeTapeDelay();
         case EffectKind::pocketMultiFx: return pocket::makeMultiFx();
+        case EffectKind::pocketWowFlutter: return pocket::makeWowFlutter(); // round 189h (FL Studio Mobile)
+        case EffectKind::pocketPhaser: return pocket::makePhaser();
+        case EffectKind::pocketFlanger: return pocket::makeFlanger();
+        case EffectKind::pocketTremolo: return pocket::makeTremolo();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:
