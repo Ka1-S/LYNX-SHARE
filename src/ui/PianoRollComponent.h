@@ -153,6 +153,11 @@ public:
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
+    // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
+    static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
+                         laneVelocityRange = 8, laneLast = 8;
+    // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
+    void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
 
     static constexpr int keyboardWidth = 72;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
@@ -253,6 +258,8 @@ private:
     float laneValue (const Note& n) const;          // 0..1 of the chosen property
     void setLaneValue (Note& n, float value) const; // inverse
     bool laneIsBipolar() const;
+    bool laneIsChance() const;
+    void addNoteLanes();
     void setNotesMuted (bool mute); // the selection (or all notes)
     void togglePorta(); // porta notes glide from the previous note (toggles the channel's porta)
 
