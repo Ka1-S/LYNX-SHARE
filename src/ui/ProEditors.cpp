@@ -11,6 +11,7 @@
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
+#include "core/StrikeShaper.h"
 #include "ui/DynamicsDisplays.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/ProEditorBase.h"

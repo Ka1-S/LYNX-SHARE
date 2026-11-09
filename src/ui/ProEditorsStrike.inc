@@ -254,11 +254,11 @@ private:
     {
         std::vector<std::pair<float, juce::String>> v;
         for (int i = 5; i >= 1; --i)
-            v.push_back ({ 0.5f - 0.1f * (float) i, (i == 5 ? "-" : "") + juce::String (below[i], 0).replace (".0", "") });
+            v.push_back ({ 0.5f - 0.1f * (float) i, "-" + juce::String (below[i], 1).replace (".0", "") });
         v.push_back ({ 0.5f, "0" });
         for (int i = 1; i <= 5; ++i)
             if (! (skipHalf && i == 4))
-                v.push_back ({ 0.5f + 0.1f * (float) i, (i == 5 ? "+" : "") + juce::String (above[i], 0).replace (".0", "") });
+                v.push_back ({ 0.5f + 0.1f * (float) i, (i == 5 ? "+" : "") + juce::String (above[i], 1).replace (".0", "") });
         return v;
     }
 
