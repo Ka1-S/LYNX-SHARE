@@ -932,7 +932,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
     widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
-    widths[(std::size_t) Group::key] = 124; // "Key" over "C# harmonic minor" (round 184a S11)
+    widths[(std::size_t) Group::key] = 112; // "Key" over "C# harmonic minor" (round 184a S11; the name shrinks to fit)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -4670,7 +4670,10 @@ juce::PopupMenu MainComponent::makeKeyMenu()
         const auto ticked = current && current->flScale == flScale;
         auto choose = [this, root, flScale] { setProjectKey (projectkey::Key { root, flScale }); };
         if ((int) i < keyguess::commonScales)
-            menu.addItem (tr (juce::String (projectkey::shortScaleName (flScale))), true, ticked, choose);
+        {
+            const auto name = tr (juce::String (projectkey::shortScaleName (flScale))); // ("minor" in "A minor"; "Minor" in the list)
+            menu.addItem (name.substring (0, 1).toUpperCase() + name.substring (1), true, ticked, choose);
+        }
         else // FL's own scale names (its Reference scales folder), as its Piano roll lists them
             more.addItem (juce::String (notetools::flReferenceScales()[(std::size_t) flScale].name), true, ticked, choose);
     }

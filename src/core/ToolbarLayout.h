@@ -60,7 +60,7 @@ inline const char* groupName (Group g)
 // Save / Undo are also in the File and Edit menus and their keys).
 inline int groupPriority (Group g)
 {
-    static constexpr std::array<int, groupCount> p { 100, 80, 70, 90, 75, 60, 55, 50, 45, 65, 58 }; // (Multilink: one button, shown only on request)
+    static constexpr std::array<int, groupCount> p { 100, 80, 70, 90, 75, 60, 55, 50, 45, 65, 72 }; // (Multilink: one button, shown only on request; Key: shown only in the workflows that use it, round 184a S11)
     return p[(std::size_t) g];
 }
 
