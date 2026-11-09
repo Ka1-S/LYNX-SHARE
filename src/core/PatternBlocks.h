@@ -49,8 +49,8 @@ bool erase (Song& song, int pattern, std::int64_t tick);
 
 // Moves the block of row `pattern` under `fromTick` to the bar at `toTick` (snapped to a bar, clamped to >= 0),
 // keeping its row. Returns the block's start after the call: the new start on success, the unchanged start when it
-// cannot move (collision with another block of the row, invalid/zero-length pattern), or -1 when there is no block
-// of that pattern at `fromTick`.
+// cannot move (collision with another block of the row), or -1 when there is no block of that pattern at `fromTick`
+// (invalid and zero-length patterns never have one: `blockAt` finds nothing there).
 std::int64_t move (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick);
 
 // Removes every block of row `pattern` whose played span meets [fromTick, toTick]. Returns how many.

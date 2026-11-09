@@ -150,19 +150,21 @@ std::int64_t move (Song& song, int pattern, std::int64_t fromTick, std::int64_t 
     if (to == start)
         return start;
     const PatternBlock block = song.blocks[(std::size_t) index];
-    song.blocks.erase (song.blocks.begin() + index); // out first, so it never collides with itself
+    song.blocks.erase (song.blocks.begin() + (std::ptrdiff_t) index); // out first, so it never collides with itself
     if (! fits (song, pattern, to))
     {
         song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), block, before), block);
         return start;
     }
-    song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), PatternBlock { pattern, to }, before),
-                        PatternBlock { pattern, to });
+    const PatternBlock moved { pattern, to };
+    song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), moved, before), moved);
     return to;
 }
 
 int eraseRange (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick)
 {
+    if (pattern < 0) // rows are never negative: keep the old contract (no row, nothing erased)
+        return 0;
     return eraseSpan (song, pattern, fromTick, toTick);
 }
 

@@ -319,6 +319,9 @@ TEST (pb170f_move_block_within_its_row)
     // the same bar: a no-op returning the current start
     CHECK (patternblocks::move (s, 0, 2 * bar, 2 * bar + 10) == 2 * bar);
     CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
+    // the source tick may be anywhere inside the block's played span, not just its start
+    CHECK (patternblocks::move (s, 0, 2 * bar + 10, 2 * bar + 500) == 2 * bar);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
     // onto the occupied bar: it stays where it was
     CHECK (patternblocks::move (s, 0, 2 * bar, 3 * bar) == 2 * bar);
     CHECK (s.blocks.size() == 2 && s.blocks[0].start == 2 * bar && s.blocks[1].start == 3 * bar);
@@ -374,6 +377,22 @@ TEST (pb170f_erase_any_row)
     CHECK (patternblocks::place (row, 1, 2 * bar));
     CHECK (patternblocks::eraseRange (row, 1, 2 * bar, 2 * bar) == 1);
     CHECK (row.blocks.size() == 1 && row.blocks[0].pattern == 0);
+
+    // a reversed range erases the same intersecting blocks, on every row (the range is swapped first)
+    auto rev = pb170f::blockSong();
+    CHECK (patternblocks::place (rev, 0, bar)); // P1 on [bar, 2*bar), P2 on [2*bar, 4*bar)
+    CHECK (patternblocks::place (rev, 1, 2 * bar));
+    CHECK (patternblocks::eraseAnyRow (rev, 2 * bar, bar) == 2);
+    CHECK (rev.blocks.empty());
+    // and the row-filtered erase swaps too
+    auto revRow = pb170f::blockSong();
+    CHECK (patternblocks::place (revRow, 0, bar));
+    CHECK (patternblocks::place (revRow, 1, 2 * bar));
+    CHECK (patternblocks::eraseRange (revRow, 0, 2 * bar, bar) == 1);
+    CHECK (revRow.blocks.size() == 1 && revRow.blocks[0].pattern == 1);
+    // a negative row erases nothing (it is not "any row": that is eraseAnyRow's job)
+    CHECK (patternblocks::eraseRange (revRow, -1, 0, 4 * bar) == 0);
+    CHECK (revRow.blocks.size() == 1 && revRow.blocks[0].pattern == 1);
 
     // a range over every row takes them all, whatever the row
     auto all = pb170f::blockSong();
