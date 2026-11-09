@@ -743,3 +743,169 @@ void showSamplePitchDialog (AudioEngine& engine, int channel)
     keepAboveMainWindow (*window);
 }
 } // namespace lynx
+
+namespace lynx
+{
+namespace
+{
+// FL's message text: "|bar-delimited|" words in the accent colour, wrapped at the window's width
+class FlMessageText final : public juce::Component
+{
+public:
+    explicit FlMessageText (const juce::String& text)
+    {
+        const auto parts = juce::StringArray::fromTokens (text, "|", {});
+        for (int i = 0; i < parts.size(); ++i)
+            layoutText.append (parts[i], theme::font (theme::type::body), i % 2 == 1 ? theme::colour::accent : theme::colour::textPrimary);
+        layoutText.setWordWrap (juce::AttributedString::byWord);
+        layoutText.setJustification (juce::Justification::topLeft);
+        juce::TextLayout layout;
+        layout.createLayout (layoutText, (float) width);
+        setSize (width, (int) std::ceil (layout.getHeight()) + 8);
+    }
+
+    void paint (juce::Graphics& g) override { layoutText.draw (g, getLocalBounds().toFloat().withTrimmedTop (2.0f)); }
+
+private:
+    static constexpr int width = 380;
+    juce::AttributedString layoutText;
+};
+
+class FlMessageWindow final : public juce::AlertWindow
+{
+public:
+    explicit FlMessageWindow (const FlMessage& m)
+        : juce::AlertWindow (m.title, {}, juce::MessageBoxIconType::QuestionIcon), text (m.text)
+    {
+        addCustomComponent (&text);
+        if (m.buttons.size() > 2) // FL stacks three or more choices, one under the other ("Playlist tracks")
+        {
+            for (int i = 0; i < m.buttons.size(); ++i)
+            {
+                auto* b = stacked.add (new juce::TextButton (m.buttons[i]));
+                b->setSize (220, 28);
+                b->onClick = [this, i] { exitModalState (i + 1); };
+                auto* row = rows.add (new juce::Component());
+                row->setSize (text.getWidth(), 32);
+                row->addAndMakeVisible (b);
+                b->setTopLeftPosition ((row->getWidth() - b->getWidth()) / 2, 2);
+                addCustomComponent (row);
+            }
+            addKeyListener (&escape);
+        }
+        if (m.rememberBox)
+        {
+            remember.setButtonText (tr ("Remember my choice"));
+            remember.setSize (text.getWidth(), 26);
+            addCustomComponent (&remember);
+        }
+        if (m.buttons.size() <= 2)
+            for (int i = 0; i < m.buttons.size(); ++i)
+                addButton (m.buttons[i], i + 1,
+                           i == 0 ? juce::KeyPress (juce::KeyPress::returnKey)
+                                  : i == m.buttons.size() - 1 ? juce::KeyPress (juce::KeyPress::escapeKey) : juce::KeyPress());
+    }
+
+    bool remembered() const { return remember.getToggleState(); }
+
+private:
+    struct Escape final : juce::KeyListener
+    {
+        bool keyPressed (const juce::KeyPress& key, juce::Component* c) override
+        {
+            if (key != juce::KeyPress::escapeKey)
+                return false;
+            c->exitModalState (0);
+            return true;
+        }
+    } escape;
+    FlMessageText text;
+    juce::OwnedArray<juce::TextButton> stacked;
+    juce::OwnedArray<juce::Component> rows;
+    juce::ToggleButton remember;
+};
+
+std::set<juce::String>& hiddenMessages()
+{
+    static std::set<juce::String> hidden;
+    return hidden;
+}
+} // namespace
+
+void showFlMessage (const FlMessage& message, std::function<void (int, bool)> onChoice)
+{
+    auto* window = new FlMessageWindow (message);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onChoice] (int result) {
+                                 if (onChoice != nullptr)
+                                     onChoice (result, window->remembered());
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+}
+
+std::unique_ptr<juce::AlertWindow> makeFlMessageDialog (const FlMessage& message)
+{
+    return std::make_unique<FlMessageWindow> (message);
+}
+
+namespace messages
+{
+const std::vector<Entry>& all()
+{
+    // FL's entries LYNX shows (the rest of FL's list belongs to features with their own setting in LYNX)
+    static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") } };
+    return entries;
+}
+
+bool shown (const juce::String& id) { return hiddenMessages().count (id) == 0; }
+
+void setShown (const juce::String& id, bool show)
+{
+    if (show == shown (id))
+        return;
+    if (show)
+        hiddenMessages().erase (id);
+    else
+        hiddenMessages().insert (id);
+    if (onChanged != nullptr)
+        onChanged();
+}
+
+juce::String hiddenList()
+{
+    juce::StringArray ids;
+    for (const auto& id : hiddenMessages())
+        ids.add (id);
+    return ids.joinIntoString (",");
+}
+
+void setHiddenList (const juce::String& list)
+{
+    hiddenMessages().clear();
+    for (const auto& id : juce::StringArray::fromTokens (list, ",", {}))
+        if (id.trim().isNotEmpty())
+            hiddenMessages().insert (id.trim());
+}
+
+juce::PopupMenu manageMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Show all"), [] {
+        for (const auto& e : all())
+            setShown (e.id, true);
+    });
+    menu.addItem (tr ("Show none"), [] {
+        for (const auto& e : all())
+            setShown (e.id, false);
+    });
+    juce::String heading;
+    for (const auto& e : all())
+    {
+        if (heading != e.category)
+            menu.addSectionHeader (tr (heading = e.category));
+        menu.addItem (tr (e.label), true, shown (e.id), [id = juce::String (e.id)] { setShown (id, ! shown (id)); });
+    }
+    return menu;
+}
+} // namespace messages
+} // namespace lynx

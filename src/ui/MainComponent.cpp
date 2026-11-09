@@ -164,6 +164,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         skin::onStyleSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // an editor's own style was picked
             if (safe != nullptr) safe->saveUiSettings();
         };
+        messages::onChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // "Remember my choice" / Manage messages
+            if (safe != nullptr) safe->saveUiSettings();
+        };
         loadKeyMap();
         startSession();
         if (BrowserComponent::sampleBrowserWasOpen()) // it was open when LYNX closed (round 163)
@@ -2116,6 +2119,8 @@ void MainComponent::loadUiSettings()
             autosaveMinutes = prefs::clampAutosaveMinutes (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askUnusedRecordings")
             askUnusedRecordings = on;
+        else if (key == "messagesHidden") // FL's "Manage messages" (round 186c)
+            messages::setHiddenList (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "backupWaitsForQuiet")
             backupWaitsForQuiet = on;
         else if (key == "backupLongestWait")
@@ -2273,6 +2278,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntoolbarVisible=" + juce::String (toolbarLayout.visible ? 1 : 0)
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
+                                      + "\nmessagesHidden=" + messages::hiddenList()
                                       + "\nbackupWaitsForQuiet=" + juce::String (backupWaitsForQuiet ? 1 : 0)
                                       + "\nbackupLongestWait=" + juce::String (backupLongestWaitMinutes)
                                       + "\nhoverValues=" + juce::String (hoverValues ? 1 : 0)

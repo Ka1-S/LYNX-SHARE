@@ -151,6 +151,10 @@ public:
     bool moveSelected (int delta);           // Alt+Left/Right
     void linkSelectedChannels (bool startingHere); // Ctrl+L / Ctrl+Shift+L
     void selectLinkedChannels();             // Alt+L
+    // FL's "Delete" (round 186c): the confirmation "Delete tracks" (with "Remember my choice"), then, when a Playlist
+    // audio / instrument track is linked to one of them, "Delete tracks and channels" / "Unlink tracks and channels"
+    void deleteTracks (std::vector<int> tracks);
+    void deleteSelectedTracks() { deleteTracks (selection); }
     // The insert's right-click menu (FL's mixer track menu, REA rounds 115/134/143); public for --snapshot and tests.
     juce::PopupMenu buildMenu (int track);
     // runs the selected track's menu item whose caption (before any "\t" key text) is `caption` (translated): the
