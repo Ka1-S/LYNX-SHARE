@@ -1030,10 +1030,15 @@ protected:
         s.outHighCut = 100.0 + 14900.0 * p[3];
         s.bandLimit = t.cut;
         const auto earlyLate = (double) p[4]; // 0 = early only, 1 = late only
-        // round 172d: a linear crossfade like the reference's (its impulse energy per window at 0 / ¼ / ½ / ¾ / 1: the late
-        // tank grows in proportion and sits ≈ 6 dB above the old law at 50 %, the early part −3.7 dB at 0 %)
-        s.earlyLevel = t.early * 0.92 * (1.0 - earlyLate);
-        s.lateLevel = t.lateGain * 3.8 * earlyLate;
+        // round 183b: an equal-power crossfade (the reference's total level moves only 2.6 dB from early only to late
+        // only: −28.7 / −27.2 / −26.1 dB at 0 / 50 / 100 %, impulse at −20 dB; the old linear one moved 10.7 dB). The
+        // late level holds over Decay (the reference: −27.2 / −26.8 dB at RT 2.1 / 8.6 s, ours rose with the RT) and
+        // over Late size (0 % ran +3 dB, 100 % −1.2 dB)
+        const auto fade = 0.5 * pi * earlyLate;
+        s.earlyLevel = t.early * 0.92 * 1.46 * std::cos (fade);
+        const auto lateSizeDb = p[5] <= 0.5f ? -3.1 * (1.0 - 2.0 * p[5]) : 2.4 * (p[5] - 0.5);
+        s.lateLevel = t.lateGain * 3.8 * 0.575 * std::sin (fade) * std::sqrt (2.1 / std::max (0.1, atriumDecaySec (p[2]) * t.rtScale))
+                    * std::pow (10.0, lateSizeDb / 20.0);
         s.shape = t.shape;
         s.lineScale = t.scale * (0.35 + 0.9 * p[5]);
         s.crossFeed = 0.35 + 0.65 * p[6];
@@ -1055,11 +1060,11 @@ protected:
         s.loopDiffusion = 0.3 + 0.6 * p[18];
         const auto space = (double) p[20];
         s.buildSec = 0.02 + 0.06 * space;
-        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults)
+        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25 * 1.18; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults); 183b: +1.4 dB with the equal-power fade and the lower shelf
         // round 172d: the reference's late field holds far more below 100 Hz (impulse and music, octave bands: 31 / 63 Hz
         // +8 … +15 dB at the defaults) than this tank's few low modes give
         s.lowShelfHz = 90.0;
-        s.lowShelfDb = 10.0;
+        s.lowShelfDb = 5.0; // round 183b: +10 dB was 4 … 7 dB too much below 80 Hz with the louder early part (impulse at −20 dB, music)
         s.toneMidHz = 140.0; // (the tank's own hump around 125 … 160 Hz taken back)
         s.toneMidDb = -5.0;
         s.toneMidQ = 1.4;
