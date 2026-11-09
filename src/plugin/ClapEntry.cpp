@@ -400,6 +400,8 @@ private:
                 s->editor->setOpaque (true);
                #if JUCE_WINDOWS
                 s->editor->addToDesktop (0, window->win32);
+               #elif JUCE_MAC
+                s->editor->addToDesktop (0, window->cocoa); // (the host's NSView)
                #else
                 s->editor->addToDesktop (0, reinterpret_cast<void*> (window->x11));
                #endif
@@ -433,6 +435,8 @@ private:
     {
        #if JUCE_WINDOWS
         return CLAP_WINDOW_API_WIN32;
+       #elif JUCE_MAC
+        return CLAP_WINDOW_API_COCOA;
        #else
         return CLAP_WINDOW_API_X11;
        #endif

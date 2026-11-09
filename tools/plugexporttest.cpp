@@ -361,7 +361,11 @@ void clapStateLoadIsSilent (const juce::File& file, const Entry& entry)
     source->getStateInformation (saved);
 
     juce::DynamicLibrary library;
-    if (! library.open (file.getFullPathName()))
+    auto binary = file; // (macOS: the executable inside the .clap bundle; clap_entry.init still gets the bundle)
+    if (file.isDirectory())
+        if (const auto inside = file.getChildFile ("Contents/MacOS").getChildFile (file.getFileNameWithoutExtension()); inside.existsAsFile())
+            binary = inside;
+    if (! library.open (binary.getFullPathName()))
         return check (false, "CLAP opens in a plain host");
     const auto* clapEntry = static_cast<const clap_plugin_entry_t*> (library.getFunction ("clap_entry"));
     if (clapEntry == nullptr || ! clapEntry->init (file.getFullPathName().toRawUTF8()))
