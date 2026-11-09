@@ -133,6 +133,7 @@ public:
 
     // For snapshots: the tool in use and a time selection over [fromBar, toBar).
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    EditTool currentTool() const noexcept { return tools.getTool(); }
     void setTimeSelectionForSnapshot (int fromBar, int toBar);
     // the selected clips (indices into the Playlist), for Tools › Consolidate playlist selection (round 168e)
     const std::vector<int>& getSelectedClips() const noexcept { return selection; }

@@ -12,6 +12,18 @@
 
 namespace lynx
 {
+namespace
+{
+// Whether a block of any row plays over [lo, hi] (to skip edits that would be empty undo steps).
+bool anyBlockInSpan (const Song& song, std::int64_t lo, std::int64_t hi)
+{
+    for (std::size_t i = 0; i < song.blocks.size(); ++i)
+        if (song.blocks[i].start <= hi && lo < patternblocks::playedEnd (song, song.blocks, i))
+            return true;
+    return false;
+}
+} // namespace
+
 PatternBlocksView::PatternBlocksView (AudioEngine& e, PlaylistComponent& p)
     : engine (e), playlist (p)
 {
@@ -202,6 +214,7 @@ void PatternBlocksView::mouseDown (const juce::MouseEvent& e)
 {
     const auto p = e.getPosition();
     drag = Drag::none;
+    moveStart = 0;
     if (p.y < dividerHeight)
     {
         drag = Drag::divider;
@@ -229,11 +242,70 @@ void PatternBlocksView::mouseDown (const juce::MouseEvent& e)
 
     dragRow = row;
     lastTick = tickAt (p.x);
+    const auto& song = engine.getSong();
     if (e.mods.isPopupMenu())
     {
+        // right click / right drag always erases, whatever the tool (the Playlist grammar)
         drag = Drag::erase;
-        if (patternblocks::blockAt (engine.getSong(), row, lastTick) >= 0)
-            engine.editSong ([row, t = lastTick] (Song& s) { patternblocks::erase (s, row, t); });
+        if (anyBlockInSpan (song, lastTick, lastTick))
+            engine.editSong ([t = lastTick] (Song& s) { patternblocks::eraseAnyRow (s, t, t); });
+        repaint();
+        return;
+    }
+    const auto tool = playlist.currentTool();
+    if (tool == EditTool::eraser)
+    {
+        // deleting is not selecting: the current pattern stays as it is
+        drag = Drag::erase;
+        if (anyBlockInSpan (song, lastTick, lastTick))
+            engine.editSong ([t = lastTick] (Song& s) { patternblocks::eraseAnyRow (s, t, t); });
+    }
+    else if (tool == EditTool::pencil)
+    {
+        // the row is the pattern: painting makes it the current one too (the Channel Rack shows what is painted)
+        if (song.currentPattern != row)
+            engine.editSong ([row] (Song& s) { s.currentPattern = row; }, false);
+        const auto at = patternblocks::blockAt (song, row, lastTick);
+        if (at >= 0)
+        {
+            drag = Drag::move;
+            moveStart = song.blocks[(std::size_t) at].start;
+        }
+        else if (! patternblocks::fits (song, row, patternblocks::snapToBar (song, lastTick)))
+        {
+            drag = Drag::none; // it would not fit: no edit, no empty undo step
+        }
+        else
+        {
+            auto placed = false;
+            engine.editSong ([row, t = lastTick, &placed] (Song& s) { placed = patternblocks::place (s, row, t); });
+            if (placed)
+            {
+                drag = Drag::move;
+                moveStart = patternblocks::snapToBar (song, lastTick);
+            }
+            else
+                drag = Drag::none; // nowhere to move from: no stuck move
+        }
+    }
+    else if (tool == EditTool::brush)
+    {
+        if (song.currentPattern != row)
+            engine.editSong ([row] (Song& s) { s.currentPattern = row; }, false);
+        const auto at = patternblocks::blockAt (song, row, lastTick);
+        if (at >= 0)
+        {
+            drag = Drag::move;
+            moveStart = song.blocks[(std::size_t) at].start;
+        }
+        else
+        {
+            drag = Drag::paint;
+            // no immediate place where it would not fit (the drag can still paint further along)
+            if (patternblocks::fits (song, row, patternblocks::snapToBar (song, lastTick))
+                && patternblocks::blockAt (engine.getSong(), row, lastTick) < 0)
+                engine.editSong ([row, t = lastTick] (Song& s) { patternblocks::place (s, row, t); });
+        }
     }
     else
     {
@@ -254,13 +326,36 @@ void PatternBlocksView::mouseDrag (const juce::MouseEvent& e)
         playlist.setBlocksHeight (dividerStartHeight - e.getDistanceFromDragStartY());
         return;
     }
-    if (drag != Drag::paint && drag != Drag::erase)
+    if (drag != Drag::paint && drag != Drag::erase && drag != Drag::move)
         return;
     const auto tick = tickAt (e.x);
     const auto from = lastTick;
     lastTick = tick;
     const auto row = dragRow;
-    if (drag == Drag::paint)
+    if (drag == Drag::move)
+    {
+        // the block stays in dragRow, whatever row the mouse is over
+        const auto& song = engine.getSong();
+        const auto target = patternblocks::snapToBar (song, tick);
+        if (target != moveStart)
+        {
+            // a cheap pre-check against a pointless undo step; when the target overlaps the moving
+            // block's own span, move decides (a rare self-overlap collision may coalesce one step)
+            const auto at = patternblocks::blockAt (song, row, moveStart);
+            const auto ownEnd = at >= 0 ? patternblocks::playedEnd (song, song.blocks, (std::size_t) at) : moveStart;
+            const auto overlapsOwn = target < ownEnd && moveStart < target + patternblocks::lengthOf (song, row);
+            if (overlapsOwn || patternblocks::fits (song, row, target))
+            {
+                std::int64_t atTick = -1;
+                engine.editSong ([row = dragRow, from = moveStart, to = tick, &atTick] (Song& s) { atTick = patternblocks::move (s, row, from, to); });
+                if (atTick >= 0)
+                    moveStart = atTick;
+                else
+                    drag = Drag::none; // the block is gone: stop the drag
+            }
+        }
+    }
+    else if (drag == Drag::paint)
     {
         // only where a whole block fits: the bars already covered stay as they are
         auto fits = false;
@@ -273,14 +368,11 @@ void PatternBlocksView::mouseDrag (const juce::MouseEvent& e)
     }
     else
     {
-        // only when a block of the row meets the swept span (no empty undo steps)
+        // only when a block of any row meets the swept span (no empty undo steps)
         const auto& song = engine.getSong();
         const auto lo = juce::jmin (from, tick), hi = juce::jmax (from, tick);
-        auto any = false;
-        for (std::size_t i = 0; i < song.blocks.size() && ! any; ++i)
-            any = song.blocks[i].pattern == row && song.blocks[i].start <= hi && lo < patternblocks::playedEnd (song, song.blocks, i);
-        if (any)
-            engine.editSong ([row, lo, hi] (Song& s) { patternblocks::eraseRange (s, row, lo, hi); });
+        if (anyBlockInSpan (song, lo, hi))
+            engine.editSong ([lo, hi] (Song& s) { patternblocks::eraseAnyRow (s, lo, hi); });
     }
     // the view follows a paint drag past its edges, like the Playlist
     const auto grid = rowsArea().withTrimmedLeft (PlaylistComponent::headerWidth);
@@ -293,6 +385,7 @@ void PatternBlocksView::mouseUp (const juce::MouseEvent&)
 {
     drag = Drag::none;
     dragRow = -1;
+    moveStart = 0;
     repaint();
 }
 
@@ -358,6 +451,13 @@ ui::Hint PatternBlocksView::hintAt (juce::Point<int> p)
     const auto label = name.empty() ? juce::String (row + 1) : juce::String::fromUTF8 (name.c_str());
     if (p.x < PlaylistComponent::headerWidth)
         return { tr ("Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it"), label, false, true };
+    const auto tool = playlist.currentTool();
+    if (tool == EditTool::pencil)
+        return { tr ("Pattern blocks: click places one block and drags it along its row, right-click erases"), label };
+    if (tool == EditTool::brush)
+        return { tr ("Pattern blocks: drag paints whole blocks; press a block and drag to move it, right-click erases"), label };
+    if (tool == EditTool::eraser)
+        return { tr ("Pattern blocks: click or drag erases blocks in any row"), label };
     return { tr ("Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases"), label };
 }
 } // namespace lynx
