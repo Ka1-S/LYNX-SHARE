@@ -139,6 +139,7 @@
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
 #include "ui/StemExtract.h"
+#include "ui/AudioToMidi.h"
 
 #include <atomic>
 #include <chrono>
@@ -1607,6 +1608,21 @@ public:
             return;
         }
 
+        if (args.contains ("--audio2midi"))
+        {
+            // LYNX.exe --audio2midi input.wav melody|harmony|drums notes.csv: the clip menu's Convert to MIDI, without the
+            // window (round a2m189b's measurements)
+            const auto i = args.indexOf ("--audio2midi");
+            const auto mode = args[i + 2] == "drums" ? lynx::a2m::Mode::drums : args[i + 2] == "harmony" ? lynx::a2m::Mode::harmony : lynx::a2m::Mode::melody;
+            lynx::AudioEngine loader (false);
+            const juce::File csv (args[i + 3].unquoted());
+            const auto error = lynx::convertFileToMidiCsv (loader, juce::File (args[i + 1].unquoted()), mode, csv);
+            csv.getSiblingFile ("audio2midi.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            setApplicationReturnValue (error.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--stems"))
         {
             // LYNX.exe --stems project.(flp|als|lynx) base.wav: one WAV per insert that has sound (like "Export stems")
@@ -2077,6 +2093,7 @@ public:
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
+        lynx::shutdownAudioToMidi();    // (the same for a conversion to MIDI)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine
