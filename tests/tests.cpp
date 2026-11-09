@@ -1,5 +1,6 @@
-// Core tests (no JUCE). Usage: lynx_tests [folder-with-flp-files]
+// Core tests (no JUCE). Usage: lynx_tests [folder-with-flp-files] [--list] [--filter a,b] [--exclude a,b] [--shard i/n] [--weights f] [--times f] [--no-times]
 
+#include <algorithm>
 #include <optional>
 #include <atomic>
 #include <chrono>
@@ -7226,18 +7227,204 @@ TEST (three_osc_host_hq_render_box_filters_aliasing_shapes)
     CHECK (sineEnergy > 1.0 && sineDiff == 0.0); // a sine does not
 }
 
+namespace
+{
+// The runner's options (round speed185a). They choose WHICH tests run and how the output looks, never what a test checks.
+//   [folder]           the FL Data folder (realFlpDir), as before
+//   --list             print the selected test names, one per line, and run nothing
+//   --filter a,b       run only the tests whose name contains one of these; several --filter options must all match
+//                      (the LYNX_TEST variable works as before, as one more --filter)
+//   --exclude a,b      skip the tests whose name contains one of these
+//   --shard i/n        run only shard i of n (1-based): the selected tests split into n disjoint sets that together
+//                      cover them all. With --weights the sets are balanced by time, otherwise test k goes to k mod n.
+//   --weights file     "<name> <ms>" lines (--times output) used to balance the shards; unknown tests weigh 50 ms
+//   --times file       write "<name> <ms>" per test that ran
+//   --no-times         no per-test time lines
+// Output: each test's name on its own line (as before), its FAILED lines, then "  time <ms> ms"; at the end the slowest
+// tests and the unchanged "N checks, M failures" line. stdout is line-buffered so a long test never looks hung.
+struct RunnerOptions
+{
+    bool list = false, times = true;
+    std::vector<std::vector<std::string>> filters; // (each must match: one of its names)
+    std::vector<std::string> excludes;
+    int shard = 0, shards = 1;
+    std::string weightsFile, timesFile;
+};
+
+std::vector<std::string> splitCommas (const std::string& s)
+{
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : s + ",")
+        if (c == ',')
+        {
+            if (! cur.empty())
+                out.push_back (cur);
+            cur.clear();
+        }
+        else
+            cur += c;
+    return out;
+}
+
+bool parseRunnerOptions (int argc, char** argv, RunnerOptions& o)
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string a = argv[i];
+        auto value = [&] () -> std::optional<std::string> {
+            if (i + 1 >= argc)
+                return std::nullopt;
+            return std::string (argv[++i]);
+        };
+        if (a == "--list")
+            o.list = true;
+        else if (a == "--no-times")
+            o.times = false;
+        else if (a == "--filter" || a == "--exclude" || a == "--shard" || a == "--weights" || a == "--times")
+        {
+            const auto v = value();
+            if (! v)
+            {
+                std::fprintf (stderr, "lynx_tests: %s needs a value\n", a.c_str());
+                return false;
+            }
+            if (a == "--filter")
+                o.filters.push_back (splitCommas (*v));
+            else if (a == "--exclude")
+                for (auto& f : splitCommas (*v)) o.excludes.push_back (f);
+            else if (a == "--weights")
+                o.weightsFile = *v;
+            else if (a == "--times")
+                o.timesFile = *v;
+            else
+            {
+                int k = 0, n = 0;
+                char tail = 0;
+                if (std::sscanf (v->c_str(), "%d/%d%c", &k, &n, &tail) != 2 || n < 1 || k < 1 || k > n)
+                {
+                    std::fprintf (stderr, "lynx_tests: --shard wants i/n with 1 <= i <= n, not %s\n", v->c_str());
+                    return false;
+                }
+                o.shard = k - 1;
+                o.shards = n;
+            }
+        }
+        else if (a.size() > 2 && a.compare (0, 2, "--") == 0)
+        {
+            std::fprintf (stderr, "lynx_tests: unknown option %s\n", a.c_str());
+            return false;
+        }
+        else
+            realFlpDir = a;
+    }
+    if (const char* only = std::getenv ("LYNX_TEST")) // run only the tests whose name contains this
+        o.filters.push_back ({ only });
+    return true;
+}
+
+// which of the selected tests (indices into `names`) belong to shard o.shard: a partition of all of them over o.shards
+std::vector<std::size_t> shardOf (const std::vector<const char*>& names, const RunnerOptions& o)
+{
+    std::vector<std::size_t> all (names.size());
+    for (std::size_t k = 0; k < all.size(); ++k)
+        all[k] = k;
+    if (o.shards <= 1)
+        return all;
+    std::map<std::string, double> weight;
+    if (! o.weightsFile.empty())
+    {
+        std::ifstream in (o.weightsFile);
+        std::string name;
+        double ms = 0.0;
+        while (in >> name >> ms)
+            weight[name] = ms;
+    }
+    std::vector<int> owner (names.size(), 0);
+    if (weight.empty())
+        for (std::size_t k = 0; k < names.size(); ++k)
+            owner[k] = (int) (k % (std::size_t) o.shards);
+    else
+    {
+        // longest first onto the least loaded shard (ties: lower index), deterministic for a given list and file
+        auto order = all;
+        auto w = [&] (std::size_t k) { const auto it = weight.find (names[k]); return it == weight.end() ? 50.0 : it->second; };
+        std::stable_sort (order.begin(), order.end(), [&] (std::size_t a, std::size_t b) { return w (a) > w (b); });
+        std::vector<double> load ((std::size_t) o.shards, 0.0);
+        for (auto k : order)
+        {
+            const auto s = (std::size_t) (std::min_element (load.begin(), load.end()) - load.begin());
+            owner[k] = (int) s;
+            load[s] += w (k);
+        }
+    }
+    std::vector<std::size_t> mine;
+    for (auto k : all)
+        if (owner[k] == o.shard)
+            mine.push_back (k); // (in registry order: a shard runs its tests in the usual order)
+    return mine;
+}
+} // namespace
+
 int main (int argc, char** argv)
 {
-    if (argc > 1)
-        realFlpDir = argv[1];
+    std::setvbuf (stdout, nullptr, _IOLBF, 0);
+    RunnerOptions opt;
+    if (! parseRunnerOptions (argc, argv, opt))
+        return 2;
 
-    const char* only = std::getenv ("LYNX_TEST"); // run only the tests whose name contains this
-    for (auto& [name, fn] : registry())
+    auto& tests = registry();
+    std::vector<const char*> names;
+    std::vector<std::size_t> selected;
+    for (std::size_t k = 0; k < tests.size(); ++k)
     {
-        if (only != nullptr && std::strstr (name, only) == nullptr)
+        const char* name = tests[k].first;
+        auto has = [name] (const std::string& part) { return std::strstr (name, part.c_str()) != nullptr; };
+        if (! std::all_of (opt.filters.begin(), opt.filters.end(), [&] (const auto& any) { return std::any_of (any.begin(), any.end(), has); }))
             continue;
+        if (std::any_of (opt.excludes.begin(), opt.excludes.end(), has))
+            continue;
+        names.push_back (name);
+        selected.push_back (k);
+    }
+    const auto mine = shardOf (names, opt);
+    if (opt.list)
+    {
+        for (auto k : mine)
+            std::printf ("%s\n", names[k]);
+        return 0;
+    }
+
+    std::vector<std::pair<double, const char*>> took;
+    for (auto k : mine)
+    {
+        auto& [name, fn] = tests[selected[k]];
         std::printf ("%s\n", name);
+        const auto start = std::chrono::steady_clock::now();
         fn();
+        const auto ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - start).count();
+        took.emplace_back (ms, name);
+        if (opt.times)
+            std::printf ("  time %.0f ms\n", ms);
+    }
+    if (! opt.timesFile.empty())
+    {
+        std::ofstream out (opt.timesFile);
+        for (auto& [ms, name] : took)
+            out << name << ' ' << (long long) std::llround (ms) << '\n';
+    }
+    if (opt.times && took.size() > 1)
+    {
+        double total = 0.0;
+        for (auto& t : took)
+            total += t.first;
+        auto slow = took;
+        std::sort (slow.begin(), slow.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
+        slow.resize (std::min<std::size_t> (slow.size(), 15));
+        std::printf ("\n  %zu tests in %.1f s%s; slowest:\n", took.size(), total / 1000.0,
+                     opt.shards > 1 ? (" (shard " + std::to_string (opt.shard + 1) + "/" + std::to_string (opt.shards) + ")").c_str() : "");
+        for (auto& [ms, name] : slow)
+            std::printf ("  %8.1f s  %s\n", ms / 1000.0, name);
     }
 
     std::printf ("\n%d checks, %d failures\n", checks, failures);
@@ -16426,6 +16613,8 @@ TEST (plugin_layout_options_match_the_engine_values)
 #include "Parity150bTests.inc"
 #include "Parity152Tests.inc"
 #include "Tp172dTests.inc"
+#include "Verb183bNebulaTests.inc"
+#include "Verb183bTests.inc"
 #include "Parity152aTests.inc"
 #include "Parity152bTests.inc"
 #include "Parity152cTests.inc"
@@ -17073,6 +17262,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"
 #include "Rec168kTests.inc"
+#include "FlPaths124Tests.inc"
+#include "Auto125Tests.inc"
 #include "Rec170dTests.inc"
 #include "Rec177dTests.inc"
 #include "Pain177dTests.inc"
@@ -17087,7 +17278,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MixPre167qTests.inc"
 #include "Design168rTests.inc"
 #include "Playlist168fTests.inc"
-#include "RecFold167qTests.inc"
+#include "RecNoFold126Tests.inc"
 #include "LoopWrap167qTests.inc"
 #include "Sel168tTests.inc"
 #include "Gap169kTests.inc"
@@ -17171,3 +17362,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue97Tests.inc"
 #include "Rack116Tests.inc"
 #include "Trial187bTests.inc"
+#include "ProjectKey184aTests.inc"
+#include "Render186bTests.inc"
+#include "SimpleTracks184aTests.inc"

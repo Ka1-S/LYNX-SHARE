@@ -201,6 +201,7 @@ APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 APP_SOURCES+=(src/core/ThemePalette.cpp src/ui/ThemeSettings.cpp src/ui/ColourPicker.cpp src/ui/TrackIcons.cpp)
 # Loop Starter, local (round 168b)
 APP_SOURCES+=(src/core/LoopStarter.cpp src/ui/LoopStarterWindow.cpp)
+APP_SOURCES+=(src/core/SimpleTracks.cpp) # Simple workflow: adding a track (round 184a)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 # spectral waveforms: band analysis, background cache and drawing
 APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)

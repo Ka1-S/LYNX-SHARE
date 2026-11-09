@@ -77,7 +77,7 @@ lynx::Song videoSong()
 }
 
 // FL's rule for takes inside a clip longer than its pattern (the pattern grows) is LYNX's with "Stretched pattern clips
-// loop their pattern" off; on (the default) the take folds into the pattern (RecFold167qTests.inc)
+// loop their pattern" off; on (the default) too since issue #126 (RecNoFold126Tests.inc)
 struct FlClipRule
 {
     FlClipRule() : was (lynx::stretchedClipsLoop()) { lynx::setStretchedClipsLoop (false); }

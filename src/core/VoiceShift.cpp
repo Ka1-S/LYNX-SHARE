@@ -172,10 +172,10 @@ public:
         // Quantize: "as quickly as possible" — a 2 ms glide between notes, only to avoid clicks
         const auto glide = 1.0 - std::exp (-1.0 / (0.002 * sr));
         const auto fShift = std::exp2 (formantSt / 12.0);
-        // round trial187b: nothing to shift (Transpose at Pitch 0 / Formant 0, no MIDI note) = the input itself,
+        // round tp172d slice 11 / trial187b: nothing to shift (Transpose at Pitch 0 / Formant 0, no MIDI note) = the input itself,
         // delayed — the reference nulls its input there within its level trim (−15 dB on a sung line), while the
         // overlap-add left a sung note up to half a period off its input; the switch fades over 20 ms
-        const bool unshifted = md == Mode::transpose && std::abs (pitchSt) < 1e-6 && std::abs (formantSt) < 1e-6;
+        const bool unshifted = md == Mode::transpose && midiNote < 0 && std::abs (pitchSt) < 1e-6 && std::abs (formantSt) < 1e-6;
         const auto fade = 1.0 - std::exp (-1.0 / (0.02 * sr));
 
         for (int i = 0; i < n; ++i)

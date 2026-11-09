@@ -525,7 +525,6 @@ int applyInsertRender (Song& song, int track, const std::string& wav, std::int64
     const auto added = applyBounce (song, track, wav, length);
     if (added < 0)
         return -1;
-    song.channels.back().volume = audioClipUnityVolume; // the render plays at unity in FL (see applyFreeze)
     std::string list;
     for (const auto& n : names)
         list += (list.empty() ? "" : ", ") + n;
