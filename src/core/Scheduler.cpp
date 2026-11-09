@@ -337,10 +337,12 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
         e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
                                       | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
-                                      | (clip.reversed ? 4 : 0));
-        // an automatic crossfade has no tension of its own here
-        e.fadeInTension = clip.crossfadeIn > 0 ? 0.0f : clip.fadeInTension;
-        e.fadeOutTension = clip.crossfadeOut > 0 ? 0.0f : clip.fadeOutTension;
+                                      | (clip.reversed ? 4 : 0)
+                                      // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
+                                      | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
+        // an automatic crossfade, or a comp crossfade, has no tension of its own here
+        e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
+        e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
         e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
         e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
 
@@ -513,7 +515,14 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
     {
         const auto& clip = song.playlist[clipIndex];
 
-        if (clip.muted || song.isTrackMuted (clip.track))
+        if (song.auditionLane >= 0) // comping (round 177c): an auditioned take lane plays instead of its comp track
+        {
+            if (clip.track == song.auditionComp)
+                continue;
+            if (clip.track != song.auditionLane && (clip.muted || song.isTrackMuted (clip.track)))
+                continue;
+        }
+        else if (clip.muted || song.isTrackMuted (clip.track))
             continue;
         if (clip.start < zoneEnd) // Performance mode: the zone's clips play only when launched (schedulePerformance)
             continue;

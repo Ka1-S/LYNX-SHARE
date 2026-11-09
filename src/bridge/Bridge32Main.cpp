@@ -48,9 +48,16 @@ void prepare (juce::AudioPluginInstance& plugin, double sampleRate, int blockSiz
         layout.outputBuses.getReference (0) = juce::AudioChannelSet::stereo();
         if (! layout.inputBuses.isEmpty())
             layout.inputBuses.getReference (0) = juce::AudioChannelSet::stereo();
-        if (plugin.checkBusesLayoutSupported (layout))
-            plugin.setBusesLayout (layout);
     }
+    // issue #109: no side input over the bridge (nothing feeds it there): a plugin whose detector follows an enabled
+    // side bus would listen to silence
+    auto withoutSide = layout;
+    for (int i = 1; i < withoutSide.inputBuses.size(); ++i)
+        withoutSide.inputBuses.getReference (i) = juce::AudioChannelSet::disabled();
+    if (plugin.checkBusesLayoutSupported (withoutSide))
+        plugin.setBusesLayout (withoutSide);
+    else if (! layout.outputBuses.isEmpty() && plugin.checkBusesLayoutSupported (layout))
+        plugin.setBusesLayout (layout);
     plugin.setRateAndBufferSizeDetails (sampleRate, blockSize);
     plugin.prepareToPlay (sampleRate, blockSize);
 }
