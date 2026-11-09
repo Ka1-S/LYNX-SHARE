@@ -498,6 +498,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             browser.leaveSearchBox();
     };
     workspace.onKeyInDetachedWindow = [this] (const juce::KeyPress& key) { return keyPressed (key); };
+    PluginWindows::setDockWorkspace (&workspace); // FL's docked plugin windows float there (issue #116, developer switch)
     workspace.onTitleWheel = [this] (Panel panel, const juce::MouseEvent& ev, const juce::MouseWheelDetails& wheel) {
         if (panel == Panel::channelRack && ev.mods.isShiftDown())
             selectPattern (stepPattern (engine.getSong(), (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? -1 : 1));
@@ -776,6 +777,7 @@ MainComponent::~MainComponent()
     removeDialogTextFocus();
     engine.nameAutomation = nullptr;
     PluginWindows::closeAll(); // plugin UIs before the engine
+    PluginWindows::setDockWorkspace (nullptr); // (issue #116: the docked ones were in the workspace)
     ParametricEqWindows::closeAll();
     closeAutomationEditors();
     closeChannelSettings();

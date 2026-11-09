@@ -8033,3 +8033,7 @@ countries: jp
 "{0} (not found)" = "{0} (見つかりません)"
 "Select default project template" = "デフォルトのプロジェクトテンプレートを選択"
 "Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "起動時と ファイル › 新規 で、名前のない新しいプロジェクトとして開くため、テンプレート自体が上書きされることはありません。ファイル › テンプレートとして保存... で独自のものを追加できます。"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "切り離し"
+"Minimize" = "最小化"

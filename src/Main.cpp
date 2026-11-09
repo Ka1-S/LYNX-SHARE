@@ -63,6 +63,8 @@
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
+#include "ui/NativeChild.h"
+#include "ui/Workspace.h"
 #include "ui/PluginThumbs.h"
 #include "ui/ClipProperties.h"
 #include "ui/NewProjectDialog.h"
@@ -3705,7 +3707,55 @@ private:
             juce::AudioPluginInstance* instance = nullptr;
             juce::AudioProcessorParameter* checked = nullptr;
             std::unique_ptr<juce::DocumentWindow> mainWindow; // stands for LYNX's main window (window ownership)
+            std::unique_ptr<lynx::Workspace> workspace;       // LYNX_PLUGWIN_DOCK=1: its desktop (issue #116)
+            bool dockOk = true;
             std::function<void (bool)> done;
+
+            // issue #116 (with LYNX_DOCKED_PLUGINS=1 and LYNX_PLUGWIN_DOCK=1): FL's docked window goes behind a clicked
+            // Channel rack and comes back in front when clicked; Detached reopens it as a window of its own
+            void dockCheck (int at)
+            {
+                using lynx::workspace::Panel;
+                auto* main = mainWindow->getWindowHandle();
+                auto* rack = workspace->getFrame (Panel::channelRack).getWindowHandle();
+                auto* plug = lynx::PluginWindows::hostWindowHandle (*instance);
+                auto expect = [this] (const juce::String& name, bool value) {
+                    step (name + "=" + juce::String ((int) value));
+                    dockOk = dockOk && value;
+                };
+                if (at == 0)
+                {
+                    expect ("docked", lynx::PluginWindows::isDocked (*instance));
+                    expect ("rack_native_child", rack != nullptr && rack != main && lynx::nativechild::parentOf (rack) == main);
+                    expect ("plugin_native_child", plug != nullptr && lynx::nativechild::parentOf (plug) == main);
+                    expect ("plugin_above_rack_when_opened", lynx::nativechild::isAbove (plug, rack));
+                    workspace->activate (Panel::channelRack); // a click on the rack
+                    expect ("rack_above_plugin_after_rack_click", lynx::nativechild::isAbove (rack, plug));
+                    lynx::PluginWindows::open ({}, *instance, {}); // (open again = bring the open one in front)
+                    expect ("plugin_above_rack_after_plugin_click", lynx::nativechild::isAbove (plug, rack));
+                    lynx::PluginWindows::setDetached (*instance, true);
+                }
+                else if (at == 1)
+                {
+                    expect ("detached_reopened", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance));
+                    expect ("detached_owned_by_main", plug != nullptr && lynx::nativechild::ownerOf (plug) == main);
+                    expect ("detached_saved", find() == instance && engineRef()->detached);
+                    lynx::PluginWindows::setDetached (*instance, false);
+                }
+                else
+                {
+                    expect ("docked_again", lynx::PluginWindows::isDocked (*instance) && ! engineRef()->detached);
+                    step (juce::String ("dock_result=") + (dockOk ? "OK" : "FAILED"));
+                }
+            }
+
+            const lynx::PluginRef* engineRef() const
+            {
+                const auto& song = engine->getSong();
+                if (instrument)
+                    return song.channels.empty() ? nullptr : &song.channels[0].plugin;
+                return song.mixer.size() < 2 || song.mixer[1].effects.empty() ? nullptr : &song.mixer[1].effects[0].plugin;
+            }
 
             void step (const juce::String& line)
             {
@@ -3796,6 +3846,8 @@ private:
                 }
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
+                if (phase == 1 && workspace != nullptr && (ticks == 30 || ticks == 50 || ticks == 70))
+                    dockCheck ((ticks - 30) / 20);
                 if (phase == 1 && ticks >= seconds * 20) // remove the plugin from the song
                 {
                     engine->editSong ([this] (lynx::Song& song) {
@@ -3813,10 +3865,10 @@ private:
                 {
                     const auto open = lynx::PluginWindows::isOpen (*instance);
                     step ("window_open_after_remove=" + juce::String ((int) open));
-                    step (open ? "result=FAILED" : "result=OK");
+                    step (open || ! dockOk ? "result=FAILED" : "result=OK");
                     stopTimer();
                     lynx::PluginWindows::closeAll();
-                    done (! open);
+                    done (! open && dockOk);
                 }
             }
         };
@@ -3828,6 +3880,10 @@ private:
             setApplicationReturnValue (ok ? 0 : 1);
             juce::MessageManager::callAsync ([this, test] {
                 lynx::setMainWindowForOwnership (nullptr);
+                lynx::PluginWindows::setDockWorkspace (nullptr);
+                if (test->mainWindow != nullptr)
+                    test->mainWindow->clearContentComponent();
+                test->workspace = nullptr;
                 test->mainWindow = nullptr;
                 test->engine = nullptr;
                 delete test;
@@ -3837,8 +3893,20 @@ private:
         test->engine = std::make_unique<lynx::AudioEngine> (false);
         test->mainWindow = std::make_unique<juce::DocumentWindow> ("LYNX test main window", juce::Colours::darkgrey, 0);
         test->mainWindow->setBounds (20, 20, 300, 200);
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_DOCK", {}) == "1" && lynx::nativechild::dockingEnabled())
+        {
+            test->workspace = std::make_unique<lynx::Workspace>();
+            test->mainWindow->setContentNonOwned (test->workspace.get(), false);
+            test->mainWindow->setBounds (20, 20, 1200, 760);
+            lynx::PluginWindows::setDockWorkspace (test->workspace.get());
+        }
         test->mainWindow->setVisible (true);
         lynx::setMainWindowForOwnership (test->mainWindow.get());
+        if (test->workspace != nullptr)
+        {
+            test->workspace->show (lynx::workspace::Panel::channelRack);
+            test->step ("dock_test=1 rack_visible=" + juce::String ((int) test->workspace->isPanelVisible (lynx::workspace::Panel::channelRack)));
+        }
         auto& host = test->engine->getPluginHost();
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;

@@ -8033,3 +8033,7 @@ countries: de at ch li lu
 "{0} (not found)" = "{0} (nicht gefunden)"
 "Select default project template" = "Standard-Projektvorlage wählen"
 "Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Öffnet sich beim Start und mit Datei › Neu als neues, unbenanntes Projekt, die Vorlage selbst wird also nie überschrieben. Datei › Als Vorlage speichern... fügt eigene hinzu."
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Abgelöst"
+"Minimize" = "Minimieren"

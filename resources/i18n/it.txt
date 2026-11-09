@@ -8033,3 +8033,7 @@ countries: it ch sm
 "{0} (not found)" = "{0} (non trovato)"
 "Select default project template" = "Scegli il modello di progetto predefinito"
 "Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Si apre all'avvio e con File › Nuovo come nuovo progetto senza titolo, così il modello non viene mai sovrascritto. File › Salva come modello... aggiunge i tuoi."
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Separato"
+"Minimize" = "Riduci a icona"

@@ -8033,3 +8033,7 @@ countries: cn sg
 "{0} (not found)" = "{0} (未找到)"
 "Select default project template" = "选择默认工程模板"
 "Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "启动时以及“文件 › 新建”时作为未命名的新工程打开，因此模板本身不会被覆盖。“文件 › 另存为模板...”可添加你自己的模板。"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "已分离"
+"Minimize" = "最小化"

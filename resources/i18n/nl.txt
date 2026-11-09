@@ -8033,3 +8033,7 @@ countries: nl be
 "{0} (not found)" = "{0} (niet gevonden)"
 "Select default project template" = "Standaard projectsjabloon kiezen"
 "Opens at start-up and with File › New as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Opent bij het starten en met Bestand › Nieuw als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Losgemaakt"
+"Minimize" = "Minimaliseren"
