@@ -2427,6 +2427,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 const auto gain = e.gain * (gains != nullptr ? gains[index] : 1.0f);
                 if (gain != 1.0f && ! instrument.setNextNoteGain (gain))
                     velocity *= gain;
+                instrument.setNextNoteFinePitch (e.cents); // (issue #63: a hosted plugin's key and VST3 tuning)
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
                 HostSlide::pendingGlide() = {};
             }
