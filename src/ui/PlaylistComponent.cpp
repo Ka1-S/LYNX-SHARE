@@ -4730,17 +4730,23 @@ void PlaylistComponent::trimTimeSelection()
 
 void PlaylistComponent::shiftSelectedClips (int steps, int tracks)
 {
-    if (selection.empty())
+    // the selected clips, else all of them (FL's menu offers these with nothing selected: FL's usual "selected, else all",
+    // as Mute does, FUN_01061e80)
+    auto chosen = selection;
+    if (chosen.empty())
+        for (int i = 0; i < (int) engine.getSong().playlist.size(); ++i)
+            chosen.push_back (i);
+    if (chosen.empty())
         return;
 
     const auto delta = (std::int64_t) steps * juce::jmax<std::int64_t> (1, gridTicks());
-    engine.editSong ([chosen = selection, delta, tracks] (Song& s) {
+    engine.editSong ([chosen, delta, tracks] (Song& s) {
         if (delta != 0)
             clipops::shiftClipsInTime (s.playlist, chosen, delta);
         if (tracks != 0)
             clipops::shiftClipsTrack (s.playlist, chosen, tracks);
     });
-    sortClips (selection);
+    sortClips (chosen);
 }
 
 void PlaylistComponent::selectBySelectedSource()
@@ -4842,10 +4848,10 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Duplicate") + "\tCtrl+B", any || time, false, [this] { duplicateSelection(); });
     m.addItem (tr ("Delete") + "\tDel", any, false, [this] { if (ripple) rippleDeleteSelection(); else deleteSelection(); });
     m.addSeparator();
-    m.addItem (tr ("Shift left") + key ("playlist.shiftLeft"), any, false, [this] { runAction ("playlist.shiftLeft"); });
-    m.addItem (tr ("Shift right") + key ("playlist.shiftRight"), any, false, [this] { runAction ("playlist.shiftRight"); });
-    m.addItem (tr ("Shift up") + key ("playlist.shiftUp"), any, false, [this] { runAction ("playlist.shiftUp"); });
-    m.addItem (tr ("Shift down") + key ("playlist.shiftDown"), any, false, [this] { runAction ("playlist.shiftDown"); });
+    m.addItem (tr ("Shift left") + key ("playlist.shiftLeft"), [this] { runAction ("playlist.shiftLeft"); });
+    m.addItem (tr ("Shift right") + key ("playlist.shiftRight"), [this] { runAction ("playlist.shiftRight"); });
+    m.addItem (tr ("Shift up") + key ("playlist.shiftUp"), [this] { runAction ("playlist.shiftUp"); });
+    m.addItem (tr ("Shift down") + key ("playlist.shiftDown"), [this] { runAction ("playlist.shiftDown"); });
     m.addItem (tr ("Make unique") + key ("playlist.makeUnique"), any, false, [this] { runAction ("playlist.makeUnique"); });
     m.addSeparator();
     {
