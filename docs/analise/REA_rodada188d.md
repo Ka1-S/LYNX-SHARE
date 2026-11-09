@@ -6,7 +6,7 @@ after "Auto map outputs" (outputs 1…7 on offsets 1…7). LYNX took only a plug
 
 ## Evidence
 
-- **[EXEC]** FL Studio 2026.1.7 (build 5654), session 2026-11-09 08:17–08:31, shots in
+- **[EXEC]** FL Studio 2026.1.7 (build 5654), sessions 2026-11-09 08:17–08:31 and 08:46–08:48, shots in
   `/mnt/e/lynx-work/multiout188d/shots/fl/`. Plugin: `tools/testplugin/lynx_test_drums_vst2.c` (8 stereo outputs
   named Kick … Crash, all pins flagged active; "LYNX Test Drums 2" plays output (key − 36) mod 8 so the typing
   keyboard reaches each output). FL found it after adding the search path `E:\lynx-work\multiout188d\vst\` in the
@@ -37,6 +37,8 @@ after "Auto map outputs" (outputs 1…7 on offsets 1…7). LYNX took only a plug
 | Channel pan 100 % left | g0x | Snare (insert 6) also left only |
 | Channel volume 0 % | h0x | Kick and Snare silent |
 
+| Second session (08:46): "LYNX Test Drums 3", the Crash pins without kVstPinIsActive | j18 | "8. Crash" starts with its LED off; the others on |
+
 So: target insert = the channel's insert + offset; offset 0 ("---") = the channel's insert; an inactive output is
 silent; the channel's volume and pan act on every output. Seen once more: after an LED was turned off, the "Process
 inactive inputs and outputs" box showed off (a38, b23) — not modelled (LYNX has no such option yet).
@@ -60,7 +62,6 @@ inactive inputs and outputs" box showed off (a38, b23) — not modelled (LYNX ha
 
 - Effects' Connections (inputs as sidechain indexes, "Auto map inputs"): LYNX's sidechain picker covers side inputs.
 - Importing / exporting the mapping in .flp (the wrapper data).
-- Which outputs start active when a VST2 does not flag its pins (FL's rule not observed: the test plugin flags all).
 - "Process inactive inputs and outputs".
 
 ## Best way?

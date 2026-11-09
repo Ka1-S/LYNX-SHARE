@@ -2148,6 +2148,6 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Auto map outputs | from output 1's offset, +1 per output, inactive ones included | same | same |
 | Reset | offsets back to "---", LEDs unchanged | same | same |
 | Channel volume / pan | apply to every output | same | same |
-| Which outputs start active | the plugin's declaration (all on for the test VST2) | VST2 pin "active" flag, VST3 bus default-active | see REA notes |
+| Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
 | Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
 | .flp import of the mapping | stored in the wrapper data | not yet | open |
