@@ -14,14 +14,23 @@ inside that DLL. **[UI]** FL 2026 screenshots (`E:\lynx-work\dock186a\shots\fl-*
   **`Change default template...`** (UTF-16, right after `TemplateAction`) [STR].
 - Templates live in `Data\Templates\` and the user's `Projects\Templates` [STR]; File › Save as template...
   (`FileSaveAsTemplateAction`) adds one ("The project and its data have been saved as a new project template.") [STR].
-- FL opens the default template at start-up and with File › New, as an untitled project (the f116 shots start in it).
+- FL 2026 driven (2026-11-09, `fl-02c`…`fl-07c`): File › New is labelled with the default template
+  ("New (Basic with limiter)"). New from template shows the categories (Advanced, Minimal, Other, Performance, Power
+  User, Utility), Empty, then **Change default template...**, which opens Settings › General with Miscellaneous
+  expanded: a **Default template** combo (the same template menu as a popup) and a **Startup project** combo with
+  *Empty project / Default template / Last used project* (FL's default: Default template) [UI].
+- The same panel holds "Detach all new plugins" and "Open detached plugins with the FL Studio window" (for #116 later).
 
 ### What LYNX does now
 - Settings › General › Startup › **Default template**: "Default (LYNX SHARE)", the built-in templates, then the user's
   `.lynx` files in Documents\LYNX\Templates. Kept in `new-project.txt` as `defaultTemplate=` (`core/Templates.h`
   `TemplateChoice`: `builtin:<name>` / `user:<file name>`; paths and unknown names read as LYNX's default).
-- At start-up without a file to open, and with File › New when the New project window is turned off, the default
-  template opens as a new untitled project (`MainComponent::startFromDefaultTemplate`, `makeDefaultTemplateProject`),
+- Settings › General › Startup › **Startup project** under it: Empty project (LYNX's built-in "Empty"), Default
+  template (default), Last used project (the newest recent project, opened as itself; gone → the default template).
+- File › New reads "New (<template>)" when a default template is chosen (FL always names it; LYNX's own default keeps
+  the plain "New").
+- At start-up without a file to open (with Startup project = Default template), and with File › New when the New project
+  window is turned off, the default template opens as a new untitled project (`MainComponent::startFromDefaultTemplate`, `makeDefaultTemplateProject`),
   so Ctrl+S asks for a name. A template whose file is gone: LYNX's default opens, with a hint.
 - The New project window selects the default template first and marks it; a right-click on a template there offers
   "Use as default template" (the reporter's suggestion; FL has no such item).
