@@ -437,12 +437,13 @@ inline std::string rackSet()
                             "<PluginFloatParameter Id=\"0\">" + v ("ParameterName", "Gain") + v ("ParameterId", "1") + "<ParameterValue>" + keyMidi (2) +
                             v ("Manual", "0.5") + "<MidiControllerRange>" + v ("Min", "0.2") + v ("Max", "0.8") + "</MidiControllerRange></ParameterValue>" +
                             "</PluginFloatParameter></ParameterList></PluginDevice>";
-    const auto audioRack = "<AudioEffectGroupDevice Id=\"5\"><On><Manual Value=\"true\" /></On>" + v ("UserName", "Bus") + "<Branches>" +
+    const auto audioRack = "<AudioEffectGroupDevice Id=\"5\"><On><Manual Value=\"true\" /></On>" + v ("UserName", "Bus") + v ("IsRangesEditorVisible", "true") + "<Branches>" +
                            "<AudioEffectBranch Id=\"0\"><Name>" + v ("EffectiveName", "kHs Gain") + v ("UserName", "Dry") + "</Name>" + v ("IsSoloed", "false") +
                            "<DeviceChain><AudioToAudioDeviceChain><Devices>" + mappedVst2 + "</Devices></AudioToAudioDeviceChain></DeviceChain>" +
                            range ("BranchSelectorRange", 0, 63, 0, 40) + branchMixer (1.0, 0.0) + "</AudioEffectBranch>" +
                            "<AudioEffectBranch Id=\"1\"><Name>" + v ("EffectiveName", "EQ Eight") + v ("UserName", "") + "</Name>" + v ("IsSoloed", "false") +
-                           "<DeviceChain><AudioToAudioDeviceChain><Devices><Eq8 Id=\"0\">" + v ("UserName", "") + "</Eq8></Devices></AudioToAudioDeviceChain></DeviceChain>" +
+                           "<DeviceChain><AudioToAudioDeviceChain><Devices><Eq8 Id=\"0\">" + v ("UserName", "") + "<GlobalGain>" + keyMidi (4) + v ("Manual", "0") +
+                           "</GlobalGain></Eq8></Devices></AudioToAudioDeviceChain></DeviceChain>" +
                            range ("BranchSelectorRange", 40, 127, 63, 127) + branchMixer (0.5, -0.25, keyMidi (1)) + "</AudioEffectBranch></Branches>" +
                            macros ({ "Tone", "Macro 2", "Level" }, { 64, 10, 100 }, keyMidi (0)) +
                            "<MacroVariations><MacroSnapshots><MacroSnapshot Id=\"0\">" + v ("SnapshotName", "Verse");
@@ -516,6 +517,9 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
     CHECK (rack::macroOf (r, sel) == 0);
     CHECK (r.variations.size() == 1 && r.variations[0].name == "Verse" && r.variations[0].has[0] && r.variations[0].values[0] == 32.0f && ! r.variations[0].has[1]);
     CHECK (report.droppedEffects.count ("Eq8") == 1);
+    // the zone editor shows (an Audio Effect Rack's is the Chain editor); macro 5, not renamed, on a parameter of the dropped
+    // EQ Eight only: the name Live shows for it, the parameter's
+    CHECK (r.zoneEditor == 2 && r.macros[4].name == "Global Gain" && r.macros[4].mappings.empty());
     // the instrument rack: a channel whose Patcher is a rack, its chain's instrument the VST3, keys 0…59
     const ChannelDef* keys = nullptr;
     for (const auto& c : song->channels)
@@ -526,7 +530,7 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
         return;
     const auto& ir = *rack::rackOf (keys->patcher);
     CHECK (ir.kind == RackDoc::Kind::instrument && ir.chains.size() == 1 && ir.chains[0].nodes.size() == 1
-           && ir.chains[0].key == (RackZone { 0, 59, 0, 59 }));
+           && ir.chains[0].key == (RackZone { 0, 59, 0, 59 }) && ir.zoneEditor == -1);
     if (! ir.chains.empty() && ! ir.chains[0].nodes.empty())
     {
         const auto& n = keys->patcher.nodes[(std::size_t) ir.chains[0].nodes[0]];

@@ -2,6 +2,7 @@
 #include "core/Effects.h"
 #include "core/Rack.h"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -374,6 +375,22 @@ void pluginMappings (Ctx& ctx, const Element& device, PatcherDoc& doc, int node)
 
 bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth);
 
+// A Live member name as words: "FormantShift" → "Formant Shift"
+std::string spacedName (std::string_view tag)
+{
+    std::string out;
+    for (std::size_t i = 0; i < tag.size(); ++i)
+    {
+        const auto c = tag[i];
+        const auto upper = c >= 'A' && c <= 'Z';
+        const auto prevLower = i > 0 && ((tag[i - 1] >= 'a' && tag[i - 1] <= 'z') || (tag[i - 1] >= '0' && tag[i - 1] <= '9'));
+        if (upper && prevLower)
+            out += ' ';
+        out += c;
+    }
+    return out;
+}
+
 // One device of a rack chain → a Patcher node (−1 = dropped and listed)
 int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth)
 {
@@ -483,6 +500,7 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
     if (r == nullptr)
         return false;
     const auto instrumentRack = r->kind == RackDoc::Kind::instrument;
+    std::array<std::vector<std::string>, rackMacroCount> droppedTargets;
     while (! r->chains.empty())
     {
         rack::removeChain (doc, 0);
@@ -506,7 +524,10 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         // the chain's devices (Live's chain kinds: AudioToAudio, MidiToAudio, MidiToMidi) [DATA]
         for (const auto* list : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices" })
             for (const auto& d : branch.path (list).children())
-                rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth);
+                if (rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth) < 0)
+                    for (const auto& parameter : d.children()) // a dropped device's mapped parameters (for the macro names)
+                        if (const auto m = mappingOf (parameter))
+                            droppedTargets[(std::size_t) m->macro].push_back (spacedName (parameter.name()));
         // macros on the chain's volume / pan (Live's linear gain and −1..1 → LYNX's 0..1 controls)
         if (const auto m = mappingOf (branch.path ("MixerDevice/Volume")))
         {
@@ -540,6 +561,11 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         m.excludeFromRandom = device.boolean ("ExcludeMacroFromRandomization." + n, false);
         m.excludeFromVariations = device.boolean ("ExcludeMacroFromSnapshots." + n, false);
     }
+    // Live names a macro that wasn't renamed after its one mapped parameter ("Macro 3" stored, "Formant Shift" shown
+    // [SHOT]); when LYNX drops that device, the macro keeps the name Live showed
+    for (int k = 0; k < rackMacroCount; ++k)
+        if (auto& m = r->macros[(std::size_t) k]; m.name.empty() && m.mappings.empty() && droppedTargets[(std::size_t) k].size() == 1)
+            m.name = droppedTargets[(std::size_t) k].front();
     r->shownMacros = std::clamp ((int) device.number ("NumVisibleMacroControls", 8), 1, rackMacroCount);
     r->selector = (float) std::clamp (device.number ("ChainSelector/Manual", 0.0), 0.0, 127.0);
     r->selectorFiltersCtrl = device.boolean ("ChainSelectorFilterMidiCtrl", false);
@@ -547,6 +573,10 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
     r->showMacros = device.boolean ("AreMacroControlsVisible", true);
     r->showChains = device.boolean ("IsBranchesListVisible", false);
     r->showDevices = device.boolean ("AreDevicesVisible", false);
+    // the zone editor: Live keeps only whether it shows [DATA]; an Audio Effect Rack has only the Chain editor, the
+    // others open on Key
+    if (device.boolean ("IsRangesEditorVisible", false))
+        r->zoneEditor = r->kind == RackDoc::Kind::audioEffect ? 2 : 0;
     r->showVariations = device.boolean ("AreMacroVariationsControlsVisible", false);
     for (const auto& snapshot : device.path ("MacroVariations/MacroSnapshots").children ("MacroSnapshot"))
     {

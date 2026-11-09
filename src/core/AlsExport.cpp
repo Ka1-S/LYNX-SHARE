@@ -437,6 +437,7 @@ struct Exporter
         out.value ("AreMacroControlsVisible", boolean (r->showMacros));
         out.value ("IsBranchesListVisible", boolean (r->showChains));
         out.value ("AreDevicesVisible", boolean (r->showDevices));
+        out.value ("IsRangesEditorVisible", boolean (r->zoneEditor >= 0));
         out.value ("AreMacroVariationsControlsVisible", boolean (r->showVariations));
         if (auto* snapshots = out.at ("MacroVariations/MacroSnapshots"))
             for (int i = 0; i < (int) r->variations.size(); ++i)
