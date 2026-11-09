@@ -1,13 +1,29 @@
-# LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md).
-# Manual only, and nothing here is published: the plugins are not shipped yet (the user decides packaging and names).
+# LYNX's own effects and instruments as CLAP / VST3 plugins for other hosts: the optional download of a release
+# (rounds 180b and 188b, docs/PLUGIN_EXPORT.md). Every entry of src/plugin/plugins.def with built = 1 or 2 is in the one
+# CLAP; built = 2 also gets a VST3 of its own. Never inside the app's installer.
 #
-#   build  (ubuntu)   Zig cross build with LYNX_BUILD_PLUGINS=1: the .vst3 bundles, the .clap and plugexporttest.exe
-#   check  (windows)  plugexporttest (scan, null test against the engine, automation, state, editor) on every plugin,
-#                     pluginval (strictness 10, no GUI tests) on the .vst3 and clap-validator on the .clap
+# Run by hand (workflow_dispatch, any branch) or by release.yml (workflow_call), which attaches the archives to the draft
+# release. Nothing here publishes anything.
+#
+#   version         the package label (input, or CMakeLists.txt's version + the commit)
+#   windows-build   (ubuntu)   Zig cross build with LYNX_BUILD_PLUGINS=1, LYNX-Plugins-<label>-win-x64.zip
+#   windows-check   (windows)  from that zip: plugexporttest on every plugin, pluginval (strictness 10) on each .vst3,
+#                              clap-validator on the .clap
+#   linux           (ubuntu 22.04 container, glibc 2.35)  CMake + GCC 13, glibc check, the same three checks under Xvfb
+#                              with editor pictures, LYNX-Plugins-<label>-linux-x86_64.tar.xz
+#   macos           (macos-15)  CMake universal (arm64 + x86_64), ad hoc signature, the same three checks,
+#                              LYNX-Plugins-<label>-macos-universal.zip
+#   sums            LYNX-Plugins-<label>-SHA256SUMS.txt over the three archives (artifact LYNX-Plugins-<label>-all)
 name: Plugins
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      label:
+        description: 'package label (release.yml passes its own)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -18,12 +34,34 @@ env:
   JUCE_VERSION: 8.0.4
   JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
   PLUGINVAL_VERSION: v1.0.4
-  CLAP_VALIDATOR_URL: https://github.com/free-audio/clap-validator/releases/download/0.4.1/clap-validator-0.4.1-127-g152b982-windows.zip
+  CLAP_VALIDATOR: https://github.com/free-audio/clap-validator/releases/download/0.4.1/clap-validator-0.4.1-127-g152b982
 
 jobs:
-  build:
-    name: Build the plugins (Windows x64)
+  version:
+    name: Version
     runs-on: ubuntu-24.04
+    outputs:
+      label: ${{ steps.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Label
+        id: version
+        shell: bash
+        env:
+          INPUT_LABEL: ${{ inputs.label }}
+        run: |
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
+          label="${INPUT_LABEL:-$version-${GITHUB_SHA::7}}"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "LYNX plugins $label"
+
+  windows-build:
+    name: Windows x64 (build)
+    needs: version
+    runs-on: ubuntu-24.04
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
     steps:
       - uses: actions/checkout@v5
 
@@ -49,43 +87,205 @@ jobs:
       - name: Build
         shell: bash
         run: |
+          set -o pipefail
           LYNX_BUILD_PLUGINS=1 ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
-          mkdir -p out && cp -r build-win/plugins out/ && cp build-win/plugexporttest.exe out/
-          find out -type f -printf '%s %p\n'
+
+      - name: Package
+        shell: bash
+        run: |
+          ./scripts/package-plugins.sh windows build-win/plugins "$LABEL" dist
+          mkdir -p tool && cp build-win/plugexporttest.exe tool/
 
       - uses: actions/upload-artifact@v7
         with:
-          name: LYNX-plugins-windows-x64-unsigned
-          path: out/*
+          name: LYNX-Plugins-${{ env.LABEL }}-win-x64
+          path: dist/*
+          if-no-files-found: error
 
-  check:
-    name: Check the plugins
-    needs: build
-    runs-on: windows-2022
-    steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
-          name: LYNX-plugins-windows-x64-unsigned
-          path: out
+          name: plugexporttest-windows
+          path: tool/plugexporttest.exe
+          if-no-files-found: error
 
-      - name: Host test, pluginval, clap-validator
+  windows-check:
+    name: Windows x64 (check)
+    needs: [version, windows-build]
+    runs-on: windows-2022
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: scripts
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: LYNX-Plugins-${{ env.LABEL }}-win-x64
+          path: dist
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: plugexporttest-windows
+          path: tool
+
+      - name: Host test, pluginval, clap-validator (on what the zip holds)
         shell: bash
         env:
           LYNX_TEST_MODE: '1'
         run: |
-          set -o pipefail
-          export LYNX_PROFILE_DIR="$RUNNER_TEMP/profile"
           curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Windows.zip" && unzip -q pv.zip -d pv
-          curl -fsSL -o cv.zip "$CLAP_VALIDATOR_URL" && unzip -q cv.zip -d cv
-          fail=0
-          for p in out/plugins/*.vst3 out/plugins/*.clap; do
-            ./out/plugexporttest.exe "$p" "report-$(basename "$p").txt" || fail=1
-          done
-          for p in out/plugins/*.vst3; do
-            ./pv/pluginval.exe --validate "$p" --strictness-level 10 --skip-gui-tests --validate-in-process --timeout-ms 120000 || fail=1
-          done
-          for p in out/plugins/*.clap; do
-            "$(find cv -name clap-validator.exe | head -1)" validate --in-process "$p" || fail=1
-          done
-          exit $fail
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-windows.zip" && unzip -q cv.zip -d cv
+          unzip -q "dist/LYNX-Plugins-$LABEL-win-x64.zip" -d pkg
+          ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" tool/plugexporttest.exe pv/pluginval.exe "$(find cv -name 'clap-validator.exe' | head -1)" reports
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: plugin-reports-windows
+          path: reports/*
+
+  linux:
+    name: Linux x86_64
+    needs: version
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      DEBIAN_FRONTEND: noninteractive
+      MAX_GLIBC: '2.35'
+    steps:
+      - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends ca-certificates curl git gnupg software-properties-common
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          apt-get update -q
+          apt-get install -y -q gcc-13 g++-13 cmake ninja-build pkg-config file binutils xvfb xauth x11-utils unzip xz-utils \
+            fonts-dejavu-core libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev libcurl4
+
+      - uses: actions/checkout@v5
+
+      - name: JUCE (checksum verified)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
+            -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13 -DLYNX_BUILD_PLUGINS=ON -DLYNX_LTO=OFF
+          cmake --build build --target lynx_plugins -- -k 0
+
+      - name: Package
+        run: ./scripts/package-plugins.sh linux build/plugins "$LABEL" dist
+
+      - name: Runs on glibc ${{ env.MAX_GLIBC }} without the system's libstdc++
+        run: |
+          mkdir pkg && tar xJf "dist/LYNX-Plugins-$LABEL-linux-x86_64.tar.xz" -C pkg
+          find pkg -type f \( -name '*.so' -o -name '*.clap' \) -print0 | xargs -0 -n1 ./scripts/check-linux-compat.sh
+
+      - name: Host test, pluginval, clap-validator (on what the archive holds)
+        shell: bash
+        env:
+          LYNX_TEST_MODE: '1'
+        run: |
+          curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Linux.zip" && unzip -q pv.zip -d pv
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-ubuntu-22.04.zip" && unzip -q cv.zip -d cv
+          chmod +x pv/pluginval "$(find cv -name clap-validator -type f | head -1)"
+          xvfb-run -a ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest pv/pluginval "$(find cv -name clap-validator -type f | head -1)" reports pictures
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-Plugins-${{ env.LABEL }}-linux-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: plugin-reports-linux
+          path: reports/*
+
+  macos:
+    name: macOS universal
+    needs: version
+    runs-on: macos-15
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build dependencies
+        run: brew list ninja > /dev/null 2>&1 || brew install ninja
+
+      - name: JUCE (checksum verified)
+        run: |
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+      - name: Build (universal)
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DLYNX_BUILD_PLUGINS=ON -DLYNX_LTO=OFF
+          cmake --build build --target lynx_plugins -- -k 0
+          lipo -info "build/plugins/LYNX Plugins.clap/Contents/MacOS/LYNX Plugins"
+
+      - name: Package
+        run: ./scripts/package-plugins.sh macos build/plugins "$LABEL" dist
+
+      - name: Host test, pluginval, clap-validator (on what the zip holds)
+        shell: bash
+        env:
+          LYNX_TEST_MODE: '1'
+        run: |
+          curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_macOS.zip" && unzip -q pv.zip -d pv
+          curl -fsSL -o cv.zip "$CLAP_VALIDATOR-macos-universal.zip" && unzip -q cv.zip -d cv
+          ditto -x -k "dist/LYNX-Plugins-$LABEL-macos-universal.zip" pkg
+          codesign --verify --deep --strict "pkg/LYNX-Plugins-$LABEL/CLAP/LYNX Plugins.clap"
+          cv_bin="$(find cv -name clap-validator -type f | head -1)"; chmod +x "$cv_bin"
+          ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest pv/pluginval.app/Contents/MacOS/pluginval "$cv_bin" reports
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-Plugins-${{ env.LABEL }}-macos-universal
+          path: dist/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: plugin-reports-macos
+          path: reports/*
+
+  sums:
+    name: Checksums
+    needs: [version, windows-check, linux, macos]
+    runs-on: ubuntu-24.04
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: scripts
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: LYNX-Plugins-${{ env.LABEL }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: SHA256SUMS
+        run: ./scripts/package-plugins.sh --sums "$LABEL" dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-Plugins-${{ env.LABEL }}-all
+          path: dist/*
+          if-no-files-found: error

@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <initializer_list>
 #include <memory>
 #include <vector>
 
@@ -38,7 +39,18 @@ public:
         plugin.destroy = [] (const clap_plugin_t* p) { delete self (p); };
         plugin.activate = [] (const clap_plugin_t* p, double rate, std::uint32_t, std::uint32_t maxFrames) {
             auto* s = self (p);
-            s->processor->setPlayConfigDetails (s->entry.instrument ? 0 : 2, 2, rate, (int) maxFrames);
+            if (s->entry.instrument)
+                s->processor->setPlayConfigDetails (0, 2, rate, (int) maxFrames);
+            else
+            {
+                // main in / out and the side-chain bus, always stereo here (round 188b): an unconnected port plays silence
+                auto layout = s->processor->getBusesLayout();
+                for (auto& bus : layout.inputBuses)
+                    bus = juce::AudioChannelSet::stereo();
+                s->processor->setBusesLayout (layout);
+                s->processor->setRateAndBufferSizeDetails (rate, (int) maxFrames);
+            }
+            s->side.setSize (2, (int) maxFrames);
             s->processor->prepareToPlay (rate, (int) maxFrames);
             s->midi.ensureSize (4096);
             return true;
@@ -191,8 +203,27 @@ private:
 
         position.transport = p.transport;
         processor->setPlayHead (&position);
-        juce::AudioBuffer<float> buffer (outs, 2, frames);
-        processor->processBlock (buffer, midi);
+        if (! entry.instrument && processor->getTotalNumInputChannels() > 2 && frames <= side.getNumSamples())
+        {
+            // the side-chain port (round 188b): a copy, the host's input buffers stay untouched
+            const auto has = p.audio_inputs_count > 1 && p.audio_inputs[1].data32 != nullptr && p.audio_inputs[1].channel_count > 0;
+            for (int c = 0; c < 2; ++c)
+            {
+                if (has)
+                    std::memcpy (side.getWritePointer (c), p.audio_inputs[1].data32[juce::jmin ((std::uint32_t) c, p.audio_inputs[1].channel_count - 1)],
+                                 sizeof (float) * (std::size_t) frames);
+                else
+                    side.clear (c, 0, frames);
+            }
+            float* channels[] { outs[0], outs[1], side.getWritePointer (0), side.getWritePointer (1) };
+            juce::AudioBuffer<float> buffer (channels, 4, frames);
+            processor->processBlock (buffer, midi);
+        }
+        else
+        {
+            juce::AudioBuffer<float> buffer (outs, 2, frames);
+            processor->processBlock (buffer, midi);
+        }
         return entry.instrument ? CLAP_PROCESS_CONTINUE : CLAP_PROCESS_CONTINUE_IF_NOT_QUIET;
     }
 
@@ -218,14 +249,16 @@ private:
     const void* extension (const char* id)
     {
         static const clap_plugin_audio_ports_t audioPorts {
-            [] (const clap_plugin_t* p, bool isInput) -> std::uint32_t { return isInput && self (p)->entry.instrument ? 0u : 1u; },
-            [] (const clap_plugin_t*, std::uint32_t index, bool isInput, clap_audio_port_info_t* info) {
-                if (index != 0)
+            // an effect: Input (main) and Sidechain (round 188b) in, Output out; an instrument: Output only
+            [] (const clap_plugin_t* p, bool isInput) -> std::uint32_t { return ! isInput ? 1u : self (p)->entry.instrument ? 0u : 2u; },
+            [] (const clap_plugin_t* p, std::uint32_t index, bool isInput, clap_audio_port_info_t* info) {
+                if (index >= (! isInput ? 1u : self (p)->entry.instrument ? 0u : 2u))
                     return false;
                 std::memset (info, 0, sizeof (*info));
-                info->id = isInput ? 0 : 1;
-                std::strncpy (info->name, isInput ? "Input" : "Output", sizeof (info->name) - 1);
-                info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+                const auto sidechain = isInput && index == 1;
+                info->id = sidechain ? 2 : isInput ? 0 : 1;
+                std::strncpy (info->name, sidechain ? "Sidechain" : isInput ? "Input" : "Output", sizeof (info->name) - 1);
+                info->flags = sidechain ? 0u : CLAP_AUDIO_PORT_IS_MAIN;
                 info->channel_count = 2;
                 info->port_type = CLAP_PORT_STEREO;
                 info->in_place_pair = CLAP_INVALID_ID;
@@ -428,13 +461,63 @@ private:
     const clap_host_timer_support_t* hostTimer = nullptr;
     clap_id timerId = CLAP_INVALID_ID;
     juce::MidiBuffer midi;
+    juce::AudioBuffer<float> side; // the side-chain port's copy (activate sizes it)
     PlayHead position;
 };
 
+// What a host files the plugin under (clap/plugin-features.h): the main kind, then what it does, then "stereo"
+const char* const* featuresOf (const Entry& e)
+{
+    using F = std::initializer_list<const char*>;
+    static std::vector<std::vector<const char*>> lists; // (built once, in catalog order, by descriptorOf)
+    const auto make = [] (F what) {
+        std::vector<const char*> list { CLAP_PLUGIN_FEATURE_AUDIO_EFFECT };
+        list.insert (list.end(), what);
+        list.push_back (CLAP_PLUGIN_FEATURE_STEREO);
+        list.push_back (nullptr);
+        return list;
+    };
+    std::vector<const char*> list;
+    if (e.instrument)
+        list = { CLAP_PLUGIN_FEATURE_INSTRUMENT, CLAP_PLUGIN_FEATURE_SYNTHESIZER, CLAP_PLUGIN_FEATURE_STEREO, nullptr };
+    else
+        switch (e.effect)
+        {
+            case EffectKind::facetEq: list = make ({ CLAP_PLUGIN_FEATURE_EQUALIZER }); break;
+            case EffectKind::aether: list = make ({ CLAP_PLUGIN_FEATURE_EQUALIZER, CLAP_PLUGIN_FEATURE_DISTORTION }); break;
+            case EffectKind::apexLimiter: list = make ({ CLAP_PLUGIN_FEATURE_LIMITER, CLAP_PLUGIN_FEATURE_MASTERING }); break;
+            case EffectKind::crestCompressor:
+            case EffectKind::prismMultiband:
+            case EffectKind::glowLeveler: list = make ({ CLAP_PLUGIN_FEATURE_COMPRESSOR }); break;
+            case EffectKind::sentryGate: list = make ({ CLAP_PLUGIN_FEATURE_GATE, CLAP_PLUGIN_FEATURE_EXPANDER }); break;
+            case EffectKind::hushDeEsser: list = make ({ CLAP_PLUGIN_FEATURE_DEESSER }); break;
+            case EffectKind::ridgeStrip:
+            case EffectKind::kilnChannel:
+            case EffectKind::fretChannel:
+            case EffectKind::shellChannel: list = make ({ CLAP_PLUGIN_FEATURE_MIXING, CLAP_PLUGIN_FEATURE_EQUALIZER, CLAP_PLUGIN_FEATURE_COMPRESSOR }); break;
+            case EffectKind::ember: list = make ({ CLAP_PLUGIN_FEATURE_DISTORTION }); break;
+            case EffectKind::epochVerb:
+            case EffectKind::atrium:
+            case EffectKind::foilPlate:
+            case EffectKind::nebula:
+            case EffectKind::halo: list = make ({ CLAP_PLUGIN_FEATURE_REVERB }); break;
+            case EffectKind::horizon: list = make ({ CLAP_PLUGIN_FEATURE_REVERB, CLAP_PLUGIN_FEATURE_DELAY }); break;
+            case EffectKind::echoform:
+            case EffectKind::spiralEcho: list = make ({ CLAP_PLUGIN_FEATURE_DELAY }); break;
+            case EffectKind::latticeMod: list = make ({ CLAP_PLUGIN_FEATURE_DELAY, CLAP_PLUGIN_FEATURE_CHORUS }); break;
+            case EffectKind::orbit: list = make ({ CLAP_PLUGIN_FEATURE_CHORUS, CLAP_PLUGIN_FEATURE_FLANGER }); break;
+            case EffectKind::lynxTune: list = make ({ CLAP_PLUGIN_FEATURE_PITCH_CORRECTION }); break;
+            case EffectKind::voiceShift: list = make ({ CLAP_PLUGIN_FEATURE_PITCH_SHIFTER }); break;
+            case EffectKind::geminiDoubler: list = make ({ CLAP_PLUGIN_FEATURE_CHORUS }); break; // (a doubler: no own feature)
+            case EffectKind::quellDenoiser: list = make ({ CLAP_PLUGIN_FEATURE_RESTORATION }); break;
+            default: list = make ({}); break;
+        }
+    lists.push_back (std::move (list));
+    return lists.back().data();
+}
+
 const clap_plugin_descriptor_t* descriptorOf (std::size_t index)
 {
-    static const char* const effectFeatures[] { CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_STEREO, nullptr };
-    static const char* const synthFeatures[] { CLAP_PLUGIN_FEATURE_INSTRUMENT, CLAP_PLUGIN_FEATURE_SYNTHESIZER, CLAP_PLUGIN_FEATURE_STEREO, nullptr };
     static const auto all = [] {
         std::vector<clap_plugin_descriptor_t> list;
         for (const auto& e : catalog)
@@ -449,7 +532,7 @@ const clap_plugin_descriptor_t* descriptorOf (std::size_t index)
             d.support_url = "";
             d.version = LYNX_EXPORT_VERSION;
             d.description = "LYNX SHARE plugin";
-            d.features = e.instrument ? synthFeatures : effectFeatures;
+            d.features = featuresOf (e);
             list.push_back (d);
         }
         return list;

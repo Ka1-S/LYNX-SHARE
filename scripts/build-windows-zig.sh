@@ -44,6 +44,12 @@ cmp -s "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h" 2>/dev/null && rm "$OUT/JuceC
 COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
         -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
+# The plugins (LYNX_BUILD_PLUGINS=1 below) link these objects with --gc-sections: with a section per function and per
+# datum the linker drops what a plugin never reaches (round 180b measured 32 % on Linux). Plugin builds only, so the app's
+# objects and their cache entries stay as they are (LYNX_PLUGIN_SECTIONS=0 turns it off).
+if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 && "${LYNX_PLUGIN_SECTIONS:-1}" == 1 ]]; then
+    COMMON+=(-ffunction-sections -fdata-sections)
+fi
 
 # juce_gui_basics, juce_audio_processors, juce_graphics and juce_events are compiled from patched copies
 # (cmake/LynxPatchJuce.cmake: issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; round 174e2 Direct2D image
@@ -362,14 +368,16 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     plugin_cxx "$OUT/plugin/ClapEntry.o" src/plugin/ClapEntry.cpp -Wall -Wextra
     plugin_link "$OUT/plugins/LYNX Plugins.clap" "$OUT/plugin/ClapEntry.o"
     index=0 # (one table, src/plugin/plugins.def: every built entry; the index counts them, plugin/ExportCatalog.h)
-    while IFS='~' read -r name synth code category; do
+    while IFS='~' read -r name synth code category built; do
+        # built = 2: a VST3 of its own as well (1: in the CLAP only)
+        [[ "$built" == 2 ]] || { index=$((index + 1)); continue; }
         dir="$OUT/plugins/$name.vst3/Contents/x86_64-win"
         mkdir -p "$dir"
         plugin_cxx "$OUT/plugin/Vst3Entry$index.o" src/plugin/Vst3Entry.cpp -w -DLYNX_EXPORT_INDEX=$index "-DJucePlugin_Name=\"$name\"" -DJucePlugin_IsSynth=$synth \
             -DJucePlugin_PluginCode=$code "-DJucePlugin_Vst3Category=\"$category\""
         plugin_link "$dir/$name.vst3" "$OUT/plugin/Vst3Entry$index.o"
         index=$((index + 1))
-    done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", 1\)$/\1~\2~\3~\4/p' src/plugin/plugins.def)
+    done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", ([12])\)$/\1~\2~\3~\4~\5/p' src/plugin/plugins.def)
     plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
     plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
     "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
