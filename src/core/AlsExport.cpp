@@ -954,7 +954,8 @@ struct Exporter
             const auto& ch = song.channels[i];
             if (ch.instrument == InstrumentKind::audioClip)
                 continue;
-            const auto plugin = ch.instrument == InstrumentKind::plugin;
+            // (a plugin or an Instrument Rack (round 183c) is a device of its own: its track goes out even with no notes)
+            const auto plugin = ch.instrument == InstrumentKind::plugin || rack::isRack (ch);
             if (! plays[i] && ! plugin)
                 continue;
             LiveTrack t;

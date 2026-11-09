@@ -1119,7 +1119,12 @@ bool Graph::hasInstruments() const noexcept
 
 bool Graph::instrumentsIdle() const noexcept
 {
-    // (a VFX node that holds voices or plays on its own — a sequencer — keeps the graph running)
+    // (a VFX node that holds voices or plays on its own — a sequencer — keeps the graph running; so do notes still on
+    // their way: queued, waiting at a VFX node for the next piece, or played to the host and not yet taken (round 183c: a
+    // MIDI Effect Rack's chains are VFX nodes only, and a note reaches them one piece after it came in))
+    if (timedCount > 0 || hostEventCount > 0
+        || std::any_of (vfxQueues.begin(), vfxQueues.end(), [] (const auto& q) { return q != nullptr && q->in.size() > 0; }))
+        return false;
     return std::all_of (nodes.begin(), nodes.end(), [] (const auto& n) {
         return (n->instrument == nullptr || n->instrument->idle()) && (n->vfx == nullptr || ! n->vfx->busy());
     });

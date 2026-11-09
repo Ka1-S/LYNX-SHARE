@@ -463,7 +463,12 @@ inline std::string rackSet()
                                 "</ZoneSettings>" + branchMixer (1.0, 0.0) + "</InstrumentBranch></Branches>" + macros ({}, {}, {}) + "</InstrumentGroupDevice>";
     std::string s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Ableton MajorVersion=\"5\" MinorVersion=\"12.0_12117\" Creator=\"test\">\n<LiveSet><Tracks>";
     s += "<AudioTrack Id=\"20\">" + als175a::name ("Vocal") + v ("Color", "20") + v ("TrackGroupId", "-1") + "<DeviceChain>" + als175a::mixer (200, 1.0, 0.0, true) +
-         "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting><DeviceChain><Devices>" + audioRackFull + "</Devices></DeviceChain></DeviceChain></AudioTrack>";
+         "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting>" +
+         // (a clip, so the track has a channel and the export writes it back)
+         "<MainSequencer><Sample><ArrangerAutomation><Events><AudioClip Id=\"0\" Time=\"0\">" + v ("CurrentStart", "0") + v ("CurrentEnd", "4") +
+         v ("Name", "Take") + v ("IsWarped", "false") + "<Loop>" + v ("LoopStart", "0") + v ("LoopEnd", "4") + v ("StartRelative", "0") + v ("LoopOn", "false") +
+         v ("OutMarker", "4") + "</Loop><SampleRef><FileRef>" + v ("RelativePathType", "1") + v ("RelativePath", "Samples/vocal.wav") + v ("Path", "D:/x/Samples/vocal.wav") +
+         "</FileRef></SampleRef></AudioClip></Events></ArrangerAutomation></Sample></MainSequencer><DeviceChain><Devices>" + audioRackFull + "</Devices></DeviceChain></DeviceChain></AudioTrack>";
     s += "<MidiTrack Id=\"10\">" + als175a::name ("Keys") + v ("Color", "3") + v ("TrackGroupId", "-1") + "<DeviceChain>" + als175a::mixer (100, 1.0, 0.0, true) +
          "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") + "</AudioOutputRouting><DeviceChain><Devices>" + instrumentRack + "</Devices></DeviceChain></DeviceChain></MidiTrack>";
     s += "</Tracks><MainTrack><DeviceChain>" + als175a::mixer (900, 1.0, 0.0, true, {}, "<Tempo><Manual Value=\"120\" /></Tempo>") + "</DeviceChain></MainTrack></LiveSet>\n</Ableton>\n";
@@ -502,7 +507,7 @@ TEST (rack183c_als_racks_import_chains_zones_macros_and_variations)
     CHECK (approx (r.chains[1].volume, rack::volumeGain (rack::unityVolume * 10.0f / 127.0f), 1.0e-5f) && approx (r.chains[1].pan, -0.25f));
     CHECK (approx (20.0f * std::log10 (rack::volumeGain (rack::unityVolume * 91.0f / 127.0f)), -9.637f, 0.01f)); // (Live's -9.637 dB [SHOT])
     CHECK (r.macros[0].name == "Tone" && r.macros[1].name.empty() && r.macros[2].name == "Level" && r.macros[0].value == 64.0f && r.macros[3].excludeFromRandom);
-    CHECK (r.shownMacros == 4 && r.selector == 20.0f);
+    CHECK (r.shownMacros == 4 && approx (r.selector, 64.0f, 0.01f)); // (stored at 20, but macro 1 (64) drives it, as in Live)
     // the mappings: macro 3 → the plugin's parameter 1 (0.2…0.8); macro 2 → chain 2's volume; macro 1 → the selector
     RackMapping p;
     p.node = r.chains[0].nodes[0], p.param = 1;
@@ -725,7 +730,7 @@ TEST (rack183c_group_into_a_rack_keeps_the_sound_and_the_automation)
     if (fx.size() == 3)
         CHECK (approx (fx[1].params[0], 0.25f, 1.0e-3f));
     CHECK (song.automations[0].target == (AutomationTarget { AutomationTargetKind::effectParam, 1, 1, 0 }));
-    CHECK (song.automations[1].target == (AutomationTarget { AutomationTargetKind::effectParam, 1, 3, 2 }));
+    CHECK (song.automations[1].target == (AutomationTarget { AutomationTargetKind::effectParam, 1, 2, 2 })); // (the limiter: slot 1 -> 2)
     // not a one-chain Audio Effect Rack: untouched
     const auto before = song.mixer[1].effects.size();
     CHECK (rack::ungroupSlot (song, 1, 0) == -1 && song.mixer[1].effects.size() == before);
