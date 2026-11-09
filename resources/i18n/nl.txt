@@ -6109,6 +6109,8 @@ countries: nl be
 "Insert effects" = "Insert-effecten"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Uit: de effecten van de inserts (niet die van de Master) worden bij de export overgeslagen"
 "Select first channel with notes when the pattern changes" = "Eerste kanaal met noten selecteren bij een patroonwissel"
+"Auto select linked modules" = "Gekoppelde modules automatisch selecteren"
+"Focusing plugin windows selects mixer tracks" = "Een plug-invenster focussen selecteert de mixertrack"
 "Mute / unmute" = "Dempen / dempen opheffen"
 "Portamento / deselect" = "Portamento / deselecteren"
 "Shift+arrows" = "Shift+pijlen"

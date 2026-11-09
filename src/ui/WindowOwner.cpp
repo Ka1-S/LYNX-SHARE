@@ -546,6 +546,58 @@ bool runSecondaryWindowKey (const juce::KeyPress& key)
     return keyForwarder().handler != nullptr && keyForwarder().handler (key);
 }
 
+namespace
+{
+std::function<void (int, int)> linkedFocusHandler;
+
+struct LinkedFocusListener final : juce::FocusChangeListener
+{
+    juce::Component::SafePointer<juce::Component> last;
+    void globalFocusChanged (juce::Component* focused) override
+    {
+        if (auto* top = focused != nullptr ? focused->getTopLevelComponent() : nullptr)
+            linkedWindowFocused (*top);
+    }
+};
+
+LinkedFocusListener& linkedFocusListener()
+{
+    static LinkedFocusListener listener;
+    return listener;
+}
+} // namespace
+
+void markLinkedWindow (juce::Component& window, int channel, int insert)
+{
+    window.getProperties().set ("lynxLinkChannel", channel);
+    window.getProperties().set ("lynxLinkInsert", insert);
+}
+
+void setLinkedWindowFocusHandler (std::function<void (int, int)> handler)
+{
+    linkedFocusHandler = std::move (handler);
+    if (linkedFocusHandler != nullptr)
+        juce::Desktop::getInstance().addFocusChangeListener (&linkedFocusListener());
+    else
+        juce::Desktop::getInstance().removeFocusChangeListener (&linkedFocusListener());
+}
+
+void linkedWindowFocused (juce::Component& window)
+{
+    auto& listener = linkedFocusListener();
+    if (! window.getProperties().contains ("lynxLinkInsert"))
+    {
+        listener.last = nullptr; // (another window: coming back to this one is a new focus)
+        return;
+    }
+    if (linkedFocusHandler == nullptr)
+        return;
+    if (listener.last.getComponent() == &window) // (the same window again: a click inside it, not a new focus)
+        return;
+    listener.last = &window;
+    linkedFocusHandler ((int) window.getProperties()["lynxLinkChannel"], (int) window.getProperties()["lynxLinkInsert"]);
+}
+
 void keepAboveMainWindow (juce::Component& window)
 {
     window.addKeyListener (&keyForwarder()); // (JUCE adds it once)

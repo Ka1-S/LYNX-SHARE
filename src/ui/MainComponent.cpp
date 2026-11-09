@@ -750,6 +750,21 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     });
 
     // the keys a secondary window (tool, plugin, channel window) leaves unused run the global shortcuts, as in FL
+    // FL's Auto select linked modules [DECOMP FUN_00f5c340] (round 187a): a focused channel / plugin window selects its
+    // channel and that channel's mixer track; a mixer effect's window selects its track
+    setLinkedWindowFocusHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (int channel, int insert) {
+        if (safe == nullptr || ! ChannelRackComponent::autoSelectLinked)
+            return;
+        const auto& song = safe->engine.getSong();
+        if (channel >= 0 && channel < (int) song.channels.size())
+        {
+            if (safe->engine.getSelectedChannel() != channel || safe->engine.getSelectedChannels().size() != 1)
+                safe->engine.setSelectedChannel (channel);
+            insert = song.channels[(std::size_t) channel].mixerTrack;
+        }
+        if (insert >= 0 && insert < (int) song.mixer.size())
+            safe->mixer.selectTrack (insert);
+    });
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
@@ -766,6 +781,7 @@ MainComponent::~MainComponent()
     liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
+    setLinkedWindowFocusHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
@@ -2025,6 +2041,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "autoSelectLinked")
+            ChannelRackComponent::autoSelectLinked = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
@@ -2250,6 +2268,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
@@ -4031,6 +4050,16 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    // FL's Auto select linked modules [DECOMP FUN_00ffe510 -> FUN_011e84e0] (round 187a): selecting one channel selects
+    // its mixer track
+    if (const auto selected = engine.getSelectedChannel(); selected != lastLinkedChannel)
+    {
+        lastLinkedChannel = selected;
+        if (ChannelRackComponent::autoSelectLinked && selected >= 0 && selected < (int) song.channels.size() && engine.getSelectedChannels().size() == 1)
+            if (const auto insert = song.channels[(std::size_t) selected].mixerTrack; insert >= 0 && insert < (int) song.mixer.size()
+                                                                                       && insert != mixer.getStripsForSnapshot().getSelectedTrack())
+                mixer.selectTrack (insert);
+    }
     // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
     if (song.currentPattern != lastCurrentPattern)
     {
@@ -5841,6 +5870,7 @@ void MainComponent::openSettings (int page)
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
@@ -5923,6 +5953,7 @@ void MainComponent::openSettings (int page)
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);

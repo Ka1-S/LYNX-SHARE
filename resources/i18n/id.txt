@@ -6109,6 +6109,8 @@ countries: id
 "Insert effects" = "Efek insert"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Mati: efek insert (bukan milik Master) dilewati saat ekspor"
 "Select first channel with notes when the pattern changes" = "Pilih kanal pertama yang berisi not saat pattern berganti"
+"Auto select linked modules" = "Pilih modul tertaut secara otomatis"
+"Focusing plugin windows selects mixer tracks" = "Memfokuskan jendela plugin memilih trek mixer"
 "Mute / unmute" = "Bisukan / batal bisu"
 "Portamento / deselect" = "Portamento / batal pilih"
 "Shift+arrows" = "Shift+panah"

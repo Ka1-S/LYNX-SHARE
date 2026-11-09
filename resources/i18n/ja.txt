@@ -6109,6 +6109,8 @@ countries: jp
 "Insert effects" = "インサートのエフェクト"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "オフ: インサートのエフェクト (Master 以外) を書き出しでバイパスします"
 "Select first channel with notes when the pattern changes" = "パターンが変わったら最初のノートのあるチャンネルを選択"
+"Auto select linked modules" = "リンクされたモジュールを自動選択"
+"Focusing plugin windows selects mixer tracks" = "プラグインウィンドウにフォーカスするとミキサートラックを選択します"
 "Mute / unmute" = "ミュート / ミュート解除"
 "Portamento / deselect" = "ポルタメント / 選択解除"
 "Shift+arrows" = "Shift+矢印"

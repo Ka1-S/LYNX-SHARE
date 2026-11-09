@@ -6109,6 +6109,8 @@ countries: fr be ch ca lu
 "Insert effects" = "Effets des pistes"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Désactivé : les effets des pistes (pas ceux du Master) sont contournés pour l'export"
 "Select first channel with notes when the pattern changes" = "Sélectionner le premier canal avec des notes au changement de pattern"
+"Auto select linked modules" = "Sélectionner automatiquement les modules liés"
+"Focusing plugin windows selects mixer tracks" = "Activer la fenêtre d'un plugin sélectionne sa piste de mixage"
 "Mute / unmute" = "Muet / réactiver"
 "Portamento / deselect" = "Portamento / désélectionner"
 "Shift+arrows" = "Maj+flèches"

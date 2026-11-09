@@ -6109,6 +6109,8 @@ countries: tr
 "Insert effects" = "Insert efektleri"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Kapalı: insert'lerin efektleri (Master'ınkiler hariç) dışa aktarımda atlanır"
 "Select first channel with notes when the pattern changes" = "Pattern değişince notası olan ilk kanalı seç"
+"Auto select linked modules" = "Bağlı modülleri otomatik seç"
+"Focusing plugin windows selects mixer tracks" = "Eklenti penceresine odaklanmak mikser kanalını seçer"
 "Mute / unmute" = "Sessize al / sesi aç"
 "Portamento / deselect" = "Portamento / seçimi kaldır"
 "Shift+arrows" = "Shift+oklar"

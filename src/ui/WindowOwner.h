@@ -20,6 +20,13 @@ void* mainWindowHandle();
 // had the focus). keepAboveMainWindow installs the forwarding on the window; the main window sets the handler. A window
 // that handles every key itself (a detached panel) sets the property "lynxOwnKeys".
 void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> handler);
+
+// FL's "Auto select linked modules" (round 187a): a window kept above the main window that belongs to a channel or a
+// mixer insert says so with markLinkedWindow; when one of them is focused (activated, or a control in it gets the
+// keyboard focus), `handler` gets its channel (-1: none) and insert (-1: none).
+void markLinkedWindow (juce::Component& window, int channel, int insert);
+void setLinkedWindowFocusHandler (std::function<void (int channel, int insert)> handler);
+void linkedWindowFocused (juce::Component& window); // (windows whose focus JUCE doesn't see: a plugin's native view)
 // Runs that handler for a key from elsewhere (a separate-process plugin's window, issue #99); false when none ran.
 bool runSecondaryWindowKey (const juce::KeyPress& key);
 

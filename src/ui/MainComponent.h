@@ -193,6 +193,7 @@ private:
     keys::TypingKey typingKey (const keys::Chord& chord) const; // what the typing keyboard does with it (nothing when off)
     void releaseTypingLaunches (bool all); // the released keys' launches (all: every one)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
+    int lastLinkedChannel = -1;  // (Auto select linked modules, round 187a)
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
     juce::String shortcutText (const char* actionId) const; // "\tF5" for menus ("" when unbound)
