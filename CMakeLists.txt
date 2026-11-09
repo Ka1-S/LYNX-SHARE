@@ -342,6 +342,8 @@ add_executable(lynx_remote_playlist_tests tests/RemotePlaylistEditsTests.cpp)
 target_link_libraries(lynx_remote_playlist_tests PRIVATE lynx_core)
 add_executable(lynx_remote_instrument_tests tests/RemoteInstrumentEditsTests.cpp)
 target_link_libraries(lynx_remote_instrument_tests PRIVATE lynx_core)
+add_executable(lynx_remote_pattern_tests tests/RemotePatternEditsTests.cpp)
+target_link_libraries(lynx_remote_pattern_tests PRIVATE lynx_core)
 
 add_executable(flpdump tools/flpdump.cpp)
 target_link_libraries(flpdump PRIVATE lynx_core)
@@ -353,6 +355,7 @@ enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
 add_test(NAME lynx_remote_playlist_tests COMMAND lynx_remote_playlist_tests)
 add_test(NAME lynx_remote_instrument_tests COMMAND lynx_remote_instrument_tests)
+add_test(NAME lynx_remote_pattern_tests COMMAND lynx_remote_pattern_tests)
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
@@ -404,6 +407,7 @@ if(LYNX_BUILD_APP)
         src/ui/RemoteControlSettings.cpp
         src/engine/RemotePluginControl.cpp
         src/engine/RemoteInstrumentControl.cpp
+        src/engine/RemotePatternControl.cpp
         src/engine/GeneratorCatalog.cpp
         src/engine/RemotePlaylistControl.cpp
         src/engine/ChannelRackProcessor.cpp
