@@ -4776,8 +4776,8 @@ private:
         engine.getPluginHost().addPluginFile (juce::File (pluginPath));
         std::optional<juce::PluginDescription> vst2;
         for (const auto& type : engine.getPluginHost().getKnownPlugins().getTypes())
-            if (type.pluginFormatName == "VST")
-                vst2 = type;
+            if (type.pluginFormatName == "VST" && juce::File (type.fileOrIdentifier) == juce::File (pluginPath))
+                vst2 = type; // (the profile may know other test plugins)
         if (vst2)
         {
             auto song = lynx::Song::makeDefault();
@@ -4825,8 +4825,8 @@ private:
         report << "plugins_in_file=" << scanner.getPluginHost().addPluginFile (juce::File (pluginPath)) << "\n";
         std::optional<juce::PluginDescription> vst2;
         for (const auto& type : scanner.getPluginHost().getKnownPlugins().getTypes())
-            if (type.pluginFormatName == "VST")
-                vst2 = type;
+            if (type.pluginFormatName == "VST" && juce::File (type.fileOrIdentifier) == juce::File (pluginPath))
+                vst2 = type; // (the profile may know other test plugins)
         struct Case
         {
             const char* name;
