@@ -64,8 +64,8 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
-| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | tp172b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis) |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | trial187b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference; trial187b: all 14 styles nulled on programme (5.3 → 5.4), Upward / Classic refitted |
+| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
@@ -75,8 +75,8 @@ there.
 | Atrium | ValhallaRoom | 9 | 8 | 4 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work) |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
-| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
-| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
+| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | trial187b | 8 → 9 / 7 → 9; trial187b: drives 8 / 10 measured, a hot model per style: 4.8 → 5.0 (high-drive bank 3.1 → 3.8) |
+| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release); trial187b: 16 more settings measured (6.8), no change |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 3 | 8 | 135 |  |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
@@ -88,7 +88,7 @@ there.
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
-| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
+| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
 | LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
 
@@ -106,6 +106,34 @@ default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved to
 flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
 Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
 engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
+
+## Round trial187b: captures before the trials end; Apex, Sentry, Crest, Ember, Voice Shift
+
+Captured on 2026-11-09, before the iLok (11-13), FabFilter (~11-16) and Soundtoys (~11-22) trials end: 526 renders
+in /mnt/e/lynx-work/trial187b/cap (report there). They cover Pro-L 2 at 16 more settings (Allround and Bus for the
+first time, every style at +10 dB, timing extremes), Pro-G at 22, Pro-C 3's 14 styles at one common setting plus 7
+knob sweeps, Decapitator's five styles at drive 8 / 10 / 10 with Punish plus tone / mix / filter variants, Little
+AlterBoy at 13 settings on three stereo test signals, and the Slate FG-Stress / FG-MU / FG-Red compressors. All of it
+is black-box, through our own host and the public parameter API.
+
+Mean fxparity, before → after (old bank = tp172b / tp172d settings; new bank = this round's):
+
+| LYNX plugin | Original | Old bank | New bank | What changed |
+|---|---|---|---|---|
+| Apex Limiter | Pro-L 2 | 7.1 → 7.1 | 6.8 → 6.8 | measured only (a Bus / Safe refit and a slower Aggressive fast stage gained nothing overall) |
+| Sentry Gate | Pro-G | 7.2 → 7.2 | 7.3 → 7.6 | Pro-G's Wet / Dry levels and pans act in Expert mode only (with it off, wet −6 / dry −12 passes at 0 dB and closes to −100 dB): the translation follows |
+| Crest Compressor | Pro-C 3 | 6.2 → 6.2 | 5.3 → 5.4 | Upward (it held −6.2 dB over the threshold where the trial holds −2.8; now about −5.3) and Classic (its release was too fast) refitted on tp172b's bank plus the new programme; both smooth the gain |
+| Ember Saturator (Classic) | Decapitator | 4.8 → 5.0 | 3.1 → 3.8 | a hot model per style and per style with Punish, blended in from drive 5 to 10 (at 8 / 10 the original was up to 5 dB quieter than ours: E +5.1, T / P +2.4 dB; now within 0.3 dB); the small-signal drive / Punish laws are unchanged |
+| Voice Shift | Little AlterBoy | 2.8 → 3.0 | 2.8 → 3.1 | each channel shifted on its own (the original is dual mono: a voice on the left leaves the right silent), the right 1.25 ms behind once shifted (the original's L / R correlation drops from 1.0 to about 0), the input itself at Pitch 0 / Formant 0 (the original nulls it to −15 dB; ours drifted up to half a period), the level law against the shift (+3.2·tanh(x/4) dB up, −0.43 dB/st down; was a straight 0.36), the drive's ceiling −2.5 dB at 10 |
+
+Open, all measured:
+- Pro-G's Vocal style turns broadband noise down, by 9 … 15 dB at −30 dBFS and 21 … 28 dB at −13. It leaves
+  low-passed noise and sines alone. The threshold and the side-chain filter don't change it, and Range caps it. It is
+  not built: the trigger isn't simply high-frequency noise, because the drums' hats are not cut.
+- Pro-C 3's TTM and Vari-Mu read 2.5 … 4.5 dB louder than ours on programme. Their refits halve the bank error but
+  lose round 108's own stairs, so they are kept as they were.
+- Voice Shift's spectrum on a shifted voice: the overlap-add leaves energy between the harmonics and under the
+  fundamental. The original's is clean. This is now the main gap, at 4 … 8 dB third-octave distance.
 
 ## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
 
