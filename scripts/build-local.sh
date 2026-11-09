@@ -131,6 +131,18 @@ mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o
 [[ -f "$obj" && "$obj" -nt third_party/monocypher/monocypher.c ]] || $CC -c -O2 -w -Ithird_party/monocypher third_party/monocypher/monocypher.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# zig links its compiler_rt, whose archive member also defines WEAK cos/sin/exp/log (double and x87 long double). When a
+# link needs any builtin of that member (128-bit division...), those copies replace glibc's libm, whose last bits the
+# x87 bit-exact goldens hold: the "no-LTO failures" of multiband_delay_exact and the Kepler tests (round speed185a; the
+# LTO links resolve to glibc). So a zig -fno-lto link on Linux puts GCC's libgcc.a ahead of compiler_rt: the builtins
+# come from libgcc and the math from glibc. LYNX_ZIG_LIBGCC=0 turns it off.
+case "$CXX" in
+    *zig*-fno-lto*)
+        if [[ "$(uname -s)" == Linux && "${LYNX_ZIG_LIBGCC:-1}" != 0 ]]; then
+            libgcc="$(gcc -print-libgcc-file-name 2> /dev/null || true)"
+            if [[ -f "$libgcc" ]]; then WAVPACK="$WAVPACK $libgcc"; else echo "note: no libgcc.a: zig's compiler_rt math replaces glibc's libm (x87 goldens may fail)" >&2; fi
+        fi ;;
+esac
 # g++ / clang++ (not zig, which caches each object itself): every source is compiled once per build, in parallel, and
 # the tests and tools link the objects (scripts/cxx-once.sh; it saves ~90 % of a CI "Core" job). LYNX_COMPILE_ONCE=0: off.
 case "$CXX" in
