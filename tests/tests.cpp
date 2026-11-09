@@ -17354,6 +17354,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlpPdc182eTests.inc"
 #include "Mixer177a2Tests.inc"
 #include "Mixer177a3Tests.inc"
+#include "Mixer186cTests.inc"
 #include "Mixer177a4Tests.inc"
 #include "Sc177bTests.inc"
 #include "Auto177bTests.inc"

@@ -10768,6 +10768,16 @@ private:
             saveAlert (lynx::makeSamplePitchDialog (7.25f, true, true), "-sample-pitch.png"); // round 163c
             saveAlert (lynx::makeGradientColourDialog (juce::Colour (0xffe5383b), juce::Colour (0xff3a7bd5), 8), "-gradient.png"); // round 177a
             saveAlert (lynx::makeMidiImportDialog(), "-midi-import-dialog.png"); // File › Import › MIDI file (REA round 143)
+            // round 186c: FL's mixer "Delete" questions and its Settings › General › Manage messages menu
+            saveAlert (lynx::makeFlMessageDialog ({ lynx::tr ("Delete tracks"), lynx::tr ("This will |delete| {0} selected mixer track(s). Are you sure?", { "1" }),
+                                                    { lynx::tr ("Yes"), lynx::tr ("No") }, true }),
+                       "-delete-tracks.png");
+            saveAlert (lynx::makeFlMessageDialog ({ lynx::tr ("Playlist tracks"),
+                                                    lynx::tr ("One or more mixer tracks that will be deleted are connected to instrument/audio tracks.") + "\n"
+                                                        + lynx::tr ("Do you want to unlink the tracks and channels or delete them?"),
+                                                    { lynx::tr ("Delete tracks and channels"), lynx::tr ("Unlink tracks and channels"), lynx::tr ("Cancel") }, false }),
+                       "-delete-tracks-linked.png");
+            saveMenus (juce::StringArray { "Manage messages" }, std::vector<juce::PopupMenu> { lynx::messages::manageMenu() }, prefix + "-manage-messages.png");
             saveWindow (lynx::makeSetupWizardContent (offline, {}, {}), "-setup.png");
             saveWindow (lynx::crashreporter::makeDialogForSnapshot (false), "-crash-report.png"); // round 159
             saveWindow (lynx::crashreporter::makeDialogForSnapshot (true), "-report-problem.png");
