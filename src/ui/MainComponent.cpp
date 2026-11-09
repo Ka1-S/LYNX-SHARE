@@ -37,6 +37,7 @@
 #include "ui/PluginPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
+#include "ui/RackEditor.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/WindowOwner.h"
 
@@ -128,6 +129,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
       mixer (e),
       browser (e)
 {
+    rackcards::install(); // (round 183c: racks show as their own card in the Device View)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
     addChildComponent (updateBar);

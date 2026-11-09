@@ -9,6 +9,7 @@
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
 #include "ui/ControllerKnob.h"
+#include "ui/DetailView.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/PatcherEditor.h"
@@ -1635,4 +1636,46 @@ void closeChannel (int channel)
         delete w;
 }
 } // namespace RackWindows
+
+namespace rackcards
+{
+namespace
+{
+class RackCard final : public DetailCard
+{
+public:
+    explicit RackCard (std::unique_ptr<RackView> v) : view (std::move (v))
+    {
+        addAndMakeVisible (*view);
+        accessory = view->makeTitleAccessory();
+        view->onPreferredWidthChanged = [this] {
+            if (onPreferredWidthChanged)
+                onPreferredWidthChanged();
+        };
+    }
+    int preferredWidth (int bodyHeight) const override { return view->preferredWidth (bodyHeight); }
+    juce::Component* titleAccessory() override { return accessory.get(); }
+    int titleAccessoryWidth() const override { return RackView::titleAccessoryWidth; }
+    void resized() override { view->setBounds (getLocalBounds()); }
+
+private:
+    std::unique_ptr<RackView> view;
+    std::unique_ptr<juce::Component> accessory;
+};
+} // namespace
+
+void install()
+{
+    DetailView::effectCardFactory = [] (AudioEngine& engine, int insert, int slot, const EffectSlot& fx) -> std::unique_ptr<DetailCard> {
+        if (! rack::isRack (fx))
+            return nullptr;
+        return std::make_unique<RackCard> (RackWindows::makeSlotView (engine, insert, slot, false));
+    };
+    DetailView::instrumentCardFactory = [] (AudioEngine& engine, int channel, const ChannelDef& c) -> std::unique_ptr<DetailCard> {
+        if (! rack::isRack (c))
+            return nullptr;
+        return std::make_unique<RackCard> (RackWindows::makeChannelView (engine, channel, false));
+    };
+}
+} // namespace rackcards
 } // namespace lynx

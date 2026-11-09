@@ -30,6 +30,13 @@ bool isChannelOpen (int channel);
 void closeChannel (int channel);
 } // namespace RackWindows
 
+namespace rackcards
+{
+// The Rack card of the Detail View's Device View (round 183c-card, on round 183a's DetailCard hook): a rack in a mixer
+// slot or a Channel Rack channel shows as the rack's own view, its Rand / Map in the card's title bar. Call once at start-up.
+void install();
+} // namespace rackcards
+
 class RackView final : public juce::Component, private juce::Timer
 {
 public:

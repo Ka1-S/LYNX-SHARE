@@ -7855,29 +7855,10 @@ private:
             png.writeImageToStream (image, *stream);
     }
 
-    bool runRackShots (const juce::File& out, const juce::String& liveSet = {})
+    // an Audio Effect Rack shaped like Live's reference (REA_rodada183c §8): two chains with chain-select zones and fades,
+    // four named macros (one on a chain's volume, one on two parameters), two variations, every view open
+    static lynx::EffectSlot shotRack()
     {
-        out.createDirectory();
-        lynx::AudioEngine offline (false);
-        auto save = [&] (juce::Component& c, const juce::String& name) {
-            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
-            {
-                juce::Graphics g (image);
-                g.fillAll (lynx::theme::panel);
-                c.paintEntireComponent (g, false);
-            }
-            const auto f = out.getChildFile (name);
-            f.deleteFile();
-            juce::PNGImageFormat png;
-            if (auto stream = f.createOutputStream())
-                return png.writeImageToStream (image, *stream);
-            return false;
-        };
-        auto song = lynx::Song::makeDefault();
-        song.mixer.resize (3);
-        song.mixer[1].name = "Vocal Main";
-        // an Audio Effect Rack shaped like Live's reference (REA_rodada183c §8): two chains with chain-select zones and fades,
-        // four named macros (one on a chain's volume, one on two parameters), two variations, every view open
         auto slot = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
         auto& doc = slot.patcher;
         doc.rack[0].chains[0].name = "Vocoder";
@@ -7924,6 +7905,31 @@ private:
         r.selectedChain = 0;
         lynx::rack::setSelector (doc, 56.0f);
         lynx::rack::compile (doc);
+        return slot;
+    }
+
+    bool runRackShots (const juce::File& out, const juce::String& liveSet = {})
+    {
+        out.createDirectory();
+        lynx::AudioEngine offline (false);
+        auto save = [&] (juce::Component& c, const juce::String& name) {
+            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+            {
+                juce::Graphics g (image);
+                g.fillAll (lynx::theme::panel);
+                c.paintEntireComponent (g, false);
+            }
+            const auto f = out.getChildFile (name);
+            f.deleteFile();
+            juce::PNGImageFormat png;
+            if (auto stream = f.createOutputStream())
+                return png.writeImageToStream (image, *stream);
+            return false;
+        };
+        auto song = lynx::Song::makeDefault();
+        song.mixer.resize (3);
+        song.mixer[1].name = "Vocal Main";
+        auto slot = shotRack();
         song.mixer[1].effects = { slot };
         // an Instrument Rack: three chains split over the keyboard
         lynx::ChannelDef inst;
@@ -10115,6 +10121,16 @@ private:
             write ("envelopes");
             detail->setClipTab (false);
             detail->setPage (lynx::DetailView::Page::devices);
+            // round 183c-card: an Audio Effect Rack in the chain draws as its own card (the rack's view, Rand / Map in its
+            // title bar), as Live's Device View shows a rack
+            offline.editSong ([] (lynx::Song& s) { s.mixer[2].effects.insert (s.mixer[2].effects.begin() + 1, shotRack()); }, false);
+            offline.dispatchPendingMessages();
+            detail->showSelection (2, 0);
+            detail->showSelection (1, 0);
+            write ("devices-rack");
+            counts << "rack card: cards " << detail->cardCountForCheck() << "\n";
+            offline.editSong ([] (lynx::Song& s) { s.mixer[2].effects.erase (s.mixer[2].effects.begin() + 1); }, false);
+            offline.dispatchPendingMessages();
             counts << "piano roll back in its panel: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
                                                            && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() != detail ? 1 : 0) << "\n";
         }
