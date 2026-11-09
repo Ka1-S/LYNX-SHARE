@@ -565,9 +565,10 @@ public:
                 header.removeFromLeft (100); // (the group's caption)
                 outputsGlyph = header.removeFromRight (22);
                 header.removeFromRight (4);
-                show (autoMap, header.removeFromRight (juce::jmin (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16), header.getWidth())));
+                show (autoMap, header.removeFromRight (effectSlot ? juce::jmin (112, header.getWidth())
+                                                                  : juce::jmin (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16), header.getWidth())));
                 header.removeFromRight (4);
-                show (resetIo, header.removeFromRight (juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
+                show (resetIo, header.removeFromRight (effectSlot ? 56 : juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
                 if (effectSlot)
                 {
                     header.removeFromRight (4);
