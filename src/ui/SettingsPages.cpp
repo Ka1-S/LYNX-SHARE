@@ -428,7 +428,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues })
+        for (auto* t : { &typingPiano, &keepEditors, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -447,7 +447,6 @@ private:
         unusedTakes.setBounds (r.full (24));
 
         r.section (pluginsTitle);
-        detachNew.setBounds (r.full (24));
         sandbox.setBounds (r.full (24));
         sandboxNote.setBounds (r.full (16).translated (0, -3));
         substitutes.setBounds (r.full (24));
