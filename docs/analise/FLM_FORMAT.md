@@ -90,7 +90,7 @@ normal channel. PROVEN-FILE; the values match the CHNL kind in the same slot.
 |---|---|---|
 | `RHED` | u32 (skipped), u32 next module id, i32, i32 (−1 = none). INFERRED: selected or focused slots | PROVEN-REA 0x18059b100 |
 | `FOUT` | i32, i32 → output routing (the channel's output target) | PROVEN-REA (tag at 0x1809f4f38) |
-| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats (the rack's parameters 0…5; the same ids automation lanes use with module 0):<br>• [0] **volume**, gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB: 0 dB at v ≈ 0.853, +6 dB at 1, silent at 0<br>• [1] **pan** p = 2v − 1 as a balance: p > 0 scales the left side by 1 − p, p < 0 the right side by 1 + p<br>• [4] pitch bend: a ratio of 2^(4v − 2) on the playing voices<br>• [5] is passed on to the modules<br>• [2], [3]: not handled by the setter | PROVEN-REA: setter 0x18059e0c0, fader law 0x1805943b0 (round 182c F2) |
+| `RPRM` | 6 × 32-bit rack parameters, stored as normalized floats (the rack's parameters 0…5; the same ids automation lanes use with module 0):<br>• [0] **volume**, gain = 10^(3.3·v^0.6 − 3), i.e. 66·v^0.6 − 60 dB: 0 dB at v ≈ 0.853, +6 dB at 1, silent at 0<br>• [1] **pan** p = 2v − 1 as a balance: p > 0 scales the left side by 1 − p, p < 0 the right side by 1 + p<br>• [4] pitch bend: a ratio of 2^(4v − 2) on the playing voices<br>• [5] **Aftertouch**, passed on to the modules<br>• [2] **Mute**, [3] **Solo**: not handled by the setter; 0 in every sample (INFERRED: switches, on above 0.5) | PROVEN-REA: setter 0x18059e0c0, fader law 0x1805943b0 (round 182c F2); the names from the rack's parameter-name function 0x18059eb20 (round 187d, §3.2) |
 | `CCLK` | list of (i32, i32, i32) triples, deduplicated. INFERRED: controller links | PROVEN-REA |
 | `RSMP` | **built-in drum sampler**: magic `10MS` + u32 + `PADS` (22 bytes, pad → sample index; identity by default) + one `SMPl`/`SMPL` per kit sample (section 6). Drum notes use key = sample index | PROVEN-REA (0x18074fcd0), PROVEN-FILE (2404 drum notes, all keys < kit size) |
 | `RMOd` | **one module (instrument or effect)**: u32 module **type id** + u32 module **instance id** + module body (section 3.1). Order = slot order in the rack | PROVEN-REA 0x18059b100 → factory 0x180597870 |
@@ -115,6 +115,26 @@ PROVEN-REA (module loader 0x180796e40):
 
 Parameter values are floats. INFERRED: they are normalized 0…1, because almost every value is in 0…1 and the
 defaults are 0.5/1.0. The value → unit mapping per parameter needs one REA pass per engine (plan slice F4).
+
+### 3.2 The rack's parameter ids (round 187d)
+
+The rack is module instance 0. Its parameter-name function (PROVEN-REA 0x18059eb20) names the ids that automation
+lanes on module 0 use (TRKH `DESc` +4 = 0, +8 = the id):
+
+| Id | Name |
+|---|---|
+| 0 | Level |
+| 1 | Pan |
+| 2 | Mute |
+| 3 | Solo |
+| 4 | Pitch Bend |
+| 5 | Aftertouch |
+| 7…133 | "MIDI CC #n" |
+| 0x1000 + channel id | "Enable Send (to <channel>)" |
+| 0x2000 + channel id | "Send Level (to <channel>)" |
+
+The number after 0x1000/0x2000 is looked up as a channel id among the song's channels, the master's included, and the
+name shows that channel's name.
 
 ## 4. CHNL: a channel's tracks and clips
 
@@ -202,6 +222,18 @@ The record layout is PROVEN-REA. The meanings of bytes 14–19 are INFERRED; the
 and repeat fields fit them (section 9).
 
 On audio lanes `EVN2` holds the clip's envelope points (volume/pan/pitch of the wave editor). INFERRED.
+
+**Automation points (round 187d; PROVEN-FILE over the 20 sample projects, about 50 000 points).** An automation
+clip's `EVN2` is its curve *already sampled*, not a list of control points to interpolate:
+- a positive key marks a control point the user placed, a negative key a sample FLM computed between two control
+  points. |key| stays the same within a segment (1, 2, 4, 5, 10, 20, 29, 37 seen); INFERRED: it names the segment's
+  curve shape;
+- between control points the samples sit one value step of 512 (1/128 of 0…65535) apart, at whatever tick the curve
+  reaches that value, so they follow the curve whatever its shape;
+- a jump is two control points on one tick.
+
+So straight lines through every saved point give FLM's own curve to within 1/128 of the range. A reader needs no
+shape maths; it must keep every point, the two-on-one-tick jumps included.
 
 ## 5. Paths and resources
 
@@ -307,6 +339,60 @@ lane names (PROVEN-FILE):
 - MultiFX: 2 = Axis X;
 - rack (id 0): 0 = Level, 4 = Pitch Bend.
 
+
+### 7.1 Parameter names per module (F4/F5 groundwork)
+
+Each module class has a parameter-name function: a switch from the PRMS index to the name. The list below is
+PROVEN-REA: the 43 overrides of the base 0x1807993f0, read in round 182c's third REA turn, 06:47–07:02.
+The base names index 0 "Enable" in every module, and the SMPR ids: 0x7FC0 "Post Gain", 0x7FC1 "Mix",
+0x7FC2 "Wet Pan". Function → module is INFERRED from the names, with "?" where unsure. The automation lane names
+of section 7 confirm MiniSynth, DW Sampler, GMSynth, SuperSaw, Equalizer, Reverb (legacy), Flanger, Spacer,
+Autoduck (legacy), Reverb 2 and MultiFX. Indices the switch does not name are left out: some cases use code
+shapes the extraction didn't read. The complete list is in `/mnt/e/lynx-work/flm182c/rea/paramnames.txt`.
+
+| Module | Function | Parameters (index = name) |
+|---|---|---|
+| 0 MiniSynth | 0x1806ae070 | 1=Voices Mode | 2=Transpose | 3=Slide Time | 4=MW Dest | 5=MW Amount | 6=OSC Kind | 7=OSC Mod | 8=OSC Noise | 9=FLT Freq | 10=FLT Peak | 11=FLT Kbd | 12=FLT Vel | 13=EGF Atk | 14=EGF Dec | 15=EGF Sus | 16=EGF Rel | 17=EGF Amnt | 18=LFO Shape | 19=LFO Dest | 20=LFO Rate | 21=LFO Amnt | 22=AMP Atk | 23=AMP Dec | 24=AMP Sus | 25=AMP Rel | 26=DIST | 27=Overdrive | 28=Decimator | 29=DELAY | 30=DELAY Time | 31=DELAY Fdbk | 32=DELAY Filter | 33=DELAY Mix | 34=CHORUS | 35=CHORUS ModRate | 36=CHORUS ModDepth | 37=CHORUS Mix | 38=PHASER | 39=PHASER ModSpeed | 40=PHASER ModWidth | 41=PHASER Fdbk | 42=PHA … |
+| 1 DW Sampler | 0x180781d00 | 1=Attack | 2=Release | 3=Pitch | 4=Fine Tune | 5=Decay | 6=Sustain | 7=Slide | 8=Reverse | 9=Loop | 10=Legato | 11=Mono | 12=Cutoff | 13=Resonance | 14=Kbd. Track | 15=Vel. Track | 16=Filter type | 17=Filter Attack | 18=Filter Decay | 19=Filter Sustain | 20=Filter Release | 21=Filter Env. Amount | 22=Pitch Attack | 23=Pitch Decay | 24=Pitch Sustain | 25=Pitch Release | 26=Pitch Env. Amount | 27=LFO Shape | 28=LFO Rate | 29=LFO Mode | 30=LFO Sync Rate | 31=LFO Amount | 32=LFO Destination | 33=LFO Attack |
+| 2 GMSynth | 0x180647390 | 1=Level | 2=Pan | 3=Level Attack | 4=Level Decay | 5=Level Sustain | 6=Level Release | 11=Osc B Pitch | 12=Osc B Detune | 13=Osc B Mix | 14=Osc B Phase | 15=OSc Mod | 16=Osc Mod Kind | 17=Osc Mod Attack | 18=Osc Mod Decay | 19=Osc Mod Contour | 20=Osc Noise | 21=Cutoff | 22=Resonance | 23=Filter Kind | 24=Filter Kbd. Scl. | 25=Filter Attack | 26=Filter Decay | 27=Filter Contour | 28=Transpose | 29=Slide Time | 30=Single Voice | 31=Auto Portamento | 32=LFO Rate | 33=LFO Shape | 34=LFO Ampl. | 35=LFO Dest | 36=EG Attack | 37=EG Decay | 38=EG Sustain | 39=EG Release | 40=EG Contour | 41=EG Dest | … |
+| 3 Equalizer | 0x18061b5a0 | 1=Gain 1 | 2=Frequency 1 | 3=Bandwidth 1 | 4=Kind 1 | 5=Gain 2 | 6=Frequency 2 | 7=Bandwidth 2 | 8=Kind 2 | 9=Gain 3 | 10=Frequency 3 | 11=Bandwidth 3 | 12=Kind 3 | 13=Gain 4 | 14=Frequency 4 | 15=Bandwidth 4 | 16=Kind 4 | 17=Channel 1 | 18=Channel 2 | 19=Channel 3 | 20=Channel 4 |
+| 4 MultiFX | 0x18062cd50 | 1=FX Kind | 2=Axis X | 3=Axis Y | 4=LFO Rate | 5=LFO Amount | 6=LFO Shape |
+| 5 Limiter (legacy)? | 0x180625ce0 | 1=Threshold | 2=Release Time |
+| 6 Distortion | 0x180618700 | 1=Drive | 2=BitCrush | 3=Gain | 4=Stereo | 5=Kind | 6=Bias |
+| 7 Graphic EQ | 0x1806192b0 | 1=80 Hz | 2=160 Hz | 3=375 Hz | 4=750 Hz | 5=1.5 kHz | 6=3 kHz | 7=6 kHz | 8=12 kHz |
+| 8 Compressor | 0x180615bc0 | 1=Thresh | 2=Ratio | 3=Attack | 4=Release | 5=Level | 6=Hold | 7=Auto gain | 8=Input gain | 9=RMS |
+| 10 Autoduck (legacy) | 0x18063fc30 | 1=Ducking | 2=Attack |
+| 11 Chorus | 0x1806146c0 | 1=Rate | 2=Depth | 3=Stereo |
+| 12 Reverb (legacy) | 0x1806367c0 | 1=DECAY | 2=HIGH DAMP | 3=MIX | 4=PREDELAY | 5=ROOM SIZE | 6=DIFFUSION | 7=WIDTH | 8=LO-CUT | 9=HI-CUT | 10=INPUT | 11=EARLY REFL. | 12=DRY LEVEL | 17=BASS MULT. | 18=CRSV | 19=MOD SPEED | 20=MOD AMOUNT |
+| 13 Flanger | 0x18061fc60 | 1=LFO Rate | 2=Sync | 3=LFO Speed | 4=LFO Shape | 5=LFO Amount | 6=Delay | 7=Feedback | 8=Inv. FDBK | 9=Stereo | 10=Mix | 11=Inv. Mix |
+| 14 Phaser | 0x18062ffc0 | 1=LFO Rate | 2=LFO Amount | 3=Feedback | 4=Frequency | 5=Mix | 7=LFO Speed | 8=LFO Shape | 9=Stereo |
+| 15 Stereoizer | 0x18062e500 | 1=Strength | 2=Timbre | 3=Focus | 4=L/R Delay |
+| 16 Trance Delay? | 0x18063ef40 | 3=Mix |
+| 18 Tape Delay? | 0x18063df50 | 3=Async. |
+| 19 Transistor Bass | 0x180585070 | 1=Waveform | 2=Cutoff | 3=Reso | 4=Env Mod | 5=Decay | 6=Accent |
+| 20 Leveller | 0x180626690 | 1=In Gain | 2=Out Gain | 3=Release Time |
+| 23 SuperSaw | 0x1807f6b90 | 2=Osc. Pulse Mode | 3=Osc. Sub Level | 4=Osc. Unisono | 5=Osc. Unisono Detune | 6=Osc. Unisono Pan | 7=Osc. Unisono Detune Curve | 8=Osc. Re-trig Phases | 9=Osc. Phases Offset | 10=SuperSync Mode | 11=Osc. Sync | 12=Osc. Pulse Width | 13=Osc. Sync Attack | 14=Osc. Sync Decay | 15=Osc. Sync Sustain | 16=Osc. Sync Release | 17=Osc. Sync EG Amount | 18=Osc. Sync Kbd Dir. | 19=Filter Cutoff | 20=Filter Resonance | 21=Filter KBD | 22=Filter EG Attack | 23=Filter EG Decay | 24=Filter EG Sustain | 25=Filter EG Release | 26=Filter EG Amount | 27=Filter VEL | 28=Level EG Attack | 29=Level EG Decay | 30 … |
+| 25/45 Pitcher (2)? | 0x180465280 | 1=Note C | 2=Note Db | 3=Note D | 4=Note Eb | 5=Note E | 6=Note F | 7=Note Gb | 8=Note G | 9=Note Ab | 10=Note A | 11=Note Bb | 12=Note B | 13=Speed | 16=Formant Mode | 17=Formant Ratio | 18=Ref. Channel | 19=Stability | 20=Humanization | 21=Snapping | 22=Mix | 23=Sensitivity | 24=Vibrato | 25=Latency | 26=Process Sibilants |
+| 27 Gate | 0x180624300 | 1=Threshold | 2=Asymmetry | 3=Attack | 4=A. Curve | 5=Release | 6=R. Curve | 7=Mix | 8=Hold |
+| 29 Autoduck | 0x180640bc0 | 1=Ducking | 2=Attack | 3=Curve | 4=Time | 5=Shift | 6=Hold | 7=Shape |
+| 30 Tuned EQ? | 0x18061a0c0 | 9=Tuning | 10=Bandwidth |
+| 32 Reverb | 0x180637b50 | 1=DECAY | 2=HIGH DAMP | 3=MIX | 4=PAN | 5=EARLY REFL. | 6=PREDELAY | 7=ROOM SIZE | 8=DIFFUSION | 9=WIDTH | 10=LO-CUT | 11=HI-CUT | 12=MOD SPEED | 13=MOD AMOUNT |
+| 34 Spacer | 0x18063dc60 | 1=L/R Delay | 2=Pan | 3=Separation | 4=L/R Inversion | 5=M/S Delay | 6=M/S Inversion | 7=Stereo Mode |
+| 35 Reverb 2 | 0x1806394c0 | 1=HIGH CUT | 2=LOW CUT | 3=SIZE | 4=DECAY | 5=DIFFUSION | 6=DAMPING | 7=DRY | 8=ER | 9=WET | 10=SIDE INPUT | 11=DELAY | 12=TEMPO | 13=MOD | 14=BASS | 15=SEPARATION | 16=SPEED | 17=CROSS | 18=PAN |
+| 39 3x Osc | 0x1807e24c0 | 24=Osc 3 = amplitude modulation | 25=HQ Mode | 26=Stereo Phase Randomness | 27=Pan LFO Global Phase | 28=Volume LFO Global Phase | 29=ModX LFO Global Phase | 30=ModY LFO Global Phase | 31=Pitch LFO Global Phase | 32=Pan LFO Tempo Sync | 33=Volume LFO Tempo Sync | 34=ModX LFO Tempo Sync | 35=ModY LFO Tempo Sync | 36=Pitch LFO Tempo Sync | 37=Pan LFO Shape | 38=Volume LFO Shape | 39=ModX LFO Shape | 40=ModY LFO Shape | 41=Pitch LFO Shape | 42=Pan LFO Predelay | 43=Volume LFO Predelay | 44=ModX LFO Predelay | 45=ModY LFO Predelay | 46=Pitch LFO Predelay | 47=Pan LFO Attack | 48=Volume LFO Attack  … |
+| 40 Comb Filter | 0x18045a700 | 1=Mode | 2=Pitch | 3=Feedback | 4=Mix | 5=Offset | 6=Smoothing | 7=Snap | 8=Polarity | 9=Asymmetry | 10=Pitch Oct | 11=Pitch Note |
+| 41 Waveshaper | 0x180481070 | 1=Shape | 2=Auto-Gain | 3=X | 4=Y | 5=Drive | 6=Post Gain | 7=Stereo Spread | 8=Mix | 9=High Cut | 10=Low Cut | 11=Bass | 12=Mid Freq | 13=Mid Gain | 14=Treble | 15=LFO Shape | 16=LFO Sync | 17=LFO Rate | 18=LFO Rate Free | 19=LFO to X | 20=LFO to Y |
+| 42 Tape Stop | 0x1804788d0 | 3=Stop Time | 4=Start Time | 5=Toggle Play | 6=Warp | 7=Sync |
+| 43 Wow & Flutter | 0x180488b90 | 2=Wow Rate | 3=Wow Amount | 5=Flutter Rate | 6=Flutter Amount | 7=Sync | 9=Random Rate | 10=Random Amount |
+| 44 Spreader | 0x18046f780 | 1=Width | 2=Low Bypass | 3=Mono Bass |
+| 46 Tremolo | 0x18047d750 | 1=Rate Free | 2=Rate Sync | 3=Amount Max | 4=Amount Min | 5=Phase Offset | 6=Stereo Offset | 7=Sync | 8=Shape | 9=Smooth | 10=Skew | 11=Width |
+| 47 Note Echo | 0x18045f2c0 | 1=Repetitions | 2=Delay | 3=Delay (sync) | 4=Sync | 5=Pitch Offset | 6=Vel. Offset | 7=Velocity | 8=Pitch | 9=Time Drift | 10=Length Drift | 11=Delay Rand. | 12=Pan Offset | 13=Pan Drift | 14=Ping-Pong | 15=Stop |
+| 48 Transpose | 0x18047a830 | 1=Octave |
+| 49 Randomizer | 0x180468390 | 1=Pitch | 2=Velocity | 3=Pan |
+| 51 Arpeggiator | 0x180453a40 | 1=Rate | 2=Rate (ms) | 3=Sync | 4=Swing | 5=Swing rate | 6=Latch | 7=Velocity 1 | 8=Velocity 2 |
+| ? (ATTACK, SUST…) | 0x1807d4d30 | 3=ATTACK | 5=SUST |
+| ? (Attack, Decay, Sustain, Release) | 0x1807eff80 | 1=Attack | 2=Decay | 3=Sustain | 4=Release |
+
 ## 8. Relation to FLM-exported .flp (issue #88)
 
 FL Studio desktop hosts FLM instruments as the "FL Studio Mobile Rack" generator (`FL Studio Mobile Rack_x64.dll`).
@@ -318,8 +404,11 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
 
 1. EVN2 bytes 14–19 meanings (velocity scale, pan, fine pitch, repeat). Close it with one REA pass on the note loader,
    or by round-tripping a note edited in the plugin UI (GUI turn).
-2. CHHD colour/mute/solo; RPRM [2], [3]; SEND words [1], [3], [4].
-3. The automation point shape codes (negative keys) and their curve maths.
+2. CHHD colour and its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
+   applies them on load is not traced.)
+3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
-   TransistorBass first).
+   TransistorBass first). Done for Equalizer, Graphic EQ, Filter, Autoduck (legacy), Reverb (legacy) and Reverb 2
+   in round 188f (REA_rodada182c.md "F5 effects"). That round also found that parameter 0 is every module's Enable,
+   and that SMPR holds the reserved ids 0x7FC0 Post Gain, 0x7FC1 Mix and 0x7FC2 Wet Pan (automation lanes: −3, −2).
 5. HEAD 272/280 (loop range).

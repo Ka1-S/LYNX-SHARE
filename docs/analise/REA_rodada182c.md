@@ -292,3 +292,172 @@ Shots of the import (`/mnt/e/lynx-work/flm182c/shots/`):
 - `xonada-playlist.png`: the whole arrangement;
 - `xonada-mixer.png`: the 13 inserts with FLM's levels, Master −7.3 dB;
 - `xonada-desktop-mixer.png`.
+### F6 automation, first part (branch `feature/flm182c-f6`, after 0.1.25)
+
+- The rack's own lanes (module 0: [0] Level, [1] Pan) → LYNX automation clips on the channel's insert, the
+  Master's for the master channel. Each FLM clip is one clip, with its points repeated over its loop passes. Values
+  are u16 / 65535: Level goes through FLM's fader law onto LYNX's fader position, Pan is direct.
+- The point shapes (the negative key codes) are not decoded yet: straight lines, listed in the report.
+- Lanes on module parameters wait for F4/F5 and are listed.
+
+### F2 + F6, round 187d (branch `feature/flm187d`, 0.1.26)
+
+REA: one 13-minute turn on FL Studio Mobile_x64.dll under `~/.cache/lynx-ghidra.lock` (07:50–08:03), plus a survey of
+every EVN2 point in the 20 sample projects and the user's song. Results in FLM_FORMAT §3, §3.2 and §4.
+
+- **Rack parameters (PROVEN-REA 0x18059eb20).** Ids 0 Level, 1 Pan, 2 Mute, 3 Solo, 4 Pitch Bend, 5 Aftertouch,
+  7…133 MIDI CCs, 0x1000 + id "Enable Send (to …)", 0x2000 + id "Send Level (to …)".
+- **Mixer (F2).** On import:
+  - RPRM Mute and Solo set the insert's mute and solo (the master's Mute the Master's);
+  - the held Pitch Bend (2^(4v − 2), round 182c's setter) moves a sampler channel's pitch knob by 48·v − 24 semitones.
+    On another instrument it is reported;
+  - Aftertouch is reported;
+  - the routes from round 182c are unchanged. Channels without SEND chunks (the 4.x demos) keep the route to the
+    master. INFERRED: FLM 5 writes that route out as a SEND to id 0, so its absence means the default route.
+- **Automation (F6).** The point shapes need no maths: FLM saves each clip's curve already sampled at every 1/128 of
+  the value range, with control points marked by a positive key, so straight lines through the saved points are FLM's
+  curve. The "straight lines" approximation note is gone from the report.
+  - Imported: Level → insert volume, Pan → insert pan, Send Level (to X) → that route's level knob (`mixerSend`,
+    FLM's fader law), for the master channel too.
+  - Reported, one line each: Mute/Solo lanes (LYNX automates neither), Pitch Bend/Aftertouch lanes, MIDI CC lanes,
+    send on/off lanes, a send level without that route, and module-parameter lanes. The last group waits for F5/F4:
+    across the 21 projects there are 73 module-parameter lanes against 15 rack lanes. The module lanes are led by
+    FX Filter "Frequency" (32), MiniSynth "FLT Freq" (9) and DirectWave "Pitch" (3).
+- **Tests.** `tests/FlmImport187dTests.inc` writes its own project. The opt-in `flm187d_real_project_reports`
+  (LYNX_FLM_DIR + LYNX_FLM_REPORT) prints each real project's import report. The user's song: Level automation 1,
+  module lanes 1 (Gate Mix, waiting for F5), and no change to its 14 inserts.
+
+### F5 effects, round 188f (branch `feature/flm188f`, 0.1.26)
+
+REA: Ghidra 12.1.4 headless on FL Studio Mobile_x64.dll (sha256 c63ba7ae…), in the round's own project
+(`~/ghproj/flm188f`), every query under `~/.cache/lynx-ghidra.lock`. The effect classes were found by their RTTI
+vtables (FXEqualizer 0x1809fac30, FXGraphEQ 0x1809fa3b8, FXFilter 0x1809faf98, FXTrancer 0x1809ff130 = Autoduck
+legacy, FXReverb 0x1809fd998, FXReverb3 0x1809fe2f0 = Reverb 2, FXPad 0x1809fca98 = MultiFX). Per module: slot 65 is
+the parameter setter, 67 the defaults, 68 the names, 69 the display text, 78 the audio process. Pseudocode notes stay
+in `/mnt/e/lynx-work/flm188f/rea/` (study only). Usage in the 21 sample projects (20 FL demos/templates + the user's
+song): Equalizer 59, Filter 44, Autoduck legacy 43, Reverb legacy 36, Reverb 2 26, MultiFX 24, Graphic EQ 20 (8 in the
+user's song).
+
+**Common to every module (PROVEN-REA 0x180799350, 0x1807988a0).**
+- Parameter 0 is Enable: below 0.5 the module is bypassed.
+- The SMPR values are the reserved ids 0x7FC0 Post Gain, 0x7FC1 Mix and 0x7FC2 Wet Pan. Automation lanes reach the
+  first two as −3 and −2 (a sample's "Mix : FX Distortion" lane has −2).
+- How Mix and Post Gain are applied is not traced. INFERRED: Mix is a dry/wet blend like a LYNX slot's mix.
+
+**Equalizer (PROVEN-REA setter/coefficients 0x18061d9a0, design 0x18060de70, process 0x18061de80).**
+- Each of the 4 bands: gain (v − 0.5)·24 dB as the knob shows it; frequency 2^(9.25·v + 5) Hz (32 Hz…19.5 kHz;
+  the presets "Low Cut 50Hz" / "Low Cut 200Hz" sit at 0.07 / 0.2863); bandwidth 7·v + 0.25 octaves; kind ⌊2v⌋ =
+  0 low shelf, 1 peak, 2 high shelf; channel ⌊4v⌋ = 0 both, 1 left, 2 right, 3/4 left and right with opposite gains.
+- The design is the cookbook's bandwidth form (α = sin ω · sinh(ln2/2 · BW · ω/sin ω)), but the amplitude is
+  A = 10^(dB/20) where the cookbook has 10^(dB/40): **every band moves twice the dB its knob shows** (±24 dB).
+- The bands are designed at twice the rate (ω capped at 3) and run 2× oversampled: each input sample is fed twice,
+  every second output is kept, and the four bands run as a pipeline with one sample of delay per band.
+
+**Graphic EQ (PROVEN-REA 0x180619f90, 0x1806198a0, 0x180619bd0).** 8 bands at 80, 160, 375, 750, 1500, 3000, 6000
+and 12000 Hz: a low shelf, six peaks and a high shelf, 1 octave wide, gain 24·v − 12 dB on the same doubled amplitude
+law, designed at the running rate, run as plain biquads.
+
+**Filter (PROVEN-REA setter 0x18061fa80, coefficients 0x18061f340, designs 0x18060dae0 / 0x18060dc80 /
+0x18060d940, process 0x18061f6b0).**
+- Frequency 2^(10.3·v + 4) Hz (16 Hz…20.2 kHz). Q = 2v² + 0.8. Type ⌊2v⌋: low-pass, band-pass, high-pass.
+- Slope ⌊2v⌋: 24, 48 or 96 dB per octave, i.e. 1, 2 or 4 pairs of identical biquads.
+- The low/high-pass biquad has its feedback at α = sin ω/Q and its feed-forward at α = sin ω/2Q. That is the
+  cookbook's filter at Q/2, times (1 + s/Q)/(1 + s/2Q), with s = sin ω.
+- The low-pass output is scaled by 0.8 per biquad pair (0.8^pairs).
+- The band-pass is the cookbook's constant-skirt form, with a peak level of Q.
+- Two details are INFERRED: the low/high-pass zero coefficients (+2 / −2, set in the constructor), and that the
+  design call returns sin before cos.
+
+**Autoduck legacy (FXTrancer, PROVEN-REA process 0x18063fd00).**
+- The phase is the song position in beats, modulo 1. The attack point is a = 0.5·Attack + 0.001.
+- The envelope rises p/a up to a, then falls 1 − (p − a)/(1 − a). The gain is 1 − Ducking² · env^((Curve + 1)/2).
+- A one-pole smooths the gain, at 0.01 per sample.
+
+**Reverbs (PROVEN-REA FXReverb setter 0x180636f30, FXReverb3 setter 0x18063ab20 and process 0x18063a5a0, engine
+`fxReverb` 0x180735840 / setter 0x180736700 / coefficients 0x180737690).**
+- Both reverbs drive one engine. It is FLM's copy of the plate behind FL's Fruity Reeverb 2 (REA_rodada49): the same
+  room scaling ⌊fs·(room + 15)/115⌋, the same twelve line proportions (142, 107, 379, 277, 672, 4453, 1800, 3720, 908,
+  4217, 2656, 3163 per 20000), the same early-reflection taps (×1.5/44100, weights 0.5 / 0.36) and the same decay law
+  (ln 0.001, T = decay·0.1 s).
+- Its controls are integers ⌊lo + v·(hi − lo) + 0.5⌋ from a (min, max, default) table. Inner controls:
+  0 input (tenths of dB), 1 low cut 19…3000 Hz, 2 high cut 5…221 (×100 Hz), 3 predelay in ms (0…250 legacy,
+  0…1000 Reverb 2), 4 room 1…100, 5 diffusion 0…100, 6 bass 2…30 (×0.1), 7 crossover 25…2000 Hz, 8 decay 1…200
+  (×0.1 s), 9 damping 5…221, 10 separation 0…200, 11 dry, 12 early reflections, 13 wet (tenths of dB), 14…17 mute
+  switches for input, dry, early reflections and wet.
+- Engine gains: 10^(t/200). The early reflections are scaled by 0.5, the wet by 0.3. The predelay is fs·ms/1000
+  samples.
+- Low cut, high cut, room, diffusion, decay, damping and crossover use FL Reeverb 2's own ranges and defaults
+  (75 Hz, 4 kHz, 50, 100, 1.5 s, 4 kHz, 500 Hz).
+- The legacy Reverb's knobs map to the inner controls as follows: DECAY (cubed) → 8, HIGH DAMP → 9, MIX → 13,
+  PREDELAY → 3, ROOM → 4, DIFFUSION → 5, WIDTH → 10, LO-CUT → 1, HI-CUT → 2, INPUT → 0, EARLY → 12, DRY → 11,
+  13…16 → the switches, BASS → 6, CRSV → 7, then the modulation speed and amount.
+- Reverb 2 maps HIGH CUT → 2, LOW CUT → 1, SIZE → 4, DECAY → 8, DIFFUSION → 5, DAMPING → 9, DELAY → 3 (or tempo
+  sync), BASS → 6, CROSS → 7, plus the modulation. It mixes DRY / ER / WET itself, each at 1.25·v, on the engine's
+  default ER (−3.5 dB) and wet (−12 dB) levels. SEPARATION is a mid/side width (0.5 = unchanged), PAN a wet
+  balance, and SIDE INPUT feeds the plate L − R.
+
+**MultiFX (FXPad): no LYNX equivalent.** It is an XY-pad effect with 7 "FX Kind"s, Axis X/Y and an LFO. The decision
+was report-only: it stays listed in the report, and no new LYNX effect is made for it.
+
+**What the import does (`src/core/FlmEffects.{h,cpp}`, called from FlmImport).**
+- **Placement.** Each mapped module becomes LYNX slots on the channel's insert, in rack order. Enable becomes the
+  slot's on switch.
+- **Equalizer and Graphic EQ** become LYNX's 7-band parametric EQ (cookbook biquads, LYNX law):
+  - band dB = 2 × FLM's knob, capped at ±18 (reported);
+  - peak Q = 1/(2 sinh(ln2/2 · BW · ω/sin ω));
+  - shelves use the cookbook slope S that gives FLM's α: 1/S = 1 + (4 sinh² − 2)/(A + 1/A);
+  - a Graphic EQ with more than seven bands that aren't flat takes two slots.
+  - Measured: the Graphic EQ slot is FLM's filter to < 0.001 dB, 20 Hz–20 kHz. The Equalizer's design differs, since
+    FLM's is at twice the rate:
+    - low shelf: < 0.001 dB everywhere;
+    - peaks: < 0.002 dB at 1 kHz, up to 0.2 dB near 15 kHz;
+    - a 5.4 kHz high shelf: 0.1 dB at 1 kHz, 0.7 dB at 19 kHz.
+  - Not reproduced: one-channel bands (reported) and the 1.5-sample pipeline delay.
+- **Filter** becomes the parametric EQ:
+  - one single-biquad cut or band-pass band per FLM biquad, at Q/2 for the cuts and Q for the band-pass;
+  - FLM's level offsets go on the EQ's output: ((1 + s/Q)/(1 + s/2Q))^N · 0.8^pairs, or Q^N for the band-pass;
+  - 96 dB/oct takes two slots.
+  - Measured: < 0.001 dB against the rebuilt FLM chain (low-pass 24, band-pass 48, high-pass 24, low-pass 48).
+- **Autoduck legacy** becomes LYNX's rhythm gain:
+  - a one-beat period, with 12 points of the full-depth curve: 4 on the rise, 7 on the fall;
+  - Ducking² on the slot's mix, which is exact, since 1 − m·env = a dry/wet blend at m;
+  - the 2 ms smoothing and the exact power curve between the points are not reproduced (reported).
+- **Reverb legacy and Reverb 2** become LYNX's exact Reeverb 2. Per control:
+  - the same-unit controls are copied as they are;
+  - bass ×10;
+  - predelay round(ms·0.384);
+  - SIDE INPUT → FL's Mid/Side input.
+  - Levels: FLM's engine ends with a mid/side stage on its wet and early-reflection outputs (0x1807383d0):
+    L = (l + r) + (r − l)·σ, R = (l + r) − (r − l)·σ, σ = separation/100. At the default σ = 1 this is the two
+    sides swapped at twice the level. FL's matrix gives the same blend with its gain at 2× FLM's and f = 1 − σ:
+    FL separation 64·log₅(4f + 1) for f > 0, 64·f below. The legacy WIDTH is converted this way. The side swap is not
+    reproduced (the plate's two sides are statistically alike).
+  - FLM's linear gains go through the inverse of FL's level law, (e^(2.3979·p/128 or p/256) − 1)·0.1, to FL's
+    integer controls. When a level is beyond FL's range (Reverb 2's default early reflections are), all three are
+    lowered by one factor and a LYNX utility after the reverb gives the gain back (the user's song: +5.7 dB). FL's
+    integer steps leave up to about ±0.2 dB.
+  - Reported, not reproduced: Reverb 2's own SEPARATION other than 0.5, its wet PAN, modulation and tempo-synced
+    predelay.
+  - INFERRED, to confirm by a render: that FLM's plate outputs (before its gains) equal FL's. The structure and
+    constants are the same; the level scaling between the two builds is not proven.
+- **Automation (F6 for modules).** A lane on a mapped module's parameter is imported through the same mapping:
+  - per saved point, the module is mapped again with that value, and every LYNX parameter that moves becomes its own
+    automation clip (`effectParam`, or `effectMix` for Autoduck's Ducking and the module Mix);
+  - the first clip takes the lane's row, the others get rows of their own right after it. For example, a 24 dB
+    Filter's frequency moves two bands and the output level;
+  - lanes whose value changes the slot layout (a Filter's slope) and Enable lanes are reported. So are lanes on
+    unmapped modules (MultiFX's Axis X) and on instruments (F4).
+  - In the 21 sample projects, 41 of the 73 module-parameter lanes are now imported (the Filter's Frequency alone
+    is 32). The other 32 are instrument lanes (F4), unmapped effects (MultiFX, Trance Delay, Spacer, Leveller, …)
+    and one Autoduck Curve lane (a whole-curve knob).
+- **Real projects** (`/mnt/e/lynx-work/flm188f/demo-reports.txt`): all 21 import. Mapped: Equalizer 59, Filter 44,
+  Autoduck legacy 43, Reverb legacy 36, Reverb 2 26, Graphic EQ 20. The user's song gets its 8 Graphic EQs and
+  3 Reverb 2s; its 2 MultiFX, 2 Leveller and 1 Gate are listed.
+- **Sound check:** there are no per-effect FL Studio Mobile renders. The only FLM render is the user's full mix, so
+  the EQ and filter slots were checked against FLM's own designs, rebuilt from the REA formulas (the response tests
+  above). A render A/B in FL's FLM plugin is still open.
+- **Tests:** `tests/FlmImport188fTests.inc`, with the response comparisons above and the import of a written project.
+
+Open (next rounds): render A/B of the reverbs and the Equalizer against FL Studio Mobile in FL (GUI/FL locks) to
+settle the reverb level scaling; Mix/Post Gain application; the rest of the effects (Limiter, Distortion, Leveller,
+Trance Delay, Tape Delay, Compressor, Spacer, …); F4 engines.

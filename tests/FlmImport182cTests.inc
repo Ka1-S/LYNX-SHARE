@@ -436,9 +436,21 @@ TEST (flm182c_imports_a_project)
     const auto* lead = flm182c::channelNamed (s, "Lead");
     CHECK (lead != nullptr && lead->instrument == InstrumentKind::synth && lead->mixerTrack == 4);
     CHECK (report.unsupported.count ("FL Studio Mobile: MiniSynth") == 1);
-    CHECK (report.droppedEffects.count ("FL Studio Mobile: Reverb 2") == 1 && report.droppedEffects.count ("FL Studio Mobile: Graphic EQ") == 1
-           && report.droppedEffects.count ("FL Studio Mobile: Limiter") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation lanes (not imported yet)") == 1);
+    // effects: Graphic EQ, Reverb 2 and the legacy Reverb are mapped since round 188f (F5); the Limiter is still listed
+    CHECK (report.converted.count ("FL Studio Mobile: Reverb 2") == 1 && report.converted.count ("FL Studio Mobile: Graphic EQ") == 1
+           && report.converted.count ("FL Studio Mobile: Reverb (legacy)") == 1 && report.droppedEffects.count ("FL Studio Mobile: Limiter") == 1
+           && report.droppedEffects.size() == 1);
+    // F6: the master's Level lane → a Master volume automation clip (8 beats in, one 16-beat pass, FLM's fader law)
+    CHECK (s.automations.size() == 1 && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
+    if (s.automations.size() == 1)
+    {
+        const auto& a = s.automations[0];
+        CHECK (a.target.kind == AutomationTargetKind::mixerVolume && a.target.index == 0 && a.points.size() == 1);
+        if (! a.points.empty())
+            CHECK (std::abs (a.points[0].value - faderPosition ((float) std::pow (10.0, 3.3 * std::pow (32767.0 / 65535.0, 0.6) - 3.0))) < 1e-4f);
+        const auto clip = std::find_if (s.playlist.begin(), s.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; });
+        CHECK (clip != s.playlist.end() && clip->start == 8 * ppq && clip->length == 16 * ppq && clip->automation == 0);
+    }
     CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (one sample)") == 1);
 
     // patterns: 808 content 1 and 2, the drum pattern, the lead's
@@ -489,11 +501,11 @@ TEST (flm182c_imports_a_project)
         CHECK (s.channels[(std::size_t) c.channel].instrument == InstrumentKind::audioClip
                && s.channels[(std::size_t) c.channel].samplePath == "E:/flm/Song/My Samples/Vocal.wav" && s.channels[(std::size_t) c.channel].mixerTrack == 2);
     }
-    // Playlist tracks: one per lane with clips (the master's automation lane is not one yet)
-    CHECK (s.playlistTracks.size() >= 4);
-    if (s.playlistTracks.size() >= 4)
-        CHECK (s.playlistTracks[0].name == "808" && s.playlistTracks[0].mode == PlaylistTrackMode::instrument && s.playlistTracks[1].name == "Vocal"
-               && s.playlistTracks[1].mode == PlaylistTrackMode::audio && s.playlistTracks[1].mixerTrack == 2);
+    // Playlist tracks: one per lane with clips, in FLM's order (the master's automation lane first)
+    CHECK (s.playlistTracks.size() >= 5);
+    if (s.playlistTracks.size() >= 5)
+        CHECK (s.playlistTracks[0].name == "MASTER Level" && s.playlistTracks[1].name == "808" && s.playlistTracks[1].mode == PlaylistTrackMode::instrument
+               && s.playlistTracks[2].name == "Vocal" && s.playlistTracks[2].mode == PlaylistTrackMode::audio && s.playlistTracks[2].mixerTrack == 2);
 
     // a located file (the Missing files window) is used on the next import
     auto o = flm182c::options (&report);
