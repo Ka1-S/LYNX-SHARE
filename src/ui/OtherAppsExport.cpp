@@ -533,7 +533,7 @@ public:
         addAndMakeVisible (exportButton);
         addAndMakeVisible (cancelButton);
         update();
-        setSize (540, 372);
+        setSize (540, 352);
     }
 
     void paint (juce::Graphics& g) override
@@ -552,7 +552,8 @@ public:
         facts.setBounds (r.removeFromTop (20));
         r.removeFromTop (8);
         heading.setBounds (r.removeFromTop (22));
-        card = r.removeFromTop (128);
+        // the card fits its lines (6 or 7, the "zipped" line included)
+        card = r.removeFromTop (14 + 15 * juce::jmax (1, juce::StringArray::fromLines (contents.getText().trim()).size()));
         contents.setBounds (card.reduced (10, 6));
         r.removeFromTop (8);
         mixdownButton.setBounds (r.removeFromTop (24));
@@ -582,6 +583,8 @@ private:
         if (lastZip)
             text << tr ("Everything zipped into one .zip file.");
         contents.setText (text, juce::dontSendNotification);
+        resized();
+        repaint();
     }
 
     void chooseFolder()
