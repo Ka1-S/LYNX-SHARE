@@ -411,4 +411,8 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    TransistorBass first). Done for Equalizer, Graphic EQ, Filter, Autoduck (legacy), Reverb (legacy) and Reverb 2
    in round 188f (REA_rodada182c.md "F5 effects"). That round also found that parameter 0 is every module's Enable,
    and that SMPR holds the reserved ids 0x7FC0 Post Gain, 0x7FC1 Mix and 0x7FC2 Wet Pan (automation lanes: −3, −2).
+   Round 188h added MultiFX, Trance Delay, Distortion, both Limiters, Leveller, Gate and Tape Delay (the Pocket
+   engines) and proved how the module wrapper applies Mix (linear dry/wet), Post Gain (40g − 20 dB on the output) and
+   Wet Pan (a balance of the wet). Left: Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
+   Stereoizer, Flanger, Autoduck (29), Tremolo and the note effects.
 5. HEAD 272/280 (loop range).
