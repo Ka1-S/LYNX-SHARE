@@ -2290,19 +2290,23 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         auto markers = index >= 0 ? clipWarpMarkers (index) : std::vector<WarpPoint> {};
         if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
             markers[(std::size_t) warpIndex].beats = warpBeat;
-        const auto flag = clipContentColour (colour).brighter (0.3f);
+        // the accent (the audio editor's warp marker colour) with a dark outline: readable on any clip colour (the
+        // clip's own content colour was hard to see on pale clips, coordinator's review of 175a M3)
+        const auto flag = theme::colour::accent;
         for (std::size_t k = 1; k < markers.size(); ++k)
         {
             const auto x = (float) tickToX (warpedit::clipTickOfBeat (c, markers[k].beats));
             if (x < body.getX() - 0.5f || x > body.getRight() + 0.5f)
                 continue;
             const auto active = drag == Drag::warpMarker && warpClip == index && warpIndex == (int) k;
-            g.setColour (flag.withAlpha (active ? 1.0f : 0.85f));
+            g.setColour (flag.withAlpha (active ? 0.95f : 0.6f));
+            g.drawVerticalLine ((int) std::round (x), body.getY() + 6.0f, body.getBottom());
             juce::Path p;
-            p.addTriangle (x - 3.5f, body.getY(), x + 3.5f, body.getY(), x, body.getY() + 5.0f);
+            p.addTriangle (x - 4.5f, body.getY(), x + 4.5f, body.getY(), x, body.getY() + 7.0f);
+            g.setColour (active ? flag.brighter (0.3f) : flag);
             g.fillPath (p);
-            g.setColour (flag.withAlpha (active ? 0.9f : 0.35f));
-            g.drawVerticalLine ((int) std::round (x), body.getY() + 5.0f, body.getBottom());
+            g.setColour (theme::colour::bg0.withAlpha (0.8f));
+            g.strokePath (p, juce::PathStrokeType (1.0f));
         }
     }
 
