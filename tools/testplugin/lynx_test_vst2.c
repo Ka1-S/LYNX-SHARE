@@ -79,6 +79,51 @@ typedef struct
     void* window;
 } Synth;
 
+#ifdef _WIN32
+/* LYNX_TEST_VST2_KEYS=eat|pass: the view takes the keyboard focus when clicked and either consumes every key or passes it
+   back to its parent, as plugins do (issue #96). LYNX_TEST_VST2_KEYLOG: a file getting one line per key it saw. */
+static LRESULT CALLBACK keysViewProc (HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    if (m == WM_LBUTTONDOWN)
+    {
+        SetFocus (h);
+        return 0;
+    }
+    if (m == WM_KEYDOWN || m == WM_KEYUP)
+    {
+        const char* path = getenv ("LYNX_TEST_VST2_KEYLOG");
+        const char* mode = getenv ("LYNX_TEST_VST2_KEYS");
+        FILE* f = path != 0 ? fopen (path, "a") : 0;
+        if (f != 0)
+        {
+            fprintf (f, "%s %d %s\n", m == WM_KEYDOWN ? "down" : "up", (int) w, mode != 0 ? mode : "");
+            fclose (f);
+        }
+        if (mode != 0 && strcmp (mode, "pass") == 0)
+            return SendMessageA (GetParent (h), m, w, l);
+        return 0;
+    }
+    return DefWindowProcA (h, m, w, l);
+}
+
+static HWND createKeysView (HWND parent)
+{
+    static int registered = 0;
+    if (! registered)
+    {
+        WNDCLASSA c;
+        memset (&c, 0, sizeof (c));
+        c.lpfnWndProc = keysViewProc;
+        c.hInstance = GetModuleHandleA (0);
+        c.hbrBackground = (HBRUSH) (COLOR_BTNFACE + 1);
+        c.lpszClassName = "LYNXTestKeysView";
+        RegisterClassA (&c);
+        registered = 1;
+    }
+    return CreateWindowExA (0, "LYNXTestKeysView", "LYNX Test Synth", WS_CHILD | WS_VISIBLE, 0, 0, 240, 120, parent, 0, GetModuleHandleA (0), 0);
+}
+#endif
+
 static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, void* ptr, float opt)
 {
     Synth* s = (Synth*) e->object;
@@ -96,6 +141,11 @@ static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, 
             return 1;
         }
         case 14:                                                    /* editOpen: a child of the host's window */
+            if (getenv ("LYNX_TEST_VST2_KEYS") != 0)
+            {
+                s->window = createKeysView ((HWND) ptr);
+                return s->window != 0;
+            }
             s->window = CreateWindowExA (0, "STATIC", "LYNX Test Synth", WS_CHILD | WS_VISIBLE | SS_CENTER, 0, 0, 240, 120,
                                          (HWND) ptr, 0, GetModuleHandleA (0), 0);
             return s->window != 0;

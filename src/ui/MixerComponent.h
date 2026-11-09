@@ -175,6 +175,9 @@ public:
     // Mixer menu › "Keep links to deleted inserts, greyed (LYNX)" (round 186c, pain point 1; ui-options.txt
     // "mixerKeepLostLinks"; off = FL): Delete keeps each send into a deleted insert as a greyed MixerTrack::lostSends link.
     static inline bool keepLostLinks = false;
+    // Mixer menu › "Mixer groups follow the Playlist (LYNX)" (round 186c, pain point 4; ui-options.txt
+    // "mixerFollowPlaylist"; off by default): mixerops::followPlaylistGroups runs after every edit that changes them.
+    static inline bool followPlaylist = false;
     bool isHidden (int track) const noexcept { return track > 0 && track < (int) hidden.size() && hidden[(std::size_t) track]; }
 
     // FL's "Mixer layout" (issue #52, REA round 168h; ui-options.txt "mixerLayout", per user like FL's FXViewMode):
@@ -342,6 +345,7 @@ private:
     void routeSelection (int track, mixerops::RouteKind kind); // the selected inserts into `track` (FL's route arrow)
     void soloExclusive (int track);
     std::vector<int> selection { 0 };
+    bool followPending = false; // a followPlaylistGroups edit is on its way (round 186c)
     std::vector<std::pair<int, float>> groupStart; // (track, value) of the selection when a group drag starts
     float groupGrab = 0.0f;
     void showMenu (int track);

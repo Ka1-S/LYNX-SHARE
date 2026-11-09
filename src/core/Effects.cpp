@@ -3055,6 +3055,7 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
             return info;
         }
+        case EffectKind::strikeShaper: return mixsuite::strikeInfo();
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3795,6 +3796,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
         case EffectKind::shellChannel:
+        case EffectKind::strikeShaper:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -4180,7 +4182,8 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::ember:
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
-        case EffectKind::shellChannel: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::shellChannel:
+        case EffectKind::strikeShaper: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
         case EffectKind::epochVerb:
