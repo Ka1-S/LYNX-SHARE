@@ -8110,3 +8110,18 @@ countries: pl
 "HP Filter" = "Filtr HP"
 "Vox" = "Vox"
 "bar" = "takt"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Czas zwolnienia"
+"Output Gain" = "Gain wyjścia"
+"In Gain" = "Gain wej."
+"Thr." = "Próg"
+"Out Gain" = "Gain wyj."
+"Input Pan" = "Pan wejścia"
+"A. Curve" = "Krzywa ataku"
+"R. Curve" = "Krzywa zwolnienia"
+"Async." = "Asynchronia"
+"LFO Rate" = "Tempo LFO"
+"LFO Shape" = "Kształt LFO"
+"LFO Amnt" = "Ilość LFO"
+"Vowel" = "Samogłoska"

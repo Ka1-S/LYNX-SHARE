@@ -8110,3 +8110,18 @@ countries: kr
 "HP Filter" = "하이패스 필터"
 "Vox" = "Vox"
 "bar" = "마디"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "릴리스 타임"
+"Output Gain" = "출력 게인"
+"In Gain" = "입력 게인"
+"Thr." = "스레숄드"
+"Out Gain" = "출력 게인"
+"Input Pan" = "입력 팬"
+"A. Curve" = "어택 곡선"
+"R. Curve" = "릴리스 곡선"
+"Async." = "비동기"
+"LFO Rate" = "LFO 속도"
+"LFO Shape" = "LFO 모양"
+"LFO Amnt" = "LFO 양"
+"Vowel" = "모음"

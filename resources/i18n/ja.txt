@@ -8110,3 +8110,18 @@ countries: jp
 "HP Filter" = "ハイパス"
 "Vox" = "Vox"
 "bar" = "小節"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "リリースタイム"
+"Output Gain" = "出力ゲイン"
+"In Gain" = "入力ゲイン"
+"Thr." = "スレッショルド"
+"Out Gain" = "出力ゲイン"
+"Input Pan" = "入力パン"
+"A. Curve" = "アタックカーブ"
+"R. Curve" = "リリースカーブ"
+"Async." = "非同期"
+"LFO Rate" = "LFOレート"
+"LFO Shape" = "LFO 波形"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"
