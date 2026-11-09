@@ -8140,3 +8140,6 @@ countries: nl be
 "Disabled" = "Uitgeschakeld"
 "Curve shape" = "Curvevorm"
 "Smooth curve" = "Vloeiende curve"
+"Reset fade in" = "Fade-in herstellen"
+"Reset fade out" = "Fade-out herstellen"
+"Create crossfade" = "Crossfade maken"

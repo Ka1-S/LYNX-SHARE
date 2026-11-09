@@ -8140,3 +8140,6 @@ countries: jp
 "Disabled" = "無効"
 "Curve shape" = "カーブの形"
 "Smooth curve" = "スムーズカーブ"
+"Reset fade in" = "フェードインをリセット"
+"Reset fade out" = "フェードアウトをリセット"
+"Create crossfade" = "クロスフェードを作成"

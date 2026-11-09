@@ -8140,3 +8140,6 @@ countries: pl
 "Disabled" = "Wyłączone"
 "Curve shape" = "Kształt krzywej"
 "Smooth curve" = "Gładka krzywa"
+"Reset fade in" = "Resetuj narastanie"
+"Reset fade out" = "Resetuj wyciszanie"
+"Create crossfade" = "Utwórz przenikanie"

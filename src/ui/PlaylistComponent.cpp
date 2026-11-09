@@ -2979,8 +2979,9 @@ void PlaylistComponent::showGainMenu (int index)
 }
 
 // FL's fade handle menu (EventEditForm PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d01bc0; checks from its
-// popup FUN_00cfcdf0, round 189i): on the clicked clip, or on every selected audio clip when it is selected; `side` 0 = the
-// fade in, 1 = the fade out. Not built yet: Normalize, Normalize selection as a group, Create crossfade.
+// popup FUN_00cfcdf0, round 189i; FL 2026's own menu compared in round 189l): on the clicked clip, or on every selected
+// audio clip when it is selected; `side` 0 = the fade in, 1 = the fade out. Not built yet: Normalize, Normalize selection
+// as a group (not in FL's menu on a single clip), Create crossfade.
 void PlaylistComponent::showFadeHandleMenu (int index, int side)
 {
     if (index < 0 || index >= (int) engine.getSong().playlist.size())
@@ -3019,15 +3020,20 @@ juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side)
     };
     const auto crossfade = (side == 0 ? clip.crossfadeIn : clip.crossfadeOut) > 0;
 
-    menu.addItem (tr ("Reset"), [edit, side] {
+    // (FL 2026 GUI, round 189l: "Reset fade in" / "Reset fade out", then "Create crossfade", greyed on a clip with no
+    // neighbour to cross; "Reset crossfade tension" takes its place where the side already crossfades)
+    menu.addItem (side == 0 ? tr ("Reset fade in") : tr ("Reset fade out"), [edit, side] {
         edit ([side] (Clip& c) {
             (side == 0 ? c.fadeIn : c.fadeOut) = 0;
             (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
         });
     });
-    menu.addItem (tr ("Reset crossfade tension"), crossfade, false, [edit, side] {
-        edit ([side] (Clip& c) { (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f; });
-    });
+    if (crossfade)
+        menu.addItem (tr ("Reset crossfade tension"), [edit, side] {
+            edit ([side] (Clip& c) { (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f; });
+        });
+    else
+        menu.addItem (tr ("Create crossfade"), false, false, [] {}); // (FL's handler, Tag 100, not read yet)
     menu.addItem (tr ("Copy value"), [lengthMs] { copiedFadeMs = lengthMs; hasCopiedFade = true; });
     menu.addItem (tr ("Paste value"), hasCopiedFade, false, [setMs] { setMs (copiedFadeMs); });
     menu.addItem (tr ("Type in value..."), [lengthMs, setMs] {

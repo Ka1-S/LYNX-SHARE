@@ -8140,3 +8140,6 @@ countries: cn sg
 "Disabled" = "已禁用"
 "Curve shape" = "曲线形状"
 "Smooth curve" = "平滑曲线"
+"Reset fade in" = "重置淡入"
+"Reset fade out" = "重置淡出"
+"Create crossfade" = "创建交叉淡化"

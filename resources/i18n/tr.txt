@@ -8140,3 +8140,6 @@ countries: tr
 "Disabled" = "Devre dışı"
 "Curve shape" = "Eğri şekli"
 "Smooth curve" = "Yumuşak eğri"
+"Reset fade in" = "Girişte açılmayı sıfırla"
+"Reset fade out" = "Çıkışta kapanmayı sıfırla"
+"Create crossfade" = "Çapraz geçiş oluştur"

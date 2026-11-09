@@ -8140,3 +8140,6 @@ countries: it ch sm
 "Disabled" = "Disattivato"
 "Curve shape" = "Forma della curva"
 "Smooth curve" = "Curva morbida"
+"Reset fade in" = "Reimposta dissolvenza in entrata"
+"Reset fade out" = "Reimposta dissolvenza in uscita"
+"Create crossfade" = "Crea dissolvenza incrociata"

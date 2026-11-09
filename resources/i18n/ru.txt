@@ -8140,3 +8140,6 @@ countries: ru by kz
 "Disabled" = "Отключено"
 "Curve shape" = "Форма кривой"
 "Smooth curve" = "Плавная кривая"
+"Reset fade in" = "Сбросить нарастание"
+"Reset fade out" = "Сбросить затухание"
+"Create crossfade" = "Создать кроссфейд"

@@ -8140,3 +8140,6 @@ countries: es mx ar co cl pe ve
 "Disabled" = "Desactivado"
 "Curve shape" = "Forma de la curva"
 "Smooth curve" = "Curva suave"
+"Reset fade in" = "Restablecer fundido de entrada"
+"Reset fade out" = "Restablecer fundido de salida"
+"Create crossfade" = "Crear fundido cruzado"

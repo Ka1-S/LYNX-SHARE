@@ -8140,3 +8140,6 @@ countries: de at ch li lu
 "Disabled" = "Deaktiviert"
 "Curve shape" = "Kurvenform"
 "Smooth curve" = "Weiche Kurve"
+"Reset fade in" = "Einblendung zurücksetzen"
+"Reset fade out" = "Ausblendung zurücksetzen"
+"Create crossfade" = "Crossfade erstellen"

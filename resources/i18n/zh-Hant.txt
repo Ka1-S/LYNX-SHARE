@@ -8140,3 +8140,6 @@ countries: tw hk mo
 "Disabled" = "已停用"
 "Curve shape" = "曲線形狀"
 "Smooth curve" = "平滑曲線"
+"Reset fade in" = "重設淡入"
+"Reset fade out" = "重設淡出"
+"Create crossfade" = "建立交叉淡化"

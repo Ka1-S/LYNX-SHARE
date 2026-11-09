@@ -8140,3 +8140,6 @@ countries: id
 "Disabled" = "Nonaktif"
 "Curve shape" = "Bentuk kurva"
 "Smooth curve" = "Kurva halus"
+"Reset fade in" = "Atur ulang fade in"
+"Reset fade out" = "Atur ulang fade out"
+"Create crossfade" = "Buat crossfade"

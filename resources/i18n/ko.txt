@@ -8140,3 +8140,6 @@ countries: kr
 "Disabled" = "사용 안 함"
 "Curve shape" = "곡선 모양"
 "Smooth curve" = "부드러운 곡선"
+"Reset fade in" = "페이드 인 초기화"
+"Reset fade out" = "페이드 아웃 초기화"
+"Create crossfade" = "크로스페이드 만들기"

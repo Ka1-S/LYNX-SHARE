@@ -8223,3 +8223,6 @@ countries: br
 "Disabled" = "Desativado"
 "Curve shape" = "Forma da curva"
 "Smooth curve" = "Curva suave"
+"Reset fade in" = "Redefinir fade in"
+"Reset fade out" = "Redefinir fade out"
+"Create crossfade" = "Criar crossfade"
