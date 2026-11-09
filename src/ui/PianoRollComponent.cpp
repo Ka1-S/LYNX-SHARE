@@ -1,4 +1,5 @@
 #include "ui/FlMods.h"
+#include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
 #include "core/ChordReadout.h"
@@ -1140,12 +1141,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.fillRect (juce::Rectangle<float> (x0, (float) rulerTop, x1 - x0, 2.0f));
         }
 
+        // View › "Ruler: song bars" (round 177d, LYNX's own; off = FL's pattern bars): the bar numbers the Playlist shows
+        // where the pattern's first clip plays
+        const auto songOrigin = songBarsRuler ? polish::patternSongOrigin (song, song.currentPattern) : std::nullopt;
         for (auto b = firstBar; b <= lastBar; ++b)
         {
             const auto x = (int) tickToX ((double) (b * bar));
             g.setColour (textSecondary);
             g.drawVerticalLine (x, (float) rulerTop + 10.0f, (float) headerHeight);
-            textcache::drawText (g, juce::String (b + 1), x + 3, rulerTop + 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
+            const std::int64_t number = songOrigin.has_value() ? polish::songBarNumber (*songOrigin, b, bar) : (std::int64_t) b + 1;
+            if (number > 0)
+                textcache::drawText (g, juce::String (number), x + 3, rulerTop + 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
         }
 
         // the pattern's time markers (round 168g): a flag and the name in the ruler's lower half, like the Playlist's
@@ -3421,6 +3427,13 @@ bool PianoRollComponent::runAction (const std::string& id)
         repaint();
     }
     else if (is ("pianoRoll.backgroundWave")) setBackgroundWaveShown (! isBackgroundWaveShown());
+    else if (is ("pianoRoll.songBarsRuler"))
+    {
+        songBarsRuler = ! songBarsRuler;
+        if (EditorGlobals::get().onOptionsChanged)
+            EditorGlobals::get().onOptionsChanged();
+        repaint();
+    }
     else if (is ("pianoRoll.showChordName"))
     {
         showChordName = ! showChordName;
@@ -3575,7 +3588,7 @@ void PianoRollComponent::glideBy (double ticks, double pixels, bool immediate)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, (double) viewLengthTicks() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) rows.count * rowHeight - grid.getHeight()), glideY.target + pixels);
-    if (immediate)
+    if (immediate || ! ui::motion::enabled()) // (Settings › General › Animations off: the wheel jumps)
     {
         scrollTicks = glideX.target;
         scrollY = (int) std::round (glideY.target);
@@ -3725,6 +3738,34 @@ void PianoRollComponent::deleteSelection()
 void PianoRollComponent::copySelection()
 {
     clipboard = noteedit::copy (currentPattern (engine.getSong()), selectionOrAll());
+}
+
+// Pain point 26 (round 177d, LYNX's own; FL's ghost notes can only be looked at): the ghost notes on show (the other
+// channels' notes in this pattern, and this channel's notes in the clips that play at the same time) go to the note
+// clipboard, so Ctrl+V pastes them into the channel being edited, where they were drawn.
+std::vector<Note> PianoRollComponent::visibleGhostNotes() const
+{
+    std::vector<Note> out;
+    if (! showGhosts || allChannels)
+        return out;
+    const auto& song = engine.getSong();
+    for (const auto& n : currentPattern (song).notes)
+        if (! edits (n) && ghostShown (n.channel))
+            out.push_back (n);
+    for (const auto& n : polish::clipGhostNotes (song, song.currentPattern, engine.getSelectedChannel()))
+        out.push_back (n);
+    std::stable_sort (out.begin(), out.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+    return out;
+}
+
+void PianoRollComponent::copyGhostNotes()
+{
+    auto ghosts = visibleGhostNotes();
+    if (ghosts.empty())
+        return;
+    const auto count = (int) ghosts.size();
+    clipboard = std::move (ghosts);
+    ui::postHint ({ tr ("Copied {0} ghost notes: Ctrl+V pastes them into this channel", { juce::String (count) }) }, 2500);
 }
 
 void PianoRollComponent::paste()
@@ -4001,6 +4042,11 @@ bool PianoRollComponent::runKeyAction (const std::string& id)
 void PianoRollComponent::refreshToolKeys (const std::function<juce::String (const std::string&)>& keyOf)
 {
     tools.refreshKeys ([&keyOf] (EditTool t) { return keyOf ("pianoRoll.tool." + std::string (editToolId (t))); });
+    // round 179a: the slide toggle is only an icon, so its tips name its key the way the tool buttons do
+    const auto slideKey = keyOf ("pianoRoll.slide");
+    slideButton.setTooltip (tr ("New notes are \"slide\" notes: the currently sounding note glides to them (808 glide)")
+                            + (slideKey.isNotEmpty() ? " (" + slideKey + ")" : juce::String()));
+    ui::setQuickTip (slideButton, tr ("Slide notes"), slideKey);
 }
 
 juce::PopupMenu PianoRollComponent::midiMenu()
@@ -4602,6 +4648,7 @@ juce::PopupMenu PianoRollComponent::editMenu()
     juce::PopupMenu menu;
     menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", ! selection.empty(), false, [this] { copySelection(); deleteSelection(); });
     menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this] { copySelection(); });
+    menu.addItem (tr ("Copy ghost notes"), ! visibleGhostNotes().empty(), false, [this] { copyGhostNotes(); }); // (LYNX, round 177d)
     menu.addItem (theme::mnemonic (tr ("Paste"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this] { paste(); });
     menu.addItem (theme::mnemonic (tr ("Duplicate"), 'u') + "\tCtrl+B", [this] { duplicateSelection(); });
     menu.addItem (theme::mnemonic (tr ("Delete"), 'D') + "\tDel", ! selection.empty(), false, [this] { deleteSelection(); });
@@ -4633,6 +4680,7 @@ juce::PopupMenu PianoRollComponent::viewMenu()
                   [this] { runAction ("pianoRoll.showChordName"); });
     menu.addItem (tr ("Background waveform") + keyText ("pianoRoll.backgroundWave"), true, isBackgroundWaveShown(),
                   [this] { runAction ("pianoRoll.backgroundWave"); });
+    menu.addItem (tr ("Ruler: song bars (LYNX)") + keyText ("pianoRoll.songBarsRuler"), true, songBarsRuler, [this] { runAction ("pianoRoll.songBarsRuler"); });
     if (const auto wave = backgroundWave())
         menu.addItem (tr ("Remove the background waveform ({0})", { wave->file.getFileName() }), [this] {
             backgroundWave().reset();

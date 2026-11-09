@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Arpeggiator.h"
@@ -69,6 +70,25 @@ struct RackState
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
+    // round 177b: automation lanes (PlaylistTrack::lanes): the lane automations that play, and per lane the automations
+    // of the same target that have clips (where one of their clips plays, it wins over the lane)
+    struct LanePlay
+    {
+        int automation = -1;
+        std::vector<int> clipPeers;
+        std::vector<std::pair<int, int>> clipSlots; // peer -> the slot holding its value, for peers that share one (issue #97)
+    };
+    std::vector<LanePlay> laneAutomations;
+    // round 177b: modulator routings — each drives its own slot (bound last: it wins) from the target's value, or the
+    // value of the automation that drives it, plus depth × the modulator
+    struct ModPlay
+    {
+        int slot = -1, source = -1; // its slot; the slot that drove the target before (-1: none)
+        float base = 0.5f;          // the target's own value
+        int modulator = 0;
+        float depth = 0.0f;
+    };
+    std::vector<ModPlay> modRoutes;
     // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
     // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
     // marked as followers: they bind nothing and compute nothing.
@@ -256,10 +276,18 @@ struct RackState
     using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
                                                                                      double semitones, const StretchMap& map)>;
 
+    // A channel's precomputed span (its region after its precomputed effects and Trim) stretched by `ratio`, cached in the
+    // app by (path, variantKey, ratio, method): FL stretches that span, not the whole file (round 180d). Unset: stretched
+    // here, uncached (tests).
+    using StretchedSpanProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, const std::string& variantKey,
+                                                                                  const std::shared_ptr<const SampleData>& span, double ratio,
+                                                                                  StretchMethod method, double semitones)>;
+
     struct Factories
     {
         SampleProvider samples;
         StretchedSampleProvider stretchedSamples;
+        StretchedSpanProvider stretchedSpans;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
@@ -435,10 +463,16 @@ public:
     // (RackState::slotsOfTarget) are not driven by automation clips / pattern events; the control's own value
     // plays. UI thread writes, audio thread reads (relaxed: a block late at worst).
     void setOverriddenSlots (const std::vector<int>& slots) noexcept;
+    // FL (issue #125, [EXEC] round 185b): a control the user moves (its knob, a linked controller) is no longer driven by
+    // its automation until playback starts again, stopped or playing. The slots set here are released that way; the
+    // renderer forgets them itself when the transport starts (and the engine its list of moved targets).
+    void setReleasedSlots (const std::vector<int>& slots) noexcept;
     bool isSlotOverridden (int slot) const noexcept
     {
-        return slot >= 0 && slot < RackState::maxAutomations
-            && (overridden[(std::size_t) slot / 32].load (std::memory_order_relaxed) & (1u << ((unsigned) slot % 32))) != 0;
+        if (slot < 0 || slot >= RackState::maxAutomations)
+            return false;
+        const auto bit = 1u << ((unsigned) slot % 32);
+        return ((overridden[(std::size_t) slot / 32].load (std::memory_order_relaxed) | released[(std::size_t) slot / 32].load (std::memory_order_relaxed)) & bit) != 0;
     }
 
     // Tempo used in the last block (changes with tempo automation). The transport advances with it.
@@ -468,6 +502,8 @@ private:
     void runEffects (const RackState& state, int track, int n) noexcept;
     void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
+    void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
+    double modSeconds = 0.0; // the free-running modulators' clock
     // ticks from `tick` to the next pattern event (or pattern clip edge) that changes a lane's value; +inf if none
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
@@ -498,6 +534,9 @@ private:
     bool automatedBendReset = false;
     std::array<std::atomic<std::uint32_t>, RackState::maxAutomations / 32> overridden {}; // touched while recording
     std::atomic<bool> anyOverridden { false };
+    std::array<std::atomic<std::uint32_t>, RackState::maxAutomations / 32> released {}; // moved by the user (issue #125)
+    std::atomic<bool> anyReleased { false };
+    bool releaseWasPlaying = false; // (audio thread) the last chunk played: a start clears `released`
     void clearOverriddenValues() noexcept;
     std::array<MixerMatrix, maxMixerTracks> lastTrackGain {}; // the level matrix of the previous block, for the ramp
     // round 168x: the "Post level and panning" recording tap's own ramp (the insert's level matrix without the mute)

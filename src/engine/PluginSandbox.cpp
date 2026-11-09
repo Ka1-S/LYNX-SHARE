@@ -368,9 +368,16 @@ public:
 private:
     void handleMessageFromWorker (const juce::MemoryBlock& data) override
     {
+        auto message = juce::ValueTree::readFromData (data.getData(), data.getSize());
+        if (message.hasType ("key")) // a key the plugin's window left unused (issue #99), never an ask() reply
+        {
+            const juce::KeyPress key ((int) message["code"], juce::ModifierKeys ((int) message["mods"]), (juce::juce_wchar) (int) message["char"]);
+            juce::MessageManager::callAsync ([key] { runSecondaryWindowKey (key); });
+            return;
+        }
         {
             const std::scoped_lock l (replyMutex);
-            reply = juce::ValueTree::readFromData (data.getData(), data.getSize());
+            reply = std::move (message);
         }
         trace ("parent: reply received " + reply.getType().toString());
         replyReady.signal();
@@ -508,9 +515,20 @@ private:
     // plugin window holding this stand-in: Windows destroys an owned window with its owner, even in another process.)
     juce::int64 ownerHandle() { return (juce::int64) (juce::pointer_sized_int) mainWindowHandle(); }
 
+    // A LYNX dialog (Save changes?, Export...) is open: the child's window floats above LYNX's windows while LYNX is
+    // active, so it would cover the dialog. Popup menus are modal too, but aren't TopLevelWindows: they don't hide it.
+    // shortcut: native dialogs (file choosers) aren't JUCE components and aren't seen; upgrade if one is covered.
+    static bool dialogOpen()
+    {
+        for (int i = juce::Component::getNumCurrentlyModalComponents(); --i >= 0;)
+            if (dynamic_cast<juce::TopLevelWindow*> (juce::Component::getCurrentlyModalComponent (i)) != nullptr)
+                return true;
+        return false;
+    }
+
     void follow()
     {
-        const auto showing = isShowing() && getPeer() != nullptr;
+        const auto showing = isShowing() && getPeer() != nullptr && ! dialogOpen();
         if (showing == shown)
             return;
         shown = showing;

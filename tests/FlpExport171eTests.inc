@@ -434,6 +434,11 @@ TEST (flpexport171e_render_plan_and_freeze)
     flpexport::Report report;
     const auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
     CHECK (project.channels[0].type == flp::ChannelType::audioClip && project.channels[0].samplePath == "C:/out/kick.wav");
+    // the render plays at unity: FL's default channel volume, 10000 of 12800, where audioClipUnity × channelGain = 1
+    // (round 182b: written at 12800 it played 5.2 dB loud in FL and in LYNX)
+    CHECK (song.channels[0].volume == audioClipUnityVolume);
+    CHECK (project.channels[0].volume == 10000);
+    CHECK (std::abs (20.0 * std::log10 (channelGain (song.channels[0].volume) / channelGain (10000.0f / 12800.0f))) < 1e-6);
 }
 
 TEST (flpexport171e_insert_render_switches_off_the_lynx_slots)
@@ -454,6 +459,7 @@ TEST (flpexport171e_insert_render_switches_off_the_lynx_slots)
     CHECK (song.automations.back().target.kind == AutomationTargetKind::none);
     CHECK (report.rendered.size() == 2);
     CHECK (song.channels.back().instrument == InstrumentKind::audioClip && song.channels.back().mixerTrack == added);
+    CHECK (song.channels.back().volume == audioClipUnityVolume); // (round 182b: the insert's render at unity)
     // after the render nothing on insert 3 is reported as left out
     flpexport::Report after;
     const auto project = flp::parseProject (flpexport::exportFlp (song, options, after));

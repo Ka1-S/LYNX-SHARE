@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.24 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.25 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,12 +51,15 @@ add_library(lynx_core STATIC
     src/core/XmlLite.cpp
     src/core/Gzip.cpp
     src/core/AlsImport.cpp
+    src/core/FlmFormat.cpp
+    src/core/FlmImport.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
     src/core/Recorder.cpp
     src/core/TakeRecording.cpp
+    src/core/Comping.cpp
     src/core/Pdc.cpp
     src/core/WorkerPool.cpp
     src/core/TimeStretch.cpp
@@ -79,6 +82,7 @@ add_library(lynx_core STATIC
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
+    src/core/SimpleTracks.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -101,6 +105,7 @@ add_library(lynx_core STATIC
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
     src/core/WaveTraveller.cpp
+    src/core/FruitySlicer.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -449,6 +454,7 @@ if(LYNX_BUILD_APP)
         src/ui/VideoTracks.cpp
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
+        src/ui/FruitySlicerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp
@@ -486,6 +492,7 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
+        src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
@@ -551,6 +558,16 @@ if(LYNX_BUILD_APP)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
     endif()
 
+    # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files
+    if(UNIX AND NOT APPLE)
+        juce_add_binary_data(LynxFontData
+            HEADER_NAME LynxFontData.h
+            NAMESPACE lynxfontdata
+            SOURCES resources/fonts/OpenSans-Regular.ttf resources/fonts/OpenSans-Bold.ttf)
+        target_link_libraries(LYNX PRIVATE LynxFontData)
+        target_compile_definitions(LYNX PRIVATE LYNX_BUNDLED_FONT=1)
+    endif()
+
     target_link_libraries(LYNX
         PRIVATE
             lynx_core
@@ -559,8 +576,13 @@ if(LYNX_BUILD_APP)
             juce::juce_dsp
             juce::juce_opengl
         PUBLIC
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_lto_flags)
+            juce::juce_recommended_config_flags)
+    # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
+    # minutes of a cached CI App build). -DLYNX_LTO=OFF
+    option(LYNX_LTO "Link the app with link-time optimisation" ON)
+    if(LYNX_LTO)
+        target_link_libraries(LYNX PUBLIC juce::juce_recommended_lto_flags)
+    endif()
 endif()
 
 # LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by

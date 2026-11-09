@@ -597,7 +597,7 @@ bool takesSidechain (AudioEngine& engine, int track, int slot)
     {
         const auto effect = engine.getEffect (track, slot);
         const auto* plugin = dynamic_cast<const PluginEffect*> (effect.get());
-        return plugin != nullptr && plugin->hasSideInput();
+        return plugin != nullptr && plugin->canTakeSideInput(); // (on only once a source is picked: issue #109)
     }
     return mixerops::acceptsSidechain (kind);
 }

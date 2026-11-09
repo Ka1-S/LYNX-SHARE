@@ -103,6 +103,13 @@ std::string describeAddress (const void* address);
 // `folderUtf8`/hang <time>.txt and adds a session step ("UI not responding ..."); a second sample follows if the stall
 // lasts, and "UI responding again after N s" when it ends. stopHangWatch ends the thread (before quitting).
 void startHangWatch (const std::string& folderUtf8, int stallMs = 2000) noexcept;
+// Issue #115 (Linux / macOS; nothing on Windows). Call after the crash handler is installed (JUCE's
+// setApplicationCrashHandler), on the message thread:
+// - an alternate signal stack for this thread, and the crash handler's signals moved onto it, so a stack overflow on the
+//   message thread still writes its crash file;
+// - SIGTERM / SIGHUP (the session logging out, the terminal that started LYNX closed, `kill`) leave a session step
+//   ("ended by SIGTERM ...") before LYNX ends as it did before. Without them the report could only say "closed".
+void hardenSignals() noexcept;
 void heartbeat() noexcept;
 void stopHangWatch() noexcept;
 // --symbolize: the "LYNX.exe+0x…" frames of a crash / hang file named with this very build's symbols (LYNX.pdb of

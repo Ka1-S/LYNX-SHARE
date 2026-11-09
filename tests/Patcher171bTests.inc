@@ -296,9 +296,9 @@ TEST (patcher171b_fl_parameter_ports_import)
         auto expected = std::vector<int> { balanceVolume->param, balancePan->param };
         std::sort (expected.begin(), expected.end());
         CHECK (doc.nodes[0].paramIns == expected);
-        // the controller → volume event link (FL's Peak Controller output 0 = "peak" = LYNX's output 1)
+        // the controller → volume event link (FL's Peak Controller output 0 = "Peak+LFO" = LYNX's output 0, issue #111)
         CHECK (std::any_of (doc.wires.begin(), doc.wires.end(), [&] (const lynx::PatchWire& w) {
-            return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.fromPort == 1 && w.to == 0 && w.toPort == balanceVolume->param;
+            return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.fromPort == 0 && w.to == 0 && w.toPort == balanceVolume->param;
         }));
         CHECK (! doc.published.empty() && doc.published[0].node == 0 && doc.published[0].param == balanceVolume->param);
     }

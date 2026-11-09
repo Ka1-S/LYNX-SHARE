@@ -9,14 +9,16 @@ Channel Rack, Piano Roll, Playlist and Mixer in C++20 + JUCE 8, built to run wel
 Windows, macOS and Linux.</p>
 
 <p align="center">
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.24%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.25%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
+  <a href="https://discord.gg/XHKkbtbkY"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the LYNX SHARE Discord"></a>
 </p>
 
 <p align="center">
   <a href="https://lynx-share.com"><strong>Website</strong></a> ·
+  <a href="https://discord.gg/XHKkbtbkY"><strong>Discord</strong></a> ·
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><strong>Download</strong></a> ·
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#opens-fl-studio-projects">FL projects</a> ·
@@ -140,10 +142,10 @@ Up to 127 inserts, sends with levels, 10 effect slots with dry/wet per track, bu
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/img/eq.png" alt="Parametric EQ">
+<img src="docs/img/eq.png" alt="Facet EQ">
 
-### 7-band parametric EQ
-Draggable handles, shelves, 12–48 dB/oct cuts, band-pass and notch, with the response drawn in real time.
+### Facet EQ
+8 bands of bells, shelves, tilt, notch and band pass, cuts up to 96 dB/oct, dynamic bands and a live pre/post analyser, at zero latency. The FL-style 7-band Parametric EQ is there too.
 
 </td>
 <td width="50%" valign="top">
@@ -155,6 +157,11 @@ Any knob or fader (channel, mixer, effect, plugin parameter) becomes a clip with
 </td>
 </tr>
 </table>
+
+<p align="center">
+  <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes beside the Playlist" width="100%">
+  <br><sub><strong>Clip-launch workflow</strong> (View › Layout style): a grid of clips and scenes beside the Playlist, with launch modes, quantisation and follow actions. The Pattern workflow stays the default.</sub>
+</p>
 
 ### Everything in the box
 
@@ -408,6 +415,8 @@ cmake --build build
 
 More than a million checks, including parsing the 165 `.flp` projects that ship with FL Studio 2026 when that folder is given. It also builds `build-local/flpdump` (dumps a `.flp`) and `build-local/renderwav`.
 
+`LYNX_TEST_JOBS=auto` (or a number) runs the tests in parallel shards (`scripts/run-tests.sh`); the result line is the same. The test binary takes `--list`, `--filter a,b`, `--exclude a,b`, `--shard i/n` and `--times file`, e.g. `build-local/lynx_tests --filter flp_ --no-times`.
+
 ## Under the hood
 
 ```
@@ -443,6 +452,11 @@ docs/         architecture, status, roadmap and the behavioural analysis of FL S
 
 > [!NOTE]
 > The documentation is being translated from Portuguese to English; some files are still in Portuguese.
+
+## Community
+
+- **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY). Chat, help, feedback and release announcements.
+- **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)): an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It's a separate community project, not an official LYNX SHARE release, and it isn't maintained or reviewed by us.
 
 ## Credits and notice
 
