@@ -2,6 +2,7 @@
 #include "ui/EditorTools.h"
 
 #include "core/NoteEdit.h"
+#include "core/NoteTools.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -776,7 +777,12 @@ public:
         addRow (modY, TR_NOOP ("Mod Y"), 0.0, 100.0, "%");
         // FL's Note properties also have the colour group (its "Color group / MIDI channel" button, 1..16; round 168g)
         addRow (colour, TR_NOOP ("Colour group"), 1.0, (double) noteColourCount, "");
-        release.slider.setTooltip (tr ("Release velocity (kept with the note; instruments do not use it yet)"));
+        // Live 12's note Chance and Velocity Range (round 187c, LYNX additions)
+        addRow (chance, TR_NOOP ("Chance"), 0.0, 100.0, "%");
+        addRow (velocityRange, TR_NOOP ("Vel. range"), -100.0, 100.0, "%");
+        chance.slider.setTooltip (tr ("How likely the note is to play each time it comes round (LYNX; Live's note Chance)"));
+        velocityRange.slider.setTooltip (tr ("Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)"));
+        release.slider.setTooltip (tr ("Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)"));
         modX.slider.setTooltip (tr ("Free modulation value (kept with the note; not routed yet)"));
         modY.slider.setTooltip (modX.slider.getTooltip());
 
@@ -819,7 +825,7 @@ public:
         addAndMakeVisible (resetButton);
 
         load();
-        setSize (320, 34 + 7 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
+        setSize (320, 34 + 9 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
     }
 
     void paint (juce::Graphics& g) override
@@ -832,7 +838,7 @@ public:
         auto area = getLocalBounds().reduced (12, 8);
         title.setBounds (area.removeFromTop (26));
 
-        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &colour })
+        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &colour, &chance, &velocityRange })
         {
             auto r = area.removeFromTop (rowHeight);
             row->label.setBounds (r.removeFromLeft (80));
@@ -871,6 +877,8 @@ public:
         set (finePitch, 0.0);
         set (modX, std::round (defaults.modX * 100.0f));
         set (modY, std::round (defaults.modY * 100.0f));
+        set (chance, 100.0);
+        set (velocityRange, 0.0);
     }
 
 private:
@@ -917,6 +925,8 @@ private:
         set (modX, std::round (shown.modX * 100.0f));
         set (modY, std::round (shown.modY * 100.0f));
         set (colour, (double) (shown.colour + 1));
+        set (chance, std::round (shown.chance * 100.0f));
+        set (velocityRange, std::round (shown.velocityRange * 100.0f));
         slide.setToggleState (shown.slide, juce::dontSendNotification);
         porta.setToggleState (shown.porta, juce::dontSendNotification);
         slideTouched = portaTouched = false;
@@ -974,6 +984,8 @@ private:
                 if (modX.touched) n.modX = (float) modX.slider.getValue() / 100.0f;
                 if (modY.touched) n.modY = (float) modY.slider.getValue() / 100.0f;
                 if (colour.touched) n.colour = juce::jlimit (0, noteColourCount - 1, (int) colour.slider.getValue() - 1);
+                if (chance.touched) n.chance = (float) chance.slider.getValue() / 100.0f;
+                if (velocityRange.touched) n.velocityRange = (float) velocityRange.slider.getValue() / 100.0f;
                 if (slideTouched) n.slide = slide.getToggleState();
                 if (portaTouched) n.porta = porta.getToggleState();
                 if (single)
@@ -983,6 +995,8 @@ private:
                 }
             }
 
+            if (chance.touched) // a probability group has one Chance (round 187c)
+                notetools::spreadGroupChance (s.patterns[(std::size_t) patternIndex], indices);
             if (single)
                 s.patterns[(std::size_t) patternIndex].sortNotes();
         });
@@ -998,7 +1012,7 @@ private:
     Note shown;
     bool single = false, slideTouched = false, portaTouched = false;
     juce::Label title;
-    SliderRow velocity, pan, release, finePitch, modX, modY, colour;
+    SliderRow velocity, pan, release, finePitch, modX, modY, colour, chance, velocityRange;
     juce::ToggleButton slide, porta;
     TextRow time, length;
     juce::TextButton applyButton, revertButton, resetButton;

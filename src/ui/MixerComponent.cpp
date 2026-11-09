@@ -1592,6 +1592,23 @@ void MixerStrips::paint (juce::Graphics& g)
             }
         }
 
+        // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
+        // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
+        if (t == selected && t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty() && needs (routeArea (t)))
+        {
+            const auto& lost = song.mixer[(std::size_t) t].lostSends;
+            const auto r = routeArea (t).toFloat().reduced (0.5f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r, radius::sm);
+            const float dashes[] = { 2.5f, 2.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::textDisabled);
+            g.fillPath (dashed);
+            g.setFont (font (10.0f));
+            textcache::drawFittedText (g, juce::String::fromUTF8 ("\xc3\x97 ") + (lost.size() == 1 ? juce::String::fromUTF8 (lost[0].to.c_str()) : juce::String ((int) lost.size())),
+                                       r.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
+        }
+
         // routing lane: send switch from the selected insert to this one, and its level knob
         if (selected > 0 && t != selected && selected < tracks && needs (routeArea (t).getUnion (sendArea (t))))
         {
@@ -2248,7 +2265,7 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
     auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
         if (safe == nullptr)
             return;
-        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked); });
+        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
         const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
         safe->setSelection ({ first }, first);
     };
@@ -3169,6 +3186,27 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
         menu.addSubMenu (tr ("Track routing"), routing, any);
+        // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
+        if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
+        {
+            juce::PopupMenu lost;
+            const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
+            for (int i = 0; i < (int) lostSends.size(); ++i)
+            {
+                juce::PopupMenu one;
+                juce::PopupMenu to;
+                for (int x = 1; x < (int) song.mixer.size(); ++x)
+                    if (x != t)
+                        to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
+                                    false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
+                one.addSubMenu (tr ("Reconnect to"), to);
+                one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
+                lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
+            }
+            lost.addSeparator();
+            lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
+            menu.addSubMenu (tr ("Disconnected links"), lost);
+        }
     }
     {
         juce::PopupMenu select;
@@ -3801,6 +3839,8 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
                                       EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate, // LYNX's dynamics suite
                                       EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::voiceShift, // LYNX's voice tools
+                                      EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
+                                      EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx, // Pocket: FL Studio Mobile's effects (round 188h)
                                       EffectKind::formulaController, EffectKind::peakController, EffectKind::xyController, EffectKind::xyzController,
                                       EffectKind::controlSurface, // controllers (link their output to any knob)
                                       EffectKind::patcher, // FL's Patcher: a graph of effects / instruments / plugins (REA_rodada141)
@@ -4356,6 +4396,11 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
         ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+    });
+    // LYNX's option (round 186c, pain point 1; off = FL, which drops them): a deleted insert's incoming sends stay greyed
+    menu.addItem (tr ("Keep links to deleted inserts, greyed (LYNX)"), true, MixerStrips::keepLostLinks, [] {
+        MixerStrips::keepLostLinks = ! MixerStrips::keepLostLinks;
+        notifyChanged();
     });
 
     if (! newProjects)

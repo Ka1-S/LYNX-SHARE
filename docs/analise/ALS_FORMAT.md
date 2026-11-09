@@ -253,6 +253,27 @@ Reference: Live 12.4.16 renders of a test voice (`warp-refs/`, 48 kHz, clip warp
 - **Beats transposed** (round 175a, the Beats-transpose slice): Live resamples each piece by the clip's transpose (2^(st/12) faster, so higher and shorter), starts it at its own place on the grid and fills the gap back and forth. LYNX renders the same offline: `timeStretch (…, beats, semitones)` reads each piece with 4-point Hermite interpolation. An imported Beats clip with a transpose stores it in its channel's `sampler.stretchPitch` (saved in .lynx as `stretchPitch`). The stretched-sample cache keys on it, in memory and on disk, and the clip plays untransposed. On export the value is written back as `PitchCoarse`/`PitchFine`. Beats-up5 against Live: envelope correlation 0.754 → 0.944, spectral deviation 1.54 → 0.95 dB (the stretcher alone, outside the app). The other modes still transpose in real time.
 - Open: the `TransientResolution`, `TransientEnvelope` and Texture `FluctuationTexture` parameters are not modelled.
 
+## Live's .asd analysis files (round 175a, M2)
+
+Live writes `<sample>.asd` next to each sample it has analysed (3,567 in the trial's Core Library). It uses the same binary
+serialisation as `Preferences.cfg`: a schema of named records, then the data. Two records matter for auto-warp:
+
+- `OnSets` (`Positions`, `TransitionEnergies`, `IsSet`): Live's transients. The data is a u32 count N, N u32 positions
+  (sample frames, increasing), then N f32 energies.
+- `WarpMarker` (`SecTime`, `BeatTime`, both f64): the warp markers Live stores for the sample. Data records are 0x0A
+  "WarpMarker", a u32, then the two doubles. The loops store their start (0, 0) and one marker that gives the rate.
+
+Read by `/mnt/e/lynx-work/ableton175a/m2/asd.py`. Measured against LYNX on the Core Library loops (`m2/onsets.txt`,
+`m2/warp.txt`):
+
+- Transients (±10 ms): LYNX's attack detector matches Live with F 0.81 on drums, but only 0.31 on tonal and 0.36 on
+  textures. Live marks many soft onsets that LYNX doesn't. Lowering the threshold to 3 or 4.5 dB changed nothing.
+- Tempo: Live uses the tempo in the file name for 148 of 156 named loops. For the others it mostly takes the length as
+  a power of two of beats (33 of 47).
+- Beat 0: the file's start, for 195 of 203 loops.
+- LYNX's auto-warp agrees with Live's stored tempo for 162 of 203 loops without names, 148 of 156 with them, and on the
+  start for 194 of 203.
+
 ## 13. Session view ↔ clip grid (round 181c, 2026-11-07)
 Launch numbers read in Live 12's own Clip View on a set we wrote [LIVE: docs/analise/REA_rodada181a.md, 181b]:
 - `LaunchQuantisation` 0…14 = Global, None, 8 Bars, 4 Bars, 2 Bars, 1 Bar, 1/2, 1/2T, 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32 = `LaunchQuant`.

@@ -69,3 +69,36 @@ TEST (mixer186c_delete_tracks_linked_playlist_tracks)
     CHECK (del.playlistTracks[1].name.empty() && del.playlistTracks[1].mode == PlaylistTrackMode::unassigned);
     CHECK (del.channels.size() == 2 && del.channels[1].mixerTrack == 2);
 }
+
+TEST (mixer186c_keep_lost_links_option)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.mixer = Song::defaultMixer (6);
+    song.mixer[3].name = "Bus";
+    song.mixer[1].sends = { { 3, 0.7f } };
+    song.mixer[2].sends = { { 3, 0.0f } }; // a side-chain link
+
+    auto fl = song; // the option off (FL): the links go
+    mixerops::deleteTracks (fl, { 3 });
+    CHECK (fl.mixer[1].lostSends.empty() && fl.mixer[2].lostSends.empty());
+
+    mixerops::deleteTracks (song, { 3 }, mixerops::LinkedPlaylistTracks::unlink, true);
+    CHECK ((song.mixer[1].lostSends == std::vector<LostSend> { { "Bus", 0.7f } }));
+    CHECK ((song.mixer[2].lostSends == std::vector<LostSend> { { "Bus", 0.0f } }));
+    CHECK (song.mixer[2].sends.empty()); // (no sound goes anywhere through it)
+
+    // reconnect to insert 4 at its level; not to itself; remove the rest
+    CHECK (! mixerops::reconnectLostSend (song, 2, 0, 2));
+    CHECK (mixerops::reconnectLostSend (song, 2, 0, 4));
+    CHECK (song.mixer[2].lostSends.empty() && song.mixer[2].sends.size() == 1 && song.mixer[2].sends[0].target == 4
+           && song.mixer[2].sends[0].level == 0.0f);
+    mixerops::removeLostSends (song, 1);
+    CHECK (song.mixer[1].lostSends.empty());
+
+    // an unnamed insert is kept by its default name
+    song.mixer[4].name.clear();
+    song.mixer[5].sends = { { 4, 1.0f } };
+    mixerops::deleteTracks (song, { 4 }, mixerops::LinkedPlaylistTracks::unlink, true);
+    CHECK (song.mixer[4].lostSends.size() == 1 && song.mixer[4].lostSends[0].to == "Insert 4");
+}
