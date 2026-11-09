@@ -50,7 +50,7 @@ TEST (playlist189n_create_crossfade_sets_the_overlap_on_both_sides)
     CHECK (clips[0].fadeOut == 200 && clips[1].fadeIn == 200);
     CHECK (! clipops::manualFade (clips[0], 1) && ! clipops::manualFade (clips[1], 0));
     CHECK (clips[0].fadeIn == 300 && clips[1].fadeOut == 100); // the other sides stay
-    CHECK (clipops::crossfadedSide (clips, 1, 0) && clipops::crossfadedSide (clips, 0, 1));
+    CHECK (clipops::flCrossfadePair (clips[0], clips[1])); // FL's FUN_00cf7580 now sees a crossfade
     // touching clips (overlap 0): nothing to do
     CHECK (clipops::createCrossfades (clips, 1, 1, {}) == 0 && clips[2].fadeIn == 0);
 

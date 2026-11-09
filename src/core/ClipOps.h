@@ -840,25 +840,6 @@ inline bool canCreateCrossfade (const std::vector<Clip>& clips, const std::vecto
     return false;
 }
 
-// The side crossfades (FL shows "Reset crossfade tension" there in place of "Reset fade in / out"): LYNX's automatic
-// crossfade, or FL's pair with a fade (FUN_00cf9930 flags 1: FUN_00cf7580, and the tensions equal or opposite,
-// FUN_00cf7690). The fade > 0 condition is LYNX's (INFERRED: FL's handle kinds 2 / 4 only exist on a fade).
-inline bool crossfadedSide (const std::vector<Clip>& clips, int index, int side)
-{
-    if (index < 0 || index >= (int) clips.size())
-        return false;
-    const auto& c = clips[(std::size_t) index];
-    if ((side == 0 ? c.crossfadeIn : c.crossfadeOut) > 0)
-        return true;
-    const auto other = crossfadeNeighbour (clips, index, side);
-    if (other < 0)
-        return false;
-    const auto& a = side == 0 ? clips[(std::size_t) other] : c;
-    const auto& b = side == 0 ? c : clips[(std::size_t) other];
-    const auto tensions = std::abs (a.fadeOutTension - b.fadeInTension) <= 1.0e-6f || std::abs (a.fadeOutTension + b.fadeInTension) <= 1.0e-6f;
-    return a.fadeOut > 0 && flCrossfadePair (a, b) && tensions;
-}
-
 // --- FL's Normalize on the gain handle (Tags 110 / 111, round 189n; [DECOMP] FUN_00d029b0) ----
 // Normalize (and "Normalize selection individually"): each audio clip's gain = 1 / its peak, kept in the gain handle's
 // range -96.1 ... +36 dB (FUN_01064dc0, FUN_010657d0). The peak is the largest |sample| of every channel of the file over

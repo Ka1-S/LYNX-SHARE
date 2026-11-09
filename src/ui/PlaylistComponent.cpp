@@ -3030,21 +3030,15 @@ juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side)
                 clipops::setManualFade (c, side, true); // a set fade is a manual one (FL's fade flags bit 0 / 1)
         });
     };
-    const auto crossfade = clipops::crossfadedSide (song.playlist, index, side);
-
-    // FL's popup (FUN_00cfcdf0, round 189n): "Reset fade in" / "Reset fade out", or "Reset crossfade tension" in its place
-    // where the side crossfades; then "Create crossfade", enabled when the side has a clip to cross (FUN_00d023d0)
-    if (crossfade)
-        menu.addItem (tr ("Reset crossfade tension"), [edit, side] {
-            edit ([side] (Clip& c) { (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f; });
+    // FL 2026's fade handle menu (GUI, rounds 189l / 189n: shots FL-fade-in-menu-overlap.png): "Reset fade in" / "Reset fade
+    // out" even on a crossfaded side, then "Create crossfade", enabled when the side has a clip to cross (FUN_00d023d0).
+    // ("Reset ... tension" belongs to FL's tension handle, the circle in a fade, which LYNX's clip fades don't have.)
+    menu.addItem (side == 0 ? tr ("Reset fade in") : tr ("Reset fade out"), [edit, side] {
+        edit ([side] (Clip& c) {
+            (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+            (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
         });
-    else
-        menu.addItem (side == 0 ? tr ("Reset fade in") : tr ("Reset fade out"), [edit, side] {
-            edit ([side] (Clip& c) {
-                (side == 0 ? c.fadeIn : c.fadeOut) = 0;
-                (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
-            });
-        });
+    });
     std::vector<int> menuClips; // FL's FUN_00cf9770: the selection when the clicked clip is in it, else the clicked clip
     for (auto i : isSelected (index) ? selection : std::vector<int> { index })
         if (i >= 0 && i < (int) song.playlist.size())

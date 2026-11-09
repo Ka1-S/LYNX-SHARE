@@ -10767,8 +10767,8 @@ private:
                 }
             }
             {
-                // round 189n: FL's gain handle menu with two clips selected (Normalize selection individually / as a group)
-                // and the fade in menu of a clip that overlaps the one before it (Create crossfade enabled)
+                // round 189n: FL's gain handle menu with two overlapping clips selected (Normalize selection individually / as a
+                // group) and the later clip's fade in menu (Create crossfade enabled); FL shots in /mnt/e/lynx-work/flgap189n
                 const auto before = offline.getSong();
                 auto song = before;
                 lynx::ChannelDef channel;
@@ -10789,13 +10789,14 @@ private:
                     song.playlist.push_back (clip);
                 }
                 const auto second = (int) song.playlist.size() - 1;
+                song.autoCrossfades = true; // FL's capture: Thief has Automatic crossfades on
                 offline.setSong (song);
                 offline.dispatchPendingMessages();
                 auto& playlist = ui.getPlaylistForSnapshot();
                 playlist.selectForSnapshot ({ second - 1, second });
                 auto gain = playlist.gainMenu (second);
+                auto fadeIn = playlist.fadeHandleMenu (second, 0); // (both selected, as in FL's capture)
                 playlist.selectForSnapshot ({});
-                auto fadeIn = playlist.fadeHandleMenu (second, 0);
                 saveMenus (juce::StringArray { "Gain handle, 2 selected", "Fade in, overlapping" },
                            std::vector<juce::PopupMenu> { gain, fadeIn }, prefix + "-fade-gain189n.png");
                 offline.setSong (before);
