@@ -7983,6 +7983,9 @@ countries: fr be ch ca lu
 "Change declicking mode?" = "Changer le mode de déclic ?"
 "Change the declicking mode of all selected audio clip channels?" = "Changer le mode de déclic de tous les canaux de clip audio sélectionnés ?"
 
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Flux simple"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Flux simple : une seule fenêtre avec les pistes et la ligne de temps ; les autres fenêtres restent à un clic."
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Ajouter un effet à cet insert (ou en déposer un depuis le Navigateur)"
 "Channel on / off (its mute)" = "Canal activé / désactivé (sa sourdine)"

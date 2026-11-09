@@ -17368,6 +17368,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "UiFont179aTests.inc"
 #include "Multilink177bTests.inc"
 #include "Issue97Tests.inc"
+#include "LayoutStyle184aTests.inc"
 #include "Rack116Tests.inc"
 #include "Trial187bTests.inc"
 #include "ProjectKey184aTests.inc"

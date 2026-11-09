@@ -7983,6 +7983,9 @@ countries: tw hk mo
 "Change declicking mode?" = "變更去喀嗒模式?"
 "Change the declicking mode of all selected audio clip channels?" = "變更所有所選音訊片段通道的去喀嗒模式?"
 
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "簡易工作流程"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "簡易工作流程：音軌和時間軸在同一個視窗中；其他視窗一鍵即可開啟。"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "為此插入通道新增效果（或從瀏覽器拖入）"
 "Channel on / off (its mute)" = "通道開 / 關（靜音）"

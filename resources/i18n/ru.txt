@@ -7983,6 +7983,9 @@ countries: ru by kz
 "Change declicking mode?" = "Изменить режим деклика?"
 "Change the declicking mode of all selected audio clip channels?" = "Изменить режим деклика всех выбранных каналов аудиоклипов?"
 
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Простой режим работы"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Простой режим работы: одно окно с дорожками и шкалой времени; остальные окна доступны в один клик."
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Добавить эффект в этот инсерт (или перетащить его из браузера)"
 "Channel on / off (its mute)" = "Канал вкл. / выкл. (его заглушение)"

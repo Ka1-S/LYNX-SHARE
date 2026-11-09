@@ -7983,6 +7983,9 @@ countries: tr
 "Change declicking mode?" = "Declicking modu değiştirilsin mi?"
 "Change the declicking mode of all selected audio clip channels?" = "Seçili tüm ses klibi kanallarının declicking modu değiştirilsin mi?"
 
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Basit iş akışı"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Basit iş akışı: parçalar ve zaman çizelgesi tek pencerede; diğer pencereler bir tık uzakta."
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Bu inserte bir efekt ekle (veya Tarayıcı'dan birini bırak)"
 "Channel on / off (its mute)" = "Kanal açık / kapalı (sesi kapatma)"

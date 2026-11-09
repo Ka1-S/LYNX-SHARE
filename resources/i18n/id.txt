@@ -7983,6 +7983,9 @@ countries: id
 "Change declicking mode?" = "Ubah mode declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Ubah mode declicking semua saluran klip audio yang dipilih?"
 
+# --- Simple workflow layout style (round 184a)
+"Simple workflow" = "Alur kerja sederhana"
+"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Alur kerja sederhana: satu jendela berisi trek dan linimasa; jendela lain tetap sekali klik."
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Tambahkan efek ke insert ini (atau letakkan satu dari Browser)"
 "Channel on / off (its mute)" = "Channel aktif / nonaktif (mute-nya)"
