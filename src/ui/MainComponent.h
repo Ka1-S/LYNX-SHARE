@@ -72,6 +72,9 @@ public:
     void confirmDiscard (std::function<void()> then);
     // The main window came up (issue #62): the detached panels restored with the layout go to their saved place, above it.
     void restoreDetachedWindows() { workspace.restoreDetachedWindows(); }
+    // Issue #123: at start-up without a file to open, FL's "Startup project" (Settings › General › Startup): the default
+    // template as a new untitled project (nothing changes while it is LYNX's default), an empty project or the last one.
+    void openStartupProject();
 
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the

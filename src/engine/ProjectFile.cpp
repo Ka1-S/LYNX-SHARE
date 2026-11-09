@@ -325,6 +325,8 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("sendLoopPosition", false);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
+    if (p.detached) // issue #116 (saved only when not the default)
+        o->setProperty ("detached", true);
     return juce::var (o.release());
 }
 
@@ -338,6 +340,7 @@ PluginRef pluginFromVar (const juce::var& v)
         p.foreign = {};
     p.fixedBuffers = (bool) v.getProperty ("fixedBuffers", false);
     p.separateProcess = (bool) v.getProperty ("separateProcess", false);
+    p.detached = (bool) v.getProperty ("detached", false);
     p.threaded = (bool) v.getProperty ("threaded", true);
     p.maxSizeBuffers = (bool) v.getProperty ("maxSizeBuffers", false);
     p.allowSmartDisable = (bool) v.getProperty ("allowSmartDisable", true);

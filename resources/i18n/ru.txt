@@ -8097,3 +8097,22 @@ countries: ru by kz
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Насколько вероятно, что нота прозвучит при каждом проходе (LYNX; Chance нот в Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "При каждом звучании велосити выбирается случайно между велосити ноты и велосити + этот диапазон (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Велосити отпускания: передаётся с концом ноты инструментам, которые её используют (плагины, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Шаблон по умолчанию не найден; вместо него открыт проект LYNX SHARE по умолчанию"
+"{0} could not be opened." = "Не удалось открыть {0}."
+"Change default template..." = "Изменить шаблон по умолчанию..."
+"Use as default template" = "Использовать как шаблон по умолчанию"
+"Default template" = "Шаблон по умолчанию"
+"Default (LYNX SHARE)" = "По умолчанию (LYNX SHARE)"
+"{0} (not found)" = "{0} (не найден)"
+"Select default project template" = "Выбрать шаблон проекта по умолчанию"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Отстыкована"
+"Minimize" = "Свернуть"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Проект при запуске"
+"Empty project" = "Пустой проект"
+"Last used project" = "Последний проект"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Шаблон по умолчанию открывается по Файл › Новый, а при запуске — если в «Проект при запуске» выбран «Шаблон по умолчанию», как новый проект без имени, поэтому сам шаблон никогда не перезаписывается. Файл › Сохранить как шаблон... добавляет ваши."

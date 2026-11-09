@@ -8097,3 +8097,22 @@ countries: nl be
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Hoe waarschijnlijk de noot klinkt telkens als hij aan de beurt is (LYNX; Live's noot-Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Telkens als hij klinkt, wordt de velocity geloot tussen de velocity van de noot en velocity + dit bereik (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Release-velocity: met het einde van de noot verstuurd naar de instrumenten die hem gebruiken (plugins, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Het standaardsjabloon is niet gevonden; in plaats daarvan is het standaardproject van LYNX SHARE geopend"
+"{0} could not be opened." = "{0} kon niet worden geopend."
+"Change default template..." = "Standaardsjabloon wijzigen..."
+"Use as default template" = "Gebruiken als standaardsjabloon"
+"Default template" = "Standaardsjabloon"
+"Default (LYNX SHARE)" = "Standaard (LYNX SHARE)"
+"{0} (not found)" = "{0} (niet gevonden)"
+"Select default project template" = "Standaard projectsjabloon kiezen"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Losgemaakt"
+"Minimize" = "Minimaliseren"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Project bij het starten"
+"Empty project" = "Leeg project"
+"Last used project" = "Laatst gebruikt project"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Het standaardsjabloon opent met Bestand › Nieuw, en bij het starten als Project bij het starten op \"Standaardsjabloon\" staat, als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."

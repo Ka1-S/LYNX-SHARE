@@ -479,16 +479,25 @@ bool focusIsInPluginView()
     const auto focus = GetFocus();
     if (focus == nullptr)
         return false;
-    const auto root = GetAncestor (focus, GA_ROOT);
+    // the nearest LYNX window up from the focus: a secondary top-level window, or a docked plugin frame (a native child
+    // of the main window, issue #116); the main window itself (its panels) is not a plugin view
     auto* main = mainWindow().getComponent();
-    if (root == nullptr || (main != nullptr && main->getWindowHandle() == (void*) root))
-        return false;
     juce::Component* window = nullptr;
-    for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
-        if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getNativeHandle() == (void*) root)
-            window = &peer->getComponent();
+    HWND root = nullptr;
+    for (auto h = focus; h != nullptr && h != GetDesktopWindow() && window == nullptr; h = GetAncestor (h, GA_PARENT))
+        for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+            if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getNativeHandle() == (void*) h)
+            {
+                window = &peer->getComponent();
+                root = h;
+            }
     if (window == nullptr)
         return false; // (not a LYNX window)
+    if (window == main)
+        return false;
+    // a native child panel (the Channel rack, issue #116) is LYNX's own, not a plugin's view
+    if (GetAncestor (root, GA_ROOT) != root && ! (bool) window->getProperties().getWithDefault ("lynxPluginWindow", false))
+        return false;
     if (focus != root)
     {
         // a native child: the plugin's view, unless it is a native text field

@@ -473,6 +473,7 @@ if(LYNX_BUILD_APP)
     # workflow shell: workspace desktop, control contract, dialogs
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
+        src/ui/NativeChild.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp

@@ -8097,3 +8097,22 @@ countries: it ch sm
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Quanto è probabile che la nota suoni ogni volta che arriva il suo turno (LYNX; il Chance delle note di Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Ogni volta che suona, la velocity viene estratta tra la velocity della nota e velocity + questo intervallo (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity di rilascio: inviata con la fine della nota agli strumenti che la usano (plugin, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Il modello predefinito non è stato trovato; è stato aperto al suo posto il progetto predefinito di LYNX SHARE"
+"{0} could not be opened." = "Impossibile aprire {0}."
+"Change default template..." = "Cambia modello predefinito..."
+"Use as default template" = "Usa come modello predefinito"
+"Default template" = "Modello predefinito"
+"Default (LYNX SHARE)" = "Predefinito (LYNX SHARE)"
+"{0} (not found)" = "{0} (non trovato)"
+"Select default project template" = "Scegli il modello di progetto predefinito"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Separato"
+"Minimize" = "Riduci a icona"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Progetto all'avvio"
+"Empty project" = "Progetto vuoto"
+"Last used project" = "Ultimo progetto usato"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Il modello predefinito si apre con File › Nuovo, e all'avvio quando Progetto all'avvio è \"Modello predefinito\", come nuovo progetto senza titolo, così il modello non viene mai sovrascritto. File › Salva come modello... aggiunge i tuoi."

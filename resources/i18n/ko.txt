@@ -8097,3 +8097,22 @@ countries: kr
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "노트 차례가 올 때마다 재생될 확률 (LYNX; Live의 노트 Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "재생될 때마다 벨로시티가 노트의 벨로시티와 벨로시티 + 이 범위 사이에서 뽑힙니다 (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "릴리스 벨로시티: 노트가 끝날 때 이를 사용하는 악기로 보내집니다 (플러그인, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "기본 템플릿을 찾을 수 없어 대신 LYNX SHARE의 기본 프로젝트를 열었습니다"
+"{0} could not be opened." = "{0}을(를) 열 수 없습니다."
+"Change default template..." = "기본 템플릿 변경..."
+"Use as default template" = "기본 템플릿으로 사용"
+"Default template" = "기본 템플릿"
+"Default (LYNX SHARE)" = "기본값 (LYNX SHARE)"
+"{0} (not found)" = "{0} (찾을 수 없음)"
+"Select default project template" = "기본 프로젝트 템플릿 선택"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "분리됨"
+"Minimize" = "최소화"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "시작 프로젝트"
+"Empty project" = "빈 프로젝트"
+"Last used project" = "마지막으로 사용한 프로젝트"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "기본 템플릿은 파일 › 새로 만들기에서, 그리고 시작 프로젝트가 \"기본 템플릿\"일 때 시작할 때 이름 없는 새 프로젝트로 열리므로 템플릿 자체는 덮어쓰지 않습니다. 파일 › 템플릿으로 저장...으로 직접 만든 템플릿을 추가합니다."

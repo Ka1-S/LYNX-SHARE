@@ -8097,3 +8097,22 @@ countries: de at ch li lu
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Wie wahrscheinlich die Note bei jedem Durchlauf spielt (LYNX; Lives Noten-Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Bei jedem Spielen wird die Velocity zwischen der Velocity der Note und Velocity + diesem Bereich ausgewürfelt (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Release-Velocity: wird mit dem Notenende an die Instrumente gesendet, die sie nutzen (Plugins, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Die Standardvorlage wurde nicht gefunden; stattdessen wurde das Standardprojekt von LYNX SHARE geöffnet"
+"{0} could not be opened." = "{0} konnte nicht geöffnet werden."
+"Change default template..." = "Standardvorlage ändern..."
+"Use as default template" = "Als Standardvorlage verwenden"
+"Default template" = "Standardvorlage"
+"Default (LYNX SHARE)" = "Standard (LYNX SHARE)"
+"{0} (not found)" = "{0} (nicht gefunden)"
+"Select default project template" = "Standard-Projektvorlage wählen"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Abgelöst"
+"Minimize" = "Minimieren"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Projekt beim Start"
+"Empty project" = "Leeres Projekt"
+"Last used project" = "Zuletzt verwendetes Projekt"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Die Standardvorlage öffnet sich mit Datei › Neu und beim Start, wenn Projekt beim Start auf „Standardvorlage\" steht, als neues, unbenanntes Projekt, die Vorlage selbst wird also nie überschrieben. Datei › Als Vorlage speichern... fügt eigene hinzu."

@@ -8180,3 +8180,22 @@ countries: br
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "A probabilidade de a nota tocar a cada vez que chega a vez dela (LYNX; o Chance de nota do Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "A cada vez que toca, a velocity é sorteada entre a velocity da nota e a velocity + esta faixa (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity de soltura: enviada com o fim da nota aos instrumentos que a usam (plugins, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "O modelo padrão não foi encontrado; o projeto padrão do LYNX SHARE foi aberto no lugar dele"
+"{0} could not be opened." = "Não foi possível abrir {0}."
+"Change default template..." = "Mudar o modelo padrão..."
+"Use as default template" = "Usar como modelo padrão"
+"Default template" = "Modelo padrão"
+"Default (LYNX SHARE)" = "Padrão (LYNX SHARE)"
+"{0} (not found)" = "{0} (não encontrado)"
+"Select default project template" = "Escolher o modelo padrão de projeto"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Destacada"
+"Minimize" = "Minimizar"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Projeto ao iniciar"
+"Empty project" = "Projeto vazio"
+"Last used project" = "Último projeto usado"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "O modelo padrão abre com Arquivo › Novo, e ao iniciar quando Projeto ao iniciar é \"Modelo padrão\", como um projeto novo sem nome, então o próprio modelo nunca é sobrescrito. Arquivo › Salvar como modelo... adiciona os seus."

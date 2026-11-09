@@ -8097,3 +8097,22 @@ countries: pl
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Jak prawdopodobne jest, że nuta zagra za każdym razem, gdy przyjdzie jej kolej (LYNX; Chance nut z Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Za każdym razem velocity jest losowane między velocity nuty a velocity + tym zakresem (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity zwolnienia: wysyłane z końcem nuty do instrumentów, które go używają (wtyczki, Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "Nie znaleziono domyślnego szablonu; zamiast niego otwarto domyślny projekt LYNX SHARE"
+"{0} could not be opened." = "Nie udało się otworzyć {0}."
+"Change default template..." = "Zmień domyślny szablon..."
+"Use as default template" = "Użyj jako domyślnego szablonu"
+"Default template" = "Domyślny szablon"
+"Default (LYNX SHARE)" = "Domyślny (LYNX SHARE)"
+"{0} (not found)" = "{0} (nie znaleziono)"
+"Select default project template" = "Wybierz domyślny szablon projektu"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "Odłączony"
+"Minimize" = "Minimalizuj"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "Projekt przy starcie"
+"Empty project" = "Pusty projekt"
+"Last used project" = "Ostatnio używany projekt"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Domyślny szablon otwiera się przez Plik › Nowy, a przy starcie, gdy Projekt przy starcie to „Domyślny szablon\", jako nowy projekt bez nazwy, więc sam szablon nigdy nie zostaje nadpisany. Plik › Zapisz jako szablon... dodaje własne."

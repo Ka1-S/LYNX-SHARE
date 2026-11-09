@@ -8097,3 +8097,22 @@ countries: jp
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "ノートの順番が来るたびに鳴る確率 (LYNX; Live のノート Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "鳴るたびに、ベロシティはノートのベロシティとベロシティ + この範囲の間で抽選されます (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "リリースベロシティ: ノートの終わりとともに、それを使う楽器へ送られます (プラグイン、Patcher)"
+# --- Default template (issue #123, round 186a)
+"The default template was not found; LYNX SHARE's default project opened instead" = "デフォルトのテンプレートが見つからないため、代わりに LYNX SHARE のデフォルトのプロジェクトを開きました"
+"{0} could not be opened." = "{0} を開けませんでした。"
+"Change default template..." = "デフォルトのテンプレートを変更..."
+"Use as default template" = "デフォルトのテンプレートとして使用"
+"Default template" = "デフォルトのテンプレート"
+"Default (LYNX SHARE)" = "デフォルト (LYNX SHARE)"
+"{0} (not found)" = "{0} (見つかりません)"
+"Select default project template" = "デフォルトのプロジェクトテンプレートを選択"
+
+# --- Docked plugin windows (issue #116, round 186a)
+"Detached" = "切り離し"
+"Minimize" = "最小化"
+
+# --- Startup project (issue #123, round 186a)
+"Startup project" = "起動時のプロジェクト"
+"Empty project" = "空のプロジェクト"
+"Last used project" = "最後に使用したプロジェクト"
+"The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "デフォルトのテンプレートは ファイル › 新規 で、また起動時のプロジェクトが「デフォルトのテンプレート」のときは起動時にも、名前のない新しいプロジェクトとして開くため、テンプレート自体が上書きされることはありません。ファイル › テンプレートとして保存... で独自のものを追加できます。"
