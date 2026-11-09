@@ -45,6 +45,12 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 class WrapperSettingsPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    bool hostProcessesKeys() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref != nullptr && ref->allowHostKeys && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
+    }
+
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
         : engine (e), find (std::move (f)), plugin (p)
     {
@@ -268,6 +274,10 @@ private:
     // A 32-bit plugin always runs bridged: FL's Processing page has no "Make bridged" for it [UI fl25c vs fl34c]
     bool hiddenOption (std::size_t i) const
     {
+       #if ! JUCE_WINDOWS
+        if (wrapperOptions()[i].member == &PluginRef::allowHostKeys) // (the keyboard hook is Windows' only)
+            return true;
+       #endif
         return wrapperOptions()[i].member == &PluginRef::separateProcess && isBridged32 (plugin);
     }
 
@@ -350,6 +360,9 @@ private:
         {
             toggles[(int) i]->setToggleState (ref->*(options[i].member), juce::dontSendNotification);
             toggles[(int) i]->setEnabled (! options[i].needsFixed || ref->fixedBuffers);
+            // a plugin in another process has its own keyboard: the option can't reach it (issue #99 is that case)
+            if (options[i].member == &PluginRef::allowHostKeys && (ref->separateProcess || pluginSandboxEnabled() || isBridged32 (plugin)))
+                toggles[(int) i]->setEnabled (false);
         }
         // with Options › "Run plugins in a separate process" every plugin already runs bridged
         for (std::size_t i = 0; i < options.size(); ++i)
@@ -429,6 +442,7 @@ public:
     }
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
+    bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
 
     // the picker's label follows the slot's side input (the window's timer)
     void refreshSidechain()
@@ -559,6 +573,13 @@ public:
 
         const auto resizable = editor->isResizable();
         shownEditor = editor;
+        // (issue #96: as in FL, what it leaves unused plays the typing keyboard. A plugin in another process has its
+        // own keyboard: issue #99 is that case, this path stays away from it.)
+        if (sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin))
+        {
+            listenForKeysPluginLeaves (*editor);
+            getProperties().set ("lynxPluginWindow", true);
+        }
         thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
         if (context.engine != nullptr && context.find) // FL's wrapper header and settings page (round 146a)
             setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel, context.track, context.slot), true);
@@ -868,6 +889,13 @@ private:
 
 namespace PluginWindows
 {
+bool letsHostProcessKeys (juce::Component& window)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    return wrapped != nullptr && wrapped->hostProcessesKeys();
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();

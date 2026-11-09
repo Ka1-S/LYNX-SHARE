@@ -48,6 +48,8 @@ std::vector<EditorCrash> editorCrashes();
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;
+// `window` is a plugin's window and that plugin has "Allow LYNX to process keyboard presses" on (issue #96)
+bool letsHostProcessKeys (juce::Component& window);
 } // namespace PluginWindows
 
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.

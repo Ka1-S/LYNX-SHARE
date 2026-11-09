@@ -4198,6 +4198,8 @@ countries: kr
 "Reset plugin when LYNX SHARE resets" = "LYNX SHARE가 초기화할 때 플러그인 초기화"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "내보내기 전과 패닉 시 플러그인 초기화(테일과 지속 노트 제거)"
 "Send loop position" = "루프 위치 보내기"
+"Allow LYNX to process keyboard presses" = "LYNX가 키 입력을 처리하도록 허용"
+"Plain keys go to the typing keyboard and LYNX's shortcuts before this plugin gets them; its text fields keep typing" = "일반 키는 이 플러그인보다 먼저 타이핑 키보드와 LYNX 단축키로 전달됩니다. 플러그인의 텍스트 필드에는 계속 입력할 수 있습니다"
 "Let the plugin know about loop start and end points" = "루프 시작 및 끝 지점을 플러그인에 알림"
 
 # --- Patcher Surface (REA round 151)

@@ -23,6 +23,15 @@ void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> h
 // Runs that handler for a key from elsewhere (a separate-process plugin's window, issue #99); false when none ran.
 bool runSecondaryWindowKey (const juce::KeyPress& key);
 
+// Plain keys (letters, digits, punctuation) with the focus in a hosted plugin's own view (round 181c, issue #96). As in
+// FL, a key the plugin leaves unused goes on to the typing keyboard: `left` gets what comes back from the plugin's view
+// (listenForKeysPluginLeaves on its editor). The plugin gets the key first, unless `allows` says that window's plugin
+// lets the host process them (FL's per-plugin option; Windows): then `first` gets it before the plugin, and what it
+// takes never reaches the plugin, repeats and key-up included. A native text field in the plugin always keeps its keys.
+void setPluginViewPlainKeyHandler (std::function<bool (juce::Component& window)> allows, std::function<bool (const juce::KeyPress&)> first,
+                                   std::function<bool (const juce::KeyPress&)> left);
+void listenForKeysPluginLeaves (juce::Component& pluginEditor);
+
 // Before a drag (a sample from the Browser...): JUCE finds the drop target in its own list of windows, where the main
 // window comes first after any click in it, while the windows kept above it (channel settings, a plugin...) are on top
 // on the screen. This puts those windows back above the main window in that list, in their screen order, so a drop on
