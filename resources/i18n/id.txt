@@ -8087,3 +8087,17 @@ countries: id
 "Hints and warnings" = "Petunjuk dan peringatan"
 "Manage messages" = "Kelola pesan"
 "Delete the selected mixer tracks" = "Hapus trek Mixer yang dipilih"
+
+# --- Project key (round 184a, S11)
+"Project key" = "Kunci nada proyek"
+"Project key: the scale the song is in. Click to choose it, or to guess it from the notes" = "Kunci nada proyek: tangga nada lagu. Klik untuk memilihnya, atau menebaknya dari not"
+"Guess from notes" = "Tebak dari not"
+"No notes to guess from yet" = "Belum ada not untuk ditebak"
+"{0} of {1} notes in scale" = "{0} dari {1} not dalam tangga nada"
+"Choose the root" = "Pilih nada dasar"
+"More scales" = "Tangga nada lainnya"
+"major" = "mayor"
+"major pentatonic" = "pentatonik mayor"
+"minor pentatonic" = "pentatonik minor"
+"blues" = "blues"
+"harmonic minor" = "minor harmonik"

@@ -8087,3 +8087,17 @@ countries: fr be ch ca lu
 "Hints and warnings" = "Conseils et avertissements"
 "Manage messages" = "Gérer les messages"
 "Delete the selected mixer tracks" = "Supprimer les pistes de Mixer sélectionnées"
+
+# --- Project key (round 184a, S11)
+"Project key" = "Tonalité du projet"
+"Project key: the scale the song is in. Click to choose it, or to guess it from the notes" = "Tonalité du projet : la gamme du morceau. Cliquez pour la choisir ou la deviner d'après les notes"
+"Guess from notes" = "Deviner d'après les notes"
+"No notes to guess from yet" = "Pas encore de notes pour deviner"
+"{0} of {1} notes in scale" = "{0} notes sur {1} dans la gamme"
+"Choose the root" = "Choisir la tonique"
+"More scales" = "Plus de gammes"
+"major" = "majeur"
+"major pentatonic" = "pentatonique majeure"
+"minor pentatonic" = "pentatonique mineure"
+"blues" = "blues"
+"harmonic minor" = "mineur harmonique"

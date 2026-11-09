@@ -8087,3 +8087,17 @@ countries: ru by kz
 "Hints and warnings" = "Подсказки и предупреждения"
 "Manage messages" = "Управление сообщениями"
 "Delete the selected mixer tracks" = "Удалить выбранные дорожки микшера"
+
+# --- Project key (round 184a, S11)
+"Project key" = "Тональность проекта"
+"Project key: the scale the song is in. Click to choose it, or to guess it from the notes" = "Тональность проекта: лад песни. Щёлкните, чтобы выбрать её или определить по нотам"
+"Guess from notes" = "Определить по нотам"
+"No notes to guess from yet" = "Пока нет нот для определения"
+"{0} of {1} notes in scale" = "{0} из {1} нот в ладу"
+"Choose the root" = "Выбрать тонику"
+"More scales" = "Другие лады"
+"major" = "мажор"
+"major pentatonic" = "мажорная пентатоника"
+"minor pentatonic" = "минорная пентатоника"
+"blues" = "блюз"
+"harmonic minor" = "гармонический минор"
