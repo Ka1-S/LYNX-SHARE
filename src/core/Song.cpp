@@ -1595,6 +1595,7 @@ int applyBounce (Song& song, int track, const std::string& samplePath, std::int6
     ChannelDef c;
     c.name = copy.name;
     c.instrument = InstrumentKind::audioClip;
+    c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
     c.samplePath = samplePath;
     c.mixerTrack = newTrack;
     c.volume = audioClipUnityVolume; // the render plays at the level of what it replaces (1.0 was +5.18 dB, round 186b)

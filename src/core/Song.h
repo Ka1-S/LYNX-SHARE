@@ -68,6 +68,12 @@ float channelGain (float volume) noexcept;
 // AudioTrack.fst and never set the volume, FUN_01188230 / FUN_012fbda0), the FL Studio export's option A (round 182b/186b).
 inline constexpr float audioClipUnityVolume = 10000.0f / 12800.0f;
 
+// FL's audio clip channel template (Data/System/AudioTrack.fst, 0xD7 byte 0x53 = 1, round 189l/189n): a NEW audio clip
+// channel declicks in mode 1 (4 ms transient attack at a clip start, sharp end). Every place that makes a new audio
+// clip channel sets it. SamplerSettings keeps 0 as its default: .lynx files store declickMode only when it is not 0, so
+// saved projects load with the mode they were saved with.
+inline constexpr int audioClipDeclickMode = 1;
+
 // Which running instance a channel or mixer effect slot is (round 168s, issue #32): a number given when the channel /
 // slot is made, kept by every copy (snapshots, undo, moving it in its list) and never saved. The renderer keeps an
 // instrument / effect with its channel / slot when the list order changes (inserting a channel, moving an effect up),

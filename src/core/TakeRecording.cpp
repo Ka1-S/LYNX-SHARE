@@ -202,6 +202,7 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
         ChannelDef c;
         c.name = f.name;
         c.instrument = InstrumentKind::audioClip;
+        c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
         c.samplePath = f.path;
         c.mixerTrack = f.insert > 0 && f.insert < (int) song.mixer.size() ? f.insert : song.claimFreeInsert();
         song.channels.push_back (c);

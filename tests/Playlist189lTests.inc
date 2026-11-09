@@ -127,3 +127,34 @@ TEST (playlist189l_unique_sample_renders_pitch_stretch_reverse)
     clipops::resetRenderedClip (c, 4);
     CHECK (c.channel == 4 && c.offset == 0 && c.offsetFraction == 0.0f && c.pitch == 0.0f && c.stretch == 1.0 && ! c.reversed);
 }
+
+// --- Round 189n: a NEW audio clip channel takes FL's AudioTrack.fst declick mode 1; ChannelDef's default stays 0 so saved
+// projects (declickMode stored only when not 0) load as saved ----
+#include "core/PlaylistOps.h"
+#include "core/QuickRender.h"
+
+TEST (playlist189n_new_audio_clip_channels_take_fl_template_declick)
+{
+    using namespace lynx;
+    CHECK (ChannelDef{}.sampler.declickMode == 0);
+    CHECK (audioClipDeclickMode == 1);
+
+    auto song = Song::makeDefault();
+    CHECK (trackmodes::dropOnHeader (song, 5, "C:/s/Conga.wav", "Conga", 300, trackmodes::HeaderDrop::audioTracks, true));
+    CHECK (song.channels.back().instrument == InstrumentKind::audioClip && song.channels.back().sampler.declickMode == 1);
+    CHECK (trackmodes::dropOnHeader (song, 6, "C:/s/Conga.wav", "Conga", 300, trackmodes::HeaderDrop::instrumentTracks, false));
+    CHECK (song.channels.back().instrument == InstrumentKind::sampler && song.channels.back().sampler.declickMode == 0);
+
+    const auto channel = quickrender::applyPatternRender (song, 0, "C:/r/Pattern 1.wav", false);
+    CHECK (channel >= 0 && song.channels[(std::size_t) channel].sampler.declickMode == 1);
+
+    // a channel the project already has keeps its mode when a drop reuses it
+    song.channels.back().sampler.declickMode = 0;
+    ChannelDef old;
+    old.instrument = InstrumentKind::audioClip;
+    old.samplePath = "C:/s/Old.wav";
+    song.channels.push_back (old);
+    const auto oldIndex = (int) song.channels.size() - 1;
+    CHECK (trackmodes::dropOnHeader (song, 7, "C:/s/Old.wav", "Old", 300, trackmodes::HeaderDrop::audioClips, false));
+    CHECK (song.playlist.back().channel == oldIndex && song.channels[(std::size_t) oldIndex].sampler.declickMode == 0);
+}

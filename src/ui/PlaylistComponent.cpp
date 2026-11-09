@@ -7653,6 +7653,7 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
             ChannelDef c;
             c.name = name;
             c.instrument = InstrumentKind::audioClip;
+            c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
             c.samplePath = path;
             // dropped on an audio track: the new channel plays through its mixer track (FL [DECOMP FUN_012f2a10])
             const auto linked = trackmodes::armableInsert (s, track);
