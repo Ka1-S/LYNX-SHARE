@@ -295,7 +295,8 @@ bool directWaveProgram (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 }
 
 // FLM's MiniSynth → LYNX's MiniSynth engine (F4). FLM's parameters 1…43 are the desktop plugin's 0…42, in the same
-// order (the two parameter-name tables, FLM_FORMAT §7.1 and REA_rodada41 §1.2); FLM's 0 is the module's Enable. The
+// order (the two parameter-name tables, FLM_FORMAT §7.1 and REA_rodada41 §1.2; PROVEN-REA setter 0x1806af050 and
+// A/B inside FL, round 190n); FLM's 0 is the module's Enable. The
 // state is written the way the desktop plugin saves it ("SSLF" + its .flms preset: signature, HEAD with the name, DATA
 // "0rev" + 43 floats); the wave tables come from oscdata.dat, which FLM's resources and FL's MiniSynth folder share.
 bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
@@ -334,7 +335,13 @@ bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     for (std::size_t i = 1; i <= 43; ++i)
     {
         std::uint32_t bits;
-        const auto v = std::clamp (m.params[i], 0.0f, 1.0f);
+        auto v = std::clamp (m.params[i], 0.0f, 1.0f);
+        // MW Dest has three steps in FLM (filter, LFO amount, OSC Mod) and two on the desktop (below 1 = filter,
+        // 1 = LFO amount); OSC Mod has no desktop twin, so its wheel amount goes to 0 (spec-minisynth-diff §3.2)
+        if (i == 4)
+            v = v >= 0.5f && v < 1.0f ? 1.0f : 0.0f;
+        if (i == 5 && m.params[4] >= 1.0f)
+            v = 0.0f;
         std::memcpy (&bits, &v, 4);
         u32 (bits);
     }
@@ -346,6 +353,7 @@ bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     if (! miniSynthStateUsable (state))
         return false;
     c.instrument = InstrumentKind::minisynth;
+    c.modelParams = { 1.0f }; // FLM's build of the engine: velocity as it is, balance pan, 5 voices (core/MiniSynth.h)
     c.pluginState = std::move (state);
     c.samplePath = oscdata;
     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: MiniSynth");

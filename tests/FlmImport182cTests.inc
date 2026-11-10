@@ -91,7 +91,7 @@ inline Bytes sample (const std::string& name, const std::string& root, const std
 }
 
 inline Bytes module (std::uint32_t type, std::uint32_t id, const std::string& presetFile = {}, const std::string& presetName = "Default/Default",
-                     int keyLow = 0, int keyHigh = 127, int params = 4)
+                     int keyLow = 0, int keyHigh = 127, int params = 4, bool ramp = false)
 {
     Bytes b;
     u32 (b, type);
@@ -109,7 +109,7 @@ inline Bytes module (std::uint32_t type, std::uint32_t id, const std::string& pr
     lp32 (prst, presetName);
     Bytes prms;
     for (int k = 0; k < params; ++k)
-        f32 (prms, 0.5f);
+        f32 (prms, ramp ? (float) k / 100.0f : 0.5f); // ramp: every parameter its own value (order checks)
     return chunk ("RMOd", cat ({ b, chunk ("HEAD", h), chunk ("DESC", desc), chunk ("PRST", prst), chunk ("ADD1", add1), chunk ("PRMS", prms) }));
 }
 
@@ -282,7 +282,7 @@ inline Bytes project()
                                            module (7, 3) }),
                   rack (flm::kindNormal, {}, { sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav"), sample ("Snare", "@R@", "Drum Samples\\Snare\\Gone.wav") }),
                   rack (flm::kindNormal, { module (35, 2) }),
-                  rack (flm::kindNormal, { module (0, 2, {}, "Default/Default", 0, 127, 44) }),
+                  rack (flm::kindNormal, { module (0, 2, {}, "Default/Default", 0, 127, 44, true) }),
                   rack (flm::kindBus, { module (12, 2) }),
                   channel (flm::kindMaster, "MASTER", 0, { lane (1, "Level", { clip (8, 0, 16, 0, 1, { { 0, 0, -5 } }) }, 0, 0) }),
                   // 2 clips of content 1 (8 beats, 4-beat loop → 2 passes each) and one of content 2 starting 1 beat in
@@ -441,7 +441,29 @@ TEST (flm182c_imports_a_project)
     if (lead != nullptr)
     {
         const auto params = miniSynthParams (lead->pluginState);
-        CHECK (params.size() == 43 && std::all_of (params.begin(), params.end(), [] (float v) { return std::abs (v - 0.5f) < 1e-6f; }));
+        CHECK (params.size() == 43);
+        for (std::size_t k = 0; k < params.size(); ++k) // desktop parameter k = FLM's k + 1 (A/B inside FL, round 190n)
+            CHECK (std::abs (params[k] - (k == 3 ? 0.0f : (float) (k + 1) / 100.0f)) < 1e-6f); // (MW Dest 0.04: FLM's first step)
+        CHECK (miniSynthIsFlm (*lead)); // FLM's build of the engine
+        // FLM's build: balance pan (centre 1, 1) against the desktop's equal-power law, the velocity as it is
+        auto noisy = lead->pluginState;
+        const auto at = miniSynthParamOffset (noisy, 7); // OSC Noise (plays without the wave tables)
+        CHECK (at > 0);
+        if (at > 0)
+        {
+            const float one = 1.0f;
+            std::memcpy (noisy.data() + at, &one, 4);
+            // Init.Vol 1 is MIDI velocity 100 on the desktop; FLM's module takes 100 / 127 itself
+            const auto rms = [&noisy] (bool flm) {
+                const auto y = minisynth::renderReference (noisy, { { 0, 60, flm ? 100.0 / 127.0 : 1.0, 1.0, 0.0, 0.0, 20000 } }, 44100.0, 16384, "", 512, 120.0, 0, -1.0, true, flm);
+                double e = 0.0;
+                for (const auto v : y)
+                    e += (double) v * v;
+                return std::sqrt (e / (double) std::max<std::size_t> (1, y.size()));
+            };
+            const auto desktop = rms (false), mobile = rms (true);
+            CHECK (desktop > 1e-4 && mobile > desktop * 1.3 && mobile < desktop * 1.55); // +3 dB at centre
+        }
     }
     CHECK (report.converted.count ("FL Studio Mobile: MiniSynth") == 1 && report.unsupported.count ("FL Studio Mobile: MiniSynth") == 0);
     // effects: Graphic EQ, Reverb 2 and the legacy Reverb are mapped since round 188f (F5), the Limiter since 188h
