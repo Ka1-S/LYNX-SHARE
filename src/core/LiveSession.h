@@ -29,7 +29,8 @@
 namespace lynx::live
 {
 // 2 (round 169j): resume after a drop, chat, transport, permissions during the session, live stand-ins, FLAC media
-constexpr int protocolVersion = 2;
+// 3 (round 190ai): P5-A1 remote plugins — PluginRef::playedBy / values, the host's "shared" and "rbusy" messages
+constexpr int protocolVersion = 3;
 // how many commits the host keeps to replay to someone who reconnects (§1.5; older: a fresh snapshot)
 constexpr std::size_t replayLimit = 4096;
 
