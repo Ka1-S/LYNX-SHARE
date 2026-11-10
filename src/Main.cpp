@@ -76,6 +76,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
+#include "ui/FlVoicePanel.h"
 #include "core/LynxBanks.h"
 #include "core/NativeEngines.h"
 #include "ui/ControllerEditors.h"
@@ -11458,7 +11459,14 @@ private:
                 if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fruityslicer)
                 {
                     saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fruityslicer.png");
-                    saveWindow (lynx::makeChannelFrame (offline, c, 1), "-fruityslicer-envelope.png"); // round 190f: its Envelope / instrument page
+                    // rounds 190f / 190m: its Envelope / instrument page, one picture per target
+                    saveWindow (lynx::makeChannelFrame (offline, c, 1), "-fruityslicer-envelope.png");
+                    for (const auto& [target, name] : std::vector<std::pair<int, const char*>> { { 0, "panning" }, { 2, "modx" }, { 3, "mody" }, { 4, "pitch" } })
+                    {
+                        auto frame = lynx::makeChannelFrame (offline, c, 1);
+                        lynx::showFlVoiceTarget (*frame, target);
+                        saveWindow (std::move (frame), juce::String ("-fruityslicer-envelope-") + name + ".png");
+                    }
                     break;
                 }
 
