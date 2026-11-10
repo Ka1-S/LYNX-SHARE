@@ -92,12 +92,12 @@ only (a .flm's kinds are static) and starts an enabled slot faded in.
 
 | Kind | Law | Status in LYNX |
 |---|---|---|
-| DIST | sample-and-hold of clamp(Y⁴)·256 + 1 samples; held value x/(|x|·k + 1)·(0.1 − 0.09·Y)·(k + 1), k = 10^(4·(X + lfo) + 1); no fade | implemented from the law (PROVEN) |
-| PHAS | six one-pole all-pass stages, a = (1 − w)/(1 + w), w = (100 + X²·(1 + lfo)·39 900)·0.5/fs clamped 0.001…0.499; feedback 0.98·(0.6·Y)^(1/3); wet added to dry; tail 0.25 s | implemented (INFERRED) |
-| F LP | four biquads with one sample between stages; f = 2^(8.28·clamp(X + lfo) + 6) Hz, q = 2·Y² + 1; cross-faded with dry | implemented (INFERRED) |
-| DLY | two lines of 1.5 s; delay = slot period in seconds, halved while above 1.5 s; write = fade·input + wet; wet = line·X² through a one-pole low-pass (coefficient 0.01 + 0.99·min(2Y, 1)), one sample later a one-pole high-pass (0.45·max(2Y − 1, 0)); output += wet·(1 ± lfo) per side, LFO per sample; a new length clears the lines; runs on until 1.5 s of silence | implemented (INFERRED) |
-| RVRB | FLM's plate engine (the one behind its Reverb modules, rounds 182c / 188h): decay ⌊1 + 199·0.75·X³ + ½⌋ tenths of a second, damping ⌊5 + 216·Y² + ½⌋ ×100 Hz, low cut 317 Hz, no high cut, room 100, diffusion 100, no predelay, dry off, early reflections muted, wet 0.3·10^(t/200) with t = ⌊−361 + 421·(0.5 + 0.15·X³) + ½⌋; input × fade, output added; stops after 0.25 s of silence. **PROVEN** (this corrects the 190u spec, which had Y² as the decay) | implemented on LYNX's Reeverb 2 plate with the wet gain applied exactly. Not reproduced: FLM's second input-diffuser coefficient (about +0.4 dB of tilt on the wet, round 188h) |
-| PAN | two lines of ⌊0.002·fs⌋ samples; position X + lfo and depth √Y smoothed 0.005; the far side delayed and lowered | implemented (INFERRED) |
+| DIST | sample-and-hold of clamp(Y⁴)·256 + 1 samples; held value x/(|x|·k + 1)·(0.1 − 0.09·Y)·(k + 1), k = 10^(4·(X + lfo) + 1); no fade | implemented from the law (PROVEN, MEASURED) |
+| PHAS | six one-pole all-pass stages, a = (1 − w)/(1 + w), w = (100 + X²·(1 + lfo)·39 900)·0.5/fs clamped 0.001…0.499; feedback 0.98·(0.6·Y)^(1/3); wet added to dry; tail 0.25 s | implemented (MEASURED: the phaser moves the harmonics by −7.7…+11.6 dB, the same in LYNX to 0.1 dB) |
+| F LP | four biquads with one sample between stages; f = 2^(8.28·clamp(X + lfo) + 6) Hz, q = 2·Y² + 1; cross-faded with dry | implemented (MEASURED) |
+| DLY | two lines of 1.5 s; delay = slot period in seconds, halved while above 1.5 s; write = fade·input + wet; wet = line·X² through a one-pole low-pass (coefficient 0.01 + 0.99·min(2Y, 1)), one sample later a one-pole high-pass (0.45·max(2Y − 1, 0)); output += wet·(1 ± lfo) per side, LFO per sample; a new length clears the lines; runs on until 1.5 s of silence | implemented (MEASURED: echoes −12 dB apiece down to −88 dB within 0.5 dB) |
+| RVRB | FLM's plate engine (the one behind its Reverb modules, rounds 182c / 188h): decay ⌊1 + 199·0.75·X³ + ½⌋ tenths of a second, damping ⌊5 + 216·Y² + ½⌋ ×100 Hz, low cut 317 Hz, no high cut, room 100, diffusion 100, no predelay, dry off, early reflections muted, wet 0.3·10^(t/200) with t = ⌊−361 + 421·(0.5 + 0.15·X³) + ½⌋; input × fade, output added; stops after 0.25 s of silence. **PROVEN** (this corrects the 190u spec, which had Y² as the decay) | implemented on LYNX's Reeverb 2 plate with the wet gain applied exactly. Not reproduced: FLM's second input-diffuser coefficient (round 188h). MEASURED: the same decay rate (−21.9 dB/s on both), the tail 0.6…1.1 dB louder in LYNX, ±2 dB per third-octave band |
+| PAN | two lines of ⌊0.002·fs⌋ samples; position X + lfo and depth √Y smoothed 0.005; the far side delayed and lowered | implemented (INFERRED; measured only at the centre position, where it is a pass-through) |
 | FLNG, F HP, RING, VOX | not read in detail | pass through; the import report lists them when switched on. None is switched on in FLM's shipped content |
 
 ## 7. Import (`gmSynthState`)
@@ -115,10 +115,26 @@ only (a .flm's kinds are static) and starts an enabled slot faded in.
 
 ## 8. Measurements (FLM inside FL through "FL Studio Mobile Rack", against LYNX's import of the same module)
 
-Method of round 190u (`score_osc.py`): energy ratio, level per 125 ms, third-octave bands, best-lag error per note.
-The numbers are in `/mnt/e/lynx-work/flm190ab/gms/NOTES.md` (work folder) and in the round's report. Waveform error
-is bounded by the random start phases and the dither (section 2), so level and spectrum are the criteria for patches
-with free-running phases.
+Ten renders, 2026-11-10; method of round 190u (energy ratio, level per 125 ms, third-octave bands, best-lag error per
+note) plus the levels of the harmonics of the first two notes. Sets: the default patch (Sine), Saw with LP / "BP" /
+HP at cutoff 0.5, Saw with one effect each at X = Y = 0.5, Saw with Slide Time 0.5.
+
+| Set | Energy FLM − LYNX | Level mean / max | Harmonics, max difference | Note |
+|---|---|---|---|---|
+| default | −0.02 dB | 0.05 / 0.36 dB | 0.27 dB (4) | waveform error −36.8 dB; the AM trace matches |
+| LP, resonance 0.8 | −0.02 | 0.14 / 1.39 | 0.04 dB (16), 0.22 dB (32) | |
+| "BP", resonance 0 | −0.02 | 0.10 / 1.49 | 0.03 dB (9), 0.21 dB (18) | |
+| HP, resonance 0.8 | −0.02 | 0.14 / 0.95 | 0.05 dB (40), 0.30 dB (40) | |
+| RVRB | +0.01 | 0.25 / 1.30 | 1.0…2.6 dB | tail 0.6…1.1 dB louder in LYNX, same decay rate |
+| PHAS | −0.02 | 0.10 / 1.42 | 0.06 dB, 0.30 dB | |
+| F LP | −0.02 | 0.11 / 1.55 | 0.03 dB (7), 0.13 dB (14) | |
+| DIST | −0.01 | 0.03 / 0.30 | 1.2 dB | the hold counter runs free: its phase against the note differs |
+| DLY | −0.02 | 0.13 / 0.81 | 0.08 dB, 0.39 dB | echoes within 0.5 dB down to −88 dB |
+| Slide Time 0.5 (+ PAN at centre) | −0.70 | 0.36 / 3.04 | — | pitch track equal window by window; 3 dB apart only while keys 36 and 48 sound together (an octave pair: its sum depends on the random start phases) |
+
+The level maxima are the windows at note boundaries (FLM inside FL starts a note up to one block late). The waveform
+error is bounded by the random start phases and the dither (section 2), so level and spectrum are the criteria. The
+second note's −0.1 dB is the test renderer's 8-bit velocity, not the engine.
 
 ## 9. Desktop GMS
 
