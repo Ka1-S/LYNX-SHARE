@@ -8267,3 +8267,5 @@ countries: tr
 "Mixer groups follow the Playlist (LYNX)" = "Mikser grupları Playlist'i izler (LYNX)"
 "Arrange inserts like the Playlist" = "Insert'leri Playlist gibi sırala"
 "{0} insert(s) moved to follow the Playlist" = "Playlist'i izlemek için {0} insert taşındı"
+"Switch all plugin editors to" = "Tüm plugin düzenleyicilerini şuna geçir"
+"Attached" = "Yerleşik"

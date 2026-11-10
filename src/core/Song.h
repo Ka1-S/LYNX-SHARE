@@ -2118,6 +2118,10 @@ std::vector<std::int64_t> patternLengths (const Song& song);
 // than before, and no saved state yet: a plugin just added, not one loaded or cloned) as Detached. Returns how many.
 std::map<std::string, int> pluginIdCounts (const Song& song);
 int detachNewPlugins (const std::map<std::string, int>& before, Song& song);
+// FL's Tools › Macros › "Switch all plugin editors to" › Attached / Detached (round 190i, issue #116 [STR: FLEngine's
+// main menu, SwitchAllPluginsToMenu with MacroSwitchEditorsToAttachedAction / …DetachedAction; EXEC:
+// docs/analise/REA_rodada190i.md]): every hosted plugin's Detached flag, instruments and effects. Returns how many changed.
+int setAllPluginsDetached (Song& song, bool detached);
 void followPatternLengths (const std::vector<std::int64_t>& before, Song& song);
 
 // Copy of the song ready for export: always in song mode (the current pattern becomes a clip

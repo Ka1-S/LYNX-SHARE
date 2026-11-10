@@ -6728,6 +6728,15 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
         // greyed until the project has a file, as in FL 2026 (seen in an unsaved project, round 181b)
         menu.addItem (tr ("Delete unused files and save project"), currentFile != juce::File(), false, [this] { deleteUnusedRecordingsAndSave(); });
+        // FL's next item (round 190i, issue #116; FL 2026's Tools menu, shots fl2-01 / fl2-02): every plugin editor
+        // docked in the desktop (FL's word: Attached) or in a window of its own
+        if (nativechild::dockingEnabled())
+        {
+            juce::PopupMenu editors;
+            editors.addItem (tr ("Attached"), [this] { PluginWindows::setAllDetached (engine, false); });
+            editors.addItem (tr ("Detached"), [this] { PluginWindows::setAllDetached (engine, true); });
+            menu.addSubMenu (tr ("Switch all plugin editors to"), editors);
+        }
         {
             juce::PopupMenu declick;
             int mode = 0;

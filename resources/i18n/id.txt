@@ -8267,3 +8267,5 @@ countries: id
 "Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
+"Switch all plugin editors to" = "Alihkan semua editor plugin ke"
+"Attached" = "Terpasang"

@@ -8267,3 +8267,5 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+"Switch all plugin editors to" = "Переключить все редакторы плагинов в режим"
+"Attached" = "Пристыкована"

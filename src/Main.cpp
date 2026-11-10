@@ -3826,7 +3826,7 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 16; // (the last one reports dock_result)
+            const int dockSteps = 2 * 4 + 17; // (the last one reports dock_result)
             int danceChannel = -1;            // issue #116 slice 4: a dance channel's dancer over the docked plugin
             lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
             struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
@@ -4117,7 +4117,16 @@ private:
                                                                      && workspace->nativeFadeDirection (Panel::mixer) == 0);
                         lynx::ui::motion::enabled() = true;
                         workspace->setNativeFadeScale (1.0);
+                        // FL's Tools > Macros > Switch all plugin editors to > Detached (round 190i)
+                        lynx::PluginWindows::setAllDetached (*engine, true);
                     }
+                }
+                else if (at == 23)
+                {
+                    expect ("macro_detached_the_open_editor", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance)
+                                                                  && plug != nullptr && lynx::nativechild::ownerOf (plug) == main);
+                    expect ("macro_detached_saved", find() == instance && engineRef() != nullptr && engineRef()->detached);
+                    lynx::PluginWindows::setAllDetached (*engine, false); // ... > Attached
                 }
                 else
                 {

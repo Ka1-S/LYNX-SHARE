@@ -8267,3 +8267,5 @@ countries: de at ch li lu
 "Mixer groups follow the Playlist (LYNX)" = "Mixer-Gruppen folgen der Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts wie die Playlist anordnen"
 "{0} insert(s) moved to follow the Playlist" = "{0} Insert(s) verschoben, um der Playlist zu folgen"
+"Switch all plugin editors to" = "Alle Plugin-Editoren umschalten auf"
+"Attached" = "Angedockt"
