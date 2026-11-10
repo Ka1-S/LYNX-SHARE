@@ -1432,12 +1432,24 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::runUndoStep (undokeys::Step step)
+{
+    if (step != undokeys::Step::none)
+        undoRedo (step == undokeys::Step::redo);
+}
+
 void MainComponent::flUndo()
 {
-    if (alternateUndo)
-        undoRedo (false);
-    else
-        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+    // FL's default: undo, or redo when something is undone ("undo/redo on the same shortcut"); "Alternate undo mode":
+    // every press one more step back (core/UndoKeys.h)
+    runUndoStep (undokeys::undoKey (alternateUndo, engine.canUndo(), engine.canRedo()));
+}
+
+void MainComponent::flUndoBackwards()
+{
+    // FL's Undo backwards: one more step back; "Alternate undo mode" swaps the two shortcuts, so there it is the
+    // undo/redo key (round 190b)
+    runUndoStep (undokeys::backwardsKey (alternateUndo, engine.canUndo(), engine.canRedo()));
 }
 
 void MainComponent::undoRedo (bool redo)
@@ -1821,7 +1833,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
     else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
-    else if (is ("edit.undoBackwards")) undoRedo (false);
+    else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts"))
     {
@@ -6874,9 +6886,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     else if (index == 1)
     {
         // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
-        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
-        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
-                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
+        // ("Alternate undo mode" swaps the two shortcuts, as FL's menu does: round 190b)
+        const auto backwardsId = alternateUndo ? "edit.undo" : "edit.undoBackwards";
+        const auto toggleId = alternateUndo ? "edit.undoBackwards" : "edit.undo";
+        menu.addItem (tr ("Undo backwards") + shortcutText (backwardsId), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((engine.canRedo() ? tr ("Undo (redo)") : tr ("Undo")) + shortcutText (toggleId), engine.canUndo() || engine.canRedo(), false,
+                      [this] { runUndoStep (undokeys::toggle (engine.canUndo(), engine.canRedo())); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
