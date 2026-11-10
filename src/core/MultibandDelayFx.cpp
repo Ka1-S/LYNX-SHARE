@@ -1064,10 +1064,14 @@ namespace
 class MultibandDelayEffect final : public Effect
 {
 public:
-    explicit MultibandDelayEffect (const std::vector<std::uint8_t>& flState)
+    // `initial` (may be null): the slot's parameters, applied over the state as process() does on its first block, so
+    // the mode (the linear-phase latency) is known before it (issue #113)
+    MultibandDelayEffect (const std::vector<std::uint8_t>& flState, const EffectParams* initial)
     {
         if (auto s = parse (flState))
             state = *s;
+        if (initial != nullptr)
+            applyParams (*initial, state);
         engine.load (state);
     }
 
@@ -1124,8 +1128,8 @@ private:
 };
 } // namespace
 
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState)
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState, const EffectParams* params)
 {
-    return std::make_unique<MultibandDelayEffect> (flState);
+    return std::make_unique<MultibandDelayEffect> (flState, params);
 }
 } // namespace lynx::mbdelay

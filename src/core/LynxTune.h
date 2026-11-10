@@ -21,6 +21,8 @@
 #include <utility>
 #include <string>
 
+#include "core/Song.h"
+
 namespace lynx
 {
 struct EffectInfo;
@@ -196,6 +198,7 @@ int sendScaleToAll (Song& song, int track, int slot);
 
 const EffectInfo& info();
 std::string paramText (int param, float value01);
-std::unique_ptr<Effect> make();
+// `params` (may be null): the slot's parameters, so the latency is known before the first block (issue #113)
+std::unique_ptr<Effect> make (const EffectParams* params = nullptr);
 } // namespace lynxtune
 } // namespace lynx
