@@ -860,6 +860,14 @@ namespace
 class TransmitterEffect final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, so the look-ahead (latency) is known before the first block
+    // (issue #113; the engine keeps its values through prepare())
+    explicit TransmitterEffect (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            engine.setParams (initial->data());
+    }
+
     void prepare (double sampleRate) noexcept override
     {
         rate = sampleRate;
@@ -962,5 +970,5 @@ const EnvelopeView* envelopeOf (const Effect* effect)
     return nullptr;
 }
 
-std::unique_ptr<Effect> make() { return std::make_unique<TransmitterEffect>(); }
+std::unique_ptr<Effect> make (const EffectParams* params) { return std::make_unique<TransmitterEffect> (params); }
 } // namespace lynx::transmitter

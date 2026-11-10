@@ -90,6 +90,58 @@ StyleModel punishModelA()
     m.envReleaseMs = 40.9654;
     return m;
 }
+// round trial187b [EXEC trial, black-box]: the styles at high drive. The table above was fitted at drives 0 … 6; at 8 / 10
+// the trial came out quieter than it and with a softer knee (programme level error before: A +0.8, E +5.1, T / P +2.4,
+// E with Punish +4.4 dB). A "hot" model per style (and per style with Punish), fitted on the trial's renders at drives
+// 8 / 9 / 10 (sweep, stair, drums, music, vocal; Tone, Mix, Low cut, Thump and Steep variants; round tp172d's E 6 / N 8
+// takes) with trial187b/fit/emberfit (coordinate descent on the null plus twice the level error, knees ≥ 0.05): the
+// curve blends from the table at drive 5 to it at drive 10, and its output trim keeps the table's small-signal gain, so
+// round 136 / 165's drive and Punish laws (measured at −70 dBFS) are unchanged. Level error after: within 0.3 dB (E
+// with Punish −1.0); fxparity on those takes 3.1 → 3.8, round tp172d's 4.8 → 5.0. Below drive 5 nothing changes.
+struct HotModel { double outDb, cPos, pPos, cNeg, pNeg, bias, biasDyn, envAttackMs, envReleaseMs, preLowDb, preHighDb; };
+constexpr double hotFromDrive = 5.0;
+constexpr HotModel hotTable[styleCount] {
+    { -1.1431, 0.3616, 3.6867, 1.5383, 2.2379, -0.3772, -1.0326, 69.650, 124.432, 0.257, 0.721 }, // A
+    { 1.1179, 0.0686, 1.5908, 0.3965, 1.9849, -0.1363, -2.1967, 55.816, 53.249, -1.180, 7.560 }, // E
+    { -1.6350, 0.7426, 1.2038, 1.1049, 1.7309, -0.0687, -1.1247, 21.276, 36.546, 0.827, 0.557 }, // N
+    { -0.8754, 0.1859, 0.8000, 0.8300, 3.0187, -0.2836, -7.3109, 76.981, 6.906, -2.220, 0.793 }, // T
+    { -0.7575, 0.0500, 0.9239, 0.9423, 3.1843, -0.4272, -1.6654, 77.567, 69.891, 0.223, 2.667 }, // P
+};
+constexpr HotModel hotPunishTable[styleCount] {
+    { -0.8888, 0.4714, 1.9697, 1.1179, 2.0146, -0.1238, -0.1292, 130.526, 40.965, -0.327, -0.079 }, // A
+    { 1.1179, 0.0500, 7.5499, 0.2492, 11.8895, -0.0689, -2.9887, 64.460, 53.249, 1.163, 0.444 }, // E
+    { -1.6350, 0.4480, 3.9332, 0.9944, 1.7588, -0.1014, -1.4262, 22.194, 36.546, 1.730, 1.382 }, // N
+    { -0.8754, 0.2302, 0.9660, 0.6969, 1.9523, -0.2115, -6.8423, 127.063, 102.321, -1.284, 2.496 }, // T
+    { -0.7575, 0.0636, 3.4114, 1.2090, 2.9207, -0.2295, -5.1214, 94.347, 69.891, 0.179, 2.199 }, // P
+};
+
+StyleModel hotBlend (const StyleModel& b, const HotModel& h, double drive) noexcept
+{
+    const double w = std::clamp ((drive - hotFromDrive) / (10.0 - hotFromDrive), 0.0, 1.0);
+    if (w <= 0.0)
+        return b;
+    auto m = b;
+    const auto mix = [w] (double x, double y) { return x + w * (y - x); };
+    m.outDb = mix (b.outDb, h.outDb);
+    m.cPos = mix (b.cPos, h.cPos);
+    m.pPos = mix (b.pPos, h.pPos);
+    m.cNeg = mix (b.cNeg, h.cNeg);
+    m.pNeg = mix (b.pNeg, h.pNeg);
+    m.bias = mix (b.bias, h.bias);
+    m.biasDyn = mix (b.biasDyn, h.biasDyn);
+    m.envAttackMs = mix (b.envAttackMs, h.envAttackMs);
+    m.envReleaseMs = mix (b.envReleaseMs, h.envReleaseMs);
+    m.preLowDb = mix (b.preLowDb, h.preLowDb);
+    m.preHighDb = mix (b.preHighDb, h.preHighDb);
+    // the small-signal gain stays the table's (the measured drive / Punish laws): the output trim makes up the curve's
+    // slope at its bias, side'(b) = (1 + |b / c|^p)^(−(1 + p) / p)
+    const auto slopeDb = [] (const StyleModel& q) {
+        const double c = q.bias >= 0.0 ? q.cPos : q.cNeg, p = q.bias >= 0.0 ? q.pPos : q.pNeg;
+        return 20.0 * std::log10 (std::pow (1.0 + std::pow (std::abs (q.bias / c), p), -(1.0 + p) / p));
+    };
+    m.outDb += (b.outDb + slopeDb (b)) - (m.outDb + slopeDb (m));
+    return m;
+}
 } // namespace
 
 const StyleModel& styleModel (int style) noexcept { return styleTable[std::clamp (style, 0, styleCount - 1)]; }
@@ -235,7 +287,14 @@ void Engine::reset() noexcept
 void Engine::set (const Settings& settings, const StyleModel* model)
 {
     s = settings;
-    m = model != nullptr ? *model : s.punish && s.measuredPunish ? punishModel (s.style) : styleModel (s.style);
+    if (model != nullptr)
+        m = *model;
+    else
+    {
+        const bool p = s.punish && s.measuredPunish;
+        const int st = std::clamp (s.style, 0, styleCount - 1);
+        m = hotBlend (p ? punishModel (st) : styleModel (st), (p ? hotPunishTable : hotTable)[st], s.drive);
+    }
     design();
 }
 

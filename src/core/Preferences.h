@@ -190,6 +190,9 @@ struct MidiPrefs
     // FL's "MIDI channel used for playlist live mode" (round 165m): notes on this channel (1…16, 0 = off) launch the
     // Playlist's performance clips while Performance mode is on (core/Performance.h, perf::MidiMapping)
     int performanceChannel = 0;
+    // "Use a game controller" (round 184a, S16): the first XInput pad plays the transport and is linkable like a
+    // MIDI controller (core/GamepadMap.h); off by default
+    bool gamepad = false;
 
     // The settings of a device (the defaults when it was never changed).
     MidiInputPrefs input (const std::string& name) const;

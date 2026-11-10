@@ -27,6 +27,22 @@ namespace lynx::plugexport
 namespace
 {
 constexpr int insertTrack = 1; // the effect sits in Insert 1, slot 0, as in the app's --parityshot / --plugui
+constexpr int sideTrack = 2;   // round 188b: the host's side-chain bus comes in here, the effect's side-chain source
+
+// The side-chain track of an effect's song: the host's side-chain bus is its input, it goes nowhere else (round 188b).
+// States saved before it existed (round 180b: Master + Insert 1) get it on load.
+void addSideTrack (Song& song)
+{
+    if (song.mixer.size() == 2)
+    {
+        song.mixer.resize (3);
+        song.mixer[(std::size_t) sideTrack].name = "Sidechain";
+        song.mixer[(std::size_t) sideTrack].effects.clear();
+        song.mixer[(std::size_t) sideTrack].toMaster = false;
+        if (! song.mixer[1].effects.empty() && song.mixer[1].effects[0].sidechain < 0)
+            song.mixer[1].effects[0].sidechain = sideTrack;
+    }
+}
 
 Song makeSong (const Entry& entry)
 {
@@ -53,6 +69,7 @@ Song makeSong (const Entry& entry)
         auto slot = makeEffectSlot (entry.effect);
         slot.smartDisable = false; // a host decides when it is silent
         song.mixer[1].effects.push_back (std::move (slot));
+        addSideTrack (song);
     }
     return song;
 }
@@ -99,7 +116,8 @@ public:
     explicit ExportProcessor (const Entry& e)
         : AudioProcessor (e.instrument ? BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                                        : BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                                                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+                                                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
+                                                          .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
           entry (e),
           song (makeSong (e)),
           renderer (std::make_unique<RackRenderer>())
@@ -149,7 +167,12 @@ public:
     {
         if (layout.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
             return false;
-        return entry.instrument || layout.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
+        if (entry.instrument)
+            return true;
+        // the side-chain bus: off, mono or stereo (round 188b)
+        const auto side = layout.inputBuses.size() > 1 ? layout.inputBuses[1] : juce::AudioChannelSet::disabled();
+        return layout.getMainInputChannelSet() == juce::AudioChannelSet::stereo()
+               && (side.isDisabled() || side == juce::AudioChannelSet::mono() || side == juce::AudioChannelSet::stereo());
     }
 
     void prepareToPlay (double sampleRate, int maxBlock) override
@@ -158,8 +181,14 @@ public:
         rate = sampleRate;
         renderer->prepare (sampleRate, juce::jmax (maxBlock, 64));
         inputs.setSize (2, juce::jmax (maxBlock, 64));
+        sideInputs.setSize (2, juce::jmax (maxBlock, 64));
+        // a (re)start is a new stream that sounds exactly as a fresh instance's: new engines, not the ones of the last
+        // build (publish reuses them, and a reset leaves some state behind: smoothed settings, a detector's history),
+        // round 188b
+        shape = RackState {};
         publish();
         setLatencySamples (currentLatency());
+        resetWanted.store (true, std::memory_order_relaxed);
     }
 
     void releaseResources() override {}
@@ -187,6 +216,8 @@ public:
         auto loaded = ProjectFile::fromJson (juce::String::createStringFromData (data, size), error);
         if (! loaded || ! matches (*loaded))
             return false;
+        if (! entry.instrument)
+            addSideTrack (*loaded);
         const juce::ScopedLock sl (songLock);
         song = std::move (*loaded);
         if (entry.instrument)
@@ -293,7 +324,7 @@ private:
     {
         if (entry.instrument)
             return s.channels.size() == 1 && s.channels[0].instrument == entry.synth;
-        return s.mixer.size() == 2 && s.mixer[1].effects.size() == 1 && s.mixer[1].effects[0].kind == entry.effect;
+        return (s.mixer.size() == 2 || s.mixer.size() == 3) && s.mixer[1].effects.size() == 1 && s.mixer[1].effects[0].kind == entry.effect;
     }
 
     // Only the named parameters differ: they reach the audio as host values, nothing to rebuild
@@ -352,7 +383,7 @@ private:
     LiveEventQueue liveEvents;
     EffectParams live {};
     std::vector<float> sent; // what the instrument last got (audio thread)
-    juce::AudioBuffer<float> inputs;
+    juce::AudioBuffer<float> inputs, sideInputs;
     std::atomic<bool> resetWanted { false }, editorDirty { false };
 };
 
@@ -489,6 +520,19 @@ void ExportProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         inputs.setSize (2, numSamples, true, false, true); // (no allocation: prepareToPlay's size, or the host broke its promise)
         inputs.copyFrom (0, 0, buffer, 0, 0, numSamples);
         inputs.copyFrom (1, 0, buffer, 1, 0, numSamples);
+        // the host's side-chain bus (round 188b): into the side-chain track, the slot's side-chain source
+        const auto* sideBus = getBusCount (true) > 1 ? getBus (true, 1) : nullptr;
+        const auto sideChannels = sideBus != nullptr && sideBus->isEnabled() ? sideBus->getNumberOfChannels() : 0;
+        if (sideChannels > 0 && buffer.getNumChannels() >= 2 + sideChannels)
+        {
+            sideInputs.setSize (2, numSamples, true, false, true);
+            const auto first = sideBus->getChannelIndexInProcessBlockBuffer (0);
+            sideInputs.copyFrom (0, 0, buffer, first, 0, numSamples);
+            sideInputs.copyFrom (1, 0, buffer, sideChannels > 1 ? first + 1 : first, 0, numSamples);
+            renderer->setSideInput (sideInputs.getReadPointer (0), sideInputs.getReadPointer (1), sideTrack);
+        }
+        else
+            renderer->setSideInput (nullptr, nullptr, -1);
         renderer->setSlotParamsOverride (&live, insertTrack, 0);
         renderer->setMetronomeInput (inputs.getReadPointer (0), inputs.getReadPointer (1), insertTrack);
         renderer->process (state, playing, quarters * lynx::ppq, numSamples, buffer.getWritePointer (0), buffer.getWritePointer (1), &liveEvents);

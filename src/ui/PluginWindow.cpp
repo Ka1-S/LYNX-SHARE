@@ -19,7 +19,10 @@
 #include "engine/Text.h"
 #include "platform/CrashGuard.h"
 #include "ui/I18n.h"
+#include "ui/Icons.h"
+#include "ui/NativeChild.h"
 #include "ui/PluginHeader.h"
+#include "ui/Workspace.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
 
@@ -45,6 +48,28 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 class WrapperSettingsPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    // FL's Typing keyboard priority (the window caption's keyboard button, round 187a): on = the plugin gets keys first
+    bool pluginKeysFirst() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref == nullptr || ! ref->hostKeysFirst;
+    }
+    void setPluginKeysFirst (bool on)
+    {
+        engine.editSong ([this, on] (Song& song) {
+            if (auto* ref = find (song))
+                ref->hostKeysFirst = ! on;
+        }, false);
+        engine.markModified();
+    }
+    bool keysReachHost() const { return sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin); }
+
+    bool hostProcessesKeys() const
+    {
+        const auto* ref = find (const_cast<Song&> (engine.getSong()));
+        return ref != nullptr && ref->hostKeysFirst && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
+    }
+
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
         : engine (e), find (std::move (f)), plugin (p)
     {
@@ -387,6 +412,35 @@ private:
     std::vector<Label> labels;
 };
 
+// FL's Typing keyboard priority button in the plugin window's caption (FLEngine PluginForm.NewCaption.KeyboardFocusBtn,
+// round 187a [UI shots/fl a00-a06]): a keyboard glyph left of the presets, bright while the plugin handles keys first
+// (FL's default for a new plugin), dim when LYNX goes first; outlined under the mouse.
+class KeyboardPriorityButton final : public juce::Button
+{
+public:
+    KeyboardPriorityButton() : juce::Button ("Typing keyboard priority") { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (1.5f);
+        if (over || down)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.drawRoundedRectangle (r, 4.0f, 1.2f);
+        }
+        const auto on = getToggleState() && isEnabled();
+        g.setColour (on ? theme::colour::textPrimary : theme::colour::textDisabled);
+        const auto side = juce::jmin (r.getWidth(), r.getHeight()) * 0.62f;
+        auto key = juce::Rectangle<float> (side, side).withCentre (r.getCentre());
+        g.drawRoundedRectangle (key, 1.5f, 1.2f);
+        // the 3 x 3 grid of keys
+        const auto cell = (key.getWidth() - 3.0f) / 3.0f;
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                g.fillRect (key.getX() + 1.5f + (float) col * cell + 0.6f, key.getY() + 1.5f + (float) row * cell + 0.6f, cell - 1.2f, cell - 1.2f);
+    }
+};
+
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
 class WrappedEditor final : public juce::Component
 {
@@ -408,6 +462,15 @@ public:
             refreshSidechain();
         }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
+        // FL's Typing keyboard priority, left of the presets (issue #96 slice 2). A plugin in another process has its
+        // own keyboard (FL: bridged plugins always take it), so there it stays greyed.
+        addAndMakeVisible (keyboardPriority);
+        keyboardPriority.setTooltip (tr ("Allow the plugin to handle keystrokes before the host does"));
+        keyboardPriority.onClick = [this] {
+            page.setPluginKeysFirst (! page.pluginKeysFirst());
+            refreshKeyboardPriority();
+        };
+        refreshKeyboardPriority();
         for (auto* b : { &pluginTab, &settingsTab })
         {
             b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
@@ -429,6 +492,15 @@ public:
     }
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
+    bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
+    void showPage (bool showSettings) { show (showSettings); }
+    void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
+
+    void refreshKeyboardPriority()
+    {
+        keyboardPriority.setEnabled (page.keysReachHost());
+        keyboardPriority.setToggleState (page.pluginKeysFirst(), juce::dontSendNotification);
+    }
 
     // the picker's label follows the slot's side input (the window's timer)
     void refreshSidechain()
@@ -466,6 +538,8 @@ public:
             sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
             header.removeFromRight (6);
         }
+        keyboardPriority.setBounds (header.removeFromLeft (26));
+        header.removeFromLeft (4);
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
         if (editor != nullptr && ! settings)
@@ -485,10 +559,11 @@ public:
     }
 
 private:
-    static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 250 + 4;
+    static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 30 + 250 + 4;
     AudioEngine& engineRef;
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
+    KeyboardPriorityButton keyboardPriority;
 
     void fitEditor()
     {
@@ -540,37 +615,197 @@ private:
     bool settings = false, laying = false;
 };
 
-class PluginWindow final : public juce::DocumentWindow, private juce::AudioProcessorListener, private juce::Timer
+// Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
+// one plugin's editor opens detached: always for a plugin in another process (its window belongs to that process) and
+// without the switch; else the PluginRef's "Detached" (FL's plugin menu).
+Workspace*& dockWorkspace()
 {
-public:
-    PluginWindow (std::shared_ptr<void> keepAlive, juce::AudioPluginInstance& p, const juce::String& title, PluginWindows::WrapperContext context)
-        : DocumentWindow (title, theme::colour::bg1, DocumentWindow::closeButton | DocumentWindow::minimiseButton),
-          owner (std::move (keepAlive)),
-          plugin (p)
-    {
-        setUsingNativeTitleBar (true);
-        useClassicRendering();
+    static Workspace* w = nullptr;
+    return w;
+}
 
+bool canDock (const juce::AudioPluginInstance& plugin)
+{
+    return nativechild::dockingEnabled() && dockWorkspace() != nullptr && ! isSandboxedPlugin (plugin);
+}
+
+bool opensDetached (const juce::AudioPluginInstance& plugin, const PluginWindows::WrapperContext& context)
+{
+    if (! canDock (plugin))
+        return true;
+    if (context.engine != nullptr && context.find)
+        if (const auto* ref = context.find (const_cast<Song&> (context.engine->getSong())))
+            return ref->detached;
+    return false;
+}
+
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached);
+
+// What a plugin editor's host does, whether it is a window of its own (detached) or a frame docked in the desktop: it
+// keeps the plugin alive while it is open, makes the editor (with FL's wrapper header when there is an engine) and
+// follows the editor's gestures and moves (Last tweaked, automation recording, the picker's thumbnail).
+class EditorHost : private juce::AudioProcessorListener, private juce::Timer
+{
+    std::shared_ptr<void> owner; // (first member: released last, after the editor)
+
+public:
+    EditorHost (std::shared_ptr<void> keepAlive, juce::AudioPluginInstance& p, const juce::String& t, PluginWindows::WrapperContext c)
+        : owner (std::move (keepAlive)), plugin (p), title (t), context (c)
+    {
         crashguard::note (("opening the editor of " + plugin.getName()).toStdString()); // session breadcrumb (round 111)
         juce::AudioProcessorEditor* editor = plugin.createEditorIfNeeded();
         if (editor == nullptr)
             editor = new juce::GenericAudioProcessorEditor (plugin); // plugin without a UI
         crashguard::note (("editor open: " + plugin.getName()).toStdString());
 
-        const auto resizable = editor->isResizable();
+        editorResizable = editor->isResizable();
         shownEditor = editor;
+        // (issue #96: as in FL, what it leaves unused plays the typing keyboard. A plugin in another process has its
+        // own keyboard: issue #99 is that case, this path stays away from it.)
+        if (sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin))
+        {
+            listenForKeysPluginLeaves (*editor);
+            keysFromPluginView = true; // (the window marks itself: SecondaryKeyForwarder hands it what the view leaves)
+        }
         thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
-        if (context.engine != nullptr && context.find) // FL's wrapper header and settings page (round 146a)
-            setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel, context.track, context.slot), true);
+        if (c.engine != nullptr && c.find) // FL's wrapper header and settings page (round 146a)
+        {
+            auto* wrapped = new WrappedEditor (editor, *c.engine, c.find, plugin, c.channel, c.track, c.slot);
+            if (canDock (plugin)) // FL's plugin menu ends with "Detached" (issue #116)
+                wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) { addDetachedItem (menu); });
+            content.reset (wrapped);
+        }
         else
-            setContentOwned (editor, true);
-        setResizable (resizable, false);
-        centreWithSize (getWidth(), getHeight());
-        setVisible (true);
-        keepAboveMainWindow (*this);
+            content.reset (editor);
+    }
+
+    virtual ~EditorHost() override { stopHost(); }
+
+    virtual juce::Component& hostComponent() = 0;
+    virtual bool hostActive() = 0;
+    virtual void bringToFront() = 0;
+    virtual bool hostMinimised() { return false; }
+    void* nativeHandle() { return hostComponent().getWindowHandle(); }
+
+    juce::AudioPluginInstance* key() const noexcept { return &plugin; }
+
+    static juce::AudioPluginInstance*& lastUsed()
+    {
+        static juce::AudioPluginInstance* last = nullptr;
+        return last;
+    }
+
+    // True when nothing but this window keeps the plugin's adapter alive: the plugin was removed or replaced, its
+    // channel deleted or the project closed (issue #9: the removed plugin's editor stayed on screen).
+    bool orphaned() const noexcept { return owner != nullptr && owner.use_count() == 1; }
+
+    // what reopening the editor elsewhere needs (issue #116: Detached closes it and opens it again, never re-parents it)
+    std::shared_ptr<void> keepAlive() const { return owner; }
+    const juce::String& hostTitle() const noexcept { return title; }
+    const PluginWindows::WrapperContext& getContext() const noexcept { return context; }
+
+    void addDetachedItem (juce::PopupMenu& menu)
+    {
+        auto* p = &plugin;
+        const auto detached = opensDetached (plugin, context);
+        menu.addItem (tr ("Detached"), true, detached, [p, detached] {
+            juce::MessageManager::callAsync ([p, detached] { setDetachedAndReopen (*p, ! detached); });
+        });
+    }
+
+protected:
+    void startHost()
+    {
         crashguard::note (("editor shown: " + plugin.getName()).toStdString()); // (its OpenGL / GPU setup runs when shown)
         plugin.addListener (this); // the editor's gestures: Last tweaked, automation recording (REA round 143)
         startTimerHz (10);         // its moves without gestures (round 162d)
+    }
+
+    void stopHost()
+    {
+        crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
+        stopTimer();
+        plugin.removeListener (this);
+    }
+
+    std::unique_ptr<juce::Component> content; // until the host takes it
+    juce::Component* shownContent = nullptr;   // the host's content (owned by the host)
+    bool editorResizable = false;
+    bool keysFromPluginView = false; // issue #96: the editor's unused keys come back (listenForKeysPluginLeaves)
+
+private:
+    // round 162d (issue #8): many plugins move their parameters without begin/end gestures, so their knobs never
+    // became "Last tweaked". A change made on the UI thread while this window is active or under the mouse, when it
+    // is the only parameter that moved since the last tick, counts as a tweak (core/LastTweaked.h; automation and
+    // links run on the audio thread, preset loads move many parameters at once).
+    void audioProcessorParameterChanged (juce::AudioProcessor*, int index, float) override
+    {
+        if (juce::MessageManager::getInstanceWithoutCreating() != nullptr && juce::MessageManager::getInstance()->isThisTheMessageThread())
+            changes.changed (index);
+    }
+    void timerCallback() override
+    {
+        auto& host = hostComponent();
+        // the Plugin picker's picture of this plugin (round 171c): its editor once it has been drawn for a while
+        if (++ticks == 15 && shownEditor != nullptr && shownEditor->isShowing() && ! hostMinimised())
+            pluginthumbs::captureEditor (thumbKey, *shownEditor);
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+        const auto active = hostActive() || (host.isShowing() && host.getScreenBounds().contains (mouse));
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+        {
+            wrapped->refreshSidechain();
+            wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
+        }
+        if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
+        {
+            PluginWindows::onGesture (plugin, moved, true);
+            PluginWindows::onGesture (plugin, moved, false);
+        }
+    }
+    void audioProcessorChanged (juce::AudioProcessor*, const ChangeDetails&) override {}
+    void audioProcessorParameterChangeGestureBegin (juce::AudioProcessor*, int index) override { gesture (index, true); }
+    void audioProcessorParameterChangeGestureEnd (juce::AudioProcessor*, int index) override { gesture (index, false); }
+    void gesture (int index, bool starting)
+    {
+        if (juce::MessageManager::getInstanceWithoutCreating() != nullptr && juce::MessageManager::getInstance()->isThisTheMessageThread())
+            changes.gesture (index, starting);
+        auto* p = &plugin;
+        juce::MessageManager::callAsync ([p, index, starting] {
+            if (PluginWindows::onGesture)
+                PluginWindows::onGesture (*p, index, starting);
+        });
+    }
+
+    juce::AudioPluginInstance& plugin;
+    juce::String title;
+    PluginWindows::WrapperContext context;
+    lasttweak::ChangeFilter changes;
+    juce::Component::SafePointer<juce::Component> shownEditor;
+    std::string thumbKey;
+    int ticks = 0;
+};
+
+void closeHostOf (const juce::AudioPluginInstance* plugin);
+
+// FL's "Detached": the editor in a top-level window of its own, kept above the main window (LYNX's only kind so far).
+class PluginWindow final : public juce::DocumentWindow, public EditorHost
+{
+public:
+    PluginWindow (std::shared_ptr<void> keepAlive, juce::AudioPluginInstance& p, const juce::String& title, PluginWindows::WrapperContext context)
+        : DocumentWindow (title, theme::colour::bg1, DocumentWindow::closeButton | DocumentWindow::minimiseButton),
+          EditorHost (std::move (keepAlive), p, title, std::move (context))
+    {
+        setUsingNativeTitleBar (true);
+        useClassicRendering();
+        if (keysFromPluginView)
+            getProperties().set ("lynxPluginWindow", true);
+        shownContent = content.get();
+        setContentOwned (content.release(), true);
+        setResizable (editorResizable, false);
+        centreWithSize (getWidth(), getHeight());
+        setVisible (true);
+        keepAboveMainWindow (*this);
+        startHost();
     }
 
     // round 157a: the window that holds a third-party editor draws LYNX's few pixels with GDI, not Direct2D (JUCE 8's
@@ -595,84 +830,267 @@ public:
 
     ~PluginWindow() override
     {
-        crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
         // round 165q: closing the active plugin window (its X, F12, Alt+F12, removing the plugin) let Windows hand the
         // activation to another program (seen: a terminal on the second screen) instead of LYNX, so Space and the
         // shortcuts went there. The main window takes it first, while LYNX is still the foreground program.
         if (isActiveWindow())
             activateMainWindow();
-        stopTimer();
-        plugin.removeListener (this);
-        // the UI must be destroyed before the plugin (which may die together with `owner`)
+        stopHost();
+        // the UI must be destroyed before the plugin (which may die together with the host's keep-alive)
         clearContentComponent();
     }
 
-    void closeButtonPressed() override;
+    void closeButtonPressed() override { closeHostOf (key()); }
 
-    juce::AudioPluginInstance* key() const noexcept { return &plugin; }
+    juce::Component& hostComponent() override { return *this; }
+    bool hostActive() override { return isActiveWindow(); }
+    bool hostMinimised() override { return isMinimised(); }
+    void bringToFront() override { toFront (true); }
 
     void activeWindowStatusChanged() override
     {
         DocumentWindow::activeWindowStatusChanged();
         if (isActiveWindow())
-            lastUsed() = &plugin;
+            lastUsed() = key();
     }
+};
 
-    static juce::AudioPluginInstance*& lastUsed()
+// FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
+// main window, so a clicked panel (also a native child) comes in front of it. FL's title strip: the plugin menu at the
+// left (its last item "Detached"), the title, minimise and close at the right.
+class DockedPluginFrame final : public juce::Component, public EditorHost
+{
+public:
+    DockedPluginFrame (std::shared_ptr<void> keepAlive, juce::AudioPluginInstance& p, const juce::String& title, PluginWindows::WrapperContext context,
+                       Workspace& w)
+        : EditorHost (std::move (keepAlive), p, title, std::move (context)),
+          workspace (w)
     {
-        static juce::AudioPluginInstance* last = nullptr;
-        return last;
+        setName (title);
+        setOpaque (true);
+        setWantsKeyboardFocus (true);
+        for (auto* b : { &menuButton, &minimiseButton, &closeButton })
+        {
+            b->setFlat (true);
+            b->setIconSizing (0.62f, 14.0f);
+            b->setWantsKeyboardFocus (false);
+            b->setMouseClickGrabsKeyboardFocus (false);
+            addAndMakeVisible (b);
+        }
+        menuButton.setTooltip (tr ("Plugin options"));
+        menuButton.onClick = [this] { showMenu(); };
+        minimiseButton.setTooltip (tr ("Minimize"));
+        minimiseButton.onClick = [this] { setMinimisedFrame (! minimised); };
+        closeButton.setTooltip (tr ("Close"));
+        closeButton.onClick = [this] { closeHostOf (key()); };
+
+        shownContent = content.get();
+        addAndMakeVisible (*content);
+        content->addMouseListener (this, true); // a click anywhere in it brings the frame in front
+        if (editorResizable)
+        {
+            corner = std::make_unique<juce::ResizableCornerComponent> (this, &limits);
+            limits.setMinimumSize (200, titleHeight + 60);
+            addAndMakeVisible (*corner);
+        }
+        const auto size = juce::Rectangle<int> (content->getWidth(), content->getHeight() + titleHeight);
+        setBounds (workspace.placeForDockedFrame (size.getWidth(), size.getHeight()));
+
+        workspace.addDockedFrame (*this);
+        if (! nativechild::attach (*this, workspace))
+            workspace.addAndMakeVisible (*this); // (no native window: a plain child of the desktop)
+        nativechild::forwardUnusedKeys (*this);
+        getProperties().set ("lynxPluginWindow", true);
+        useClassicRendering();
+        setVisible (true);
+        toFront (false);
+        startHost();
     }
 
-    // True when nothing but this window keeps the plugin's adapter alive: the plugin was removed or replaced, its
-    // channel deleted or the project closed (issue #9: the removed plugin's editor stayed on screen).
-    bool orphaned() const noexcept { return owner != nullptr && owner.use_count() == 1; }
+    ~DockedPluginFrame() override
+    {
+        stopHost();
+        workspace.removeDockedFrame (*this);
+        if (content != nullptr)
+            content->removeMouseListener (this);
+        corner = nullptr;
+        // the UI goes before the plugin (which may die together with the host's keep-alive), and the native window
+        // before the frame
+        removeChildComponent (content.get());
+        content = nullptr;
+        nativechild::detach (*this);
+        if (auto* parent = getParentComponent())
+            parent->removeChildComponent (this);
+    }
+
+    juce::Component& hostComponent() override { return *this; }
+    bool hostMinimised() override { return minimised; }
+
+    bool hostActive() override
+    {
+        if (hasKeyboardFocus (true))
+            return true;
+       #if JUCE_WINDOWS
+        if (auto* own = static_cast<HWND> (getWindowHandle()))
+            if (const auto focus = GetFocus(); focus != nullptr && (focus == own || IsChild (own, focus)))
+                return true;
+       #endif
+        return false;
+    }
+
+    void bringToFront() override
+    {
+        if (minimised)
+            setMinimisedFrame (false);
+        toFront (true);
+        lastUsed() = key();
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        toFront (false);
+        lastUsed() = key();
+        if (e.eventComponent != this)
+            return;
+        if (e.mods.isPopupMenu() && e.y < titleHeight)
+        {
+            showMenu();
+            return;
+        }
+        dragging = e.y < titleHeight;
+        dragStart = nativechild::boundsIn (*this, workspace);
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! dragging || e.eventComponent != this)
+            return;
+        const auto delta = e.getScreenPosition() - e.getMouseDownScreenPosition();
+        auto r = dragStart.translated (delta.x, delta.y);
+        // the title strip stays reachable inside the desktop
+        const auto area = workspace.getLocalBounds();
+        r.setX (juce::jlimit (-r.getWidth() + 80, juce::jmax (0, area.getWidth() - 80), r.getX()));
+        r.setY (juce::jlimit (0, juce::jmax (0, area.getHeight() - titleHeight), r.getY()));
+        nativechild::place (*this, workspace, r);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override { dragging = false; }
+
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        if (e.eventComponent == this && e.y < titleHeight)
+            setMinimisedFrame (! minimised);
+    }
+
+    bool keyPressed (const juce::KeyPress& press) override
+    {
+        if (press == juce::KeyPress::escapeKey) // FL closes the focused plugin window with Esc (round 170h)
+        {
+            juce::MessageManager::callAsync ([k = key()] { closeHostOf (k); });
+            return true;
+        }
+        return false;
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg1);
+        auto strip = getLocalBounds().removeFromTop (titleHeight);
+        g.setColour (colour::bg3);
+        g.fillRect (strip);
+        g.setColour (colour::border);
+        g.fillRect (strip.removeFromBottom (1));
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
+        g.drawFittedText (hostTitle(), text, juce::Justification::centredLeft, 1, 0.9f);
+    }
+
+    void paintOverChildren (juce::Graphics& g) override
+    {
+        g.setColour (theme::colour::borderStrong);
+        g.drawRect (getLocalBounds(), 1);
+    }
+
+    void resized() override
+    {
+        auto strip = getLocalBounds().removeFromTop (titleHeight).reduced (3, 2);
+        menuButton.setBounds (strip.removeFromLeft (strip.getHeight()));
+        closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
+        strip.removeFromRight (2);
+        minimiseButton.setBounds (strip.removeFromRight (strip.getHeight()));
+        if (shownContent != nullptr && ! minimised)
+        {
+            const juce::ScopedValueSetter<bool> guard (laying, true);
+            if (editorResizable)
+                shownContent->setBounds (getLocalBounds().withTrimmedTop (titleHeight));
+            else
+                shownContent->setTopLeftPosition (0, titleHeight);
+        }
+        if (corner != nullptr)
+            corner->setBounds (getWidth() - 14, getHeight() - 14, 14, 14);
+    }
+
+    // the editor resized itself (or its wrapper switched pages): the frame follows
+    void childBoundsChanged (juce::Component* child) override
+    {
+        if (child == shownContent && ! laying && ! minimised)
+            setSize (child->getWidth(), child->getHeight() + titleHeight);
+    }
 
 private:
-    // round 162d (issue #8): many plugins move their parameters without begin/end gestures, so their knobs never
-    // became "Last tweaked". A change made on the UI thread while this window is active or under the mouse, when it
-    // is the only parameter that moved since the last tick, counts as a tweak (core/LastTweaked.h; automation and
-    // links run on the audio thread, preset loads move many parameters at once).
-    void audioProcessorParameterChanged (juce::AudioProcessor*, int index, float) override
+    static constexpr int titleHeight = 24;
+
+    void showMenu()
     {
-        if (juce::MessageManager::getInstanceWithoutCreating() != nullptr && juce::MessageManager::getInstance()->isThisTheMessageThread())
-            changes.changed (index);
-    }
-    void timerCallback() override
-    {
-        // the Plugin picker's picture of this plugin (round 171c): its editor once it has been drawn for a while
-        if (++ticks == 15 && shownEditor != nullptr && shownEditor->isShowing() && ! isMinimised())
-            pluginthumbs::captureEditor (thumbKey, *shownEditor);
-        const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
-        const auto active = isActiveWindow() || (isShowing() && getScreenBounds().contains (mouse));
-        if (auto* wrapped = dynamic_cast<WrappedEditor*> (getContentComponent()))
-            wrapped->refreshSidechain();
-        if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
-        {
-            PluginWindows::onGesture (plugin, moved, true);
-            PluginWindows::onGesture (plugin, moved, false);
-        }
-    }
-    void audioProcessorChanged (juce::AudioProcessor*, const ChangeDetails&) override {}
-    void audioProcessorParameterChangeGestureBegin (juce::AudioProcessor*, int index) override { gesture (index, true); }
-    void audioProcessorParameterChangeGestureEnd (juce::AudioProcessor*, int index) override { gesture (index, false); }
-    void gesture (int index, bool starting)
-    {
-        if (juce::MessageManager::getInstanceWithoutCreating() != nullptr && juce::MessageManager::getInstance()->isThisTheMessageThread())
-            changes.gesture (index, starting);
-        auto* p = &plugin;
-        juce::MessageManager::callAsync ([p, index, starting] {
-            if (PluginWindows::onGesture)
-                PluginWindows::onGesture (*p, index, starting);
-        });
+        juce::PopupMenu menu;
+        menu.addSectionHeader (hostTitle());
+        addDetachedItem (menu);
+        menu.addSeparator();
+        menu.addItem (tr ("Close"), [k = key()] { juce::MessageManager::callAsync ([k] { closeHostOf (k); }); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
     }
 
-    std::shared_ptr<void> owner;
-    juce::AudioPluginInstance& plugin;
-    lasttweak::ChangeFilter changes;
-    juce::Component::SafePointer<juce::Component> shownEditor;
-    std::string thumbKey;
-    int ticks = 0;
+    // FL's minimise of a docked window: only the title strip stays
+    void setMinimisedFrame (bool shouldBe)
+    {
+        if (minimised == shouldBe || shownContent == nullptr)
+            return;
+        minimised = shouldBe;
+        shownContent->setVisible (! minimised);
+        if (corner != nullptr)
+            corner->setVisible (! minimised);
+        if (minimised)
+        {
+            restoredHeight = getHeight();
+            // a plugin's native view isn't always unmapped with its component (issue #8): out of the frame, it is clipped
+            shownContent->setTopLeftPosition (-12000, -12000);
+            setSize (juce::jmin (getWidth(), 320), titleHeight);
+        }
+        else
+        {
+            setSize (shownContent->getWidth(), restoredHeight);
+            resized();
+        }
+    }
+
+    void useClassicRendering()
+    {
+       #if JUCE_WINDOWS
+        if (auto* peer = getPeer()) // (as PluginWindow: GDI around a third-party editor)
+            if (const auto engines = peer->getAvailableRenderingEngines(); engines.size() > 1 && peer->getCurrentRenderingEngine() != 0)
+                peer->setCurrentRenderingEngine (0);
+       #endif
+    }
+
+    Workspace& workspace;
+    IconButton menuButton { "menu", Icon::panelMenu }, minimiseButton { "minimise", Icon::minimise }, closeButton { "close", Icon::close };
+    juce::ComponentBoundsConstrainer limits;
+    std::unique_ptr<juce::ResizableCornerComponent> corner;
+    juce::Rectangle<int> dragStart;
+    bool dragging = false, minimised = false, laying = false;
+    int restoredHeight = 0;
 };
 
 } // namespace
@@ -681,10 +1099,44 @@ std::function<void (const juce::AudioPluginInstance&, int, bool)> PluginWindows:
 
 namespace
 {
-std::map<juce::AudioPluginInstance*, std::unique_ptr<PluginWindow>>& windows()
+std::map<juce::AudioPluginInstance*, std::unique_ptr<EditorHost>>& windows()
 {
-    static std::map<juce::AudioPluginInstance*, std::unique_ptr<PluginWindow>> open;
+    static std::map<juce::AudioPluginInstance*, std::unique_ptr<EditorHost>> open;
     return open;
+}
+
+void closeHostOf (const juce::AudioPluginInstance* plugin)
+{
+    // close after leaving this callback (the window deletes itself)
+    juce::MessageManager::callAsync ([plugin] { windows().erase (const_cast<juce::AudioPluginInstance*> (plugin)); });
+}
+
+std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title,
+                                      PluginWindows::WrapperContext context)
+{
+    if (! opensDetached (plugin, context))
+        return std::make_unique<DockedPluginFrame> (std::move (owner), plugin, title, std::move (context), *dockWorkspace());
+    return std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
+}
+
+// Issue #116: FL's plugin menu › Detached. The editor closes and opens again in the other host (never re-parented:
+// some editors break when their native view changes parent); the choice is saved with the plugin in the project.
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached)
+{
+    auto& open = windows();
+    auto it = open.find (&plugin);
+    if (it == open.end())
+        return;
+    auto keep = it->second->keepAlive();
+    const auto title = it->second->hostTitle();
+    const auto context = it->second->getContext();
+    open.erase (it);
+    if (context.engine != nullptr && context.find)
+        context.engine->editSong ([find = context.find, detached] (Song& song) {
+            if (auto* ref = find (song))
+                ref->detached = detached;
+        });
+    PluginWindows::open (std::move (keep), plugin, title, context);
 }
 
 // Closes the windows of plugins the engine no longer hosts (checked 4 times a second while a window is open; a removed
@@ -750,18 +1202,23 @@ void* claimEditorWindow (void* window, const wchar_t* faultModule)
     if (window == nullptr) // a timer / thread message: by the faulting module
     {
         for (const auto& [plugin, w] : windows())
-            if (w->getWindowHandle() != nullptr && moduleOfPlugin (module, *plugin))
-                return w->getWindowHandle();
+            if (w->nativeHandle() != nullptr && moduleOfPlugin (module, *plugin))
+                return w->nativeHandle();
         return nullptr;
     }
     // a message for one of the plugin's windows: a child of the editor's window, or a popup up its owner chain (LYNX
     // makes the editor window itself owned by the main window, so the walk stops at the first editor window). LYNX's
     // own frame window around the editor is not the plugin's.
+    // a docked editor's frame is a child window of the main window (issue #116): its parents first
+    for (auto p = static_cast<HWND> (window); p != nullptr && p != GetDesktopWindow(); p = GetAncestor (p, GA_PARENT))
+        for (const auto& [plugin, w] : windows())
+            if (auto* own = w->nativeHandle(); own != nullptr && p == static_cast<HWND> (own))
+                return window != own ? own : nullptr;
     auto h = GetAncestor (static_cast<HWND> (window), GA_ROOT);
     for (int i = 0; i < 8 && h != nullptr; ++i)
     {
         for (const auto& [plugin, w] : windows())
-            if (auto* own = w->getWindowHandle(); own != nullptr && h == static_cast<HWND> (own))
+            if (auto* own = w->nativeHandle(); own != nullptr && h == static_cast<HWND> (own))
                 return window != own ? own : nullptr;
         const auto owner = GetWindow (h, GW_OWNER);
         h = owner != nullptr ? GetAncestor (owner, GA_ROOT) : nullptr;
@@ -773,7 +1230,7 @@ void onEditorFault (const crashguard::WindowFault& fault)
 {
     juce::AudioPluginInstance* faulted = nullptr;
     for (const auto& [plugin, w] : windows())
-        if (w->getWindowHandle() == fault.rootWindow)
+        if (w->nativeHandle() == fault.rootWindow)
             faulted = plugin;
     const auto name = faulted != nullptr ? faulted->getPluginDescription().name : juce::String ("?");
 
@@ -798,7 +1255,7 @@ void onEditorFault (const crashguard::WindowFault& fault)
     auto* root = fault.rootWindow;
     juce::MessageManager::callAsync ([faulted, root] {
         auto& open = windows();
-        if (auto it = open.find (faulted); faulted != nullptr && it != open.end() && it->second->getWindowHandle() == root)
+        if (auto it = open.find (faulted); faulted != nullptr && it != open.end() && it->second->nativeHandle() == root)
         {
             auto window = std::move (it->second);
             open.erase (it);
@@ -823,12 +1280,6 @@ void installEditorGuard()
    #endif
 }
 
-void PluginWindow::closeButtonPressed()
-{
-    const auto* k = key();
-    // close after leaving this callback (the window deletes itself)
-    juce::MessageManager::callAsync ([k] { windows().erase (const_cast<juce::AudioPluginInstance*> (k)); });
-}
 
 class ScanThread final : public juce::ThreadWithProgressWindow
 {
@@ -868,20 +1319,64 @@ private:
 
 namespace PluginWindows
 {
+bool letsHostProcessKeys (juce::Component& window)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    return wrapped != nullptr && wrapped->hostProcessesKeys();
+}
+
+bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
+{
+    auto* w = dynamic_cast<PluginWindow*> (&window);
+    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    if (wrapped == nullptr)
+        return false;
+    wrapped->refreshKeyboardPriority(); // (the window's timer may not have run since the change)
+    wrapped->showPage (true);
+    const auto image = wrapped->createComponentSnapshot (wrapped->getLocalBounds(), true, 1.0f);
+    wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
 
     if (auto it = open.find (&plugin); it != open.end())
     {
-        it->second->toFront (true);
+        it->second->bringToFront();
         return;
     }
 
     installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
-    open[&plugin] = std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
+    open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
+}
+
+void setDockWorkspace (Workspace* workspace)
+{
+    dockWorkspace() = workspace;
+}
+
+void setDetached (juce::AudioPluginInstance& plugin, bool detached)
+{
+    setDetachedAndReopen (plugin, detached);
+}
+
+bool isDocked (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    return it != windows().end() && dynamic_cast<DockedPluginFrame*> (it->second.get()) != nullptr;
+}
+
+void* hostWindowHandle (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    return it != windows().end() ? it->second->nativeHandle() : nullptr;
 }
 
 void closeAll()
@@ -898,7 +1393,7 @@ void closeOrphans()
 std::vector<juce::AudioPluginInstance*> openPlugins()
 {
     std::vector<juce::AudioPluginInstance*> out;
-    const auto* last = PluginWindow::lastUsed();
+    const auto* last = EditorHost::lastUsed();
     for (auto& [plugin, window] : windows())
         if (plugin == last)
             out.insert (out.begin(), plugin);
