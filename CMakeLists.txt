@@ -465,6 +465,7 @@ if(LYNX_BUILD_APP)
         src/ui/VideoTracks.cpp
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
+        src/ui/FpcEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp

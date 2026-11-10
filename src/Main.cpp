@@ -11471,6 +11471,14 @@ private:
                     break;
                 }
 
+            // round 190q: FPC's editor
+            for (int c = 0; c < (int) offline.getSong().channels.size(); ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fpc)
+                {
+                    saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fpc.png");
+                    break;
+                }
+
             // parametric EQ: the one with the most pronounced curve (in an imported .flp, with FL's settings)
             {
                 int bestTrack = -1, bestSlot = -1;
