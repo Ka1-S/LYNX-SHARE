@@ -931,10 +931,13 @@ enum class EffectKind : std::uint8_t
     pocketWowFlutter,      // Pocket Wow & Flutter, FL Studio Mobile's Wow & Flutter (round 189h, core/PocketFxB.cpp)
     pocketPhaser,          // Pocket Phaser, FL Studio Mobile's Phaser (round 189h, core/PocketFxB.cpp)
     pocketFlanger,         // Pocket Flanger, FL Studio Mobile's Flanger (round 189h, core/PocketFxB.cpp)
-    pocketTremolo          // Pocket Tremolo, FL Studio Mobile's Tremolo (round 189h, core/PocketFxB.cpp)
+    pocketTremolo,          // Pocket Tremolo, FL Studio Mobile's Tremolo (round 189h, core/PocketFxB.cpp)
+    pocketWaveshaper,      // Pocket Waveshaper, FL Studio Mobile's Waveshaper, exact (round 189h, core/PocketFxC.cpp): FLM's 20 values
+    pocketCompressor,      // Pocket Compressor, FL Studio Mobile's Compressor, exact (round 189h, core/PocketFxC.cpp): FLM's 9 values
+    pocketSpreader         // Pocket Spreader, FL Studio Mobile's Spreader, exact (round 189h, core/PocketFxC.cpp): FL's Spreader engine, FLM's 4 values
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::pocketTremolo;
+constexpr EffectKind lastEffectKind = EffectKind::pocketSpreader;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

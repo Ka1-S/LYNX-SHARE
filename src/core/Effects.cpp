@@ -3106,6 +3106,28 @@ const EffectInfo& effectInfo (EffectKind kind)
             static const EffectInfo info { "Pocket Tremolo", { { "Rate", 0.045467f }, { "Rate sync", 0.0f }, { "Amount max", 1.0f },
                                                                { "Amount min", 0.0f }, { "Phase offset", 0.0f }, { "Stereo offset", 0.0f },
                                                                { "Sync", 0.0f }, { "Shape", 0.5f }, { "Smooth", 1.0f }, { "Skew", 0.5f }, { "Width", 0.5f } } };
+        case EffectKind::pocketWaveshaper:
+        {
+            // FL Studio Mobile's own values and defaults (round 189h)
+            static const EffectInfo info { "Pocket Waveshaper", { { "Shape", 0.0f }, { "Auto-gain", 0.0f }, { "X", 0.5f }, { "Y", 0.5f },
+                                                                  { "Drive", 0.0f }, { "Post gain", 0.5f }, { "Stereo spread", 0.0f },
+                                                                  { "Mix", 1.0f }, { "High cut", 1.0f }, { "Low cut", 0.0f }, { "Bass", 0.5f },
+                                                                  { "Mid freq", 0.5f }, { "Mid gain", 0.5f }, { "Treble", 0.5f },
+                                                                  { "LFO shape", 0.0f }, { "LFO sync", 0.0f }, { "LFO rate", 0.5f },
+                                                                  { "LFO rate free", 0.0f }, { "LFO to X", 0.0f }, { "LFO to Y", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketCompressor:
+        {
+            static const EffectInfo info { "Pocket Compressor", { { "Thresh", 0.499f }, { "Ratio", 0.0f }, { "Attack", 0.6f }, { "Release", 0.6f },
+                                                                  { "Level", 0.5001f }, { "Hold", 0.0f }, { "Auto gain", 1.0f },
+                                                                  { "Input gain", 0.5f }, { "RMS", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketSpreader:
+        {
+            static const EffectInfo info { "Pocket Spreader", { { "Width", 0.0f }, { "Low bypass", 0.0f }, { "Mono bass", 0.0f },
+                                                                { "Separation", 0.5f } } };
             return info;
         }
         case EffectKind::lynxTune: return lynxtune::info();
@@ -3367,6 +3389,8 @@ const EffectInfo& effectInfo (EffectKind kind)
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {
+    if (kind == EffectKind::pocketCompressor && param == 4) // round 189h: FLM's Level reads 20 dB less with Auto gain on
+        return pocket::compressorLevelText (v, context[6] >= 0.5f);
     if (kind == EffectKind::ridgeStrip && param == mixsuite::ridge::driveAmount) // round tp172c6: the model's own dial
     {
         const auto model = mixsuite::ridge::driveModelIndex (context[(std::size_t) mixsuite::ridge::driveModel]);
@@ -3927,6 +3951,12 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::flangerParamText (param, v);
         case EffectKind::pocketTremolo:
             return pocket::tremoloParamText (param, v);
+        case EffectKind::pocketWaveshaper:
+            return pocket::waveshaperParamText (param, v);
+        case EffectKind::pocketCompressor:
+            return pocket::compressorParamText (param, v);
+        case EffectKind::pocketSpreader:
+            return pocket::spreaderParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4298,6 +4328,9 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketPhaser: return pocket::makePhaser();
         case EffectKind::pocketFlanger: return pocket::makeFlanger();
         case EffectKind::pocketTremolo: return pocket::makeTremolo();
+        case EffectKind::pocketWaveshaper: return pocket::makeWaveshaper(); // round 189h
+        case EffectKind::pocketCompressor: return pocket::makeCompressor();
+        case EffectKind::pocketSpreader: return pocket::makeSpreader();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

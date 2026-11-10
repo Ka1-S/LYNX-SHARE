@@ -250,6 +250,9 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketPhaser: return "pocketPhaser";
         case EffectKind::pocketFlanger: return "pocketFlanger";
         case EffectKind::pocketTremolo: return "pocketTremolo";
+        case EffectKind::pocketWaveshaper: return "pocketWaveshaper";
+        case EffectKind::pocketCompressor: return "pocketCompressor";
+        case EffectKind::pocketSpreader: return "pocketSpreader";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -989,6 +992,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx,
                     EffectKind::pocketAutoduck, EffectKind::pocketChorus, EffectKind::pocketSpacer, EffectKind::pocketStereoizer,
                     EffectKind::pocketWowFlutter, EffectKind::pocketPhaser, EffectKind::pocketFlanger, EffectKind::pocketTremolo,
+                    EffectKind::pocketWaveshaper, EffectKind::pocketCompressor, EffectKind::pocketSpreader,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,

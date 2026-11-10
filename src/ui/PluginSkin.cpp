@@ -57,10 +57,11 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper:
         case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
         case EffectKind::pocketAutoduck:
+        case EffectKind::pocketCompressor:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
-        case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion:
+        case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
         case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:
@@ -68,6 +69,7 @@ juce::Colour accentFor (EffectKind kind)
             return colour::rose;
         case EffectKind::utility: case EffectKind::stereoShaper: case EffectKind::stereoEnhancer: case EffectKind::spreader:
         case EffectKind::fruityBalance: case EffectKind::fruitySend: case EffectKind::pocketSpacer: case EffectKind::pocketStereoizer:
+        case EffectKind::pocketSpreader:
             return colour::lime;
         default:
             return colour::crimson;
