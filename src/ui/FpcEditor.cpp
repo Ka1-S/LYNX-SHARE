@@ -864,6 +864,15 @@ private:
             r.repaint();
         }
         layoutLayers();
+        // the selected layer stays in view (a new layer is added below the visible rows)
+        if (selectedLayer < (int) rows.size() && layerView.getHeight() > 0)
+        {
+            const auto row = rows[(std::size_t) selectedLayer]->getBounds();
+            auto y = layerView.getViewPositionY();
+            y = std::min (y, row.getY());
+            y = std::max (y, row.getBottom() - layerView.getHeight());
+            layerView.setViewPosition (0, std::max (0, y));
+        }
 
         const auto file = selectedLayer < (int) files[(std::size_t) selectedPad].size() ? files[(std::size_t) selectedPad][(std::size_t) selectedLayer] : std::string();
         const auto saved = selectedLayer < (int) pad.layers.size() ? text (pad.layers[(std::size_t) selectedLayer].path) : juce::String();
