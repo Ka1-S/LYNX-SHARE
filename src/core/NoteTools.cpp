@@ -793,6 +793,32 @@ void ungroupNotes (Pattern& pattern, const std::vector<int>& indices)
         pattern.notes[(std::size_t) i].group = 0;
 }
 
+void groupChance (Pattern& pattern, const std::vector<int>& indices, bool playOne)
+{
+    const auto list = validSorted (pattern, indices);
+    if (list.size() < 2)
+        return;
+    auto id = 1;
+    for (const auto& n : pattern.notes)
+        id = std::max (id, n.chanceGroup + 1);
+    for (auto i : list)
+    {
+        auto& n = pattern.notes[(std::size_t) i];
+        n.chanceGroup = id;
+        n.chanceOne = playOne;
+        n.chance = 1.0f; // a new group plays at 100 % [LIVE 12.4: grouping notes at 25-90 % showed "Probability: 100 %"]
+    }
+}
+
+void ungroupChance (Pattern& pattern, const std::vector<int>& indices)
+{
+    for (auto i : validSorted (pattern, indices))
+    {
+        pattern.notes[(std::size_t) i].chanceGroup = 0;
+        pattern.notes[(std::size_t) i].chanceOne = false;
+    }
+}
+
 std::vector<int> groupOf (const Pattern& pattern, int index)
 {
     if (! valid (pattern, index))
@@ -820,6 +846,33 @@ void regroup (Pattern& pattern, const std::vector<int>& indices)
         if (renamed.find (old) == renamed.end())
             renamed[old] = next++;
         g = renamed[old];
+    }
+    // the copies' probability groups too (round 187c)
+    std::map<int, int> renamedChance;
+    auto nextChance = 1;
+    for (const auto& n : pattern.notes)
+        nextChance = std::max (nextChance, n.chanceGroup + 1);
+    for (auto i : validSorted (pattern, indices))
+    {
+        auto& g = pattern.notes[(std::size_t) i].chanceGroup;
+        if (g == 0)
+            continue;
+        if (renamedChance.find (g) == renamedChance.end())
+            renamedChance[g] = nextChance++;
+        g = renamedChance[g];
+    }
+}
+
+void spreadGroupChance (Pattern& pattern, const std::vector<int>& edited)
+{
+    for (auto i : validSorted (pattern, edited))
+    {
+        const auto& from = pattern.notes[(std::size_t) i];
+        if (from.chanceGroup == 0)
+            continue;
+        for (auto& n : pattern.notes)
+            if (n.chanceGroup == from.chanceGroup)
+                n.chance = from.chance;
     }
 }
 

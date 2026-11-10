@@ -388,6 +388,32 @@ bool deleteTrack (Song& song, int t)
     return true;
 }
 
+bool reconnectLostSend (Song& song, int track, int index, int to)
+{
+    if (! isInsert (song, track) || index < 0 || index >= (int) song.mixer[(std::size_t) track].lostSends.size() || to < 1
+        || to >= (int) song.mixer.size() || to == track || (! song.routes (track, to) && ! song.canRoute (track, to)))
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto lost = t.lostSends[(std::size_t) index];
+    t.lostSends.erase (t.lostSends.begin() + index);
+    if (const auto it = std::find_if (t.sends.begin(), t.sends.end(), [to] (const MixerSend& s) { return s.target == to; }); it != t.sends.end())
+        it->level = lost.level;
+    else
+        t.sends.push_back ({ to, lost.level });
+    return true;
+}
+
+void removeLostSends (Song& song, int track, int index)
+{
+    if (! isInsert (song, track))
+        return;
+    auto& lost = song.mixer[(std::size_t) track].lostSends;
+    if (index < 0)
+        lost.clear();
+    else if (index < (int) lost.size())
+        lost.erase (lost.begin() + index);
+}
+
 std::vector<int> playlistTracksLinkedTo (const Song& song, const std::vector<int>& tracks)
 {
     const auto among = [&tracks] (int t) { return t > 0 && std::find (tracks.begin(), tracks.end(), t) != tracks.end(); };
@@ -433,7 +459,7 @@ void rerouteFeeders (Song& song, int t)
 }
 } // namespace
 
-int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked)
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked, bool keepLostLinks)
 {
     std::sort (tracks.begin(), tracks.end());
     tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
@@ -463,6 +489,14 @@ int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks link
     int deleted = 0;
     for (auto it = tracks.rbegin(); it != tracks.rend(); ++it) // from the right: the numbers still to delete stay valid
     {
+        if (keepLostLinks) // (round 186c's option) each send into it stays, greyed, under the deleted insert's name
+        {
+            const auto name = song.mixer[(std::size_t) *it].name.empty() ? "Insert " + std::to_string (*it) : song.mixer[(std::size_t) *it].name;
+            for (int x = 1; x < (int) song.mixer.size(); ++x)
+                for (const auto& send : song.mixer[(std::size_t) x].sends)
+                    if (x != *it && send.target == *it)
+                        song.mixer[(std::size_t) x].lostSends.push_back ({ name, send.level });
+        }
         rerouteFeeders (song, *it);
         if (deleteTrack (song, *it))
             ++deleted;
@@ -1032,6 +1066,7 @@ void resetRouting (Song& song, const std::vector<int>& tracks)
         {
             auto& m = song.mixer[(std::size_t) t];
             m.sends.clear();
+            m.lostSends.clear();
             m.toMaster = true;
             m.masterLevel = 1.0f;
         }
@@ -1341,6 +1376,148 @@ bool mergeVcaIntoMembers (Song& song, int vca)
     }
     song.vcas[(std::size_t) vca].level = unityFader;
     return true;
+}
+
+namespace
+{
+int linkedInsert (const Song& song, const PlaylistTrack& pt)
+{
+    if (pt.mode == PlaylistTrackMode::audio)
+        return pt.mixerTrack;
+    if (pt.mode == PlaylistTrackMode::instrument)
+        return pt.channel >= 0 && pt.channel < (int) song.channels.size() ? song.channels[(std::size_t) pt.channel].mixerTrack : pt.mixerTrack;
+    return -1;
+}
+} // namespace
+
+std::vector<int> playlistOrderInserts (const Song& song)
+{
+    std::vector<int> out;
+    for (const auto& pt : song.playlistTracks)
+        if (const auto t = linkedInsert (song, pt); t > 0 && t < (int) song.mixer.size() && std::find (out.begin(), out.end(), t) == out.end())
+            out.push_back (t);
+    return out;
+}
+
+std::vector<PlaylistGroupInserts> playlistGroupInserts (const Song& song)
+{
+    std::vector<PlaylistGroupInserts> groups;
+    std::vector<int> seen;
+    const auto& tracks = song.playlistTracks;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        if (tracks[i].grouped)
+            continue; // (a member: handled with its header)
+        auto end = i + 1;
+        while (end < tracks.size() && tracks[end].grouped)
+            ++end;
+        if (end == i + 1)
+            continue; // an ungrouped track on its own
+        PlaylistGroupInserts g;
+        g.collapsed = tracks[i].collapsed;
+        for (auto k = i; k < end; ++k)
+            if (const auto t = linkedInsert (song, tracks[k]); t > 0 && t < (int) song.mixer.size() && std::find (seen.begin(), seen.end(), t) == seen.end())
+            {
+                seen.push_back (t);
+                g.inserts.push_back (t);
+            }
+        if (! g.inserts.empty())
+            groups.push_back (std::move (g));
+    }
+    return groups;
+}
+
+namespace
+{
+// the separator / fold flags followPlaylistGroups wants, per mixer track
+void followedFlags (const Song& song, std::vector<bool>& separator, std::vector<bool>& folded)
+{
+    const auto count = song.mixer.size();
+    separator.assign (count, false);
+    folded.assign (count, false);
+    for (std::size_t t = 0; t < count; ++t)
+    {
+        separator[t] = song.mixer[t].separator;
+        folded[t] = song.mixer[t].folded;
+    }
+    for (const auto t : playlistOrderInserts (song)) // the follow owns these
+        separator[(std::size_t) t] = folded[(std::size_t) t] = false;
+
+    const auto order = displayOrder (song);
+    const auto at = [&order] (int t) { return (int) (std::find (order.begin(), order.end(), t) - order.begin()); };
+    for (const auto& g : playlistGroupInserts (song))
+    {
+        if (g.inserts.size() < 2)
+            continue;
+        auto positions = g.inserts;
+        for (auto& p : positions)
+            p = at (p);
+        std::sort (positions.begin(), positions.end());
+        const auto dock = song.mixer[(std::size_t) order[(std::size_t) positions.front()]].dock;
+        auto runs = positions.back() - positions.front() + 1 == (int) positions.size();
+        for (const auto p : positions)
+            runs = runs && song.mixer[(std::size_t) order[(std::size_t) p]].dock == dock;
+        if (! runs)
+            continue; // not side by side: "Arrange inserts like the Playlist" puts them together
+        const auto first = order[(std::size_t) positions.front()];
+        separator[(std::size_t) first] = true;
+        folded[(std::size_t) first] = g.collapsed;
+        if (const auto next = positions.back() + 1; next < (int) order.size() && order[(std::size_t) next] > 0
+                                                     && song.mixer[(std::size_t) order[(std::size_t) next]].dock == dock)
+            separator[(std::size_t) order[(std::size_t) next]] = true;
+    }
+}
+} // namespace
+
+bool followsPlaylistGroups (const Song& song)
+{
+    std::vector<bool> separator, folded;
+    followedFlags (song, separator, folded);
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+        if (song.mixer[t].separator != separator[t] || song.mixer[t].folded != folded[t])
+            return false;
+    return true;
+}
+
+bool followPlaylistGroups (Song& song)
+{
+    std::vector<bool> separator, folded;
+    followedFlags (song, separator, folded);
+    auto changed = false;
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+    {
+        auto& m = song.mixer[t];
+        changed = changed || m.separator != separator[t] || m.folded != folded[t];
+        m.separator = separator[t];
+        m.folded = folded[t];
+    }
+    return changed;
+}
+
+int arrangeLikePlaylist (Song& song)
+{
+    const auto linked = playlistOrderInserts (song);
+    std::vector<int> wanted = linked; // the new order of inserts 1..n: the linked ones, then the rest as they are
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+        if (std::find (linked.begin(), linked.end(), t) == linked.end())
+            wanted.push_back (t);
+
+    // place by place, the wanted insert swaps in (swapTracks carries every reference along)
+    std::vector<int> now (song.mixer.size()); // now[t] = which original insert sits at t
+    std::iota (now.begin(), now.end(), 0);
+    int moved = 0;
+    for (int place = 1; place <= (int) wanted.size(); ++place)
+    {
+        const auto from = (int) (std::find (now.begin() + 1, now.end(), wanted[(std::size_t) place - 1]) - now.begin());
+        if (from == place)
+            continue;
+        swapTracks (song, place, from);
+        std::swap (now[(std::size_t) place], now[(std::size_t) from]);
+    }
+    for (int t = 1; t < (int) now.size(); ++t)
+        moved += now[(std::size_t) t] != t ? 1 : 0;
+    followPlaylistGroups (song);
+    return moved;
 }
 
 void createGroup (Song& song, const std::vector<int>& tracks, int current)

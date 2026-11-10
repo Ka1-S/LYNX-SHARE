@@ -47,7 +47,7 @@ bool isAudio (const juce::File& f)
 
 bool isListed (const juce::File& f)
 {
-    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;mid;midi;lynx;flp;fst;sf2;sf3;sfz");
+    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;mid;midi;lynx;flp;als;flm;fst;sf2;sf3;sfz");
 }
 
 constexpr int maxResults = 500;
@@ -117,7 +117,7 @@ Icon iconFor (const juce::File& f, bool folder)
         return Icon::audioFile;
     if (f.hasFileExtension ("mid;midi"))
         return Icon::pianoRoll;
-    if (f.hasFileExtension ("lynx;flp"))
+    if (f.hasFileExtension ("lynx;flp;als;flm"))
         return Icon::project;
     if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset"))
         return Icon::preset;
@@ -134,7 +134,7 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
                    "[Shift][Up] / [Shift][Down] swap through the files");
     if (f.hasFileExtension ("mid;midi"))
         return tr ("MIDI file: [2xLMB] open it as a project");
-    if (f.hasFileExtension ("lynx;flp"))
+    if (f.hasFileExtension ("lynx;flp;als;flm"))
         return tr ("Project: [2xLMB] open it");
     if (f.hasFileExtension ("lynxtrack") || (f.hasFileExtension ("fst") && f.getFullPathName().containsIgnoreCase ("Mixer presets")))
         return tr ("Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)");
@@ -3377,7 +3377,7 @@ void BrowserComponent::showFileMenu (const juce::File& file)
         menu.addSeparator();
         menu.addItem (tr ("Edit in the audio editor..."), [this, file] { openAudioEditor (engine, file); });
     }
-    else if (file.hasFileExtension ("lynx;flp"))
+    else if (file.hasFileExtension ("lynx;flp;als;flm"))
         menu.addItem (tr ("Open project"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
     else if (file.hasFileExtension ("mid;midi"))
         menu.addItem (tr ("Open MIDI file"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
@@ -4068,7 +4068,7 @@ void BrowserComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("lynx;flp;mid;midi") && onOpenProject)
+    if (file.hasFileExtension ("lynx;flp;als;flm;mid;midi") && onOpenProject)
         onOpenProject (file);
 }
 } // namespace lynx

@@ -74,7 +74,8 @@ constexpr int numParams = 16;
 void toParams (const State& s, EffectParams& p) noexcept;
 State fromParams (const EffectParams& p) noexcept;
 std::string paramText (int param, float v);
-std::unique_ptr<Effect> make();
+// `params` (may be null): the slot's parameters, so the latency is known before the first block (issue #113)
+std::unique_ptr<Effect> make (const EffectParams* params = nullptr);
 
 // FL's MSVC run-time tanhf (the engines' soft-clip table is built from it); exposed for the tests
 float tanhfCrt (float x) noexcept;
