@@ -17381,6 +17381,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rack116Tests.inc"
 #include "Trial187bTests.inc"
 #include "ProjectKey184aTests.inc"
+#include "KeyGuess184aTests.inc"
 #include "Render186bTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"

@@ -2,6 +2,7 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
+#include "core/KeyGuess.h"
 #include "core/PlaylistOps.h"
 #include "core/Comping.h"
 #include "core/Drumaxx.h"
@@ -10251,12 +10252,59 @@ private:
         }
         saveStyleMenus ("simple");
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");
+        // round 184a S11: the Key panel (no key, then an A minor riff and its guesses) and its menu
+        const auto toolbarShot = [&] (const char* name) {
+            writeImage (ui.createComponentSnapshot (ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80)), true, 1.0f), name);
+        };
+        toolbarShot ("key-none");
+        saveMenus (juce::StringArray { lynx::tr ("Key") }, std::vector<juce::PopupMenu> { ui.getKeyMenuForSnapshot() }, prefix + "-key-menu-empty.png");
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            if (s.patterns.empty())
+                s.patterns.emplace_back();
+            int t = 0;
+            for (int k : { 57, 60, 64, 67, 69, 67, 64, 60, 57, 59, 60, 62, 64, 62, 60, 59, 57, 57, 64, 45 })
+            {
+                lynx::Note n;
+                n.channel = 0;
+                n.key = k;
+                n.start = t * lynx::ppq / 2;
+                n.length = k == 57 || k == 45 ? lynx::ppq : lynx::ppq / 2;
+                s.patterns[0].notes.push_back (n);
+                ++t;
+            }
+        });
+        offline.dispatchPendingMessages();
+        saveMenus (juce::StringArray { lynx::tr ("Key") }, std::vector<juce::PopupMenu> { ui.getKeyMenuForSnapshot() }, prefix + "-key-menu-guess.png");
+        const auto guesses = lynx::keyguess::guess (offline.getSong(), 3);
+        if (! guesses.empty())
+            offline.editSong ([k = guesses[0].key] (lynx::Song& s) { lynx::projectkey::set (s, k); });
+        offline.dispatchPendingMessages();
+        toolbarShot ("key-set");
+        write ("simple-key");
+        juce::String keyCounts;
+        for (const auto& g : guesses)
+            keyCounts << "guess " << lynx::projectkey::name (g.key) << " " << g.notesInScale << "/" << g.notes << " score " << g.score << "\n";
+        offline.editSong ([] (lynx::Song& s) { lynx::projectkey::set (s, std::nullopt); });
         ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
         offline.dispatchPendingMessages();
+        toolbarShot ("key-pattern-toolbar");
         write ("pattern-after");
+        // round 184a S17: the setup wizard with its Workflow choice — a first start (Pattern selected), then reopened in Simple
+        for (int style : { 0, 2 })
+        {
+            auto wizard = lynx::makeSetupWizardContent (offline, {}, {}, style, {});
+            juce::Image image (juce::Image::ARGB, wizard->getWidth(), wizard->getHeight(), true);
+            {
+                juce::Graphics g (image);
+                wizard->paintEntireComponent (g, false);
+            }
+            writeImage (image, style == 0 ? "wizard-pattern" : "wizard-simple");
+        }
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
                                                              + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
-                                                             + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n");
+                                                             + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n" + keyCounts);
     }
 
     void runDetailShot (const juce::String& prefix)
