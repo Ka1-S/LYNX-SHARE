@@ -10201,6 +10201,24 @@ private:
                 offline.dispatchPendingMessages();
                 simple->hideChooser();
             }
+            // round 190t, slice A: one click on a starter beat adds it, placed for four bars (undone again)
+            {
+                const auto clipsBefore = offline.getSong().playlist.size();
+                const auto tempoBefore = offline.getSong().bpm;
+                simple->clickStarterForSnapshot (1);
+                offline.dispatchPendingMessages();
+                write ("simple-starter-added");
+                const auto& song = offline.getSong();
+                juce::String report ("tempo " + juce::String (tempoBefore, 1) + " -> " + juce::String (song.bpm, 1) + "\n");
+                for (auto i = clipsBefore; i < song.playlist.size(); ++i)
+                    report << "clip at beat " << juce::String ((double) song.playlist[i].start / lynx::ppq, 2) << ", " << juce::String ((double) song.playlist[i].length / lynx::ppq, 2)
+                           << " beats, pattern " << song.playlist[i].pattern << ", track " << song.playlist[i].track << "\n";
+                juce::File (prefix + "-starter.txt").replaceWithText (report);
+                if (song.playlist.size() > clipsBefore && offline.canUndo())
+                    offline.undo();
+                offline.dispatchPendingMessages();
+                simple->hideChooser();
+            }
             // slice S4: the Simple headers with a few tracks (voice, instrument, drums, an audio file), some levels moved
             offline.editSong ([] (lynx::Song& s) {
                 namespace st = lynx::simpletracks;

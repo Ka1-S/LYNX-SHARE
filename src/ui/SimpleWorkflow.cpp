@@ -256,13 +256,7 @@ public:
         back.onClick = [this] { showTilesPage(); };
         useTempo.setButtonText (tr ("Use the suggested tempo"));
         useTempo.setToggleState (true, juce::dontSendNotification);
-        addDrums.setButtonText (tr ("Add drums"));
-        addDrums.onClick = [this] {
-            const auto picked = std::find_if (genreButtons.begin(), genreButtons.end(), [] (const auto& b) { return b->getToggleState(); });
-            const auto index = picked == genreButtons.end() ? 0 : (int) (picked - genreButtons.begin());
-            owner.addDrums (index == 0 ? std::string() : genreIds[(std::size_t) index], index != 0, useTempo.getToggleState());
-        };
-        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo, &addDrums })
+        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             addChildComponent (*c);
     }
 
@@ -280,13 +274,12 @@ public:
                     genreButtons.push_back (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (genre->label.c_str()) + "  "
                                                                                 + tr ("{0} BPM", { juce::String (juce::roundToInt (genre->defaultTempo)) })));
                 }
-            for (auto& b : genreButtons)
+            // one click on a starter adds it (round 190t): nothing to pick first, nothing to confirm
+            for (std::size_t i = 0; i < genreButtons.size(); ++i)
             {
-                b->setClickingTogglesState (true);
-                b->setRadioGroupId (2184);
-                addChildComponent (*b);
+                genreButtons[i]->onClick = [this, i] { owner.addDrums (genreIds[i], i != 0, useTempo.getToggleState()); };
+                addChildComponent (*genreButtons[i]);
             }
-            genreButtons[genreButtons.size() > 1 ? 1 : 0]->setToggleState (true, juce::dontSendNotification);
         }
         // the starter's tempo is for a project that has nothing yet: with tracks in it the tempo stays, unless asked
         useTempo.setToggleState (simpletracks::isEmptySong (owner.engine.getSong()), juce::dontSendNotification);
@@ -347,12 +340,10 @@ public:
         guitarButton.setBounds (sw.removeFromLeft (sw.getWidth() / 2));
         bassButton.setBounds (sw);
 
-        // the starter-beat page: genres in three columns, the tempo switch and Add
+        // the starter-beat page: the tempo switch, then the starters in three columns (a click adds one)
         auto s = card().reduced (20, 14).withTrimmedTop (50);
-        auto bottom = s.removeFromBottom (34);
-        addDrums.setBounds (bottom.removeFromRight (140));
-        useTempo.setBounds (bottom.removeFromLeft (bottom.getWidth() - 10));
-        s.removeFromBottom (10);
+        useTempo.setBounds (s.removeFromTop (28));
+        s.removeFromTop (10);
         const auto columns = 3, buttonH = 32;
         const auto w = (s.getWidth() - (columns - 1) * gap) / columns;
         for (int i = 0; i < (int) genreButtons.size(); ++i)
@@ -390,7 +381,7 @@ private:
     {
         for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
             c->setVisible (! starterPage);
-        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo, &addDrums })
+        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             c->setVisible (starterPage);
         for (auto& b : genreButtons)
             b->setVisible (starterPage);
@@ -400,7 +391,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, addDrums, guitarButton, bassButton, moreInstruments;
+    juce::TextButton close, back, guitarButton, bassButton, moreInstruments;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -562,6 +553,13 @@ void SimpleWorkflow::showStarterPageForSnapshot()
 {
     chooserForSnapshot();
     chooser->showStarterPage();
+}
+
+void SimpleWorkflow::clickStarterForSnapshot (int index)
+{
+    showStarterPageForSnapshot();
+    if (index >= 0 && index < (int) chooser->genreButtons.size() && chooser->genreButtons[(std::size_t) index]->onClick)
+        chooser->genreButtons[(std::size_t) index]->onClick();
 }
 
 bool SimpleWorkflow::add (simpletracks::Request request)
@@ -753,6 +751,7 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
         pattern.lengthTicks = 16 * ticksPerStep;
     }
     q.pattern = std::move (pattern);
+    q.fillBars = 4; // the beat loops for four bars: long enough to play along and build on (round 190t)
     if (q.kit.empty())
         return;
     if (useTempo && steps)

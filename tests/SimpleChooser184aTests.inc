@@ -96,6 +96,65 @@ TEST (simple184a_starter_beat_becomes_a_drums_track)
     CHECK (! simpletracks::isEmptySong (s));
 }
 
+// Round 190t, slice A: a starter beat is placed for four bars (whole clips of its pattern), in the same edit.
+TEST (simple190t_a_starter_beat_fills_four_bars)
+{
+    using namespace lynx;
+    const auto bar = (std::int64_t) 16 * ticksPerStep;
+    auto add = [bar] (Song& s, int patternBars, int fillBars) {
+        s.mixer.resize (4);
+        simpletracks::Request q;
+        q.kind = simpletracks::Kind::drums;
+        ChannelDef kick;
+        kick.instrument = InstrumentKind::kick;
+        q.kit = { kick };
+        Pattern beat;
+        beat.lengthTicks = patternBars * bar;
+        Note n;
+        n.length = ticksPerStep;
+        n.key = 60;
+        beat.notes = { n };
+        q.pattern = beat;
+        q.fillBars = fillBars;
+        return simpletracks::addTrack (s, q);
+    };
+    {
+        Song s; // one bar: four clips, one after the other, all the same pattern on the drum track
+        const auto r = add (s, 1, 4);
+        CHECK (r.ok() && s.playlist.size() == 4);
+        for (std::size_t i = 0; i < s.playlist.size(); ++i)
+            CHECK (s.playlist[i].start == (std::int64_t) i * bar && s.playlist[i].length == bar && s.playlist[i].pattern == r.pattern
+                   && s.playlist[i].track == r.track && s.playlist[i].kind == ClipKind::pattern);
+        CHECK (r.pattern == (int) s.patterns.size() - 1); // one pattern added, not four
+    }
+    {
+        Song s; // two bars: twice
+        CHECK (add (s, 2, 4).ok() && s.playlist.size() == 2 && s.playlist[1].start == 2 * bar);
+    }
+    {
+        Song s; // three bars: whole clips only, so six bars
+        CHECK (add (s, 3, 4).ok() && s.playlist.size() == 2 && s.playlist[1].start == 3 * bar);
+    }
+    {
+        Song s; // four bars or more: once
+        CHECK (add (s, 4, 4).ok() && s.playlist.size() == 1);
+        Song t;
+        CHECK (add (t, 8, 4).ok() && t.playlist.size() == 1);
+    }
+    {
+        Song s; // 0: as before
+        CHECK (add (s, 1, 0).ok() && s.playlist.size() == 1);
+    }
+    {
+        Song s; // a waltz: four bars of three beats
+        s.beatsPerBar = 3;
+        const auto r = add (s, 1, 4);
+        const auto length = s.playlist[0].length;
+        CHECK (r.ok() && length > 0 && (std::int64_t) s.playlist.size() * length >= 4 * 3 * ppq
+               && (std::int64_t) (s.playlist.size() - 1) * length < 4 * 3 * ppq);
+    }
+}
+
 TEST (simple184a_imported_audio_is_a_track_with_its_clip)
 {
     using namespace lynx;

@@ -63,6 +63,8 @@ public:
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
+    // round 190t: a click on the starter page's button `index` (0 = Empty grid), and the status line showing `text`
+    void clickStarterForSnapshot (int index);
 
     // how many were ever made in this process (the "nothing exists in Pattern workflow" check)
     static inline std::atomic<int> instances { 0 };

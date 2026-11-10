@@ -56,6 +56,9 @@ struct Request
     std::vector<ChannelDef> kit;
     std::optional<Pattern> pattern;
     double bpm = 0.0; // Drums: > 0 sets the project's tempo too (a starter beat's suggested tempo), in the same edit
+    // Drums (round 190t): > 0 repeats the pattern's clip from the song's start until it covers this many bars, so Play
+    // gives a loop long enough to build on (a one-bar starter: four clips). 0: one clip.
+    int fillBars = 0;
     // Audio (slice S3: an imported file or a dropped loop): the file, played from the song's start by an audio clip
     // channel routed to the track's insert, `audioLength` ticks long (> 0). Empty: no clip.
     std::string audioFile;

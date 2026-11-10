@@ -215,6 +215,13 @@ Result addDrums (Song& song, int track, const Request& request)
     clip.start = 0;
     clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
     song.playlist.push_back (clip);
+    // the same pattern again and again until `fillBars` bars are covered (whole clips: a 3-bar pattern covers 6)
+    const auto wanted = (std::int64_t) std::clamp (request.fillBars, 0, 64) * song.beatsPerBar * ppq;
+    for (auto at = clip.length; clip.length > 0 && at < wanted; at += clip.length)
+    {
+        clip.start = at;
+        song.playlist.push_back (clip);
+    }
     song.mode = PlayMode::song; // (the Simple workflow plays the song)
     if (request.bpm > 0.0)
         song.bpm = std::clamp (request.bpm, 10.0, 999.0);
