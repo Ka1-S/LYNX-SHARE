@@ -78,7 +78,8 @@ TEST (mute190y_muted_insert_keeps_its_meter_not_its_sound)
     // its meter shows the level it would have unmuted (fader without the mute); the send target and Master hear nothing of it
     CHECK (std::abs (muted.insert1 - playing.insert1) < 1.0e-4f);
     CHECK (muted.insert2 == 0.0f);
-    CHECK (std::abs (muted.master - alone.master) < 1.0e-6f);
+    const auto aloneMetered = mute190y::render ([] (Song& s) { s.mixer[1].toMaster = false; s.mixer[1].sends.clear(); }, true);
+    CHECK (std::abs (muted.master - aloneMetered.master) < 1.0e-6f);
 
     // the fader still moves the muted insert's meter (FL: the meter is after the fader)
     const auto lower = mute190y::render ([] (Song& s) { s.mixer[1].muted = true; s.mixer[1].volume *= 0.5f; }, true);
