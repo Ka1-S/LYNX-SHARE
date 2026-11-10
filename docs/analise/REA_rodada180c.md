@@ -144,6 +144,26 @@ Key = `round(pitch · 0.01)` (0…124) through the 125-entry key table; the voic
 slice keeps its pitch. Length: up to the next slice, or to the sample's end with PLAY TO END (`P+0x13E`), minus one
 frame. LYNX plays it on the sampler's slice mode (first key and PLAY TO END added to it).
 
+## Note-off and the voice settings (round 190f, issue #129)
+
+Voice_Release (`FUN_007684d0`) hands the voice to the plugin voice processor's release, `FUN_00756d80` →
+`FUN_007579d0`: the volume, Mod X, Mod Y and pitch articulators enter their release stage, and **when the volume
+record's envelope is off** (`+4` of the second 0xA0-byte record) it calls `FUN_00757a50`, which starts the 10 ms end
+fade at once — the same code as 3x Osc's (REA_rodada47 §3.1). So a slice never rings past its note in FL: either the
+volume envelope's release plays, or the 441-entry end fade does. LYNX's sampler voice followed FL's *channel sampler*
+here (no envelope = the sample plays on, REA_rodada76 §6), so a Slicer made in LYNX, or one from a state older than
+version 16, kept sounding after the note-off. Now a Slicer voice without volume envelope takes the end fade
+(`Instruments.cpp`, note-off; test `slicer190f_note_off_ends_the_slice`).
+
+The plugin's defaults (`FUN_00757bd0`, used when the state has no block): five neutral records, the volume one with
+flag 4 and release tension −101, Mod X 256, envelopes off. FL's three version-16 demo states all hold a volume envelope
+that is on with delay/attack/hold/decay 100, sustain 128, release 6500; no such constant is in the DLL, so whether a new
+Fruity Slicer starts like that in FL is **[OPEN: needs a fresh Slicer saved from FL]**.
+
+The block's fields are read and written through `core/FlVoiceSettings.h` (`fslicer::voiceSettings` /
+`setVoiceSettings`), in FL's units, so a .flp export carries an edit made in LYNX and FL reads it as its own
+(test `slicer190f_voice_settings_survive_flp_export_and_import`).
+
 ## Dump beat to piano roll (`FUN_0076b640`, tags of the DumpToPRMenu)
 
 Times: `pos · ((ppq · P188 · beats / frames) / 4)` (P188 taken as 4), or the slice's beat place · ppq; Original length
