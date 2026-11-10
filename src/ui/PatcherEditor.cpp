@@ -1629,7 +1629,7 @@ private:
             case InstrumentKind::boobass: case InstrumentKind::flkeys: case InstrumentKind::soundfont:
                 return "Misc";
             case InstrumentKind::granulizer: case InstrumentKind::directwave: case InstrumentKind::sampler:
-            case InstrumentKind::wavetraveller: case InstrumentKind::fruityslicer:
+            case InstrumentKind::wavetraveller: case InstrumentKind::fruityslicer: case InstrumentKind::slicex:
                 return "Sampler";
             case InstrumentKind::beepmap: case InstrumentKind::harmor: case InstrumentKind::morphine: case InstrumentKind::ogun:
             case InstrumentKind::autogun: case InstrumentKind::plucked: case InstrumentKind::sakura: case InstrumentKind::slayer:

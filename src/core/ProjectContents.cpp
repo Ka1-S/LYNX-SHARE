@@ -11,7 +11,7 @@ namespace lynx::projectcontents
 bool playsSampleFile (InstrumentKind kind) noexcept
 {
     return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
-           || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer;
+           || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer || kind == InstrumentKind::slicex;
 }
 
 bool pluginWindowTakesSample (InstrumentKind kind) noexcept

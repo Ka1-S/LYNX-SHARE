@@ -2,6 +2,7 @@
 #include "core/MixerOps.h"
 
 #include "core/FruitySlicer.h"
+#include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
@@ -214,6 +215,21 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         std::shared_ptr<Instrument> instrument = sf::makeInstrument (channel.samplePath.empty() ? nullptr : sf::FontLibrary::instance().get (channel.samplePath));
         instrument->prepare (sampleRate);
         instrument->configure (channel, bpm);
+        return instrument;
+    }
+
+    // Slicex (round 190l): FL's engine on the two decks' samples (deck A = the channel's sample, deck B = its one zone)
+    if (kind == InstrumentKind::slicex)
+    {
+        std::shared_ptr<const SampleData> a, b;
+        if (samples && ! channel.samplePath.empty())
+            a = samples (channel.samplePath);
+        if (samples && ! slicex::deckBPath (channel).empty())
+            b = samples (slicex::deckBPath (channel));
+        std::shared_ptr<Instrument> instrument = makeSlicexInstrument (std::move (a), std::move (b));
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
+        instrument->settleNew();
         return instrument;
     }
 
@@ -516,6 +532,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             && (kind != InstrumentKind::fruityslicer
                 || (previous->song.channels[p].samplePath == channel.samplePath
                     && previous->song.channels[p].pluginState == channel.pluginState))
+            && (kind != InstrumentKind::slicex // (its state is taken live; its samples are the instrument's)
+                || (previous->song.channels[p].samplePath == channel.samplePath && previous->song.channels[p].zones == channel.zones
+                    && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
@@ -754,7 +773,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             case InstrumentKind::simsynth: case InstrumentKind::plucked: case InstrumentKind::beepmap:
             case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
             case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
-            case InstrumentKind::wavetraveller:
+            case InstrumentKind::wavetraveller: case InstrumentKind::slicex:
                 return false;
             default:
                 return true;

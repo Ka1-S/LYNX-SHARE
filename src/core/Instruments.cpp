@@ -30,6 +30,7 @@
 #include "core/Drumaxx.h"
 #include "core/Granulizer.h"
 #include "core/WaveTraveller.h"
+#include "core/SlicexInstrument.h"
 #include "core/Slayer.h"
 #include "core/Ogun.h"
 #include "core/TransistorBass.h"
@@ -316,6 +317,7 @@ private:
             case InstrumentKind::granulizer:
             case InstrumentKind::wavetraveller:
             case InstrumentKind::fruityslicer:
+            case InstrumentKind::slicex:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -3460,6 +3462,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeWaveTravellerInstrument (std::move (sample));
     if (kind == InstrumentKind::fruityslicer) // the sampler's voices on the slices (the rack prepares the sample)
         return makeInstrument (InstrumentKind::sampler, std::move (sample));
+    if (kind == InstrumentKind::slicex)
+        return makeSlicexInstrument (std::move (sample), nullptr); // (deck B's sample comes from RackRenderer)
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)
