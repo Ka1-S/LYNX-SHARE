@@ -107,6 +107,7 @@ public:
         // FL tells the plugin when it renders (the sample-rate message's flag) and reads the samples with its render
         // interpolation then (REA_rodada190h Part 3)
         const auto rendering = offlineRendering();
+        sampleRate = sr > 0.0 ? sr : 44100.0;
         engine.setRate ((int) std::lround (sr), rendering);
         engine.setInterpolation (rendering ? flrs::renderQuality : flrs::liveQuality);
     }
@@ -162,6 +163,12 @@ public:
 
     void setNextNoteColour (int colour) noexcept override { nextColour = colour & 15; }
 
+    void setSongPosition (double ticks) noexcept override
+    {
+        songTicks = ticks;
+        sinceBlock = 0;
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
@@ -178,6 +185,10 @@ public:
         n.pitchCents = (float) (100.0 * (k - 60) + (double) pitchCents.load() + (double) nextCents);
         n.modX = nextModX;
         n.modY = nextModY;
+        // where the song is at this note (the block's position and what was rendered since): the LFOs with a global
+        // phase and the "song time" layering
+        const auto beats = std::max (0.0, songTicks / (double) ppq + (double) sinceBlock * (double) tempo / (60.0 * sampleRate));
+        engine.setSongPosition (beats, beats * 60.0 / (double) tempo);
         const auto id = engine.trigger (n);
         if (id >= 0)
         {
@@ -243,6 +254,7 @@ public:
                                           (float) (100.0 * (note.key - 60) + pitch + (double) note.cents));
                 }
         }
+        sinceBlock += n;
         if (engine.idle())
             return;
         engine.render (left, right, n);
@@ -277,6 +289,7 @@ private:
                     n.id = -1;
             }
             velocityToVolume = s->velocityToVolume;
+            tempo = s->tempo > 0.0f ? s->tempo : 140.0f;
             engine.setTempo (s->tempo);
             retired.store (s);
         }
@@ -304,6 +317,9 @@ private:
     // (audio thread)
     std::array<Held, slicex::Engine::maxVoices> notes {};
     bool velocityToVolume = true;
+    float tempo = 140.0f;
+    double sampleRate = 44100.0, songTicks = 0.0;
+    std::int64_t sinceBlock = 0;
     double channelVol = 1.0, channelPan = 0.0, channelPitch = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f, nextModX = 0.0f, nextModY = 0.0f;
     int nextColour = 0;

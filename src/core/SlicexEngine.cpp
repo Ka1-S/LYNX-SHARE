@@ -132,10 +132,12 @@ struct SxEnv
         return (double) (sub < 3 ? kA : kD);
     }
 
-    void finish() noexcept
+    void finish() noexcept // (a cut voice: the envelope stops where it is)
     {
         stage = sub = 9;
         phase = rate = 0.0;
+        start = out;
+        delta = 0.0f;
     }
 
     void begin (const Curve& c, float a, float d, float s, float r) noexcept
@@ -270,6 +272,7 @@ struct DeckSet
     DeckAudio audio;
     std::vector<RegionValues> values;
     KeyMap map;
+    double tempo = 0.0; // the sample's tempo (its beat grid over its length), 0 = none
 };
 } // namespace
 
@@ -333,6 +336,9 @@ std::shared_ptr<Program> makeProgram (const State& state, DeckAudio deckA, DeckA
         const auto& records = state.decks[(std::size_t) d].regions;
         for (std::size_t i = 0; i < deck.audio.regions.size(); ++i)
             deck.values.push_back (regionValues (i < records.size() ? records[i] : defaultRegion()));
+        if (const double beats = state.decks[(std::size_t) d].beatEnd() - state.decks[(std::size_t) d].beatStart();
+            deck.audio.frames > 0 && deck.audio.sampleRate > 0.0 && std::isfinite (beats) && beats > 0.0)
+            deck.tempo = beats * 60.0 * deck.audio.sampleRate / (double) deck.audio.frames;
     }
     for (int d = 0; d < 2; ++d)
         p->decks[(std::size_t) d].map = keyMap (d, p->decks[0].audio.regions, p->decks[1].audio.regions, sameDeck);
@@ -495,6 +501,7 @@ struct Engine::Impl
     std::array<std::array<std::uint32_t, 128>, 2> cycle {};
     u32 seed = 0x2545f491u;
     int nextNote = 0;
+    double songBeats = 0.0, songSeconds = 0.0;
 
     double random() noexcept // Delphi's generator: a 32-bit LCG scaled to [0, 1)
     {
@@ -578,12 +585,16 @@ struct Engine::Impl
     {
         const int mode = program->layering, xf = program->crossfade;
         if (mode <= 0 || mode > 6)
-            return 1.0f; // (7, song time: needs the sample's tempo; every layer plays)
+            return 1.0f;
         if (mode == 1)
             return 1.0f / (float) n;
         if (xf <= 0)
             return i == i0 ? 1.0f : 0.0f;
-        const float t = (float) (1.0 - std::abs (s * (double) (n - 1) - (double) i));
+        return crossfaded ((float) (1.0 - std::abs (s * (double) (n - 1) - (double) i)), xf);
+    }
+
+    static float crossfaded (float t, int xf) noexcept
+    {
         if (! (t > 0.0f))
             return 0.0f;
         switch (xf)
@@ -593,6 +604,25 @@ struct Engine::Impl
             case 3: return 1.0f - (float) (dmath::exp ((double) (1.0f - t) * dmath::ln (9.0)) - 1.0) * 0.125f;
             default: return t >= 0.5f ? 1.0f : (float) ((dmath::cos ((double) (1.0f - 2.0f * t) * kPi) + 1.0) * 0.5);
         }
+    }
+
+    // "Song time" layering: the layer whose region the song is in (the sample looped over the song at its own tempo)
+    // plays, fading towards its neighbours; `previous` is the layer before it on the key (itself for the first)
+    float songGain (const DeckSet& deck, int region, const DeckSet& previousDeck, int previous) const noexcept
+    {
+        if (! (deck.tempo > 0.0) || deck.audio.frames <= 0)
+            return 1.0f;
+        const double rate = deck.audio.sampleRate * 60.0 / deck.tempo; // frames per beat
+        const double loopBeats = (double) deck.audio.frames / rate;
+        const double song = std::max (0.0, songBeats);
+        const double p = (song - std::trunc (song / loopBeats) * loopBeats) * rate;
+        const auto& r = deck.audio.regions[(std::size_t) region];
+        const double a = (double) r.start, e = (double) std::min (r.end, deck.audio.frames - 1);
+        const double before = (double) previousDeck.audio.regions[(std::size_t) previous].start;
+        const float t = p >= a ? (float) (1.0 - (p - a) / (e - a + 1.0)) : (float) (1.0 - (a - p) / (a - before + 1.0));
+        if (! (t > 0.0f))
+            return 0.0f;
+        return program->crossfade <= 0 ? (float) rnd ((double) t) : crossfaded (t, program->crossfade);
     }
 
     Voice* freeVoice() noexcept
@@ -674,6 +704,12 @@ struct Engine::Impl
             a.es.begin (s.env, s.kA, s.kD, s.kS, s.kR);
             a.ls.begin (s.lfoEnv, 1.0f, 1.0f, 0.0f, 1.0f);
             a.lfoPhase = (u32) (s.wave.startPhase + s.phaseOffset);
+            if ((s.lfoEnv.flags & 2) != 0 && (s.lfoEnv.flags & 8) == 0)
+            {
+                // a global phase: the LFO runs with the song (as if it had started with it), in beats or half seconds
+                const double units = (s.lfoEnv.flags & 1) ? songBeats : songSeconds * 2.0;
+                a.lfoPhase = (u32) (a.lfoPhase + (u32) (std::uint64_t) rnd (std::fmod (std::max (0.0, units) * s.lfoSpeed, 4294967296.0)));
+            }
         }
         if (v.art[speed].base * (double) v.rv.speedAmount == 0.0)
             v.scratch = false;
@@ -955,9 +991,9 @@ struct Engine::Impl
                 }
                 else
                 {
-                    std::fill (work.begin() + 2 * i, work.begin() + 2 * n, 0.0f);
-                    done = i;
-                    break;
+                    // past its end the read goes on over the region's last frame, held (the interpolation rings out on
+                    // it and the closing declick then fades that level)
+                    done = std::min (done, i);
                 }
             }
             if (v.scratch && v.pos < 0.0)
@@ -972,8 +1008,8 @@ struct Engine::Impl
                 outL = outR = 0.0f;
             else if (speed == 1.0 && frac == 0.0)
             {
-                outL = l[whole];
-                outR = r[whole];
+                outL = l[std::min (whole, last)];
+                outR = r[std::min (whole, last)];
             }
             else if (const auto lo = whole - half + 1, hi = whole + half; lo >= 0 && hi <= last)
                 flrs::interpolate (v.kernel, l + lo, r + lo, frac, outL, outR);
@@ -984,10 +1020,10 @@ struct Engine::Impl
                     auto q = lo + t;
                     if (v.loop && q > last && last >= v.loopStart)
                         q -= last + 1 - v.loopStart;
-                    // frames before the region repeat its first one; past its end the plugin asks for zeros
-                    q = std::max<std::int64_t> (q, 0);
-                    tapL[(std::size_t) t] = q <= last ? l[q] : 0.0f;
-                    tapR[(std::size_t) t] = q <= last ? r[q] : 0.0f;
+                    // frames before the region repeat its first one, frames past its end its last one
+                    q = std::clamp<std::int64_t> (q, 0, last);
+                    tapL[(std::size_t) t] = l[q];
+                    tapR[(std::size_t) t] = r[q];
                 }
                 flrs::interpolate (v.kernel, tapL.data(), tapR.data(), frac, outL, outR);
             }
@@ -1123,6 +1159,12 @@ void Engine::setTempo (float bpm) noexcept
 
 void Engine::setInterpolation (int quality) noexcept { d->quality = quality; }
 
+void Engine::setSongPosition (double beats, double seconds) noexcept
+{
+    d->songBeats = beats;
+    d->songSeconds = seconds;
+}
+
 int Engine::trigger (const Note& n) noexcept
 {
     if (d->program == nullptr || n.key < 0 || n.key > 127)
@@ -1166,7 +1208,14 @@ int Engine::trigger (const Note& n) noexcept
         const int region = list[(std::size_t) i] & 0xffff;
         if (region >= (int) src.audio.regions.size())
             continue;
-        const float gain = count >= 2 ? d->layerGain (i, i0, s, count) : 1.0f;
+        float gain = count >= 2 ? d->layerGain (i, i0, s, count) : 1.0f;
+        if (count >= 2 && d->program->layering == 7)
+        {
+            const auto before = list[(std::size_t) std::max (0, i - 1)];
+            const auto& beforeDeck = d->program->decks[(std::size_t) ((before >> 16) & 1)];
+            if ((before & 0xffff) < (int) beforeDeck.audio.regions.size())
+                gain = d->songGain (src, region, beforeDeck, before & 0xffff);
+        }
         if (const int group = src.values[(std::size_t) region].cutGroup; group > 0)
             for (auto& v : d->voices)
                 if (v.state < 10 && v.cutGroup == group && ! v.first)
