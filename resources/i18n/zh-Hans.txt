@@ -8322,3 +8322,13 @@ countries: cn sg
 "to" = "至"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "添加标记..."
+"Clone as region" = "克隆为区域"
+"Freeze all" = "全部冻结"
+"New region name" = "新区域名称"
+"Rename all..." = "全部重命名..."
+"Save sample as" = "采样另存为"
+"Save sample as..." = "采样另存为..."
+"Zoom on selection" = "缩放到选区"

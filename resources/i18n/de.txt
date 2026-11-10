@@ -8322,3 +8322,13 @@ countries: de at ch li lu
 "to" = "bis"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Marker hinzufügen..."
+"Clone as region" = "Als Region klonen"
+"Freeze all" = "Alle einfrieren"
+"New region name" = "Name der neuen Region"
+"Rename all..." = "Alle umbenennen..."
+"Save sample as" = "Sample speichern unter"
+"Save sample as..." = "Sample speichern unter..."
+"Zoom on selection" = "Auf Auswahl zoomen"

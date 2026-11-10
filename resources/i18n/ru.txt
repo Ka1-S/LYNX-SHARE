@@ -8322,3 +8322,13 @@ countries: ru by kz
 "to" = "до"
 "Deck A" = "Дек A"
 "Deck B" = "Дек B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Добавить маркер..."
+"Clone as region" = "Клонировать как регион"
+"Freeze all" = "Заморозить все"
+"New region name" = "Имя нового региона"
+"Rename all..." = "Переименовать все..."
+"Save sample as" = "Сохранить сэмпл как"
+"Save sample as..." = "Сохранить сэмпл как..."
+"Zoom on selection" = "Масштаб по выделению"

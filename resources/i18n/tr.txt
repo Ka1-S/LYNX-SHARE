@@ -8322,3 +8322,13 @@ countries: tr
 "to" = "-"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "İşaretçi ekle..."
+"Clone as region" = "Bölge olarak klonla"
+"Freeze all" = "Tümünü dondur"
+"New region name" = "Yeni bölge adı"
+"Rename all..." = "Tümünü yeniden adlandır..."
+"Save sample as" = "Örneği farklı kaydet"
+"Save sample as..." = "Örneği farklı kaydet..."
+"Zoom on selection" = "Seçime yakınlaştır"
