@@ -5081,6 +5081,7 @@ void PlaylistComponent::selectTrack (int track)
 {
     if (track < 0)
         return;
+    track = juce::jmin (track, juce::jmax (0, numTracks() - 1));
     selectedTracks = { track };
     currentTrack = track;
     if (simpleHeaders)
@@ -5146,14 +5147,6 @@ juce::Rectangle<int> PlaylistComponent::trackInput (int track) const
     if (arm.isEmpty() || heightOf (track) < inputButtonMinHeight)
         return {};
     return arm.translated (-15, 0);
-}
-
-void PlaylistComponent::selectTrack (int track)
-{
-    track = juce::jlimit (0, juce::jmax (0, numTracks() - 1), track);
-    selectedTracks = { track };
-    currentTrack = track;
-    repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
 }
 
 bool PlaylistComponent::isTrackSelected (int track) const
