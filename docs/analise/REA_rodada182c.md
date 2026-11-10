@@ -797,13 +797,13 @@ installation.
 | 22 / 23 mix, 26 phase randomness | state | round(128v); round(64v) |
 | 27–61 LFOs (global, tempo, shape, predelay, attack, amount, speed) | snapshot records 0…4 | flags; round(2v); times round(65536v); amount in the record's unit (pan 128, volume / Mod X / Mod Y 256, pitch 4800, all × (v−½)) |
 | 62–105 envelopes (on, tempo, predelay, attack, hold, decay, sustain, release, tensions) | snapshot records 1…4 | flags; times round(65536v) (attack raw 100 where FLM's time is 0); sustain round(128v); tensions round(256(v−½)) |
-| 107–109 envelope amounts | records 2…4 | round(256(v−½)) |
+| 107–109 envelope amounts | records 2…4 | Mod X, Mod Y: round(256(v−½)); pitch: round(4800(v−½)) = ±2400 cents (A/B, round 190ab, setting P1) |
 | 110 filter type, 111 cutoff, 112 resonance, 115 / 116 offsets | snapshot | round(7v); round(256(v + offset)) clamped to 0…256 |
 | 106 volume envelope amount, 114 volume multiplier | channel gain (modelParams[2]) | 2v · clamp(2(v106−½), 0, 1): plain factors, as in FLM |
 | 113 pan | channel pan | 2v − 1 |
 | 117 polyphony, 118 slide, 119 porta, 120 mono | channel | round(99v); FL's time knob law on int(1660v) |
-| 121–128 key / velocity tracking | channel misc | middle key 120 − 120v (key) / 120v (velocity) as LYNX stores them, pan 8(v−½), Mod X / Y 2(v−½) |
-| 129 gate, 130–138 echo delay | channel misc | FL's time knob law on int(997v + 450); echoes round(9v + 1), feedback 2v, time 2v beats, pan 4v − 2, pitch 2400(v−½) cents, ping-pong, fat |
+| 121–128 key / velocity tracking | channel misc | middle key 120 − 120v (key) / 120v (velocity) as LYNX stores them, pan 8(v−½) (the key's not clamped at ±1), Mod X / Y 2(v−½) |
+| 129 gate, 130–138 echo delay | channel misc | FL's time knob law on int(997v + 450); echoes round(9v + 1), feedback 2v, time 2v beats, pan 8v − 4 (A/B, round 190ab, setting G1; INFERRED from one point: FLM's converter reads 4v − 2), pitch 2400(v−½) cents, ping-pong, fat |
 | 139–145 arpeggiator | channel arp | direction {0,1,2,3,5,4}[round(5v)], time knob law, gate v, range round(6v) (1…4), repeat round(5v + 1), slide, chord k = round(90v) − 2 of FL's chord list (88 chords: the parameter's default 1/90 is "one above auto") |
 
 **FLM's module around the engine** (`ChannelDef::modelParams = { PPQ 96, 1, gain }`, `threeOscIsFlm`; the desktop
@@ -827,6 +827,18 @@ The default patch settles the three open points of the spec: the octave (O1: one
 Fourteen more settings (oscillators, envelopes, filters, LFOs, pan / tracking, mono / porta, echo, gate, arpeggiator,
 tempo-synced times, volume multiplier) are rendered and scored by /mnt/e/lynx-work/flm190u/ab/score_osc.py; their
 numbers are in the round's HANDOFF.
+
+All fourteen scored in round 190ab (FLM inside FL − LYNX; energy / third-octave mean, max dB): O2 +0.01 / 0.41, 2.49;
+E1 0.00 / 0.45, 3.26; F1 0.00 / 0.36, 3.27; F2 0.00 / 0.36, 3.19; F3 +0.66 / 0.40, 3.01; L1 +0.02 / 0.41, 2.73;
+P1 −0.01 / 0.29, 2.71; M1 +0.01 / 0.39, 3.30; K1 −0.06 / 0.42, 3.07; G1 +0.01 / 0.50, 3.25; A1 +0.19 / 0.61, 3.59;
+T1 +0.11 / 0.49, 3.47; V1 +0.01 / 0.94, 1.55. Three mapping errors showed and are fixed: the pitch envelope's amount
+(P1: FLM started 288 cents up, LYNX 15: the record's unit is 4800(v−½)), the echo's pan (G1: twice as far per echo),
+the key tracking's pan (V1: not clamped at ±1). Left open:
+- F3 (square through filter type 3): FLM is 0.66 dB louder. The main partials agree within 0.1 dB; FLM's shape tables
+  carry 1…4 dB more above 5 kHz and even partials 20 dB under the odd ones, and this filter leaves mostly those.
+- V1 velocity tracking of the pan: FLM pans about +0.12 at velocity 80 and +0.68 at 120 (pan knob 0.9, middle 0.833),
+  LYNX −0.11 and +0.20 (FL's desktop curve, the pan clamped at 1). FLM's law looks linear in the velocity, about
+  0.55·8(v−½)·(w − 0.56); it needs FLM's tracking code read before it is built.
 
 **The module's clock and envelope stepping (round 190ab, setting E1: volume envelope with attack 25 %, tension
 +40 %, hold 10 %, decay 40 %, tension −40 %, sustain 50 %, release 35 %).** With PPQ 128 and the desktop's stepping

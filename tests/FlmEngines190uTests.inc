@@ -362,7 +362,7 @@ TEST (flm190u_three_osc_maps_the_parameters)
         CHECK (c->misc.mono && c->misc.porta && c->synth.porta && c->misc.portaBeats > 0.125f && c->misc.gateBeats > 0.0f && c->misc.gateBeats < 1.0f);
         CHECK (c->misc.key.mid == 72 && std::abs (c->misc.key.pan - 0.5f) < 1e-6f && c->misc.velocity.mid == 60 && std::abs (c->misc.velocity.pan + 0.5f) < 1e-6f);
         CHECK (c->misc.echo.echoes == 7 && std::abs (c->misc.echo.feedback - 0.5f) < 1e-6f && std::abs (c->misc.echo.timeBeats - 0.5f) < 1e-6f
-               && std::abs (c->misc.echo.pan - 0.4f) < 1e-5f && std::abs (c->misc.echo.pitch - 200.0f) < 1e-3f && c->misc.echo.pingPong && ! c->misc.echo.fat);
+               && std::abs (c->misc.echo.pan - 0.8f) < 1e-5f && std::abs (c->misc.echo.pitch - 200.0f) < 1e-3f && c->misc.echo.pingPong && ! c->misc.echo.fat);
         CHECK (c->arp.direction == 5 && c->arp.range == 2 && std::abs (c->arp.gate - 0.6f) < 1e-6f && c->arp.octaveRepeat == 3 && c->arp.slide
                && c->arp.chord == std::vector<int> { 0 } && c->arp.chordSustain && c->arp.stepBeats > 0.0f && c->arp.stepBeats < 0.25f);
         CHECK (report.unsupported.empty());
@@ -486,6 +486,22 @@ TEST (flm190ab_three_osc_envelope_steps_as_flm)
         CHECK (c != nullptr && c->modelParams.size() == 3 && c->modelParams[0] == 96.0f);
         if (c == nullptr)
             return;
+        // the pitch envelope's amount is in cents × 2 (±2400 cents), the Mod X / Mod Y ones in 1/128 (A/B setting P1)
+        {
+            auto q = flm190u::threeOscDefaults();
+            q[65] = 1.0f, q[109] = 0.56f, q[107] = 0.85f, q[108] = 0.25f;
+            FlpImportReport report;
+            const auto amounts = importFlm (flm190u::engineProject (flm::module::threeOsc, 149, q), flm182c::options (&report));
+            const auto* ca = amounts ? flm182c::channelNamed (*amounts, "Bass") : nullptr;
+            const auto amount = [ca] (int record) {
+                std::int32_t x = 0;
+                std::memcpy (&x, ca->pluginState.data() + 0x60 + 0x44 * record + 4 * 8, 4);
+                return x;
+            };
+            CHECK (ca != nullptr && ca->pluginState.size() >= 460);
+            if (ca != nullptr && ca->pluginState.size() >= 460)
+                CHECK (amount (4) == 288 && amount (2) == 90 && amount (3) == -64 && amount (1) == 0);
+        }
         // the level per 128 samples of a held key 84 (523 Hz in FLM's octave, 84 samples a cycle)
         const auto levels = [] (const ChannelDef& channel) {
             auto inst = makeThreeOscInstrument();

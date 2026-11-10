@@ -574,7 +574,9 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
             r[5] = time (86 + e);
             r[6] = rnd (128.0 * v (94 + e));
             r[7] = time (98 + e);
-            r[8] = e == 0 ? 0 : rnd (256.0 * (v (106 + e) - 0.5));
+            // the amount in the record's unit, as the LFO's: Mod X / Mod Y 256, the pitch 4800 = ±2400 cents (A/B inside
+            // FL, round 190ab, setting P1: 0.56 starts 288 cents up)
+            r[8] = e == 0 ? 0 : rnd ((j == 4 ? 4800.0 : 256.0) * (v (106 + e) - 0.5));
             r[14] = rnd (256.0 * (v (78 + e) - 0.5));
             r[15] = rnd (256.0 * (v (90 + e) - 0.5));
             r[16] = rnd (256.0 * (v (102 + e) - 0.5));
@@ -606,7 +608,8 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     misc.portaBeats = c.synth.portaBeats = c.sampler.portaBeats = (float) knobBeats ((int) (1660.0 * v (118)));
     misc.gateBeats = v (129) >= 1.0 ? 0.0f : (float) knobBeats ((int) (997.0 * v (129) + 450.0));
     misc.key.mid = std::clamp (rnd (120.0 - 120.0 * v (121)), 0, 131);
-    misc.key.pan = (float) std::clamp (8.0 * (v (122) - 0.5), -1.0, 1.0);
+    // (not clamped at ±1: A/B inside FL, round 190ab, setting V1 — 0.8 pans 2.4 / 48 a key, hard right 20 keys up)
+    misc.key.pan = (float) (8.0 * (v (122) - 0.5));
     misc.key.modX = (float) (2.0 * (v (123) - 0.5));
     misc.key.modY = (float) (2.0 * (v (124) - 0.5));
     misc.velocity.mid = std::clamp (rnd (120.0 * v (125)), 0, 128);
@@ -616,7 +619,8 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     misc.echo.echoes = std::clamp (rnd (9.0 * v (130) + 1.0), 1, 10);
     misc.echo.feedback = (float) (2.0 * v (131));
     misc.echo.timeBeats = (float) std::clamp (2.0 * v (132), 1.0 / 192.0, 16.0);
-    misc.echo.pan = (float) std::clamp (4.0 * v (133) - 2.0, -1.0, 1.0);
+    // (A/B inside FL, round 190ab, setting G1: 0.6 pans each echo 0.8 further — twice the 4v − 2 of FLM's converter)
+    misc.echo.pan = (float) std::clamp (8.0 * v (133) - 4.0, -1.0, 1.0);
     misc.echo.pitch = (float) (2400.0 * (v (134) - 0.5));
     misc.echo.modX = (float) (2.0 * v (135) - 1.0);
     misc.echo.modY = (float) (2.0 * v (136) - 1.0);
