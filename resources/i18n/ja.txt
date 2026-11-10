@@ -6109,6 +6109,9 @@ countries: jp
 "Insert effects" = "インサートのエフェクト"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "オフ: インサートのエフェクト (Master 以外) を書き出しでバイパスします"
 "Select first channel with notes when the pattern changes" = "パターンが変わったら最初のノートのあるチャンネルを選択"
+"Allow the plugin to handle keystrokes before the host does" = "ホストより先にプラグインがキー入力を処理する"
+"Disable typing keyboard priority by default" = "タイピングキーボードの優先をデフォルトで無効にする"
+"Disable typing keyboard priority for all newly added plugins by default" = "新しく追加するすべてのプラグインでタイピングキーボードの優先をデフォルトで無効にする"
 "Mute / unmute" = "ミュート / ミュート解除"
 "Portamento / deselect" = "ポルタメント / 選択解除"
 "Shift+arrows" = "Shift+矢印"
@@ -7075,6 +7078,9 @@ countries: jp
 "Pattern blocks: drag to resize, double-click to show every row" = "パターンブロック: ドラッグでサイズ変更、ダブルクリックで全行を表示"
 "Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "パターンブロックの行: クリックでパターンを選択、ダブルクリックで開く、右クリックで名前と色を変更"
 "Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "パターンブロック: クリックまたはドラッグでこの行のパターンのブロック全体を描く、右クリックで消去"
+"Pattern blocks: click places one block and drags it along its row, right-click erases" = "パターンブロック: クリックでブロックを1つ置き、その行でドラッグして移動、右クリックで消去"
+"Pattern blocks: drag paints whole blocks; press a block and drag to move it, right-click erases" = "パターンブロック: ドラッグでブロック全体を描く、ブロックを押してドラッグで移動、右クリックで消去"
+"Pattern blocks: click or drag erases blocks in any row" = "パターンブロック: クリックまたはドラッグで任意の行のブロックを消去"
 "This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "このプロジェクトにはパターンブロックがあります。再生され続けるようにクリップ（パターンごとに1トラック）に変換しますか、それとも削除しますか？"
 "Turn them into clips" = "クリップに変換"
 "Delete them" = "削除"
@@ -8012,6 +8018,16 @@ countries: jp
 "Use the suggested tempo" = "おすすめのテンポを使う"
 "Voice / audio" = "ボーカル / オーディオ"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "ここにループ、オーディオ、MIDI ファイルをドロップ"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "トラック: [LMB] ミキサートラックをミュート / 解除"
+"Track: [LMB] solo its mixer track" = "トラック: [LMB] ミキサートラックをソロ"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "トラック音量: [LMB] クリックまたはドラッグ  [Shift] 微調整  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "トラックのパン: [LMB] 上下にドラッグ  [Shift] 微調整  [2xLMB] センター"
+"Track effects: [LMB] open the effects of its mixer track" = "トラックのエフェクト: [LMB] ミキサートラックのエフェクトを開く"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "このインサートにエフェクトを追加（またはブラウザからドロップ）"
 "Channel on / off (its mute)" = "チャンネルのオン / オフ（ミュート）"
@@ -8272,3 +8288,21 @@ countries: jp
 "Mixer groups follow the Playlist (LYNX)" = "ミキサーのグループをプレイリストに合わせる（LYNX）"
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
+"Keyboard style" = "鍵盤のスタイル"
+"Flat keys (FL Studio style)" = "フラットな鍵盤（FL Studio スタイル）"
+"Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "リリースタイム"
+"Output Gain" = "出力ゲイン"
+"In Gain" = "入力ゲイン"
+"Thr." = "スレッショルド"
+"Out Gain" = "出力ゲイン"
+"Input Pan" = "入力パン"
+"A. Curve" = "アタックカーブ"
+"R. Curve" = "リリースカーブ"
+"Async." = "非同期"
+"LFO Rate" = "LFOレート"
+"LFO Shape" = "LFO 波形"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"

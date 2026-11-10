@@ -577,14 +577,14 @@ VideoLanesView::Hit VideoLanesView::hitAt (juce::Point<int> p) const
     }
     if (song.video.showTimecodeRuler && p.y < timecodeHeight)
     {
-        h.part = p.x >= PlaylistComponent::headerWidth ? Hit::timecode : Hit::none;
+        h.part = p.x >= playlist.headerWidth ? Hit::timecode : Hit::none;
         return h;
     }
     for (int t = 0; t < (int) song.videoTracks.size(); ++t)
         if (p.y >= laneTop (t) && p.y < laneTop (t) + laneHeight (t))
         {
             h.track = t;
-            if (p.x < PlaylistComponent::headerWidth)
+            if (p.x < playlist.headerWidth)
             {
                 h.part = p.x < 18 ? Hit::mute : Hit::header;
                 return h;
@@ -611,7 +611,7 @@ void VideoLanesView::paint (juce::Graphics& g)
 {
     using namespace theme;
     const auto& song = engine.getSong();
-    const auto gridX = PlaylistComponent::headerWidth;
+    const auto gridX = playlist.headerWidth;
     const auto gridW = getWidth() - gridX - PlaylistComponent::scrollBarSize;
     const auto lanesBottom = getHeight() - dividerHeight;
     g.fillAll (colour::bg1);
@@ -723,9 +723,9 @@ void VideoLanesView::paint (juce::Graphics& g)
         g.fillRect (gridX, top + lh - 1, gridW, 1);
 
         // the header (FL's track header: a plate with the name; the LED mutes)
-        const auto plate = juce::Rectangle<float> (2.0f, (float) top + 1.0f, (float) PlaylistComponent::headerWidth - 4.0f, (float) lh - 2.0f);
+        const auto plate = juce::Rectangle<float> (2.0f, (float) top + 1.0f, (float) playlist.headerWidth - 4.0f, (float) lh - 2.0f);
         g.setColour (colour::bg2);
-        g.fillRect (0, top, PlaylistComponent::headerWidth, lh);
+        g.fillRect (0, top, playlist.headerWidth, lh);
         g.setColour (hover.track == t && hover.part == Hit::header ? colour::bg4 : colour::bg3);
         g.fillRoundedRectangle (plate, radius::sm);
         g.setColour (trackColour (song, t));
@@ -734,18 +734,18 @@ void VideoLanesView::paint (juce::Graphics& g)
         g.fillEllipse (6.0f, (float) top + 7.0f, 7.0f, 7.0f);
         g.setColour (vt.muted ? colour::textSecondary : colour::textPrimary);
         g.setFont (font (type::caption));
-        textcache::drawFittedText (g, trackName (song, t), 18, top + 2, PlaylistComponent::headerWidth - 26, 16, juce::Justification::centredLeft, 1, 0.8f);
+        textcache::drawFittedText (g, trackName (song, t), 18, top + 2, playlist.headerWidth - 26, 16, juce::Justification::centredLeft, 1, 0.8f);
         // the frame shown at the playhead, small, under the name (when there is room)
         if (lh >= 44)
         {
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption).withHeight (10.0f));
             juce::String status = vt.clips.empty() ? tr ("empty") : tr ("{0} clips", { juce::String ((int) vt.clips.size()) });
-            textcache::drawText (g, status, 8, top + 20, PlaylistComponent::headerWidth - 16, 14, juce::Justification::centredLeft, true);
+            textcache::drawText (g, status, 8, top + 20, playlist.headerWidth - 16, 14, juce::Justification::centredLeft, true);
         }
     }
     g.setColour (colour::border);
-    g.fillRect (PlaylistComponent::headerWidth - 1, 0, 1, lanesBottom);
+    g.fillRect (playlist.headerWidth - 1, 0, 1, lanesBottom);
 
     // --- the playhead ----------------------------------------------------------------------------------------------
     if (playlist.playheadTick >= 0.0)
@@ -944,7 +944,7 @@ void VideoLanesView::filesDropped (const juce::StringArray& files, int x, int y)
     const auto h = hitAt ({ x, y });
     auto track = h.track;
     for (const auto& f : files)
-        if (videotracks::isVideoFile (juce::File (f)) && videotracks::importVideo (engine, juce::File (f), secondsAt (std::max (x, PlaylistComponent::headerWidth)), track))
+        if (videotracks::isVideoFile (juce::File (f)) && videotracks::importVideo (engine, juce::File (f), secondsAt (std::max (x, playlist.headerWidth)), track))
             track = -1; // (more files: where there is room)
 }
 
