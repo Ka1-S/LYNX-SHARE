@@ -9,6 +9,11 @@
 #include <algorithm>
 #include <tuple>
 #include <cmath>
+#include <limits>
+#include <stdexcept>
+#include <iomanip>
+#include <locale>
+#include <sstream>
 
 #include "core/Effects.h"
 #include "core/FruityBasicFx.h"
@@ -20,6 +25,21 @@ namespace lynx::ProjectFile
 {
 namespace
 {
+// Remote project documents retain model precision; ordinary saved files keep their compact numbers.
+thread_local bool exactNumbers = false;
+double projectNumber (float value, float scale)
+{
+    return exactNumbers ? (double) value : juce::roundToInt (value * scale) / (double) scale;
+}
+juce::String projectFloatString (float value, int decimals)
+{
+    if (! exactNumbers) return juce::String (value, decimals);
+    std::ostringstream text;
+    text.imbue (std::locale::classic());
+    text << std::setprecision (std::numeric_limits<float>::max_digits10) << std::defaultfloat << value;
+    return juce::String (text.str());
+}
+
 // cutoff/pitch envelopes: [amount, attack, hold, decay, sustain, release(, shape)]; only the active ones
 void writeEnvelopes (juce::DynamicObject& o, const ModEnvelope& filter, const ModEnvelope& pitch)
 {
@@ -426,8 +446,8 @@ juce::var patcherToVar (const PatcherDoc& doc)
             v->setProperty ("effect", effectToVar (n.effect));
         if (! n.label.empty())
             v->setProperty ("label", str (n.label));
-        v->setProperty ("x", juce::roundToInt (n.x * 10.0f) / 10.0);
-        v->setProperty ("y", juce::roundToInt (n.y * 10.0f) / 10.0);
+        v->setProperty ("x", projectNumber (n.x, 10.0f));
+        v->setProperty ("y", projectNumber (n.y, 10.0f));
         if (! n.busHeads.empty())
         {
             juce::Array<juce::var> heads;
@@ -462,7 +482,7 @@ juce::var patcherToVar (const PatcherDoc& doc)
         // [kind (0 audio, 1 MIDI, 2 control), from, from port, to, to port, gain, on, curve…]
         juce::Array<juce::var> wire { (int) w.kind, w.from, w.fromPort, w.to, w.toPort, w.gain, w.enabled };
         for (const auto v : w.curve)
-            wire.add (juce::roundToInt (v * 10000.0f) / 10000.0);
+            wire.add (projectNumber (v, 10000.0f));
         wires.add (wire);
     }
     o->setProperty ("wires", wires);
@@ -474,7 +494,7 @@ juce::var patcherToVar (const PatcherDoc& doc)
         {
             juce::Array<juce::var> entry { p.node, p.param, str (p.name) };
             for (const auto v : p.curve)
-                entry.add (juce::roundToInt (v * 10000.0f) / 10000.0);
+                entry.add (projectNumber (v, 10000.0f));
             published.add (entry);
         }
         o->setProperty ("published", published);
@@ -655,7 +675,7 @@ namespace
 // and event lanes that move it) over 0..127 when all of them target an insert up to 127 — older versions then read the
 // same insert — and over today's span only when one of them needs more. "sendSpan" says which, on the slot and on each
 // automation / lane of it.
-double rounded4 (float v) { return juce::roundToInt (v * 10000.0f) / 10000.0; }
+double rounded4 (float v) { return projectNumber (v, 10000.0f); }
 
 // value [1] of every [tick, value, ...] entry, written over `span`
 void rewriteSendValues (juce::var& list, int span)
@@ -800,7 +820,7 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("sendSpan", maxMixerTracks - 1);
 
     if (slot.mix < 1.0f)
-        e->setProperty ("mix", juce::roundToInt (slot.mix * 10000.0f) / 10000.0);
+        e->setProperty ("mix", projectNumber (slot.mix, 10000.0f));
     if (! slot.smartDisable)
         e->setProperty ("smartDisable", false);
     if (slot.row >= 0) // the mixer row (FL's slot places, round 170b); absent = right after the previous effect
@@ -1098,10 +1118,10 @@ juce::var clipsToVar (const std::vector<Clip>& list)
 
         // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed, stretch] up to the last value that
         // is not the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9; 167l: the clip stretch)
-        const auto fraction = juce::roundToInt (c.offsetFraction * 10000.0f) / 10000.0;
-        const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
-        const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
-        const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
+        const auto fraction = projectNumber (c.offsetFraction, 10000.0f);
+        const auto pan = projectNumber (c.pan, 1000.0f);
+        const auto pitch = projectNumber (c.pitch, 1000.0f);
+        const auto stretch = exactNumbers ? c.stretch : std::round (c.stretch * 1.0e6) / 1.0e6;
         const int used = c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
@@ -1110,6 +1130,7 @@ juce::var clipsToVar (const std::vector<Clip>& list)
             clip.add ((juce::int64) c.fadeOut);
             // (round 166e: the gain handle reaches −96 dB, so the value keeps 6 significant digits)
             clip.add ([g = (double) c.gain] {
+                if (exactNumbers) return g;
                 if (g <= 0.0)
                     return 0.0;
                 const auto scale = std::pow (10.0, 5.0 - std::floor (std::log10 (g)));
@@ -1343,7 +1364,7 @@ juce::var channelToVar (const ChannelDef& c)
     {
         juce::StringArray values;
         for (auto v : c.modelParams)
-            values.add (juce::String (v, 7));
+            values.add (projectFloatString (v, 7));
         o->setProperty ("modelParams", values.joinIntoString (" "));
     }
 
@@ -1456,8 +1477,8 @@ juce::var channelToVar (const ChannelDef& c)
             juce::StringArray amplitudes, phases;
             for (int h = 0; h < SynthSettings::spectrumSize; ++h)
             {
-                amplitudes.add (juce::String (c.synth.spectrum[(std::size_t) h], 6));
-                phases.add (juce::String (c.synth.spectrumPhase[(std::size_t) h], 6));
+                amplitudes.add (projectFloatString (c.synth.spectrum[(std::size_t) h], 6));
+                phases.add (projectFloatString (c.synth.spectrumPhase[(std::size_t) h], 6));
             }
             synth->setProperty ("spectrum", amplitudes.joinIntoString (" "));
             synth->setProperty ("spectrumPhase", phases.joinIntoString (" "));
@@ -1465,13 +1486,13 @@ juce::var channelToVar (const ChannelDef& c)
             {
                 juce::StringArray decays;
                 for (auto t : c.synth.spectrumDecay)
-                    decays.add (juce::String (t, 4));
+                    decays.add (projectFloatString (t, 4));
                 synth->setProperty ("spectrumDecay", decays.joinIntoString (" "));
                 if (std::any_of (c.synth.spectrumTarget.begin(), c.synth.spectrumTarget.end(), [] (float a) { return a != 0.0f; }))
                 {
                     juce::StringArray targets;
                     for (auto a : c.synth.spectrumTarget)
-                        targets.add (juce::String (a, 6));
+                        targets.add (projectFloatString (a, 6));
                     synth->setProperty ("spectrumTarget", targets.joinIntoString (" "));
                 }
             }
@@ -1546,7 +1567,7 @@ juce::var channelToVar (const ChannelDef& c)
         {
             juce::Array<juce::var> slices;
             for (auto v : c.sampler.slices)
-                slices.add (juce::roundToInt (v * 100000.0f) / 100000.0);
+                slices.add (projectNumber (v, 100000.0f));
             sampler->setProperty ("slices", slices);
         }
         sampler->setProperty ("reverse", c.sampler.reverse);
@@ -1974,11 +1995,11 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     if (! t.toMaster)
         o->setProperty ("toMaster", false);
     if (t.masterLevel != 1.0f)
-        o->setProperty ("masterLevel", juce::roundToInt (t.masterLevel * 10000.0f) / 10000.0);
+        o->setProperty ("masterLevel", projectNumber (t.masterLevel, 10000.0f));
     if (t.colour != 0)
         o->setProperty ("colour", juce::String::toHexString ((juce::int64) (t.colour & 0xFFFFFF)).paddedLeft ('0', 6));
     if (t.stereo != 0.0f)
-        o->setProperty ("stereo", juce::roundToInt (t.stereo * 1000.0f) / 1000.0);
+        o->setProperty ("stereo", projectNumber (t.stereo, 1000.0f));
     if (t.invertPhase)
         o->setProperty ("invertPhase", true);
     if (t.swapChannels)
@@ -2000,7 +2021,7 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     if (t.recordDryToo)
         o->setProperty ("recordDryToo", true);
     if (t.latencyMs != 0.0f) // FL's manual track latency, ms (REA round 165f-mixer)
-        o->setProperty ("latencyMs", juce::roundToInt (t.latencyMs * 1000.0f) / 1000.0);
+        o->setProperty ("latencyMs", projectNumber (t.latencyMs, 1000.0f));
     if (t.latencyBypass != LatencyBypass::never)
         o->setProperty ("latencyBypass", t.latencyBypass == LatencyBypass::always ? "always" : "whenIdle");
     if (! t.compensateMasterLatency)
@@ -2024,7 +2045,7 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         juce::Array<juce::var> sends;
 
         for (const auto& send : t.sends)
-            sends.add (juce::Array<juce::var> { send.target, juce::roundToInt (send.level * 10000.0f) / 10000.0 });
+            sends.add (juce::Array<juce::var> { send.target, projectNumber (send.level, 10000.0f) });
 
         o->setProperty ("sends", sends);
     }
@@ -2032,7 +2053,7 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     {
         juce::Array<juce::var> lost;
         for (const auto& l : t.lostSends)
-            lost.add (juce::Array<juce::var> { juce::String::fromUTF8 (l.to.c_str()), juce::roundToInt (l.level * 10000.0f) / 10000.0 });
+            lost.add (juce::Array<juce::var> { juce::String::fromUTF8 (l.to.c_str()), projectNumber (l.level, 10000.0f) });
         o->setProperty ("lostSends", lost);
     }
 
@@ -2134,7 +2155,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     root->setProperty ("beatsPerBar", song.beatsPerBar);
 
     if (song.swing > 0.0f)
-        root->setProperty ("swing", juce::roundToInt (song.swing * 1000.0f) / 1000.0);
+        root->setProperty ("swing", projectNumber (song.swing, 1000.0f));
     if (song.chanceSeed != 0)
         root->setProperty ("chanceSeed", (juce::int64) song.chanceSeed);
     if (! song.channelGroups.empty())
@@ -2251,32 +2272,32 @@ juce::String toJson (const Song& song, bool stampVersion)
         for (const auto& n : p.notes)
         {
             juce::Array<juce::var> note { (juce::int64) n.start, (juce::int64) n.length, n.channel, n.key,
-                                          juce::roundToInt (n.velocity * 1000.0f) / 1000.0 };
+                                          projectNumber (n.velocity, 1000.0f) };
 
             // [.., pan, fine pitch, muted] only when not default
             // [.., release, mod X, mod Y (, colour)]
             // [.., colour, group, chance, velocity range, chance group, play one] (round 187c)
-            const auto chanced = n.hasChance();
+            const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne);
             const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0 || chanced;
             if (n.pan != 0.0f || n.finePitch != 0.0f || n.muted || n.slide || n.porta || extra)
             {
-                note.add (juce::roundToInt (n.pan * 1000.0f) / 1000.0);
-                note.add (juce::roundToInt (n.finePitch * 10.0f) / 10.0);
+                note.add (projectNumber (n.pan, 1000.0f));
+                note.add (projectNumber (n.finePitch, 10.0f));
                 note.add (n.muted);
                 note.add (n.slide);
                 if (n.porta || extra)
                     note.add (n.porta);
                 if (extra)
                     for (auto v : { n.release, n.modX, n.modY })
-                        note.add (juce::roundToInt (v * 1000.0f) / 1000.0);
+                        note.add (projectNumber (v, 1000.0f));
                 if (n.colour != 0 || n.group != 0 || chanced)
                     note.add (n.colour);
                 if (n.group != 0 || chanced)
                     note.add (n.group); // [.., colour, group]
                 if (chanced)
                 {
-                    note.add (juce::roundToInt (n.chance * 10000.0f) / 10000.0);
-                    note.add (juce::roundToInt (n.velocityRange * 10000.0f) / 10000.0);
+                    note.add (projectNumber (n.chance, 10000.0f));
+                    note.add (projectNumber (n.velocityRange, 10000.0f));
                     note.add (n.chanceGroup);
                     note.add (n.chanceOne);
                 }
@@ -2298,7 +2319,7 @@ juce::String toJson (const Song& song, bool stampVersion)
             l->setProperty ("target", juce::Array<juce::var> { targetKindName (lane.target.kind), lane.target.index, lane.target.slot, lane.target.param });
             juce::Array<juce::var> events;
             for (const auto& e : lane.events)
-                events.add (juce::Array<juce::var> { (juce::int64) e.tick, juce::roundToInt (e.value * 10000.0f) / 10000.0 });
+                events.add (juce::Array<juce::var> { (juce::int64) e.tick, projectNumber (e.value, 10000.0f) });
             l->setProperty ("events", events);
             lanes.add (juce::var (l.release()));
         }
@@ -2322,8 +2343,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         juce::Array<juce::var> points;
 
         for (const auto& pt : a.points)
-            points.add (juce::Array<juce::var> { (juce::int64) pt.tick, juce::roundToInt (pt.value * 10000.0f) / 10000.0,
-                                                 juce::roundToInt (pt.tension * 1000.0f) / 1000.0 });
+            points.add (juce::Array<juce::var> { (juce::int64) pt.tick, projectNumber (pt.value, 10000.0f),
+                                                 projectNumber (pt.tension, 1000.0f) });
 
         o->setProperty ("points", points);
         if (a.isLive())
@@ -2331,7 +2352,7 @@ juce::String toJson (const Song& song, bool stampVersion)
             o->setProperty ("source", juce::Array<juce::var> { a.source.track, a.source.slot, a.source.output, a.source.channel });
             juce::Array<juce::var> curve;
             for (auto v : a.curve)
-                curve.add (juce::roundToInt (v * 10000.0f) / 10000.0);
+                curve.add (projectNumber (v, 10000.0f));
             o->setProperty ("curve", curve);
         }
         if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
@@ -2682,7 +2703,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         mixer.add (mixerTrackToVar (t));
 
     root->setProperty ("mixer", mixer);
-    storeSendSpans (song, *root); // round 167a: "Send to" over 0..127 when it fits (older LYNX versions)
+    if (! exactNumbers)
+        storeSendSpans (song, *root); // round 167a: "Send to" over 0..127 when it fits (older LYNX versions)
     root->setProperty ("mode", song.mode == PlayMode::song ? "song" : "pattern");
 
     if (song.hasLoop())
@@ -2723,7 +2745,13 @@ juce::String toJson (const Song& song, bool stampVersion)
         block->setProperty ("participants", people);
         root->setProperty ("session", juce::var (block.release()));
     }
-    return juce::JSON::toString (juce::var (root.release()), false);
+    return juce::JSON::toString (juce::var (root.release()), false, exactNumbers ? 17 : 15);
+}
+
+juce::String toJsonExact (const Song& song)
+{
+    const juce::ScopedValueSetter<bool> precision (exactNumbers, true);
+    return toJson (song);
 }
 
 std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy)

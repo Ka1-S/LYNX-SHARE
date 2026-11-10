@@ -180,6 +180,15 @@ void recordCrash (const std::string& name, std::uint32_t code) noexcept
     crashCount.store (index + 1, std::memory_order_release); // (two plugins crashing in the same instant may share a slot)
 }
 
+void recordCrashOnce (std::atomic<bool>& crashed, const std::string& name, std::uint32_t code) noexcept
+{
+    if (! crashed.exchange (true, std::memory_order_acq_rel))
+        recordCrash (name, code);
+}
+
+// A waiting caller takes its normal silence/bypass branch, without recording the earlier fault again.
+constexpr std::uint32_t alreadyCrashed = 1;
+
 // The calls of one audio block, as a guarded unit
 struct BlockCall
 {
@@ -190,10 +199,25 @@ struct BlockCall
 };
 
 // a block call under the crash guard, with this thread's floating-point mode put back after it (core/Denormals.h)
-std::uint32_t runBlock (BlockCall call) noexcept
+std::uint32_t runBlock (BlockCall call, std::atomic<bool>& crashed, const std::string& name) noexcept
 {
     const KeepFloatMode keep;
-    return crashguard::run (call);
+    // State capture/restoration uses this same per-instance lock. Keep it outside
+    // the crash guard so a guarded vendor fault returns before the lock unwinds.
+    const juce::ScopedLock lock (call.plugin->getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return alreadyCrashed;
+    const auto code = crashguard::run (call);
+    if (code != 0) recordCrashOnce (crashed, name, code);
+    return code;
+}
+
+std::uint32_t runReset (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name) noexcept
+{
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return alreadyCrashed;
+    const auto code = crashguard::run ([&] { plugin.reset(); });
+    if (code != 0) recordCrashOnce (crashed, name, code);
+    return code;
 }
 } // namespace
 
@@ -217,18 +241,36 @@ std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std:
 {
     if (crashed.load())
         return std::nullopt;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return std::nullopt;
     juce::MemoryBlock state;
     if (const auto code = crashguard::run ([&] { plugin.getStateInformation (state); }); code != 0)
     {
-        crashed.store (true);
-        recordCrash (name, code);
+        recordCrashOnce (crashed, name, code);
         return std::nullopt;
     }
     return state.toBase64Encoding().toStdString();
 }
 
+bool guardedRestore (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name,
+                     const std::string& encoded)
+{
+    if (crashed.load()) return false;
+    juce::MemoryBlock state;
+    if (encoded.empty() || ! state.fromBase64Encoding (juce::String::fromUTF8 (encoded.c_str()))) return false;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return false;
+    if (const auto code = crashguard::run ([&] { plugin.setStateInformation (state.getData(), (int) state.getSize()); }); code != 0)
+    {
+        recordCrashOnce (crashed, name, code);
+        return false;
+    }
+    return true;
+}
+
 void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name, int index, float value)
 {
+    const juce::ScopedLock lock (plugin.getCallbackLock());
     if (crashed.load())
         return;
     if (const auto code = crashguard::run ([&] {
@@ -238,8 +280,7 @@ void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& c
         });
         code != 0)
     {
-        crashed.store (true);
-        recordCrash (name, code);
+        recordCrashOnce (crashed, name, code);
     }
 }
 } // namespace
@@ -305,7 +346,7 @@ void PluginInstrument::resetForExport()
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
     // (tails, notes)
     if (! hasCrashed() && options.resetOnFlush)
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
             failed (code);
 }
 
@@ -340,13 +381,17 @@ PluginInstrument::~PluginInstrument()
 
 void PluginInstrument::failed (std::uint32_t code) noexcept
 {
-    crashed.store (true, std::memory_order_relaxed);
-    recordCrash (name, code);
+    recordCrashOnce (crashed, name, code);
 }
 
 std::optional<std::string> PluginInstrument::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginInstrument::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginInstrument::setParameterFromUi (int index, float value)
@@ -463,6 +508,7 @@ void PluginInstrument::allNotesOff() noexcept
 // A Patcher parameter output (round 171b): the parameter's value as the plugin reports it, guarded like the audio calls
 static float hostedParameterValue (juce::AudioPluginInstance& plugin, const std::atomic<bool>& crashed, int index) noexcept
 {
+    const juce::ScopedLock lock (plugin.getCallbackLock());
     if (crashed.load (std::memory_order_relaxed) || index < 0)
         return -1.0f;
     float value = -1.0f;
@@ -483,6 +529,9 @@ void PluginInstrument::setParameter (int index, float value) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
         return;
+    // Automation/Patcher controls can run while a remote snapshot captures this instance's state.
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return;
     if (const auto code = crashguard::run ([&] { setPluginParameter (*plugin, index, value); }); code != 0)
         failed (code);
 }
@@ -495,7 +544,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         return; // silent
     }
     if (resetPending.exchange (false, std::memory_order_relaxed))
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
         {
             failed (code);
             midi.clear();
@@ -534,7 +583,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             if (! crashed.load (std::memory_order_relaxed))
-                if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }); code != 0)
+                if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }, crashed, name); code != 0)
                 {
                     failed (code);
                     view.clear(); // silent from here on
@@ -570,7 +619,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         view.clear();
         bendBlock (midi, 0, count);
         setHostBlockOffset (chunkOffset + done);
-        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
             failed (code);
@@ -625,7 +674,7 @@ void PluginEffect::resetForExport()
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
     // (tails, notes)
     if (! hasCrashed() && options.resetOnFlush)
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
             failed (code);
 }
 
@@ -639,13 +688,17 @@ PluginEffect::~PluginEffect()
 
 void PluginEffect::failed (std::uint32_t code) noexcept
 {
-    crashed.store (true, std::memory_order_relaxed);
-    recordCrash (name, code);
+    recordCrashOnce (crashed, name, code);
 }
 
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginEffect::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginEffect::flushMidiControls() noexcept
@@ -669,6 +722,9 @@ void PluginEffect::setParameter (int index, float value) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
         return;
+    // Automation/Patcher controls can run while a remote snapshot captures this instance's state.
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return;
     if (const auto code = crashguard::run ([&] { setPluginParameter (*plugin, index, value); }); code != 0)
         failed (code);
 }
@@ -895,7 +951,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
     if (! layout.owns_lock())
         return;
     if (resetPending.exchange (false, std::memory_order_relaxed))
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
         {
             failed (code);
             return;
@@ -932,7 +988,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
                 if (sideCount > 1)
                     view.copyFrom (sideChannel + 1, 0, ch[3], count);
             }
-            if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+            if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
             {
                 midi.clear();
                 failed (code); // this block keeps its dry input
@@ -953,7 +1009,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
         view.copyFrom (0, 0, left + done, count);
         view.copyFrom (1, 0, right + done, count);
         feedSide (view, done, count);
-        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
             failed (code); // this block keeps its dry input
@@ -2332,6 +2388,39 @@ void PluginHost::preload (const PluginRef& ref, int wanted)
     p.instance = createInstance (ref, preloadRate, &p.error);
     const std::scoped_lock lock (preloadLock);
     preloaded[preloadKey (ref, preloadRate)].push_back (std::move (p));
+}
+
+bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                                const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate)
+{
+    if (ref.id.empty() || ! std::isfinite (sampleRate) || sampleRate <= 0)
+    {
+        error = "Invalid plugin identity or sample rate";
+        return false;
+    }
+    Preloaded ready;
+    ready.instance = createInstance (ref, sampleRate, &error);
+    if (ready.instance == nullptr)
+        return false;
+    if (validate && ! validate (*ready.instance, error))
+        return false;
+    const std::scoped_lock lock (preloadLock);
+    preloaded[preloadKey (ref, sampleRate)].push_back (std::move (ready));
+    return true;
+}
+
+void PluginHost::discardPreloaded (const PluginRef& ref, double sampleRate)
+{
+    std::vector<Preloaded> discarded;
+    {
+        const std::scoped_lock lock (preloadLock);
+        if (auto found = preloaded.find (preloadKey (ref, sampleRate)); found != preloaded.end())
+        {
+            discarded = std::move (found->second);
+            preloaded.erase (found);
+        }
+    }
+    // Plugin teardown stays outside the cache mutex, just as clearPreloaded().
 }
 
 void PluginHost::clearPreloaded()

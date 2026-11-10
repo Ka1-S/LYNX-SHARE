@@ -13,7 +13,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
-#include "core/PlaylistOps.h"
+#include "ui/RemoteControlSettings.h"
 #include "core/Performance.h"
 
 #include "core/TransportEdit.h"
@@ -133,6 +133,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
     addChildComponent (updateBar);
+    addChildComponent (remoteControlBar);
+    remoteControlBar.setFont (theme::font (theme::type::small, true));
+    remoteControlBar.setColour (juce::Label::backgroundColourId, theme::colour::accent.withAlpha (0.16f));
+    remoteControlBar.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+    remoteControlBar.setJustificationType (juce::Justification::centredLeft);
     updateBar.onVisibilityChanged = [this] { resized(); };
     if (restoreUserSettings) // (the real window: Update saves the project as on quit and reopens it)
         updater::setHost ({ [safe = juce::Component::SafePointer<MainComponent> (this)] (std::function<void()> then) {
@@ -1247,6 +1252,8 @@ void MainComponent::resized()
     auto below = getLocalBounds().withTrimmedTop (toolbarHeight + tray);
     if (updateBar.isVisible())
         updateBar.setBounds (below.removeFromTop (updater::UpdateBar::height));
+    if (remoteControlBar.isVisible())
+        remoteControlBar.setBounds (below.removeFromTop (24));
     workspace.setBounds (below);
     if (danceStage != nullptr)
     {
@@ -4713,6 +4720,14 @@ void MainComponent::dumpAudioLog()
 
 void MainComponent::timerCallback()
 {
+    const auto remoteHistoryError = engine.getRemoteHistoryError();
+    const auto showRemote = remoteui::enabled() || remoteui::active() || remoteHistoryError.isNotEmpty();
+    remoteControlBar.setText (remoteHistoryError.isNotEmpty() ? remoteHistoryError : tr (remoteui::status()), juce::dontSendNotification);
+    if (remoteControlBar.isVisible() != showRemote)
+    {
+        remoteControlBar.setVisible (showRemote);
+        resized();
+    }
     const uitrace::Scope trace ("MainComponent timer", false);
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
@@ -5976,6 +5991,7 @@ void MainComponent::openSettings (int page)
         o.pluginSubstitutes = pluginSubstitutesEnabled();
         o.crashReports = (int) crashreporter::consent();
         o.checkUpdates = updater::automatic();
+        o.remoteControl = remoteui::enabled();
         return o;
     };
     hooks.setGeneral = [safe] (const GeneralOptions& o) {
@@ -6040,6 +6056,7 @@ void MainComponent::openSettings (int page)
         if (o.crashReports != (int) crashreporter::consent())
             crashreporter::setConsent ((crashreport::Consent) juce::jlimit (0, 2, o.crashReports));
         updater::setAutomatic (o.checkUpdates);
+        remoteui::setEnabled (o.remoteControl);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
