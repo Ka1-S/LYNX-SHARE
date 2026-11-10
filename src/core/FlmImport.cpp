@@ -208,20 +208,51 @@ constexpr float threeOscFlmPitch = -12.0f;
 
 float velocityOf (const flm::Event& e) noexcept { return std::clamp ((float) e.velocity / 255.0f, 0.0f, 1.0f); }
 
+// A note's pan: FLM plays byte / 255 (0 = left, 1 = right); 127 is the centre every editor writes (they read the byte
+// as byte / 254) and stays the centre here (FLM's own 127 / 255 leaves the right side 0.03 dB down)
+float panOf (const flm::Event& e) noexcept
+{
+    return e.pan == 127 ? 0.0f : std::clamp ((2.0f * (float) e.pan - 255.0f) / 255.0f, -1.0f, 1.0f);
+}
+
 // The pattern holding one content of a note or drum lane: `channelFor(key)` is the channel and key a note plays on
-// (channel < 0 = dropped).
+// (channel < 0 = dropped). The note bytes beyond the velocity, as FLM's clip compiler (0x18075d6b0) and song scheduler
+// (0x180770330) play them (PROVEN-REA, rounds 190u / 190ab):
+// - pan (byte 15) on every note;
+// - drum lanes: the pitch (bytes 16–17, p = u16 / 65534) plays the pad at 2^(2p − 1) of its speed, one octave either
+//   way: here the key and fine pitch of the sampler's note;
+// - repeat (byte 18, n > 0): n more note-ons of the same key, velocity and pan at i / (n + 1) of the note's 1/16 step
+//   (W = 1/4 + swing / 8 beats on even steps, 1/4 − swing / 8 on odd ones; swing = the lane's own, 0 on note lanes in
+//   every file seen). FLM sends one note-off, at the note's end: the extra notes end there too;
+// - slide (byte 19, note lanes only: a drum lane plays it as a hit): no note-on; the held note (the highest plain note
+//   sounding at the slide's start) glides to the slide's key over the slide's length — LYNX's slide note. A slide
+//   with no held note plays nothing in FLM and is dropped. Not converted: FLM also glides the velocity and the pan.
 template <typename ChannelFor>
-int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, ChannelFor channelFor)
+int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool drums, double swing, ChannelFor channelFor)
 {
     Pattern p;
     p.name = name;
     const auto lengthBeats = clip.loopLength > 1e-9 ? clip.loopLength : clip.timelineLength();
     p.lengthTicks = std::max<std::int64_t> (1, ticksOf (lengthBeats));
+    const auto held = [&clip] (const flm::Event& s) {
+        for (const auto& o : clip.events)
+            if (o.slide == 0 && o.key >= 0 && o.length > 0.0 && o.tick <= s.tick
+                && (double) s.tick < (double) o.tick + o.length * flm::ticksPerBeat)
+                return true;
+        return false;
+    };
+    int repeats = 0, slides = 0, orphans = 0, pans = 0, pitches = 0;
     for (const auto& e : clip.events)
     {
         const auto [channel, key] = channelFor (e.key);
         if (channel < 0)
             continue;
+        const auto slide = ! drums && e.slide != 0;
+        if (slide && ! held (e))
+        {
+            ++orphans;
+            continue;
+        }
         Note n;
         n.channel = channel;
         n.key = std::clamp (key, 0, 127);
@@ -230,10 +261,51 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, Channe
             continue;
         n.length = std::clamp<std::int64_t> (ticksOf (e.length), 1, p.lengthTicks - n.start);
         n.velocity = velocityOf (e);
+        n.pan = panOf (e);
+        pans += n.pan != 0.0f ? 1 : 0;
+        n.slide = slide;
+        slides += slide ? 1 : 0;
+        if (drums && e.value != 0x7FFF)
+        {
+            const auto semitones = 12.0 * (2.0 * std::min ((double) e.value / 65534.0, 1.0) - 1.0);
+            const auto whole = std::round (semitones);
+            n.key = std::clamp (n.key + (int) whole, 0, 127);
+            n.finePitch = (float) (100.0 * (semitones - whole));
+            ++pitches;
+        }
         p.notes.push_back (n);
+        if (e.repeat > 0 && ! slide)
+        {
+            const auto startBeats = (double) e.tick / flm::ticksPerBeat;
+            const auto odd = ((int) (startBeats * 4.0) & 1) != 0;
+            const auto step = odd ? 0.25 - swing * 0.125 : 0.25 + swing * 0.125;
+            const auto end = n.start + n.length;
+            for (int i = 1; i <= e.repeat; ++i)
+            {
+                // (FLM's own arithmetic: the fraction and the offset in float, the tick truncated)
+                const auto tick = (int) ((double) ((float) ((double) ((float) i / (float) (e.repeat + 1)) * step) * 128.0f) + startBeats * 128.0);
+                auto hit = n;
+                hit.start = ticksOf ((double) tick / flm::ticksPerBeat);
+                if (hit.start <= n.start || hit.start >= p.lengthTicks)
+                    continue;
+                hit.length = drums ? std::clamp<std::int64_t> (n.length, 1, p.lengthTicks - hit.start) : std::max<std::int64_t> (1, end - hit.start);
+                p.notes.push_back (hit);
+                ++repeats;
+            }
+        }
     }
     p.sortNotes();
     ctx.song.patterns.push_back (std::move (p));
+    const auto count = [&ctx] (int n, const char* what) {
+        if (n > 0 && ctx.report != nullptr)
+            ctx.report->converted[what] += n;
+    };
+    count (pans, "FL Studio Mobile: note pan");
+    count (pitches, "FL Studio Mobile: drum note pitch");
+    count (repeats, "FL Studio Mobile: note repeat (extra hits)");
+    count (slides, "FL Studio Mobile: slide note");
+    if (orphans > 0 && ctx.report != nullptr)
+        ctx.report->unsupported["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] += orphans;
     return (int) ctx.song.patterns.size() - 1;
 }
 
@@ -790,6 +862,9 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     // value; LYNX's own grid stays at four steps per beat)
     ctx.stepsPerBeat = project.denominator;
     song.beatsPerBar = std::clamp (project.numerator, 1, 32);
+    // FLM pans by balance — the rack's pan (RPRM [1]) and a drum pad's note pan (gain w·min(1, 2(1 − p)) left,
+    // w·min(1, 2p) right): the louder side keeps its level, the other falls linearly. That is FL's triangular law
+    song.panTriangular = true;
 
     // channels in FLM's display order (the master first), each with its rack
     std::vector<std::size_t> order (project.channels.size());
@@ -1025,7 +1100,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     if (kind == flm::LaneKind::drums)
                     {
                         const auto kit = kitIndex();
-                        pattern = addPattern (ctx, clip, pname, [&] (int key) -> std::pair<int, int> {
+                        pattern = addPattern (ctx, clip, pname, true, std::clamp (lane.swing, 0.0, 1.0), [&] (int key) -> std::pair<int, int> {
                             if (key < 0 || key >= (int) kit.size())
                             {
                                 ++dropped;
@@ -1037,7 +1112,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     else
                     {
                         const auto channel = instrumentIndex();
-                        pattern = addPattern (ctx, clip, pname, [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
+                        pattern = addPattern (ctx, clip, pname, false, std::clamp (lane.swing, 0.0, 1.0),
+                                              [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
                     }
                     it = patternOf.emplace (clip.contentId, pattern).first;
                 }

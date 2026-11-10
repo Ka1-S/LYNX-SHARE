@@ -1,6 +1,7 @@
 #include "core/FlmFormat.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 // Layout: docs/analise/FLM_FORMAT.md (round 182c). Every read is bounds-checked; a nested container that runs short
@@ -278,8 +279,8 @@ Clip readClip (Bytes body)
                 ev.velocity = e.u8 (200);
                 ev.pan = e.u8 (127);
                 ev.value = e.u16 (0x7FFF);
-                ev.extra0 = e.u8();
-                ev.extra1 = e.u8();
+                ev.repeat = (std::int8_t) e.u8();
+                ev.slide = e.u8();
                 clip.events.push_back (ev);
             }
         }
@@ -300,7 +301,9 @@ Lane readLane (Bytes body)
             lane.rawKind = r.u32();
             lane.targetModule = r.i32 (-1);
             lane.targetParam = r.i32 (-1);
-            r.f64();
+            lane.swing = r.f64();
+            if (! std::isfinite (lane.swing))
+                lane.swing = 0.0;
             r.u32();
             r.u32();
             lane.name = r.fixed (1024);

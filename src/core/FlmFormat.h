@@ -41,9 +41,12 @@ struct Event
     double length = 0.0;     // beats
     int key = 0;             // MIDI key, kit sample index on drum lanes; < 0 on automation lanes
     std::uint8_t velocity = 200; // byte 14: the module's note-on velocity = byte / 255 (PROVEN-REA, round 190u)
-    std::uint8_t pan = 127;      // byte 15: pan = byte / 255 (PROVEN-REA; not imported yet)
-    std::uint16_t value = 0x7FFF; // bytes 16–17: automation value 0…65535 (notes: INFERRED fine pitch, 0x7FFF = centre)
-    std::uint8_t extra0 = 0, extra1 = 0; // bytes 18–19
+    std::uint8_t pan = 127;      // byte 15: pan = byte / 255 (PROVEN-REA; 127 is the editors' centre)
+    // bytes 16–17: automation value 0…65535; notes: pitch p = u16 / 65534, 0x7FFF = centre — a drum pad plays at
+    // 2^(2p − 1) of its speed, note lanes do not hand it to the module (PROVEN-REA, round 190u)
+    std::uint16_t value = 0x7FFF;
+    std::int8_t repeat = 0;      // byte 18: n > 0 = n more hits of the note inside its 1/16 step (PROVEN-REA, round 190ab)
+    std::uint8_t slide = 0;      // byte 19: ≠ 0 = a slide note (note lanes): glides the held note, starts none
 };
 
 struct Clip
@@ -70,6 +73,7 @@ struct Lane
     int targetModule = -1; // automation: the module instance id (0 = the rack itself)
     int targetParam = -1;  // automation: the parameter index
     std::string name;
+    double swing = 0.0;    // DESc f64 at 12: the step track's swing 0…1 (odd 1/16 steps start swing / 8 of a beat late)
     std::vector<Clip> clips;
 
     LaneKind kind() const noexcept
