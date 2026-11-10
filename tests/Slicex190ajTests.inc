@@ -93,3 +93,52 @@ TEST (slicex190aj_deck_by_reference_takes_its_beats_from_the_file)
     slicex::setDeckBeats (s, 0, 0.0, 4.0);
     CHECK (slicex::deckBeats (s.decks[0], 2.0) == 4.0);
 }
+
+// FL's slice list (the WAV's "strc" chunk) follows the region list: FL's saves before and after "Add region" and a
+// tag drag differ there, and the rewritten file is FL's byte for byte only with it (p/sxprove on aj_23…aj_29.flp)
+TEST (slicex190aj_region_edits_rewrite_the_slice_list)
+{
+    using namespace lynx;
+    auto wav = slicex190h::wavWith (1000, { { 1, 0, 0, "Kick", -1 }, { 2, 250, 100, "Snare", 61 } });
+    auto put32 = [&wav] (std::uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            wav.push_back ((std::uint8_t) (v >> (8 * i)));
+    };
+    // as FL writes it for two regions: the header (28, count 3, 0, 0, 1, 10, 0), then (2, 0…) and (0, start…) each
+    wav.insert (wav.end(), { 's', 't', 'r', 'c' });
+    put32 (28 + 24 * 3);
+    for (std::uint32_t v : { 28u, 3u, 0u, 0u, 1u, 10u, 0u, 2u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 250u, 0u, 0u, 0u, 0u })
+        put32 (v);
+    const auto size = (std::uint32_t) (wav.size() - 8);
+    std::memcpy (wav.data() + 4, &size, 4);
+    std::int64_t frames = 0;
+    auto list = slicex::wavRegions (wav, frames);
+    CHECK (frames == 1000 && list.size() == 2);
+    CHECK (slicex::withRegions (wav, list) == wav); // unchanged list: the same file
+    slicex::WavRegion made;
+    made.start = 100;
+    made.end = 199;
+    made.marker = false;
+    made.purpose = "beat";
+    made.name = "Zap";
+    list.insert (list.begin() + 1, made);
+    const auto out = slicex::withRegions (wav, list);
+    const auto back = slicex::wavRegions (out, frames);
+    CHECK (back.size() == 3 && back[1].start == 100 && back[1].end == 199 && back[1].purpose == "beat" && back[1].name == "Zap" && back[2].key == 61);
+    std::vector<std::uint32_t> slices;
+    for (std::size_t p = 12; p + 8 <= out.size();)
+    {
+        std::uint32_t len = 0;
+        std::memcpy (&len, out.data() + p + 4, 4);
+        if (std::memcmp (out.data() + p, "strc", 4) == 0)
+            for (std::size_t k = 0; k + 4 <= len; k += 4)
+            {
+                std::uint32_t v = 0;
+                std::memcpy (&v, out.data() + p + 8 + k, 4);
+                slices.push_back (v);
+            }
+        p += 8 + len + (len & 1);
+    }
+    const std::vector<std::uint32_t> expected { 28, 4, 0, 0, 1, 10, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 250, 0, 0, 0, 0 };
+    CHECK (slices == expected);
+}

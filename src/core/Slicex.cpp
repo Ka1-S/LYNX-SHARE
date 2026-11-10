@@ -882,7 +882,24 @@ std::vector<std::uint8_t> withRegions (const std::vector<std::uint8_t>& w, const
             at = out.size();
         if (list && std::memcmp (body, "INFO", 4) == 0 && info == 0)
             info = out.size();
-        if (! old)
+        if (std::memcmp (w.data() + p, "strc", 4) == 0 && have >= 28)
+        {
+            // FL's slice list follows the regions (round 190aj, nine of FL's own saves): its 28-byte header with the
+            // count (regions + 1), one entry (2, 0, …) and one (0, start, …) per region, 24 bytes each
+            tag (out, "strc");
+            put32 (out, (std::uint32_t) (28 + 24 * (regions.size() + 1)));
+            put32 (out, le32 (body));
+            put32 (out, (std::uint32_t) regions.size() + 1);
+            out.insert (out.end(), body + 8, body + 28);
+            for (std::size_t i = 0; i <= regions.size(); ++i)
+            {
+                put32 (out, i == 0 ? 2u : 0u);
+                put32 (out, i == 0 ? 0u : (std::uint32_t) regions[i - 1].start);
+                for (int k = 0; k < 4; ++k)
+                    put32 (out, 0);
+            }
+        }
+        else if (! old)
             out.insert (out.end(), w.begin() + (std::ptrdiff_t) p, w.begin() + (std::ptrdiff_t) next);
         p = next;
     }
