@@ -1113,6 +1113,12 @@ public:
     void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept override
     {
         ScopedFlushDenormals noDenormals;
+        // An export waits for the font here too (issue #138): the export's engine prepares its instruments before it
+        // switches to offline rendering, so the wait in prepare() never ran for a project without hosted plugins, and
+        // the notes played before the loader thread finished were dropped below: a short export from the start of the
+        // song came out silent or missing its first notes. (Live playback never waits: the flag is only set by renders.)
+        if (handle != nullptr && ! handle->finished() && offlineRendering())
+            handle->wait();
         const auto* font = handle != nullptr ? handle->font() : nullptr;
         if (font != lastFont)
         {
