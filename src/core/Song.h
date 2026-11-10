@@ -172,6 +172,17 @@ struct ForeignPlugin
     bool operator== (const ForeignPlugin&) const = default;
 };
 
+// FL's Settings › General › "Disable typing keyboard priority by default" (DisablePlugFocusDefaultBox, off; round
+// 187a): on, a plugin added from now on starts with its window's Typing keyboard priority off (LYNX first)
+namespace pluginkeys
+{
+inline std::atomic<bool>& newPluginsHostFirst() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+} // namespace pluginkeys
+
 struct PluginRef
 {
     std::string id;    // unique plugin identifier (JUCE's format-name-hash)
@@ -211,8 +222,9 @@ struct PluginRef
     // what it changes in LYNX comes with the Typing keyboard priority button (issue #96 slice 2)
     bool allowHostKeys = false;
     // FL's plugin-window "Typing keyboard priority" button turned off: LYNX takes the keys it uses (typing piano,
-    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96)
-    bool hostKeysFirst = false;
+    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96).
+    // .flp: wrapper flags bit 0x01000000 set [DATA round 187a: one project saved with the button on and off]
+    bool hostKeysFirst = pluginkeys::newPluginsHostFirst().load (std::memory_order_relaxed);
     bool sendLoopPosition = true;   // "Send loop position": the play head reports the loop's start and end
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64
@@ -959,7 +971,18 @@ enum class EffectKind : std::uint8_t
     pocketTranceDelay,     // Pocket Trance Delay, FL Studio Mobile's Trance Delay, exact (round 188h, core/PocketFx.h)
     pocketTapeDelay,       // Pocket Tape Delay, FL Studio Mobile's Tape Delay, exact (round 188h, core/PocketFx.h)
     pocketMultiFx,         // Pocket MultiFX, FL Studio Mobile's MultiFX, exact (round 188h, core/PocketMultiFx.cpp): an X/Y pad over 8 effects
-    strikeShaper,    // LYNX's level-independent transient designer (round trans189d, issue #94, core/StrikeShaper.h): attack / sustain ±15 / ±24 dB
+    strikeShaper,     // LYNX's level-independent transient designer (round trans189d, issue #94, core/StrikeShaper.h): attack / sustain ±15 / ±24 dB
+    pocketAutoduck,        // Pocket Autoduck, FL Studio Mobile's Autoduck, exact (round 189h, core/PocketFx.h)
+    pocketChorus,          // Pocket Chorus, FL Studio Mobile's Chorus, exact (round 189h, core/PocketFx.h)
+    pocketSpacer,          // Pocket Spacer, FL Studio Mobile's Spacer, exact (round 189h, core/PocketFx.h)
+    pocketStereoizer,       // Pocket Stereoizer, FL Studio Mobile's Stereoizer, exact (round 189h, core/PocketFx.h)
+    pocketWowFlutter,      // Pocket Wow & Flutter, FL Studio Mobile's Wow & Flutter (round 189h, core/PocketFxB.cpp)
+    pocketPhaser,          // Pocket Phaser, FL Studio Mobile's Phaser (round 189h, core/PocketFxB.cpp)
+    pocketFlanger,         // Pocket Flanger, FL Studio Mobile's Flanger (round 189h, core/PocketFxB.cpp)
+    pocketTremolo,          // Pocket Tremolo, FL Studio Mobile's Tremolo (round 189h, core/PocketFxB.cpp)
+    pocketWaveshaper,      // Pocket Waveshaper, FL Studio Mobile's Waveshaper, exact (round 189h, core/PocketFxC.cpp): FLM's 20 values
+    pocketCompressor,      // Pocket Compressor, FL Studio Mobile's Compressor, exact (round 189h, core/PocketFxC.cpp): FLM's 9 values
+    pocketSpreader,        // Pocket Spreader, FL Studio Mobile's Spreader, exact (round 189h, core/PocketFxC.cpp): FL's Spreader engine, FLM's 4 values
     rackMixer        // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
 };
 // the last EffectKind (loops over every kind; update when one is appended)

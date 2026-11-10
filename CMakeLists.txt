@@ -130,6 +130,7 @@ add_library(lynx_core STATIC
     src/core/FlLegacyFx.cpp
     src/core/PocketFx.cpp
     src/core/PocketMultiFx.cpp
+    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
@@ -466,6 +467,7 @@ if(LYNX_BUILD_APP)
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/FruitySlicerEditor.cpp
+        src/ui/FlVoicePanel.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

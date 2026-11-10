@@ -243,6 +243,17 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketTapeDelay: return "pocketTapeDelay";
         case EffectKind::pocketMultiFx: return "pocketMultiFx";
         case EffectKind::strikeShaper: return "strikeShaper";
+        case EffectKind::pocketAutoduck: return "pocketAutoduck";
+        case EffectKind::pocketChorus: return "pocketChorus";
+        case EffectKind::pocketSpacer: return "pocketSpacer";
+        case EffectKind::pocketStereoizer: return "pocketStereoizer";
+        case EffectKind::pocketWowFlutter: return "pocketWowFlutter";
+        case EffectKind::pocketPhaser: return "pocketPhaser";
+        case EffectKind::pocketFlanger: return "pocketFlanger";
+        case EffectKind::pocketTremolo: return "pocketTremolo";
+        case EffectKind::pocketWaveshaper: return "pocketWaveshaper";
+        case EffectKind::pocketCompressor: return "pocketCompressor";
+        case EffectKind::pocketSpreader: return "pocketSpreader";
         case EffectKind::rackMixer: return "rackMixer";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
@@ -1190,6 +1201,9 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
                     EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
                     EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx,
+                    EffectKind::pocketAutoduck, EffectKind::pocketChorus, EffectKind::pocketSpacer, EffectKind::pocketStereoizer,
+                    EffectKind::pocketWowFlutter, EffectKind::pocketPhaser, EffectKind::pocketFlanger, EffectKind::pocketTremolo,
+                    EffectKind::pocketWaveshaper, EffectKind::pocketCompressor, EffectKind::pocketSpreader,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,

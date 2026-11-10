@@ -61,6 +61,7 @@
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PatternBlocksView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -78,6 +79,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
+#include "ui/FlVoicePanel.h"
 #include "core/LynxBanks.h"
 #include "core/NativeEngines.h"
 #include "ui/ControllerEditors.h"
@@ -3485,7 +3487,13 @@ private:
         }
 
         const auto mixerBasics = lynx::mixerbasics::run();
-        const auto ok = mixerBasics == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        // issue #142: every font has a typeface, and one without does not crash (fonts get theirs through the
+        // look and feel, as in the app)
+        auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const auto fontsResult = lynx::theme::fontSelfTest();
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3510,6 +3518,7 @@ private:
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
+               << "fonts=" << fontsResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
@@ -10452,6 +10461,55 @@ private:
             write ("simple-starter");
             simple->hideChooser();
             write ("simple-closed");
+            // slice S4: the Simple headers with a few tracks (voice, instrument, drums, an audio file), some levels moved
+            offline.editSong ([] (lynx::Song& s) {
+                namespace st = lynx::simpletracks;
+                st::Request q;
+                q.kind = st::Kind::voice;
+                q.name = "Lead vocal";
+                st::addTrack (s, q);
+                q = {};
+                q.kind = st::Kind::instrument;
+                q.name = "Keys";
+                lynx::ChannelDef keys;
+                keys.instrument = lynx::InstrumentKind::synth;
+                q.channel = keys;
+                lynx::Pattern chords;
+                for (int i = 0; i < 4; ++i)
+                    for (int k : { 60, 64, 67 })
+                        chords.notes.push_back (lynx::Note { (std::int64_t) i * 4 * lynx::ppq, 4 * lynx::ppq - lynx::ppq / 4, 0, k });
+                q.pattern = chords;
+                const auto r = st::addTrack (s, q);
+                q = {};
+                q.kind = st::Kind::drums;
+                for (auto kind : { lynx::InstrumentKind::kick, lynx::InstrumentKind::snare, lynx::InstrumentKind::hat })
+                {
+                    lynx::ChannelDef c;
+                    c.instrument = kind;
+                    c.name = kind == lynx::InstrumentKind::kick ? "Kick" : kind == lynx::InstrumentKind::snare ? "Snare" : "Hat";
+                    q.kit.push_back (c);
+                }
+                lynx::Pattern beat;
+                const auto hit = [&beat] (int step, int row) { beat.notes.push_back (lynx::Note { (std::int64_t) step * lynx::ticksPerStep, lynx::ticksPerStep, row, 60 }); };
+                for (int step = 0; step < 16; step += 2)
+                    hit (step, 2); // hats on the 8ths, kick on 1 and 3, snare on 2 and 4
+                for (int step : { 0, 8 })
+                    hit (step, 0);
+                for (int step : { 4, 12 })
+                    hit (step, 1);
+                q.pattern = beat;
+                q.bpm = 96.0;
+                st::addTrack (s, q);
+                if (r.insert > 0)
+                {
+                    s.mixer[(std::size_t) r.insert].volume = 0.55f;
+                    s.mixer[(std::size_t) r.insert].pan = -0.4f;
+                    s.mixer[(std::size_t) r.insert].solo = true;
+                }
+            });
+            offline.dispatchPendingMessages();
+            ui.getPlaylistForSnapshot().selectTrack (1);
+            write ("simple-tracks");
         }
         saveStyleMenus ("simple");
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");
@@ -11221,6 +11279,15 @@ private:
             }
             ui.selectTabForSnapshot (1);
             saveSnapshot (ui, prefix + "-pianoroll.png");
+            {
+                // View › Keyboard style › Piano keys (round 190j, discussion #136), also with tall keys
+                auto& roll = ui.getPianoRollForSnapshot();
+                lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
+                roll.repaint();
+                saveSnapshot (ui, prefix + "-pianoroll-pianokeys.png");
+                lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+                roll.repaint();
+            }
             if (const auto strip = ui.getToolStripAreaForSnapshot (false); ! strip.isEmpty())
                 saveArea (ui, strip, prefix + "-pianoroll-tools.png");
             // the editors' mouse feel: the hovered note / clip edge (grip, outline) and its hint in the hint bar
@@ -11759,6 +11826,14 @@ private:
                 if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fruityslicer)
                 {
                     saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fruityslicer.png");
+                    // rounds 190f / 190m: its Envelope / instrument page, one picture per target
+                    saveWindow (lynx::makeChannelFrame (offline, c, 1), "-fruityslicer-envelope.png");
+                    for (const auto& [target, name] : std::vector<std::pair<int, const char*>> { { 0, "panning" }, { 2, "modx" }, { 3, "mody" }, { 4, "pitch" } })
+                    {
+                        auto frame = lynx::makeChannelFrame (offline, c, 1);
+                        lynx::showFlVoiceTarget (*frame, target);
+                        saveWindow (std::move (frame), juce::String ("-fruityslicer-envelope-") + name + ".png");
+                    }
                     break;
                 }
 
@@ -11978,6 +12053,101 @@ private:
                 }, false);
                 offline.dispatchPendingMessages();
                 saveSnapshot (ui, prefix + "-playlist-blocks.png");
+
+                // issue #127 (PR #132 and our follow-up): the Playlist's pencil, brush and eraser on the blocks, driven
+                // with real mouse events on the view. One picture per tool, and the gestures' results in
+                // <prefix>-playlist-blocks-tools.txt ("OK", or the checks that failed).
+                if (auto* blocks = ui.getPlaylistForSnapshot().getBlocksViewForSnapshot())
+                {
+                    juce::StringArray failed;
+                    const auto expect = [&failed] (bool ok, const char* what) { if (! ok) failed.add (what); };
+                    const auto bar = (std::int64_t) lynx::ppq * offline.getSong().beatsPerBar;
+                    offline.editSong ([bar] (lynx::Song& s) {
+                        s.blocks.clear();
+                        for (std::size_t r = 0; r < 4 && r < s.patterns.size(); ++r)
+                            s.patterns[r].lengthTicks = r == 1 ? 2 * bar : bar; // row 2 holds a 2-bar pattern
+                    }, false);
+                    offline.dispatchPendingMessages();
+                    const auto source = juce::Desktop::getInstance().getMainMouseSource();
+                    const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier), right (juce::ModifierKeys::rightButtonModifier);
+                    juce::Point<float> pressedAt;
+                    const auto event = [&] (int row, std::int64_t tick, juce::ModifierKeys mods) {
+                        const auto at = blocks->pointForSnapshot (row, tick).toFloat();
+                        const auto now = juce::Time::getCurrentTime();
+                        return juce::MouseEvent (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, blocks, blocks, now, pressedAt, now, 1, false);
+                    };
+                    const auto press = [&] (int row, std::int64_t tick, juce::ModifierKeys mods) {
+                        pressedAt = blocks->pointForSnapshot (row, tick).toFloat();
+                        blocks->mouseDown (event (row, tick, mods));
+                    };
+                    const auto dragTo = [&] (int row, std::int64_t tick, juce::ModifierKeys mods) { blocks->mouseDrag (event (row, tick, mods)); };
+                    const auto release = [&] (int row, std::int64_t tick) { blocks->mouseUp (event (row, tick, {})); };
+                    // the starts of row `row`'s blocks, as "0,2,5" (bars from 0)
+                    const auto rowBars = [&] (int row) {
+                        juce::StringArray bars;
+                        for (const auto& b : offline.getSong().blocks)
+                            if (b.pattern == row)
+                                bars.add (juce::String (b.start / bar) + (b.start % bar != 0 ? "+" : ""));
+                        return bars.joinIntoString (",");
+                    };
+                    auto& tools = ui.getPlaylistForSnapshot();
+
+                    // Pencil: a press on empty space places one block that follows the mouse along its row
+                    tools.setToolForSnapshot (lynx::EditTool::pencil);
+                    press (0, 2 * bar + 40, left);
+                    expect (rowBars (0) == "2", "pencil: a press places one block");
+                    dragTo (2, 5 * bar + 40, left); // (over another row: the block stays in its own)
+                    release (2, 5 * bar + 40);
+                    expect (rowBars (0) == "5" && rowBars (2).isEmpty(), "pencil: the placed block follows the drag in its row");
+                    // a 2-bar block grabbed by its second bar keeps that bar under the mouse (it used to jump a bar)
+                    press (1, 1 * bar + 40, left);
+                    release (1, 1 * bar + 40);
+                    expect (rowBars (1) == "1", "pencil: a click places the 2-bar block");
+                    press (1, 2 * bar + 40, left);
+                    dragTo (1, 2 * bar + bar / 2, left);
+                    expect (rowBars (1) == "1", "move: a small move on the grabbed bar leaves the block in place");
+                    dragTo (1, 4 * bar + 40, left);
+                    release (1, 4 * bar + 40);
+                    expect (rowBars (1) == "3", "move: the grabbed bar stays under the mouse");
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-playlist-blocks-pencil.png");
+
+                    // Brush: a drag over empty space paints a run; a press on a block moves it
+                    tools.setToolForSnapshot (lynx::EditTool::brush);
+                    press (2, 0, left);
+                    dragTo (2, 3 * bar + 40, left);
+                    release (2, 3 * bar + 40);
+                    expect (rowBars (2) == "0,1,2,3", "brush: a drag paints a run");
+                    press (2, 3 * bar + 40, left);
+                    dragTo (2, 6 * bar + 40, left);
+                    release (2, 6 * bar + 40);
+                    expect (rowBars (2) == "0,1,2,6", "brush: a press on a block moves it");
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-playlist-blocks-brush.png");
+
+                    // Eraser, and the right button with any tool: only the blocks under the mouse, row by row
+                    offline.editSong ([bar] (lynx::Song& s) {
+                        for (int r = 0; r < 4 && r < (int) s.patterns.size(); ++r)
+                            lynx::patternblocks::place (s, r, 8 * bar);
+                    }, false);
+                    offline.dispatchPendingMessages();
+                    expect (rowBars (0) == "5,8" && rowBars (3) == "8", "eraser: the column is set up");
+                    saveSnapshot (ui, prefix + "-playlist-blocks-eraser-before.png");
+                    tools.setToolForSnapshot (lynx::EditTool::eraser);
+                    press (0, 8 * bar + 40, left);
+                    expect (rowBars (0) == "5" && rowBars (1) == "3,8" && rowBars (2) == "0,1,2,6,8" && rowBars (3) == "8",
+                            "eraser: a click takes only the block under the mouse");
+                    dragTo (1, 8 * bar + 60, left); // down one row: that row's block goes too, the rows below stay
+                    release (1, 8 * bar + 60);
+                    expect (rowBars (1) == "3" && rowBars (2) == "0,1,2,6,8" && rowBars (3) == "8", "eraser: the drag erases the rows it crosses, no others");
+                    tools.setToolForSnapshot (lynx::EditTool::pencil);
+                    press (3, 8 * bar + 40, right);
+                    release (3, 8 * bar + 40);
+                    expect (rowBars (3).isEmpty() && rowBars (2) == "0,1,2,6,8", "right click: erases only the block under the mouse");
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-playlist-blocks-eraser.png");
+                    juce::File (prefix + "-playlist-blocks-tools.txt").replaceWithText (failed.isEmpty() ? juce::String ("OK\n") : "ERROR\n" + failed.joinIntoString ("\n") + "\n");
+                }
                 offline.editSong ([saved] (lynx::Song& s) { s = saved; }, false);
                 offline.dispatchPendingMessages();
             }
