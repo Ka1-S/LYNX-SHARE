@@ -69,6 +69,10 @@ public:
     void restoreDetachedWindows();
 
     std::function<void (Panel)> onFocusChanged;
+    // Round 183a: a panel is about to show (its content may first have to come back from a dock); nullptr = nothing.
+    std::function<void (Panel)> onWillShow;
+    // Round 183a: the panel's frame lets go of its content (it is docked elsewhere for a while); setContent gives it back.
+    void releaseContent (Panel panel);
     std::function<bool (const juce::KeyPress&)> onKeyInDetachedWindow;
     std::function<void (Panel, const juce::MouseEvent&, const juce::MouseWheelDetails&)> onTitleWheel;
     std::function<void (Panel, const juce::MouseEvent&)> onTitleRightClick;

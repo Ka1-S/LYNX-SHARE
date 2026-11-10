@@ -85,6 +85,12 @@ std::vector<Action> makeActions()
         { "view.midiSettings", TR_NOOP ("MIDI settings (press again to close)"), Context::global, { chord (f10) } },
         { "view.projectInfo", TR_NOOP ("Project info (press again to close)"), Context::global, { chord (f11) } },
         { "view.closeWindows", TR_NOOP ("Close all windows (plugins, channel settings, tools)"), Context::global, { chord (f12) } },
+        // Round 183a: the Clip-launch workflow's detail view, with the reference DAW's keys (its View menu, Live 12.4
+        // [SHOT] detail183a/live/d05). They do nothing in Pattern workflow, where the keys keep their old meaning.
+        { "view.detailToggle", TR_NOOP ("Clip-launch workflow: show or hide the detail view"), Context::global, { chord ('L', ctrl | alt) } },
+        { "view.detailClip", TR_NOOP ("Clip-launch workflow: clip view"), Context::global, { chord ('3', ctrl | alt) } },
+        { "view.detailDevices", TR_NOOP ("Clip-launch workflow: device view"), Context::global, { chord ('4', ctrl | alt) } },
+        { "view.detailSwitch", TR_NOOP ("Clip-launch workflow: switch between clip view and device view"), Context::global, { chord (tab, shift) } },
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
         // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
         { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
@@ -340,7 +346,10 @@ std::vector<Action> makeActions()
         { "mixer.altSoloSelected", TR_NOOP ("Alt solo the selected mixer track(s) (with the tracks that feed them)"), Context::mixer, { chord ('S', alt) } },
         { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },
         { "mixer.renderSelected", TR_NOOP ("Disk recording: render the selected tracks to wave file(s)"), Context::mixer, { chord ('R', shift | alt) } },
-        { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, { chord (del) } },
+        // FL 2026 (round 186c, checked by hand): Del deletes the selected mixer tracks (with FL's question); it never removes
+        // an effect, except with the slot's menu open (issue #11, handled by that menu). The effect action stays, unbound.
+        { "mixer.deleteTracks", TR_NOOP ("Delete the selected mixer tracks"), Context::mixer, { chord (del) } },
+        { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, {} },
     };
 
     // numeric keypad 1-9: select patterns 1-9
