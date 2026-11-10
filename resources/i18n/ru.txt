@@ -8332,3 +8332,13 @@ countries: ru by kz
 "Save sample as" = "Сохранить сэмпл как"
 "Save sample as..." = "Сохранить сэмпл как..."
 "Zoom on selection" = "Масштаб по выделению"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Добавить регион..."
+"Select after current selection" = "Выделить после текущего выделения"
+"Select before current selection" = "Выделить до текущего выделения"
+"Select next region" = "Выделить следующий регион"
+"Select previous region" = "Выделить предыдущий регион"
+"Select zoomed part" = "Выделить увеличенную часть"
+"Zoom on left of selection" = "Масштаб по левому краю выделения"
+"Zoom on right of selection" = "Масштаб по правому краю выделения"

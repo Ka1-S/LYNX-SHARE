@@ -8332,3 +8332,13 @@ countries: kr
 "Save sample as" = "다른 이름으로 샘플 저장"
 "Save sample as..." = "다른 이름으로 샘플 저장..."
 "Zoom on selection" = "선택 영역 확대"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "리전 추가..."
+"Select after current selection" = "현재 선택 영역 뒤를 선택"
+"Select before current selection" = "현재 선택 영역 앞을 선택"
+"Select next region" = "다음 리전 선택"
+"Select previous region" = "이전 리전 선택"
+"Select zoomed part" = "확대된 부분 선택"
+"Zoom on left of selection" = "선택 영역 왼쪽 확대"
+"Zoom on right of selection" = "선택 영역 오른쪽 확대"

@@ -8415,3 +8415,13 @@ countries: br
 "Save sample as" = "Salvar amostra como"
 "Save sample as..." = "Salvar amostra como..."
 "Zoom on selection" = "Aproximar a seleção"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Adicionar região..."
+"Select after current selection" = "Selecionar depois da seleção atual"
+"Select before current selection" = "Selecionar antes da seleção atual"
+"Select next region" = "Selecionar a próxima região"
+"Select previous region" = "Selecionar a região anterior"
+"Select zoomed part" = "Selecionar a parte ampliada"
+"Zoom on left of selection" = "Aproximar à esquerda da seleção"
+"Zoom on right of selection" = "Aproximar à direita da seleção"
