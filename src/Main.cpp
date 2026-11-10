@@ -41,6 +41,7 @@
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
 #include "engine/LiveTest.h"
+#include "engine/ShortExportTest.h"
 #include "core/SessionIds.h"
 #include "core/SessionParts.h"
 #include "engine/SampleLibrary.h"
@@ -582,6 +583,63 @@ public:
             // export.wav and read back) the same. With the LYNX extra off, bars 2-4 must be silent (FL's behaviour).
             const auto i = args.indexOf ("--cliplooptest");
             runClipLoopTest (juce::File (args[i + 1].unquoted()), args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? juce::File (args[i + 2].unquoted()) : juce::File());
+            return;
+        }
+
+        if (args.contains ("--devicechangetest"))
+        {
+            // LYNX --devicechangetest report.txt [switches] [--plugin file]... (round 190c, issue #134: changing the
+            // output device with a project open crashed LYNX). The engine plays a project of every instrument and effect
+            // it can make here on stand-in devices with real callback threads, while the output device, its sample
+            // rate and its buffer size change the way Settings > Audio changes them (8 kHz mono to 192 kHz, buffers of
+            // 32 to 16384 samples, a device plugged in, the open one unplugged, one that refuses to open). After every
+            // change the song must sound, finite, at the new rate. No window, no real audio or MIDI device.
+            const auto i = args.indexOf ("--devicechangetest");
+            const juce::File report (args[i + 1].unquoted());
+            const auto switches = args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? args[i + 2].getIntValue() : 0;
+            juce::StringArray plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            auto text = std::make_shared<juce::String>();
+            // --quick: the selftest's handful of instruments and effects instead of every one
+            const auto result = lynx::AudioEngine::deviceChangeSelfTest (switches > 0 ? switches : 40, ! args.contains ("--quick"), plugins, [report, text] (const juce::String& line) {
+                *text << line << "\n";
+                report.replaceWithText (*text + "(running)\n"); // what was reached, if it crashes
+            });
+            *text << "device_change=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            report.replaceWithText (*text);
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--shortexporttest"))
+        {
+            // LYNX --shortexporttest report.txt [repeats] [--plugin file]... (round 190c, issue #138: a short note at
+            // the very start of the Playlist exported quiet). Every instrument LYNX can make here, and a synth with
+            // effects, tail modes, normalising and other rates, exported through the Export window's path (the job
+            // made on the message thread, run on its own thread, the message loop running) with a 2-second note at
+            // tick 0 and again with it at bar 2: the note must come out the same. No window.
+            const auto i = args.indexOf ("--shortexporttest");
+            const juce::File report (args[i + 1].unquoted());
+            const auto repeats = args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? args[i + 2].getIntValue() : 0;
+            juce::StringArray plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            auto text = std::make_shared<juce::String>();
+            lynx::shortexport::run (true, repeats > 0 ? repeats : 3, plugins,
+                                    [report, text] (const juce::String& line) {
+                                        *text << line << "\n";
+                                        report.replaceWithText (*text + "(running)\n");
+                                    },
+                                    [this, report, text] (juce::String result) {
+                                        *text << "short_export=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+                                        report.replaceWithText (*text);
+                                        setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+                                        quit();
+                                    });
             return;
         }
 
@@ -3234,6 +3292,9 @@ private:
 
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
+        // issue #134 (round 190c): the output device, its rate and its buffer changed under a playing project, on
+        // stand-in devices (a short run; --devicechangetest plays every instrument and effect)
+        const auto deviceChange = lynx::AudioEngine::deviceChangeSelfTest (10, false);
 
         // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
         // through it, the invite code's keys)
@@ -3347,7 +3408,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
 
         juce::String report;
@@ -3381,18 +3442,25 @@ private:
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "effect_params_saved=" << effectParamsResult << "\n"
                << "driver_panel=" << driverPanel << "\n"
+               << "device_change=" << deviceChange << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
-               << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n"
-               << "result=" << (ok ? "OK" : "FAILED") << "\n";
+               << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
+        // issue #138 (round 190c): a short note at the very start of the Playlist against the same note at bar 2, through
+        // the Export window's path (its own thread while the message loop runs: the report is finished from there)
         if (reportPath.isNotEmpty())
-            juce::File (reportPath).replaceWithText (report);
-
-        setApplicationReturnValue (ok ? 0 : 1);
-        quit();
+            juce::File (reportPath).replaceWithText (report + "(short_export running)\n");
+        lynx::shortexport::run (false, 1, {}, {}, [this, report, ok, reportPath] (juce::String shortExport) {
+            const auto all = ok && shortExport.startsWith ("OK");
+            const auto text = report + "short_export=" + shortExport + "\nresult=" + (all ? "OK" : "FAILED") + "\n";
+            if (reportPath.isNotEmpty())
+                juce::File (reportPath).replaceWithText (text);
+            setApplicationReturnValue (all ? 0 : 1);
+            quit();
+        });
     }
 
     // Every built-in effect in its native editor: random / extreme parameters, mouse drags over the editor, the editor
