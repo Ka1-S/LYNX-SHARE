@@ -86,6 +86,7 @@
 #include "core/FlSynths.h"
 #include "core/SoundFont.h"
 #include "core/Sfz.h"
+#include "core/Slicex.h"
 #include "ui/Dialogs.h"
 #include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
@@ -580,6 +581,16 @@ public:
             // export.wav and read back) the same. With the LYNX extra off, bars 2-4 must be silent (FL's behaviour).
             const auto i = args.indexOf ("--cliplooptest");
             runClipLoopTest (juce::File (args[i + 1].unquoted()), args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? juce::File (args[i + 2].unquoted()) : juce::File());
+            return;
+        }
+
+        if (args.contains ("--slicexkeytest"))
+        {
+            // LYNX --slicexkeytest report.txt (round 190ac): what a click on the Slicex editor's keyboard sends
+            // (AudioEngine::sendLiveNote on the channel, velocity 100/128) through the real engine's device callback
+            // (a stand-in device, driven block by block): the key's region must sound, on the channel's mixer meter
+            // too, another key must play another region, and the note-off must end it.
+            runSlicexKeyTest (juce::File (args[args.indexOf ("--slicexkeytest") + 1].unquoted()));
             return;
         }
 
@@ -6459,6 +6470,173 @@ private:
     }
 
     // --cliplooptest (round 167q): see the command line above.
+    // --slicexkeytest (round 190ac): see the command line above
+    void runSlicexKeyTest (const juce::File& report)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        engine->getDeviceManager().closeAudioDevice(); // the engine's callback is driven by hand below
+        struct StandIn final : juce::AudioIODevice
+        {
+            StandIn() : juce::AudioIODevice ("slicexkey", "test") {}
+            juce::StringArray getOutputChannelNames() override { return { "L", "R" }; }
+            juce::StringArray getInputChannelNames() override { return {}; }
+            juce::Array<double> getAvailableSampleRates() override { return { 48000.0 }; }
+            juce::Array<int> getAvailableBufferSizes() override { return { 512 }; }
+            int getDefaultBufferSize() override { return 512; }
+            juce::String open (const juce::BigInteger&, const juce::BigInteger&, double, int) override { return {}; }
+            void close() override {}
+            bool isOpen() override { return true; }
+            void start (juce::AudioIODeviceCallback*) override {}
+            void stop() override {}
+            bool isPlaying() override { return true; }
+            juce::String getLastError() override { return {}; }
+            int getCurrentBufferSizeSamples() override { return 512; }
+            double getCurrentSampleRate() override { return 48000.0; }
+            int getCurrentBitDepth() override { return 32; }
+            juce::BigInteger getActiveOutputChannels() const override
+            {
+                juce::BigInteger b;
+                b.setRange (0, 2, true);
+                return b;
+            }
+            juce::BigInteger getActiveInputChannels() const override { return {}; }
+            int getOutputLatencyInSamples() override { return 0; }
+            int getInputLatencyInSamples() override { return 0; }
+        };
+        auto device = std::make_shared<StandIn>();
+        auto text = std::make_shared<juce::String>();
+        auto step = [report, text] (const juce::String& line) { *text << line << "\n"; report.replaceWithText (*text); };
+
+        // the deck's sample: 1 s at 48 kHz, four regions (cue points) of 0.25 s, each a steady tone of its own (200 Hz
+        // × region number), so the region a key played can be read from the output
+        constexpr int rate = 48000, regionFrames = rate / 4;
+        const auto wavFile = report.getSiblingFile ("slicexkey-deck.wav");
+        {
+            juce::MemoryOutputStream w;
+            auto chunk = [&w] (const char* id, const juce::MemoryBlock& body) {
+                w.write (id, 4);
+                w.writeInt ((int) body.getSize());
+                w.write (body.getData(), body.getSize());
+            };
+            juce::MemoryOutputStream fmt, data, cue;
+            fmt.writeShort (1);
+            fmt.writeShort (1);
+            fmt.writeInt (rate);
+            fmt.writeInt (rate * 2);
+            fmt.writeShort (2);
+            fmt.writeShort (16);
+            for (int i = 0; i < 4 * regionFrames; ++i)
+                data.writeShort ((short) std::lround (12000.0 * std::sin (juce::MathConstants<double>::twoPi * 200.0 * (double) (i / regionFrames + 1) * (double) i / rate)));
+            cue.writeInt (4);
+            for (int k = 0; k < 4; ++k)
+            {
+                cue.writeInt (k + 1);
+                cue.writeInt (k * regionFrames);
+                cue.write ("data", 4);
+                cue.writeInt (0);
+                cue.writeInt (0);
+                cue.writeInt (k * regionFrames);
+            }
+            juce::MemoryOutputStream riff;
+            riff.write ("WAVE", 4);
+            w.reset();
+            chunk ("fmt ", fmt.getMemoryBlock());
+            chunk ("data", data.getMemoryBlock());
+            chunk ("cue ", cue.getMemoryBlock());
+            riff.write (w.getData(), w.getDataSize());
+            juce::MemoryOutputStream file;
+            file.write ("RIFF", 4);
+            file.writeInt ((int) riff.getDataSize());
+            file.write (riff.getData(), riff.getDataSize());
+            wavFile.replaceWithData (file.getData(), file.getDataSize());
+        }
+
+        lynx::Song song;
+        song.bpm = 120.0;
+        song.mixer = lynx::Song::defaultMixer (2);
+        song.channels.resize (1);
+        auto& channel = song.channels[0];
+        channel.instrument = lynx::InstrumentKind::slicex;
+        channel.mixerTrack = 1;
+        channel.samplePath = wavFile.getFullPathName().toStdString();
+        {
+            auto state = lynx::slicex::fresh();
+            lynx::slicex::setDeckFile (state, 0, channel.samplePath, 4);
+            lynx::slicex::setDeckBeats (state, 0, 0.0, 2.0);
+            channel.pluginState = lynx::slicex::write (state);
+        }
+        song.patterns.emplace_back();
+        engine->setSong (song);
+        auto& callback = engine->deviceCallback();
+        callback.audioDeviceAboutToStart (device.get());
+        step ("song=one Slicex channel, deck A = 4 regions of 0.25 s (200 / 400 / 600 / 800 Hz), 48 kHz, blocks of 512; keys as the editor's keyboard sends them");
+
+        juce::Timer::callAfterDelay (2000, [this, device, step] {
+            if (engine == nullptr)
+                return;
+            auto& cb = engine->deviceCallback();
+            auto pump = [&cb] (int blocks) {
+                std::vector<float> l (512), r (512), out;
+                float* outs[] = { l.data(), r.data() };
+                juce::AudioIODeviceCallbackContext context;
+                for (int k = 0; k < blocks; ++k)
+                {
+                    cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, 512, context);
+                    out.insert (out.end(), l.begin(), l.end());
+                }
+                return out;
+            };
+            auto rms = [] (const std::vector<float>& x, int from, int count) {
+                double sum = 0.0;
+                for (int i = from; i < from + count && i < (int) x.size(); ++i)
+                    sum += (double) x[(std::size_t) i] * x[(std::size_t) i];
+                return std::sqrt (sum / juce::jmax (1, count));
+            };
+            // the tone's frequency from its rising zero crossings over a stretch
+            auto hertz = [] (const std::vector<float>& x, int from, int count) {
+                int crossings = 0, first = -1, last = -1;
+                for (int i = from + 1; i < from + count && i < (int) x.size(); ++i)
+                    if (x[(std::size_t) i - 1] < 0.0f && x[(std::size_t) i] >= 0.0f)
+                    {
+                        first = first < 0 ? i : first;
+                        last = i;
+                        ++crossings;
+                    }
+                return crossings > 1 ? 48000.0 * (double) (crossings - 1) / (double) (last - first) : 0.0;
+            };
+            bool ok = true;
+            auto check = [&ok, step] (bool good, const juce::String& what) {
+                ok = ok && good;
+                step ((good ? "ok   " : "FAIL ") + what);
+            };
+            const auto idle = pump (20);
+            engine->getMeters().takePeak (1, 0);
+            check (rms (idle, 0, (int) idle.size()) < 1.0e-6, "idle: rms " + juce::String (rms (idle, 0, (int) idle.size()), 9));
+            // 4 regions map to keys 60…63 (FL's automatic map); the editor's click: velocity 100 / 128
+            engine->sendLiveNote (0, 60, 0.78125f, true);
+            const auto first = pump (16); // 8192 frames = 171 ms, inside region 1 (250 ms)
+            const auto meter = engine->getMeters().takePeak (1, 0);
+            check (rms (first, 1024, 6000) > 0.01, "key 60 down: rms " + juce::String (rms (first, 1024, 6000), 6) + ", " + juce::String (hertz (first, 1024, 6000), 1) + " Hz");
+            check (std::abs (hertz (first, 1024, 6000) - 200.0) < 4.0, "key 60 plays region 1 (200 Hz)");
+            check (meter > 0.01f, "mixer track 1 meter peak " + juce::String (meter, 6));
+            engine->sendLiveNote (0, 60, 0.0f, false);
+            const auto tail = pump (60);
+            check (rms (tail, (int) tail.size() - 4096, 4096) < 1.0e-5, "key 60 up: the end is silent, rms " + juce::String (rms (tail, (int) tail.size() - 4096, 4096), 9));
+            engine->sendLiveNote (0, 62, 0.78125f, true);
+            const auto third = pump (16);
+            check (rms (third, 1024, 6000) > 0.01 && std::abs (hertz (third, 1024, 6000) - 600.0) < 8.0,
+                   "key 62 plays region 3 (600 Hz): rms " + juce::String (rms (third, 1024, 6000), 6) + ", " + juce::String (hertz (third, 1024, 6000), 1) + " Hz");
+            engine->sendLiveNote (0, 62, 0.0f, false);
+            engine->sendLiveNote (0, 72, 0.78125f, true); // a key without a region
+            const auto none = pump (60);
+            check (rms (none, (int) none.size() - 4096, 4096) < 1.0e-5, "key 72 (no region): silent, rms " + juce::String (rms (none, (int) none.size() - 4096, 4096), 9));
+            engine->sendLiveNote (0, 72, 0.0f, false);
+            step (ok ? "result=OK" : "result=FAILED");
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+        });
+    }
+
     void runClipLoopTest (const juce::File& report, const juce::File& wavFile)
     {
         engine = std::make_unique<lynx::AudioEngine>();

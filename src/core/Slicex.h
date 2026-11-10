@@ -182,6 +182,11 @@ void setDeckFile (State& state, int deck, const std::string& path, int regions);
 // the deck's beat grid (Deck::beatStart / beatEnd): the tempo FL shows is beats · 60 / duration
 void setDeckBeats (State& state, int deck, double start, double end);
 
+// The beat count FL gives a loaded sample that carries no tempo (no ACID beat count): the power of two that puts its
+// tempo in 80 < BPM ≤ 160 (round 190ac, nine files loaded in FL: 3.000 s → 8 beats = 160 BPM, 2.981 s → 4 = 80.5,
+// 1.370 s → 2 = 87.6; the project's tempo, 120, plays no part)
+double guessBeats (double seconds) noexcept;
+
 // ---- the laws (FL's single-precision arithmetic)
 float masterVolume (std::int32_t raw) noexcept;      // 0…16000, 12800 = 1: (11^x − 1)/10
 float masterBipolar (std::int32_t raw, int unit) noexcept; // randomness (unit 256) and LFO (unit 128): the same law on |x|, sign kept
@@ -196,12 +201,18 @@ struct WavRegion
     std::string name;
     int key = -1;                       // the region's own MIDI key (FL's trigger list), −1 = automatic
     bool marker = true;                 // a cue point without a length
+    std::string info;                   // FL's "Set info" text (a `note` entry)
+    std::string purpose;                // the length entry's four-letter purpose as saved ("beat", "rgn "…), "" = none
 };
 // `frames` receives the audio length (0 when the data chunk is missing)
 std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& wav, std::int64_t& frames);
 // The WAV with its regions' keys set (FL's trigger list chunk, rewritten): keys[i] is region i's key in the order
 // wavRegions() returns them (−1 = automatic). An empty result: `wav` is not a WAV with cue points.
 std::vector<std::uint8_t> withRegionKeys (const std::vector<std::uint8_t>& wav, const std::vector<int>& keys);
+// The WAV with its region list replaced by `regions` (cue points, names, lengths, keys — the chunks FL's writer
+// lays out as cue, LIST/adtl, tlst): what the editor's rename / delete / clone / move / add do. The regions are
+// written in the order given (sample order, as wavRegions() returns them). An empty result: `wav` is not a WAV.
+std::vector<std::uint8_t> withRegions (const std::vector<std::uint8_t>& wav, const std::vector<WavRegion>& regions);
 // FL's name for a region without one: "Marker #n" / "Region #n"
 std::string regionName (const WavRegion& r, int index);
 

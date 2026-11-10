@@ -462,6 +462,18 @@ void setDeckBeats (State& state, int deck, double start, double end)
     std::memcpy (d.params.data() + 0x18, &end, 8);
 }
 
+double guessBeats (double seconds) noexcept
+{
+    if (! (seconds > 0.0) || ! std::isfinite (seconds))
+        return 0.0;
+    double beats = 1.0;
+    while (beats * 60.0 / seconds <= 80.0 && beats < 65536.0)
+        beats *= 2.0;
+    while (beats * 60.0 / seconds > 160.0 && beats > 1.0 / 65536.0)
+        beats *= 0.5;
+    return beats;
+}
+
 float masterVolume (std::int32_t raw) noexcept { return law11 ((float) std::clamp (raw, 0, 16000) * 7.8125e-05f); }
 
 float masterBipolar (std::int32_t raw, int unit) noexcept
@@ -488,14 +500,14 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
     {
         std::uint32_t id = 0;
         std::int64_t start = 0, length = 0;
-        std::string name;
+        std::string name, info, purpose;
         int key = -1;
     };
     std::vector<Cue> cues;
     struct Extra
     {
         std::uint32_t id = 0;
-        int what = 0; // 0 name, 1 length, 2 key
+        int what = 0; // 0 name, 1 length (text: its purpose), 2 key, 3 info
         std::string text;
         std::int64_t value = 0;
     };
@@ -558,8 +570,13 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
                             const auto* text = reinterpret_cast<const char*> (sb + 4);
                             extras.push_back ({ id, 0, std::string (text, strnlen (text, sub - 4)), 0 });
                         }
+                        else if (std::memcmp (body + q, "note", 4) == 0)
+                        {
+                            const auto* text = reinterpret_cast<const char*> (sb + 4);
+                            extras.push_back ({ id, 3, std::string (text, strnlen (text, sub - 4)), 0 });
+                        }
                         else if (std::memcmp (body + q, "ltxt", 4) == 0 && sub >= 8)
-                            extras.push_back ({ id, 1, {}, (std::int64_t) le32 (sb + 4) });
+                            extras.push_back ({ id, 1, sub >= 12 ? std::string (reinterpret_cast<const char*> (sb + 8), 4) : std::string(), (std::int64_t) le32 (sb + 4) });
                     }
                     q += 8 + sub + (sub & 1);
                 }
@@ -577,7 +594,12 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
                 if (e.what == 0)
                     c.name = e.text;
                 else if (e.what == 1)
+                {
                     c.length = e.value;
+                    c.purpose = e.text;
+                }
+                else if (e.what == 3)
+                    c.info = e.text;
                 else
                     c.key = (int) e.value;
             }
@@ -589,6 +611,8 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
         WavRegion r;
         r.start = c.start;
         r.name = c.name;
+        r.info = c.info;
+        r.purpose = c.purpose;
         r.key = c.key >= 0 && c.key <= 127 ? c.key : -1;
         r.marker = c.length <= 0;
         r.end = r.marker ? -1 : c.start + c.length - 1;
@@ -665,6 +689,120 @@ std::vector<std::uint8_t> withRegionKeys (const std::vector<std::uint8_t>& w, co
             }
     }
     out.insert (out.begin() + (std::ptrdiff_t) at, list.begin(), list.end());
+    const auto riff = (std::uint32_t) (out.size() - 8);
+    for (int i = 0; i < 4; ++i)
+        out[4 + (std::size_t) i] = (std::uint8_t) (riff >> (8 * i));
+    return out;
+}
+
+std::vector<std::uint8_t> withRegions (const std::vector<std::uint8_t>& w, const std::vector<WavRegion>& regions)
+{
+    if (w.size() < 12 || std::memcmp (w.data(), "RIFF", 4) != 0 || std::memcmp (w.data() + 8, "WAVE", 4) != 0)
+        return {};
+    auto put32 = [] (std::vector<std::uint8_t>& o, std::uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            o.push_back ((std::uint8_t) (v >> (8 * i)));
+    };
+    auto tag = [] (std::vector<std::uint8_t>& o, const char* id) { o.insert (o.end(), id, id + 4); };
+    // a text entry of the label list: id, the text, a zero, padded to an even size
+    auto text = [&] (std::vector<std::uint8_t>& o, const char* id, std::uint32_t cue, const std::string& t) {
+        tag (o, id);
+        put32 (o, (std::uint32_t) (4 + t.size() + 1));
+        put32 (o, cue);
+        o.insert (o.end(), t.begin(), t.end());
+        o.push_back (0);
+        if ((t.size() + 1) & 1)
+            o.push_back (0);
+    };
+
+    // the new chunks: cue, LIST/adtl, tlst (FL's order)
+    std::vector<std::uint8_t> made;
+    if (! regions.empty())
+    {
+        tag (made, "cue ");
+        put32 (made, (std::uint32_t) (4 + 24 * regions.size()));
+        put32 (made, (std::uint32_t) regions.size());
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            put32 (made, (std::uint32_t) i + 1);
+            put32 (made, (std::uint32_t) regions[i].start);
+            tag (made, "data");
+            put32 (made, 0);
+            put32 (made, 0);
+            put32 (made, (std::uint32_t) regions[i].start);
+        }
+        std::vector<std::uint8_t> adtl;
+        tag (adtl, "adtl");
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            const auto& r = regions[i];
+            const auto id = (std::uint32_t) i + 1;
+            if (! r.name.empty())
+                text (adtl, "labl", id, r.name);
+            if (! r.info.empty())
+                text (adtl, "note", id, r.info);
+            if (! r.marker || ! r.purpose.empty())
+            {
+                tag (adtl, "ltxt");
+                put32 (adtl, 20);
+                put32 (adtl, id);
+                put32 (adtl, r.marker ? 0u : (std::uint32_t) std::max<std::int64_t> (0, r.end - r.start + 1));
+                auto purpose = r.purpose.size() == 4 ? r.purpose : std::string ("rgn ");
+                adtl.insert (adtl.end(), purpose.begin(), purpose.end());
+                put32 (adtl, 0);
+                put32 (adtl, 0);
+            }
+        }
+        if (adtl.size() > 4)
+        {
+            tag (made, "LIST");
+            put32 (made, (std::uint32_t) adtl.size());
+            made.insert (made.end(), adtl.begin(), adtl.end());
+        }
+        std::uint32_t keyed = 0;
+        for (const auto& r : regions)
+            keyed += r.key >= 0 && r.key <= 127 ? 1u : 0u;
+        if (keyed > 0)
+        {
+            tag (made, "tlst");
+            put32 (made, 4 + 24 * keyed);
+            put32 (made, keyed);
+            for (std::size_t i = 0; i < regions.size(); ++i)
+                if (regions[i].key >= 0 && regions[i].key <= 127)
+                {
+                    tag (made, "cue ");
+                    put32 (made, (std::uint32_t) i);
+                    put32 (made, 1);
+                    made.insert (made.end(), { 0xff, (std::uint8_t) regions[i].key, 0x90, 0 });
+                    put32 (made, 0);
+                    put32 (made, 0);
+                }
+        }
+    }
+
+    // the file without its old three chunks; the new ones go where the first of them was (else before LIST/INFO,
+    // else at the end)
+    std::vector<std::uint8_t> out (w.begin(), w.begin() + 12);
+    std::size_t at = 0, info = 0;
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        const std::size_t size = le32 (w.data() + p + 4);
+        const std::size_t have = std::min (size, w.size() - (p + 8));
+        const auto* body = w.data() + p + 8;
+        const std::size_t next = std::min (w.size(), p + 8 + size + (size & 1));
+        const bool list = std::memcmp (w.data() + p, "LIST", 4) == 0 && have >= 4;
+        const bool old = std::memcmp (w.data() + p, "cue ", 4) == 0 || std::memcmp (w.data() + p, "tlst", 4) == 0 || (list && std::memcmp (body, "adtl", 4) == 0);
+        if (old && at == 0)
+            at = out.size();
+        if (list && std::memcmp (body, "INFO", 4) == 0 && info == 0)
+            info = out.size();
+        if (! old)
+            out.insert (out.end(), w.begin() + (std::ptrdiff_t) p, w.begin() + (std::ptrdiff_t) next);
+        p = next;
+    }
+    if (at == 0)
+        at = info != 0 ? info : out.size();
+    out.insert (out.begin() + (std::ptrdiff_t) at, made.begin(), made.end());
     const auto riff = (std::uint32_t) (out.size() - 8);
     for (int i = 0; i < 4; ++i)
         out[4 + (std::size_t) i] = (std::uint8_t) (riff >> (8 * i));
