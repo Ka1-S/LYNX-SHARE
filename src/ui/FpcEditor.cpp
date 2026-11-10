@@ -6,6 +6,7 @@
 
 #include "core/FlSamplers.h"
 #include "core/Fpc.h"
+#include "core/FpcEnvelope.h"
 #include "core/Instruments.h"
 #include "core/Song.h"
 #include "engine/AudioEngine.h"
@@ -224,7 +225,9 @@ public:
     }
 };
 
-// a pad's volume or pan envelope as the state holds it (FL's TMEnvEditor; shown, not edited yet)
+// a pad's volume or pan envelope as FL's TMEnvEditor shows it (round 190z): a grid of quarter units by quarter levels at
+// FL's time zoom, the curve with the shapes the engine plays (core/FpcEnvelope: each segment's mode and tension), the
+// points, each curved segment's tension handle, and the decay (D) and sustain (S) points' lines. Not edited yet.
 class EnvView final : public juce::Component
 {
 public:
@@ -234,31 +237,67 @@ public:
     {
         g.setColour (theme::colour::bg0);
         g.fillRect (getLocalBounds());
+        const auto area = getLocalBounds().toFloat().reduced (2.0f * scale, 2.0f * scale);
+        const auto unit = 57.0f * scale; // FL's zoom: 71 px per time unit in its editor at 125 %
+        g.setColour (theme::colour::bg2);
+        for (auto x = area.getX(); x <= area.getRight(); x += unit * 0.25f)
+            g.drawVerticalLine (juce::roundToInt (x), area.getY(), area.getBottom());
+        for (int k = 0; k <= 4; ++k)
+            g.drawHorizontalLine (juce::roundToInt (area.getY() + area.getHeight() * (float) k / 4.0f), area.getX(), area.getRight());
+
         const auto* e = envelope ? envelope() : nullptr;
-        if (e == nullptr || e->points.empty())
+        if (e == nullptr || e->points.empty() || ! e->unparsed.empty())
             return;
-        double total = 0.0;
-        for (const auto& p : e->points)
-            total += std::max (0.0, p.time);
-        const auto area = getLocalBounds().toFloat().reduced (6.0f);
-        juce::Path path;
-        double at = 0.0;
-        for (std::size_t i = 0; i < e->points.size(); ++i)
+        const FpcEnvelope played (*e, e->index == 1);
+        const auto n = played.pointCount();
+        std::vector<juce::Point<float>> at;
+        double t = 0.0;
+        for (int i = 0; i < n; ++i)
         {
-            at += std::max (0.0, e->points[i].time);
-            const auto x = area.getX() + (total > 0.0 ? (float) (at / total) : 0.0f) * area.getWidth();
-            const auto y = area.getBottom() - (float) std::clamp (e->points[i].value, 0.0, 1.0) * area.getHeight();
-            if (i == 0)
-                path.startNewSubPath (x, y);
-            else
-                path.lineTo (x, y);
-            g.setColour (theme::colour::textPrimary);
-            g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ x, y }));
+            t += std::max (0.0, played.pointTime (i));
+            at.push_back ({ area.getX() + (float) t * unit, area.getBottom() - (float) std::clamp (played.pointLevel (i), 0.0, 1.0) * area.getHeight() });
         }
-        if (e->points.size() == 1)
-            path.lineTo (area.getRight(), path.getCurrentPosition().y);
+
+        // the D and S lines, from the point down, with their tab at the bottom
+        g.setFont (juce::FontOptions (9.0f * scale, juce::Font::bold));
+        const auto marker = [&] (int i, const char* label) {
+            if (i < 0 || i >= n)
+                return;
+            g.setColour (theme::colour::textSecondary);
+            g.drawVerticalLine (juce::roundToInt (at[(std::size_t) i].x), at[(std::size_t) i].y, area.getBottom());
+            const juce::Rectangle<float> tab (at[(std::size_t) i].x, area.getBottom() - 11.0f * scale, 9.0f * scale, 11.0f * scale);
+            g.fillRect (tab);
+            g.setColour (theme::colour::bg0);
+            g.drawText (label, tab, juce::Justification::centred, false);
+        };
+        marker (played.decayPoint(), "D");
+        marker (played.sustainPoint(), "S");
+
+        // the curve: each segment with the shape the engine plays
+        juce::Path path;
+        path.startNewSubPath (at[0]);
+        std::vector<juce::Point<float>> handles;
+        for (int i = 1; i < n; ++i)
+        {
+            const auto from = at[(std::size_t) i - 1], to = at[(std::size_t) i];
+            const auto steps = std::max (2, juce::roundToInt (std::abs (to.x - from.x) / 2.0f));
+            for (int k = 1; k <= steps; ++k)
+            {
+                const auto x = (double) k / steps;
+                path.lineTo (from.x + (to.x - from.x) * (float) x, from.y + (to.y - from.y) * played.shape (i, x));
+            }
+            if (e->points[(std::size_t) i].tension != 0.0f && to.x > from.x)
+                handles.push_back ({ (from.x + to.x) * 0.5f, from.y + (to.y - from.y) * played.shape (i, 0.5) });
+        }
+        if (n == 1)
+            path.lineTo (area.getRight(), at[0].y);
         g.setColour (theme::colour::accent);
         g.strokePath (path, juce::PathStrokeType (1.5f));
+        for (const auto& h : handles)
+            g.drawEllipse (juce::Rectangle<float> (5.0f * scale, 5.0f * scale).withCentre (h), 1.2f);
+        g.setColour (theme::colour::textPrimary);
+        for (const auto& p : at)
+            g.fillRect (juce::Rectangle<float> (3.5f * scale, 3.5f * scale).withCentre (p));
     }
 };
 
@@ -283,9 +322,7 @@ public:
         tune.setDoubleClickReturnValue (true, 0.0);
         tune.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 9.375)) + " " + tr ("cents"); };
         ui::setHint (volume, tr ("Layer volume"));
-        ui::setHint (pan, tr ("{0} (stored, not played yet)", { tr ("Layer pan") }));
-        pan.setEnabled (false); // the engine does not play a layer's pan yet: shown, not editable
-        pan.setAlpha (0.35f);
+        ui::setHint (pan, tr ("Layer pan"));
         ui::setHint (tune, tr ("Layer tune"));
         range.setSliderStyle (juce::Slider::TwoValueHorizontal);
         range.setRange (0.0, 127.0, 1.0);
@@ -440,19 +477,19 @@ public:
         };
         led (mute, tr ("Mute"), 1);
         led (solo, tr ("Solo"), 2);
-        led (scaleVolume, tr ("Scale volume with velocity"), 4);
         led (randomTrigger, tr ("Trigger overlapping layers randomly"), 8);
         randomTrigger.onMenu = [this] { triggerMenu(); };
-        // stored in the kit, not played by the engine yet (it always takes turns through the layers that cover the
-        // velocity, and plays no pad envelope): shown as they are in the state, not editable until the engine plays them
-        ui::setHint (scaleVolume, tr ("{0} (stored, not played yet)", { tr ("Scale volume with velocity") }));
-        ui::setHint (randomTrigger, tr ("{0} (stored, not played yet)", { tr ("Trigger overlapping layers randomly") }));
-        ui::setHint (envelope, tr ("{0} (stored, not played yet)", { tr ("Volume envelope") }));
-        for (auto* c : std::initializer_list<juce::Component*> { &scaleVolume, &randomTrigger, &envelope })
-        {
-            c->setEnabled (false);
-            c->setAlpha (0.35f);
-        }
+        // "Scale volume with velocity" is each layer's flag (bit 0): FL shows the selected layer's and sets every layer of
+        // the pad (FPC_x64.dll FUN_0085e290, REA_rodada190z §4)
+        ui::setHint (scaleVolume, tr ("Scale volume with velocity"));
+        scaleVolume.onChange = [this] (bool on) {
+            edit ([this, on] (fpc::Kit& k) {
+                for (auto& l : k.pads[(std::size_t) selectedPad].layers)
+                    l.flags = on ? (l.flags | 1) : (l.flags & ~1);
+            });
+        };
+        addAndMakeVisible (scaleVolume);
+        ui::setHint (envelope, tr ("Volume envelope"));
 
         auto digi = [this] (DigiWheel& w, const juce::String& hint, int lo, int hi, int reset, std::function<void (fpc::Pad&, int)> set) {
             w.low = lo;
@@ -802,7 +839,8 @@ private:
         padTune.setValue (pad.tune, juce::dontSendNotification);
         mute.set (pad.muted());
         solo.set (pad.soloed());
-        scaleVolume.set ((pad.flags & 4) != 0);
+        scaleVolume.set (pad.layers.empty() || (pad.layers[(std::size_t) selectedLayer].flags & 1) != 0);
+        ui::setHint (envelope, envelopeTab == 0 ? tr ("Volume envelope") : tr ("Pan envelope"));
         randomTrigger.set (pad.oneLayerAtATime());
         padNote.setText (keyName (pad.note), juce::dontSendNotification);
         cutGroup.set (pad.cut);
