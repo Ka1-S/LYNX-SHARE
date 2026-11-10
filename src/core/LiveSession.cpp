@@ -47,9 +47,9 @@ bool isCode (int v) noexcept { return v >= (1 << codeShift); }
 bool noteLess (const Note& a, const Note& b)
 {
     return std::tie (a.channel, a.start, a.key, a.length, a.velocity, a.pan, a.finePitch, a.muted, a.slide, a.porta, a.release, a.modX, a.modY,
-                     a.colour, a.group)
+                     a.colour, a.group, a.chance, a.velocityRange, a.chanceGroup, a.chanceOne)
            < std::tie (b.channel, b.start, b.key, b.length, b.velocity, b.pan, b.finePitch, b.muted, b.slide, b.porta, b.release, b.modX, b.modY,
-                       b.colour, b.group);
+                       b.colour, b.group, b.chance, b.velocityRange, b.chanceGroup, b.chanceOne);
 }
 
 struct U

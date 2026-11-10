@@ -1,5 +1,6 @@
 #include "ui/AudioEditor.h"
 #include "ui/AudioEditorTools.h"
+#include "ui/AudioToMidi.h"
 #include "ui/BrowserComponent.h"
 #include "ui/EditorTools.h"
 
@@ -14,11 +15,13 @@
 
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
+#include "core/AutoWarp.h"
 #include "core/EdisonScript.h"
 #include "core/Instruments.h"
 #include "core/NewtoneFx.h"
 #include "core/WaveAnalysis.h"
 #include "core/ValueMath.h"
+#include "core/WarpEdit.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
@@ -437,6 +440,7 @@ struct Source
     Kind kind = Kind::none;
     int index = -1; // channel or insert
     juce::String path;
+    int clip = -1; // a channel opened from a Playlist audio clip: that clip
 };
 
 class AudioEditor final : public juce::Component,
@@ -480,6 +484,17 @@ public:
         snapButton.setClickingTogglesState (true);
 
         menuButton.onClick = [this] { mainMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton)); };
+        warpButton.setButtonText (tr ("Warp markers")); // ("Warp" alone is a synth control's name in the tables)
+        warpButton.setTooltip (tr ("Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers)"));
+        warpButton.setClickingTogglesState (true);
+        warpButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+        warpButton.onClick = [this] { setWarpMode (warpButton.getToggleState()); };
+        autoWarpButton.setButtonText (tr ("Auto-warp"));
+        autoWarpButton.setTooltip (tr ("Place warp markers from the tempo (the file name's, else its length) and, in a long recording, on every bar"));
+        autoWarpButton.onClick = [this] { autoWarp(); };
+        addChildComponent (warpButton);
+        addChildComponent (autoWarpButton);
+        warpButton.setVisible (source.kind == Source::Kind::channel);
         undoButton.onClick = [this] { undo(); };
         redoButton.onClick = [this] { redo(); };
         historyButton.onClick = [this] { historyMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&historyButton)); };
@@ -649,6 +664,243 @@ public:
     }
 
     juce::PopupMenu mainMenu();
+
+    // --- warp markers (round 175a, M3) ------------------------------------------------------------------------
+    // The channel's markers sit in a lane above the waveform, each at the file time it ties to, labelled with its
+    // beat (bar.beat). Drag one sideways to tie its beat to another point of the audio (it snaps to the attacks,
+    // shown as small ticks; [Alt] no snap); double-click the lane to add a marker or to remove one; Del removes the
+    // selected one. Edits go to the song at once (undoable there); opened from a Playlist clip whose channel other
+    // clips share, the clip first gets its own copy of the channel, so the others keep their timing.
+    const ChannelDef* warpChannel() const
+    {
+        const auto& song = engine.getSong();
+        return source.kind == Source::Kind::channel && juce::isPositiveAndBelow (source.index, (int) song.channels.size())
+                   ? &song.channels[(std::size_t) source.index]
+                   : nullptr;
+    }
+    double warpFileSeconds() const
+    {
+        if (const auto* c = warpChannel())
+            if (const auto data = engine.getSampleLibrary().findLoaded (juce::String::fromUTF8 (c->samplePath.c_str())); data != nullptr && data->sampleRate > 0.0)
+                return (double) data->frames() / data->sampleRate;
+        return doc.audio.sampleRate > 0.0 ? (double) doc.audio.frames() / doc.audio.sampleRate : 0.0;
+    }
+    std::vector<WarpPoint> warpMarkers() const
+    {
+        const auto* c = warpChannel();
+        return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
+    }
+    void setWarpModeForPanel (bool on) { setWarpMode (on); }
+    void setWarpMode (bool on)
+    {
+        warpMode = on && source.kind == Source::Kind::channel;
+        warpButton.setToggleState (warpMode, juce::dontSendNotification);
+        autoWarpButton.setVisible (warpMode);
+        warpSelected = warpDrag = -1;
+        resized();
+        repaint();
+    }
+    void editWarp (const std::function<void (SamplerSettings&, double)>& fn)
+    {
+        const auto seconds = warpFileSeconds();
+        if (source.kind != Source::Kind::channel || ! (seconds > 0.0))
+            return;
+        auto channel = source.index;
+        engine.editSong ([&, clip = source.clip] (Song& s) {
+            if (clip >= 0)
+                if (const auto own = warpedit::channelForClipEdit (s, clip); own >= 0)
+                    channel = own;
+            if (! juce::isPositiveAndBelow (channel, (int) s.channels.size()))
+                return;
+            auto& sampler = s.channels[(std::size_t) channel].sampler;
+            warpedit::ensureMarkers (sampler, seconds, s.bpm);
+            fn (sampler, seconds);
+            warpedit::syncLength (sampler, seconds);
+        });
+        source.index = channel;
+        repaint();
+    }
+    void findWarpAttacks()
+    {
+        if (warpAttacksOf == doc.audio.channels.data() && ! warpAttacks.empty())
+            return;
+        warpAttacks.clear();
+        warpAttacksOf = doc.audio.channels.data();
+        if (doc.audio.empty() || ! (doc.audio.sampleRate > 0.0))
+            return;
+        std::vector<float> mono (doc.audio.channels[0]);
+        if (doc.audio.numChannels() > 1)
+            for (std::size_t i = 0; i < mono.size(); ++i)
+                mono[i] = 0.5f * (mono[i] + doc.audio.channels[1][i]);
+        for (const auto a : stretchdetail::detectAttacks (mono.data(), (long) mono.size(), doc.audio.sampleRate, 6.0))
+            warpAttacks.push_back ((double) a / doc.audio.sampleRate);
+    }
+    double secondsToX (double seconds) const { return frameToX (seconds * doc.audio.sampleRate); }
+    int warpMarkerAtX (int x) const
+    {
+        const auto markers = warpMarkers();
+        int best = -1;
+        double bestDx = 5.0;
+        for (std::size_t k = 0; k < markers.size(); ++k)
+            if (const auto dx = std::abs (secondsToX (markers[k].seconds) - x); dx <= bestDx)
+            {
+                bestDx = dx;
+                best = (int) k;
+            }
+        return best;
+    }
+    void paintWarpLane (juce::Graphics& g)
+    {
+        using namespace theme;
+        g.setColour (colour::bg1);
+        g.fillRect (warpLane);
+        if (doc.audio.empty())
+            return;
+        findWarpAttacks();
+        // the attacks: short ticks along the lane's bottom
+        g.setColour (colour::textDisabled.withAlpha (0.45f));
+        for (const auto a : warpAttacks)
+            if (const auto x = secondsToX (a); x >= warpLane.getX() && x <= warpLane.getRight())
+                g.drawVerticalLine ((int) std::round (x), (float) warpLane.getBottom() - 4.0f, (float) warpLane.getBottom());
+        const auto markers = warpMarkers();
+        if (markers.empty())
+        {
+            g.setColour (colour::textDisabled);
+            g.setFont (font (type::small));
+            g.drawText (tr ("No warp markers: double-click here to add one, or Auto-warp"), warpLane.reduced (6, 0), juce::Justification::centredLeft);
+            return;
+        }
+        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        g.setFont (font (type::small));
+        for (std::size_t k = 0; k < markers.size(); ++k)
+        {
+            const auto seconds = (int) k == warpDrag ? warpDragSeconds : markers[k].seconds;
+            const auto x = (float) secondsToX (seconds);
+            if (x < warpLane.getX() - 40.0f || x > warpLane.getRight() + 2.0f)
+                continue;
+            const auto selected = (int) k == warpSelected;
+            const auto fill = k == 0 ? colour::textDisabled : (selected ? colour::accent : colour::accent.withMultipliedSaturation (0.55f).brighter (0.2f));
+            juce::Path flag;
+            flag.addTriangle (x - 5.0f, (float) warpLane.getY() + 2.0f, x + 5.0f, (float) warpLane.getY() + 2.0f, x, (float) warpLane.getY() + 10.0f);
+            g.setColour (fill);
+            g.fillPath (flag);
+            g.setColour (fill.withAlpha (selected ? 0.8f : 0.4f));
+            g.drawVerticalLine ((int) std::round (x), (float) warpLane.getY() + 10.0f, (float) waveArea.getBottom());
+            const auto b = markers[k].beats;
+            const auto bar = (int) std::floor (b / perBar) + 1;
+            const auto beat = b - (bar - 1) * perBar + 1.0;
+            const auto label = juce::String (bar) + "." + (std::abs (beat - std::round (beat)) < 0.005 ? juce::String ((int) std::round (beat)) : juce::String (beat, 2));
+            g.setColour (colour::textSecondary);
+            g.drawText (label, juce::Rectangle<float> (x + 6.0f, (float) warpLane.getY(), 48.0f, (float) warpLane.getHeight()), juce::Justification::centredLeft);
+        }
+    }
+    void warpMouseDown (const juce::MouseEvent& e)
+    {
+        const auto m = warpMarkerAtX (e.x);
+        warpSelected = m;
+        if (m > 0 && ! e.mods.isPopupMenu())
+        {
+            warpDrag = m;
+            warpDragSeconds = warpMarkers()[(std::size_t) m].seconds;
+            drag = Drag::warp;
+        }
+        else if (e.mods.isPopupMenu())
+        {
+            juce::PopupMenu menu;
+            menu.addItem (tr ("Remove this warp marker"), m > 0, false, [this, m] { removeWarpMarker (m); });
+            menu.addItem (tr ("Auto-warp"), [this] { autoWarp(); });
+            menu.addItem (tr ("Remove all warp markers"), warpMarkers().size() > 2, false, [this] {
+                editWarp ([] (SamplerSettings& s, double) { warpedit::clearMarkers (s); });
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+        }
+        repaint();
+    }
+    void warpMouseDrag (const juce::MouseEvent& e)
+    {
+        const auto markers = warpMarkers();
+        if (warpDrag <= 0 || warpDrag >= (int) markers.size())
+            return;
+        auto seconds = (double) xToFrame (e.x) / doc.audio.sampleRate;
+        if (! e.mods.isAltDown()) // onto an attack within 6 px
+            for (const auto a : warpAttacks)
+                if (std::abs (secondsToX (a) - e.x) <= 6.0)
+                {
+                    seconds = a;
+                    break;
+                }
+        const auto lo = markers[(std::size_t) warpDrag - 1].seconds + warpedit::minSecondGap;
+        const auto hi = warpDrag + 1 < (int) markers.size() ? markers[(std::size_t) warpDrag + 1].seconds - warpedit::minSecondGap : warpFileSeconds();
+        warpDragSeconds = juce::jlimit (lo, juce::jmax (lo, hi), seconds);
+        repaint();
+    }
+    void warpMouseUp()
+    {
+        const auto index = warpDrag, at = warpDrag;
+        const auto seconds = warpDragSeconds;
+        warpDrag = -1;
+        drag = Drag::none;
+        const auto markers = warpMarkers();
+        if (index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].seconds - seconds) > 1.0e-6)
+            editWarp ([at, seconds] (SamplerSettings& s, double) {
+                // the marker keeps its beat and ties it to another point of the audio
+                if (juce::isPositiveAndBelow (at, (int) s.warp.size()))
+                    s.warp[(std::size_t) at].seconds = seconds;
+            });
+        repaint();
+    }
+    void warpDoubleClick (const juce::MouseEvent& e)
+    {
+        if (const auto m = warpMarkerAtX (e.x); m >= 0)
+        {
+            removeWarpMarker (m);
+            return;
+        }
+        auto seconds = (double) xToFrame (e.x) / doc.audio.sampleRate;
+        if (! e.mods.isAltDown())
+            for (const auto a : warpAttacks)
+                if (std::abs (secondsToX (a) - e.x) <= 6.0)
+                {
+                    seconds = a;
+                    break;
+                }
+        editWarp ([seconds] (SamplerSettings& s, double) { warpedit::addMarker (s, seconds); });
+        warpSelected = warpMarkerAtX ((int) std::round (secondsToX (seconds)));
+    }
+    void removeWarpMarker (int index)
+    {
+        if (index <= 0)
+            return;
+        editWarp ([index] (SamplerSettings& s, double) { warpedit::removeMarker (s, index); });
+        warpSelected = -1;
+    }
+    void autoWarp()
+    {
+        if (doc.audio.empty() || source.kind != Source::Kind::channel)
+            return;
+        SampleData sample;
+        sample.sampleRate = doc.audio.sampleRate;
+        sample.left = doc.audio.channels[0];
+        if (doc.audio.numChannels() > 1)
+            sample.right = doc.audio.channels[1];
+        autowarp::Options o;
+        o.songBpm = engine.getSong().bpm;
+        o.beatsPerBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        o.knownBpm = autowarp::bpmInName (juce::File (source.path).getFileNameWithoutExtension().toStdString());
+        const auto result = autowarp::analyse (sample, o);
+        if (result.markers.size() < 2)
+        {
+            setStatus (tr ("Auto-warp found no beat to lock to"), true);
+            return;
+        }
+        editWarp ([markers = result.markers] (SamplerSettings& s, double) {
+            s.warp = markers;
+            s.keepPitch = true;
+        });
+        if (! warpMode)
+            setWarpMode (true);
+        setStatus (tr ("Auto-warp: {0} markers at {1} BPM", { juce::String ((int) result.markers.size()), juce::String (result.bpm, 2) }), false);
+    }
     void setEnvModeForSnapshot (int mode) { setEnvMode ((EnvMode) juce::jlimit (0, 3, mode)); }
 
     // --- layout and painting ---------------------------------------------------------------------------------
@@ -674,7 +926,11 @@ public:
         place (envButton, 120, 6);
         place (snapButton, 28);
         place (fitButton, 28);
-        place (followButton, 28);
+        place (followButton, 28, 8);
+        if (warpButton.isVisible())
+            place (warpButton, 100);
+        if (autoWarpButton.isVisible())
+            place (autoWarpButton, 78);
         sendButton.setBounds (bar.removeFromRight (70));
         bar.removeFromRight (6);
         saveButton.setBounds (bar.removeFromRight (28));
@@ -747,6 +1003,7 @@ public:
         levelArea = area.removeFromLeft (34);
         rulerArea = area.removeFromTop (24);
         rulerArea.setX (area.getX());
+        warpLane = warpMode ? area.removeFromTop (18) : juce::Rectangle<int>();
         waveArea = area;
         clampView();
     }
@@ -767,6 +1024,8 @@ public:
         else
             paintWave (g);
         paintOverlays (g);
+        if (warpMode)
+            paintWarpLane (g);
         paintOverview (g);
         paintInfo (g);
     }
@@ -784,6 +1043,12 @@ public:
         }
 
         const auto pos = e.getPosition();
+
+        if (warpMode && warpLane.contains (pos))
+        {
+            warpMouseDown (e);
+            return;
+        }
 
         if (overviewArea.contains (pos))
         {
@@ -860,6 +1125,11 @@ public:
             envelopeMouseDrag (e);
             return;
         }
+        if (drag == Drag::warp)
+        {
+            warpMouseDrag (e);
+            return;
+        }
         if (drag == Drag::none)
             return;
 
@@ -892,6 +1162,11 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override
     {
+        if (drag == Drag::warp)
+        {
+            warpMouseUp();
+            return;
+        }
         if (drag == Drag::envPoint || drag == Drag::envBend)
         {
             drag = Drag::none;
@@ -918,6 +1193,11 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        if (warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()))
+        {
+            warpDoubleClick (e);
+            return;
+        }
         if (doc.audio.empty() || ! waveArea.contains (e.getPosition()))
             return;
         // the region under the mouse, else the stretch between the markers around it, else everything
@@ -964,6 +1244,11 @@ public:
         const auto c = juce::CharacterFunctions::toLowerCase (k.getTextCharacter());
         const auto code = k.getKeyCode();
 
+        if (warpMode && warpSelected > 0 && (code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey))
+        {
+            removeWarpMarker (warpSelected);
+            return true;
+        }
         if (ctrl && (code == 'Z' || c == 'z'))
             shift ? redo() : undo();
         else if (ctrl && (code == 'Y' || c == 'y'))
@@ -1073,6 +1358,7 @@ private:
     enum class Drag
     {
         none,
+        warp,
         select,
         marker,
         loopStart,
@@ -1917,6 +2203,26 @@ private:
                 self->setStatus (tr ("{0} notes put in the Piano roll of the selected channel", { juce::String (count) }), false);
             });
         }).detach();
+    }
+
+    // --- Tools › Analysis › Convert to MIDI (round a2m189b): the selection (or the whole audio) as a new pattern
+    void convertToMidi (a2m::Mode mode)
+    {
+        if (doc.audio.empty())
+            return;
+        stopPlayback();
+        const auto range = selection.empty() ? ae::Range { 0, (std::int64_t) doc.audio.frames() } : ae::clamp (doc, selection);
+        const auto from = range.start;
+        std::vector<float> mono ((std::size_t) range.length(), 0.0f);
+        const auto channels = doc.audio.numChannels();
+        for (const auto& ch : doc.audio.channels)
+            for (std::size_t i = 0; i < mono.size(); ++i)
+                mono[i] += ch[(std::size_t) from + i] / (float) channels;
+        juce::Component::SafePointer<AudioEditor> self (this);
+        convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), [self] (int count) {
+            if (self != nullptr && count > 0)
+                self->setStatus (tr ("{0} notes put in a new pattern", { juce::String (count) }), false);
+        });
     }
 
     // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
@@ -3346,6 +3652,14 @@ private:
         playButton { "play", Icon::play }, stopButton { "stop", Icon::stop }, snapButton { "snap", Icon::magnet }, fitButton { "fit", Icon::zoom },
         saveButton { "save", Icon::save }, followButton { "follow", Icon::follow };
     juce::TextButton loopButton, viewButton, sendButton, envButton;
+    // warp markers (round 175a, M3): a lane above the waveform with the channel's markers, for a channel source
+    juce::TextButton warpButton, autoWarpButton;
+    bool warpMode = false;
+    juce::Rectangle<int> warpLane;
+    int warpDrag = -1, warpSelected = -1;   // marker index (in the channel's markers)
+    double warpDragSeconds = 0.0;           // where the dragged marker goes (applied on release)
+    std::vector<double> warpAttacks;        // the file's attacks (seconds): the transient ticks, and where drags snap
+    const void* warpAttacksOf = nullptr;    // the audio they were found in
     juce::Slider volumeKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
     juce::OwnedArray<juce::TextButton> quickButtons;
 
@@ -3568,6 +3882,16 @@ juce::PopupMenu AudioEditor::mainMenu()
     tools.addItem (tr ("Tune loop..."), has, false, [this] { openEdisonTool (T::loopTuner); });
     tools.addSectionHeader (tr ("Analysis"));
     tools.addItem (tr ("Convert to score and dump to piano roll"), has && ! scoreBusy, false, [this] { convertToScore(); });
+    {
+        // round a2m189b: Live's Convert Melody / Harmony / Drums, into a new pattern (the selection, or the whole audio)
+        juce::PopupMenu convert;
+        const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
+                                                            { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
+                                                            { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
+        for (const auto& [label, mode] : modes)
+            convert.addItem (tr (label), [this, m = mode] { convertToMidi (m); });
+        tools.addSubMenu (tr ("Convert to MIDI"), convert, has);
+    }
 
     juce::PopupMenu regions;
     regions.addItem (tr ("Add marker") + "\tM", has, false, [this] { addMarkerAtCursor(); });
@@ -3631,6 +3955,17 @@ juce::PopupMenu AudioEditor::mainMenu()
     menu.addSubMenu (tr ("Regions"), regions, has);
     menu.addSubMenu (tr ("View"), view);
     menu.addSubMenu (tr ("Record"), recordMenu());
+    if (source.kind == Source::Kind::channel)
+    {
+        juce::PopupMenu warp;
+        warp.addItem (tr ("Show warp markers"), has, warpMode, [this] { setWarpMode (! warpMode); });
+        warp.addItem (tr ("Auto-warp"), has, false, [this] { autoWarp(); });
+        warp.addItem (tr ("Remove the selected warp marker"), warpMode && warpSelected > 0, false, [this] { removeWarpMarker (warpSelected); });
+        warp.addItem (tr ("Remove all warp markers"), has && warpMarkers().size() > 2, false, [this] {
+            editWarp ([] (SamplerSettings& s, double) { warpedit::clearMarkers (s); });
+        });
+        menu.addSubMenu (tr ("Warp markers"), warp);
+    }
     return menu;
 }
 
@@ -3670,16 +4005,30 @@ void openAudioEditor (AudioEngine& engine, const juce::File& file)
     openWindow (engine, s)->loadFile (file);
 }
 
-void openAudioEditorForChannel (AudioEngine& engine, int channel)
+void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip)
 {
     const auto& song = engine.getSong();
     if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
         return;
     const auto& c = song.channels[(std::size_t) channel];
     const auto path = juce::String::fromUTF8 (c.samplePath.c_str());
-    auto* editor = openWindow (engine, { Source::Kind::channel, channel, path });
+    auto* editor = openWindow (engine, { Source::Kind::channel, channel, path, clip });
     if (path.isNotEmpty())
         editor->loadFile (juce::File (path));
+}
+
+std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp)
+{
+    const auto& song = engine.getSong();
+    if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+        return {};
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    auto editor = std::make_unique<AudioEditor> (engine, Source { Source::Kind::channel, channel, path, clip });
+    if (path.isNotEmpty())
+        editor->loadFile (juce::File (path));
+    if (showWarp)
+        editor->setWarpModeForPanel (true);
+    return editor;
 }
 
 void openAudioEditorRecording (AudioEngine& engine)

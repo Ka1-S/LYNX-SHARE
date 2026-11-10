@@ -18,7 +18,8 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
-| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" | MIT (`third_party/onnxruntime/LICENSE`) |
+| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" and the Basic Pitch model of "Convert to MIDI" | MIT (`third_party/onnxruntime/LICENSE`) |
+| [Basic Pitch](https://github.com/spotify/basic-pitch) by Spotify (the ICASSP 2022 model `nmp.onnx` from commit fa5997a, unmodified, compiled in as `third_party/basic-pitch/nmp.onnx.inc`; its note-creation rules ported to C++ in `src/core/AudioToMidi.cpp`) | "Convert to MIDI": melody and harmony of audio clips | Apache-2.0, code and model weights (`third_party/basic-pitch/LICENSE`, `NOTICE`; text below) |
 | Libraries bundled inside JUCE's modules | text shaping, image and audio codecs, zip | HarfBuzz (MIT), SheenBidi (Apache-2.0), FLAC (BSD-3-Clause), Ogg/Vorbis (BSD-3-Clause), libpng (libpng/zlib licence), IJG libjpeg (IJG licence), zlib (zlib licence) |
 | [Open Sans](https://github.com/googlefonts/opensans) (`resources/fonts`, unmodified; Linux builds only) | the interface font on Linux | SIL Open Font License 1.1 (`resources/fonts/OFL.txt`, full text below) |
 
@@ -36,6 +37,24 @@ from their official sources and checks their SHA-256.
 
 VST and ASIO are trademarks of Steinberg Media Technologies GmbH. FL Studio is a registered trademark of
 Image-Line Software; LYNX is not affiliated with Image-Line.
+
+## Basic Pitch (Apache-2.0)
+
+LYNX compiles in Basic Pitch's ONNX model (`basic_pitch/saved_models/icassp_2022/nmp.onnx`, 230 444 bytes, SHA-256
+2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec) and ports its note creation (`note_creation.py`) to
+C++. The repository publishes the code and the trained weights under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0; full text in `third_party/basic-pitch/LICENSE`). Its NOTICE file:
+
+```
+Basic Pitch
+Copyright 2022 Spotify AB
+
+This product includes software developed at
+Spotify AB (http://www.spotify.com/).
+```
+
+(The rest of Basic Pitch's NOTICE names Python libraries its own package uses — librosa, mir_eval, numpy, pretty-midi,
+resampy, scipy, tensorflow — and test audio from the Vocadito dataset; none of them is part of LYNX.)
 
 ## sse2neon (MIT)
 

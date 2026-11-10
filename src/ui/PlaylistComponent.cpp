@@ -4,6 +4,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
+#include "core/WarpEdit.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
 #include "ui/ImageReadback.h"
@@ -16,6 +17,7 @@
 #include "ui/VideoTracks.h"
 #include "core/PatternBlocks.h"
 #include "ui/StemExtract.h"
+#include "ui/AudioToMidi.h"
 
 #include "core/KeyMap.h"
 #include "core/MarkerPlan.h"
@@ -33,6 +35,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/SimpleTracks.h"
 #include "core/TempoDetect.h"
 #include "core/Comping.h"
 #include "core/ExportOptions.h"
@@ -1095,7 +1098,7 @@ int PlaylistComponent::heightOf (int track) const
     // "Lock to this size" (FL +0x14, round 168f): the row keeps its px height whatever the vertical zoom
     if (const auto locked = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].lockedHeight : -1; locked > 0)
         return polish::clampTrackHeight (locked);
-    return scaledHeight (h > 0 ? polish::clampTrackHeight (h) : trackHeight);
+    return scaledHeight (h > 0 ? polish::clampTrackHeight (h) : (simpleHeaders ? simpleTrackHeight : trackHeight));
 }
 
 juce::Rectangle<int> PlaylistComponent::trackZoomHandle() const
@@ -1818,15 +1821,71 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 }
 
                 const auto led = trackLed (t).toFloat();
-                g.setColour (muteLed (muted));
-                g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
-                if (hovered && hover.led) // the LED is a button: ring it
-                {
-                    g.setColour (colour::textPrimary.withAlpha (0.7f));
-                    g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
-                }
-
                 auto textRight = led.getX() - 2.0f;
+                if (simpleHeaders)
+                {
+                    // the Simple headers (round 184a): M and S buttons on the track's insert, a colour bar, and on tall
+                    // rows the insert's volume, pan and effects
+                    if (trackColour != 0)
+                    {
+                        g.setColour (juce::Colour (trackColour));
+                        g.fillRoundedRectangle (plateArea.withWidth (4.0f).reduced (0.0f, 2.0f).translated (isTrackSelected (t) ? 4.0f : 0.0f, 0.0f), 1.5f);
+                    }
+                    const auto insert = simpleInsert (t);
+                    const auto* m = insert > 0 ? &song.mixer[(std::size_t) insert] : nullptr;
+                    const auto button = [&g] (juce::Rectangle<float> r, const char* text, bool on, juce::Colour onColour, bool lit) {
+                        g.setColour (on ? onColour : (lit ? colour::bg6 : colour::bg4));
+                        g.fillRoundedRectangle (r, radius::sm);
+                        g.setColour (on ? colour::bg0 : (lit ? colour::textPrimary : colour::textSecondary));
+                        g.setFont (font (type::caption, true));
+                        g.drawText (text, r, juce::Justification::centred, false);
+                    };
+                    button (led, "M", m != nullptr ? m->muted : muted, colour::warning, hovered && hover.led);
+                    if (const auto solo = trackSolo (t).toFloat(); ! solo.isEmpty() && m != nullptr)
+                    {
+                        button (solo, "S", m->solo, colour::info, hovered && hover.solo);
+                        textRight = solo.getX() - 2.0f;
+                    }
+                    if (const auto bar = trackVolume (t).toFloat(); ! bar.isEmpty() && m != nullptr)
+                    {
+                        // volume: a bar filled up to the fader position, a tick at 0 dB
+                        g.setColour (colour::bg0);
+                        g.fillRoundedRectangle (bar.withSizeKeepingCentre (bar.getWidth(), 6.0f), 3.0f);
+                        g.setColour ((hovered && hover.volume) || (levelDrag == 1 && levelInsert == insert) ? colour::accentHover : colour::accent);
+                        g.fillRoundedRectangle (bar.withSizeKeepingCentre (bar.getWidth(), 6.0f).withWidth (juce::jmax (6.0f, bar.getWidth() * m->volume)), 3.0f);
+                        g.setColour (colour::textSecondary.withAlpha (0.6f));
+                        g.fillRect (bar.getX() + bar.getWidth() * unityFader - 0.5f, bar.getY(), 1.0f, bar.getHeight());
+                        // pan: a small knob, its arc from the top
+                        const auto pan = trackPan (t).toFloat();
+                        g.setColour (colour::bg4);
+                        g.fillEllipse (pan.reduced (1.0f));
+                        juce::Path arc;
+                        const auto angle = m->pan * 2.356f;
+                        arc.addCentredArc (pan.getCentreX(), pan.getCentreY(), 7.0f, 7.0f, 0.0f, juce::jmin (0.0f, angle), juce::jmax (0.0f, angle), true);
+                        g.setColour ((hovered && hover.pan) || (levelDrag == 2 && levelInsert == insert) ? colour::accentHover : colour::info);
+                        g.strokePath (arc, juce::PathStrokeType (2.0f));
+                        g.setColour (colour::textPrimary);
+                        g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + 6.0f * std::sin (angle), pan.getCentreY() - 6.0f * std::cos (angle), 1.4f);
+                        // "+FX", with the insert's effect count
+                        const auto fx = trackFx (t).toFloat();
+                        const auto count = (int) m->effects.size();
+                        g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
+                        g.fillRoundedRectangle (fx, radius::sm);
+                        g.setColour (count > 0 ? colour::accent : colour::textSecondary);
+                        g.setFont (font (type::caption, true));
+                        g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
+                    }
+                }
+                else
+                {
+                    g.setColour (muteLed (muted));
+                    g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
+                    if (hovered && hover.led) // the LED is a button: ring it
+                    {
+                        g.setColour (colour::textPrimary.withAlpha (0.7f));
+                        g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
+                    }
+                }
 
                 // a take lane's audition button (round 177c): a small speaker, lit while this lane plays instead of the comp
                 if (const auto box = trackAudition (t); ! box.isEmpty())
@@ -1906,7 +1965,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     textRight = juce::jmin (textRight, (float) box.getX());
 
                 // the track's icon before its name, as FL's track header shows it (round 168h)
-                auto textLeft = (int) left + 6;
+                auto textLeft = (int) left + (simpleHeaders ? 12 : 6);
+                // the Simple headers: the name in the first row, beside the buttons
+                const auto nameHeight = simpleHeaders && ! trackVolume (t).isEmpty() ? juce::jmin (trackHeight, (int) led.getBottom() - y + 4) : trackHeight;
 
                 // round 177b: the lanes' fold arrow (points down while they show) and, on hover, "+A" (add a lane)
                 if (const auto laneArrow = trackLaneArrow (t); ! laneArrow.isEmpty())
@@ -1936,16 +1997,16 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     icon != trackicons::Icon::none && trackHeight >= 14)
                 {
                     const auto size = (float) juce::jmin (14, trackHeight - 4);
-                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) trackHeight - size) * 0.5f, size, size),
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size),
                                        muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
                     textLeft += (int) size + 4;
                 }
                 g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
-                g.setFont (font (type::small, groupHead));
+                g.setFont (font (simpleHeaders ? type::body : type::small, groupHead || (simpleHeaders && custom)));
                 textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
                                          : tr ("Track {0}", { juce::String (t + 1) }),
-                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), trackHeight, juce::Justification::centredLeft,
-                                  trackHeight >= 30 ? 2 : 1, 0.8f);
+                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), nameHeight, juce::Justification::centredLeft,
+                                  nameHeight >= 30 ? 2 : 1, 0.8f);
 
                 // the divider under the header: lit while hovered or dragged (drag resizes the track)
                 if (hover.divider == t || (drag == Drag::trackResize && (resizeTrack == t || resizeAll)))
@@ -1956,6 +2017,27 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
 
             paintLaneHeaders (g, headers); // round 177b (nothing when lanes are off)
+        }
+    }
+
+    // the Simple workflow's drop lane (round 184a): the first empty row invites files
+    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0)
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        const auto y = trackToY (laneTrack), h = heightOf (laneTrack);
+        if (g.reduceClipRegion (grid) && y < grid.getBottom() && y + h > grid.getY())
+        {
+            const auto lane = juce::Rectangle<float> ((float) grid.getX() + 6.0f, (float) y + 4.0f, (float) grid.getWidth() - 12.0f, (float) h - 8.0f);
+            juce::Path outline;
+            outline.addRoundedRectangle (lane, radius::lg);
+            juce::Path dashed;
+            const float dashes[] { 6.0f, 5.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::borderStrong);
+            g.fillPath (dashed);
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::body));
+            g.drawText (tr ("Drop a loop, audio or MIDI file here"), lane.reduced (12.0f, 0.0f), juce::Justification::centredLeft, true);
         }
     }
 
@@ -2211,6 +2293,18 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
     }
 }
 
+namespace
+{
+// the index of a clip painted from the song's own list (-1 for a copy: a clip being dragged is drawn from one)
+int playlistIndexOf (const Song& song, const Clip& c)
+{
+    const auto* first = song.playlist.data();
+    return ! song.playlist.empty() && std::less_equal<const Clip*>() (first, &c) && std::less<const Clip*>() (&c, first + song.playlist.size())
+               ? (int) (&c - first)
+               : -1;
+}
+} // namespace
+
 void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::Rectangle<float> r)
 {
     const uitrace::Scope trace ("Playlist audio clip", false);
@@ -2246,10 +2340,56 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
             style.gain = juce::jmin (style.gain, 8.0f);
         const uitrace::Part tally (uitrace::part::waveform);
-        ui::paintWaveform (g, wave, *summary, startFrame, (forward ? perTick : -perTick) / pixelsPerTick, style);
+        // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
+        auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};
+        const auto index = playlistIndexOf (song, c);
+        if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
+            markers[(std::size_t) warpIndex].beats = warpBeat;
+        if (markers.size() >= 3)
+        {
+            for (std::size_t k = 0; k + 1 < markers.size(); ++k)
+            {
+                const auto x0 = tickToX (warpedit::clipTickOfBeat (c, markers[k].beats)), x1 = tickToX (warpedit::clipTickOfBeat (c, markers[k + 1].beats));
+                const auto part = wave.withLeft (juce::jmax (wave.getX(), (float) x0)).withRight (juce::jmin (wave.getRight(), (float) x1));
+                if (part.getWidth() <= 0.0f || x1 <= x0)
+                    continue;
+                const auto perPixel = (markers[k + 1].seconds - markers[k].seconds) * summary->sampleRate / (x1 - x0);
+                const juce::Graphics::ScopedSaveState keep (g);
+                g.reduceClipRegion (part.toNearestIntEdges());
+                ui::paintWaveform (g, part, *summary, markers[k].seconds * summary->sampleRate + (part.getX() - x0) * perPixel, perPixel, style);
+            }
+        }
+        else
+            ui::paintWaveform (g, wave, *summary, startFrame, (forward ? perTick : -perTick) / pixelsPerTick, style);
     }
 
     paintClipOutline (g, r, colour, false, false);
+
+    // the warp markers: small flags on the body's top edge, the end marker included (the start one never moves)
+    {
+        const auto index = playlistIndexOf (song, c);
+        auto markers = index >= 0 ? clipWarpMarkers (index) : std::vector<WarpPoint> {};
+        if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
+            markers[(std::size_t) warpIndex].beats = warpBeat;
+        // the accent (the audio editor's warp marker colour) with a dark outline: readable on any clip colour (the
+        // clip's own content colour was hard to see on pale clips, coordinator's review of 175a M3)
+        const auto flag = theme::colour::accent;
+        for (std::size_t k = 1; k < markers.size(); ++k)
+        {
+            const auto x = (float) tickToX (warpedit::clipTickOfBeat (c, markers[k].beats));
+            if (x < body.getX() - 0.5f || x > body.getRight() + 0.5f)
+                continue;
+            const auto active = drag == Drag::warpMarker && warpClip == index && warpIndex == (int) k;
+            g.setColour (flag.withAlpha (active ? 0.95f : 0.6f));
+            g.drawVerticalLine ((int) std::round (x), body.getY() + 6.0f, body.getBottom());
+            juce::Path p;
+            p.addTriangle (x - 4.5f, body.getY(), x + 4.5f, body.getY(), x, body.getY() + 7.0f);
+            g.setColour (active ? flag.brighter (0.3f) : flag);
+            g.fillPath (p);
+            g.setColour (theme::colour::bg0.withAlpha (0.8f));
+            g.strokePath (p, juce::PathStrokeType (1.0f));
+        }
+    }
 
     // fades: a shaded ramp over the body and a handle at the header's corner; an automatic crossfade (round 166e)
     // replaces that side's fade with FL's two crossing S-curves over the overlap
@@ -2484,16 +2624,18 @@ juce::Rectangle<int> PlaylistComponent::trackLaneArrow (int track) const
         return {};
     const auto member = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track);
     const auto left = member ? groupIndent : 2;
-    return { left + 4, trackToY (track) + heightOf (track) / 2 - 6, 12, 12 };
+    // (the Simple headers: in the first row, beside the M and S buttons, clear of the volume row)
+    const auto centreY = simpleHeaders ? trackLed (track).getCentreY() : trackToY (track) + heightOf (track) / 2;
+    return { left + 4, centreY - 6, 12, 12 };
 }
 
 juce::Rectangle<int> PlaylistComponent::trackAddLane (int track) const
 {
     if (! autolanes::shown() || heightOf (track) < 16 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
-    // left of the header's buttons (input, record, group arrow, LED)
+    // left of the header's buttons (input, record, group arrow, Simple solo, LED)
     auto right = trackLed (track).getX();
-    for (const auto& r : { trackArrow (track), trackArm (track), trackInput (track) })
+    for (const auto& r : { trackSolo (track), trackArrow (track), trackArm (track), trackInput (track) })
         if (! r.isEmpty())
             right = juce::jmin (right, r.getX());
     const auto led = trackLed (track);
@@ -2899,6 +3041,55 @@ void PlaylistComponent::showAutomationPointMenu (int clip, int point)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+double PlaylistComponent::clipFileSeconds (int index) const
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size() || song.playlist[(std::size_t) index].kind != ClipKind::audio)
+        return 0.0;
+    const auto channel = song.playlist[(std::size_t) index].channel;
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return 0.0;
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    if (const auto data = engine.getSampleLibrary().findLoaded (path); data != nullptr && data->sampleRate > 0.0)
+        return (double) data->frames() / data->sampleRate;
+    // (not held by the engine: the waveform's own summary, as the clip is painted from it)
+    if (const auto summary = ui::WaveformCache::getInstance()->find (path); summary != nullptr && summary->sampleRate > 0.0)
+        return (double) summary->frames / summary->sampleRate;
+    return 0.0;
+}
+
+std::vector<WarpPoint> PlaylistComponent::clipWarpMarkers (int index) const
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return {};
+    const auto& c = song.playlist[(std::size_t) index];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size()
+        || clipops::playsBackwards (song.channels[(std::size_t) c.channel], c))
+        return {};
+    return warpedit::playedMarkers (song.channels[(std::size_t) c.channel].sampler, clipFileSeconds (index));
+}
+
+int PlaylistComponent::warpMarkerAt (int index, juce::Point<int> p) const
+{
+    const auto markers = clipWarpMarkers (index);
+    if (markers.size() < 3)
+        return -1;
+    const auto& c = engine.getSong().playlist[(std::size_t) index];
+    const auto top = (float) clipBounds (index).getY() + (float) clipTitleHeight;
+    if (p.y < top - 1.0f || p.y > top + 8.0f)
+        return -1;
+    int best = -1;
+    double bestDx = 5.0;
+    for (std::size_t k = 1; k < markers.size(); ++k)
+        if (const auto dx = std::abs (tickToX (warpedit::clipTickOfBeat (c, markers[k].beats)) - p.x); dx <= bestDx)
+        {
+            bestDx = dx;
+            best = (int) k;
+        }
+    return best;
+}
+
 int PlaylistComponent::fadeHandleAt (int index, juce::Point<int> p) const
 {
     const auto& c = engine.getSong().playlist[(std::size_t) index];
@@ -3293,6 +3484,44 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
             return;
         }
+        // the Simple headers (round 184a): M, S, volume, pan and "+FX" act on the track's mixer insert
+        if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods))
+        {
+            const auto p = e.getPosition();
+            if (onLed || trackSolo (track).contains (p))
+            {
+                const auto solo = ! onLed;
+                engine.editSong ([insert, solo] (Song& s) {
+                    auto& m = s.mixer[(std::size_t) insert];
+                    if (solo)
+                        m.solo = ! m.solo;
+                    else
+                        m.muted = ! m.muted;
+                });
+                return;
+            }
+            if (trackVolume (track).expanded (0, 4).contains (p) || trackPan (track).expanded (2).contains (p))
+            {
+                levelDrag = trackPan (track).expanded (2).contains (p) ? 2 : 1;
+                levelInsert = insert;
+                const auto& m = engine.getSong().mixer[(std::size_t) insert];
+                levelStart = levelDrag == 2 ? m.pan : m.volume;
+                if (levelDrag == 1) // a click on the bar sets the level there
+                {
+                    const auto bar = trackVolume (track);
+                    const auto v = juce::jlimit (0.0f, 1.0f, (float) (p.x - bar.getX()) / (float) juce::jmax (1, bar.getWidth()));
+                    levelStart = v;
+                    engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].volume = v; });
+                }
+                return;
+            }
+            if (trackFx (track).contains (p))
+            {
+                if (onTrackEffects)
+                    onTrackEffects (insert);
+                return;
+            }
+        }
 
         // an audio track's buttons (FL 2026): [LMB] on the record button arms / disarms its mixer track, on the input
         // button opens the input source menu; a right-click on them does nothing in FL (no track menu either)
@@ -3345,6 +3574,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             else
                 selectedTracks = { track };
             currentTrack = track;
+            if (simpleHeaders)
+                selectTrackChannel (track); // (the typing piano and the touch keyboard play the track)
             repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
         return;
@@ -3750,6 +3981,18 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
     }
 
+    // warp marker flags (round 175a): drag a marker sideways; the change is applied on release
+    if (hit >= 0)
+        if (const auto marker = warpMarkerAt (hit, e.getPosition()); marker > 0)
+        {
+            setSelection ({});
+            warpClip = hit;
+            warpIndex = marker;
+            warpBeat = clipWarpMarkers (hit)[(std::size_t) marker].beats;
+            drag = Drag::warpMarker;
+            return;
+        }
+
     // audio clip fade handles (drawn at the top corners of the body)
     if (hit >= 0)
         if (const auto fade = fadeHandleAt (hit, e.getPosition()); fade != 0)
@@ -3909,6 +4152,25 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
 void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    if (levelDrag != 0 && levelInsert > 0 && levelInsert < (int) engine.getSong().mixer.size())
+    {
+        // a Simple header's volume (along the bar) or pan (up / down, as a knob); Shift: fine
+        const auto fine = e.mods.isShiftDown() ? 0.2f : 1.0f;
+        const auto insert = levelInsert;
+        if (levelDrag == 1)
+        {
+            const auto v = juce::jlimit (0.0f, 1.0f, levelStart + fine * (float) e.getDistanceFromDragStartX() / (float) juce::jmax (40, headerWidth - 122));
+            engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].volume = v; });
+        }
+        else
+        {
+            const auto v = juce::jlimit (-1.0f, 1.0f, levelStart - fine * (float) e.getDistanceFromDragStartY() / 80.0f);
+            engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].pan = v; });
+        }
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+        return;
+    }
+
     if (drag == Drag::perfLaunch)
         return; // (a launch: nothing moves)
 
@@ -4128,6 +4390,22 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                     if (i < (int) s.playlist.size())
                         s.playlist[(std::size_t) i].gain = g;
             });
+            postDragHint();
+            repaint();
+            return;
+        }
+
+        case Drag::warpMarker:
+        {
+            const auto markers = clipWarpMarkers (warpClip);
+            if (warpIndex <= 0 || warpIndex >= (int) markers.size())
+                return;
+            const auto& clip = engine.getSong().playlist[(std::size_t) warpClip];
+            const auto tick = snapOn ? (double) snap (xToTick (e.x) + gridTicks() / 2.0, true) : xToTick (e.x);
+            const auto beats = (tick - warpedit::clipTickOfBeat (clip, 0.0)) / (ppq * std::clamp (clip.stretch, 0.01, 100.0));
+            const auto lo = markers[(std::size_t) warpIndex - 1].beats + warpedit::minBeatGap;
+            const auto hi = warpIndex + 1 < (int) markers.size() ? markers[(std::size_t) warpIndex + 1].beats - warpedit::minBeatGap : 1.0e6;
+            warpBeat = juce::jlimit (lo, juce::jmax (lo, hi), beats);
             postDragHint();
             repaint();
             return;
@@ -4432,6 +4710,7 @@ void PlaylistComponent::postDragHint()
             break;
         case Drag::fadeIn:
         case Drag::fadeOut: hint.text = tr ("Setting the fade  [Alt] no snap"); break;
+        case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
         case Drag::lanePoint:
@@ -4498,6 +4777,12 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     }
 
     ui::clearPostedHint();
+    if (levelDrag != 0)
+    {
+        levelDrag = 0;
+        levelInsert = -1;
+        return;
+    }
     if (drag == Drag::perfLaunch)
     {
         perf::Command c;
@@ -4507,6 +4792,26 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         engine.performanceCommand (c);
         drag = Drag::none;
         perfTrack = -1;
+        return;
+    }
+    if (drag == Drag::warpMarker)
+    {
+        // one undoable edit: the clip gets its own copy of the channel if others share it (warpedit), then the marker
+        // moves (in the beats the channel plays, so the markers are rewritten as played first)
+        const auto seconds = clipFileSeconds (warpClip);
+        const auto markers = clipWarpMarkers (warpClip);
+        if (seconds > 0.0 && warpIndex > 0 && warpIndex < (int) markers.size() && std::abs (markers[(std::size_t) warpIndex].beats - warpBeat) > 1.0e-9)
+            engine.editSong ([clip = warpClip, index = warpIndex, beats = warpBeat, seconds] (Song& s) {
+                const auto channel = warpedit::channelForClipEdit (s, clip);
+                if (channel < 0)
+                    return;
+                auto& sampler = s.channels[(std::size_t) channel].sampler;
+                sampler.warp = warpedit::playedMarkers (sampler, seconds);
+                warpedit::moveMarker (sampler, index, beats, seconds);
+            });
+        drag = Drag::none;
+        warpClip = warpIndex = -1;
+        repaint();
         return;
     }
     if (drag == Drag::knife)
@@ -4704,7 +5009,96 @@ void PlaylistComponent::deleteTimeSelection()
 juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
+    if (simpleHeaders) // the M button, in the first row (round 184a)
+        return { headerWidth - 28, trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
     return { headerWidth - 17, trackToY (track) + h / 2 - 6, 12, 12 };
+}
+
+int PlaylistComponent::simpleInsert (int track) const
+{
+    return simpleHeaders ? simpletracks::insertOf (engine.getSong(), track) : -1;
+}
+
+juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
+{
+    if (simpleInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    return trackLed (track).translated (-25, 0);
+}
+
+juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
+{
+    const auto h = heightOf (track);
+    if (simpleInsert (track) < 0 || h < simpleTwoRows || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
+}
+
+juce::Rectangle<int> PlaylistComponent::trackPan (int track) const
+{
+    const auto v = trackVolume (track);
+    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 10, v.getCentreY() - 8, 16, 16);
+}
+
+juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
+{
+    const auto v = trackVolume (track);
+    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
+}
+
+void PlaylistComponent::setSimpleHeaders (bool on)
+{
+    if (on == simpleHeaders)
+        return;
+    simpleHeaders = on;
+    headerWidth = on ? simpleHeaderWidth : flHeaderWidth;
+    hover = {};
+    resized();
+    repaint();
+}
+
+void PlaylistComponent::selectTrackChannel (int track)
+{
+    const auto& song = engine.getSong();
+    const auto kind = simpletracks::kindOf (song, track);
+    if (! kind)
+        return;
+    int channel = -1;
+    if (*kind == simpletracks::Kind::instrument || *kind == simpletracks::Kind::sampler)
+        channel = song.playlistTracks[(std::size_t) track].channel;
+    else if (*kind == simpletracks::Kind::drums)
+    {
+        const auto insert = simpletracks::insertOf (song, track);
+        for (int c = 0; c < (int) song.channels.size() && channel < 0; ++c)
+            if (song.channels[(std::size_t) c].mixerTrack == insert && song.channels[(std::size_t) c].instrument != InstrumentKind::audioClip)
+                channel = c;
+    }
+    if (channel >= 0 && channel != engine.getSelectedChannel())
+        engine.setSelectedChannel (channel);
+}
+
+void PlaylistComponent::selectTrack (int track)
+{
+    if (track < 0)
+        return;
+    selectedTracks = { track };
+    currentTrack = track;
+    if (simpleHeaders)
+        selectTrackChannel (track);
+    // into view (vertically)
+    const auto grid = gridArea();
+    const auto top = trackToY (track), bottom = top + heightOf (track);
+    if (top < grid.getY() || bottom > grid.getBottom())
+    {
+        scrollY = juce::jmax (0, scrollY + (top < grid.getY() ? top - grid.getY() : bottom - grid.getBottom()));
+        updateScrollBars();
+    }
+    repaint();
+}
+
+int PlaylistComponent::dropLaneTrack() const
+{
+    return simpleHeaders ? simpletracks::nextEmptyTrack (engine.getSong()) : -1;
 }
 
 juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
@@ -4712,7 +5106,8 @@ juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
     if (! noteedit::isGroupHeader (engine.getSong(), track))
         return {};
 
-    const auto led = trackLed (track);
+    const auto solo = trackSolo (track);
+    const auto led = solo.isEmpty() ? trackLed (track) : solo;
     return { led.getX() - 15, led.getY() - 1, 13, led.getHeight() + 2 };
 }
 
@@ -4721,8 +5116,13 @@ juce::Rectangle<int> PlaylistComponent::trackArm (int track) const
     if (trackmodes::armableInsert (engine.getSong(), track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
 
+    if (simpleHeaders && simpletracks::kindOf (engine.getSong(), track) == simpletracks::Kind::drums)
+        return {}; // (a drum track is FL's audio track only to keep its insert: nothing to record on it)
     const auto arrow = trackArrow (track);
-    const auto led = trackLed (track);
+    const auto solo = trackSolo (track);
+    const auto led = solo.isEmpty() ? trackLed (track) : solo;
+    if (simpleHeaders)
+        return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 17, led.getY() + (led.getHeight() - 12) / 2, 12, 12 };
     return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 15, led.getY(), 12, 12 };
 }
 
@@ -4734,7 +5134,7 @@ juce::Rectangle<int> PlaylistComponent::trackAudition (int track) const
 
     // left of whatever else the row shows
     auto left = trackLed (track);
-    for (const auto& other : { trackArrow (track), trackArm (track), trackInput (track) })
+    for (const auto& other : { trackSolo (track), trackArrow (track), trackArm (track), trackInput (track) })
         if (! other.isEmpty() && other.getX() < left.getX())
             left = other;
     return { left.getX() - 15, trackLed (track).getY(), 12, 12 };
@@ -4746,6 +5146,14 @@ juce::Rectangle<int> PlaylistComponent::trackInput (int track) const
     if (arm.isEmpty() || heightOf (track) < inputButtonMinHeight)
         return {};
     return arm.translated (-15, 0);
+}
+
+void PlaylistComponent::selectTrack (int track)
+{
+    track = juce::jlimit (0, juce::jmax (0, numTracks() - 1), track);
+    selectedTracks = { track };
+    currentTrack = track;
+    repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
 }
 
 bool PlaylistComponent::isTrackSelected (int track) const
@@ -5043,9 +5451,16 @@ void PlaylistComponent::renameTrack (int track)
     showNameAndColourDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour,
                              [this, track] (const juce::String& newName, std::uint32_t newColour) {
                                  const auto name = newName.trim().toStdString();
-                                 engine.editSong ([track, name, newColour] (Song& s) {
+                                 const auto together = simpleHeaders && simpletracks::kindOf (engine.getSong(), track).has_value();
+                                 engine.editSong ([track, name, newColour, together] (Song& s) {
                                      if ((int) s.playlistTracks.size() <= track)
                                          s.playlistTracks.resize ((std::size_t) track + 1);
+                                     if (together) // (the Simple workflow: the track, its insert and its channel, round 184a)
+                                     {
+                                         simpletracks::rename (s, track, name);
+                                         simpletracks::recolour (s, track, newColour);
+                                         return;
+                                     }
                                      s.playlistTracks[(std::size_t) track].name = name;
                                      s.playlistTracks[(std::size_t) track].colour = newColour;
                                  });
@@ -5535,6 +5950,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         menu.addItem (tr ("Extract stems from sample"), sample != nullptr, false,
                       [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
 
+        // Live's Convert Melody / Harmony / Drums to New MIDI Track, the FL way: a new pattern on new channels (round a2m189b)
+        {
+            juce::PopupMenu convert;
+            const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
+                                                                { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
+                                                                { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
+            for (const auto& [label, mode] : modes)
+                convert.addItem (tr (label), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
+            menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
+        }
+
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });
         menu.addItem (tr ("Normalize"), [this, targets] { normalizeClips (targets); });
@@ -5652,7 +6078,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             if (onOpenInSampler)
                 onOpenInSampler (ch);
         });
-        menu.addItem (tr ("Edit in the audio editor..."), sample != nullptr, false, [this, ch = clip.channel] { openAudioEditorForChannel (engine, ch); });
+        menu.addItem (tr ("Edit in the audio editor..."), sample != nullptr, false, [this, ch = clip.channel, index] { openAudioEditorForChannel (engine, ch, index); });
         menu.addItem (tr ("Show the file in Explorer"), juce::File (path).existsAsFile(), false, [path] { juce::File (path).revealToUser(); });
     }
 
@@ -6749,6 +7175,13 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.arrow = ! folded && h.divider < 0 && trackArrow (h.track).contains (p);
         h.arm = ! folded && h.divider < 0 && trackArm (h.track).expanded (2).contains (p);
         h.input = ! folded && h.divider < 0 && trackInput (h.track).expanded (2).contains (p);
+        if (simpleHeaders && ! folded && h.divider < 0)
+        {
+            h.solo = trackSolo (h.track).contains (p);
+            h.volume = trackVolume (h.track).expanded (0, 4).contains (p);
+            h.pan = trackPan (h.track).expanded (2).contains (p);
+            h.fx = trackFx (h.track).contains (p);
+        }
         h.audition = ! folded && h.divider < 0 && trackAudition (h.track).expanded (2).contains (p);
         return h;
     }
@@ -6837,7 +7270,8 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         return;
     }
     if (hover.header)
-        cursor = hover.led || hover.arrow || hover.arm || hover.input || hover.audition ? gesture::Cursor::point : gesture::Cursor::normal;
+        cursor = hover.led || hover.arrow || hover.arm || hover.input || hover.audition || hover.solo || hover.volume || hover.pan
+                         || hover.fx ? gesture::Cursor::point : gesture::Cursor::normal;
     else if (gridArea().contains (p))
     {
         const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
@@ -6897,6 +7331,24 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         hint.text = tr ("Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height");
         hint.value = juce::String (heightOf (h.divider)) + " px";
+        return hint;
+    }
+
+    if (h.header && simpleInsert (h.track) > 0 && (h.led || h.solo || h.volume || h.pan || h.fx))
+    {
+        // the Simple headers (round 184a): their controls are the track's mixer track's
+        const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
+        hint.text = h.led      ? tr ("Track: [LMB] mute / unmute its mixer track")
+                    : h.solo   ? tr ("Track: [LMB] solo its mixer track")
+                    : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
+                    : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
+                               : tr ("Track effects: [LMB] open the effects of its mixer track");
+        if (h.volume)
+            hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
+        else if (h.pan)
+            hint.value = juce::String (juce::roundToInt (m.pan * 100.0f));
+        else
+            hint.value = trackName (h.track);
         return hint;
     }
 
@@ -6997,6 +7449,18 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
         if (trackLed (track).expanded (3).contains (e.getPosition()) || trackArrow (track).contains (e.getPosition())
             || trackArm (track).expanded (2).contains (e.getPosition()) || trackInput (track).expanded (2).contains (e.getPosition()))
             return;
+        if (const auto insert = simpleInsert (track); insert > 0)
+        {
+            // the Simple headers: a double-click resets the volume (to 0 dB) or the pan (centre); on the name it renames
+            const auto p = e.getPosition();
+            if (trackVolume (track).expanded (0, 4).contains (p))
+                engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].volume = unityFader; });
+            else if (trackPan (track).expanded (2).contains (p))
+                engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].pan = 0.0f; });
+            else if (! trackSolo (track).contains (p) && ! trackFx (track).contains (p))
+                renameTrack (track);
+            return;
+        }
 
         const auto& playlist = engine.getSong().playlist;
         int first = -1;
@@ -7063,7 +7527,8 @@ void PlaylistComponent::openClipSource (int hit, bool other)
 bool PlaylistComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f)))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f))
+            || (simpleHeaders && onSimpleFilesDropped && juce::File (f).hasFileExtension ("mid;midi")))
             return true;
 
     return false;
@@ -7127,6 +7592,18 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
 {
     auto start = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
     auto track = yToTrack (y);
+
+    // the Simple workflow (round 184a): files dropped on the lane under the tracks (or on any track that isn't one of
+    // its tracks), and MIDI files anywhere, become new tracks of their own
+    if (simpleHeaders && onSimpleFilesDropped)
+    {
+        const auto midi = std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return juce::File (f).hasFileExtension ("mid;midi"); });
+        if (midi || ! simpletracks::kindOf (engine.getSong(), track).has_value())
+        {
+            onSimpleFilesDropped (files, x >= headerWidth ? start : 0);
+            return;
+        }
+    }
 
     for (const auto& f : files)
         if (videotracks::isVideoFile (juce::File (f)))
