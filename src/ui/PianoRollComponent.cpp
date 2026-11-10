@@ -615,7 +615,12 @@ bool PianoRollComponent::inScale (int key) const
 
 int PianoRollComponent::snapKey (int key) const
 {
-    return scaleSnap ? notetools::snapToScale (key, scaleRoot(), scaleIndex()) : key;
+    return scalesnap::drawKey (snapScale(), key);
+}
+
+scalesnap::Scale PianoRollComponent::snapScale() const
+{
+    return { scaleRoot(), scaleIndex(), scaleSnap };
 }
 
 void PianoRollComponent::setScaleSnap (bool on)
@@ -1957,6 +1962,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
             dragOriginals.push_back (notes[(std::size_t) i]);
 
         drag = rightEdge ? Drag::resize : leftEdge ? Drag::resizeLeft : Drag::move;
+        lastScaleDragKeys = 0; // (no scale step made yet)
         grabOffset = n.start - snap (xToTick (e.x), snapOn);
         lastLength = n.length;
         noteTemplate.takeFrom (n); // FL: new notes get the clicked note's properties (round 166e)
@@ -2279,7 +2285,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             const auto& grabbed = dragOriginals[(std::size_t) (std::find (dragIndices.begin(), dragIndices.end(), dragNote) - dragIndices.begin())];
             auto deltaTicks = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn) + grabOffset) - grabbed.start;
             auto deltaKeys = snapKey (yToKey (e.y)) - grabbed.key;
-            auto rawKeys = yToKey (e.y) - grabbed.key; // (snap to scale: every moved note snaps on its own, issue #14)
+            auto rawKeys = yToKey (e.y) - grabbed.key; // (the mouse's own row, before any snap)
 
             // locks: Shift pressed after the click keeps the pitch, Ctrl keeps the time
             if (e.mods.isShiftDown() && ! downMods.isShiftDown())
@@ -2288,19 +2294,23 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
                 deltaTicks = 0;
 
             const auto& current = currentPattern (engine.getSong()).notes[(std::size_t) dragNote];
-            const auto onScale = scaleSnap && scaleIndex() > 0 && dragIndices.size() > 1;
+            // snap to scale (core/ScaleSnap.h, round 190an): the grabbed note follows the mouse onto the scale and the
+            // whole group moves that many scale steps; on the note's own row the pitch is left alone, also off the scale
+            const auto scale = snapScale();
+            const auto onScale = scale.active() && ! folded();
+            const auto scaleSteps = onScale ? scalesnap::dragSteps (scale, grabbed.key, grabbed.key + rawKeys) : 0;
 
-            if (current.start == grabbed.start + deltaTicks && current.key == grabbed.key + deltaKeys
-                && (! onScale || rawKeys == lastScaleDragKeys))
+            if (current.start == grabbed.start + deltaTicks
+                && (onScale ? scaleSteps == lastScaleDragKeys : current.key == grabbed.key + deltaKeys))
                 return;
-            lastScaleDragKeys = rawKeys;
+            lastScaleDragKeys = scaleSteps;
 
             const auto oldKey = current.key;
 
             // from the original positions: the group keeps its shape even when hitting the limits
             // folded to the scale (round 166d): the notes move by rows (scale degrees), so they stay on shown keys
             const auto deltaRows = folded() ? rowFor (grabbed.key) - rowFor (grabbed.key + deltaKeys) : 0;
-            editNotes ([this, &deltaTicks, &deltaKeys, rawKeys, onScale, deltaRows] (Pattern& p) {
+            editNotes ([this, &deltaTicks, &deltaKeys, scale, scaleSteps, onScale, deltaRows] (Pattern& p) {
                 for (std::size_t j = 0; j < dragIndices.size(); ++j)
                     p.notes[(std::size_t) dragIndices[j]] = dragOriginals[j];
 
@@ -2318,10 +2328,10 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
                     noteedit::move (p, dragIndices, deltaTicks, deltaKeys);
                     return;
                 }
-                // snap to scale: the time moves as a group, then each note goes to the scale near its own new key
+                // snap to scale: the time moves as a group, the pitch by scale steps (a chord stays a chord of the scale)
                 auto noKeys = 0;
                 noteedit::move (p, dragIndices, deltaTicks, noKeys);
-                notetools::moveKeysOnScale (p, dragIndices, dragOriginals, rawKeys, scaleRoot(), scaleIndex());
+                scalesnap::moveBySteps (p, dragIndices, scaleSteps, scale);
             });
 
             const auto& moved = currentPattern (engine.getSong()).notes[(std::size_t) dragNote];
@@ -3049,7 +3059,7 @@ void PianoRollComponent::showMoreMenu()
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
     menu.addSeparator();
-    menu.addItem (tr ("Snap notes to the scale"), scaleIndex() > 0, scaleSnap, [this] { setScaleSnap (! scaleSnap); });
+    menu.addItem (tr ("Snap notes to the scale") + keyText ("pianoRoll.scaleSnap"), scaleIndex() > 0, scaleSnap, [this] { setScaleSnap (! scaleSnap); });
     menu.addItem (tr ("Fold to the scale (hide the other keys and their notes)"), scaleIndex() > 0, foldToScale,
                   [this] { setFoldToScale (! foldToScale); });
     menu.addItem (tr ("Chord stamp: the clicked key is the top note"), true, chordTopDown, [this] { chordTopDown = ! chordTopDown; });
@@ -3622,6 +3632,11 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.selectOddSteps"))
         setSelection (noteedit::selectOddSteps (currentPattern (engine.getSong()), channelNotes(), selection, ticksPerStep));
     else if (is ("pianoRoll.stampNone")) chordBox.setSelectedId (1, juce::sendNotificationSync);
+    else if (is ("pianoRoll.scaleSnap"))
+    {
+        if (scaleIndex() > 0) // (like its menu item and button: only with a scale chosen)
+            setScaleSnap (! scaleSnap);
+    }
     else if (is ("pianoRoll.insertSpace")) spaceOperation (0);
     else if (is ("pianoRoll.sliceInsertSpace")) spaceOperation (1);
     else if (is ("pianoRoll.deleteSpace")) spaceOperation (2);
@@ -4008,13 +4023,9 @@ void PianoRollComponent::nudge (std::int64_t ticks, int keys)
     else
     {
         if (keys == 1 || keys == -1) // snap to scale: up / down step along the scale (every selected note, issue #14)
-            if (scaleSnap && scaleIndex() > 0)
+            if (const auto scale = snapScale(); scale.active())
             {
-                editNotes ([this, keys] (Pattern& p) {
-                    for (const auto i : selection)
-                        if (i >= 0 && i < (int) p.notes.size())
-                            p.notes[(std::size_t) i].key = notetools::stepOnScale (p.notes[(std::size_t) i].key, keys, scaleRoot(), scaleIndex());
-                });
+                editNotes ([this, keys, scale] (Pattern& p) { scalesnap::moveBySteps (p, selection, keys, scale); });
                 keys = 0;
                 if (ticks == 0)
                 {

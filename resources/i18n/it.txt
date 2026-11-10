@@ -8357,3 +8357,4 @@ countries: it ch sm
 "Octaver" = "Ottavatore"
 "Rectify" = "Rettifica"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Aggancia le note alla scala attivo/disattivo"

@@ -247,6 +247,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::pianoRoll, { chord ('Z') } },
         { "pianoRoll.tool.listen", TR_NOOP ("Tool: Listen"), Context::pianoRoll, { chord ('Y') } },
         { "pianoRoll.slide", TR_NOOP ("Slide notes on/off (new notes)"), Context::pianoRoll, { chord ('S') } },
+        // round 190an (LYNX's own option; FL has none, so no key by default): the Piano roll's Snap to scale switch
+        { "pianoRoll.scaleSnap", TR_NOOP ("Snap notes to the scale on/off"), Context::pianoRoll, {} },
         { "pianoRoll.previousChannel", TR_NOOP ("Previous channel"), Context::pianoRoll, { chord ('G') } },
         { "pianoRoll.nextChannel", TR_NOOP ("Next channel"), Context::pianoRoll, { chord ('K') } },
         { "pianoRoll.previousChannelWithNotes", TR_NOOP ("Previous channel with notes"), Context::pianoRoll, { chord ('H') } },

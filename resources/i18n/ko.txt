@@ -8357,3 +8357,4 @@ countries: kr
 "Octaver" = "옥타버"
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "노트를 스케일에 스냅 켜기/끄기"

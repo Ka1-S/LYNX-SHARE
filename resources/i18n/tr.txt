@@ -8357,3 +8357,4 @@ countries: tr
 "Octaver" = "Oktavlayıcı"
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Notaları gama yapıştır aç/kapat"

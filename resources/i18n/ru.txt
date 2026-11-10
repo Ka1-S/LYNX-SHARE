@@ -8357,3 +8357,4 @@ countries: ru by kz
 "Octaver" = "Октавер"
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Привязка нот к гамме вкл./выкл."

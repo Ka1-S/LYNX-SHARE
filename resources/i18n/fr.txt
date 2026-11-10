@@ -8357,3 +8357,4 @@ countries: fr be ch ca lu
 "Octaver" = "Octaveur"
 "Rectify" = "Redresser"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Aimanter les notes à la gamme activé/désactivé"

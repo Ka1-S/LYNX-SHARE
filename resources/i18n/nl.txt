@@ -8357,3 +8357,4 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Noten aan de toonladder vastklikken aan/uit"

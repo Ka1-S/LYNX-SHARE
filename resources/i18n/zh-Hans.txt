@@ -8357,3 +8357,4 @@ countries: cn sg
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "音符吸附到音阶 开/关"

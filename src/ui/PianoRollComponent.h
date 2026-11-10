@@ -4,6 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
+#include "core/ScaleSnap.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
@@ -323,6 +324,7 @@ private:
     int scaleRoot() const;  // 0..11
     int scaleIndex() const; // index into notetools::scales(), 0 = none
     int snapKey (int key) const; // the key itself, or the nearest in-scale key while scale snap is on
+    scalesnap::Scale snapScale() const; // the chosen scale and the Snap to scale switch (core/ScaleSnap.h)
     void publishScale();
     bool scaleSnap = false;
     double panStartTicks = 0.0;
@@ -394,7 +396,7 @@ private:
     std::int64_t grabOffset = 0;    // note tick - mouse tick at drag start
     std::int64_t lastLength = ticksPerStep * 2;
     int previewKey = -1;
-    int lastScaleDragKeys = 0; // (a snap-to-scale group drag: the mouse's semitones last applied)
+    int lastScaleDragKeys = 0; // (a snap-to-scale drag: the scale steps last applied)
     NoteMask litKeys {}; // keys sounding on the channel(s) shown: lit on the keyboard (issue #14, FL)
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }

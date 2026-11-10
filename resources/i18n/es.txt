@@ -8357,3 +8357,4 @@ countries: es mx ar co cl pe ve
 "Octaver" = "Octavador"
 "Rectify" = "Rectificar"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Ajustar notas a la escala activado/desactivado"

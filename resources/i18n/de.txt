@@ -8357,3 +8357,4 @@ countries: de at ch li lu
 "Octaver" = "Oktavierer"
 "Rectify" = "Gleichrichter"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Noten an der Skala einrasten ein/aus"

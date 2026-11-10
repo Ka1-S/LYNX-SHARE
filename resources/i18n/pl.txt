@@ -8357,3 +8357,4 @@ countries: pl
 "Octaver" = "Oktawer"
 "Rectify" = "Prostowanie"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Przyciąganie nut do skali wł./wył."

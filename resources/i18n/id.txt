@@ -8357,3 +8357,4 @@ countries: id
 "Octaver" = "Oktaver"
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
+"Snap notes to the scale on/off" = "Tempelkan not ke tangga nada aktif/nonaktif"
