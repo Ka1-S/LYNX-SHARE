@@ -4,6 +4,7 @@
 #include "core/SynthPresets.h"
 
 #include <algorithm>
+#include <optional>
 
 namespace lynx
 {
@@ -148,6 +149,69 @@ void applySetup (Song& song, const NewProjectSetup& setup)
     song.info = setup.info;
     if (song.info.title.empty() && ! setup.name.empty())
         song.info.title = setup.name;
+}
+
+std::string TemplateChoice::toText() const
+{
+    if (name.empty())
+        return {};
+    switch (kind)
+    {
+        case Kind::builtIn: return "builtin:" + name;
+        case Kind::user: return "user:" + name;
+        case Kind::lynxDefault: break;
+    }
+    return {};
+}
+
+TemplateChoice TemplateChoice::parse (const std::string& text)
+{
+    auto take = [&text] (const char* prefix, Kind kind) -> std::optional<TemplateChoice> {
+        const std::string p (prefix);
+        if (text.size() <= p.size() || text.compare (0, p.size(), p) != 0)
+            return std::nullopt;
+        TemplateChoice c;
+        c.kind = kind;
+        c.name = text.substr (p.size());
+        // (a file name only: a path or a line break in the settings file never reaches the file system)
+        if (c.name.find_first_of ("/\\\r\n") != std::string::npos || c.name == "." || c.name == "..")
+            return std::nullopt;
+        return c;
+    };
+    if (auto c = take ("builtin:", Kind::builtIn); c && builtInTemplateIndex (c->name) >= 0)
+        return *c;
+    if (auto c = take ("user:", Kind::user))
+        return *c;
+    return {};
+}
+
+const char* startupProjectText (StartupProject choice) noexcept
+{
+    switch (choice)
+    {
+        case StartupProject::emptyProject: return "empty";
+        case StartupProject::lastProject: return "last";
+        case StartupProject::defaultTemplate: break;
+    }
+    return "template";
+}
+
+StartupProject parseStartupProject (const std::string& text) noexcept
+{
+    if (text == "empty")
+        return StartupProject::emptyProject;
+    if (text == "last")
+        return StartupProject::lastProject;
+    return StartupProject::defaultTemplate;
+}
+
+int builtInTemplateIndex (const std::string& name)
+{
+    const auto names = templateNames();
+    for (int i = 0; i < (int) names.size(); ++i)
+        if (names[(std::size_t) i] == name)
+            return i;
+    return -1;
 }
 
 std::string templateDisplayName (const std::string& fileName)

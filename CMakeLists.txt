@@ -67,6 +67,7 @@ add_library(lynx_core STATIC
     src/core/Arpeggiator.cpp
     src/core/SynthPresets.cpp
     src/core/Slicer.cpp
+    src/core/AudioToMidi.cpp
     src/core/Templates.cpp
     src/core/FlWrapper.cpp
     src/core/FlPluginDb.cpp
@@ -84,6 +85,8 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/GamepadMap.cpp
+    src/core/ExportBundle.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -270,6 +273,7 @@ target_sources(lynx_core PRIVATE
     src/core/PlaylistOps.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
+    src/core/AutoWarp.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
     src/core/PatternBlocks.cpp
@@ -431,6 +435,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPresetMenu.cpp
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
+        src/ui/PluginKeysTest.cpp
         src/ui/ParametricEqEditor.cpp
         src/ui/FacetEqEditor.cpp
         src/ui/ProEditors.cpp
@@ -442,6 +447,8 @@ if(LYNX_BUILD_APP)
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
+        src/ui/GamepadInput.cpp
+        src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
@@ -476,6 +483,7 @@ if(LYNX_BUILD_APP)
     # workflow shell: workspace desktop, control contract, dialogs
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
+        src/ui/NativeChild.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp
@@ -502,6 +510,7 @@ if(LYNX_BUILD_APP)
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
+        src/ui/SimpleWorkflow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
@@ -520,7 +529,8 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
-        src/ui/StemExtract.cpp)
+        src/ui/StemExtract.cpp
+        src/ui/AudioToMidi.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 

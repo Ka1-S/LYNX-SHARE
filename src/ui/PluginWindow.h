@@ -9,6 +9,8 @@
 
 namespace lynx
 {
+class Workspace;
+
 // Window with a plugin's own UI. Keeps the plugin alive while
 // it is open (even if the channel is removed), and only one window per plugin.
 namespace PluginWindows
@@ -27,6 +29,13 @@ struct WrapperContext
 };
 // `owner` is the adapter (PluginInstrument/PluginEffect) that holds the plugin.
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context = {});
+// Issue #116: the desktop docked plugin windows float in (developer switch, ui/NativeChild.h); nullptr: none.
+void setDockWorkspace (Workspace* workspace);
+// FL's plugin menu › Detached for an open editor: it closes and opens again in the other host (saved in the project).
+void setDetached (juce::AudioPluginInstance& plugin, bool detached);
+// --plugwintest (issue #116): whether the open editor is docked, and the native window that holds it.
+bool isDocked (const juce::AudioPluginInstance& plugin);
+void* hostWindowHandle (const juce::AudioPluginInstance& plugin);
 void closeAll();
 // Closes now the windows whose plugin is no longer in the song (removed, replaced, its channel deleted); a timer
 // also does it on its own while a window is open.
@@ -48,6 +57,10 @@ std::vector<EditorCrash> editorCrashes();
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;
+// `window` is a plugin's window and that plugin has "Allow LYNX to process keyboard presses" on (issue #96)
+bool letsHostProcessKeys (juce::Component& window);
+// (round 187a's check) a PNG of a plugin window's Wrapper settings page
+bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
 } // namespace PluginWindows
 
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.

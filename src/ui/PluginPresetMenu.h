@@ -46,6 +46,8 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
 
     int preferredWidth() const { return 250; }
+    // Items the window adds at the end of the menu (issue #116: FL's "Detached", the last item of FL's plugin menu)
+    std::function<void (juce::PopupMenu&)> extendMenu;
 
 private:
     struct Entry

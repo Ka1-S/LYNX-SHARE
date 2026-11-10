@@ -771,6 +771,11 @@ bool isBridged32 (const juce::AudioPluginInstance& plugin)
     return remote != nullptr && remote->bits32;
 }
 
+bool isSandboxedPlugin (const juce::AudioPluginInstance& plugin)
+{
+    return dynamic_cast<const RemotePlugin*> (&plugin) != nullptr;
+}
+
 int sandboxedPluginProcessId (const juce::AudioPluginInstance& plugin)
 {
     const auto* remote = dynamic_cast<const RemotePlugin*> (&plugin);
@@ -788,6 +793,7 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
 bool isSandboxedPluginDead (const juce::AudioPluginInstance&) { return false; }
 bool isBridged32 (const juce::AudioPluginInstance&) { return false; }
 int sandboxedPluginProcessId (const juce::AudioPluginInstance&) { return 0; }
+bool isSandboxedPlugin (const juce::AudioPluginInstance&) { return false; }
 void hangSandboxedPluginForTest (juce::AudioPluginInstance&) {}
 void crashSandboxedPluginForTest (juce::AudioPluginInstance&) {}
 

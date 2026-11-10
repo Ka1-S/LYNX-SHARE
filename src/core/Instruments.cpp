@@ -1457,6 +1457,43 @@ private:
 // transposed by the key (60 = original pitch), with FL's sampler interpolation (core/FlResampler.h: 24-point sinc while
 // playing, 32-point when exporting, FL's defaults; REA_rodada69 §1).
 
+// Issue #63: a note's Mod X / Y move LYNX's own sampler filter as FL's voice moves its channel filter (REA_rodada76
+// §1 / §4): input X = the channel's X + (modX byte − 128) / 128, Y the same with Mod Y. LYNX's cutoff (Hz) and resonance
+// go to FL's X / Y through the laws of FL's 12 dB filters (the X → frequency law FlpImport's channelFilterHz uses for
+// types 1…5, the Y → Q law of FL's biquads, and the SVF's resonance = (2 − 1/Q) / 1.9 the import maps it with), get the
+// note's offsets and come back. A channel at 19.5 kHz or above counts as fully open (FL's X = 1).
+namespace notemod
+{
+constexpr double twoPi = 6.283185307179586;
+inline double xOfHz (double hz) noexcept
+{
+    if (hz >= 19500.0)
+        return 1.0;
+    return std::log (std::max (1.0e-6, (hz * twoPi / 44100.0 - 0.02) / 0.0596 + 1.0)) / std::log (51.0);
+}
+inline double hzOfX (double x) noexcept
+{
+    if (x >= 1.0)
+        return 20000.0;
+    return std::clamp (((std::pow (51.0, x) - 1.0) * 0.0596 + 0.02) * 44100.0 / twoPi, 20.0, 20000.0);
+}
+inline double yOfResonance (double res) noexcept
+{
+    const auto q = 1.0 / std::max (0.1, 2.0 - 1.9 * std::clamp (res, 0.0, 1.0));
+    return q <= 0.1 ? 0.0 : std::log ((q - 0.1) / 0.4 + 1.0) / (0.625 * std::log (51.0));
+}
+inline double resonanceOfY (double y) noexcept
+{
+    const auto q = y <= 0.0 ? 0.1 : (std::pow (51.0, 0.625 * std::min (y, 1.0)) - 1.0) * 0.4 + 0.1;
+    return std::clamp ((2.0 - 1.0 / q) / 1.9, 0.0, 1.0);
+}
+inline float cutoff (float hz, float offset) noexcept { return offset == 0.0f ? hz : (float) hzOfX (xOfHz (hz) + offset); }
+inline float resonance (float res, float offset) noexcept
+{
+    return offset == 0.0f ? res : (float) resonanceOfY (yOfResonance (res) + offset);
+}
+} // namespace notemod
+
 struct SamplerVoice
 {
     bool active = false;
@@ -1501,7 +1538,11 @@ struct SamplerVoice
     float zoneGain = 1.0f;
     double loopStart = 0.0, loopEnd = 0.0; // loopEnd > loopStart: the voice jumps back to the loop start
     bool loopWhileHeld = false;
-    SvfCoefficients filter;         // this voice's (only with a cutoff envelope)
+    SvfCoefficients filter;         // this voice's (with a cutoff envelope, or the note's own Mod X / Y)
+    // issue #63: the note's Mod X / Y on LYNX's own sampler, as FL's voice takes them (REA_rodada76 §1): offsets of the
+    // channel filter's X / Y, (b − 128) / 128 = modX · 2 − 1 (0 = the note leaves the channel filter as it is)
+    float noteCut = 0.0f, noteRes = 0.0f;
+    float noteFc = -1.0f, noteQ = -1.0f; int noteType = -1; // the channel values `filter` was last set from
     double pitchMul = 1.0;
     int controlCountdown = 0;
     // FL's native sampler voice (REA_rodada76): the channel's articulators and filter (flvp), the note's initial
@@ -1734,10 +1775,14 @@ public:
             if (index < 0 || index >= slices.count)
                 return;
 
-            // the starts are fractions of the sample (floats): the nearest frame, as a float a hair under p/total made
-            // every Slicex slice start one frame early (round 170i2, REA_rodada170i §9)
-            first = std::round (total * slices.starts[(std::size_t) index]);
-            last = index + 1 < slices.count && ! slices.toEnd ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
+            // the starts are fractions of the sample's frame count (p / frames, as every slicer stores them): the
+            // nearest frame, as a float a hair under p / frames made every Slicex slice start one frame early (round
+            // 170i2, REA_rodada170i §9). Scaling by the last frame's index (frames − 1) instead started every slice in
+            // the sample's second half one frame early: notes "1 frame late" against FL from the middle slice on
+            // (round 180c's note-timing, fixed in round 188g)
+            const auto frames = (double) data->frames();
+            first = std::min (total, std::round (frames * slices.starts[(std::size_t) index]));
+            last = index + 1 < slices.count && ! slices.toEnd ? std::max (first, std::round (frames * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
         const auto base = baseRate (*data) / clipStretch;
@@ -1892,6 +1937,11 @@ public:
                 target->loopEnd = (double) data->loopEnd;
                 target->loopWhileHeld = false;
             }
+        }
+        if (! clipMode && ! target->flVoice) // issue #63 (FL's voice above takes them as its noteCut / noteRes)
+        {
+            target->noteCut = nextModX * 2.0f - 1.0f;
+            target->noteRes = nextModY * 2.0f - 1.0f;
         }
         voicePan (clipMode ? 0.0f : nextPan, target->panL, target->panR);
         target->basePan = clipMode ? 0.0f : nextPan;
@@ -2123,6 +2173,16 @@ public:
                 }
                 else if (prop == (int) vfx::Prop::velocity)
                     v.velocity = flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (value) : std::clamp (value, 0.0f, 1.0f);
+                else if (prop == (int) vfx::Prop::modX || prop == (int) vfx::Prop::modY) // issue #63: the note's filter
+                {
+                    const auto offset = std::clamp (value, 0.0f, 1.0f) * 2.0f - 1.0f;
+                    auto& to = prop == (int) vfx::Prop::modX ? (v.flVoice ? v.flProc.noteCut : v.noteCut) : (v.flVoice ? v.flProc.noteRes : v.noteRes);
+                    if (to != offset)
+                    {
+                        to = offset;
+                        v.noteType = -1; // (its own filter is set again)
+                    }
+                }
             }
     }
 
@@ -2373,7 +2433,7 @@ public:
         const auto fc = cutoff.load(), res = resonance.load();
         const auto type = filterType.load();
         const auto filterModulated = modEnv[0].active || lfos[lfoCutoff].active;
-        const auto filtered = fc < 19500.0f || res > 0.0f || type != 0 || filterModulated;
+        const auto filtered = fc < 19500.0f || res > 0.0f || type != 0 || filterModulated; // (the channel's own)
         const auto modulated = modEnv[0].active || modEnv[1].active || anyLfo;
 
         if (filtered && (fc != filterCutoff || res != filterResonance || type != sharedFilter.mode))
@@ -2396,6 +2456,16 @@ public:
             const auto* l = v.data->leftData();
             const auto* r = v.data->rightData();
             const auto lastFrame = std::min ((double) (v.data->frames() - 1), v.last);
+            // the note's own Mod X / Y: its own filter, from the channel's moved by the note (issue #63)
+            const auto ownFilter = v.noteCut != 0.0f || v.noteRes != 0.0f;
+            const auto voiceFc = ownFilter ? notemod::cutoff (fc, v.noteCut) : fc;
+            const auto voiceRes = ownFilter ? notemod::resonance (res, v.noteRes) : res;
+            const auto voiceFiltered = filtered || ownFilter;
+            if (ownFilter && ! filterModulated && (v.noteFc != fc || v.noteQ != res || v.noteType != type))
+            {
+                v.noteFc = fc, v.noteQ = res, v.noteType = type;
+                v.filter.set (voiceFc, voiceRes, sampleRate, type);
+            }
 
             for (int i = 0; i < n; ++i)
             {
@@ -2474,15 +2544,15 @@ public:
                         v.pitchMul = semitones != 0.0f ? std::exp2 (semitones / 12.0) : 1.0;
 
                         if (filterModulated)
-                            v.filter.set (fc * std::exp2 (octaves), res, sampleRate, type);
+                            v.filter.set (voiceFc * std::exp2 (octaves), voiceRes, sampleRate, type);
                     }
 
                     v.lfoGain += v.lfoGainStep;
                 }
 
-                if (filtered)
+                if (voiceFiltered)
                 {
-                    const auto& f = filterModulated ? v.filter : sharedFilter;
+                    const auto& f = filterModulated || ownFilter ? v.filter : sharedFilter;
                     sl = f.process (sl, v.lowL, v.bandL);
                     sr = f.process (sr, v.lowR, v.bandR);
                 }

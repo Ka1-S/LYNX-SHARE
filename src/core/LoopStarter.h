@@ -192,6 +192,12 @@ int apply (Song& song, const Plan& plan);
 // the Loop Starter channels of a pattern (channels whose loopStarter.pattern is it)
 std::vector<int> channelsOf (const Song& song, int pattern);
 void setChannelNotes (Song& song, int pattern, int channel, const std::vector<Note>& notes, int bars);
+// The Simple workflow's starter beats (round 184a, core/SimpleTracks.h): the plan's kit as plain channels (one per row,
+// in the plan's order, not Loop Starter channels: a sample or the built-in drum of the category) and its steps as one
+// pattern whose notes' `channel` is the row, `bars` × 16 steps long. No insert, no group: SimpleTracks places them.
+std::vector<ChannelDef> kitChannels (const Plan& plan);
+Pattern kitPattern (const Plan& plan);
+
 // Send to Playlist: the pattern at `at` on the first track with no clip from there to its end; the channels leave
 // Loop Starter (FL: "unset channel Loop Starter status"). Returns the track, -1 if no track is free.
 int sendToPlaylist (Song& song, int pattern, std::int64_t at);

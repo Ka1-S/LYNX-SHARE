@@ -3,6 +3,7 @@
 #include "core/Effects.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -896,10 +897,27 @@ void readLimiter (const EffectParams& params, std::array<int, limiterControls>& 
 class FruityLimiterEffect final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, so the look-ahead (latency) is known after prepare(), before the
+    // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
+    explicit FruityLimiterEffect (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            params0 = *initial;
+        hasParams0 = initial != nullptr;
+    }
+
     void prepare (double rate) noexcept override
     {
         engine.prepare ((int) std::lround (rate)); // allocates; called off the audio thread by the host
         prepared = true;
+        if (hasParams0)
+        {
+            std::array<int, limiterControls> p {};
+            bool exact = false;
+            readLimiter (params0, p, exact);
+            engine.setControls (p, exact);
+        }
+        lastLatency.store (engine.latency(), std::memory_order_relaxed);
     }
 
     void reset() noexcept override { engine.reset(); }
@@ -919,7 +937,7 @@ public:
         bool exact = false;
         readLimiter (params, p, exact);
         engine.setControls (p, exact);
-        lastLatency = engine.latency();
+        lastLatency.store (engine.latency(), std::memory_order_relaxed);
 
         for (int off = 0; off < n; off += LimiterEngine::maxBlock)
         {
@@ -951,19 +969,27 @@ public:
         sideSet = false;
     }
 
-    int latencySamples() const noexcept override { return lastLatency; }
+    int latencySamples() const noexcept override { return lastLatency.load (std::memory_order_relaxed); }
 
 private:
     LimiterEngine engine;
-    bool prepared = false, sideSet = false;
+    EffectParams params0 {};
+    bool hasParams0 = false, prepared = false, sideSet = false;
     const float* sideL = nullptr;
     const float* sideR = nullptr;
-    int lastLatency = 0;
+    std::atomic<int> lastLatency { 0 }; // (read by the UI thread)
 };
 
 class FruityCompressorEffect final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, so the reported look-ahead latency is known before the first block
+    explicit FruityCompressorEffect (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            lookahead = (*initial)[compressorControls] >= 0.5f;
+    }
+
     void prepare (double rate) noexcept override
     {
         engine.prepare ((int) std::lround (rate));
@@ -988,7 +1014,7 @@ public:
         for (int i = 0; i < compressorControls; ++i)
             p[(std::size_t) i] = raw (params[(std::size_t) i], compressorMin[(std::size_t) i], compressorMax[(std::size_t) i]);
         engine.setControls (p);
-        lookahead = params[compressorControls] >= 0.5f;
+        lookahead.store (params[compressorControls] >= 0.5f, std::memory_order_relaxed);
 
         for (int off = 0; off < n; off += 512)
         {
@@ -1019,12 +1045,13 @@ public:
     }
 
     // the output is always 64 frames late; FL only reports it (and so compensates it) with the look-ahead option
-    int latencySamples() const noexcept override { return lookahead ? 64 : 0; }
+    int latencySamples() const noexcept override { return lookahead.load (std::memory_order_relaxed) ? 64 : 0; }
 
 private:
     CompressorEngine engine;
     std::vector<float> io, side;
-    bool sideSet = false, lookahead = true;
+    bool sideSet = false;
+    std::atomic<bool> lookahead { true }; // (read by the UI thread)
     const float* sideL = nullptr;
     const float* sideR = nullptr;
 };
@@ -1163,6 +1190,6 @@ std::string compressorParamText (int i, float v)
     return t;
 }
 
-std::unique_ptr<Effect> makeLimiter() { return std::make_unique<FruityLimiterEffect>(); }
-std::unique_ptr<Effect> makeCompressor() { return std::make_unique<FruityCompressorEffect>(); }
+std::unique_ptr<Effect> makeLimiter (const EffectParams* initial) { return std::make_unique<FruityLimiterEffect> (initial); }
+std::unique_ptr<Effect> makeCompressor (const EffectParams* initial) { return std::make_unique<FruityCompressorEffect> (initial); }
 } // namespace lynx::fldyn

@@ -241,6 +241,7 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketTranceDelay: return "pocketTranceDelay";
         case EffectKind::pocketTapeDelay: return "pocketTapeDelay";
         case EffectKind::pocketMultiFx: return "pocketMultiFx";
+        case EffectKind::strikeShaper: return "strikeShaper";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -331,8 +332,14 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("resetOnFlush", false);
     if (! p.sendLoopPosition)
         o->setProperty ("sendLoopPosition", false);
+    if (p.allowHostKeys)
+        o->setProperty ("allowHostKeys", true);
+    if (p.hostKeysFirst)
+        o->setProperty ("hostKeysFirst", true);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
+    if (p.detached) // issue #116 (saved only when not the default)
+        o->setProperty ("detached", true);
     return juce::var (o.release());
 }
 
@@ -346,6 +353,7 @@ PluginRef pluginFromVar (const juce::var& v)
         p.foreign = {};
     p.fixedBuffers = (bool) v.getProperty ("fixedBuffers", false);
     p.separateProcess = (bool) v.getProperty ("separateProcess", false);
+    p.detached = (bool) v.getProperty ("detached", false);
     p.threaded = (bool) v.getProperty ("threaded", true);
     p.maxSizeBuffers = (bool) v.getProperty ("maxSizeBuffers", false);
     p.allowSmartDisable = (bool) v.getProperty ("allowSmartDisable", true);
@@ -361,6 +369,8 @@ PluginRef pluginFromVar (const juce::var& v)
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
+    p.allowHostKeys = (bool) v.getProperty ("allowHostKeys", false);
+    p.hostKeysFirst = (bool) v.getProperty ("hostKeysFirst", false);
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;
@@ -972,7 +982,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper })
         if (id == effectId (k))
             return k;
 
@@ -2018,6 +2028,13 @@ juce::var mixerTrackToVar (const MixerTrack& t)
 
         o->setProperty ("sends", sends);
     }
+    if (! t.lostSends.empty()) // round 186c: [name, level] of each send to a deleted insert
+    {
+        juce::Array<juce::var> lost;
+        for (const auto& l : t.lostSends)
+            lost.add (juce::Array<juce::var> { juce::String::fromUTF8 (l.to.c_str()), juce::roundToInt (l.level * 10000.0f) / 10000.0 });
+        o->setProperty ("lostSends", lost);
+    }
 
     juce::Array<juce::var> effects;
 
@@ -2088,6 +2105,10 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         for (const auto& send : *sends)
             if (send.isArray() && send.size() == 2)
                 track.sends.push_back ({ (int) send[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) send[1]) });
+    if (auto* lost = t["lostSends"].getArray())
+        for (const auto& l : *lost)
+            if (l.isArray() && l.size() == 2)
+                track.lostSends.push_back ({ l[0].toString().toStdString(), juce::jlimit (0.0f, maxFaderGain, (float) (double) l[1]) });
 
     if (auto* effects = t["effects"].getArray())
         for (const auto& e : *effects)
@@ -2114,6 +2135,8 @@ juce::String toJson (const Song& song, bool stampVersion)
 
     if (song.swing > 0.0f)
         root->setProperty ("swing", juce::roundToInt (song.swing * 1000.0f) / 1000.0);
+    if (song.chanceSeed != 0)
+        root->setProperty ("chanceSeed", (juce::int64) song.chanceSeed);
     if (! song.channelGroups.empty())
     {
         juce::Array<juce::var> groups;
@@ -2232,7 +2255,9 @@ juce::String toJson (const Song& song, bool stampVersion)
 
             // [.., pan, fine pitch, muted] only when not default
             // [.., release, mod X, mod Y (, colour)]
-            const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0;
+            // [.., colour, group, chance, velocity range, chance group, play one] (round 187c)
+            const auto chanced = n.hasChance();
+            const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0 || chanced;
             if (n.pan != 0.0f || n.finePitch != 0.0f || n.muted || n.slide || n.porta || extra)
             {
                 note.add (juce::roundToInt (n.pan * 1000.0f) / 1000.0);
@@ -2244,10 +2269,17 @@ juce::String toJson (const Song& song, bool stampVersion)
                 if (extra)
                     for (auto v : { n.release, n.modX, n.modY })
                         note.add (juce::roundToInt (v * 1000.0f) / 1000.0);
-                if (n.colour != 0 || n.group != 0)
+                if (n.colour != 0 || n.group != 0 || chanced)
                     note.add (n.colour);
-                if (n.group != 0)
+                if (n.group != 0 || chanced)
                     note.add (n.group); // [.., colour, group]
+                if (chanced)
+                {
+                    note.add (juce::roundToInt (n.chance * 10000.0f) / 10000.0);
+                    note.add (juce::roundToInt (n.velocityRange * 10000.0f) / 10000.0);
+                    note.add (n.chanceGroup);
+                    note.add (n.chanceOne);
+                }
             }
 
             notes.add (note);
@@ -2724,6 +2756,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     song.bpm = juce::jlimit (10.0, 999.0, (double) root.getProperty ("bpm", 130.0));
     song.beatsPerBar = juce::jlimit (1, 32, (int) root.getProperty ("beatsPerBar", 4));
     song.swing = juce::jlimit (0.0f, 1.0f, (float) (double) root.getProperty ("swing", 0.0));
+    song.chanceSeed = (std::uint32_t) (juce::int64) root.getProperty ("chanceSeed", 0);
     if (auto* groups = root["channelGroups"].getArray())
         for (const auto& name : *groups)
             song.channelGroups.push_back (name.toString().toStdString());
@@ -2823,6 +2856,13 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                             note.colour = juce::jlimit (0, noteColourCount - 1, (int) n[13]);
                         if (n.size() >= 15)
                             note.group = juce::jmax (0, (int) n[14]);
+                        if (n.size() >= 19)
+                        {
+                            note.chance = juce::jlimit (0.0f, 1.0f, (float) (double) n[15]);
+                            note.velocityRange = juce::jlimit (-1.0f, 1.0f, (float) (double) n[16]);
+                            note.chanceGroup = juce::jmax (0, (int) n[17]);
+                            note.chanceOne = (bool) n[18];
+                        }
                     }
 
                     if (note.channel >= 0 && note.channel < (int) song.channels.size())
@@ -3367,6 +3407,7 @@ juce::String mixerTrackStateToJson (const MixerTrack& track)
     // the track's own settings and effects; routing, audio input, mute and solo belong to the project
     auto state = track;
     state.sends.clear();
+    state.lostSends.clear();
     state.toMaster = true;
     state.masterLevel = 1.0f;
     state.inputChannel = -1;
