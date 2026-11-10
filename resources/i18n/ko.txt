@@ -1563,6 +1563,8 @@ countries: kr
 "Controller type" = "컨트롤러 유형"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "일반 컨트롤러: 컨트롤의 우클릭 메뉴 > MIDI 컨트롤러에 연결로 노브나 페이더를 연결하세요."
 "Pickup (takeover mode)" = "픽업(테이크오버 모드)"
+"Foot pedal controls note off" = "풋 페달이 노트 오프를 제어"
+"Disable to send sustain to plugins" = "끄면 서스테인을 플러그인으로 보냅니다"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "컨트롤러가 현재 값에 도달한 뒤에만 파라미터를 움직이므로 값이 튀지 않습니다."
 "Links in this project" = "이 프로젝트의 연결"
 "ch. {0}" = "ch. {0}"

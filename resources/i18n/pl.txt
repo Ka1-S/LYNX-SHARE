@@ -1563,6 +1563,8 @@ countries: pl
 "Controller type" = "Typ kontrolera"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Kontroler ogólny: powiąż gałkę lub suwak przez menu prawego kliku kontrolki > Powiąż z kontrolerem MIDI."
 "Pickup (takeover mode)" = "Pickup (tryb przejęcia)"
+"Foot pedal controls note off" = "Pedał steruje wyłączaniem nut"
+"Disable to send sustain to plugins" = "Wyłącz, aby wysyłać sustain do wtyczek"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Kontroler zmienia parametr dopiero po osiągnięciu jego bieżącej wartości, więc nic nie skacze."
 "Links in this project" = "Powiązania w tym projekcie"
 "ch. {0}" = "kan. {0}"

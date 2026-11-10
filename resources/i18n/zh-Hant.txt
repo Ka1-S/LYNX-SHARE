@@ -1563,6 +1563,8 @@ countries: tw hk mo
 "Controller type" = "控制器類型"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "通用控制器：透過控制項的右鍵選單 > 關聯到MIDI控制器 來關聯旋鈕或推桿。"
 "Pickup (takeover mode)" = "拾取（接管模式）"
+"Foot pedal controls note off" = "踏板控制音符釋放"
+"Disable to send sustain to plugins" = "關閉後將延音傳送給外掛"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "控制器只有在達到參數目前值後才會移動參數，因此不會跳變。"
 "Links in this project" = "此專案中的關聯"
 "ch. {0}" = "通道{0}"

@@ -1563,6 +1563,8 @@ countries: ru by kz
 "Controller type" = "Тип контроллера"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Универсальный контроллер: привяжите ручку или фейдер через меню правого клика по элементу > Привязать к MIDI-контроллеру."
 "Pickup (takeover mode)" = "Подхват (режим takeover)"
+"Foot pedal controls note off" = "Педаль управляет отпусканием нот"
+"Disable to send sustain to plugins" = "Отключите, чтобы передавать сустейн плагинам"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Контроллер двигает параметр только после достижения его текущего значения, поэтому ничего не скачет."
 "Links in this project" = "Привязки в этом проекте"
 "ch. {0}" = "кан. {0}"
