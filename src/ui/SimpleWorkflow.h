@@ -25,6 +25,7 @@ public:
     struct Host
     {
         std::function<void (juce::Component*)> setOverlay; // shows a component over the Playlist area (nullptr: none)
+        std::function<void()> showKeys;                    // an instrument was added from the chooser: the on-screen keyboard
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
@@ -63,6 +64,7 @@ public:
 private:
     class Chooser;
     void closeByHand(); // the chooser was closed (✕, Esc, a click outside): it stays closed for this project
+    void addDefaultInstrument();                   // the Instrument tile: LYNX's synth on a new track, ready to play
     void chooseInstrument (juce::Component& tile);
     void chooseSample();
     void importFiles();

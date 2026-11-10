@@ -2634,6 +2634,10 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     {
         SimpleWorkflow::Host host;
         host.setOverlay = [this] (juce::Component* c) { playlistArea.setOverlay (c); };
+        host.showKeys = [this] {
+            if (! isTouchKeyboardOpen()) // (round 190p: a new instrument can be played at once, with the mouse too)
+                toggleTouchKeyboard (engine);
+        };
         host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
         host.showLoops = [this] {
             if (findToolWindow ("sampleBrowser") == nullptr)
