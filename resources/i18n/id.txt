@@ -8015,6 +8015,16 @@ countries: id
 "Use the suggested tempo" = "Gunakan tempo yang disarankan"
 "Voice / audio" = "Vokal / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Letakkan loop, audio, atau berkas MIDI di sini"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Trek: [LMB] bisukan / bunyikan trek mixer-nya"
+"Track: [LMB] solo its mixer track" = "Trek: [LMB] solo trek mixer-nya"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volume trek: [LMB] klik atau seret  [Shift] halus  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Pan trek: [LMB] seret ke atas / bawah  [Shift] halus  [2xLMB] tengah"
+"Track effects: [LMB] open the effects of its mixer track" = "Efek trek: [LMB] buka efek trek mixer-nya"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Tambahkan efek ke insert ini (atau letakkan satu dari Browser)"
 "Channel on / off (its mute)" = "Channel aktif / nonaktif (mute-nya)"

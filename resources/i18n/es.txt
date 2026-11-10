@@ -8015,6 +8015,16 @@ countries: es mx ar co cl pe ve
 "Use the suggested tempo" = "Usar el tempo sugerido"
 "Voice / audio" = "Voz / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Suelta aquí un loop, un audio o un archivo MIDI"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Pista: [LMB] silenciar / activar su pista del mezclador"
+"Track: [LMB] solo its mixer track" = "Pista: [LMB] solo de su pista del mezclador"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volumen de la pista: [LMB] clic o arrastrar  [Shift] fino  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Panorama de la pista: [LMB] arrastrar arriba / abajo  [Shift] fino  [2xLMB] centro"
+"Track effects: [LMB] open the effects of its mixer track" = "Efectos de la pista: [LMB] abrir los efectos de su pista del mezclador"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Añadir un efecto a este insert (o soltar uno desde el Navegador)"
 "Channel on / off (its mute)" = "Canal encendido / apagado (su silencio)"

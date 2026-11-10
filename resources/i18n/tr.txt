@@ -8015,6 +8015,16 @@ countries: tr
 "Use the suggested tempo" = "Önerilen tempoyu kullan"
 "Voice / audio" = "Ses / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Bir döngüyü, sesi veya MIDI dosyasını buraya bırakın"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Parça: [LMB] mikser kanalını sustur / aç"
+"Track: [LMB] solo its mixer track" = "Parça: [LMB] mikser kanalını solo yap"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Parça sesi: [LMB] tıkla veya sürükle  [Shift] ince  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Parça pan: [LMB] yukarı / aşağı sürükle  [Shift] ince  [2xLMB] orta"
+"Track effects: [LMB] open the effects of its mixer track" = "Parça efektleri: [LMB] mikser kanalının efektlerini aç"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Bu inserte bir efekt ekle (veya Tarayıcı'dan birini bırak)"
 "Channel on / off (its mute)" = "Kanal açık / kapalı (sesi kapatma)"

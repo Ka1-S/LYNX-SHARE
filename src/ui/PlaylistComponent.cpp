@@ -35,6 +35,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/SimpleTracks.h"
 #include "core/TempoDetect.h"
 #include "core/Comping.h"
 #include "core/ExportOptions.h"
@@ -1097,7 +1098,7 @@ int PlaylistComponent::heightOf (int track) const
     // "Lock to this size" (FL +0x14, round 168f): the row keeps its px height whatever the vertical zoom
     if (const auto locked = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].lockedHeight : -1; locked > 0)
         return polish::clampTrackHeight (locked);
-    return scaledHeight (h > 0 ? polish::clampTrackHeight (h) : trackHeight);
+    return scaledHeight (h > 0 ? polish::clampTrackHeight (h) : (simpleHeaders ? simpleTrackHeight : trackHeight));
 }
 
 juce::Rectangle<int> PlaylistComponent::trackZoomHandle() const
@@ -1820,15 +1821,71 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 }
 
                 const auto led = trackLed (t).toFloat();
-                g.setColour (muteLed (muted));
-                g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
-                if (hovered && hover.led) // the LED is a button: ring it
-                {
-                    g.setColour (colour::textPrimary.withAlpha (0.7f));
-                    g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
-                }
-
                 auto textRight = led.getX() - 2.0f;
+                if (simpleHeaders)
+                {
+                    // the Simple headers (round 184a): M and S buttons on the track's insert, a colour bar, and on tall
+                    // rows the insert's volume, pan and effects
+                    if (trackColour != 0)
+                    {
+                        g.setColour (juce::Colour (trackColour));
+                        g.fillRoundedRectangle (plateArea.withWidth (4.0f).reduced (0.0f, 2.0f).translated (isTrackSelected (t) ? 4.0f : 0.0f, 0.0f), 1.5f);
+                    }
+                    const auto insert = simpleInsert (t);
+                    const auto* m = insert > 0 ? &song.mixer[(std::size_t) insert] : nullptr;
+                    const auto button = [&g] (juce::Rectangle<float> r, const char* text, bool on, juce::Colour onColour, bool lit) {
+                        g.setColour (on ? onColour : (lit ? colour::bg6 : colour::bg4));
+                        g.fillRoundedRectangle (r, radius::sm);
+                        g.setColour (on ? colour::bg0 : (lit ? colour::textPrimary : colour::textSecondary));
+                        g.setFont (font (type::caption, true));
+                        g.drawText (text, r, juce::Justification::centred, false);
+                    };
+                    button (led, "M", m != nullptr ? m->muted : muted, colour::warning, hovered && hover.led);
+                    if (const auto solo = trackSolo (t).toFloat(); ! solo.isEmpty() && m != nullptr)
+                    {
+                        button (solo, "S", m->solo, colour::info, hovered && hover.solo);
+                        textRight = solo.getX() - 2.0f;
+                    }
+                    if (const auto bar = trackVolume (t).toFloat(); ! bar.isEmpty() && m != nullptr)
+                    {
+                        // volume: a bar filled up to the fader position, a tick at 0 dB
+                        g.setColour (colour::bg0);
+                        g.fillRoundedRectangle (bar.withSizeKeepingCentre (bar.getWidth(), 6.0f), 3.0f);
+                        g.setColour ((hovered && hover.volume) || (levelDrag == 1 && levelInsert == insert) ? colour::accentHover : colour::accent);
+                        g.fillRoundedRectangle (bar.withSizeKeepingCentre (bar.getWidth(), 6.0f).withWidth (juce::jmax (6.0f, bar.getWidth() * m->volume)), 3.0f);
+                        g.setColour (colour::textSecondary.withAlpha (0.6f));
+                        g.fillRect (bar.getX() + bar.getWidth() * unityFader - 0.5f, bar.getY(), 1.0f, bar.getHeight());
+                        // pan: a small knob, its arc from the top
+                        const auto pan = trackPan (t).toFloat();
+                        g.setColour (colour::bg4);
+                        g.fillEllipse (pan.reduced (1.0f));
+                        juce::Path arc;
+                        const auto angle = m->pan * 2.356f;
+                        arc.addCentredArc (pan.getCentreX(), pan.getCentreY(), 7.0f, 7.0f, 0.0f, juce::jmin (0.0f, angle), juce::jmax (0.0f, angle), true);
+                        g.setColour ((hovered && hover.pan) || (levelDrag == 2 && levelInsert == insert) ? colour::accentHover : colour::info);
+                        g.strokePath (arc, juce::PathStrokeType (2.0f));
+                        g.setColour (colour::textPrimary);
+                        g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + 6.0f * std::sin (angle), pan.getCentreY() - 6.0f * std::cos (angle), 1.4f);
+                        // "+FX", with the insert's effect count
+                        const auto fx = trackFx (t).toFloat();
+                        const auto count = (int) m->effects.size();
+                        g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
+                        g.fillRoundedRectangle (fx, radius::sm);
+                        g.setColour (count > 0 ? colour::accent : colour::textSecondary);
+                        g.setFont (font (type::caption, true));
+                        g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
+                    }
+                }
+                else
+                {
+                    g.setColour (muteLed (muted));
+                    g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
+                    if (hovered && hover.led) // the LED is a button: ring it
+                    {
+                        g.setColour (colour::textPrimary.withAlpha (0.7f));
+                        g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
+                    }
+                }
 
                 // a take lane's audition button (round 177c): a small speaker, lit while this lane plays instead of the comp
                 if (const auto box = trackAudition (t); ! box.isEmpty())
@@ -1908,7 +1965,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     textRight = juce::jmin (textRight, (float) box.getX());
 
                 // the track's icon before its name, as FL's track header shows it (round 168h)
-                auto textLeft = (int) left + 6;
+                auto textLeft = (int) left + (simpleHeaders ? 12 : 6);
+                // the Simple headers: the name in the first row, beside the buttons
+                const auto nameHeight = simpleHeaders && ! trackVolume (t).isEmpty() ? juce::jmin (trackHeight, (int) led.getBottom() - y + 4) : trackHeight;
 
                 // round 177b: the lanes' fold arrow (points down while they show) and, on hover, "+A" (add a lane)
                 if (const auto laneArrow = trackLaneArrow (t); ! laneArrow.isEmpty())
@@ -1938,16 +1997,16 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     icon != trackicons::Icon::none && trackHeight >= 14)
                 {
                     const auto size = (float) juce::jmin (14, trackHeight - 4);
-                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) trackHeight - size) * 0.5f, size, size),
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size),
                                        muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
                     textLeft += (int) size + 4;
                 }
                 g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
-                g.setFont (font (type::small, groupHead));
+                g.setFont (font (simpleHeaders ? type::body : type::small, groupHead || (simpleHeaders && custom)));
                 textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
                                          : tr ("Track {0}", { juce::String (t + 1) }),
-                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), trackHeight, juce::Justification::centredLeft,
-                                  trackHeight >= 30 ? 2 : 1, 0.8f);
+                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), nameHeight, juce::Justification::centredLeft,
+                                  nameHeight >= 30 ? 2 : 1, 0.8f);
 
                 // the divider under the header: lit while hovered or dragged (drag resizes the track)
                 if (hover.divider == t || (drag == Drag::trackResize && (resizeTrack == t || resizeAll)))
@@ -1958,6 +2017,27 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
 
             paintLaneHeaders (g, headers); // round 177b (nothing when lanes are off)
+        }
+    }
+
+    // the Simple workflow's drop lane (round 184a): the first empty row invites files
+    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0)
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        const auto y = trackToY (laneTrack), h = heightOf (laneTrack);
+        if (g.reduceClipRegion (grid) && y < grid.getBottom() && y + h > grid.getY())
+        {
+            const auto lane = juce::Rectangle<float> ((float) grid.getX() + 6.0f, (float) y + 4.0f, (float) grid.getWidth() - 12.0f, (float) h - 8.0f);
+            juce::Path outline;
+            outline.addRoundedRectangle (lane, radius::lg);
+            juce::Path dashed;
+            const float dashes[] { 6.0f, 5.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::borderStrong);
+            g.fillPath (dashed);
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::body));
+            g.drawText (tr ("Drop a loop, audio or MIDI file here"), lane.reduced (12.0f, 0.0f), juce::Justification::centredLeft, true);
         }
     }
 
@@ -2544,16 +2624,18 @@ juce::Rectangle<int> PlaylistComponent::trackLaneArrow (int track) const
         return {};
     const auto member = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track);
     const auto left = member ? groupIndent : 2;
-    return { left + 4, trackToY (track) + heightOf (track) / 2 - 6, 12, 12 };
+    // (the Simple headers: in the first row, beside the M and S buttons, clear of the volume row)
+    const auto centreY = simpleHeaders ? trackLed (track).getCentreY() : trackToY (track) + heightOf (track) / 2;
+    return { left + 4, centreY - 6, 12, 12 };
 }
 
 juce::Rectangle<int> PlaylistComponent::trackAddLane (int track) const
 {
     if (! autolanes::shown() || heightOf (track) < 16 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
-    // left of the header's buttons (input, record, group arrow, LED)
+    // left of the header's buttons (input, record, group arrow, Simple solo, LED)
     auto right = trackLed (track).getX();
-    for (const auto& r : { trackArrow (track), trackArm (track), trackInput (track) })
+    for (const auto& r : { trackSolo (track), trackArrow (track), trackArm (track), trackInput (track) })
         if (! r.isEmpty())
             right = juce::jmin (right, r.getX());
     const auto led = trackLed (track);
@@ -3402,6 +3484,44 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
             return;
         }
+        // the Simple headers (round 184a): M, S, volume, pan and "+FX" act on the track's mixer insert
+        if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods))
+        {
+            const auto p = e.getPosition();
+            if (onLed || trackSolo (track).contains (p))
+            {
+                const auto solo = ! onLed;
+                engine.editSong ([insert, solo] (Song& s) {
+                    auto& m = s.mixer[(std::size_t) insert];
+                    if (solo)
+                        m.solo = ! m.solo;
+                    else
+                        m.muted = ! m.muted;
+                });
+                return;
+            }
+            if (trackVolume (track).expanded (0, 4).contains (p) || trackPan (track).expanded (2).contains (p))
+            {
+                levelDrag = trackPan (track).expanded (2).contains (p) ? 2 : 1;
+                levelInsert = insert;
+                const auto& m = engine.getSong().mixer[(std::size_t) insert];
+                levelStart = levelDrag == 2 ? m.pan : m.volume;
+                if (levelDrag == 1) // a click on the bar sets the level there
+                {
+                    const auto bar = trackVolume (track);
+                    const auto v = juce::jlimit (0.0f, 1.0f, (float) (p.x - bar.getX()) / (float) juce::jmax (1, bar.getWidth()));
+                    levelStart = v;
+                    engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].volume = v; });
+                }
+                return;
+            }
+            if (trackFx (track).contains (p))
+            {
+                if (onTrackEffects)
+                    onTrackEffects (insert);
+                return;
+            }
+        }
 
         // an audio track's buttons (FL 2026): [LMB] on the record button arms / disarms its mixer track, on the input
         // button opens the input source menu; a right-click on them does nothing in FL (no track menu either)
@@ -3454,6 +3574,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             else
                 selectedTracks = { track };
             currentTrack = track;
+            if (simpleHeaders)
+                selectTrackChannel (track); // (the typing piano and the touch keyboard play the track)
             repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
         return;
@@ -4030,6 +4152,25 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
 void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    if (levelDrag != 0 && levelInsert > 0 && levelInsert < (int) engine.getSong().mixer.size())
+    {
+        // a Simple header's volume (along the bar) or pan (up / down, as a knob); Shift: fine
+        const auto fine = e.mods.isShiftDown() ? 0.2f : 1.0f;
+        const auto insert = levelInsert;
+        if (levelDrag == 1)
+        {
+            const auto v = juce::jlimit (0.0f, 1.0f, levelStart + fine * (float) e.getDistanceFromDragStartX() / (float) juce::jmax (40, headerWidth - 122));
+            engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].volume = v; });
+        }
+        else
+        {
+            const auto v = juce::jlimit (-1.0f, 1.0f, levelStart - fine * (float) e.getDistanceFromDragStartY() / 80.0f);
+            engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].pan = v; });
+        }
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+        return;
+    }
+
     if (drag == Drag::perfLaunch)
         return; // (a launch: nothing moves)
 
@@ -4636,6 +4777,12 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     }
 
     ui::clearPostedHint();
+    if (levelDrag != 0)
+    {
+        levelDrag = 0;
+        levelInsert = -1;
+        return;
+    }
     if (drag == Drag::perfLaunch)
     {
         perf::Command c;
@@ -4862,7 +5009,97 @@ void PlaylistComponent::deleteTimeSelection()
 juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
+    if (simpleHeaders) // the M button, in the first row (round 184a)
+        return { headerWidth - 28, trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
     return { headerWidth - 17, trackToY (track) + h / 2 - 6, 12, 12 };
+}
+
+int PlaylistComponent::simpleInsert (int track) const
+{
+    return simpleHeaders ? simpletracks::insertOf (engine.getSong(), track) : -1;
+}
+
+juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
+{
+    if (simpleInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    return trackLed (track).translated (-25, 0);
+}
+
+juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
+{
+    const auto h = heightOf (track);
+    if (simpleInsert (track) < 0 || h < simpleTwoRows || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
+}
+
+juce::Rectangle<int> PlaylistComponent::trackPan (int track) const
+{
+    const auto v = trackVolume (track);
+    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 10, v.getCentreY() - 8, 16, 16);
+}
+
+juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
+{
+    const auto v = trackVolume (track);
+    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
+}
+
+void PlaylistComponent::setSimpleHeaders (bool on)
+{
+    if (on == simpleHeaders)
+        return;
+    simpleHeaders = on;
+    headerWidth = on ? simpleHeaderWidth : flHeaderWidth;
+    hover = {};
+    resized();
+    repaint();
+}
+
+void PlaylistComponent::selectTrackChannel (int track)
+{
+    const auto& song = engine.getSong();
+    const auto kind = simpletracks::kindOf (song, track);
+    if (! kind)
+        return;
+    int channel = -1;
+    if (*kind == simpletracks::Kind::instrument || *kind == simpletracks::Kind::sampler)
+        channel = song.playlistTracks[(std::size_t) track].channel;
+    else if (*kind == simpletracks::Kind::drums)
+    {
+        const auto insert = simpletracks::insertOf (song, track);
+        for (int c = 0; c < (int) song.channels.size() && channel < 0; ++c)
+            if (song.channels[(std::size_t) c].mixerTrack == insert && song.channels[(std::size_t) c].instrument != InstrumentKind::audioClip)
+                channel = c;
+    }
+    if (channel >= 0 && channel != engine.getSelectedChannel())
+        engine.setSelectedChannel (channel);
+}
+
+void PlaylistComponent::selectTrack (int track)
+{
+    if (track < 0)
+        return;
+    track = juce::jmin (track, juce::jmax (0, numTracks() - 1));
+    selectedTracks = { track };
+    currentTrack = track;
+    if (simpleHeaders)
+        selectTrackChannel (track);
+    // into view (vertically)
+    const auto grid = gridArea();
+    const auto top = trackToY (track), bottom = top + heightOf (track);
+    if (top < grid.getY() || bottom > grid.getBottom())
+    {
+        scrollY = juce::jmax (0, scrollY + (top < grid.getY() ? top - grid.getY() : bottom - grid.getBottom()));
+        updateScrollBars();
+    }
+    repaint();
+}
+
+int PlaylistComponent::dropLaneTrack() const
+{
+    return simpleHeaders ? simpletracks::nextEmptyTrack (engine.getSong()) : -1;
 }
 
 juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
@@ -4870,7 +5107,8 @@ juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
     if (! noteedit::isGroupHeader (engine.getSong(), track))
         return {};
 
-    const auto led = trackLed (track);
+    const auto solo = trackSolo (track);
+    const auto led = solo.isEmpty() ? trackLed (track) : solo;
     return { led.getX() - 15, led.getY() - 1, 13, led.getHeight() + 2 };
 }
 
@@ -4879,8 +5117,13 @@ juce::Rectangle<int> PlaylistComponent::trackArm (int track) const
     if (trackmodes::armableInsert (engine.getSong(), track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
 
+    if (simpleHeaders && simpletracks::kindOf (engine.getSong(), track) == simpletracks::Kind::drums)
+        return {}; // (a drum track is FL's audio track only to keep its insert: nothing to record on it)
     const auto arrow = trackArrow (track);
-    const auto led = trackLed (track);
+    const auto solo = trackSolo (track);
+    const auto led = solo.isEmpty() ? trackLed (track) : solo;
+    if (simpleHeaders)
+        return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 17, led.getY() + (led.getHeight() - 12) / 2, 12, 12 };
     return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 15, led.getY(), 12, 12 };
 }
 
@@ -4892,7 +5135,7 @@ juce::Rectangle<int> PlaylistComponent::trackAudition (int track) const
 
     // left of whatever else the row shows
     auto left = trackLed (track);
-    for (const auto& other : { trackArrow (track), trackArm (track), trackInput (track) })
+    for (const auto& other : { trackSolo (track), trackArrow (track), trackArm (track), trackInput (track) })
         if (! other.isEmpty() && other.getX() < left.getX())
             left = other;
     return { left.getX() - 15, trackLed (track).getY(), 12, 12 };
@@ -4904,14 +5147,6 @@ juce::Rectangle<int> PlaylistComponent::trackInput (int track) const
     if (arm.isEmpty() || heightOf (track) < inputButtonMinHeight)
         return {};
     return arm.translated (-15, 0);
-}
-
-void PlaylistComponent::selectTrack (int track)
-{
-    track = juce::jlimit (0, juce::jmax (0, numTracks() - 1), track);
-    selectedTracks = { track };
-    currentTrack = track;
-    repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
 }
 
 bool PlaylistComponent::isTrackSelected (int track) const
@@ -5209,9 +5444,16 @@ void PlaylistComponent::renameTrack (int track)
     showNameAndColourDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour,
                              [this, track] (const juce::String& newName, std::uint32_t newColour) {
                                  const auto name = newName.trim().toStdString();
-                                 engine.editSong ([track, name, newColour] (Song& s) {
+                                 const auto together = simpleHeaders && simpletracks::kindOf (engine.getSong(), track).has_value();
+                                 engine.editSong ([track, name, newColour, together] (Song& s) {
                                      if ((int) s.playlistTracks.size() <= track)
                                          s.playlistTracks.resize ((std::size_t) track + 1);
+                                     if (together) // (the Simple workflow: the track, its insert and its channel, round 184a)
+                                     {
+                                         simpletracks::rename (s, track, name);
+                                         simpletracks::recolour (s, track, newColour);
+                                         return;
+                                     }
                                      s.playlistTracks[(std::size_t) track].name = name;
                                      s.playlistTracks[(std::size_t) track].colour = newColour;
                                  });
@@ -6926,6 +7168,13 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.arrow = ! folded && h.divider < 0 && trackArrow (h.track).contains (p);
         h.arm = ! folded && h.divider < 0 && trackArm (h.track).expanded (2).contains (p);
         h.input = ! folded && h.divider < 0 && trackInput (h.track).expanded (2).contains (p);
+        if (simpleHeaders && ! folded && h.divider < 0)
+        {
+            h.solo = trackSolo (h.track).contains (p);
+            h.volume = trackVolume (h.track).expanded (0, 4).contains (p);
+            h.pan = trackPan (h.track).expanded (2).contains (p);
+            h.fx = trackFx (h.track).contains (p);
+        }
         h.audition = ! folded && h.divider < 0 && trackAudition (h.track).expanded (2).contains (p);
         return h;
     }
@@ -7014,7 +7263,8 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         return;
     }
     if (hover.header)
-        cursor = hover.led || hover.arrow || hover.arm || hover.input || hover.audition ? gesture::Cursor::point : gesture::Cursor::normal;
+        cursor = hover.led || hover.arrow || hover.arm || hover.input || hover.audition || hover.solo || hover.volume || hover.pan
+                         || hover.fx ? gesture::Cursor::point : gesture::Cursor::normal;
     else if (gridArea().contains (p))
     {
         const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
@@ -7074,6 +7324,24 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         hint.text = tr ("Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height");
         hint.value = juce::String (heightOf (h.divider)) + " px";
+        return hint;
+    }
+
+    if (h.header && simpleInsert (h.track) > 0 && (h.led || h.solo || h.volume || h.pan || h.fx))
+    {
+        // the Simple headers (round 184a): their controls are the track's mixer track's
+        const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
+        hint.text = h.led      ? tr ("Track: [LMB] mute / unmute its mixer track")
+                    : h.solo   ? tr ("Track: [LMB] solo its mixer track")
+                    : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
+                    : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
+                               : tr ("Track effects: [LMB] open the effects of its mixer track");
+        if (h.volume)
+            hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
+        else if (h.pan)
+            hint.value = juce::String (juce::roundToInt (m.pan * 100.0f));
+        else
+            hint.value = trackName (h.track);
         return hint;
     }
 
@@ -7174,6 +7442,18 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
         if (trackLed (track).expanded (3).contains (e.getPosition()) || trackArrow (track).contains (e.getPosition())
             || trackArm (track).expanded (2).contains (e.getPosition()) || trackInput (track).expanded (2).contains (e.getPosition()))
             return;
+        if (const auto insert = simpleInsert (track); insert > 0)
+        {
+            // the Simple headers: a double-click resets the volume (to 0 dB) or the pan (centre); on the name it renames
+            const auto p = e.getPosition();
+            if (trackVolume (track).expanded (0, 4).contains (p))
+                engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].volume = unityFader; });
+            else if (trackPan (track).expanded (2).contains (p))
+                engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].pan = 0.0f; });
+            else if (! trackSolo (track).contains (p) && ! trackFx (track).contains (p))
+                renameTrack (track);
+            return;
+        }
 
         const auto& playlist = engine.getSong().playlist;
         int first = -1;
@@ -7240,7 +7520,8 @@ void PlaylistComponent::openClipSource (int hit, bool other)
 bool PlaylistComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f)))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f))
+            || (simpleHeaders && onSimpleFilesDropped && juce::File (f).hasFileExtension ("mid;midi")))
             return true;
 
     return false;
@@ -7304,6 +7585,18 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
 {
     auto start = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
     auto track = yToTrack (y);
+
+    // the Simple workflow (round 184a): files dropped on the lane under the tracks (or on any track that isn't one of
+    // its tracks), and MIDI files anywhere, become new tracks of their own
+    if (simpleHeaders && onSimpleFilesDropped)
+    {
+        const auto midi = std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return juce::File (f).hasFileExtension ("mid;midi"); });
+        if (midi || ! simpletracks::kindOf (engine.getSong(), track).has_value())
+        {
+            onSimpleFilesDropped (files, x >= headerWidth ? start : 0);
+            return;
+        }
+    }
 
     for (const auto& f : files)
         if (videotracks::isVideoFile (juce::File (f)))

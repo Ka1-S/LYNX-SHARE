@@ -2658,8 +2658,18 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (findToolWindow ("sampleBrowser") == nullptr)
                 toggleSampleBrowser();
         };
-        host.trackAdded = [this] (int) { playlist.repaint(); };
+        host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+        // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
+        playlist.onTrackEffects = [this] (int insert) {
+            workspace.show (Panel::mixer);
+            mixer.selectTrack (insert);
+            refreshPanelButtons();
+        };
+        playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
+            if (simpleWorkflow != nullptr)
+                simpleWorkflow->dropFiles (files, tick);
+        };
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->left();
@@ -2715,6 +2725,9 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             flip->show (PlaylistArea::GridView::beside);
         workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
     }
+    // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
+    playlist.setSimpleHeaders (style == Style::simple);
+    playlistArea.setPickerHidden (style == Style::simple);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
 }

@@ -8015,6 +8015,16 @@ countries: cn sg
 "Use the suggested tempo" = "使用建议的速度"
 "Voice / audio" = "人声 / 音频"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "将循环素材、音频或 MIDI 文件拖放到这里"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "音轨：[LMB] 将其混音器轨道静音 / 取消静音"
+"Track: [LMB] solo its mixer track" = "音轨：[LMB] 独奏其混音器轨道"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "音轨音量：[LMB] 点击或拖动  [Shift] 微调  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "音轨声像：[LMB] 上下拖动  [Shift] 微调  [2xLMB] 居中"
+"Track effects: [LMB] open the effects of its mixer track" = "音轨效果：[LMB] 打开其混音器轨道的效果"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "为此插入通道添加效果（或从浏览器拖入）"
 "Channel on / off (its mute)" = "通道开 / 关（静音）"

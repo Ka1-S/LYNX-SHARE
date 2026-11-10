@@ -84,7 +84,7 @@ Result addAudio (Song& song, int track, const Request& request)
         clip.kind = ClipKind::audio;
         clip.channel = r.channels[0];
         clip.track = track;
-        clip.start = 0;
+        clip.start = std::max<std::int64_t> (0, request.start);
         clip.length = request.audioLength;
         song.playlist.push_back (clip);
         song.mode = PlayMode::song;
@@ -109,7 +109,7 @@ void placeInstrumentNotes (Song& song, int track, int channel, const std::string
     clip.kind = ClipKind::pattern;
     clip.pattern = r.pattern;
     clip.track = track;
-    clip.start = 0;
+    clip.start = std::max<std::int64_t> (0, request.start);
     clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
     song.playlist.push_back (clip);
     song.mode = PlayMode::song;
@@ -333,6 +333,24 @@ std::string rename (Song& song, int track, const std::string& name)
                 song.patterns[(std::size_t) clip.pattern].name = unique;
     }
     return unique;
+}
+
+void recolour (Song& song, int track, std::uint32_t colour)
+{
+    const auto kind = kindOf (song, track);
+    if (! kind)
+        return;
+    auto& t = trackAt (song, track);
+    t.colour = colour;
+    const auto insert = insertOf (song, track);
+    if (validInsert (song, insert))
+        song.mixer[(std::size_t) insert].colour = colour;
+    if ((*kind == Kind::instrument || *kind == Kind::sampler) && validChannel (song, t.channel))
+        song.channels[(std::size_t) t.channel].colour = colour;
+    if (*kind == Kind::drums)
+        for (auto& c : song.channels)
+            if (c.mixerTrack == insert && c.instrument != InstrumentKind::audioClip)
+                c.colour = colour;
 }
 
 std::optional<Kind> kindOf (const Song& song, int track)
