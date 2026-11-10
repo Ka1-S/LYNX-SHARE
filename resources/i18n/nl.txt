@@ -8302,3 +8302,8 @@ countries: nl be
 "Up & Down" = "Op & neer"
 "UpDown" = "OpNeer"
 "Vel." = "Vel."
+"Add interval" = "Interval toevoegen"
+"Interval size" = "Intervalgrootte"
+"Adds to every note a note this many semitones away" = "Voegt bij elke noot een noot toe op dit aantal halve tonen afstand"
+"Pitch range: drag up or down to transpose the notes" = "Toonhoogtebereik: sleep omhoog of omlaag om de noten te transponeren"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "De kleur van de clip. Klik: clip deactiveren of activeren. Rechtsklik: kleur wijzigen"

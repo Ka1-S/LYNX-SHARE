@@ -8302,3 +8302,8 @@ countries: de at ch li lu
 "Up & Down" = "Auf & Ab"
 "UpDown" = "AufAb"
 "Vel." = "Velo."
+"Add interval" = "Intervall hinzu"
+"Interval size" = "Intervallgröße"
+"Adds to every note a note this many semitones away" = "Fügt zu jeder Note eine Note in diesem Halbtonabstand hinzu"
+"Pitch range: drag up or down to transpose the notes" = "Tonhöhenbereich: nach oben oder unten ziehen, um die Noten zu transponieren"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Die Farbe des Clips. Klick: Clip deaktivieren oder aktivieren. Rechtsklick: Farbe ändern"

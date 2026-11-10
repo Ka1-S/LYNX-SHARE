@@ -8302,3 +8302,8 @@ countries: es mx ar co cl pe ve
 "Up & Down" = "Sube y baja"
 "UpDown" = "Sube-baja"
 "Vel." = "Vel."
+"Add interval" = "Añadir intervalo"
+"Interval size" = "Tamaño del intervalo"
+"Adds to every note a note this many semitones away" = "Añade a cada nota otra nota a esta cantidad de semitonos"
+"Pitch range: drag up or down to transpose the notes" = "Rango de alturas: arrastra hacia arriba o abajo para transponer las notas"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "El color del clip. Clic: desactiva o activa el clip. Clic derecho: cambia su color"

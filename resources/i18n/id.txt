@@ -8302,3 +8302,8 @@ countries: id
 "Up & Down" = "Naik & turun"
 "UpDown" = "NaikTurun"
 "Vel." = "Vel."
+"Add interval" = "Tambah interval"
+"Interval size" = "Ukuran interval"
+"Adds to every note a note this many semitones away" = "Menambahkan ke setiap not sebuah not sejauh sekian semiton"
+"Pitch range: drag up or down to transpose the notes" = "Rentang nada: seret ke atas atau bawah untuk mentranspos not"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Warna klip. Klik: nonaktifkan atau aktifkan klip. Klik kanan: ubah warnanya"

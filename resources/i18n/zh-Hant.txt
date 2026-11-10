@@ -8302,3 +8302,8 @@ countries: tw hk mo
 "Up & Down" = "上行與下行"
 "UpDown" = "上下行"
 "Vel." = "力度"
+"Add interval" = "新增音程"
+"Interval size" = "音程大小"
+"Adds to every note a note this many semitones away" = "為每個音符新增一個相隔此半音數的音符"
+"Pitch range: drag up or down to transpose the notes" = "音高範圍：上下拖曳以移調音符"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "片段的顏色。按一下：停用或啟用片段。按右鍵：變更顏色"

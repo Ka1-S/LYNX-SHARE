@@ -8302,3 +8302,8 @@ countries: jp
 "Up & Down" = "上昇と下降"
 "UpDown" = "上昇下降"
 "Vel." = "ベロ."
+"Add interval" = "音程を追加"
+"Interval size" = "音程の幅"
+"Adds to every note a note this many semitones away" = "各ノートに、この半音数だけ離れたノートを追加します"
+"Pitch range: drag up or down to transpose the notes" = "音域: 上下にドラッグしてノートを移調します"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "クリップの色。クリック: クリップを無効/有効にします。右クリック: 色を変更します"
