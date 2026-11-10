@@ -166,8 +166,6 @@ public:
     // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
     void setSimpleHeaders (bool on);
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
-    // Selects a track as a click on its header does (and scrolls it into view).
-    void selectTrack (int track);
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
@@ -193,7 +191,8 @@ public:
     void showSongAfterOpen();
 
     // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
-    // click on its header does, without the menus (round 184a, S16: the game controller's D-pad).
+    // click on its header does, without the menus, and scrolls it into view (round 184a, S4: a new Simple track; S16:
+    // the game controller's D-pad).
     int getCurrentTrack() const noexcept { return currentTrack; }
     void selectTrack (int track);
 
