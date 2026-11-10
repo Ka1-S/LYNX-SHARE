@@ -63,6 +63,7 @@
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
+#include "ui/Motion.h"
 #include "ui/NativeChild.h"
 #include "ui/Workspace.h"
 #include "ui/PluginThumbs.h"
@@ -3720,7 +3721,7 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 12; // (the last one reports dock_result)
+            const int dockSteps = 2 * 4 + 16; // (the last one reports dock_result)
             int danceChannel = -1;            // issue #116 slice 4: a dance channel's dancer over the docked plugin
             lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
             struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
@@ -3944,6 +3945,74 @@ private:
                     if (stage != nullptr)
                         stage->update();
                     expect ("dancer_window_gone", stage != nullptr && stage->windowCount() == 0);
+                }
+                else if (at >= 19 && at <= 22)
+                {
+                    // round 190i: a native panel the user opens or closes fades by its window's own alpha (round
+                    // 179a's panel fade; LYNX's own, FL has none). Each fade lasts half a step here.
+                    auto& frame = workspace->getFrame (Panel::mixer);
+                    const auto fadeMs = juce::jmax (120, stepMs / 2);
+                    workspace->setNativeFadeScale (fadeMs / (double) lynx::ui::motion::panelFadeMs);
+                    auto halfWay = [this, &frame, fadeMs] (const juce::String& name, int direction) {
+                        juce::Timer::callAfterDelay (fadeMs / 2, [this, &frame, name, direction] {
+                            const auto alpha = frame.getAlpha();
+                            step (name + "_alpha=" + juce::String (alpha, 2));
+                            const auto ok = alpha > 0.1f && alpha < 0.9f && frame.isVisible()
+                                            && workspace->nativeFadeDirection (lynx::workspace::Panel::mixer) == direction
+                                            && lynx::nativechild::isLayered (frame.getWindowHandle());
+                            step (name + "=" + juce::String ((int) ok));
+                            dockOk = dockOk && ok;
+                        });
+                    };
+                    if (at == 19)
+                    {
+                        workspace->show (Panel::mixer); // (in front of the docked plugin: it fades over it)
+                        expect ("mixer_above_plugin_before_fade", lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
+                        workspace->hide (Panel::mixer);
+                        expect ("mixer_starts_fading_out", workspace->nativeFadeDirection (Panel::mixer) == -1 && frame.isVisible()
+                                                               && ! workspace->isPanelVisible (Panel::mixer));
+                        halfWay ("mixer_half_faded_out", -1);
+                    }
+                    else if (at == 20)
+                    {
+                        expect ("mixer_hidden_after_fade", ! frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0
+                                                               && frame.getAlpha() == 1.0f);
+                        workspace->show (Panel::mixer);
+                        expect ("mixer_starts_fading_in", workspace->nativeFadeDirection (Panel::mixer) == 1 && frame.isVisible()
+                                                              && frame.getAlpha() == 0.0f);
+                        halfWay ("mixer_half_faded_in", 1);
+                    }
+                    else if (at == 21)
+                    {
+                        expect ("mixer_opaque_after_fade", frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0
+                                                               && frame.getAlpha() == 1.0f && ! lynx::nativechild::isLayered (frame.getWindowHandle())
+                                                               && lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
+                        // closed and called back in the middle of the fade: it turns round from where it is
+                        workspace->hide (Panel::mixer);
+                        juce::Timer::callAfterDelay (fadeMs / 2, [this, &frame] {
+                            const auto before = frame.getAlpha();
+                            workspace->show (lynx::workspace::Panel::mixer);
+                            const auto ok = before > 0.1f && before < 0.9f && frame.getAlpha() == before && frame.isVisible()
+                                            && workspace->nativeFadeDirection (lynx::workspace::Panel::mixer) == 1;
+                            step ("mixer_turns_round_mid_fade=" + juce::String ((int) ok));
+                            dockOk = dockOk && ok;
+                        });
+                    }
+                    else
+                    {
+                        expect ("mixer_shown_after_turning_round", frame.isVisible() && frame.getAlpha() == 1.0f
+                                                                       && workspace->nativeFadeDirection (Panel::mixer) == 0
+                                                                       && ! lynx::nativechild::isLayered (frame.getWindowHandle()));
+                        // Settings > General > Animations off: no fade, no timer
+                        lynx::ui::motion::enabled() = false;
+                        workspace->hide (Panel::mixer);
+                        expect ("no_fade_out_without_animations", ! frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0);
+                        workspace->show (Panel::mixer);
+                        expect ("no_fade_in_without_animations", frame.isVisible() && frame.getAlpha() == 1.0f
+                                                                     && workspace->nativeFadeDirection (Panel::mixer) == 0);
+                        lynx::ui::motion::enabled() = true;
+                        workspace->setNativeFadeScale (1.0);
+                    }
                 }
                 else
                 {

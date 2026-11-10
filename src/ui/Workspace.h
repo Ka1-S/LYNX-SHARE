@@ -103,6 +103,10 @@ public:
     // of the main window, so it can come in front of a docked plugin window. Slice 1: the Channel rack only.
     bool isNativePanel (Panel panel) const;
     juce::Component& getFrame (Panel panel) const; // (tests: the panel's frame)
+    // (tests) a native panel (issue #116) fading in (+1) or out (−1) right now, 0 otherwise; and a fade's length
+    // scaled (1 = ui::motion::panelFadeMs), for a look at a fade's frames
+    int nativeFadeDirection (Panel panel) const;
+    void setNativeFadeScale (double scale);
     // A floating panel's frame is placed in the desktop's coordinates whether it is a native child or a child component.
     void placeFrame (juce::Component& frame, juce::Rectangle<int> bounds);
     juce::Rectangle<int> frameBounds (const juce::Component& frame) const;
@@ -121,6 +125,9 @@ private:
     std::vector<juce::Component::SafePointer<juce::Component>> dockedFrames;
     void nativeToFront (Panel panel);
     void rehostNativeFrames(); // the main window's native window was (re)created or the desktop moved in it
+    // the open / close fade of the panels that are native child windows (issue #116): the window's own alpha
+    struct NativeFader;
+    std::unique_ptr<NativeFader> nativeFader;
     void applyLayout (bool fadePanels = false); // fadePanels: a panel the user opened or closed fades (round 179a)
     void setFocusedPanel (Panel panel);
 
