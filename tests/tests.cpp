@@ -17260,6 +17260,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Live169bTests.inc"
 #include "Live169jTests.inc"
 #include "StemSplitTests.inc"
+#include "AudioToMidi189bTests.inc"
 #include "Zoom167tTests.inc"
 #include "Proll168gTests.inc"
 #include "Rea168eTests.inc"

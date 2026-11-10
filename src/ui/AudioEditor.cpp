@@ -1,5 +1,6 @@
 #include "ui/AudioEditor.h"
 #include "ui/AudioEditorTools.h"
+#include "ui/AudioToMidi.h"
 #include "ui/BrowserComponent.h"
 #include "ui/EditorTools.h"
 
@@ -2204,6 +2205,26 @@ private:
         }).detach();
     }
 
+    // --- Tools › Analysis › Convert to MIDI (round a2m189b): the selection (or the whole audio) as a new pattern
+    void convertToMidi (a2m::Mode mode)
+    {
+        if (doc.audio.empty())
+            return;
+        stopPlayback();
+        const auto range = selection.empty() ? ae::Range { 0, (std::int64_t) doc.audio.frames() } : ae::clamp (doc, selection);
+        const auto from = range.start;
+        std::vector<float> mono ((std::size_t) range.length(), 0.0f);
+        const auto channels = doc.audio.numChannels();
+        for (const auto& ch : doc.audio.channels)
+            for (std::size_t i = 0; i < mono.size(); ++i)
+                mono[i] += ch[(std::size_t) from + i] / (float) channels;
+        juce::Component::SafePointer<AudioEditor> self (this);
+        convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), [self] (int count) {
+            if (self != nullptr && count > 0)
+                self->setStatus (tr ("{0} notes put in a new pattern", { juce::String (count) }), false);
+        });
+    }
+
     // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
     struct ScriptRef
     {
@@ -3861,6 +3882,16 @@ juce::PopupMenu AudioEditor::mainMenu()
     tools.addItem (tr ("Tune loop..."), has, false, [this] { openEdisonTool (T::loopTuner); });
     tools.addSectionHeader (tr ("Analysis"));
     tools.addItem (tr ("Convert to score and dump to piano roll"), has && ! scoreBusy, false, [this] { convertToScore(); });
+    {
+        // round a2m189b: Live's Convert Melody / Harmony / Drums, into a new pattern (the selection, or the whole audio)
+        juce::PopupMenu convert;
+        const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
+                                                            { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
+                                                            { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
+        for (const auto& [label, mode] : modes)
+            convert.addItem (tr (label), [this, m = mode] { convertToMidi (m); });
+        tools.addSubMenu (tr ("Convert to MIDI"), convert, has);
+    }
 
     juce::PopupMenu regions;
     regions.addItem (tr ("Add marker") + "\tM", has, false, [this] { addMarkerAtCursor(); });

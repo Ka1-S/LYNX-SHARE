@@ -67,6 +67,7 @@ add_library(lynx_core STATIC
     src/core/Arpeggiator.cpp
     src/core/SynthPresets.cpp
     src/core/Slicer.cpp
+    src/core/AudioToMidi.cpp
     src/core/Templates.cpp
     src/core/FlWrapper.cpp
     src/core/FlPluginDb.cpp
@@ -528,7 +529,8 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
-        src/ui/StemExtract.cpp)
+        src/ui/StemExtract.cpp
+        src/ui/AudioToMidi.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 

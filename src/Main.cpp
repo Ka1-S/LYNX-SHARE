@@ -139,6 +139,7 @@
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
 #include "ui/StemExtract.h"
+#include "ui/AudioToMidi.h"
 
 #include <atomic>
 #include <chrono>
@@ -1607,6 +1608,21 @@ public:
             return;
         }
 
+        if (args.contains ("--audio2midi"))
+        {
+            // LYNX.exe --audio2midi input.wav melody|harmony|drums notes.csv: the clip menu's Convert to MIDI, without the
+            // window (round a2m189b's measurements)
+            const auto i = args.indexOf ("--audio2midi");
+            const auto mode = args[i + 2] == "drums" ? lynx::a2m::Mode::drums : args[i + 2] == "harmony" ? lynx::a2m::Mode::harmony : lynx::a2m::Mode::melody;
+            lynx::AudioEngine loader (false);
+            const juce::File csv (args[i + 3].unquoted());
+            const auto error = lynx::convertFileToMidiCsv (loader, juce::File (args[i + 1].unquoted()), mode, csv);
+            csv.getSiblingFile ("audio2midi.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            setApplicationReturnValue (error.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--stems"))
         {
             // LYNX.exe --stems project.(flp|als|lynx) base.wav: one WAV per insert that has sound (like "Export stems")
@@ -2077,6 +2093,7 @@ public:
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
+        lynx::shutdownAudioToMidi();    // (the same for a conversion to MIDI)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine
@@ -3795,49 +3812,96 @@ private:
             juce::AudioPluginInstance* instance = nullptr;
             juce::AudioProcessorParameter* checked = nullptr;
             std::unique_ptr<juce::DocumentWindow> mainWindow; // stands for LYNX's main window (window ownership)
+            lynx::Workspace* workspace = nullptr; // LYNX_PLUGWIN_DOCK=1: the real main window's desktop (issue #116)
+            int channelIndex = -1;                // an instrument: its channel (added after the song's own channels)
+            int stepMs = 3000;                    // dock mode: each state held that long (screenshots)
             bool keysDone = false;
-            std::unique_ptr<lynx::Workspace> workspace;       // LYNX_PLUGWIN_DOCK=1: its desktop (issue #116)
             bool dockOk = true;
             std::function<void (bool)> done;
 
-            // issue #116 (with LYNX_DOCKED_PLUGINS=1 and LYNX_PLUGWIN_DOCK=1): FL's docked window goes behind a clicked
-            // Channel rack and comes back in front when clicked; Detached reopens it as a window of its own
+            // issue #116 (with LYNX_DOCKED_PLUGINS=1 and LYNX_PLUGWIN_DOCK=1), FL's f116 sequence for every floating
+            // panel: the docked plugin window goes behind a clicked panel and comes back in front when clicked; a
+            // panel called by its key comes in front too; Detached reopens it as a window of its own, which stays above
+            // every panel clicked (it is owned by the main window).
+            const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
+                                                                     lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
+            const int dockSteps = 2 * 4 + 5;
+
+            void* panelHandle (lynx::workspace::Panel p) const { return workspace->getFrame (p).getWindowHandle(); }
+
             void dockCheck (int at)
             {
                 using lynx::workspace::Panel;
                 auto* main = mainWindow->getWindowHandle();
-                auto* rack = workspace->getFrame (Panel::channelRack).getWindowHandle();
                 auto* plug = lynx::PluginWindows::hostWindowHandle (*instance);
                 auto expect = [this] (const juce::String& name, bool value) {
                     step (name + "=" + juce::String ((int) value));
                     dockOk = dockOk && value;
                 };
+                auto id = [] (Panel p) { return juce::String (lynx::workspace::panelId (p)); };
                 if (at == 0)
                 {
                     expect ("docked", lynx::PluginWindows::isDocked (*instance));
-                    expect ("rack_native_child", rack != nullptr && rack != main && lynx::nativechild::parentOf (rack) == main);
                     expect ("plugin_native_child", plug != nullptr && lynx::nativechild::parentOf (plug) == main);
-                    expect ("plugin_above_rack_when_opened", lynx::nativechild::isAbove (plug, rack));
-                    workspace->activate (Panel::channelRack); // a click on the rack
-                    expect ("rack_above_plugin_after_rack_click", lynx::nativechild::isAbove (rack, plug));
+                    for (auto p : dockPanels)
+                    {
+                        auto* h = panelHandle (p);
+                        expect (id (p) + "_visible", workspace->isPanelVisible (p));
+                        expect (id (p) + "_native_child", h != nullptr && h != main && lynx::nativechild::parentOf (h) == main);
+                        expect ("plugin_above_" + id (p) + "_when_opened", lynx::nativechild::isAbove (plug, h));
+                    }
+                    expect ("browser_plain", ! workspace->isNativePanel (Panel::browser));
                 }
-                else if (at == 1)
+                if (at < 2 * 4)
                 {
-                    lynx::PluginWindows::open ({}, *instance, {}); // (open again = bring the open one in front)
-                    expect ("plugin_above_rack_after_plugin_click", lynx::nativechild::isAbove (plug, rack));
+                    const auto p = dockPanels[at / 2];
+                    if (at % 2 == 0)
+                    {
+                        workspace->activate (p); // a click on the panel
+                        expect (id (p) + "_above_plugin_after_its_click", lynx::nativechild::isAbove (panelHandle (p), plug));
+                        // the plugin stays above the panels nobody clicked
+                        for (auto other : dockPanels)
+                            if (other != p)
+                                expect ("plugin_above_" + id (other) + "_after_" + id (p) + "_click", lynx::nativechild::isAbove (plug, panelHandle (other)));
+                    }
+                    else
+                    {
+                        lynx::PluginWindows::open ({}, *instance, {}); // (open again = a click on the plugin)
+                        expect ("plugin_above_" + id (p) + "_after_plugin_click", lynx::nativechild::isAbove (plug, panelHandle (p)));
+                    }
+                    return;
                 }
-                else if (at == 2)
+                if (at == 8)
+                {
+                    // a layout change elsewhere (a panel resized, the Browser shown) keeps the plugin in front; a panel
+                    // called by its key comes in front of it
+                    workspace->hide (Panel::browser);
+                    workspace->show (Panel::browser);
+                    for (auto p : dockPanels)
+                        expect ("plugin_above_" + id (p) + "_after_layout_change", lynx::nativechild::isAbove (plug, panelHandle (p)));
+                    workspace->show (Panel::mixer);
+                    expect ("mixer_above_plugin_after_show", lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
+                }
+                else if (at == 9)
                     lynx::PluginWindows::setDetached (*instance, true);
-                else if (at == 3)
+                else if (at == 10)
                 {
                     expect ("detached_reopened", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance));
                     expect ("detached_owned_by_main", plug != nullptr && lynx::nativechild::ownerOf (plug) == main);
-                    expect ("detached_saved", find() == instance && engineRef()->detached);
+                    expect ("detached_saved", find() == instance && engineRef() != nullptr && engineRef()->detached);
+                    for (auto p : dockPanels)
+                        workspace->activate (p);
+                }
+                else if (at == 11)
+                {
+                    // (an owned top-level window: above the main window and so above all its child windows)
+                    expect ("detached_stays_above_clicked_panels", plug != nullptr && lynx::nativechild::ownerOf (plug) == main
+                                                                       && lynx::nativechild::parentOf (plug) != main && lynx::PluginWindows::isOpen (*instance));
                     lynx::PluginWindows::setDetached (*instance, false);
                 }
                 else
                 {
-                    expect ("docked_again", lynx::PluginWindows::isDocked (*instance) && ! engineRef()->detached);
+                    expect ("docked_again", lynx::PluginWindows::isDocked (*instance) && engineRef() != nullptr && ! engineRef()->detached);
                     step (juce::String ("dock_result=") + (dockOk ? "OK" : "FAILED"));
                 }
             }
@@ -3846,7 +3910,7 @@ private:
             {
                 const auto& song = engine->getSong();
                 if (instrument)
-                    return song.channels.empty() ? nullptr : &song.channels.back().plugin;
+                    return channelIndex < 0 || channelIndex >= (int) song.channels.size() ? nullptr : &song.channels[(size_t) channelIndex].plugin;
                 return song.mixer.size() < 2 || song.mixer[1].effects.empty() ? nullptr : &song.mixer[1].effects[0].plugin;
             }
 
@@ -3860,8 +3924,7 @@ private:
             {
                 if (instrument)
                 {
-                    // (the channel added last: the engine's default song may already have some)
-                    if (auto* p = dynamic_cast<lynx::PluginInstrument*> (engine->getChannelInstrument ((int) engine->getSong().channels.size() - 1).get()))
+                    if (auto* p = dynamic_cast<lynx::PluginInstrument*> (engine->getChannelInstrument (channelIndex).get()))
                         return &p->getInstance();
                 }
                 else if (auto* p = dynamic_cast<lynx::PluginEffect*> (engine->getEffect (1, 0).get()))
@@ -3924,13 +3987,13 @@ private:
                         step ("browser_lists=" + juce::String (lynx::pluginpresetui::userPresets (instance->getName()).size()));
                     }
 
-                    // (the channel added last, as find() above: the engine's default song may already have some)
-                    std::shared_ptr<void> owner = instrument ? std::shared_ptr<void> (engine->getChannelInstrument ((int) engine->getSong().channels.size() - 1))
+                    std::shared_ptr<void> owner = instrument ? std::shared_ptr<void> (engine->getChannelInstrument (channelIndex))
                                                              : std::shared_ptr<void> (engine->getEffect (1, 0));
                     lynx::PluginWindows::open (owner, *instance, instance->getName(),
                                                { engine.get(), [this] (lynx::Song& song) -> lynx::PluginRef* {
                                                     if (instrument)
-                                                        return song.channels.empty() ? nullptr : &song.channels.back().plugin;
+                                                        return channelIndex < 0 || channelIndex >= (int) song.channels.size()
+                                                                   ? nullptr : &song.channels[(size_t) channelIndex].plugin;
                                                     return song.mixer.size() < 2 || song.mixer[1].effects.empty() ? nullptr : &song.mixer[1].effects[0].plugin;
                                                 }, instrument });
                     owner.reset();
@@ -3944,7 +4007,7 @@ private:
                     keysDone = ! lynx::pluginKeysTestTick (*instance->getActiveEditor(),
                                                            [this] (bool on) {
                                                                engine->editSong ([this, on] (lynx::Song& song) {
-                                                                   (instrument ? song.channels.back().plugin : song.mixer[1].effects[0].plugin).hostKeysFirst = on;
+                                                                   (instrument ? song.channels[(size_t) channelIndex].plugin : song.mixer[1].effects[0].plugin).hostKeysFirst = on;
                                                                });
                                                            },
                                                            [this] (const juce::String& line) { step (line); });
@@ -3952,13 +4015,16 @@ private:
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
                 // (3 s apart: time for screenshots of each state)
-                if (phase == 1 && workspace != nullptr && dockStep < 5 && elapsedMs >= (dockStep + 1) * 3000)
+                if (phase == 1 && workspace != nullptr && dockStep < dockSteps && elapsedMs >= (dockStep + 1) * stepMs)
                     dockCheck (dockStep++);
-                if (phase == 1 && elapsedMs >= seconds * 1000 && (workspace == nullptr || dockStep >= 5)) // remove the plugin from the song
+                if (phase == 1 && elapsedMs >= seconds * 1000 && (workspace == nullptr || dockStep >= dockSteps)) // remove the plugin from the song
                 {
                     engine->editSong ([this] (lynx::Song& song) {
                         if (instrument)
-                            song.channels.clear();
+                        {
+                            if (channelIndex >= 0 && channelIndex < (int) song.channels.size())
+                                song.channels.erase (song.channels.begin() + channelIndex);
+                        }
                         else
                             song.mixer[1].effects.clear();
                     });
@@ -3987,10 +4053,8 @@ private:
             juce::MessageManager::callAsync ([this, test] {
                 lynx::setMainWindowForOwnership (nullptr);
                 lynx::PluginWindows::setDockWorkspace (nullptr);
-                if (test->mainWindow != nullptr)
-                    test->mainWindow->clearContentComponent();
                 test->workspace = nullptr;
-                test->mainWindow = nullptr;
+                test->mainWindow = nullptr; // (dock mode: the main component with it, before the engine)
                 test->engine = nullptr;
                 delete test;
                 quit();
@@ -4001,17 +4065,24 @@ private:
         test->mainWindow->setBounds (20, 20, 300, 200);
         if (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_DOCK", {}) == "1" && lynx::nativechild::dockingEnabled())
         {
-            test->workspace = std::make_unique<lynx::Workspace>();
-            test->mainWindow->setContentNonOwned (test->workspace.get(), false);
-            test->mainWindow->setBounds (20, 20, 1200, 760);
-            lynx::PluginWindows::setDockWorkspace (test->workspace.get());
+            // the real main window's contents (it docks plugin windows in its own desktop), so the panels are real
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            auto* ui = new lynx::MainComponent (*test->engine, false);
+            test->mainWindow->setUsingNativeTitleBar (true);
+            test->mainWindow->setContentOwned (ui, false);
+            test->mainWindow->setBounds (20, 20, 1500, 900);
+            test->workspace = &ui->workspaceForTest();
+            if (const auto ms = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_STEP_MS", {}).getIntValue(); ms > 0)
+                test->stepMs = ms;
         }
         test->mainWindow->setVisible (true);
         lynx::setMainWindowForOwnership (test->mainWindow.get());
         if (test->workspace != nullptr)
         {
-            test->workspace->show (lynx::workspace::Panel::channelRack);
-            test->step ("dock_test=1 rack_visible=" + juce::String ((int) test->workspace->isPanelVisible (lynx::workspace::Panel::channelRack)));
+            using lynx::workspace::Panel;
+            for (auto p : { Panel::playlist, Panel::mixer, Panel::pianoRoll, Panel::channelRack })
+                test->workspace->show (p);
+            test->step ("dock_test=2 rack_visible=" + juce::String ((int) test->workspace->isPanelVisible (Panel::channelRack)));
         }
         auto& host = test->engine->getPluginHost();
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
@@ -4041,6 +4112,7 @@ private:
                 c.name = ref.name;
                 c.instrument = lynx::InstrumentKind::plugin;
                 c.plugin = ref;
+                test->channelIndex = (int) song.channels.size();
                 song.channels.push_back (c);
             }
             else
