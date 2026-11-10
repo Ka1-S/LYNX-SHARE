@@ -8264,5 +8264,7 @@ countries: ru by kz
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
 "Keyboard style" = "Стиль клавиатуры"
-"Flat keys (FL Studio style)" = "Плоские клавиши (стиль FL Studio)"
+"Flat keys" = "Плоские клавиши"
 "Piano keys (lines between the white keys)" = "Клавиши пианино (линии между белыми клавишами)"
+"Zoom level {0}" = "Уровень масштаба {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Высота клавиш: тяните вверх / вниз или крутите колесо  [Ctrl] точно"

@@ -8264,5 +8264,7 @@ countries: id
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
 "Keyboard style" = "Gaya keyboard"
-"Flat keys (FL Studio style)" = "Tuts datar (gaya FL Studio)"
+"Flat keys" = "Tuts datar"
 "Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"
+"Zoom level {0}" = "Tingkat zoom {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tinggi tuts: seret ke atas / bawah atau putar roda  [Ctrl] halus"

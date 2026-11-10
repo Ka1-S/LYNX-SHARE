@@ -8264,5 +8264,7 @@ countries: kr
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
 "Keyboard style" = "건반 스타일"
-"Flat keys (FL Studio style)" = "평면 건반 (FL Studio 스타일)"
+"Flat keys" = "평면 건반"
 "Piano keys (lines between the white keys)" = "피아노 건반 (흰 건반 사이에 선)"
+"Zoom level {0}" = "확대 수준 {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "건반 높이: 위 / 아래로 드래그하거나 휠을 돌리기  [Ctrl] 미세 조정"

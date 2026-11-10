@@ -8264,5 +8264,7 @@ countries: tr
 "Arrange inserts like the Playlist" = "Insert'leri Playlist gibi sırala"
 "{0} insert(s) moved to follow the Playlist" = "Playlist'i izlemek için {0} insert taşındı"
 "Keyboard style" = "Klavye stili"
-"Flat keys (FL Studio style)" = "Düz tuşlar (FL Studio stili)"
+"Flat keys" = "Düz tuşlar"
 "Piano keys (lines between the white keys)" = "Piyano tuşları (beyaz tuşlar arasında çizgiler)"
+"Zoom level {0}" = "Yakınlaştırma düzeyi {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tuş yüksekliği: yukarı / aşağı sürükleyin veya tekerleği çevirin  [Ctrl] ince"

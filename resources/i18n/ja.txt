@@ -8264,5 +8264,7 @@ countries: jp
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
 "Keyboard style" = "鍵盤のスタイル"
-"Flat keys (FL Studio style)" = "フラットな鍵盤（FL Studio スタイル）"
+"Flat keys" = "フラットな鍵盤"
 "Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"
+"Zoom level {0}" = "ズームレベル {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "鍵盤の高さ：上下にドラッグ、またはホイールを回す  [Ctrl] 微調整"

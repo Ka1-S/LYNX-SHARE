@@ -8264,5 +8264,7 @@ countries: cn sg
 "Arrange inserts like the Playlist" = "按 Playlist 排列插入轨"
 "{0} insert(s) moved to follow the Playlist" = "已移动 {0} 个插入轨以跟随 Playlist"
 "Keyboard style" = "键盘样式"
-"Flat keys (FL Studio style)" = "平面琴键（FL Studio 样式）"
+"Flat keys" = "平面琴键"
 "Piano keys (lines between the white keys)" = "钢琴琴键（白键之间有分隔线）"
+"Zoom level {0}" = "缩放级别 {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "琴键高度：上下拖动或滚动滚轮  [Ctrl] 微调"

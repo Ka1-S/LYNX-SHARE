@@ -8264,5 +8264,7 @@ countries: nl be
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
 "Keyboard style" = "Klavierstijl"
-"Flat keys (FL Studio style)" = "Vlakke toetsen (FL Studio-stijl)"
+"Flat keys" = "Vlakke toetsen"
 "Piano keys (lines between the white keys)" = "Pianotoetsen (lijnen tussen de witte toetsen)"
+"Zoom level {0}" = "Zoomniveau {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Toetshoogte: sleep omhoog / omlaag of draai aan het wiel  [Ctrl] fijn"

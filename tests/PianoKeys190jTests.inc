@@ -53,3 +53,28 @@ TEST (pianokeys190j_lines_between_white_keys)
     CHECK (! lineBelow (62) && ! lineBelow (61) && ! lineBelow (0));
     CHECK (upperPart (14) == 7 && upperPart (7) == 3);
 }
+
+TEST (zoom190j_wheel_levels_and_anchor)
+{
+    using namespace lynx::gesture;
+    // two pixels a level, from LYNX's shortest key; out-of-range heights clamp
+    CHECK (zoomLevel (minKeyHeight) == 1 && zoomLevel (minKeyHeight + 2) == 2);
+    CHECK (zoomLevel (14) == 5 && zoomLevel (maxKeyHeight) == 56);
+    CHECK (zoomLevel (0) == 1 && zoomLevel (1000) == 56);
+    // FL's levels 1..50 are the keys of 18..116 px: the same two-pixel steps
+    CHECK (zoomLevel (116) - zoomLevel (18) == 49);
+    // the anchor: the middle of the notes in view, or of the view without notes
+    CHECK (zoomWheelAnchor (std::vector<int> {}, 84, 48) == 66);
+    CHECK (zoomWheelAnchor (std::vector<int> { 60 }, 84, 48) == 60);
+    CHECK (zoomWheelAnchor (std::vector<int> { 72, 60, 64 }, 84, 48) == 66);
+    // the wheel's drag: one level (two pixels) per 4 px of travel, per 16 px with Ctrl
+    HeightZoomDrag d;
+    d.begin (100);
+    d.move (96, false);
+    CHECK (d.height (14) == 16);
+    d.begin (100);
+    d.move (96, true);
+    CHECK (d.height (14) == 14);
+    d.move (84, true);
+    CHECK (d.height (14) == 16);
+}

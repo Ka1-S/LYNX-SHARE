@@ -8264,5 +8264,7 @@ countries: fr be ch ca lu
 "Arrange inserts like the Playlist" = "Ranger les inserts comme la Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) déplacé(s) pour suivre la Playlist"
 "Keyboard style" = "Style du clavier"
-"Flat keys (FL Studio style)" = "Touches plates (style FL Studio)"
+"Flat keys" = "Touches plates"
 "Piano keys (lines between the white keys)" = "Touches de piano (lignes entre les touches blanches)"
+"Zoom level {0}" = "Niveau de zoom {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Hauteur des touches : glisser vers le haut / bas ou tourner la molette  [Ctrl] fin"

@@ -8264,5 +8264,7 @@ countries: tw hk mo
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
 "Keyboard style" = "鍵盤樣式"
-"Flat keys (FL Studio style)" = "平面琴鍵（FL Studio 樣式）"
+"Flat keys" = "平面琴鍵"
 "Piano keys (lines between the white keys)" = "鋼琴琴鍵（白鍵之間有分隔線）"
+"Zoom level {0}" = "縮放級別 {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "琴鍵高度：上下拖曳或滾動滾輪  [Ctrl] 微調"
