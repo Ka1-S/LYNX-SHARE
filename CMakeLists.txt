@@ -523,6 +523,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginMonitorWindow.cpp
         src/ui/ClipGridComponent.cpp
         src/ui/DetailView.cpp
+        src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp

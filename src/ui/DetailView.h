@@ -19,6 +19,7 @@
 namespace lynx
 {
 class AudioEngine;
+class MidiToolsPanel;
 
 // A card body drawn by another module (round 183c's racks): the Device View keeps the shared title bar (LED, name,
 // window button, fold, right-click menu, drag, the selection outline) and lays this component out as the card's body,
@@ -94,6 +95,7 @@ public:
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;
     void toggleFoldForCheck (int card);
+    MidiToolsPanel& midiToolsForSnapshot(); // the Clip page's Transform panel (round 190s)
 
     void paint (juce::Graphics& g) override;
     void resized() override;

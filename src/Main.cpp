@@ -100,6 +100,7 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
 #include "ui/MainComponent.h"
+#include "ui/MidiToolsPanel.h"
 #include "ui/FrameProbe.h"
 #include "ui/UiTrace.h"
 #include "core/MixerOps.h"
@@ -10246,6 +10247,23 @@ private:
             offline.dispatchPendingMessages();
             ui.getPianoRollForSnapshot().scrollToNotes(); // (the app does it on the message loop, which this shot doesn't run)
             write ("clip"); // slice 2: the Piano roll docked here
+            {
+                // round 190s: the Transform panel with each MIDI tool, then Arpeggiate applied (and undone again)
+                auto& tools = detail->midiToolsForSnapshot();
+                for (int t = 0; t < lynx::MidiToolsPanel::toolCount; ++t)
+                {
+                    tools.setTool (t);
+                    write (("clip-mt-" + juce::String (lynx::MidiToolsPanel::toolName (t)).toLowerCase()).toRawUTF8());
+                }
+                tools.setTool (lynx::MidiToolsPanel::arpeggiate);
+                tools.transformNow();
+                offline.dispatchPendingMessages();
+                write ("clip-mt-applied");
+                counts << "midi tools: arpeggiate made " << (int) offline.getSong().patterns[0].notes.size() << " notes of 4\n";
+                offline.undo();
+                offline.dispatchPendingMessages();
+                counts << "midi tools: undo gives " << (int) offline.getSong().patterns[0].notes.size() << " notes\n";
+            }
             counts << "piano roll docked: " << (ui.getPianoRollForSnapshot().getParentComponent() != nullptr
                                                 && ui.getPianoRollForSnapshot().getParentComponent()->getParentComponent() == detail ? 1 : 0) << "\n";
             detail->setClipTab (true); // slice 3: the pattern's events in the Envelopes tab

@@ -128,6 +128,17 @@ struct ChopOptions
 };
 Notes chop (Notes notes, const ChopOptions& options);
 
+// --- Quantize ---------------------------------------------------------------------------------------------------
+struct QuantizeOptions
+{
+    std::int64_t step = 0;  // 0 = the editor's grid [LIVE default "Grid"; the panel offers 1/4, 1/8, 1/16, 1/32]
+    bool triplets = false;  // two thirds of the step [MAN]
+    bool start = true;      // Adjust Note Start: the note moves, keeping its length [LIVE default; MAN]
+    bool end = false;       // Adjust Note End: the note's end moves (its length changes) [MAN]
+    float amount = 1.0f;    // 0..1 of the way to the nearest line [LIVE default 100 %]
+};
+Notes quantize (Notes notes, const QuantizeOptions& options, std::int64_t grid);
+
 // --- on a pattern ------------------------------------------------------------------------------------------------
 // Replaces the notes at `indices` by `result` (a tool's output for exactly those notes) and returns the new notes'
 // indices after sorting, for the selection.

@@ -509,6 +509,34 @@ Notes notesAt (const Pattern& pattern, const std::vector<int>& indices)
     return out;
 }
 
+Notes quantize (Notes notes, const QuantizeOptions& o, std::int64_t grid)
+{
+    auto step = o.step > 0 ? o.step : grid;
+    if (o.triplets)
+        step = step * 2 / 3;
+    if (step <= 0)
+        return notes;
+    const auto amount = std::clamp ((double) o.amount, 0.0, 1.0);
+    const auto towards = [step, amount] (std::int64_t t) {
+        const auto line = (t + step / 2) / step * step; // (times are never negative here)
+        return t + (std::int64_t) std::llround ((double) (line - t) * amount);
+    };
+    for (auto& n : notes)
+    {
+        auto end = n.start + n.length;
+        if (o.start)
+        {
+            const auto moved = std::max<std::int64_t> (0, towards (n.start));
+            end += moved - n.start;
+            n.start = moved;
+        }
+        if (o.end)
+            end = towards (end);
+        n.length = std::max<std::int64_t> (1, end - n.start);
+    }
+    return notes;
+}
+
 std::vector<int> replaceNotes (Pattern& pattern, const std::vector<int>& indices, const Notes& result)
 {
     auto doomed = indices;
