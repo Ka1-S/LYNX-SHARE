@@ -201,6 +201,8 @@ APP_SOURCES+=(src/core/MissingFiles.cpp src/core/ProjectSafety.cpp src/ui/Missin
 APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp src/engine/SessionPack.cpp src/ui/SessionDialogs.cpp)
 # Online Sessions P2: live sessions over the relay (round 169b)
 APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLink.cpp src/engine/LiveSessions.cpp src/engine/MediaPack.cpp src/ui/LiveChat.cpp src/engine/LiveTest.cpp src/ui/LiveSessionUi.cpp)
+# round 190c: the device-change self-test (issue #134)
+APP_SOURCES+=(src/engine/DeviceChangeTest.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)

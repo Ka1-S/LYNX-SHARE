@@ -583,6 +583,34 @@ public:
             return;
         }
 
+        if (args.contains ("--devicechangetest"))
+        {
+            // LYNX --devicechangetest report.txt [switches] [--plugin file]... (round 190c, issue #134: changing the
+            // output device with a project open crashed LYNX). The engine plays a project of every instrument and effect
+            // it can make here on stand-in devices with real callback threads, while the output device, its sample
+            // rate and its buffer size change the way Settings > Audio changes them (8 kHz mono to 192 kHz, buffers of
+            // 32 to 16384 samples, a device plugged in, the open one unplugged, one that refuses to open). After every
+            // change the song must sound, finite, at the new rate. No window, no real audio or MIDI device.
+            const auto i = args.indexOf ("--devicechangetest");
+            const juce::File report (args[i + 1].unquoted());
+            const auto switches = args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? args[i + 2].getIntValue() : 0;
+            juce::StringArray plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            auto text = std::make_shared<juce::String>();
+            // --quick: the selftest's handful of instruments and effects instead of every one
+            const auto result = lynx::AudioEngine::deviceChangeSelfTest (switches > 0 ? switches : 40, ! args.contains ("--quick"), plugins, [report, text] (const juce::String& line) {
+                *text << line << "\n";
+                report.replaceWithText (*text + "(running)\n"); // what was reached, if it crashes
+            });
+            *text << "device_change=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            report.replaceWithText (*text);
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--countinrectest"))
         {
             // LYNX --countinrectest report.txt (round 170d, the Busy Works video: the chord on the downbeat after the
@@ -3232,6 +3260,9 @@ private:
 
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
+        // issue #134 (round 190c): the output device, its rate and its buffer changed under a playing project, on
+        // stand-in devices (a short run; --devicechangetest plays every instrument and effect)
+        const auto deviceChange = lynx::AudioEngine::deviceChangeSelfTest (10, false);
 
         // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
         // through it, the invite code's keys)
@@ -3339,7 +3370,7 @@ private:
         const auto mixerBasics = lynx::mixerbasics::run();
         const auto ok = mixerBasics == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
 
         juce::String report;
@@ -3372,6 +3403,7 @@ private:
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "effect_params_saved=" << effectParamsResult << "\n"
                << "driver_panel=" << driverPanel << "\n"
+               << "device_change=" << deviceChange << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"

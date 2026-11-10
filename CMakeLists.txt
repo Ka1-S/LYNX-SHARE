@@ -405,6 +405,7 @@ if(LYNX_BUILD_APP)
         src/engine/LiveSessions.cpp
         src/engine/MediaPack.cpp
         src/engine/LiveTest.cpp
+        src/engine/DeviceChangeTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/PluginHost.cpp
