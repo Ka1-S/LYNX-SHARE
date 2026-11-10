@@ -426,6 +426,14 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::shellChannel, "output" }, TR_NOOP ("Level out of the strip") },
         { { K::shellChannel, "output mix" }, TR_NOOP ("Blend of the processed strip with the dry input") },
         { { K::shellChannel, "process order" }, TR_NOOP ("Order of the five modules") },
+        // Strike Shaper (round trans189d, issue #94)
+        { { K::strikeShaper, "attack" }, TR_NOOP ("Lifts or softens the start of each hit, at any level (no threshold)") },
+        { { K::strikeShaper, "sustain" }, TR_NOOP ("Lengthens or shortens the tail after each hit, at any level") },
+        { { K::strikeShaper, "output" }, TR_NOOP ("Level out of the effect") },
+        { { K::strikeShaper, "guard" }, TR_NOOP ("A soft clipper that keeps the lifted peaks under 0 dBFS") },
+        { { K::strikeShaper, "mix" }, TR_NOOP ("Blend of the shaped signal with the dry one (parallel processing)") },
+        { { K::strikeShaper, "link" }, TR_NOOP ("One gain for both channels, so the stereo image stays put") },
+        { { K::strikeShaper, "detect high-pass" }, TR_NOOP ("Keeps low notes out of the detector (a kick on a drum bus)") },
         // Ember Saturator
         { { K::ember, "drive" }, TR_NOOP ("How hard the signal hits the saturation") },
         { { K::ember, "style" }, TR_NOOP ("The saturation's character: tube, tape, transistor or fuzz") },

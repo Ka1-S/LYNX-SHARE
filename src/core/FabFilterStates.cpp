@@ -384,9 +384,11 @@ int fromProG (const State& s, EffectSlot& slot)
     set (scExternal, s.at (16) >= 0.5f ? 1.0f : 0.0f);
     set (lowPass, clamp01 (s.at (17)));                             // 5 Hz … 30 kHz log, as ours
     set (highPass, clamp01 (s.at (18)));
-    const auto wetDb = levelDb (s.at (20));
-    const auto dryDb = levelDb (s.at (22));
-    set (dry, clamp01 (std::pow (10.0, (dryDb - wetDb) / 20.0)));
+    // round trial187b [EXEC trial]: the Wet / Dry levels and their pans act in Expert mode only (26) — with it off a
+    // gate at wet −6 / dry −12 dB passes at 0 dB and closes to −100 dB; with it on, −2.5 dB open, −12 dB closed
+    const bool expert = s.at (26) >= 0.5f;
+    const auto wetDb = expert ? levelDb (s.at (20)) : 0.0;
+    set (dry, expert ? clamp01 (std::pow (10.0, (levelDb (s.at (22)) - wetDb) / 20.0)) : 0.0f);
     set (output, linValue (levelDb (s.at (30)) + wetDb, -24.0, 24.0));
     // round 128: expert side chain (12 / 14 level dB, 13 / 15 mix −1 … 1), wet / dry pan (21 / 23), channel mode
     // (27), input level (28)
@@ -394,8 +396,8 @@ int fromProG (const State& s, EffectSlot& slot)
     set (scMixL, linValue (s.at (13), -1.0, 1.0));
     set (scGainR, linValue (s.at (14), -36.0, 36.0));
     set (scMixR, linValue (s.at (15), -1.0, 1.0));
-    set (wetPan, linValue (s.at (21), -1.0, 1.0));
-    set (dryPan, linValue (s.at (23), -1.0, 1.0));
+    set (wetPan, expert ? linValue (s.at (21), -1.0, 1.0) : 0.5f);
+    set (dryPan, expert ? linValue (s.at (23), -1.0, 1.0) : 0.5f);
     set (channelMode, s.at (27) >= 0.5f ? 1.0f : 0.0f);
     set (input, linValue (levelDb (s.at (28)), -24.0, 24.0));
     return n;

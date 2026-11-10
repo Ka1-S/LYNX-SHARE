@@ -12,6 +12,7 @@
 #include "core/EmberClassic.h"
 #include "core/LrCrossover.h"
 #include "core/ParametricEqLinear.h"
+#include "core/StrikeShaper.h"
 #include "core/VoiceMatch.h"
 #include "core/VoxStrip.h"
 
@@ -973,6 +974,15 @@ namespace
 class Strip final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, so the latency (the Vocal voicing's look-ahead, the DRIVE
+    // section) is known after prepare(), before the first block (issue #113)
+    explicit Strip (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            params0 = *initial;
+        hasParams0 = initial != nullptr;
+    }
+
     void prepare (double rate) noexcept override
     {
         sr = rate;
@@ -981,6 +991,16 @@ public:
         vocalEngine.prepare (rate);
         drive.prepare (rate);
         reset();
+        if (hasParams0)
+        {
+            vocalLatency = 0;
+            if (vocalVoicing (params0))
+            {
+                vocalEngine.set (vocalSettings (params0));
+                vocalLatency = vocalEngine.latencySamples();
+            }
+            driveLatency = on (params0[driveOn]) ? DriveStage::latency() : 0;
+        }
     }
 
     // round 145: only the Vocal strip voicing's look-ahead adds latency (known from the last block's settings);
@@ -1202,6 +1222,8 @@ private:
     DriveStage drive; // round tp172c6
     int driveLatency = 0;
     bool driveWasIn = false;
+    EffectParams params0 {};
+    bool hasParams0 = false;
 
     static void filters (EqDesign& d, float& a, float& b) noexcept
     {
@@ -1538,8 +1560,21 @@ namespace
 class DeEsser final : public Effect
 {
 public:
+    // `p` (may be null): the slot's parameters, so the latency (voicing, look-ahead, oversampling) is known before the
+    // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
     explicit DeEsser (const EffectParams* p = nullptr)
-        : primedMs (p != nullptr ? lookaheadTimeMs ((*p)[lookaheadTime]) : lookaheadMs()), vocalOn (p != nullptr && vocal (*p)) {}
+        : primedMs (p != nullptr ? lookaheadTimeMs ((*p)[lookaheadTime]) : lookaheadMs()),
+          vocalOn (p != nullptr && (vocal (*p) || (extended (*p) && on ((*p)[allround]) && ! classic (*p)))),
+          classicOn (p != nullptr && classic (*p))
+    {
+        // (the same as processCore does when the factor moves)
+        if (const auto factor = p != nullptr && ! classic (*p) ? oversamplingOf ((*p)[oversampling]) : 1; factor != osFactor)
+        {
+            osFactor = factor;
+            for (auto* bank : { &os, &osBand, &osGain })
+                for (auto& o : *bank) { o.setFactor (std::max (2, factor)); o.reset(); }
+        }
+    }
 
     void prepare (double rate) noexcept override
     {
@@ -2130,10 +2165,14 @@ private:
 class Air final : public Effect
 {
 public:
-    Air()
+    // `initial` (may be null): the slot's parameters, so the model (the exciter path's latency) is known before the
+    // first block (issue #113)
+    explicit Air (const EffectParams* initial = nullptr)
     {
         for (auto& o : os)
             o.setFactor (4);
+        if (initial != nullptr)
+            dynamicMode = (*initial)[dynamic] >= 0.5f;
     }
 
     void prepare (double rate) noexcept override
@@ -3720,11 +3759,12 @@ std::unique_ptr<Effect> makeHush (const EffectParams* params) { return std::make
 
 std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
 std::unique_ptr<Effect> makeShell();
+std::unique_ptr<Effect> makeStrike(); // round trans189d (core/StrikeSuite.inc)
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
            || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
-           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel;
+           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -3739,11 +3779,14 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::kilnChannel: return ridge::makeKiln();
         case EffectKind::fretChannel: return makeFret();
         case EffectKind::shellChannel: return makeShell();
+        case EffectKind::strikeShaper: return makeStrike();
         default: return nullptr;
     }
 }
 
 std::unique_ptr<Effect> makeEmber (const EffectParams* params) { return std::make_unique<ember::Saturator> (params); }
+std::unique_ptr<Effect> makeRidge (const EffectParams* params) { return std::make_unique<ridge::Strip> (params); }
+std::unique_ptr<Effect> makeAether (const EffectParams* params) { return std::make_unique<aether::Air> (params); }
 
 namespace
 {
@@ -3768,6 +3811,7 @@ std::string onOff (float v) { return on (v) ? "on" : "off"; }
 } // namespace
 
 #include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
+#include "core/StrikeSuite.inc" // round trans189d: Strike Shaper
 
 namespace glow
 {
@@ -3896,6 +3940,8 @@ std::string paramText (EffectKind kind, int param, float v)
         return fretParamText (param, v);
     if (kind == EffectKind::shellChannel)
         return shellParamText (param, v);
+    if (kind == EffectKind::strikeShaper)
+        return strikeParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;

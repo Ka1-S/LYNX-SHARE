@@ -181,12 +181,18 @@ struct MidiPrefs
     std::vector<GlobalLink> globalLinks;
     VelocityCurve velocity = VelocityCurve::linear;
     bool pickup = false;                // a controller takes over a parameter only once it reaches its value
+    // FL's "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a): LYNX holds the notes on CC 64 (sustain)
+    // and CC 66 (sostenuto); off, the pedal goes to the plugins as a controller
+    bool footPedalNoteOff = true;
     // FL's Options › MIDI "Song marker jump (MIDI channel)": a note on this channel (1..16; 0 = off) jumps the song to
     // a marker (note 0 = the first marker...) instead of playing
     int songMarkerJumpChannel = 0;
     // FL's "MIDI channel used for playlist live mode" (round 165m): notes on this channel (1…16, 0 = off) launch the
     // Playlist's performance clips while Performance mode is on (core/Performance.h, perf::MidiMapping)
     int performanceChannel = 0;
+    // "Use a game controller" (round 184a, S16): the first XInput pad plays the transport and is linkable like a
+    // MIDI controller (core/GamepadMap.h); off by default
+    bool gamepad = false;
 
     // The settings of a device (the defaults when it was never changed).
     MidiInputPrefs input (const std::string& name) const;
