@@ -514,6 +514,16 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
     def.sampler.pitch = std::clamp (def.sampler.pitch + (float) state.pitchCents / 100.0f, -24.0f, 24.0f);
 }
 
+flvoice::Settings voiceSettings (const State& state)
+{
+    return flvoice::read (state.voiceBlock);
+}
+
+void setVoiceSettings (State& state, const flvoice::Settings& settings)
+{
+    flvoice::write (state.voiceBlock, settings); // (write() saves version 16, which carries the block)
+}
+
 State fresh (const std::string& path, int sampleRate)
 {
     State s;
