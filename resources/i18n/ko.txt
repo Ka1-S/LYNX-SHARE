@@ -8263,3 +8263,18 @@ countries: kr
 "Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "릴리스 타임"
+"Output Gain" = "출력 게인"
+"In Gain" = "입력 게인"
+"Thr." = "스레숄드"
+"Out Gain" = "출력 게인"
+"Input Pan" = "입력 팬"
+"A. Curve" = "어택 곡선"
+"R. Curve" = "릴리스 곡선"
+"Async." = "비동기"
+"LFO Rate" = "LFO 속도"
+"LFO Shape" = "LFO 모양"
+"LFO Amnt" = "LFO 양"
+"Vowel" = "모음"

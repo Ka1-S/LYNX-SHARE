@@ -8263,3 +8263,18 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Время релиза"
+"Output Gain" = "Выходной гейн"
+"In Gain" = "Входной гейн"
+"Thr." = "Порог"
+"Out Gain" = "Выходной гейн"
+"Input Pan" = "Панорама входа"
+"A. Curve" = "Кривая атаки"
+"R. Curve" = "Кривая затухания"
+"Async." = "Асинхронность"
+"LFO Rate" = "Скор. LFO"
+"LFO Shape" = "Форма LFO"
+"LFO Amnt" = "Глубина LFO"
+"Vowel" = "Гласная"

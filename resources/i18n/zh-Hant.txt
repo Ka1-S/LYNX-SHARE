@@ -8263,3 +8263,18 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "釋放時間"
+"Output Gain" = "輸出增益"
+"In Gain" = "輸入增益"
+"Thr." = "閾值"
+"Out Gain" = "輸出增益"
+"Input Pan" = "輸入聲像"
+"A. Curve" = "起音曲線"
+"R. Curve" = "釋放曲線"
+"Async." = "非同步"
+"LFO Rate" = "LFO 速率"
+"LFO Shape" = "LFO 形狀"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"

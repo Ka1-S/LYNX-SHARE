@@ -14,6 +14,7 @@
 //     --set <i>=<v>            parameter i to the normalized value v
 //     --text <i>=<value>       parameter i to the value whose text (formatEffectParam) matches: a number = the
 //                              closest numeric text, otherwise the same text (case-insensitive)
+//     --songpos <samples>      the song position before each block (<samples> at the file's first sample, 120 BPM)
 //     --settle <s>             silence processed before each file (default 0.5 s, after a reset)
 //     --list                   print the parameters (index, name, value, text) and exit
 //     --dump <file>            write the parameters ("index value" lines; LYNX --parityshot reads them)
@@ -197,6 +198,8 @@ int main (int argc, char** argv)
     auto kind = (EffectKind) kindIndex;
     auto slot = makeEffectSlot (kind);
     double rate = 0.0, settle = 0.5;
+    bool songPos = false;
+    double songOffset = 0.0; // samples
     int block = 512;
     bool list = false;
     std::string dump;
@@ -208,6 +211,8 @@ int main (int argc, char** argv)
             rate = std::atof (argv[++i]);
         else if (a == "--block" && i + 1 < argc)
             block = std::max (1, std::atoi (argv[++i]));
+        else if (a == "--songpos" && i + 1 < argc)
+            songPos = true, songOffset = std::atof (argv[++i]); // round 188i: the song position (from 0 at the file's first sample) before each block, as a host gives it
         else if (a == "--settle" && i + 1 < argc)
             settle = std::atof (argv[++i]);
         else if (a == "--list")
@@ -304,6 +309,8 @@ int main (int argc, char** argv)
         for (std::size_t at = 0; at < out.l.size(); at += (std::size_t) block)
         {
             const int n = (int) std::min<std::size_t> ((std::size_t) block, out.l.size() - at);
+            if (songPos)
+                fx->setSongPosition (((double) at + songOffset) / sr * 2.0 * (double) ppq); // 120 BPM: two beats a second
             fx->process (out.l.data() + at, out.r.data() + at, n, slot.params, 120.0);
         }
         bool finite = true;

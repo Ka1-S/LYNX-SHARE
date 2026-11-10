@@ -8263,3 +8263,18 @@ countries: id
 "Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Waktu release"
+"Output Gain" = "Gain output"
+"In Gain" = "Gain in"
+"Thr." = "Threshold"
+"Out Gain" = "Gain out"
+"Input Pan" = "Pan input"
+"A. Curve" = "Kurva attack"
+"R. Curve" = "Kurva release"
+"Async." = "Asinkron"
+"LFO Rate" = "Laju LFO"
+"LFO Shape" = "Bentuk LFO"
+"LFO Amnt" = "Jumlah LFO"
+"Vowel" = "Vokal"

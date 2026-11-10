@@ -8263,3 +8263,18 @@ countries: pl
 "Mixer groups follow the Playlist (LYNX)" = "Grupy miksera podążają za Playlistą (LYNX)"
 "Arrange inserts like the Playlist" = "Ułóż inserty jak w Playliście"
 "{0} insert(s) moved to follow the Playlist" = "Przeniesiono inserty, by podążały za Playlistą: {0}"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Czas zwolnienia"
+"Output Gain" = "Gain wyjścia"
+"In Gain" = "Gain wej."
+"Thr." = "Próg"
+"Out Gain" = "Gain wyj."
+"Input Pan" = "Pan wejścia"
+"A. Curve" = "Krzywa ataku"
+"R. Curve" = "Krzywa zwolnienia"
+"Async." = "Asynchronia"
+"LFO Rate" = "Tempo LFO"
+"LFO Shape" = "Kształt LFO"
+"LFO Amnt" = "Ilość LFO"
+"Vowel" = "Samogłoska"

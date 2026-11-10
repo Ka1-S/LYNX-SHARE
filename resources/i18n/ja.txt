@@ -8263,3 +8263,18 @@ countries: jp
 "Mixer groups follow the Playlist (LYNX)" = "ミキサーのグループをプレイリストに合わせる（LYNX）"
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "リリースタイム"
+"Output Gain" = "出力ゲイン"
+"In Gain" = "入力ゲイン"
+"Thr." = "スレッショルド"
+"Out Gain" = "出力ゲイン"
+"Input Pan" = "入力パン"
+"A. Curve" = "アタックカーブ"
+"R. Curve" = "リリースカーブ"
+"Async." = "非同期"
+"LFO Rate" = "LFOレート"
+"LFO Shape" = "LFO 波形"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"
