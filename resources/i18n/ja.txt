@@ -8357,3 +8357,6 @@ countries: jp
 "Octaver" = "オクターバー"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "プリフェーダーセンド (このトラックのフェーダーの影響を受けません)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "センドレベル (プリフェーダー)"

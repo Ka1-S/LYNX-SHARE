@@ -8357,3 +8357,6 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Pre-fader-send (de fader van dit spoor verandert hem niet)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Sendniveau (pre-fader)"

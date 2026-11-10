@@ -8357,3 +8357,6 @@ countries: it ch sm
 "Octaver" = "Ottavatore"
 "Rectify" = "Rettifica"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Mandata pre-fader (il fader di questa traccia non la modifica)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Livello mandata (pre-fader)"

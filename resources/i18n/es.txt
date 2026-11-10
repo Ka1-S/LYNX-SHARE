@@ -8357,3 +8357,6 @@ countries: es mx ar co cl pe ve
 "Octaver" = "Octavador"
 "Rectify" = "Rectificar"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Envío pre-fader (el fader de esta pista no lo mueve)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Nivel de envío (pre-fader)"

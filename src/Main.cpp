@@ -2659,6 +2659,29 @@ private:
                         && ! plain.contains ("latencyMs") && ! plain.contains ("latencyBypass") && ! plain.contains ("compensateMaster");
         }
 
+        // LYNX's pre-fader sends (round 190aq): saved only when one is used, in a list of its own ("preSends") that a
+        // version from before ignores (its sends then play post-fader, as FL's)
+        bool preSendOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.setRoute (1, 3, true, 0.5f);
+            song.setRoute (1, 4, true);
+            song.setRoute (2, 3, true);
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.setSendPre (1, 3, true);
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            preSendOk = back && back->sendPre (1, 3) && ! back->sendPre (1, 4) && ! back->sendPre (2, 3)
+                        && std::abs (back->routeLevel (1, 3) - 0.5f) < 1.0e-4f && back->mixer[1].sends == song.mixer[1].sends
+                        && ! plain.contains ("preSends") && json.contains ("preSends")
+                        && json.replace ("\"preSends\"", "\"preSendsOld\"") != json;
+            // the same file without the list (what an older version reads): the sends are there, post-fader
+            if (const auto old = lynx::ProjectFile::fromJson (json.replace ("\"preSends\"", "\"unknownToOldVersions\""), error))
+                preSendOk = preSendOk && old->routes (1, 3) && ! old->sendPre (1, 3) && old->mixer[1].sends.size() == 2;
+            else
+                preSendOk = false;
+        }
+
         // LYNX substitutes (round 98): a missing plugin's slot plays a built-in equivalent and the project keeps the
         // original reference byte for byte (.flp record and LYNX plugin state)
         bool substituteOk = false;
@@ -3406,7 +3429,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3425,6 +3448,7 @@ private:
                << "comp_crossfades=" << (compOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
+               << "pre_fader_sends=" << (preSendOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"

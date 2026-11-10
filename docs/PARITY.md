@@ -2295,3 +2295,12 @@ FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flag
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
 export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
 have no Detached state: their imported flags are kept as they were.
+
+## Round 190aq: audio-path extras (each off by default; FL's way stays the default)
+
+These come from the cross-DAW study of round 190ak (TOP-20 items 15, 7 and 6). With the options off a project renders
+what it rendered before.
+
+| Feature | FL Studio | Ableton Live | LYNX | Status |
+|---|---|---|---|---|
+| Pre-fader send | none: every route between inserts is post-fader | a Pre / Post toggle per return track (all tracks' sends to that return) | a switch per send: right-click the send knob or the route arrow › "Pre-fader send". The send then leaves after the insert's effects and EQ and before its fader, pan, separation, polarity and swap; the insert's mute and solo still silence it. A "PRE" mark sits beside the knob. Saved only when used (`preSends`): an older LYNX opens the project with those sends post-fader. `.flp` export writes FL's post-fader route and says so in the report. `.als`: Live's "Pre" return comes in as pre-fader sends; a return whose sends are all pre-fader goes out as "Pre" (mixed: "Post", with a note). The planned session-recording mixer (GAPMAP-0126 item 6) uses the same field | LYNX extra |

@@ -8357,3 +8357,6 @@ countries: id
 "Octaver" = "Oktaver"
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Send pra-fader (fader trek ini tidak mengubahnya)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Level send (pra-fader)"

@@ -824,6 +824,7 @@ void RackState::buildMixerGraph()
     mixerInputs.assign ((std::size_t) tracks, {});
     sendTaps.clear();
     slotTap.assign ((std::size_t) tracks, {});
+    preTap.assign ((std::size_t) tracks, -1);
     std::vector<int> depth ((std::size_t) tracks, 0);
 
     // who listens to each track via sidechain (the source goes in an earlier layer)
@@ -860,7 +861,18 @@ void RackState::buildMixerGraph()
             // (a send at 0 is left out, unless an automation brings it up)
             if (send.target > 0 && send.target < tracks && send.target != t && (send.level > 0.0f || automation >= 0))
             {
-                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, -1, automation });
+                // a pre-fader send (round 190aq) pulls the insert's pre-fader tap, made on its first such send
+                auto tap = -1;
+                if (send.pre)
+                {
+                    if (preTap[(std::size_t) t] < 0 && (int) sendTaps.size() < maxSendTaps)
+                    {
+                        preTap[(std::size_t) t] = (int) sendTaps.size();
+                        sendTaps.push_back ({ t, -1, 0 });
+                    }
+                    tap = preTap[(std::size_t) t];
+                }
+                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, tap, automation, tap >= 0 });
                 depth[(std::size_t) send.target] = std::max (depth[(std::size_t) send.target], depth[(std::size_t) t] + 1);
             }
         }
@@ -1828,6 +1840,7 @@ void RackRenderer::resetUnitTimes() noexcept
 
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
+    lastPreGain.fill (std::numeric_limits<float>::quiet_NaN());
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
@@ -4107,7 +4120,7 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         const auto active = tap >= 0 ? tapActive[(std::size_t) tap] : trackActive[(std::size_t) in.source];
         const auto& delays = state.sendDelays[(std::size_t) in.source];
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
-        if (pdcBypassNow && tap < 0 && state.bypassWhenIdle[(std::size_t) in.source] != 0)
+        if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
             delay = nullptr; // FL's "When recording or not playing": no compensation now
         auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackBuffer (in.source, 0);
         auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackBuffer (in.source, 1);
@@ -4194,8 +4207,15 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     auto* l = trackBuffer (t, 0);
     auto* r = trackBuffer (t, 1);
 
-    if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
+    // pre-fader sends (round 190aq): the insert's signal before its fader goes to its tap, with the mute as a ramp
+    const auto preTap = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1;
+    auto& lastPre = lastPreGain[(std::size_t) t];
+    const auto preTarget = silent ? 0.0f : 1.0f;
+    const auto preFading = preTap >= 0 && ! std::isnan (lastPre) && lastPre > 0.0f; // (still heard: its mute ramps out)
+
+    if (silent && from == zero && taps == 0 && ! preFading) // (a muted insert being recorded still runs its effects for the take)
     {
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
@@ -4211,6 +4231,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
         last = target;
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return;
@@ -4228,6 +4249,26 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
             lastLevel = applyMatrix (l, r, dest.first, dest.second, n, fromLevel, level);
         }
+    if (preTap >= 0 && preTap < RackState::maxSendTaps)
+    {
+        auto g = std::isnan (lastPre) ? preTarget : lastPre;
+        if (g > 0.0f || preTarget > 0.0f)
+        {
+            auto* pl = tapBuffer (preTap, 0);
+            auto* pr = tapBuffer (preTap, 1);
+            constexpr float step = 0.001f; // (the fader ramp's step, applyMatrix)
+            for (int i = 0; i < n; ++i)
+            {
+                g = preTarget > g ? std::min (preTarget, g + step) : std::max (preTarget, g - step);
+                pl[i] = l[i] * g;
+                pr[i] = r[i] * g;
+            }
+            tapActive[(std::size_t) preTap] = 1;
+        }
+        lastPre = g;
+    }
+    else
+        lastPre = preTarget;
     last = applyMatrix (l, r, l, r, n, from, target);
     tap (RecordSource::postTrack, l, r);
 

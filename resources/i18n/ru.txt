@@ -8357,3 +8357,6 @@ countries: ru by kz
 "Octaver" = "Октавер"
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Посыл до фейдера (фейдер этой дорожки на него не влияет)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Уровень посыла (до фейдера)"

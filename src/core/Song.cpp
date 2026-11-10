@@ -477,6 +477,25 @@ void Song::setRouteLevel (int from, int to, float level)
                 s.level = v;
 }
 
+bool Song::sendPre (int from, int to) const noexcept
+{
+    if (to <= 0 || ! routes (from, to))
+        return false;
+    for (const auto& s : mixer[(std::size_t) from].sends)
+        if (s.target == to)
+            return s.pre;
+    return false;
+}
+
+void Song::setSendPre (int from, int to, bool pre)
+{
+    if (to <= 0 || ! routes (from, to))
+        return;
+    for (auto& s : mixer[(std::size_t) from].sends)
+        if (s.target == to)
+            s.pre = pre;
+}
+
 bool Song::canRoute (int from, int to) const
 {
     const auto n = (int) mixer.size();

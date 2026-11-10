@@ -8357,3 +8357,6 @@ countries: fr be ch ca lu
 "Octaver" = "Octaveur"
 "Rectify" = "Redresser"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Send pré-fader (le fader de cette piste ne le modifie pas)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Niveau du send (pré-fader)"

@@ -1058,8 +1058,13 @@ struct MixerSend
 {
     int target = 0;      // destination track (> 0; Master is `toMaster`)
     float level = 1.0f;  // linear gain, 0..maxFaderGain (FL's send knob: the fader curve, 0 dB at 80%, +5.6 dB at 100%)
+    // LYNX extra (round 190aq; FL's sends are post-fader only): the send leaves before the insert's fader, pan,
+    // separation, polarity and swap (after its effects and EQ), so the fader no longer moves it: headphone mixes,
+    // effects fed at a fixed level. The insert's mute and solo still silence it. Off = FL. Saved only when on; an
+    // .flp export writes the send as FL's post-fader route. Live's per-return Pre / Post toggle maps to it (.als).
+    bool pre = false;
 
-    bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level; }
+    bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level && pre == o.pre; }
 };
 
 // LYNX's "Keep links to deleted inserts" (round 186c, pain point 1, off by default; FL drops them): a send whose insert
@@ -2089,6 +2094,10 @@ struct Song
     float routeLevel (int from, int to) const noexcept;
     // Sets the level of an existing route (FL's route knob); does nothing if there is no such route.
     void setRouteLevel (int from, int to, float level);
+    // LYNX's pre-fader switch of the send from -> to (MixerSend::pre); false / nothing without such a send (the route
+    // to Master is always post-fader).
+    bool sendPre (int from, int to) const noexcept;
+    void setSendPre (int from, int to, bool pre);
     // Inserts (1..N) in processing order: senders come before receivers.
     std::vector<int> mixerOrder() const;
     // Tracks audible with the current solo: the soloed ones, those that feed them and the path to Master.

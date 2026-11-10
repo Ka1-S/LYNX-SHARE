@@ -8357,3 +8357,6 @@ countries: tw hk mo
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "推桿前傳送（不受此軌道推桿影響）"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "傳送電平（推桿前）"

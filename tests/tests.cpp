@@ -17400,4 +17400,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Layer190bTests.inc"
 #include "Undo190bTests.inc"
 #include "Bugs190cTests.inc"
+#include "AudioX190aqTests.inc"
 #include "Surge190xTests.inc"

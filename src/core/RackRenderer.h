@@ -186,6 +186,7 @@ struct RackState
         float level = 1.0f;
         int tap = -1;  // ≥ 0: a Fruity Send slot's signal (sendTaps[tap]) instead of the source's output
         int automation = -1; // the route's level automation (mixerSend, issue #12): its slot; -1 = none
+        bool pre = false;    // a pre-fader send (MixerSend::pre): `tap` is the source's pre-fader signal (preTap)
     };
     std::vector<std::vector<MixerInput>> mixerInputs; // [track]; [0] = Master
 
@@ -198,6 +199,10 @@ struct RackState
     };
     std::vector<SendTap> sendTaps;
     std::vector<std::vector<int>> slotTap; // [track][slot · maxSlotSends + output]: index into sendTaps, or −1
+    // Pre-fader sends (LYNX extra, round 190aq): [track] the tap holding the insert's signal before its fader (after
+    // its effects and EQ, silenced by its mute), or −1 — one per insert with a pre-fader send, in sendTaps with slot −1.
+    // No tap left (maxSendTaps): that insert's pre-fader sends play post-fader.
+    std::vector<int> preTap;
     std::vector<std::vector<int>> mixerLayers;        // inserts with no dependencies among them, in order
     // "Allow threaded processing" off (PluginRef::threaded, REA round 134): those channels / inserts always run on the
     // calling (audio) thread, the others may go to the workers. Same layers as mixerLayers.
@@ -552,6 +557,8 @@ private:
     std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
     std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block
+    // round 190aq: the mute ramp of each insert's pre-fader send signal (1 = heard, 0 = muted; NaN: none yet)
+    std::array<float, maxMixerTracks> lastPreGain {};
     float* tapBuffer (int tap, int side) noexcept;
     std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)

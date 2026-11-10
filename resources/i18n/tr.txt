@@ -8357,3 +8357,6 @@ countries: tr
 "Octaver" = "Oktavlayıcı"
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Fader öncesi send (bu kanalın fader'ı onu değiştirmez)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Send seviyesi (fader öncesi)"

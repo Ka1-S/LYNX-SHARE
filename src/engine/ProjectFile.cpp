@@ -2041,6 +2041,14 @@ juce::var mixerTrackToVar (const MixerTrack& t)
             sends.add (juce::Array<juce::var> { send.target, juce::roundToInt (send.level * 10000.0f) / 10000.0 });
 
         o->setProperty ("sends", sends);
+        // LYNX's pre-fader sends (round 190aq): their targets, written only when one is used. A version from before
+        // ignores the list and plays those sends post-fader (its loader takes "sends" entries of two values only).
+        juce::Array<juce::var> pre;
+        for (const auto& send : t.sends)
+            if (send.pre)
+                pre.add (send.target);
+        if (! pre.isEmpty())
+            o->setProperty ("preSends", pre);
     }
     if (! t.lostSends.empty()) // round 186c: [name, level] of each send to a deleted insert
     {
@@ -2119,6 +2127,11 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         for (const auto& send : *sends)
             if (send.isArray() && send.size() == 2)
                 track.sends.push_back ({ (int) send[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) send[1]) });
+    if (auto* pre = t["preSends"].getArray())
+        for (const auto& target : *pre)
+            for (auto& send : track.sends)
+                if (send.target == (int) target)
+                    send.pre = true;
     if (auto* lost = t["lostSends"].getArray())
         for (const auto& l : *lost)
             if (l.isArray() && l.size() == 2)

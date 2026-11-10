@@ -8440,3 +8440,6 @@ countries: br
 "Octaver" = "Oitavador"
 "Rectify" = "Retificar"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "Envio pré-fader (o fader desta trilha não o altera)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "Nível do envio (pré-fader)"

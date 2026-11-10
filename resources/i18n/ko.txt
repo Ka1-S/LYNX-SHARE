@@ -8357,3 +8357,6 @@ countries: kr
 "Octaver" = "옥타버"
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "프리 페이더 센드 (이 트랙의 페이더에 영향받지 않음)"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "센드 레벨 (프리 페이더)"

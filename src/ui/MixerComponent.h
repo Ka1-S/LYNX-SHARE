@@ -342,6 +342,7 @@ private:
     void dragSelectTo (int track);
     bool headerDragged = false;
     void showSendMenu (int track);
+    void addPreFaderItem (juce::PopupMenu& menu, int from, int track); // LYNX's pre-fader switch of a send (round 190aq)
     void routeSelection (int track, mixerops::RouteKind kind); // the selected inserts into `track` (FL's route arrow)
     void soloExclusive (int track);
     std::vector<int> selection { 0 };

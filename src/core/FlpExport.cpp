@@ -1548,6 +1548,12 @@ struct Converter
         fixSideInputs();
         if (! song.vcas.empty())
             report.notes.push_back ("VCA faders: FL Studio has none; their levels are baked into the member tracks' faders (their automation and mutes are left out)");
+        // LYNX's pre-fader sends (round 190aq): FL has post-fader routes only, so they are written as those
+        if (const auto pre = std::accumulate (song.mixer.begin(), song.mixer.end(), 0, [] (int n, const MixerTrack& m) {
+                return n + (int) std::count_if (m.sends.begin(), m.sends.end(), [] (const MixerSend& s) { return s.pre; });
+            }); pre > 0)
+            report.notes.push_back ("Pre-fader sends: FL Studio's sends are post-fader; " + std::to_string (pre)
+                                    + (pre == 1 ? " pre-fader send is" : " pre-fader sends are") + " written as post-fader (they follow the track's fader in FL)");
         report.exact.push_back ("Mixer: " + std::to_string (song.mixer.size()) + " tracks (names, colours, routes, sends, levels, EQ)");
     }
 

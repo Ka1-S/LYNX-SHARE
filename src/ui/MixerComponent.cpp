@@ -1637,6 +1637,15 @@ void MixerStrips::paint (juce::Graphics& g)
                                                                    faderPosition (song.routeLevel (selected, t))),
                               false,
                               dragging (Part::send) ? colour::accent : colour::accentHover, hovered (Part::send) || dragging (Part::send));
+                // a pre-fader send (LYNX's switch, round 190aq) is marked beside its knob
+                if (on && t > 0 && song.sendPre (selected, t))
+                {
+                    const auto area = sendArea (t);
+                    g.setColour (colour::accentHover);
+                    g.setFont (font (8.0f, true));
+                    textcache::drawText (g, compactLayout ? juce::String ("P") : tr ("PRE"),
+                                         area.withWidth (juce::jmax (8, (area.getWidth() - (compactLayout ? 16 : 22)) / 2)), juce::Justification::centred);
+                }
             }
             else if (feedsSelected) // this insert sends into the selected one
             {
@@ -1827,6 +1836,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             menu.addSectionHeader (spec.name + ": " + spec.text (valueOf (Part::send, t)));
             ui::addValueItems (menu, *this, &engine, spec, valueOf (Part::send, t), [this, t] (double v) { setValue (Part::send, t, v); });
             menu.addSeparator();
+            addPreFaderItem (menu, from, t);
             menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
                           [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
@@ -2152,7 +2162,8 @@ ui::ValueSpec MixerStrips::specFor (Part part, int t) const
 
     if (part == Part::send)
     {
-        auto spec = sendSpec (nameOf (selected) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + name + " - " + (t == 0 ? tr ("Level to Master") : tr ("Send level")));
+        auto spec = sendSpec (nameOf (selected) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + name + " - "
+                              + (t == 0 ? tr ("Level to Master") : engine.getSong().sendPre (selected, t) ? tr ("Send level (pre-fader)") : tr ("Send level")));
         spec.target = AutomationTarget { AutomationTargetKind::mixerSend, selected, t }; // automatable (issue #12)
         return spec;
     }
@@ -2349,6 +2360,18 @@ void MixerStrips::routeSelection (int t, mixerops::RouteKind kind)
         ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
 }
 
+// LYNX's pre-fader switch of a send (round 190aq; FL's sends are post-fader, the default): a ticked item in the send
+// knob's and the route arrow's menus. The route to Master has none.
+void MixerStrips::addPreFaderItem (juce::PopupMenu& menu, int from, int t)
+{
+    const auto& song = engine.getSong();
+    if (t <= 0 || from <= 0 || ! song.routes (from, t))
+        return;
+    const auto pre = song.sendPre (from, t);
+    menu.addItem (tr ("Pre-fader send (not moved by this track's fader)"), true, pre,
+                  [this, from, t, pre] { engine.editSong ([from, t, pre] (Song& s) { s.setSendPre (from, t, ! pre); }); });
+}
+
 void MixerStrips::showSendMenu (int t)
 {
     const auto& song = engine.getSong();
@@ -2376,6 +2399,7 @@ void MixerStrips::showSendMenu (int t)
     if (on)
     {
         menu.addSeparator();
+        addPreFaderItem (menu, from, t);
         menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
                       [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
     }

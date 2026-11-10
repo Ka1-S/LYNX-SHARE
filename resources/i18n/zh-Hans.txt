@@ -8357,3 +8357,6 @@ countries: cn sg
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Pre-fader send (not moved by this track's fader)" = "推子前发送（不受此轨道推子影响）"
+"PRE" = "PRE"
+"Send level (pre-fader)" = "发送电平（推子前）"
