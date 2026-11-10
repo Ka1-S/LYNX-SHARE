@@ -60,6 +60,8 @@ struct Request
     // channel routed to the track's insert, `audioLength` ticks long (> 0). Empty: no clip.
     std::string audioFile;
     std::int64_t audioLength = 0;
+    // Audio and Instrument with notes (slice S4: a file dropped on the timeline): where the clip starts, in ticks (>= 0)
+    std::int64_t start = 0;
     // Voice, Guitar, Bass: the insert's audio input (the device's input channel, 0-based; -1 none) and whether the
     // next channel is taken too. Audio (imports) has no input.
     int input = 0;
@@ -98,6 +100,9 @@ std::string rename (Song& song, int track, const std::string& name);
 // Simple workflow's dock needs. Voice, Guitar, Bass and imported audio all read back as `audio`. nullopt for a track
 // that is none of these (an FL track without a mode, or a mode whose insert or channel is gone).
 std::optional<Kind> kindOf (const Song& song, int track);
+
+// Gives a Simple track, its insert and its channel (Drums: its kit) the colour `colour` (0xFFRRGGBB; 0 = the default).
+void recolour (Song& song, int track, std::uint32_t colour);
 
 // The insert a Simple track plays through, or -1 (the same rule as kindOf).
 int insertOf (const Song& song, int track);

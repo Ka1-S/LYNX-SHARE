@@ -6109,6 +6109,9 @@ countries: nl be
 "Insert effects" = "Insert-effecten"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Uit: de effecten van de inserts (niet die van de Master) worden bij de export overgeslagen"
 "Select first channel with notes when the pattern changes" = "Eerste kanaal met noten selecteren bij een patroonwissel"
+"Allow the plugin to handle keystrokes before the host does" = "De plug-in toetsaanslagen laten verwerken vóór de host"
+"Disable typing keyboard priority by default" = "Voorrang van het typtoetsenbord standaard uitschakelen"
+"Disable typing keyboard priority for all newly added plugins by default" = "Voorrang van het typtoetsenbord standaard uitschakelen voor alle nieuw toegevoegde plug-ins"
 "Mute / unmute" = "Dempen / dempen opheffen"
 "Portamento / deselect" = "Portamento / deselecteren"
 "Shift+arrows" = "Shift+pijlen"
@@ -7075,6 +7078,9 @@ countries: nl be
 "Pattern blocks: drag to resize, double-click to show every row" = "Patternblokken: sleep om de grootte te wijzigen, dubbelklik om alle rijen te tonen"
 "Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "Patternblokrij: klik selecteert het pattern, dubbelklik opent het, rechtsklik geeft het een naam en kleur"
 "Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "Patternblokken: klik of sleep tekent hele blokken van het pattern van deze rij, rechtsklik wist"
+"Pattern blocks: click places one block and drags it along its row, right-click erases" = "Patternblokken: klik plaatst één blok en sleept het langs zijn rij, rechtsklik wist"
+"Pattern blocks: drag paints whole blocks; press a block and drag to move it, right-click erases" = "Patternblokken: slepen tekent hele blokken; druk op een blok en sleep om het te verplaatsen, rechtsklik wist"
+"Pattern blocks: click or drag erases blocks in any row" = "Patternblokken: klik of sleep wist blokken in elke rij"
 "This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "Dit project heeft patternblokken. Omzetten in clips (één track per pattern) zodat ze blijven spelen, of verwijderen?"
 "Turn them into clips" = "Omzetten in clips"
 "Delete them" = "Verwijderen"
@@ -8012,6 +8018,16 @@ countries: nl be
 "Use the suggested tempo" = "Het voorgestelde tempo gebruiken"
 "Voice / audio" = "Stem / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Zet hier een loop, audio- of MIDI-bestand neer"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Spoor: [LMB] het mixerspoor dempen / weer aan"
+"Track: [LMB] solo its mixer track" = "Spoor: [LMB] het mixerspoor solo zetten"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Spoorvolume: [LMB] klikken of slepen  [Shift] fijn  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Spoorpanning: [LMB] omhoog / omlaag slepen  [Shift] fijn  [2xLMB] midden"
+"Track effects: [LMB] open the effects of its mixer track" = "Spooreffecten: [LMB] de effecten van het mixerspoor openen"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Een effect aan deze insert toevoegen (of er een vanuit de Browser neerzetten)"
 "Channel on / off (its mute)" = "Kanaal aan / uit (de demping)"
@@ -8263,6 +8279,9 @@ countries: nl be
 "Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
+"Keyboard style" = "Klavierstijl"
+"Flat keys (FL Studio style)" = "Vlakke toetsen (FL Studio-stijl)"
+"Piano keys (lines between the white keys)" = "Pianotoetsen (lijnen tussen de witte toetsen)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
 "Release Time" = "Releasetijd"

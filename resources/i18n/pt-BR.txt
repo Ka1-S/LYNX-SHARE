@@ -6265,6 +6265,9 @@ countries: br
 "Insert effects" = "Efeitos dos inserts"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Desligado: os efeitos dos inserts (não os do Master) ficam em bypass na exportação"
 "Select first channel with notes when the pattern changes" = "Selecionar o primeiro canal com notas quando o pattern mudar"
+"Allow the plugin to handle keystrokes before the host does" = "Permitir que o plugin trate as teclas antes do host"
+"Disable typing keyboard priority by default" = "Desativar a prioridade do teclado de digitação por padrão"
+"Disable typing keyboard priority for all newly added plugins by default" = "Desativar a prioridade do teclado de digitação para todos os plugins adicionados a partir de agora"
 "Mute / unmute" = "Mutar / tirar do mudo"
 "Portamento / deselect" = "Portamento / desmarcar"
 "Shift+arrows" = "Shift+setas"
@@ -7231,6 +7234,9 @@ countries: br
 "Pattern blocks: drag to resize, double-click to show every row" = "Blocos de pattern: arraste para redimensionar, clique duplo para mostrar todas as linhas"
 "Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "Linha de blocos de pattern: clique seleciona o pattern, clique duplo abre, clique direito renomeia e colore"
 "Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "Blocos de pattern: clique ou arraste para pintar blocos inteiros do pattern desta linha, clique direito apaga"
+"Pattern blocks: click places one block and drags it along its row, right-click erases" = "Blocos de pattern: clique coloca um bloco e arrasta para mover na linha, clique direito apaga"
+"Pattern blocks: drag paints whole blocks; press a block and drag to move it, right-click erases" = "Blocos de pattern: arraste para pintar blocos inteiros; segure um bloco e arraste para mover, clique direito apaga"
+"Pattern blocks: click or drag erases blocks in any row" = "Blocos de pattern: clique ou arraste para apagar blocos de qualquer linha"
 "This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "Este projeto tem blocos de pattern. Transformá-los em clipes (uma faixa por pattern) para continuarem tocando, ou apagá-los?"
 "Turn them into clips" = "Transformar em clipes"
 "Delete them" = "Apagar"
@@ -8095,6 +8101,16 @@ countries: br
 "Use the suggested tempo" = "Usar o andamento sugerido"
 "Voice / audio" = "Voz / áudio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Solte aqui um loop, um áudio ou um arquivo MIDI"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Faixa: [LMB] silenciar / reativar a trilha do mixer dela"
+"Track: [LMB] solo its mixer track" = "Faixa: [LMB] solo da trilha do mixer dela"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volume da faixa: [LMB] clique ou arraste  [Shift] fino  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Pan da faixa: [LMB] arraste para cima / baixo  [Shift] fino  [2xLMB] centro"
+"Track effects: [LMB] open the effects of its mixer track" = "Efeitos da faixa: [LMB] abrir os efeitos da trilha do mixer dela"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Adicionar um efeito a este insert (ou soltar um vindo do Navegador)"
 "Channel on / off (its mute)" = "Canal ligado / desligado (o mudo dele)"
@@ -8346,6 +8362,9 @@ countries: br
 "Mixer groups follow the Playlist (LYNX)" = "Grupos do Mixer seguem a Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Organizar inserts como a Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) movido(s) para seguir a Playlist"
+"Keyboard style" = "Estilo do teclado"
+"Flat keys (FL Studio style)" = "Teclas planas (estilo FL Studio)"
+"Piano keys (lines between the white keys)" = "Teclas de piano (linhas entre as teclas brancas)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
 "Release Time" = "Tempo de release"
