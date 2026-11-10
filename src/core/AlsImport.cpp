@@ -815,14 +815,32 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
     p.name = clip.value ("Name");
     p.colour = alsColour ((int) clip.number ("Color", -1));
     const auto passes = passesOf (loopOverride != nullptr ? *loopOverride : loopOf (clip), length);
+    // Live 12's probability groups (round 187c) [LIVE 12.4 save: NoteProbabilityGroup { GroupType 0 = Play All, 1 = Play
+    // One; Notes/NoteId; Probability (the group's: its notes keep their own for an ungroup) }]: NoteId → group
+    struct ChanceGroup
+    {
+        int index = 0;
+        bool playOne = false;
+        double chance = 1.0;
+    };
+    std::map<int, ChanceGroup> groupOfNote;
+    int groupCount = 0;
+    for (const auto& g : clip.path ("Notes/NoteProbabilityGroups").children ("NoteProbabilityGroup"))
+    {
+        const ChanceGroup group { ++groupCount, g.number ("GroupType", 0) == 1, std::clamp (g.number ("Probability", 1), 0.0, 1.0) };
+        for (const auto& id : g.path ("Notes").children ("NoteId"))
+            groupOfNote[(int) numberAttr (id, "NoteId", -1)] = group;
+    }
     for (const auto& keyTrack : clip.path ("Notes/KeyTracks").children ("KeyTrack"))
     {
         const auto key = (int) keyTrack.number ("MidiKey", 60);
         for (const auto& n : keyTrack.path ("Notes").children ("MidiNoteEvent"))
         {
             const auto t = numberAttr (n, "Time"), d = numberAttr (n, "Duration", 0.25);
-            for (const auto& pass : passes)
+            const auto grouped = groupOfNote.find ((int) numberAttr (n, "NoteId", -1));
+            for (std::size_t passIndex = 0; passIndex < passes.size(); ++passIndex)
             {
+                const auto& pass = passes[passIndex];
                 if (t < pass.from - 1e-9 || t >= pass.to - 1e-9)
                     continue;
                 Note note;
@@ -833,6 +851,15 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
                 note.velocity = (float) std::clamp (numberAttr (n, "Velocity", 100) / 127.0, 0.0, 1.0);
                 note.release = (float) std::clamp (numberAttr (n, "OffVelocity", 64) / 127.0, 0.0, 1.0);
                 note.muted = n.hasAttr ("IsEnabled") && n.attr ("IsEnabled") == "false";
+                // Live's note Chance and Velocity Range (round 187c; Live 12 leaves out the defaults 1 and 0 [DATA])
+                note.chance = (float) std::clamp (numberAttr (n, "Probability", 1), 0.0, 1.0);
+                note.velocityRange = (float) std::clamp (numberAttr (n, "VelocityDeviation", 0) / 127.0, -1.0, 1.0);
+                if (grouped != groupOfNote.end()) // each pass of a looped clip draws its own groups
+                {
+                    note.chanceGroup = (int) passIndex * groupCount + grouped->second.index;
+                    note.chanceOne = grouped->second.playOne;
+                    note.chance = (float) grouped->second.chance;
+                }
                 p.notes.push_back (note);
             }
         }

@@ -3,6 +3,28 @@
 How to use LYNX SHARE's own features, the ones FL Studio does not have. For the FL-style workflow (Channel Rack,
 Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built-in plugins see [PLUGINS.md](PLUGINS.md).
 
+## Projects from other apps
+
+**File › Open...** (Ctrl+O), or a double-click in the Browser, opens:
+
+| File | From | What happens |
+|---|---|---|
+| `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
+| `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
+| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing; other instruments play a built-in synth for now |
+| `.mid` | any app | opened as a project |
+
+After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
+**Help › Missing files...** helps find samples that moved. Save the result as a `.lynx` project.
+
+To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip with the samples) and **Ableton Live set
+(.als)...** (Live 12 or Live 11, with the samples collected). Each export shows what did not go over: LYNX-only
+instruments and effects are rendered to audio or replaced in an `.flp`, and are not converted yet in an `.als`.
+
+**Layout style** (Settings, or View › Layout style): **Pattern workflow** (FL Studio-style, the default) or
+**Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist). Switching moves panels only;
+the project stays the same.
+
 ## Online sessions: make a song with a friend (phase 1, packages)
 
 Send your project to a friend, who records their part in their own LYNX SHARE with their own plugins and sends it back; you

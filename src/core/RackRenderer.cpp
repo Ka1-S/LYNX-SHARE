@@ -555,7 +555,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             const auto* old = previous != nullptr && p < previous->instruments.size() ? previous->instruments[p].get() : nullptr;
             if (old != nullptr && previous->song.channels[p].instrument == kind && previous->sampleRate == sampleRate
-                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher))
+                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher)
+                // a node's latency moved since its delay compensation was planned: build it again (issue #113)
+                && (patcher::graphOf (previous->instruments[p].get()) == nullptr
+                    || ! patcher::graphOf (previous->instruments[p].get())->latencyStale (&channel.patcher)))
             {
                 state->instruments.push_back (previous->instruments[p]);
                 state->instruments.back()->configure (channel, song.bpm);
@@ -2435,6 +2438,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 const auto gain = e.gain * (gains != nullptr ? gains[index] : 1.0f);
                 if (gain != 1.0f && ! instrument.setNextNoteGain (gain))
                     velocity *= gain;
+                instrument.setNextNoteFinePitch (e.cents); // (issue #63: a hosted plugin's key and VST3 tuning)
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
                 HostSlide::pendingGlide() = {};
             }
@@ -3540,7 +3544,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
-                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0);
+                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0, song.chanceSeed);
     }
 
     // each started note ends where it was going to, whatever was edited meanwhile (FL, round 169d)
@@ -3765,6 +3769,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         if (liveInput != nullptr && liveInput->numChannels > 0)
             mixLiveInput (state, playing, numSamples);
         mixMetronome (state, metronomeTarget (state), numSamples);
+        mixSideInput (state, sideTrack, numSamples);
 
         // 2) inserts by layers: within a layer nothing depends on anything else; each track pulls the
         //    outputs of the tracks that send to it (without writing into others' buffers)
@@ -4018,6 +4023,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             if (live)
                 mixLiveInputTrack (state, t, recording, playing, n);
             mixMetronome (state, t, n);
+            mixSideInput (state, t, n);
             processTrack (state, t, n, meters);
         }
         for (auto k = state.graphNextStart[(std::size_t) id]; k < state.graphNextStart[(std::size_t) id + 1]; ++k)
@@ -4052,6 +4058,22 @@ void RackRenderer::mixMetronome (const RackState& state, int track, int n) noexc
     auto* dr = trackBuffer (track, 1);
     const auto* a = clickLeft + liveInputOffset;
     const auto* b = clickRight + liveInputOffset;
+    for (int i = 0; i < n; ++i)
+    {
+        dl[i] += a[i];
+        dr[i] += b[i];
+    }
+}
+
+// round 188b: a plugin's side-chain bus into its side track's input (setSideInput); `track` is the one being filled
+void RackRenderer::mixSideInput (const RackState& state, int track, int n) noexcept
+{
+    if (sideLeft == nullptr || track <= 0 || track != sideTrack || track >= std::min ((int) state.song.mixer.size(), maxMixerTracks))
+        return;
+    auto* dl = trackBuffer (track, 0);
+    auto* dr = trackBuffer (track, 1);
+    const auto* a = sideLeft + liveInputOffset;
+    const auto* b = sideRight + liveInputOffset;
     for (int i = 0; i < n; ++i)
     {
         dl[i] += a[i];

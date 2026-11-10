@@ -133,7 +133,13 @@ public:
     bool hasInstruments() const noexcept;
     bool instrumentsIdle() const noexcept;
 
-    int latencySamples() const noexcept { return latency; }
+    // The delay the graph adds (its longest path to "To LYNX SHARE"). If a node's latency moved since the graph planned
+    // its compensation (latencyStale), the latency it will have once built again. UI thread (allocates when stale).
+    int latencySamples() const;
+    // Whether a node's own latency differs from the one the delay compensation was planned with: an effect that learned
+    // its latency while running, a look-ahead changed by a value, a node switched on / off in `doc` (null: as planned).
+    // The rack then builds the graph again (the running nodes are kept). UI thread.
+    bool latencyStale (const PatcherDoc* doc = nullptr) const;
     // The device's input and output buses for the hardware insert nodes (round 165c; null: offline / no device), and
     // where the next process() call's first sample sits in the callback piece. Audio thread, before process().
     void setHardwareIo (const LiveInput* in, HardwareOutput* out, int offset) noexcept
@@ -170,6 +176,9 @@ private:
 
     void processPiece (const float* inL, const float* inR, const float* scL, const float* scR, float* outL, float* outR, int n, double bpm) noexcept;
     void applyPending() noexcept;
+    int ownLatency (int node, bool enabled) const noexcept;
+    // the nodes' input / output latencies and the graph's latency, for the nodes' own latencies `own`
+    int planLatencies (const std::vector<int>& own, std::vector<int>& in, std::vector<int>& out) const;
 
     std::vector<std::unique_ptr<Node>> nodes;
     std::vector<int> order;
@@ -252,6 +261,8 @@ private:
     std::atomic<Values*> pending { nullptr };
     std::atomic<Values*> retired { nullptr };
     int latency = 0;
+    std::vector<int> plannedOwn;    // [node] the own latency the compensation was planned with
+    std::vector<char> plannedEnabled;
     double rate = 44100.0;
     const LiveInput* hwIn = nullptr;
     HardwareOutput* hwOut = nullptr;

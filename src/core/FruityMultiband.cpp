@@ -907,13 +907,28 @@ private:
 class MultibandEffect final : public Effect
 {
 public:
-    explicit MultibandEffect (std::optional<State> fl) : imported (std::move (fl)) {}
+    // `initial` (may be null): the slot's parameters, so the engine is set up in prepare() and its linear-phase
+    // latency is known before the first block (issue #113)
+    MultibandEffect (std::optional<State> fl, const EffectParams* initial) : imported (std::move (fl))
+    {
+        if (initial != nullptr)
+            params0 = *initial;
+        hasParams0 = initial != nullptr;
+    }
 
     void prepare (double r) noexcept override
     {
         sampleRate = std::max (1, (int) std::lround (r));
         prepared = true;
         configured = false;
+        if (hasParams0)
+        {
+            std::array<int, controls> c {};
+            for (int i = 0; i < controls; ++i)
+                c[(std::size_t) i] = control (i, params0[(std::size_t) i]);
+            engine.setup (c, sampleRate);
+            configured = true;
+        }
     }
 
     void reset() noexcept override { engine.reset(); }
@@ -954,8 +969,9 @@ private:
 
     Engine engine;
     std::optional<State> imported;
+    EffectParams params0 {};
     int sampleRate = 44100;
-    bool prepared = false, configured = false;
+    bool hasParams0 = false, prepared = false, configured = false;
 };
 
 std::int32_t i32 (const std::vector<std::uint8_t>& d, std::size_t at) noexcept
@@ -1038,6 +1054,9 @@ std::string paramText (int i, float value)
     return t;
 }
 
-std::unique_ptr<Effect> make() { return std::make_unique<MultibandEffect> (std::nullopt); }
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState) { return std::make_unique<MultibandEffect> (parse (flState)); }
+std::unique_ptr<Effect> make (const EffectParams* params) { return std::make_unique<MultibandEffect> (std::nullopt, params); }
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& flState, const EffectParams* params)
+{
+    return std::make_unique<MultibandEffect> (parse (flState), params);
+}
 } // namespace lynx::flmb
