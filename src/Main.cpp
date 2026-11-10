@@ -2,7 +2,6 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
-#include "core/MasterLooks.h"
 #include "core/PlaylistOps.h"
 #include "core/Comping.h"
 #include "core/Drumaxx.h"
@@ -22,6 +21,7 @@
 #include "core/FlpImport.h"
 #include "core/NoteEdit.h"
 #include "core/MaximusFx.h"
+#include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "flp/Flp.h"
 #include "core/SynthPresets.h"
