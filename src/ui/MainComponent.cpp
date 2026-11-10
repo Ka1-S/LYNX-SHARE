@@ -1768,6 +1768,15 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (is ("view.audioEditor")) openAudioEditorForSelection();
     else if (is ("channel.soloSelected")) rack.solo (engine.getSelectedChannel());
+    else if (is ("automation.lastTweaked"))
+    {
+        // FL's Add › Automation for last tweaked parameter (round 143) from a key (round 190an): LYNX's own controls
+        // and a hosted plugin's parameters alike (AudioEngine::noteTweaked keeps the last moved one)
+        if (const auto t = engine.getLastTweaked (0))
+            createAutomationClip (engine, *t);
+        else
+            ui::postHint ({ tr ("Automation for last tweaked parameter"), tr ("Last tweaked: none") }, 3000);
+    }
     else if (is ("view.tempoTapper")) openTempoTapper (engine);
     else if (is ("view.sampleBrowser")) toggleSampleBrowser();
     else if (is ("view.pluginDatabase"))
@@ -6657,12 +6666,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSectionHeader (tr ("Other"));
         // FL's "Automation for last tweaked parameter" (Add_AutoLastMenu → FUN_01231100, REA round 143)
         const auto last = engine.getLastTweaked (0);
-        menu.addItem (last ? tr ("Automation for last tweaked parameter ({0})", { describeAutomationTarget (engine, *last) })
-                           : tr ("Automation for last tweaked parameter"),
-                      last.has_value(), false, [this] {
-                          if (const auto t = engine.getLastTweaked (0))
-                              createAutomationClip (engine, *t);
-                      });
+        menu.addItem ((last ? tr ("Automation for last tweaked parameter ({0})", { describeAutomationTarget (engine, *last) })
+                            : tr ("Automation for last tweaked parameter"))
+                          + shortcutText ("automation.lastTweaked"),
+                      last.has_value(), false, [this] { runAction ("automation.lastTweaked"); });
         menu.addItem (tr ("Pattern"), [this] { newPatternButton.onClick(); });
         menu.addItem (tr ("Plugin manager..."), [this] { showPluginManager(); });
         return menu;

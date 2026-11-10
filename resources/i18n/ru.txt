@@ -8358,3 +8358,4 @@ countries: ru by kz
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Привязка нот к гамме вкл./выкл."
+"Create automation clip for the last tweaked control" = "Создать клип автоматизации для последнего изменённого регулятора"

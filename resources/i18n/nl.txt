@@ -8358,3 +8358,4 @@ countries: nl be
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Noten aan de toonladder vastklikken aan/uit"
+"Create automation clip for the last tweaked control" = "Automation clip maken voor de laatst bewogen regelaar"

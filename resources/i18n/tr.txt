@@ -8358,3 +8358,4 @@ countries: tr
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Notaları gama yapıştır aç/kapat"
+"Create automation clip for the last tweaked control" = "Son oynatılan kontrol için otomasyon klibi oluştur"

@@ -8441,3 +8441,4 @@ countries: br
 "Rectify" = "Retificar"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Encaixar notas na escala liga/desliga"
+"Create automation clip for the last tweaked control" = "Criar clipe de automação para o último controle mexido"

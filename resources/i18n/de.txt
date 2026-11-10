@@ -8358,3 +8358,4 @@ countries: de at ch li lu
 "Rectify" = "Gleichrichter"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Noten an der Skala einrasten ein/aus"
+"Create automation clip for the last tweaked control" = "Automationsclip für das zuletzt bewegte Bedienelement erstellen"

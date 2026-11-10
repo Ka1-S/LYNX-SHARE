@@ -8358,3 +8358,4 @@ countries: es mx ar co cl pe ve
 "Rectify" = "Rectificar"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Ajustar notas a la escala activado/desactivado"
+"Create automation clip for the last tweaked control" = "Crear clip de automatización para el último control movido"

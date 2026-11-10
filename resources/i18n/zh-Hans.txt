@@ -8358,3 +8358,4 @@ countries: cn sg
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "音符吸附到音阶 开/关"
+"Create automation clip for the last tweaked control" = "为最后调整的控件创建自动化片段"

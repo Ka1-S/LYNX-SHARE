@@ -8358,3 +8358,4 @@ countries: tw hk mo
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "音符吸附到音階 開/關"
+"Create automation clip for the last tweaked control" = "為最後調整的控制項建立自動化片段"

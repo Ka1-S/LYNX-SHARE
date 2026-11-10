@@ -8358,3 +8358,4 @@ countries: kr
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "노트를 스케일에 스냅 켜기/끄기"
+"Create automation clip for the last tweaked control" = "마지막으로 조작한 컨트롤의 오토메이션 클립 만들기"

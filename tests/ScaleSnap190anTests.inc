@@ -163,3 +163,22 @@ TEST (scalesnap190an_arrow_keys_one_scale_step_and_the_toggle_has_no_default_key
     if (it != actions.end())
         CHECK (it->defaults.empty() && it->context == keys::Context::pianoRoll);
 }
+
+// Round 190an (TOP-20 #4, CROSS-DAW F13): "Create automation clip for the last tweaked control" as a key action. FL has
+// the menu item (Add › Automation for last tweaked parameter) and no key for it, so LYNX binds none by default.
+TEST (autokey190an_automate_last_tweaked_is_a_global_action_without_a_default_key)
+{
+    const auto* action = lynx::keys::findAction ("automation.lastTweaked");
+    CHECK (action != nullptr);
+    if (action != nullptr)
+    {
+        CHECK (action->context == lynx::keys::Context::global); // from any window, also over a hosted plugin's editor
+        CHECK (action->defaults.empty());
+        CHECK (std::string (action->description) == "Create automation clip for the last tweaked control");
+    }
+    // one action per id (a second entry would shadow the first in the shortcut editor)
+    int count = 0;
+    for (const auto& a : lynx::keys::actions())
+        count += std::string (a.id) == "automation.lastTweaked" || std::string (a.id) == "pianoRoll.scaleSnap" ? 1 : 0;
+    CHECK (count == 2);
+}

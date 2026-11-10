@@ -8358,3 +8358,4 @@ countries: it ch sm
 "Rectify" = "Rettifica"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Aggancia le note alla scala attivo/disattivo"
+"Create automation clip for the last tweaked control" = "Crea clip di automazione per l'ultimo controllo modificato"

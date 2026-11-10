@@ -2312,3 +2312,11 @@ works as in Bitwig 6's Snap to Key, through `core/ScaleSnap.h` for every note ed
 
 Before this round a dragged group snapped note by note to the nearest key (a triad could lose its shape between two
 scale keys) and an off-scale note jumped onto the scale as soon as it was dragged sideways.
+
+## Round 190an: a key for "Automation for last tweaked parameter"
+FL has the menu item (Add › Automation for last tweaked parameter) and no shortcut for it: the DFM item
+`Add_AutoLastMenu` carries no `ShortCut` and FL's ShortcutsModule has no action for it (round 167j's list of 125
+default shortcuts). LYNX adds the global key action `automation.lastTweaked` ("Create automation clip for the last
+tweaked control"), with no default key as in FL; bind one in the shortcut editor. It does what the menu item does, for
+LYNX's own controls and for a hosted plugin's parameters, and the menu item shows the key once one is bound. With
+nothing tweaked yet the hint bar says so.

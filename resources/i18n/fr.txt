@@ -8358,3 +8358,4 @@ countries: fr be ch ca lu
 "Rectify" = "Redresser"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Aimanter les notes à la gamme activé/désactivé"
+"Create automation clip for the last tweaked control" = "Créer un clip d'automation pour le dernier contrôle modifié"

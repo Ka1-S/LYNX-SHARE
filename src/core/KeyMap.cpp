@@ -67,6 +67,9 @@ std::vector<Action> makeActions()
         // round 177d (an FL wishlist item): solo the selected channel from any window, no key by default (bind one in
         // the shortcut editor); again = every channel plays (FL's channel solo)
         { "channel.soloSelected", TR_NOOP ("Solo the selected channel (from any window)"), Context::global, {} },
+        // round 190an (CROSS-DAW F13): FL's Add › Automation for last tweaked parameter as a key action. FL gives it
+        // no key (DFM Add_AutoLastMenu has no ShortCut and ShortcutsModule has no action for it), so none by default
+        { "automation.lastTweaked", TR_NOOP ("Create automation clip for the last tweaked control"), Context::global, {} },
 
         // workspace panels
         { "panel.playlist", TR_NOOP ("Show, focus or hide the Playlist"), Context::global, { chord (f5) } },

@@ -8358,3 +8358,4 @@ countries: pl
 "Rectify" = "Prostowanie"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "Przyciąganie nut do skali wł./wył."
+"Create automation clip for the last tweaked control" = "Utwórz klip automatyki dla ostatnio ruszonej kontrolki"

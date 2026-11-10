@@ -8358,3 +8358,4 @@ countries: jp
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Snap notes to the scale on/off" = "ノートをスケールにスナップ オン/オフ"
+"Create automation clip for the last tweaked control" = "最後に操作したコントロールのオートメーションクリップを作成"
