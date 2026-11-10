@@ -254,8 +254,13 @@ private:
         modX.setValue (current.modX, quiet);
         modY.setValue (current.modY, quiet);
         filterType.setSelectedId (juce::jlimit (0, 7, (int) current.filterType) + 1, quiet);
-        for (auto* s : { &envelope[0], &envelope[1], &envelope[2], &envelope[3], &envelope[5], &lfo[0], &lfo[1], &lfo[3] })
-            s->updateText(); // seconds / beats
+        // the texts again: seconds / beats follow the tempo switches, and a value that did not move keeps the text it
+        // had before its unit was set
+        for (auto* group : { envelope.data(), tension.data(), lfo.data() })
+            for (int i = 0; i < (group == envelope.data() ? 7 : group == tension.data() ? 3 : 4); ++i)
+                group[i].updateText();
+        modX.updateText();
+        modY.updateText();
 
         // what the voice processor does not use: the pan target has no envelope (its LFO alone moves the pan), and
         // the volume envelope has no amount
