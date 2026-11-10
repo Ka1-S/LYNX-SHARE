@@ -644,19 +644,17 @@ double velocityShape (const VelocityShaperOptions& o, double x) noexcept
     if (p.empty())
         return 1.0;
     x = std::clamp (x, 0.0, 1.0);
-    if (x <= p.front().x)
-        return std::clamp (p.front().y, 0.0, 1.0);
-    for (std::size_t i = 1; i < p.size(); ++i)
-        if (x <= p[i].x)
-        {
-            const auto& a = p[i - 1];
-            const auto& b = p[i];
-            const auto u = b.x > a.x ? (x - a.x) / (b.x - a.x) : 1.0;
-            const auto c = (double) a.curve;
-            const auto bend = std::abs (c) < 1.0e-6 ? u : (1.0 - std::exp (-c * u)) / (1.0 - std::exp (-c));
-            return std::clamp (a.y + (b.y - a.y) * bend, 0.0, 1.0);
-        }
-    return std::clamp (p.back().y, 0.0, 1.0);
+    std::size_t i = 0;
+    while (i + 1 < p.size() && p[i + 1].x <= x) // the last point at or before x (of points at one x, the later)
+        ++i;
+    if (i + 1 >= p.size() || x < p[i].x)
+        return std::clamp (x < p[i].x ? p.front().y : p.back().y, 0.0, 1.0);
+    const auto& a = p[i];
+    const auto& b = p[i + 1];
+    const auto u = (x - a.x) / (b.x - a.x);
+    const auto c = (double) a.curve;
+    const auto bend = std::abs (c) < 1.0e-6 ? u : (1.0 - std::exp (-c * u)) / (1.0 - std::exp (-c));
+    return std::clamp (a.y + (b.y - a.y) * bend, 0.0, 1.0);
 }
 
 Notes velocityShaper (Notes notes, const VelocityShaperOptions& o, std::int64_t grid)

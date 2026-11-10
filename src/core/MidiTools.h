@@ -187,8 +187,9 @@ struct VelocityShaperOptions
         double x, y;  // 0..1 of the cycle, 0..1 of minimum..maximum
         float curve;  // the bend of the segment to the next point: 0 straight, > 0 fast first (exponential)
     };
-    // [LIVE, fitted on 96 measured notes] the default: from the top straight down an exponential to the floor at 0.503
-    std::vector<Point> points { { 0.0, 1.0, 2.825f }, { 0.503, 0.0, 0.0f }, { 1.0, 0.0, 0.0f } };
+    // [LIVE, fitted on 96 measured notes] the default: up the left edge to the top, an exponential down to the floor at
+    // 0.503, then flat (Live draws the bottom-left corner as a point too). Points at one x make a jump: the later wins.
+    std::vector<Point> points { { 0.0, 0.0, 0.0f }, { 0.0, 1.0, 2.825f }, { 0.503, 0.0, 0.0f }, { 1.0, 0.0, 0.0f } };
     int minimum = 1, maximum = 127; // [LIVE defaults]
     int loops = 1;                  // cycles over the notes' span [LIVE]
     int rotate = 0;                 // the envelope starts this many divisions later (wrapping) [LIVE]
