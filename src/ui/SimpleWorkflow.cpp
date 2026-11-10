@@ -639,12 +639,16 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
 
 void SimpleWorkflow::chooseSample()
 {
-    fileChooser = ui::makeFileChooser (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
+    // the dialog opens where there are samples to choose from (round 190t): the Browser's sample folder the first time,
+    // then the folder the last sample came from
+    const auto start = sampleFolder.isDirectory() ? sampleFolder : host.sampleFolder ? host.sampleFolder() : juce::File();
+    fileChooser = ui::makeFileChooser (tr ("Choose sample"), start, engine.getSampleLibrary().wildcard());
     ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                        [this] (const juce::FileChooser& fc) {
                            const auto file = fc.getResult();
                            if (! file.existsAsFile())
                                return;
+                           sampleFolder = file.getParentDirectory();
                            if (engine.getSampleLibrary().load (file.getFullPathName()) == nullptr)
                            {
                                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),

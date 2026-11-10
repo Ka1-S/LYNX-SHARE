@@ -29,6 +29,8 @@ public:
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
+        // round 190t
+        std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
     };
 
@@ -88,5 +90,6 @@ private:
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };
 } // namespace lynx
