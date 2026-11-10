@@ -22,6 +22,7 @@
 #include "core/FlpImport.h"
 #include "core/NoteEdit.h"
 #include "core/MaximusFx.h"
+#include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "flp/Flp.h"
 #include "core/SynthPresets.h"
@@ -10249,6 +10250,15 @@ private:
             offline.dispatchPendingMessages();
             ui.getPlaylistForSnapshot().selectTrack (1);
             write ("simple-tracks");
+            // slice S8: the Finish dock, empty, then with a look on the Master (Balanced, Normal, a little Tone)
+            simple->showFinish();
+            offline.dispatchPendingMessages();
+            write ("simple-finish-empty");
+            offline.editSongStructural ([] (lynx::Song& s) { lynx::looks::apply (s, lynx::MasterLookSettings { lynx::looks::balanced, 0.5f, { 1.5f, 0.0f, 1.0f }, -3.0f }); });
+            offline.dispatchPendingMessages();
+            simple->showFinish();
+            write ("simple-finish");
+            simple->hideFinish();
         }
         saveStyleMenus ("simple");
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");

@@ -29,6 +29,7 @@ public:
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
+        std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -54,6 +55,11 @@ public:
     // Files dropped on the timeline below the tracks (slice S4): one new track each (MIDI: one per MIDI track), from `tick`.
     void dropFiles (const juce::StringArray& files, std::int64_t tick);
 
+    // The Finish dock (slice S8, ui/FinishDock.h): the Master looks, on the right of the Playlist
+    void showFinish();
+    void hideFinish();
+    bool isFinishShowing() const noexcept;
+
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
@@ -77,7 +83,8 @@ private:
     bool active = false;
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
     std::unique_ptr<Chooser> chooser;
-    std::unique_ptr<juce::Component> addButton;
+    std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
+    std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<juce::FileChooser> fileChooser;
 };
 } // namespace lynx

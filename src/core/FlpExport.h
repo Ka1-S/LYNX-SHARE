@@ -108,6 +108,10 @@ std::vector<std::uint8_t> exportFlp (const Song& song, const Options& options, R
 
 // FL 2026's default Fruity Limiter state (option B's substitute for LYNX's Limiter)
 std::vector<std::uint8_t> fruityLimiterDefaultState();
+// A fresh FL 2026 Fruity Parametric EQ 2 (version 8, 354 bytes), as FL saves a new instance (round 189k capture)
+std::vector<std::uint8_t> parametricEq2DefaultState();
+// The FL plugin and state a Master look's slot (EffectSlot::look) is written as; nullopt for any other slot
+std::optional<std::pair<std::string, std::vector<std::uint8_t>>> nativeLookState (const EffectSlot& slot);
 // LYNX's 3x Osc with no state, as FL's own version-14 state
 std::vector<std::uint8_t> defaultThreeOscState();
 

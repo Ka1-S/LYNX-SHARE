@@ -987,6 +987,9 @@ struct EffectSlot
     // slot 5 with slots 1-4 empty. -1 = right after the previous effect (every effect of an old project). The chain
     // order is the vector's order; the rows only grow along it (core/MixerOps.h effectRows).
     int row = -1;
+    // Part of a Master look (round 189k S8, core/MasterLooks.h): the look's id, 0 = an ordinary slot. Saved in .lynx;
+    // FL export writes such a slot as FL's own plugin with its settings (core/FlStateWrite.h).
+    std::uint8_t look = 0;
     FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
@@ -1838,6 +1841,16 @@ struct SessionInfo
     bool operator== (const SessionInfo&) const = default;
 };
 
+// The Master look the Finish dock last applied (round 189k S8, core/MasterLooks.h); id 0 = none. Saved in .lynx.
+struct MasterLookSettings
+{
+    int id = 0;
+    float intensity = 0.5f;           // 0…1 (Light 0.25, Normal 0.5, Heavy 0.85)
+    std::array<float, 3> tone {};     // Low, Mid, High in dB, −6…+6
+    float inputDb = 0.0f;             // Auto level's input gain (Parametric EQ 2's main level), dB
+    bool operator== (const MasterLookSettings&) const = default;
+};
+
 struct Song
 {
     double bpm = 130.0;
@@ -1848,6 +1861,7 @@ struct Song
     std::vector<std::string> channelGroups; // the Channel Rack's filter groups (FL's "All" dropdown), by name
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
     ProjectInfo info;
+    MasterLookSettings masterLook;
     // Online Sessions (round 168a): the project's lineage (random 128-bit hex, kept by copies and packages), the last
     // uid counter used and who works on it (uids::normalize fills the first two)
     std::string projectId;

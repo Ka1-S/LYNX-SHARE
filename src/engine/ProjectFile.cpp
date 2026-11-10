@@ -805,6 +805,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("smartDisable", false);
     if (slot.row >= 0) // the mixer row (FL's slot places, round 170b); absent = right after the previous effect
         e->setProperty ("row", slot.row);
+    if (slot.look != 0) // part of a Master look (round 189k)
+        e->setProperty ("look", (int) slot.look);
     if (slot.sidechain >= 0)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
@@ -889,6 +891,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.mix = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("mix", 1.0));
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
+    slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
 
     if (auto* params = e["params"].getArray())
     {
@@ -2146,6 +2149,12 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
     if (song.masterPitch != 0.0f)
         root->setProperty ("masterPitch", (double) song.masterPitch);
+    if (song.masterLook.id != 0) // the Finish dock's Master look (round 189k)
+    {
+        const auto& l = song.masterLook;
+        root->setProperty ("masterLook", juce::String (l.id) + " " + juce::String (l.intensity, 4) + " " + juce::String (l.tone[0], 2) + " "
+                                             + juce::String (l.tone[1], 2) + " " + juce::String (l.tone[2], 2) + " " + juce::String (l.inputDb, 2));
+    }
     if (song.substitutesBypassed)
         root->setProperty ("substitutesBypassed", true);
     if (song.cleanMixer)
@@ -2761,6 +2770,19 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         for (const auto& name : *groups)
             song.channelGroups.push_back (name.toString().toStdString());
     song.masterPitch = juce::jlimit (-1200.0f, 1200.0f, (float) (double) root.getProperty ("masterPitch", 0.0));
+    {
+        const auto t = juce::StringArray::fromTokens (root.getProperty ("masterLook", "").toString(), " ", "");
+        song.masterLook = {};
+        if (t.size() == 6)
+        {
+            auto& l = song.masterLook;
+            l.id = juce::jlimit (0, 255, t[0].getIntValue());
+            l.intensity = juce::jlimit (0.0f, 1.0f, t[1].getFloatValue());
+            for (int i = 0; i < 3; ++i)
+                l.tone[(std::size_t) i] = juce::jlimit (-6.0f, 6.0f, t[2 + i].getFloatValue());
+            l.inputDb = juce::jlimit (-18.0f, 18.0f, t[5].getFloatValue());
+        }
+    }
     song.substitutesBypassed = (bool) root.getProperty ("substitutesBypassed", false);
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);

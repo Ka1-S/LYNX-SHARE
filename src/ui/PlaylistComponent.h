@@ -625,8 +625,14 @@ public:
     void setTitleBarInsets (int left, int right) override
     {
         titleLeft = left;
-        playlist.setTitleBarInsets (juce::jmax (0, left - PatternPicker::width), right);
+        titleRight = right;
+        applyTitleInsets();
         resized();
+    }
+    // the Playlist's toolbar starts after the window title; the pattern picker column (when shown) sits under the title
+    void applyTitleInsets()
+    {
+        playlist.setTitleBarInsets (juce::jmax (0, titleLeft - (pickerHidden ? 0 : PatternPicker::width)), titleRight);
     }
 
     // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
@@ -656,6 +662,7 @@ public:
             return;
         pickerHidden = hidden;
         picker.setVisible (! hidden && (clipGrid == nullptr || gridView != GridView::grid));
+        applyTitleInsets(); // (round 189k: in Simple the toolbar went under the title bar's tools by the picker's width)
         resized();
         repaint();
     }
@@ -688,6 +695,19 @@ public:
         resized();
     }
 
+    // A dock on the right, beside the Playlist (round 189k: the Simple workflow's Finish dock); not owned, nullptr = none.
+    void setSideDock (juce::Component* c, int width)
+    {
+        if (sideDock != nullptr && sideDock != c)
+            removeChildComponent (sideDock);
+        sideDock = c;
+        sideDockWidth = width;
+        if (sideDock != nullptr)
+            addAndMakeVisible (*sideDock);
+        resized();
+    }
+    juce::Component* getSideDock() const noexcept { return sideDock; }
+
     void resized() override
     {
         layoutChildren();
@@ -698,6 +718,8 @@ public:
     void layoutChildren()
     {
         auto area = getLocalBounds();
+        if (sideDock != nullptr) // under the title row (the window's buttons are there)
+            sideDock->setBounds (area.removeFromRight (juce::jmin (sideDockWidth, area.getWidth() / 2)).withTrimmedTop (PlaylistComponent::toolbarHeight));
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
             detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (pickerHidden)
@@ -746,10 +768,12 @@ public:
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
-    int titleLeft = 0;
+    int titleLeft = 0, titleRight = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
+    juce::Component* sideDock = nullptr; // (not owned)
+    int sideDockWidth = 0;
     bool pickerHidden = false;
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;

@@ -11,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/UndoKeys.h"
 #include "core/LayoutStyle.h"
 #include "core/Performance.h"
 #include "ui/UiTrace.h"
@@ -296,6 +297,10 @@ private:
     // FL's Edit › Undo (Ctrl+Z, round 167k): undoes the last step, or redoes one when something is undone (FL's
     // FUN_010173a0: history position 0 → 1, else position − 1); with "Alternate undo mode" a plain multi-level undo
     void flUndo();
+    // FL's Edit › Undo backwards (Ctrl+Alt+Z): one more step back; with "Alternate undo mode" the two shortcuts swap, so
+    // it undoes, or redoes when something is undone (round 190b, issue #140; core/UndoKeys.h)
+    void flUndoBackwards();
+    void runUndoStep (undokeys::Step step);
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
