@@ -131,6 +131,7 @@ add_library(lynx_core STATIC
     src/core/FlLegacyFx.cpp
     src/core/PocketFx.cpp
     src/core/PocketMultiFx.cpp
+    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
@@ -406,6 +407,8 @@ if(LYNX_BUILD_APP)
         src/engine/LiveSessions.cpp
         src/engine/MediaPack.cpp
         src/engine/LiveTest.cpp
+        src/engine/DeviceChangeTest.cpp
+        src/engine/ShortExportTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/PluginHost.cpp
@@ -465,6 +468,7 @@ if(LYNX_BUILD_APP)
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/FruitySlicerEditor.cpp
+        src/ui/FlVoicePanel.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

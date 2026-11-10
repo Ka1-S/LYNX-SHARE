@@ -69,6 +69,25 @@ TEST (flm188h_pocket_distortion)
         CHECK (flm188h::near (o[16][0], 0.0, 1e-9) && flm188h::near (o[17][0], 0.017 * std::pow (10.0, -12.0 / 20.0), 1e-6)
                && flm188h::near (o[33][0], o[17][0], 1e-9) && flm188h::near (o[34][0], 0.034 * std::pow (10.0, -12.0 / 20.0), 1e-6));
     }
+    // round 188i (A/B against FLM in FL): a fractional hold (BitCrush 0.7: (0.7²)²·256 + 1 = 62.47 samples) falls
+    // where FLM's own single-precision counter puts it, with the length squared twice as FLM computes it
+    {
+        std::vector<std::array<float, 2>> ramp;
+        for (int i = 0; i < 4000; ++i)
+            ramp.push_back ({ (float) i * 1e-5f, (float) i * 1e-5f });
+        const auto o = flm188h::run (K, { 0.0f, 0.7f, 1.0f, 0.5f, 0.0f, 0.5f }, ramp);
+        const float sq = 0.7f * 0.7f, crush = sq * sq * 256.0f + 1.0f;
+        float hold = 0.0f;
+        bool same = true;
+        for (int i = 0; i < 4000; ++i)
+        {
+            const auto starts = ! (hold > 0.0f);
+            if (starts) hold += crush;
+            hold -= 1.0f;
+            if (i > 0 && starts != (o[(std::size_t) i][0] != o[(std::size_t) i - 1][0])) same = false;
+        }
+        CHECK (same);
+    }
     // Bias (2(b − 0.5))⁵ is added before the curve, then a one-pole high-pass at 220.5/fs takes the offset out
     {
         std::vector<std::array<float, 2>> silence (48000, { 0.0f, 0.0f });

@@ -50,6 +50,8 @@ public:
     // Adds a track built from `request` (one undo step): arms an audio track's insert, selects an instrument's channel,
     // hides the chooser. False (and a message) when it can't be added.
     bool add (simpletracks::Request request);
+    // Files dropped on the timeline below the tracks (slice S4): one new track each (MIDI: one per MIDI track), from `tick`.
+    void dropFiles (const juce::StringArray& files, std::int64_t tick);
 
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
@@ -64,6 +66,7 @@ private:
     void chooseInstrument (juce::Component& tile);
     void chooseSample();
     void importFiles();
+    void addFiles (const juce::Array<juce::File>& files, std::int64_t start);
     void addDrums (const std::string& genre, bool steps, bool useTempo);
     void addAudio (simpletracks::Kind kind);
 
