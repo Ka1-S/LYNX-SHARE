@@ -10920,6 +10920,15 @@ private:
             }
             ui.selectTabForSnapshot (1);
             saveSnapshot (ui, prefix + "-pianoroll.png");
+            {
+                // View › Keyboard style › Piano keys (round 190j, discussion #136), also with tall keys
+                auto& roll = ui.getPianoRollForSnapshot();
+                lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
+                roll.repaint();
+                saveSnapshot (ui, prefix + "-pianoroll-pianokeys.png");
+                lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+                roll.repaint();
+            }
             if (const auto strip = ui.getToolStripAreaForSnapshot (false); ! strip.isEmpty())
                 saveArea (ui, strip, prefix + "-pianoroll-tools.png");
             // the editors' mouse feel: the hovered note / clip edge (grip, outline) and its hint in the hint bar

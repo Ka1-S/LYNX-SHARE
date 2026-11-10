@@ -8263,3 +8263,6 @@ countries: jp
 "Mixer groups follow the Playlist (LYNX)" = "ミキサーのグループをプレイリストに合わせる（LYNX）"
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
+"Keyboard style" = "鍵盤のスタイル"
+"Flat keys (FL Studio style)" = "フラットな鍵盤（FL Studio スタイル）"
+"Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"

@@ -2097,6 +2097,9 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
+            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
+                                                                                                                  : pianokeys::Style::flat;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2304,6 +2307,7 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)

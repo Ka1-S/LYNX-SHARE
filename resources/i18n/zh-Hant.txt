@@ -8263,3 +8263,6 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+"Keyboard style" = "鍵盤樣式"
+"Flat keys (FL Studio style)" = "平面琴鍵（FL Studio 樣式）"
+"Piano keys (lines between the white keys)" = "鋼琴琴鍵（白鍵之間有分隔線）"
