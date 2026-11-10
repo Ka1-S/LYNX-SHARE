@@ -2303,4 +2303,5 @@ curve): √2 × the curve at the centre (−2.2 dB at the default 78 %), where L
 panning law, note velocity `Round (128 v)`): Surge XT renders within 0.05 dB of FL's at every volume and pan tested
 (`docs/analise/REA_rodada190ad.md`; before: 3.0 dB under). The project keeps this as `"pluginLevels": "fl"`. LYNX's
 own projects, saved or new, keep LYNX's law and sound as before; their `.flp` export writes the plugin channel's
-volume that sounds the same in FL. Open: whether new LYNX projects should take FL's level too.
+volume that sounds the same in FL. New projects (File › New, built-in templates, user templates without a hosted
+plugin) start with FL's levels; saved projects and `.als` imports keep theirs.
