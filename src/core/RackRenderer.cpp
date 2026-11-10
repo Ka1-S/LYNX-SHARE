@@ -23,6 +23,8 @@
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
 #include "core/Patcher.h"
+
+#include <optional>
 #include "core/LoadTrace.h"
 #include "core/DynamicsSuite.h"
 #include "core/MixSuite.h"
@@ -3798,6 +3800,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         meters->rollingLog.push (RollingAudioLog::Position::postEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
 
     MixerMatrix target; // without a mixer: unity
+    std::optional<MixerMatrix> mutedLevel; // issue #144: a muted Master's meter shows its level without the mute (FL)
 
     if (! song.mixer.empty())
     {
@@ -3806,8 +3809,24 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, 0, master.pan);
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], fader) : fader;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
-        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f }
-                              : mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        const auto level = mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : level;
+        if (master.muted && meters != nullptr)
+            mutedLevel = level;
+    }
+
+    if (mutedLevel) // (read before the buffers are scaled; nothing is written)
+    {
+        const auto& m = *mutedLevel;
+        const auto* a = trackBuffer (0, 0);
+        const auto* b = trackBuffer (0, 1);
+        float pl = 0.0f, pr = 0.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            pl = std::max (pl, std::abs (m.ll * a[i] + m.rl * b[i]));
+            pr = std::max (pr, std::abs (m.rr * b[i] + m.lr * a[i]));
+        }
+        meters->accumulate (0, pl, pr);
     }
 
     lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);

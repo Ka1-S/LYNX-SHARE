@@ -99,6 +99,11 @@ TEST (mute190y_muted_insert_keeps_its_meter_not_its_sound)
     CHECK (sendMuted.l == sendUnmetered.l && sendMuted.r == sendUnmetered.r);
     CHECK (sendMuted.insert2 == 0.0f && sendMuted.insert1 > 0.1f);
 
+    // a muted Master: silent output, its meter keeps its level (FL)
+    const auto masterMuted = mute190y::render ([] (Song& s) { s.mixer[0].muted = true; }, true);
+    CHECK (std::all_of (masterMuted.l.end() - 2048, masterMuted.l.end(), [] (float x) { return x == 0.0f; }));
+    CHECK (std::abs (masterMuted.master - playing.master) < 1.0e-4f && playing.master > 0.1f);
+
     // a controller in it (it would move other controls) keeps the old way: not run, no meter
     const auto controller = mute190y::render ([] (Song& s) {
         s.mixer[1].muted = true;
