@@ -47,7 +47,33 @@ byte b is b / 128 in LYNX, and LYNX sent JUCE's `round (127 v)`: 100 went out as
 0.5…2.0 s, dBFS; LYNX − FL in dB. Surge's oscillators start at a random phase: ±0.05 dB between runs; the R / L ratio
 of one render is exact (the patch is mono).
 
-@@TABLE@@
+| project (volume, pan, law) | FL L / R | LYNX before L / R | before − FL | LYNX after L / R | after − FL | R / L: FL, before, after |
+|---|---|---|---|---|---|---|
+| volume 25 %, centre | −40.72 / −40.72 | −43.72 / −43.72 | −3.01 | −40.70 / −40.70 | +0.01 | 1.0000, 1.0000, 1.0000 |
+| volume 50 % | −31.70 / −31.70 | −34.71 / −34.71 | −3.01 | −31.69 / −31.69 | +0.01 | 1, 1, 1 |
+| volume 78 % (default) | −24.20 / −24.20 | −27.22 / −27.22 | −3.01 | −24.20 / −24.20 | 0.00 | 1, 1, 1 |
+| volume 100 % | −19.00 / −19.00 | −22.00 / −22.00 | −2.99 | −18.99 / −18.99 | +0.02 | 1, 1, 1 |
+| pan hard left | −21.20 / silent | −24.20 / silent | −3.00 | −21.20 / silent | 0.00 | 0, 0, 0 |
+| pan half left | −21.88 / −29.54 | −24.89 / −32.55 | −3.01 | −21.89 / −29.54 | 0.00 | 0.4142, 0.4142, 0.4142 |
+| pan hard right | silent / −21.20 | −142.5 / −24.21 | −3.01 | silent / −21.19 | +0.01 | — |
+| velocity 51 | −24.21 | −27.21 | −2.99 | −24.21 | 0.00 | 1, 1, 1 |
+| velocity 127 | −24.20 | −27.22 | −3.01 | −24.21 | 0.00 | 1, 1, 1 |
+| pan +1.5 / 64 | −24.32 / −24.11 | −27.38 / −27.06 | −3.06 / −2.95 | −24.31 / −24.10 | +0.01 | 1.0249, 1.0375, 1.0248 |
+| pan +2.5 / 64 | −24.42 / −24.00 | −27.49 / −26.96 | −3.07 / −2.96 | −24.41 / −23.99 | +0.01 | 1.0503, 1.0633, 1.0503 |
+| pan +0.4 / 64 | −24.21 / −24.21 | −27.26 / −27.18 | −3.05 / −2.96 | −24.21 / −24.21 | 0.00 | 1.0000, 1.0099, 1.0000 |
+| triangular law, half left | −24.21 / −30.23 | −24.90 / −32.55 | −0.69 / −2.32 | −24.20 / −30.22 | 0.00 | 0.5000, 0.4142, 0.5000 |
+| triangular law, centre | −24.21 / −24.21 | −27.22 / −27.22 | −3.01 | −24.20 / −24.20 | +0.02 | 1, 1, 1 |
+
+"Before" = round 190x's build (c7b997151); "after" = a0d2ff1bd (cloud build, run 42906499360). What the renders fix:
+the gain is √2·f(v) at every volume (so the event's `vol` is the curve f(v)); the pan is the kernel's, in whole steps
+of 1 / 64 **truncated** (1.5 → 1, 2.5 → 2, 0.4 → 0; negative pans assumed to truncate towards zero too); the project's
+triangular law reaches the wrapper (the louder side at the centre's level, R / L = 0.5 at half left). Surge's default
+patch does not react to velocity, so the velocity law rests on §2 alone.
+
+**Gate** (same cloud build of origin/main e6c77291b vs a0d2ff1bd, `lx/base_gate_*` / `lx/after_gate_*`): the selftest's
+demo project (.lynx), FL's "Use Me" and "NewStuff" demo .flp (no hosted plugin) export **byte-identical**; a LYNX
+project with Surge XT (`gate/s3.lynx`) keeps its level (−25.92 dBFS RMS both). Its `.flp` export rendered by FL:
+−22.71 dBFS before (3.2 dB over LYNX), −25.71 after (peak −16.01 vs LYNX's −16.03).
 
 ## 4. Change
 
