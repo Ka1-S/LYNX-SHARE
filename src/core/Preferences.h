@@ -181,6 +181,9 @@ struct MidiPrefs
     std::vector<GlobalLink> globalLinks;
     VelocityCurve velocity = VelocityCurve::linear;
     bool pickup = false;                // a controller takes over a parameter only once it reaches its value
+    // FL's "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a): LYNX holds the notes on CC 64 (sustain)
+    // and CC 66 (sostenuto); off, the pedal goes to the plugins as a controller
+    bool footPedalNoteOff = true;
     // FL's Options › MIDI "Song marker jump (MIDI channel)": a note on this channel (1..16; 0 = off) jumps the song to
     // a marker (note 0 = the first marker...) instead of playing
     int songMarkerJumpChannel = 0;
