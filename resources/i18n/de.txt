@@ -8269,3 +8269,18 @@ countries: de at ch li lu
 "Keyboard style" = "Klaviatur-Stil"
 "Flat keys (FL Studio style)" = "Flache Tasten (FL-Studio-Stil)"
 "Piano keys (lines between the white keys)" = "Klaviertasten (Linien zwischen den weißen Tasten)"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Release-Zeit"
+"Output Gain" = "Ausgangs-Gain"
+"In Gain" = "In-Gain"
+"Thr." = "Threshold"
+"Out Gain" = "Out-Gain"
+"Input Pan" = "Eingangs-Pan"
+"A. Curve" = "Attack-Kurve"
+"R. Curve" = "Release-Kurve"
+"Async." = "Asynchron"
+"LFO Rate" = "LFO-Rate"
+"LFO Shape" = "LFO-Form"
+"LFO Amnt" = "LFO-Stärke"
+"Vowel" = "Vokal"

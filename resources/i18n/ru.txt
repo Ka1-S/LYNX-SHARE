@@ -8269,3 +8269,18 @@ countries: ru by kz
 "Keyboard style" = "Стиль клавиатуры"
 "Flat keys (FL Studio style)" = "Плоские клавиши (стиль FL Studio)"
 "Piano keys (lines between the white keys)" = "Клавиши пианино (линии между белыми клавишами)"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Время релиза"
+"Output Gain" = "Выходной гейн"
+"In Gain" = "Входной гейн"
+"Thr." = "Порог"
+"Out Gain" = "Выходной гейн"
+"Input Pan" = "Панорама входа"
+"A. Curve" = "Кривая атаки"
+"R. Curve" = "Кривая затухания"
+"Async." = "Асинхронность"
+"LFO Rate" = "Скор. LFO"
+"LFO Shape" = "Форма LFO"
+"LFO Amnt" = "Глубина LFO"
+"Vowel" = "Гласная"

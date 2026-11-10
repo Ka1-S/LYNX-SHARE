@@ -8269,3 +8269,18 @@ countries: tr
 "Keyboard style" = "Klavye stili"
 "Flat keys (FL Studio style)" = "Düz tuşlar (FL Studio stili)"
 "Piano keys (lines between the white keys)" = "Piyano tuşları (beyaz tuşlar arasında çizgiler)"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Bırakma süresi"
+"Output Gain" = "Çıkış gain"
+"In Gain" = "Giriş gain"
+"Thr." = "Threshold"
+"Out Gain" = "Çıkış gain"
+"Input Pan" = "Giriş pan"
+"A. Curve" = "Atak eğrisi"
+"R. Curve" = "Bırakma eğrisi"
+"Async." = "Asenkron"
+"LFO Rate" = "LFO hızı"
+"LFO Shape" = "LFO şekli"
+"LFO Amnt" = "LFO miktarı"
+"Vowel" = "Ünlü"

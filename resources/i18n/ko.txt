@@ -8269,3 +8269,18 @@ countries: kr
 "Keyboard style" = "건반 스타일"
 "Flat keys (FL Studio style)" = "평면 건반 (FL Studio 스타일)"
 "Piano keys (lines between the white keys)" = "피아노 건반 (흰 건반 사이에 선)"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "릴리스 타임"
+"Output Gain" = "출력 게인"
+"In Gain" = "입력 게인"
+"Thr." = "스레숄드"
+"Out Gain" = "출력 게인"
+"Input Pan" = "입력 팬"
+"A. Curve" = "어택 곡선"
+"R. Curve" = "릴리스 곡선"
+"Async." = "비동기"
+"LFO Rate" = "LFO 속도"
+"LFO Shape" = "LFO 모양"
+"LFO Amnt" = "LFO 양"
+"Vowel" = "모음"

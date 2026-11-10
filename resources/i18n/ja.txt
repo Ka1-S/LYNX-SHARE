@@ -8269,3 +8269,18 @@ countries: jp
 "Keyboard style" = "鍵盤のスタイル"
 "Flat keys (FL Studio style)" = "フラットな鍵盤（FL Studio スタイル）"
 "Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "リリースタイム"
+"Output Gain" = "出力ゲイン"
+"In Gain" = "入力ゲイン"
+"Thr." = "スレッショルド"
+"Out Gain" = "出力ゲイン"
+"Input Pan" = "入力パン"
+"A. Curve" = "アタックカーブ"
+"R. Curve" = "リリースカーブ"
+"Async." = "非同期"
+"LFO Rate" = "LFOレート"
+"LFO Shape" = "LFO 波形"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"

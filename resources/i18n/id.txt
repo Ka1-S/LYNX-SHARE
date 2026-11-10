@@ -8269,3 +8269,18 @@ countries: id
 "Keyboard style" = "Gaya keyboard"
 "Flat keys (FL Studio style)" = "Tuts datar (gaya FL Studio)"
 "Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "Waktu release"
+"Output Gain" = "Gain output"
+"In Gain" = "Gain in"
+"Thr." = "Threshold"
+"Out Gain" = "Gain out"
+"Input Pan" = "Pan input"
+"A. Curve" = "Kurva attack"
+"R. Curve" = "Kurva release"
+"Async." = "Asinkron"
+"LFO Rate" = "Laju LFO"
+"LFO Shape" = "Bentuk LFO"
+"LFO Amnt" = "Jumlah LFO"
+"Vowel" = "Vokal"

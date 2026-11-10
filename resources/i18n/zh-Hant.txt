@@ -8269,3 +8269,18 @@ countries: tw hk mo
 "Keyboard style" = "鍵盤樣式"
 "Flat keys (FL Studio style)" = "平面琴鍵（FL Studio 樣式）"
 "Piano keys (lines between the white keys)" = "鋼琴琴鍵（白鍵之間有分隔線）"
+
+# --- Pocket editors: FL Studio Mobile panel captions (round 188i)
+"Release Time" = "釋放時間"
+"Output Gain" = "輸出增益"
+"In Gain" = "輸入增益"
+"Thr." = "閾值"
+"Out Gain" = "輸出增益"
+"Input Pan" = "輸入聲像"
+"A. Curve" = "起音曲線"
+"R. Curve" = "釋放曲線"
+"Async." = "非同步"
+"LFO Rate" = "LFO 速率"
+"LFO Shape" = "LFO 形狀"
+"LFO Amnt" = "LFO量"
+"Vowel" = "母音"
