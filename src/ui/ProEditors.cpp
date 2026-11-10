@@ -12,6 +12,7 @@
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
 #include "core/StrikeShaper.h"
+#include "core/PocketFx.h"
 #include "ui/DynamicsDisplays.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/ProEditorBase.h"
@@ -4081,6 +4082,7 @@ private:
 
 #include "ui/ProEditorsStrips.inc"
 #include "ui/ProEditorsStrike.inc" // round trans189d: Strike Shaper
+#include "ui/PocketEditors.inc"
 
 // --- windows -------------------------------------------------------------------------------------------------
 std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool demo)
@@ -4101,6 +4103,14 @@ std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool 
         case EffectKind::fretChannel: return std::make_unique<FretEditor> (engine, track, slot, demo);
         case EffectKind::shellChannel: return std::make_unique<ShellEditor> (engine, track, slot, demo);
         case EffectKind::strikeShaper: return std::make_unique<StrikeEditor> (engine, track, slot, demo);
+        case EffectKind::pocketDistortion: return std::make_unique<PocketDistortionEditor> (engine, track, slot, demo);
+        case EffectKind::pocketLimiterClassic: return std::make_unique<PocketLimiterClassicEditor> (engine, track, slot, demo);
+        case EffectKind::pocketLimiter: return std::make_unique<PocketLimiterEditor> (engine, track, slot, demo);
+        case EffectKind::pocketTranceDelay: return std::make_unique<PocketTranceDelayEditor> (engine, track, slot, demo);
+        case EffectKind::pocketLeveller: return std::make_unique<PocketLevellerEditor> (engine, track, slot, demo);
+        case EffectKind::pocketGate: return std::make_unique<PocketGateEditor> (engine, track, slot, demo);
+        case EffectKind::pocketTapeDelay: return std::make_unique<PocketTapeDelayEditor> (engine, track, slot, demo);
+        case EffectKind::pocketMultiFx: return std::make_unique<PocketMultiFxEditor> (engine, track, slot, demo);
         default: return nullptr;
     }
 }
@@ -4182,7 +4192,10 @@ bool handles (EffectKind kind) noexcept
     return kind == EffectKind::apexLimiter || kind == EffectKind::hushDeEsser || kind == EffectKind::crestCompressor
            || kind == EffectKind::sentryGate || kind == EffectKind::prismMultiband || kind == EffectKind::ember
            || kind == EffectKind::aether || kind == EffectKind::kilnChannel || kind == EffectKind::fretChannel
-           || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper;
+           || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper
+           || kind == EffectKind::pocketDistortion || kind == EffectKind::pocketLimiterClassic
+           || kind == EffectKind::pocketLimiter || kind == EffectKind::pocketTranceDelay || kind == EffectKind::pocketLeveller
+           || kind == EffectKind::pocketGate || kind == EffectKind::pocketTapeDelay || kind == EffectKind::pocketMultiFx;
 }
 
 void open (AudioEngine& engine, int track, int slot)
