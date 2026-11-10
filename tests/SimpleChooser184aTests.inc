@@ -155,3 +155,45 @@ TEST (simple184a_imported_midi_track_is_an_instrument_with_its_notes)
     const auto plain = simpletracks::addTrack (s, q);
     CHECK (plain.ok() && plain.pattern == -1 && s.playlist.size() == 1);
 }
+
+TEST (simple184a_dropped_files_start_where_they_land_and_recolour)
+{
+    using namespace lynx;
+    Song s;
+    s.mixer.resize (4);
+    simpletracks::Request q;
+    q.kind = simpletracks::Kind::audio;
+    q.audioFile = "loop.wav";
+    q.audioLength = 4 * ppq;
+    q.start = 8 * ppq;
+    const auto a = simpletracks::addTrack (s, q);
+    CHECK (a.ok() && s.playlist.back().start == 8 * ppq);
+    q.start = -5; // clamped
+    simpletracks::addTrack (s, q);
+    CHECK (s.playlist.back().start == 0);
+
+    simpletracks::Request m;
+    m.kind = simpletracks::Kind::instrument;
+    ChannelDef synth;
+    m.channel = synth;
+    Pattern p;
+    p.notes.push_back (Note {});
+    m.pattern = p;
+    m.start = 16 * ppq;
+    const auto i = simpletracks::addTrack (s, m);
+    CHECK (i.ok() && s.playlist.back().start == 16 * ppq && s.playlist.back().pattern == i.pattern);
+
+    // recolour: the track, its insert and its channel together
+    simpletracks::recolour (s, i.track, 0xFF112233u);
+    CHECK (s.playlistTracks[(std::size_t) i.track].colour == 0xFF112233u);
+    CHECK (s.mixer[(std::size_t) i.insert].colour == 0xFF112233u);
+    CHECK (s.channels[(std::size_t) i.channels[0]].colour == 0xFF112233u);
+    // the audio track's clip channel keeps its own colour
+    const auto before = s.channels[(std::size_t) a.channels[0]].colour;
+    simpletracks::recolour (s, a.track, 0xFF445566u);
+    CHECK (s.mixer[(std::size_t) a.insert].colour == 0xFF445566u && s.channels[(std::size_t) a.channels[0]].colour == before);
+    // a track that is not a Simple one: nothing
+    const auto copy = s.playlistTracks;
+    simpletracks::recolour (s, 40, 0xFF000000u);
+    CHECK (s.playlistTracks == copy);
+}

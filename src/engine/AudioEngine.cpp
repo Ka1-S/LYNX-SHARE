@@ -3369,6 +3369,24 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 
 void AudioEngine::publishSong()
 {
+    // Issue #134: a hosted plugin may run the message loop while it is created (a licence or trial box, COM, a splash
+    // window), and what that loop dispatches can ask for a publish while this one is still building its rack: the
+    // engine's own timer (after a device change to another sample rate it sees the old rate until this publish ends, so
+    // it started a second rebuild of every plugin inside the first one's, and another inside each of those, as deep as
+    // the plugins kept running the loop), or an edit. The nested one waits: when this publish is done, one more runs
+    // with the song as it then is.
+    if (publishing)
+    {
+        publishAgain = true;
+        ++nestedPublishes;
+        return;
+    }
+    publishing = true;
+    const juce::ScopeGuard published { [this] {
+        publishing = false;
+        if (std::exchange (publishAgain, false))
+            publishSong();
+    } };
     ++songStamp;
     ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
@@ -3452,8 +3470,16 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_stretch");
         return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
     };
-    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
-    factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
+    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeInstrument (ref, sr);
+    };
+    factories.pluginEffects = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeEffect (ref, sr);
+    };
 
     const auto buildStart = juce::Time::getMillisecondCounterHiRes();
     const auto tracePhases = traceEdits && ! loadtrace::active(); // the build's phases (an open traces its own)
@@ -4025,8 +4051,12 @@ void AudioEngine::timerCallback()
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.
     const auto rateChanged = std::abs (transport.sampleRate.load() - lastPublishedShape.sampleRate) > 0.5;
     const auto latencies = lastPublishedShape.currentLatencies();
-    if (rateChanged || latencies != lastPublishedShape.latencies)
+    if (! publishing && (rateChanged || latencies != lastPublishedShape.latencies)) // (not inside a publish: see publishSong)
     {
+        // the plugins made for the new rate start from what the running ones hold now (issue #134: they started from
+        // the state of the last save or export, so a device at another rate undid every change made in their windows)
+        if (rateChanged)
+            capturePluginStates();
         // (diagnostics: which unit's latency moved)
         if (! rateChanged)
             for (std::size_t i = 0; i < latencies.size() && i < lastPublishedShape.latencies.size(); ++i)
