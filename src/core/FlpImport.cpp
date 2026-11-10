@@ -1485,7 +1485,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 // mixer insert (a pad with an output offset needs its own insert: those kits keep a channel per pad)
                 const auto oneInsert = std::all_of (found.begin(), found.end(), [] (const DrumPad& pad) { return pad.mixerOffset == 0; });
                 const auto kit = fpc::read (c.pluginState);
-                if (! found.empty() && oneInsert && kit && ! options.fpcAsPads)
+                if (kit && ! options.fpcAsPads && (options.fpcAsChannel || (! found.empty() && oneInsert)))
                 {
                     def.instrument = InstrumentKind::fpc;
                     def.plugin = {};
