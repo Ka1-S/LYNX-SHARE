@@ -3197,6 +3197,20 @@ void RackRenderer::applyLiveControl (const RackState& state, const NoteEvent& e)
     // a controller's pitch wheel, mod wheel (CC 1), other CCs and channel pressure played into a channel (round 162,
     // issue #9): hosted plugins (and the SoundFont player) get the MIDI message; LYNX's own instruments bend by the
     // channel's pitch range (FL's Misc › Pitch range, default ±2 semitones) and take the CCs they know
+    // A Layer makes no sound: what is played into it goes to its children, as its notes do (issue #141: the sustain
+    // pedal, the wheels and the other controllers stopped at the Layer)
+    if (const auto& channels = state.song.channels; (std::size_t) e.channel < channels.size() && channels[(std::size_t) e.channel].instrument == InstrumentKind::layer)
+    {
+        for (const auto c : channels[(std::size_t) e.channel].layer.children)
+            if (c >= 0 && c < (int) channels.size() && c < (int) state.instruments.size() && c != e.channel
+                && channels[(std::size_t) c].instrument != InstrumentKind::layer)
+            {
+                auto child = e;
+                child.channel = c;
+                applyLiveControl (state, child);
+            }
+        return;
+    }
     auto* instrument = state.instruments[(std::size_t) e.channel].get();
     if (instrument == nullptr)
         return;
