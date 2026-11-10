@@ -1852,6 +1852,7 @@ public:
             target->loopWhileHeld = zone->zone.loopMode == 2;
         }
         target->position = startFrame;
+        newestVoice = (int) (target - voices.data()); // (the locator follows it, round 190w)
         target->first = first;
         target->last = last;
         target->cutAtEnd = sliced && slices.cutAtEnd;
@@ -2391,6 +2392,12 @@ public:
             int n;
             ~Advance() { at += n; }
         } advance { songSample, n };
+        // round 190w: the newest voice's place in its region, for the channel settings' locator, after every block
+        const struct Publish
+        {
+            SamplerInstrument& s;
+            ~Publish() { s.publishPosition(); }
+        } publish { *this };
 
         if (sample == nullptr && zones.empty())
             return;
@@ -2917,12 +2924,29 @@ public:
         return std::none_of (voices.begin(), voices.end(), [] (const auto& v) { return v.active; });
     }
 
+public:
+    float playPosition() const noexcept override { return shownPosition.load (std::memory_order_relaxed); }
+
 private:
+    void publishPosition() noexcept
+    {
+        auto at = -1.0f;
+        if (newestVoice >= 0 && newestVoice < (int) voices.size())
+        {
+            const auto& v = voices[(std::size_t) newestVoice];
+            if (v.active && ! v.stolen && v.last > v.first)
+                at = (float) std::clamp ((v.position - v.first) / (v.last - v.first), 0.0, 1.0);
+        }
+        shownPosition.store (at, std::memory_order_relaxed);
+    }
+
     std::shared_ptr<const SampleData> sample;
     bool clipMode = false;
     double sampleRate = 44100.0;
     float fadeStep = 0.01f;
     std::array<SamplerVoice, 16> voices {};
+    int newestVoice = -1;                     // the voice the last note started (audio thread)
+    std::atomic<float> shownPosition { -1.0f }; // playPosition()
     std::array<KeyShift, 16> shifts {};
     std::array<std::unique_ptr<VoicePitchShifter>, keyShiftVoices> shifterPool;
     std::array<int, keyShiftVoices> shifterUser {}; // the voice using each shifter (-1 = none)

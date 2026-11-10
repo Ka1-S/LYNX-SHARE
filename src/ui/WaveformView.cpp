@@ -512,6 +512,49 @@ void WaveformDisplay::setReversed (bool r)
     }
 }
 
+void WaveformDisplay::setStartOffset (float fraction)
+{
+    fraction = juce::jlimit (0.0f, 1.0f, fraction);
+    if (fraction != startOffset)
+    {
+        startOffset = fraction;
+        repaint();
+    }
+}
+
+float WaveformDisplay::regionX (float fraction) const
+{
+    const auto inner = getLocalBounds().toFloat().reduced (1.0f);
+    const auto x0 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart);
+    const auto x1 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd);
+    return x0 + (x1 - x0) * juce::jlimit (0.0f, 1.0f, fraction);
+}
+
+juce::Rectangle<int> WaveformDisplay::locatorArea (float fraction) const
+{
+    if (fraction < 0.0f)
+        return {};
+    const auto x = (int) regionX (fraction);
+    return { x - locatorTrail - 1, 0, locatorTrail + 4, getHeight() };
+}
+
+void WaveformDisplay::setLocator (float fraction)
+{
+    fraction = fraction < 0.0f ? -1.0f : juce::jmin (1.0f, fraction);
+    if (fraction == locator)
+        return;
+    const auto before = locatorArea (locator);
+    locator = fraction;
+    const auto after = locatorArea (locator);
+    if (! before.isEmpty() && ! after.isEmpty() && before.intersects (after.expanded (locatorTrail)))
+        repaint (before.getUnion (after));
+    else
+    {
+        if (! before.isEmpty()) repaint (before);
+        if (! after.isEmpty()) repaint (after);
+    }
+}
+
 void WaveformDisplay::setCaption (const juce::String& text)
 {
     caption = text;
@@ -566,6 +609,32 @@ void WaveformDisplay::paint (juce::Graphics& g)
         g.setColour (colour::accent);
         g.fillRect (x0 - 0.5f, inner.getY(), 1.5f, inner.getHeight());
         g.fillRect (x1 - 1.0f, inner.getY(), 1.5f, inner.getHeight());
+    }
+
+    // round 190w: FL 2026 dims the region before the start offset and marks it "Start" (What's New 20921; [SHOT]
+    // flgap190w w8, o1: the waveform shows through, darker; a line with a small tab and its label at the top)
+    if (startOffset > 0.0f)
+    {
+        const auto xs = regionX (startOffset), xr = regionX (0.0f);
+        g.setColour (colour::bg0.withAlpha (0.55f));
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (juce::jmin (xr, xs), inner.getY(), juce::jmax (xr, xs), inner.getBottom()));
+        g.setColour (colour::warning);
+        g.fillRect (xs - 0.5f, inner.getY(), 1.5f, inner.getHeight());
+        g.fillRect (xs - 0.5f, inner.getY(), 4.0f, 7.0f);
+        g.setFont (font (type::caption));
+        g.drawText (tr ("Start"), juce::Rectangle<float> (xs + 5.0f, inner.getY(), 60.0f, 11.0f), juce::Justification::centredLeft, false);
+    }
+
+    // round 190w: the playback locator (What's New 21138; [SHOT] flgap190w loc3: a line in the playhead colour, the
+    // waveform lit just behind it, fading over ~20 px)
+    if (locator >= 0.0f)
+    {
+        const auto x = regionX (locator);
+        juce::ColourGradient trail (colour::playhead.withAlpha (0.0f), x - (float) locatorTrail, 0.0f, colour::playhead.withAlpha (0.28f), x, 0.0f, false);
+        g.setGradientFill (trail);
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x - (float) locatorTrail, inner.getY(), x, inner.getBottom()));
+        g.setColour (colour::playhead);
+        g.fillRect (x - 0.75f, inner.getY(), 1.5f, inner.getHeight());
     }
 
     // caption: the file name and its length

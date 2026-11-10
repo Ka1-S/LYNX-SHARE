@@ -97,6 +97,10 @@ public:
     // sounding voice can follow a Mono channel's notes (slideTo). Engines that do neither: the rack retriggers instead.
     virtual bool followsChannelPorta() const noexcept { return false; }
     virtual bool followsSlides() const noexcept { return followsChannelPorta(); }
+    // Round 190w (FL 2026's playback locator in the channel settings' sample display, What's New 21138): where the
+    // newest sounding voice reads, as a fraction 0..1 of its played region in play order (a reversed voice from the
+    // region's end); -1 when no voice sounds. Any thread. Only LYNX's Sampler reports it.
+    virtual float playPosition() const noexcept { return -1.0f; }
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
     // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
     // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"

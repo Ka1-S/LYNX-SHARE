@@ -2994,6 +2994,9 @@ public:
 
         wave.setEmptyText (tr ("No sample loaded"));
         wave.setTooltip (tr ("The sample: colours show where it is bass-heavy (warm) or bright (cool); outside Start/End is dimmed"));
+        // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
+        // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
+        wave.onClick = [this] { previewFromDisplay(); };
         addAndMakeVisible (wave);
 
         refresh();
@@ -3003,7 +3006,54 @@ public:
             startTimerHz (30); // the knobs follow their automation while the song plays (issue #12)
     }
 
-    ~SettingsPanel() override { engine.removeChangeListener (this); }
+    ~SettingsPanel() override
+    {
+        stopPreview();
+        engine.removeChangeListener (this);
+    }
+
+    // FL's sample display click: the channel's root note, the sample from its start offset; a second click stops it
+    void previewFromDisplay()
+    {
+        const auto* c = current();
+        if (c == nullptr || ref.index < 0)
+            return;
+        if (previewKey >= 0)
+        {
+            stopPreview();
+            return;
+        }
+        previewKey = juce::jlimit (0, 127, c->misc.rootNote);
+        previewSeen = false;
+        previewFrames = 0;
+        engine.sendLiveNote (ref.index, previewKey, 100.0f / 128.0f, true); // (FL's default velocity)
+    }
+
+    void stopPreview()
+    {
+        if (previewKey >= 0 && ref.index >= 0)
+            engine.sendLiveNote (ref.index, previewKey, 0.0f, false);
+        previewKey = -1;
+        wave.setLocator (-1.0f);
+    }
+
+    // the locator follows the preview's voice; the preview ends with it (or ~2 s after a note that never sounded)
+    void followPreview()
+    {
+        if (previewKey < 0)
+            return;
+        const auto instrument = engine.getChannelInstrument (ref.index);
+        const auto at = instrument != nullptr ? instrument->playPosition() : -1.0f;
+        ++previewFrames;
+        if (at >= 0.0f)
+            previewSeen = true;
+        if ((previewSeen && at < 0.0f) || (! previewSeen && previewFrames > 60))
+        {
+            stopPreview();
+            return;
+        }
+        wave.setLocator (at);
+    }
 
     void resized() override
     {
@@ -3179,6 +3229,7 @@ private:
             wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
             wave.setRegion (c->sampler.regionStart, c->sampler.regionEnd);
             wave.setReversed (c->sampler.reverse);
+            wave.setStartOffset (c->sampler.startOffset); // round 190w (FL dims the region before it)
 
             if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
                 w->setName (tr ("Sampler settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) })
@@ -3225,6 +3276,7 @@ private:
     {
         if (isShowing())
             showAutomation (false);
+        followPreview();
     }
 
     // the Song's value of `param` (a knob that shows its automation must not write the automated value back)
@@ -3369,6 +3421,8 @@ private:
     juce::ComboBox filterType, stretchMethod;
     juce::TextButton modulationButton, precomputeButton;
     ui::WaveformDisplay wave;
+    int previewKey = -1, previewFrames = 0; // round 190w: the display's preview note (-1 = none)
+    bool previewSeen = false;
 };
 
 // Built-in synth page: 3 oscillators, envelope and filter.
