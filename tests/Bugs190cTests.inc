@@ -240,3 +240,46 @@ TEST (issue134_a_patcher_with_a_hosted_plugin_is_built_again_for_a_new_device_ra
     CHECK (keptGraph != nullptr && keptGraph->instrumentAt (0) == nativeNode);
     CHECK (keptFxGraph != nullptr && keptFxGraph->effectAt (0) == nativeFxNode);
 }
+
+// Issue #138 (a short export from the very start of the Playlist came out quiet or silent). The export path is checked
+// end to end by --shortexporttest / --selftest "short_export" (engine/ShortExportTest.cpp); this is the one cause found
+// in the core.
+TEST (issue138_an_export_waits_for_a_soundfont_that_is_still_loading)
+{
+    // The font loads on a thread of its own. The export's engine builds and prepares its instruments before it switches
+    // to offline rendering, so the instrument's wait in prepare() did not run: an export that started before the font
+    // was in (a command-line export, a font just chosen) dropped the notes at the start of the song.
+    const auto path = (std::filesystem::temp_directory_path() / ("lynx-bugs190c-font-" + std::to_string ((long long) std::chrono::steady_clock::now().time_since_epoch().count()) + ".sf2")).string();
+    {
+        std::vector<lynx::sf::TestPreset> presets;
+        for (int p = 0; p < 64; ++p) // (big enough to take the loader a moment)
+            presets.push_back ({ "Preset " + std::to_string (p), 0, p });
+        const auto bytes = lynx::sf::makeTestFont (presets, 4);
+        std::ofstream out (path, std::ios::binary);
+        out.write ((const char*) bytes.data(), (std::streamsize) bytes.size());
+    }
+    auto channel = lynx::sf::makeChannel();
+    channel.samplePath = path;
+
+    lynx::setOfflineRendering (false); // as when the export's engine is made
+    auto instrument = lynx::sf::makeInstrument (lynx::sf::FontLibrary::instance().get (path)); // the load starts
+    instrument->prepare (44100.0);
+    instrument->configure (channel, 120.0);
+    lynx::setOfflineRendering (true);  // the render begins
+    instrument->noteOn (48, 0.8f);     // a note on the first sample
+    std::vector<float> l (512, 0.0f), r (512, 0.0f);
+    float peak = 0.0f;
+    for (int block = 0; block < 8; ++block)
+    {
+        std::fill (l.begin(), l.end(), 0.0f);
+        std::fill (r.begin(), r.end(), 0.0f);
+        instrument->render (l.data(), r.data(), 512, 1.0f, 1.0f);
+        for (const auto v : l)
+            peak = std::max (peak, std::abs (v));
+    }
+    lynx::setOfflineRendering (false);
+    CHECK (peak > 0.01f); // the note sounds: the render waited for the font
+    instrument.reset();
+    std::error_code ignored;
+    std::filesystem::remove (path, ignored);
+}
