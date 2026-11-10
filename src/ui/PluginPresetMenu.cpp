@@ -507,6 +507,11 @@ void PresetBar::showMenu()
         folder.createDirectory();
         folder.revealToUser();
     });
+    if (extendMenu)
+    {
+        menu.addSeparator();
+        extendMenu (menu);
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 

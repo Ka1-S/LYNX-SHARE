@@ -100,6 +100,7 @@ struct Settings
     double lowShelfHz = 200.0, lowShelfDb = 0.0;
     double highShelfHz = 6000.0, highShelfDb = 0.0;
     double toneHighHz = 8000.0, toneHighDb = 0.0;          // a second high shelf (an algorithm's own tone)
+    double toneLowHz = 100.0, toneLowDb = 0.0;             // round 183b: a second low shelf (an algorithm's own tone)
     double toneMidHz = 1000.0, toneMidDb = 0.0, toneMidQ = 0.7; // a bell (an algorithm's own tone)
     double gain = 1.0;
 };

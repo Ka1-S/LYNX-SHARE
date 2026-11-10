@@ -663,6 +663,57 @@ inline const Theme& shellTheme()
     return t;
 }
 
+// === Strike Shaper (the two-knob transient designer role, round trans189d): brushed silver modules round black
+// capsules, silver knobs, lit square keys
+inline void canvasStrike (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff2a2c30), Colour (0xff141518));
+    if (display) return;
+    const auto sx = a.getWidth() / 540.0f, sy = a.getHeight() / 300.0f;
+    const auto frame = Rectangle<float> (a.getX() + 6.0f * sx, a.getY() + 6.0f * sy, 528.0f * sx, 288.0f * sy);
+    vfill (g, frame, Colour (0xffe9ebee), Colour (0xffa4a7ac));
+    juce::Random rnd (228);
+    for (int i = 0; i < 400; ++i) // vertical brushing
+    {
+        const auto x = frame.getX() + rnd.nextFloat() * frame.getWidth();
+        const auto y = frame.getY() + rnd.nextFloat() * frame.getHeight();
+        g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.04f));
+        g.drawVerticalLine ((int) x, y, juce::jmin (frame.getBottom(), y + 10.0f + 30.0f * rnd.nextFloat()));
+    }
+    const auto cap = frame.reduced (16.0f * sx, 16.0f * sy);
+    vfill (g, cap, Colour (0xff24262b), Colour (0xff0b0c0e));
+    g.setColour (Colours::black.withAlpha (0.8f));
+    g.drawRoundedRectangle (cap, juce::jmin (cap.getHeight() * 0.5f, 60.0f * sy), 1.4f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour strikeCapTint (const char*) { return Colour (0xffd6d9de); }
+
+inline const Theme& strikeTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Strike Shaper";
+        x.pal = { Colour (0xff24262b), Colour (0xff0b0c0e), Colour (0xffff8a2a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe9eaec),
+                  Colour (0xff0a0b0c), Colour (0xff3a3c41), Colour (0xff1a1b1e), Colour (0xff9a9ea6), Colour (0xfff4f4f2),
+                  Colour (0xff2a2c30) };
+        x.canvas = canvasStrike;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = strikeCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffe9eaec);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff9a9ea6);
+        return x;
+    }();
+    return t;
+}
+
 inline Colour kilnCapTint (const char* param)
 {
     const juce::String n (param);
@@ -4798,6 +4849,7 @@ const Theme* effectTheme (Art a)
         case Art::kiln: return &kilnTheme();
         case Art::fret: return &fretTheme();
         case Art::shell: return &shellTheme();
+        case Art::strike: return &strikeTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4929,6 +4981,7 @@ Art artForEffect (EffectKind kind)
         case EffectKind::kilnChannel: return Art::kiln;
         case EffectKind::fretChannel: return Art::fret;
         case EffectKind::shellChannel: return Art::shell;
+        case EffectKind::strikeShaper: return Art::strike;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;
