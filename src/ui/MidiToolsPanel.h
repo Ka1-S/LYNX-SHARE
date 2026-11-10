@@ -26,7 +26,7 @@ class MidiToolsPanel final : public juce::Component
 {
 public:
     // Live's Transform chooser, in its order (the tools LYNX has).
-    enum Tool { arpeggiate, chop, connect, ornament, quantize, recombine, span, strum, toolCount };
+    enum Tool { arpeggiate, chop, connect, ornament, quantize, recombine, span, strum, timeWarp, velocityShaper, toolCount };
     static const char* toolName (int tool) noexcept; // English, for tr()
 
     // What the tool works on now: `indices` of `pattern`'s notes (the editor's selection, or every note it shows when
@@ -48,6 +48,9 @@ public:
     int getTool() const noexcept { return tool; }
     void transformNow(); // the Transform button
     void setAuto (bool on);
+    // --detailshot: the settings of round 190aa's Live shots (Chop part 1 emphasised, Quantize 1/8 + 1/8T, Time Warp
+    // breakpoint 2 at x2)
+    void setLiveShotSettingsForSnapshot();
 
     void paint (juce::Graphics& g) override;
     void resized() override;
@@ -77,7 +80,11 @@ private:
     miditools::RecombineOptions recombineOptions;
     miditools::SpanOptions spanOptions;
     miditools::StrumOptions strumOptions;
+    miditools::TimeWarpOptions timeWarpOptions;
+    miditools::VelocityShaperOptions shaperOptions;
+    int warpSelected = 0; // Time Warp's selected breakpoint (its Time and Speed show)
     std::uint32_t seed = 1;
+    juce::String warpTimeText (double share) const;
 
     // the notes before the tool, while the pattern still holds this panel's last result
     struct Session

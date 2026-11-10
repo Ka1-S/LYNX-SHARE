@@ -12,6 +12,7 @@
 // preview and its Apply give the same notes. No JUCE.
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "core/Song.h"
@@ -133,10 +134,73 @@ Notes connect (Notes notes, const ConnectOptions& options, std::int64_t grid);
 // --- Chop --------------------------------------------------------------------------------------------------------
 struct ChopOptions
 {
-    int parts = 4;  // 2..64 equal parts per note [LIVE default 4]
-    int gaps = 0;   // > 0: a gap after every `gaps` parts; < 0: `-gaps` gaps after every part [MAN]
+    int parts = 4;  // 2..64 parts per note [LIVE default 4]
+    int gaps = 0;   // > 0: a gap after every `gaps` parts; < 0: `-gaps` gaps after every part [LIVE round 190aa: 2, -1]
+    // Live's pattern row (round 190aa): one toggle per part, at most 16, repeated over more parts [MAN]. Gaps writes it;
+    // a toggle clicked by hand makes it `custom` (Live's Gaps then shows "-") until Gaps is turned again.
+    bool custom = false;
+    std::uint16_t pattern = 0xFFFF; // bit i: part i plays (when custom) [LIVE: part 2 off → 1 0 1 1]
+    std::uint16_t emphasis = 0;     // bit i: part i (a note or a gap) lasts `stretch` parts [LIVE: 2 1 1 1 / 7ths at x4]
+    int stretch = 2;                // 2..8 [LIVE default x2]
+    float variation = 0.0f;         // 0..1: each part's share is scaled by a random 1 +- variation, the same for every note
+                                    // [LIVE round 190aa at 50 %: shares 0.61 0.08 0.13 0.17 of 0.57 0.14 0.14 0.14; the
+                                    // law of the draw INFERRED]
+    std::uint32_t seed = 1;
 };
+// Does part `part` play? (the pattern from Gaps, or the hand-made one)
+bool chopPlays (const ChopOptions& options, int part) noexcept;
+// The pattern Gaps makes, as `pattern` bits (for the panel's row).
+std::uint16_t chopPattern (int parts, int gaps) noexcept;
 Notes chop (Notes notes, const ChopOptions& options);
+
+// --- Time Warp ---------------------------------------------------------------------------------------------------
+struct TimeWarpOptions
+{
+    struct Breakpoint
+    {
+        bool on;
+        double time;  // 0..1 of the range
+        double speed; // x0.25 .. x4 [INFERRED range]: > 1 the notes come closer together there
+    };
+    // [LIVE] defaults: 1 and 3 on at the range's ends, 2 off in the middle, all x1.0
+    Breakpoint points[3] { { true, 0.0, 1.0 }, { false, 0.5, 1.0 }, { true, 1.0, 1.0 } };
+    bool quantize = false;   // the warped starts go to the nearest grid line, lengths stay [LIVE]
+    bool fit = true;         // Range "Fit": the notes keep their first start and last end [LIVE]
+    bool includeEnd = true;  // Note End "Include": the ends are warped too (lengths change) [LIVE]
+    // the span the breakpoints' times refer to (Live: the clip / time selection); rangeEnd <= rangeStart = the whole
+    // bars the notes touch
+    std::int64_t rangeStart = 0, rangeEnd = 0;
+};
+// [LIVE round 190aa, 7 settings within 1e-5 beats] A note at time t moves to first + c * integral from the first start
+// to t of r(x), where r is 1 / speed interpolated linearly between the breakpoints that are on (flat beyond them) and
+// c makes the last end stay where it was (Fit; else c = 1). With Note End off the lengths stay and Live's c differs a
+// little (0.2 %, up to 7 ticks on the measured clip; LYNX keeps Include's c).
+// The span the breakpoints refer to for these notes (the range given, else the whole bars they touch).
+std::pair<std::int64_t, std::int64_t> timeWarpRange (const Notes& notes, const TimeWarpOptions& options);
+Notes timeWarp (Notes notes, const TimeWarpOptions& options, std::int64_t grid);
+
+// --- Velocity Shaper -----------------------------------------------------------------------------------------------
+struct VelocityShaperOptions
+{
+    struct Point
+    {
+        double x, y;  // 0..1 of the cycle, 0..1 of minimum..maximum
+        float curve;  // the bend of the segment to the next point: 0 straight, > 0 fast first (exponential)
+    };
+    // [LIVE, fitted on 96 measured notes] the default: from the top straight down an exponential to the floor at 0.503
+    std::vector<Point> points { { 0.0, 1.0, 2.825f }, { 0.503, 0.0, 0.0f }, { 1.0, 0.0, 0.0f } };
+    int minimum = 1, maximum = 127; // [LIVE defaults]
+    int loops = 1;                  // cycles over the notes' span [LIVE]
+    int rotate = 0;                 // the envelope starts this many divisions later (wrapping) [LIVE]
+    enum Division { sixteenth, eighth, grid };
+    int division = sixteenth;       // [LIVE: 1/16 = a quarter beat, 1/8 = half a beat, Grid = the editor's grid]
+};
+// The envelope's value 0..1 at `x` (0..1 of a cycle).
+double velocityShape (const VelocityShaperOptions& options, double x) noexcept;
+// [LIVE round 190aa, 6 settings note for note] Every note's velocity becomes floor (minimum + (maximum - minimum) *
+// shape (x)), x = its place in the span from the first start to the last end (times `loops`, shifted by `rotate`),
+// whatever its old velocity.
+Notes velocityShaper (Notes notes, const VelocityShaperOptions& options, std::int64_t grid);
 
 // --- Quantize ---------------------------------------------------------------------------------------------------
 struct QuantizeOptions

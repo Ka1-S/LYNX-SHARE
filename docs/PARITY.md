@@ -2303,7 +2303,7 @@ FL Studio Mobile plugin is the open sound check.
 | Item | FL Studio | Ableton Live 12 | LYNX |
 |---|---|---|---|
 | Transform panel: Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum; Auto apply, Transform | tool dialogs with preview / Accept (unchanged) | Clip View › Transform | ✅ `ui/MidiToolsPanel`: the Clip View's fourth panel (Clip-launch workflow) and Piano roll › Tools › MIDI Tools…; Live's controls and defaults (`docs/analise/REA_rodada190s.md`) |
-| Time Warp, Velocity Shaper, Glissando / LFO (MPE), the Generate section | — | Transform / Generate | ❌ not built |
+| Glissando / LFO (MPE), the Generate section | — | Transform / Generate | ❌ not built (Time Warp and Velocity Shaper: round 190aa) |
 | Clip colour / activator square, pitch range (drag to transpose), Add interval | clip menu; transpose keys | Clip View title bar, Pitch & Time | ✅ Clip View column (Clip-launch workflow) |
 | Set Length + grid, Humanize amount, Scale / Highlight Scale buttons in the editor header | — | Pitch & Time, editor header | ❌ open (GAPMAP-0126 D5, D13) |
 
@@ -2312,6 +2312,10 @@ FL Studio Mobile plugin is the open sound check.
 | Item | FL Studio | Ableton Live 12 | LYNX |
 |---|---|---|---|
 | Arpeggiate (18 styles, overlapping notes), Connect (chords, Tie), Recombine on Grid, Span Offset, Strum (High + Tension), Quantize (incl. 1/8 + 1/8T) | its own Piano roll tools (unchanged) | Clip View › Transform | ✅ note for note against Live 12.4.16 (60-clip set, `docs/analise/REA_rodada190aa.md`); random settings checked by range |
+| Chop in full: pattern row (plays / emphasis), Stretch, Variation | Chop (Alt+U) | Clip View › Transform › Chop | ✅ core note for note; panel page as Live's (Variation's law inferred) |
+| Time Warp (3 breakpoints, Quantize, Range Fit, Note End) | — | Transform › Time Warp | ✅ core within 1e-5 beats on 7 settings (Note End off: up to 7 ticks apart); panel page as Live's |
+| Velocity Shaper (envelope, Min / Max, Loop, Rotate, Division) | — | Transform › Velocity Shaper (Max for Live) | ✅ core note for note on 6 settings; envelope editing LYNX's own gestures |
+| Glissando, LFO (MPE) | — | Transform | ❌ need MPE notes (issue #108); requirements in REA_rodada190aa.md §5 |
 
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see

@@ -131,6 +131,264 @@ private:
     std::function<int()> getter;
     std::function<void (int)> setter;
 };
+
+// Chop's pattern row [LIVE round 190aa, live/x-H04.png]: one cell per part (16 at most), the upper half lit when the
+// part plays, the lower half lit when it is emphasised (it then lasts `stretch` parts). Click either half.
+class ChopPatternRow final : public juce::Component
+{
+public:
+    ChopPatternRow (miditools::ChopOptions& o, std::function<void()> onChange) : options (o), changed (std::move (onChange))
+    {
+        ui::setHint (*this, tr ("Upper row: the part plays or is a gap. Lower row: the part lasts as long as Stretch says"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (getLocalBounds());
+        const auto n = cells();
+        const auto w = (float) getWidth() / (float) n, h = (float) getHeight() * 0.5f;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto plays = miditools::chopPlays (options, i);
+            const auto stressed = (options.emphasis >> i & 1u) != 0;
+            const juce::Rectangle<float> top ((float) i * w + 1.0f, 1.0f, w - 2.0f, h - 1.5f), bottom ((float) i * w + 1.0f, h + 0.5f, w - 2.0f, h - 1.5f);
+            g.setColour (plays ? (stressed ? colour::accentPressed : colour::accent) : (stressed ? colour::accentMuted : colour::bg4));
+            g.fillRect (top);
+            g.setColour (stressed ? colour::automation : colour::bg4.interpolatedWith (colour::automation, 0.18f));
+            g.fillRect (bottom);
+        }
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const auto n = cells();
+        const auto i = std::clamp (e.x * n / std::max (1, getWidth()), 0, n - 1);
+        if (e.y < getHeight() / 2)
+        {
+            if (! options.custom) // (the pattern Gaps made becomes the hand-made one)
+                options.pattern = miditools::chopPattern (std::clamp (options.parts, 2, 64), options.gaps);
+            options.custom = true;
+            options.pattern = (std::uint16_t) (options.pattern ^ (1u << i));
+        }
+        else
+            options.emphasis = (std::uint16_t) (options.emphasis ^ (1u << i));
+        repaint();
+        changed();
+    }
+
+private:
+    int cells() const noexcept { return std::min (std::clamp (options.parts, 2, 64), 16); }
+    miditools::ChopOptions& options;
+    std::function<void()> changed;
+};
+
+// Time Warp's display [LIVE round 190aa, live/x-W04.png]: the range's ends as two lines, the speed line through the
+// breakpoints that are on (up = faster, x0.25 … x4 on a log scale), each breakpoint a numbered circle. Click one to
+// select it; drag it sideways for its time (1 and 3 stay at the ends) and up / down for its speed.
+class TimeWarpCurve final : public juce::Component
+{
+public:
+    TimeWarpCurve (miditools::TimeWarpOptions& o, int& sel, std::function<void()> onChange) : options (o), selected (sel), changed (std::move (onChange))
+    {
+        ui::setHint (*this, tr ("Drag a breakpoint: sideways for its time, up or down for its speed"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat();
+        g.setColour (colour::bg0);
+        g.fillRect (r);
+        const auto a = area();
+        g.setColour (colour::border);
+        g.fillRect (a.getX(), a.getCentreY(), a.getWidth(), 1.0f);
+        g.setColour (colour::automation);
+        g.fillRect (a.getX(), r.getY() + 2.0f, 1.0f, r.getHeight() - 4.0f);
+        g.fillRect (a.getRight() - 1.0f, r.getY() + 2.0f, 1.0f, r.getHeight() - 4.0f);
+        juce::Path line;
+        bool started = false;
+        for (int i = 0; i < 3; ++i)
+            if (options.points[i].on)
+            {
+                const auto p = at (i);
+                if (! started)
+                    line.startNewSubPath (a.getX(), p.y);
+                line.lineTo (p);
+                started = true;
+            }
+        if (started)
+        {
+            line.lineTo (a.getRight(), line.getCurrentPosition().y);
+            g.setColour (colour::automation);
+            g.strokePath (line, juce::PathStrokeType (1.2f));
+        }
+        g.setFont (font (type::caption, true));
+        for (int i = 0; i < 3; ++i)
+            if (options.points[i].on)
+            {
+                const auto c = juce::Rectangle<float> (11.0f, 11.0f).withCentre (at (i));
+                g.setColour (i == selected ? colour::accent : colour::bg3);
+                g.fillEllipse (c);
+                g.setColour (colour::accent);
+                g.drawEllipse (c, 1.0f);
+                g.setColour (i == selected ? colour::onAccent : colour::textPrimary);
+                g.drawText (juce::String (i + 1), c.toNearestInt(), juce::Justification::centred);
+            }
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        auto best = -1;
+        auto distance = 1.0e9f;
+        for (int i = 0; i < 3; ++i)
+            if (options.points[i].on)
+                if (const auto d = at (i).getDistanceFrom (e.position); d < distance)
+                {
+                    distance = d;
+                    best = i;
+                }
+        if (best >= 0)
+            selected = best;
+        changed();
+        repaint();
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (selected < 0 || selected > 2 || ! options.points[selected].on)
+            return;
+        const auto a = area();
+        auto& p = options.points[selected];
+        if (selected == 1)
+            p.time = juce::jlimit (0.05, 0.95, (double) ((e.position.x - a.getX()) / a.getWidth()));
+        const auto octaves = juce::jlimit (-2.0, 2.0, (double) ((a.getCentreY() - e.position.y) / (a.getHeight() * 0.5f)) * 2.0);
+        p.speed = std::round (std::pow (2.0, octaves) * 10.0) / 10.0;
+        changed();
+        repaint();
+    }
+
+private:
+    juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (8.0f, 7.0f); }
+    juce::Point<float> at (int i) const
+    {
+        const auto a = area();
+        const auto& p = options.points[i];
+        const auto y = (float) (std::log2 (std::clamp (p.speed, 0.25, 4.0)) / 2.0);
+        return { a.getX() + (float) p.time * a.getWidth(), a.getCentreY() - y * a.getHeight() * 0.5f };
+    }
+    miditools::TimeWarpOptions& options;
+    int& selected;
+    std::function<void()> changed;
+};
+
+// Velocity Shaper's envelope [LIVE round 190aa, live/x-V01.png]: the shape over one cycle, top = Maximum, bottom =
+// Minimum. Drag a point; click elsewhere to add one; double-click a point to remove it; Alt + drag a line to bend it.
+class ShaperEnvelope final : public juce::Component
+{
+public:
+    ShaperEnvelope (miditools::VelocityShaperOptions& o, std::function<void()> onChange) : options (o), changed (std::move (onChange))
+    {
+        ui::setHint (*this, tr ("Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (getLocalBounds());
+        const auto a = area();
+        g.setColour (colour::border);
+        g.fillRect (a.getCentreX(), a.getY(), 1.0f, a.getHeight());
+        g.fillRect (a.getX(), a.getCentreY(), a.getWidth(), 1.0f);
+        juce::Path path;
+        for (int i = 0; i <= 96; ++i)
+        {
+            const auto x = (double) i / 96.0;
+            const juce::Point<float> p { a.getX() + (float) x * a.getWidth(), a.getBottom() - (float) miditools::velocityShape (options, x) * a.getHeight() };
+            if (i == 0)
+                path.startNewSubPath (p);
+            else
+                path.lineTo (p);
+        }
+        g.setColour (colour::automation);
+        g.strokePath (path, juce::PathStrokeType (1.4f));
+        for (const auto& p : options.points)
+            g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre (toScreen (p.x, p.y)));
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        dragging = nearest (e.position);
+        bending = e.mods.isAltDown();
+        if (bending)
+        {
+            segment = segmentAt (e.position.x);
+            startCurve = segment >= 0 ? options.points[(std::size_t) segment].curve : 0.0f;
+            return;
+        }
+        if (dragging < 0) // add a point on the line
+        {
+            const auto [x, y] = fromScreen (e.position);
+            auto it = std::upper_bound (options.points.begin(), options.points.end(), x, [] (double v, const auto& p) { return v < p.x; });
+            dragging = (int) (options.points.insert (it, { x, y, 0.0f }) - options.points.begin());
+            changed();
+            repaint();
+        }
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (bending)
+        {
+            if (segment >= 0)
+                options.points[(std::size_t) segment].curve = juce::jlimit (-8.0f, 8.0f, startCurve + (float) e.getDistanceFromDragStartY() * 0.08f);
+        }
+        else if (dragging >= 0)
+        {
+            auto [x, y] = fromScreen (e.position);
+            const auto i = (std::size_t) dragging;
+            const auto lo = i == 0 ? 0.0 : options.points[i - 1].x, hi = i + 1 >= options.points.size() ? 1.0 : options.points[i + 1].x;
+            options.points[i].x = i == 0 ? 0.0 : i + 1 == options.points.size() ? 1.0 : juce::jlimit (lo, hi, x);
+            options.points[i].y = y;
+        }
+        changed();
+        repaint();
+    }
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        const auto i = nearest (e.position);
+        if (i > 0 && i + 1 < (int) options.points.size())
+        {
+            options.points.erase (options.points.begin() + i);
+            changed();
+            repaint();
+        }
+    }
+
+private:
+    juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (6.0f, 6.0f); }
+    juce::Point<float> toScreen (double x, double y) const
+    {
+        const auto a = area();
+        return { a.getX() + (float) x * a.getWidth(), a.getBottom() - (float) y * a.getHeight() };
+    }
+    std::pair<double, double> fromScreen (juce::Point<float> p) const
+    {
+        const auto a = area();
+        return { juce::jlimit (0.0, 1.0, (double) ((p.x - a.getX()) / a.getWidth())), juce::jlimit (0.0, 1.0, (double) ((a.getBottom() - p.y) / a.getHeight())) };
+    }
+    int nearest (juce::Point<float> p) const
+    {
+        for (std::size_t i = 0; i < options.points.size(); ++i)
+            if (toScreen (options.points[i].x, options.points[i].y).getDistanceFrom (p) < 6.0f)
+                return (int) i;
+        return -1;
+    }
+    int segmentAt (float screenX) const
+    {
+        const auto x = fromScreen ({ screenX, 0.0f }).first;
+        for (std::size_t i = 0; i + 1 < options.points.size(); ++i)
+            if (x >= options.points[i].x && x <= options.points[i + 1].x)
+                return (int) i;
+        return -1;
+    }
+    miditools::VelocityShaperOptions& options;
+    std::function<void()> changed;
+    int dragging = -1, segment = -1;
+    bool bending = false;
+    float startCurve = 0.0f;
+};
 } // namespace
 
 const char* MidiToolsPanel::toolName (int t) noexcept
@@ -145,6 +403,8 @@ const char* MidiToolsPanel::toolName (int t) noexcept
         case recombine:  return TR_NOOP ("Recombine");
         case span:       return TR_NOOP ("Span");
         case strum:      return TR_NOOP ("Strum");
+        case timeWarp:   return TR_NOOP ("Time Warp");
+        case velocityShaper: return TR_NOOP ("Velocity Shaper");
         default:         return "";
     }
 }
@@ -166,6 +426,8 @@ struct MidiToolsPanel::Body final : public juce::Component
             case recombine:  buildRecombine(); break;
             case span:       buildSpan(); break;
             case strum:      buildStrum(); break;
+            case timeWarp:   buildTimeWarp(); break;
+            case velocityShaper: buildVelocityShaper(); break;
             default: break;
         }
     }
@@ -266,12 +528,29 @@ struct MidiToolsPanel::Body final : public juce::Component
         knob (tr ("Rate"), { 0, 66, half, 58 }, rateSpec (false, 2), [&o] { return (double) rateIndex (o.rate); }, [&o] (double v) { o.rate = rateTicks (juce::roundToInt (v)); });
         knob (tr ("Gate"), { half, 66, half, 58 }, makeSpec ({}, 0.01, 2.0, 1.0, 0.0, percent0), [&o] { return (double) o.gate; }, [&o] (double v) { o.gate = (float) v; });
     }
+    // Live 12.4's Chop [LIVE round 190aa, live/x-H04.png]: Parts and Gaps, the pattern row, Stretch, Variation
     void buildChop()
     {
         auto& o = panel.chopOptions;
-        const auto half = getWidth() / 2;
-        knob (tr ("Parts"), { 0, 4, half, 62 }, makeSpec ({}, 2, 64, 4, 1.0, whole), [&o] { return (double) o.parts; }, [&o] (double v) { o.parts = juce::roundToInt (v); });
-        knob (tr ("Gaps"), { half, 4, half, 62 }, makeSpec ({}, -16, 16, 0, 1.0, whole), [&o] { return (double) o.gaps; }, [&o] (double v) { o.gaps = juce::roundToInt (v); });
+        const auto w = getWidth(), half = w / 2;
+        label (tr ("Stretch"), { 2, 90, half, 16 });
+        auto* stretch = &box (tr ("Stretch"), { w - 40, 90, 40, 16 }, makeSpec ({}, 2, 8, 2, 1.0, [] (double v) { return juce::String::fromUTF8 ("\xc3\x97") + whole (v); }),
+                              [&o] { return (double) o.stretch; }, [&o] (double v) { o.stretch = juce::roundToInt (v); });
+        stretch->setAlpha (o.emphasis != 0 ? 1.0f : 0.45f); // [LIVE] greyed while nothing is emphasised
+        auto* row = &add (std::make_unique<ChopPatternRow> (o, [this, stretch] {
+                              stretch->setAlpha (panel.chopOptions.emphasis != 0 ? 1.0f : 0.45f);
+                              panel.changed();
+                          }), { 2, 60, w - 4, 26 });
+        knob (tr ("Parts"), { 0, 0, half, 58 }, makeSpec ({}, 2, 64, 4, 1.0, whole), [&o] { return (double) o.parts; },
+              [&o, row] (double v) { o.parts = juce::roundToInt (v); row->repaint(); });
+        knob (tr ("Gaps"), { half, 0, half, 58 }, makeSpec ({}, -15, 15, 0, 1.0, [&o] (double v) { return o.custom ? juce::String ("-") : whole (v); }),
+              [&o] { return (double) o.gaps; }, [&o, row] (double v) {
+                  o.gaps = juce::roundToInt (v);
+                  o.custom = false; // [LIVE] turning Gaps replaces the hand-made pattern
+                  row->repaint();
+              });
+        label (tr ("Variation"), { 2, 108, half, 16 });
+        box (tr ("Variation"), { w - 54, 108, 54, 16 }, makeSpec ({}, 0.0, 1.0, 0.0, 0.0, percent1), [&o] { return (double) o.variation; }, [&o] (double v) { o.variation = (float) v; });
     }
     void buildConnect()
     {
@@ -313,18 +592,46 @@ struct MidiToolsPanel::Body final : public juce::Component
         label (tr ("Amount"), { 94, 103, 44, 16 });
         box (tr ("Amount"), { w - 30, 103, 30, 16 }, makeSpec ({}, 1, 8, 3, 1.0, whole), [&o] { return (double) o.graceAmount; }, [&o] (double v) { o.graceAmount = juce::roundToInt (v); });
     }
+    // Live 12.4's Quantize [LIVE round 190aa, live/x-Q07.png]: with Triplets on the four values read 1/8T, 1/8 + 1/8T,
+    // 1/16T, 1/16 + 1/16T; Triplets is greyed while Grid is chosen
+    static int quantizeCell (const miditools::QuantizeOptions& o) noexcept
+    {
+        if (o.step <= 0)
+            return -1;
+        if (! o.triplets)
+        {
+            for (int i = 0; i < 4; ++i)
+                if (o.step == (std::int64_t) (ppq * 4 / (4 << i)))
+                    return i;
+            return -1;
+        }
+        return (o.step == ppq / 2 ? 0 : 2) + (o.straightToo ? 1 : 0);
+    }
+    static void setQuantizeCell (miditools::QuantizeOptions& o, int cell, bool triplets) noexcept
+    {
+        o.triplets = triplets && cell >= 0;
+        o.straightToo = o.triplets && (cell % 2) == 1;
+        o.step = cell < 0 ? 0 : o.triplets ? (cell < 2 ? ppq / 2 : ppq / 4) : (std::int64_t) (ppq * 4 / (4 << cell));
+    }
     void buildQuantize()
     {
         auto& o = panel.quantizeOptions;
         const auto w = getWidth(), half = (w - 4) / 2;
-        toggle (tr ("Grid"), { 0, 0, w, 17 }, o.step == 0, [&o] (bool) { o.step = 0; }, 1902);
-        const int dens[] = { 4, 8, 16, 32 };
+        const auto relabel = [this] { // the labels change with Triplets: build the page again once the click is over
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MidiToolsPanel> (&panel)] {
+                if (safe != nullptr)
+                    safe->rebuild();
+            });
+        };
+        toggle (tr ("Grid"), { 0, 0, w, 17 }, o.step == 0, [&o, relabel] (bool) { setQuantizeCell (o, -1, false); relabel(); }, 1902);
+        const char* straight[] = { "1/4", "1/8", "1/16", "1/32" };
+        const char* triplet[] = { "1/8T", "1/8 + 1/8T", "1/16T", "1/16 + 1/16T" };
+        const auto cell = quantizeCell (o);
         for (int i = 0; i < 4; ++i)
-        {
-            const auto ticks = (std::int64_t) (ppq * 4 / dens[i]);
-            toggle ("1/" + juce::String (dens[i]), { (i % 2) * (half + 4), 20 + (i / 2) * 20, half, 17 }, o.step == ticks, [&o, ticks] (bool) { o.step = ticks; }, 1902);
-        }
-        toggle (tr ("Triplets"), { 0, 60, w, 17 }, o.triplets, [&o] (bool on) { o.triplets = on; });
+            toggle (o.triplets ? triplet[i] : straight[i], { (i % 2) * (half + 4), 20 + (i / 2) * 20, half, 17 }, cell == i,
+                    [&o, i] (bool) { setQuantizeCell (o, i, o.triplets); }, 1902);
+        auto& triplets = toggle (tr ("Triplets"), { 0, 60, w, 17 }, o.triplets, [&o, relabel] (bool on) { setQuantizeCell (o, quantizeCell (o), on); relabel(); });
+        triplets.setEnabled (cell >= 0);
         label (tr ("Adjust note"), { 0, 81, 70, 17 });
         const auto small = (w - 70 - 4) / 2;
         toggle (tr ("Start"), { 70, 81, small, 17 }, o.start, [&o] (bool on) { o.start = on; });
@@ -403,6 +710,63 @@ struct MidiToolsPanel::Body final : public juce::Component
         box (tr ("Tension"), { 60, 104, 54, 16 }, bipolar(), [&o] { return (double) o.tension; }, redraw (o.tension));
     }
 
+    // Live 12.4's Time Warp [LIVE round 190aa, live/x-W04.png]: Time and Speed of the selected breakpoint, the display,
+    // breakpoints 1 2 3 on / off, Quantize, Range (Fit), Note End (Include)
+    void buildTimeWarp()
+    {
+        auto& o = panel.timeWarpOptions;
+        const auto w = getWidth(), third = (w - 4) / 3;
+        auto& sel = panel.warpSelected;
+        label (tr ("Time"), { 0, 0, 30, 14 });
+        box (tr ("Time"), { 30, 0, 46, 14 }, makeSpec ({}, 0.0, 1.0, 0.5, 0.0, [this] (double v) { return panel.warpTimeText (v); }),
+             [&o, &sel] { return o.points[std::clamp (sel, 0, 2)].time; }, [&o, &sel] (double v) {
+                 if (sel == 1) // (1 and 3 sit at the range's ends)
+                     o.points[1].time = juce::jlimit (0.05, 0.95, v);
+             });
+        label (tr ("Speed"), { w - 80, 0, 36, 14 });
+        box (tr ("Speed"), { w - 40, 0, 40, 14 }, makeSpec ({}, 0.25, 4.0, 1.0, 0.1, [] (double v) { return juce::String::fromUTF8 ("\xc3\x97") + juce::String (v, 1); }),
+             [&o, &sel] { return o.points[std::clamp (sel, 0, 2)].speed; }, [&o, &sel] (double v) { o.points[std::clamp (sel, 0, 2)].speed = v; });
+        juce::Component* display = &add (std::make_unique<TimeWarpCurve> (o, sel, [this] { repaint(); panel.changed(); }), { 0, 17, w, 52 });
+        const auto redraw = [this, display] {
+            display->repaint();
+            repaint();
+        };
+        for (int i = 0; i < 3; ++i)
+        {
+            auto& b = toggle (juce::String (i + 1), { i * (third + 2), 72, third, 14 }, o.points[i].on, [&o, &sel, i, redraw] (bool on) {
+                o.points[i].on = on;
+                if (on)
+                    sel = i;
+                redraw();
+            });
+            b.setColour (juce::TextButton::buttonOnColourId, colour::automation);
+        }
+        label (tr ("Quantize"), { 0, 90, third + 2, 12 }, juce::Justification::centred);
+        label (tr ("Range"), { third + 2, 90, third + 2, 12 }, juce::Justification::centred);
+        label (tr ("Note End"), { 2 * (third + 2), 90, third + 2, 12 }, juce::Justification::centred);
+        auto* quantizeButton = &toggle (o.quantize ? tr ("On") : tr ("Off"), { 0, 104, third, 16 }, o.quantize, [&o] (bool on) { o.quantize = on; });
+        quantizeButton->onStateChange = [quantizeButton] { quantizeButton->setButtonText (quantizeButton->getToggleState() ? tr ("On") : tr ("Off")); };
+        toggle (tr ("Fit"), { third + 2, 104, third, 16 }, o.fit, [&o] (bool on) { o.fit = on; });
+        toggle (tr ("Include"), { 2 * (third + 2), 104, third, 16 }, o.includeEnd, [&o] (bool on) { o.includeEnd = on; });
+    }
+    // Live 12.4's Velocity Shaper [LIVE round 190aa, live/x-V01.png]: the envelope with Maximum (top) and Minimum (bottom)
+    // beside it, then Loop, Rotate, Division
+    void buildVelocityShaper()
+    {
+        auto& o = panel.shaperOptions;
+        const auto w = getWidth(), third = (w - 4) / 3;
+        auto* envelope = &add (std::make_unique<ShaperEnvelope> (o, [this] { panel.changed(); }), { 0, 0, w - 36, 92 });
+        box (tr ("Maximum"), { w - 32, 4, 32, 16 }, makeSpec ({}, 1, 127, 127, 1.0, whole), [&o] { return (double) o.maximum; }, [&o] (double v) { o.maximum = juce::roundToInt (v); });
+        box (tr ("Minimum"), { w - 32, 72, 32, 16 }, makeSpec ({}, 1, 127, 1, 1.0, whole), [&o] { return (double) o.minimum; }, [&o] (double v) { o.minimum = juce::roundToInt (v); });
+        juce::ignoreUnused (envelope);
+        label (tr ("Loop"), { 0, 94, third, 12 }, juce::Justification::centred);
+        label (tr ("Rotate"), { third + 2, 94, third, 12 }, juce::Justification::centred);
+        label (tr ("Division"), { 2 * (third + 2), 94, third, 12 }, juce::Justification::centred);
+        box (tr ("Loop"), { 0, 107, third, 16 }, makeSpec ({}, 1, 16, 1, 1.0, whole), [&o] { return (double) o.loops; }, [&o] (double v) { o.loops = juce::roundToInt (v); });
+        box (tr ("Rotate"), { third + 2, 107, third, 16 }, makeSpec ({}, -16, 16, 0, 1.0, whole), [&o] { return (double) o.rotate; }, [&o] (double v) { o.rotate = juce::roundToInt (v); });
+        choice ({ 2 * (third + 2), 107, third, 16 }, { "1/16", "1/8", tr ("Grid") }, o.division, [&o] (int i) { o.division = i; });
+    }
+
     MidiToolsPanel& panel;
     std::vector<std::unique_ptr<juce::Component>> items;
 };
@@ -435,6 +799,8 @@ MidiToolsPanel::MidiToolsPanel (AudioEngine& e, std::function<Target()> t, std::
             case recombine:  recombineOptions = {}; break;
             case span:       spanOptions = {}; break;
             case strum:      strumOptions = {}; break;
+            case timeWarp:   timeWarpOptions = {}; warpSelected = 0; break;
+            case velocityShaper: shaperOptions = {}; break;
             default: break;
         }
         rebuild();
@@ -469,6 +835,34 @@ void MidiToolsPanel::setTool (int t)
     tool = t;
     session.valid = false; // (what the tool before did stays)
     chooser.setSelectedId (tool + 1, juce::dontSendNotification);
+    rebuild();
+}
+
+juce::String MidiToolsPanel::warpTimeText (double share) const
+{
+    // the breakpoint's place as Live writes it, bar.beat.sixteenth within the span the tool would use now
+    miditools::Notes notes;
+    if (target != nullptr)
+    {
+        const auto t = target();
+        const auto& song = engine.getSong();
+        if (t.pattern >= 0 && t.pattern < (int) song.patterns.size())
+            notes = miditools::notesAt (song.patterns[(std::size_t) t.pattern], t.indices);
+    }
+    const auto [from, to] = miditools::timeWarpRange (notes, timeWarpOptions);
+    const auto ticks = from + (std::int64_t) std::llround (std::clamp (share, 0.0, 1.0) * (double) (to - from));
+    const auto sixteenths = ticks / (ppq / 4);
+    return juce::String (sixteenths / 16 + 1) + "." + juce::String (sixteenths / 4 % 4 + 1) + "." + juce::String (sixteenths % 4 + 1);
+}
+
+void MidiToolsPanel::setLiveShotSettingsForSnapshot()
+{
+    chopOptions.emphasis = 0x1;
+    quantizeOptions.step = ppq / 2;
+    quantizeOptions.triplets = quantizeOptions.straightToo = true;
+    timeWarpOptions.points[1].on = true;
+    timeWarpOptions.points[1].speed = 2.0;
+    warpSelected = 1;
     rebuild();
 }
 
@@ -537,7 +931,12 @@ miditools::Notes MidiToolsPanel::apply (const miditools::Notes& notes, std::int6
             o.seed = seed;
             return miditools::arpeggiate (notes, o);
         }
-        case chop: return miditools::chop (notes, chopOptions);
+        case chop:
+        {
+            auto o = chopOptions;
+            o.seed = seed;
+            return miditools::chop (notes, o);
+        }
         case connect:
         {
             auto o = connectOptions;
@@ -568,6 +967,8 @@ miditools::Notes MidiToolsPanel::apply (const miditools::Notes& notes, std::int6
             return miditools::span (notes, o, grid);
         }
         case strum: return miditools::strum (notes, strumOptions, grid);
+        case timeWarp: return miditools::timeWarp (notes, timeWarpOptions, grid);
+        case velocityShaper: return miditools::velocityShaper (notes, shaperOptions, grid);
         default: return notes;
     }
 }
