@@ -331,7 +331,14 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
         {
             node->channel = src.channel;
             node->plugin = src.channel.instrument == InstrumentKind::plugin;
-            if (reuse != nullptr)
+            const auto* nested = reuse != nullptr ? graphOf (reuse->instrument.get()) : nullptr;
+            if (nested != nullptr && nested->latencyStale (&src.channel.patcher))
+            {
+                // a nested generator Patcher whose plan no longer holds (issue #113): built again, keeping its nodes
+                node->instrument = makeInstrument (src.channel, sampleRate, factories, reuse->instrument.get());
+                node->instrument->configure (src.channel, 140.0);
+            }
+            else if (reuse != nullptr)
             {
                 node->instrument = reuse->instrument;
                 node->instrument->configure (src.channel, 140.0);
@@ -343,7 +350,14 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
         {
             node->setup = src.effect;
             node->plugin = src.effect.kind == EffectKind::plugin;
-            if (reuse != nullptr)
+            const auto* nested = reuse != nullptr ? graphOf (reuse->effect.get()) : nullptr;
+            if (nested != nullptr && nested->latencyStale (&src.effect.patcher))
+            {
+                // a nested Patcher whose plan no longer holds (issue #113): built again too, keeping its running nodes
+                node->effect = makeEffect (src.effect, sampleRate, factories, reuse->effect.get());
+                node->effect->prepare (sampleRate);
+            }
+            else if (reuse != nullptr)
                 node->effect = reuse->effect;
             else if (factories.effect)
                 node->effect = factories.effect (src.effect);
@@ -596,26 +610,22 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
         position[(std::size_t) order[k]] = (int) k;
     auto runsBefore = [&] (const AudioWire& w) { return w.from < 0 || w.to < 0 || position[(std::size_t) w.from] < position[(std::size_t) w.to]; };
     auto sourceLatency = [&] (const AudioWire& w) { return w.from >= 0 ? nodes[(std::size_t) w.from]->outLatency : 0; };
-    for (const auto i : order)
+    plannedOwn.resize ((std::size_t) count);
+    plannedEnabled.resize ((std::size_t) count);
+    for (int i = 0; i < count; ++i)
     {
-        auto& node = *nodes[(std::size_t) i];
-        int in = 0;
-        for (const auto k : node.mainInputs)
-            if (runsBefore (wires[(std::size_t) k]))
-                in = std::max (in, sourceLatency (wires[(std::size_t) k]));
-        for (const auto k : node.sideInputs)
-            if (runsBefore (wires[(std::size_t) k]))
-                in = std::max (in, sourceLatency (wires[(std::size_t) k]));
-        node.inLatency = in;
-        const auto own = node.generator ? (node.instrument != nullptr ? node.instrument->latencySamples() : 0)
-                                        : (doc.nodes[(std::size_t) i].effect.enabled ? node.effect->latencySamples() : 0);
-        node.outLatency = in + std::max (0, own);
+        plannedEnabled[(std::size_t) i] = doc.nodes[(std::size_t) i].generator || doc.nodes[(std::size_t) i].effect.enabled ? 1 : 0;
+        plannedOwn[(std::size_t) i] = ownLatency (i, plannedEnabled[(std::size_t) i] != 0);
     }
-    std::vector<int> outLatency ((std::size_t) highestAux + 1, 0);
-    for (const auto& w : wires)
-        if (w.to == patchToHost)
-            outLatency[(std::size_t) w.toBus] = std::max (outLatency[(std::size_t) w.toBus], sourceLatency (w));
-    latency = outLatency.empty() ? 0 : *std::max_element (outLatency.begin(), outLatency.end());
+    {
+        std::vector<int> in, out;
+        latency = planLatencies (plannedOwn, in, out);
+        for (int i = 0; i < count; ++i)
+        {
+            nodes[(std::size_t) i]->inLatency = in[(std::size_t) i];
+            nodes[(std::size_t) i]->outLatency = out[(std::size_t) i];
+        }
+    }
     for (auto& w : wires)
     {
         if (! runsBefore (w))
@@ -637,6 +647,74 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
     active = std::make_unique<Values>();
     takeValues (doc, 140.0);
     applyPending();
+}
+
+int Graph::ownLatency (int i, bool enabled) const noexcept
+{
+    const auto& node = *nodes[(std::size_t) i];
+    if (node.generator)
+        return node.instrument != nullptr ? std::max (0, node.instrument->latencySamples()) : 0;
+    return enabled && node.effect != nullptr ? std::max (0, node.effect->latencySamples()) : 0;
+}
+
+int Graph::planLatencies (const std::vector<int>& own, std::vector<int>& in, std::vector<int>& out) const
+{
+    const auto count = nodes.size();
+    in.assign (count, 0);
+    out.assign (count, 0);
+    std::vector<int> position (count, 0);
+    for (std::size_t k = 0; k < order.size(); ++k)
+        position[(std::size_t) order[k]] = (int) k;
+    auto runsBefore = [&] (const AudioWire& w) { return w.from < 0 || w.to < 0 || position[(std::size_t) w.from] < position[(std::size_t) w.to]; };
+    auto sourceLatency = [&] (const AudioWire& w) { return w.from >= 0 ? out[(std::size_t) w.from] : 0; };
+    for (const auto i : order)
+    {
+        const auto& node = *nodes[(std::size_t) i];
+        int latest = 0;
+        for (const auto k : node.mainInputs)
+            if (runsBefore (wires[(std::size_t) k]))
+                latest = std::max (latest, sourceLatency (wires[(std::size_t) k]));
+        for (const auto k : node.sideInputs)
+            if (runsBefore (wires[(std::size_t) k]))
+                latest = std::max (latest, sourceLatency (wires[(std::size_t) k]));
+        in[(std::size_t) i] = latest;
+        out[(std::size_t) i] = latest + std::max (0, own[(std::size_t) i]);
+    }
+    int longest = 0;
+    for (const auto& w : wires)
+        if (w.to == patchToHost && w.toBus <= (int) aux.size())
+            longest = std::max (longest, sourceLatency (w));
+    return longest;
+}
+
+bool Graph::latencyStale (const PatcherDoc* doc) const
+{
+    for (std::size_t i = 0; i < nodes.size() && i < plannedOwn.size(); ++i)
+    {
+        const auto* src = doc != nullptr && i < doc->nodes.size() ? &doc->nodes[i] : nullptr;
+        const auto enabled = src != nullptr ? (src->generator || src->effect.enabled) : plannedEnabled[i] != 0;
+        if (ownLatency ((int) i, enabled) != plannedOwn[i])
+            return true;
+        // a nested Patcher: a node switched on / off in its own document
+        const auto& node = *nodes[i];
+        const auto* nested = node.generator ? graphOf (node.instrument.get()) : graphOf (node.effect.get());
+        if (nested != nullptr && src != nullptr && src->generator == node.generator
+            && nested->latencyStale (node.generator ? &src->channel.patcher : &src->effect.patcher))
+            return true;
+    }
+    return false;
+}
+
+int Graph::latencySamples() const
+{
+    if (! latencyStale())
+        return latency;
+    // a node's latency moved since the plan (issue #113): report what the graph will have once the rack builds it
+    // again, so the mixer sees the change and rebuilds it (the UI thread polls the rack's latencies)
+    std::vector<int> own (plannedOwn.size(), 0), in, out;
+    for (std::size_t i = 0; i < own.size(); ++i)
+        own[i] = ownLatency ((int) i, plannedEnabled[i] != 0);
+    return planLatencies (own, in, out);
 }
 
 Graph::~Graph()
@@ -1735,6 +1813,9 @@ bool acceptValues (Effect* effect, const EffectSlot& slot)
 {
     if (auto* g = graphOf (effect))
     {
+        // a node's latency moved since the graph planned its delay compensation: build it again (issue #113)
+        if (g->latencyStale (&slot.patcher))
+            return false;
         g->takeValues (slot.patcher);
         return true;
     }

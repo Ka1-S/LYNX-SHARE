@@ -233,6 +233,15 @@ const char* effectId (EffectKind k)
         case EffectKind::kilnChannel: return "kilnChannel";
         case EffectKind::fretChannel: return "fretChannel";
         case EffectKind::shellChannel: return "shellChannel";
+        case EffectKind::pocketDistortion: return "pocketDistortion";
+        case EffectKind::pocketLimiterClassic: return "pocketLimiterClassic";
+        case EffectKind::pocketLimiter: return "pocketLimiter";
+        case EffectKind::pocketLeveller: return "pocketLeveller";
+        case EffectKind::pocketGate: return "pocketGate";
+        case EffectKind::pocketTranceDelay: return "pocketTranceDelay";
+        case EffectKind::pocketTapeDelay: return "pocketTapeDelay";
+        case EffectKind::pocketMultiFx: return "pocketMultiFx";
+        case EffectKind::strikeShaper: return "strikeShaper";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -323,8 +332,14 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("resetOnFlush", false);
     if (! p.sendLoopPosition)
         o->setProperty ("sendLoopPosition", false);
+    if (p.allowHostKeys)
+        o->setProperty ("allowHostKeys", true);
+    if (p.hostKeysFirst)
+        o->setProperty ("hostKeysFirst", true);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
+    if (p.detached) // issue #116 (saved only when not the default)
+        o->setProperty ("detached", true);
     return juce::var (o.release());
 }
 
@@ -338,6 +353,7 @@ PluginRef pluginFromVar (const juce::var& v)
         p.foreign = {};
     p.fixedBuffers = (bool) v.getProperty ("fixedBuffers", false);
     p.separateProcess = (bool) v.getProperty ("separateProcess", false);
+    p.detached = (bool) v.getProperty ("detached", false);
     p.threaded = (bool) v.getProperty ("threaded", true);
     p.maxSizeBuffers = (bool) v.getProperty ("maxSizeBuffers", false);
     p.allowSmartDisable = (bool) v.getProperty ("allowSmartDisable", true);
@@ -353,6 +369,8 @@ PluginRef pluginFromVar (const juce::var& v)
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
+    p.allowHostKeys = (bool) v.getProperty ("allowHostKeys", false);
+    p.hostKeysFirst = (bool) v.getProperty ("hostKeysFirst", false);
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;
@@ -959,10 +977,12 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
                     EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::formulaController, EffectKind::voiceShift, EffectKind::patcher, EffectKind::emphasizer, EffectKind::flFrequencyShifter, EffectKind::flLowLifter, EffectKind::waveCandy, EffectKind::visualizer,
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
+                    EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
+                    EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper })
         if (id == effectId (k))
             return k;
 
@@ -2008,6 +2028,13 @@ juce::var mixerTrackToVar (const MixerTrack& t)
 
         o->setProperty ("sends", sends);
     }
+    if (! t.lostSends.empty()) // round 186c: [name, level] of each send to a deleted insert
+    {
+        juce::Array<juce::var> lost;
+        for (const auto& l : t.lostSends)
+            lost.add (juce::Array<juce::var> { juce::String::fromUTF8 (l.to.c_str()), juce::roundToInt (l.level * 10000.0f) / 10000.0 });
+        o->setProperty ("lostSends", lost);
+    }
 
     juce::Array<juce::var> effects;
 
@@ -2078,6 +2105,10 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         for (const auto& send : *sends)
             if (send.isArray() && send.size() == 2)
                 track.sends.push_back ({ (int) send[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) send[1]) });
+    if (auto* lost = t["lostSends"].getArray())
+        for (const auto& l : *lost)
+            if (l.isArray() && l.size() == 2)
+                track.lostSends.push_back ({ l[0].toString().toStdString(), juce::jlimit (0.0f, maxFaderGain, (float) (double) l[1]) });
 
     if (auto* effects = t["effects"].getArray())
         for (const auto& e : *effects)
@@ -3376,6 +3407,7 @@ juce::String mixerTrackStateToJson (const MixerTrack& track)
     // the track's own settings and effects; routing, audio input, mute and solo belong to the project
     auto state = track;
     state.sends.clear();
+    state.lostSends.clear();
     state.toMaster = true;
     state.masterLevel = 1.0f;
     state.inputChannel = -1;

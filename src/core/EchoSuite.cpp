@@ -1262,6 +1262,11 @@ private:
                     case ModSource::none: break;
                 }
             }
+            // round 183b: one tape transport in the Single style. The ValhallaDelay role's tail is mono there (L/R
+            // correlation 0.998 with its default wow and flutter, as without them); two independent swings
+            // decorrelated the sides (0.18) and, summed, combed the repeats (spectral fluctuation 3.4 x the reference's)
+            if (vd == nullptr && modulation == ModSource::tape && st == Style::single)
+                modMs[1] = modMs[0];
 
             // targets in samples (tape glide when the time changes)
             double target[2] = { tL * 0.001 * sr, tR * 0.001 * sr };
@@ -1611,7 +1616,9 @@ private:
             case Mode::tape:
             case Mode::phaser:
                 u = drive (u); // saturation at the record head, then the tape's response
-                u = 0.8f * (u - 0.44f * s.shelf.lp (u)); // −1.9 dB through the tape path, −5 dB low shelf
+                // round 183b: no −1.9 dB through the tape path (the ValhallaDelay demo, Mix 100 %, 300 ms, Feedback 70 %:
+                // its first repeat sat 2.6 dB above ours and each further one lost 4.3 … 5.6 dB against our 6.5 … 7.9)
+                u = u - 0.44f * s.shelf.lp (u); // −5 dB low shelf
                 return s.tapeLp2.lp (s.tapeLp1.lp (u));
             case Mode::lofi:
             {
