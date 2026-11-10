@@ -28,6 +28,17 @@
 //     Flanger, Phaser, Panner, Vox), [1] Axis X (0.5), [2] Axis Y (0.5), [3] LFO Rate (0.61: 1/8 beat … 4 bars in 10
 //     steps), [4] LFO Amount (0; squared), [5] LFO Shape (0: Sine / Saw / Square). An X/Y pad over eight effects with
 //     a song-locked LFO; a kind change cross-fades (core/PocketMultiFx.cpp).
+//   Pocket Autoduck (EffectKind::pocketAutoduck, FLM module 29): [0] Ducking (0.501; depth √v), [1] Attack (0.1; 0.5v +
+//     0.001 beat), [2] Curve (0.501), [3] Time (1; of the beat), [4] Shift (0.5; ±½ beat), [5] Hold (0; of Time), [6] Shape
+//     (0: Accel, Accel 2, Decel, Decel 2, S-Curve, S-Curve 2). A gain curve on every song beat, 0.01 one-pole per sample
+//     (core/PocketFxA.cpp).
+//   Pocket Chorus (EffectKind::pocketChorus, FLM module 11): [0] Rate (0.4; 4v² + 0.2 Hz), [1] Depth (0.6), [2] Stereo
+//     (1), [3] Mix (0.6; v², added to the dry). Two taps into one 10 ms ring of L + R.
+//   Pocket Spacer (EffectKind::pocketSpacer, FLM module 34): [0] L/R Delay (0.5; ±300 ms, cubic), [1] Pan (0.5),
+//     [2] Separation (0.5), [3] L/R Inversion (0), [4] M/S Delay (0.5; ±100 ms, fifth power), [5] M/S Inversion (0),
+//     [6] Stereo Mode (0: Standard, Output M/S, Input M/S).
+//   Pocket Stereoizer (EffectKind::pocketStereoizer, FLM module 15): [0] Strength (0.7), [1] Timbre (0.52; Haas delay
+//     0.5…50 ms), [2] Focus (0.75; low-pass below ½, high-pass above), [3] L/R Delay (0.5; ±25 ms), [4] Pan (0.5).
 
 #include <memory>
 #include <string>
@@ -37,6 +48,7 @@
 namespace lynx::pocket
 {
 constexpr int distortionParams = 6, limiterClassicParams = 3, limiterParams = 4, levellerParams = 2, gateParams = 8, tranceDelayParams = 7, tapeDelayParams = 4, multiFxParams = 6;
+constexpr int autoduckParams = 7, chorusParams = 4, spacerParams = 7, stereoizerParams = 5;
 
 // Distortion's curves: soft knee x/(k|x| + 1), tanh, exponential, hard clip
 const char* distortionKindName (int kind) noexcept;
@@ -50,6 +62,10 @@ std::unique_ptr<Effect> makeGate();
 std::unique_ptr<Effect> makeTranceDelay();
 std::unique_ptr<Effect> makeTapeDelay();
 std::unique_ptr<Effect> makeMultiFx(); // core/PocketMultiFx.cpp
+std::unique_ptr<Effect> makeAutoduck();   // core/PocketFxA.cpp
+std::unique_ptr<Effect> makeChorus();     // core/PocketFxA.cpp
+std::unique_ptr<Effect> makeSpacer();     // core/PocketFxA.cpp
+std::unique_ptr<Effect> makeStereoizer(); // core/PocketFxA.cpp
 
 std::string distortionParamText (int param, float v);
 std::string limiterClassicParamText (int param, float v);
@@ -63,4 +79,11 @@ const char* multiFxKindName (int kind) noexcept;            // "Delay", "Reverb"
 int multiFxKind (float v) noexcept;                          // ⌊7v⌋
 const char* multiFxAxisName (int kind, bool yAxis) noexcept; // the pad's axis labels per kind
 const char* tranceTimeName (float v) noexcept; // "1/4" … "1/1" (of a beat)
+std::string autoduckParamText (int param, float v, double bpm);
+std::string autoduckHoldText (float hold, float time); // Hold reads as a share of the beat (× Time)
+const char* autoduckShapeName (int shape) noexcept;     // "Accel" … "S-Curve 2"
+float autoduckEnvelope (const EffectParams& p, float phase) noexcept; // the duck curve (0…1) at a beat phase
+std::string chorusParamText (int param, float v);
+std::string spacerParamText (int param, float v);
+std::string stereoizerParamText (int param, float v);
 } // namespace lynx::pocket

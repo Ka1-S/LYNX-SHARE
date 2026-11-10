@@ -595,3 +595,33 @@ tests/FlmImport188hTests.inc.
 in the same 10 ms windows, but inside a window FLM switches earlier and its swept filters differ; no block size or
 position offset reproduces it. Needs one REA pass on how FLM applies the LFO within a block (per-sample update or a
 coefficient ramp).
+
+### F5 effects, round 189h: MultiFX's LFO inside FL (branch `feature/flm189h`, 0.1.26)
+
+The LFO settings were not an engine difference but how FL drives the module, found by fitting the square-LFO edges of
+`mfx_L3` (HP Filter, 1 kHz stair) and confirmed on all three settings:
+- **FL runs a hosted FLM rack in chunks of one song tick (1/96 beat)** cut on the song's grid (chunk k starts at sample
+  round(k · tick)), and each chunk gets its tick's exact position. FLM reads its per-block LFO once per chunk. The
+  falling edges of a square LFO land on the beat, the rising ones one tick (229.7 samples at 120 BPM) after the half
+  beat: the chunk at the half beat starts on ph = 0.5 exactly, and FLM's square switches on ph > 0.5. A 512-sample host
+  block (fxrender's default) put both edges up to 511 samples late, which was the 188i mismatch. The 48 and 192 grids
+  and floor/ceil rounding all fit worse (fxrender `--ticks <ppq> <mode>`).
+- **The "input is active" flag is always true inside FL.** With LYNX computing it from the block (FLM's own tracks
+  derive it from playing voices, spec-multifx §2), the Flanger skipped the silent gaps of the burst segment and its
+  tape speed did not glide on: bursts −3.5 dB. Always active: −52.7 dB. The flag only gates skipping and tails; no
+  static setting changes.
+
+LYNX's Pocket MultiFX now cuts every host block on the same grid, carries a chunk that a block boundary cuts with the
+LFO value it started with, gives grid chunks their exact tick position and never skips silent input. Its output is
+the same to the bit for host blocks of 64, 100, 256, 512, 1000, 2048 and 4096 samples (before, it changed with the
+block). The Reverb kind has no LFO and runs once per block (identical output). Test: `flm189h_pocket_multifx_tick_chunks`.
+
+| Setting | 188i | 189h |
+|---|---|---|
+| mfx_L1 LP Filter, sine 3/8 beat, amount 0.36 | 6 (−9.5) | 9 (−59.5) |
+| mfx_L2 Flanger, saw 1 beat, amount 0.64 | 7 (−11.8) | 10 (−72.4) |
+| mfx_L3 HP Filter, square 1 beat, amount 0.25 | 4 (−6.3) | 9 (−68.2) |
+| mfx_D, K1–K7 (no LFO) | 10, 8, 10, 10, 10, 10, 10, 9 | 10, 8, 10, 10, 10, 10 (−70.2 → −80.9), 10, 10 (−65.3 → −72.0) |
+
+Not reproduced (INFERRED from the fit, not REA): whether FL or the rack wrapper makes the tick chunks. FLM's own app
+calls with its device buffer and voice-derived activity; LYNX follows the measurable host (FL).
