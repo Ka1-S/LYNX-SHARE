@@ -48,6 +48,20 @@ lynx::Song back (const flp::Project& p)
     return lynx::importFlp (p, o);
 }
 
+// the imported song's channel 0 / insert 1 slot 0 plugin: 1 detached, 0 docked, −1 not there
+int channelDetached (const lynx::Song& s)
+{
+    return s.channels.empty() ? -1 : (int) s.channels[0].plugin.detached;
+}
+int effectDetached (const lynx::Song& s)
+{
+    return s.mixer.size() < 2 || s.mixer[1].effects.empty() ? -1 : (int) s.mixer[1].effects[0].plugin.detached;
+}
+int channelFlags (const flp::Project& p)
+{
+    return p.channels.empty() ? -1 : p.channels[0].wrapperFlags;
+}
+
 int slotFlags (const flp::Project& p)
 {
     for (const auto& m : p.mixer)
@@ -65,25 +79,24 @@ TEST (issue116_flp_detached_flag_round_trips)
 
     // docked (the default): FL's flags without 0x4 — a generator wrapper 0x150, an effect wrapper 0x140
     auto p = written (song (false, false, -1));
-    CHECK (p.channels.at (0).wrapperFlags == 0x150 && slotFlags (p) == 0x140);
+    CHECK (channelFlags (p) == 0x150 && slotFlags (p) == 0x140);
     auto s = back (p);
-    CHECK (! s.channels.at (0).plugin.detached);
-    CHECK (s.mixer.at (1).effects.size() == 1 && ! s.mixer[1].effects[0].plugin.detached);
+    CHECK (channelDetached (s) == 0 && effectDetached (s) == 0);
 
     // detached: bit 0x4 on each plugin's own record, and back
     p = written (song (true, false, -1));
-    CHECK (p.channels.at (0).wrapperFlags == 0x154 && slotFlags (p) == 0x140);
+    CHECK (channelFlags (p) == 0x154 && slotFlags (p) == 0x140);
     s = back (p);
-    CHECK (s.channels.at (0).plugin.detached && ! s.mixer.at (1).effects.at (0).plugin.detached);
+    CHECK (channelDetached (s) == 1 && effectDetached (s) == 0);
     p = written (song (false, true, -1));
-    CHECK (p.channels.at (0).wrapperFlags == 0x150 && slotFlags (p) == 0x144);
+    CHECK (channelFlags (p) == 0x150 && slotFlags (p) == 0x144);
     s = back (p);
-    CHECK (! s.channels.at (0).plugin.detached && s.mixer.at (1).effects.at (0).plugin.detached);
+    CHECK (channelDetached (s) == 0 && effectDetached (s) == 1);
 
     // FL's other flags of an imported channel stay (0x1 visible, 0x20 smart disable); LYNX's Detached decides 0x4:
     // imported detached and docked again in LYNX, or the other way round
-    CHECK (written (song (false, false, 0x175)).channels.at (0).wrapperFlags == 0x171);
-    CHECK (written (song (true, false, 0x171)).channels.at (0).wrapperFlags == 0x175);
+    CHECK (channelFlags (written (song (false, false, 0x175))) == 0x171);
+    CHECK (channelFlags (written (song (true, false, 0x171))) == 0x175);
 
     // a channel that is not a hosted plugin keeps the flags it was imported with, 0x4 included (LYNX's own editors
     // have no Detached state to set it from)
@@ -92,5 +105,5 @@ TEST (issue116_flp_detached_flag_round_trips)
     sampler.channels[0].instrument = lynx::InstrumentKind::sampler;
     sampler.channels[0].samplePath = "C:/x.wav";
     sampler.channels[0].flWrapperFlags = 0x54;
-    CHECK (written (sampler).channels.at (0).wrapperFlags == 0x54);
+    CHECK (channelFlags (written (sampler)) == 0x54);
 }
