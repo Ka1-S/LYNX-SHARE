@@ -1293,4 +1293,33 @@ void Engine::render (float* left, float* right, int frames) noexcept
         if (d->voices[(std::size_t) i].state < 10)
             d->renderVoice (d->voices[(std::size_t) i], left, right, frames);
 }
+
+// ---- for editors: the shapes as the voices play them
+std::vector<float> curveLevels (const slicex::Curve& curve, bool map, int count)
+{
+    std::vector<float> out ((std::size_t) std::max (count, 0), 0.0f);
+    if (count < 2)
+        return out;
+    const auto c = prepared (curve, 0.0, map ? CurveUse::map : CurveUse::envelope);
+    double length = 0.0;
+    for (std::size_t i = 1; i < c.pts.size(); ++i)
+        length += (double) c.pts[i].dt;
+    if (! (length > 0.0))
+    {
+        std::fill (out.begin(), out.end(), c.pts.empty() ? 0.0f : c.pts.front().y);
+        return out;
+    }
+    c.table (out.data(), count, length / (double) (count - 1));
+    return out;
+}
+
+std::vector<float> lfoCycle (const Articulator& a, int count)
+{
+    std::vector<float> out ((std::size_t) std::max (count, 0), 0.0f);
+    LfoWave wave;
+    wave.build (a.lfoKnobs[1], a.lfoKnobs[2], a.lfoKnobs[3], (a.lfo.flags & 4) != 0);
+    for (int i = 0; i < count; ++i)
+        out[(std::size_t) i] = wave.value ((u32) (wave.startPhase + (u32) (4294967296.0 * (double) i / (double) std::max (count, 1))));
+    return out;
+}
 } // namespace lynx::slicex

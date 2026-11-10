@@ -1,5 +1,6 @@
 // Round 190r: Slicex region keys (FL's trigger list) — read and written as FL does
 #include "core/Slicex.h"
+#include "core/SlicexEngine.h"
 
 // FL's trigger list is a chunk of its own (a project FL saved after "Assign current region to this key"); one inside a
 // LIST is not read, as FL ignores it
@@ -44,3 +45,56 @@ TEST (slicex190r_region_keys_are_read_and_written_as_fl_does)
     regions = slicex::wavRegions (wrapped, frames);
     CHECK (regions.size() == 3 && regions[0].key == -1);
 }
+
+// ---- the editor's helpers (curve shapes for the articulator graph)
+TEST (slicex190r_curve_levels_follow_the_points)
+{
+    using namespace lynx;
+    slicex::Curve c;
+    c.enabled = -1;
+    slicex::Point a, b, d;
+    a.y = 0.0;
+    b.dt = 1.0;
+    b.y = 1.0;
+    d.dt = 1.0;
+    d.y = 0.5;
+    c.points = { a, b, d };
+    const auto v = slicex::curveLevels (c, false, 201);
+    CHECK (v.size() == 201);
+    CHECK (std::abs (v.front() - 0.0f) < 1.0e-4f);
+    CHECK (std::abs (v[100] - 1.0f) < 0.02f);  // the second point, half way
+    CHECK (std::abs (v[50] - 0.5f) < 0.02f);   // a straight segment (tension 0)
+    CHECK (std::abs (v[200] - 0.5f) < 0.02f);
+    // a "hold" segment keeps the previous level up to its point
+    c.points[1].mode = 2;
+    const auto h = slicex::curveLevels (c, false, 201);
+    CHECK (std::abs (h[50] - 0.0f) < 1.0e-4f);
+    // a map is shown across x = 0…1 whatever its points' spacing
+    c.points[1].mode = 0;
+    c.points[2].dt = 3.0;
+    const auto m = slicex::curveLevels (c, true, 101);
+    CHECK (std::abs (m[25] - 1.0f) < 0.03f);
+    // one point, or none: a flat line, no crash
+    c.points.resize (1);
+    CHECK (slicex::curveLevels (c, false, 16).size() == 16);
+    c.points.clear();
+    CHECK (slicex::curveLevels (c, false, 16).size() == 16);
+    CHECK (slicex::curveLevels (c, false, 1).size() == 1);
+}
+
+TEST (slicex190r_lfo_cycle_is_one_bipolar_period)
+{
+    using namespace lynx;
+    const auto st = slicex::fresh();
+    const auto w = slicex::lfoCycle (st.groups[0].art[slicex::volume], 64);
+    CHECK (w.size() == 64);
+    float lo = 1.0f, hi = -1.0f;
+    for (const auto v : w)
+    {
+        CHECK (std::isfinite (v) && v >= -1.0001f && v <= 1.0001f);
+        lo = std::min (lo, v);
+        hi = std::max (hi, v);
+    }
+    CHECK (hi > 0.9f && lo < -0.9f);
+}
+

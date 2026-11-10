@@ -66,6 +66,7 @@
 #include "ui/VideoPlayerView.h"
 #include "ui/WaveTravellerEditor.h"
 #include "ui/FruitySlicerEditor.h"
+#include "ui/SlicexEditor.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -5168,6 +5169,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeWaveTravellerEditor (engine, ref.locate, ref.index); // round 167f
     if (kind == InstrumentKind::fruityslicer)
         return makeFruitySlicerEditor (engine, ref.locate, ref.index); // round 180c
+    if (kind == InstrumentKind::slicex)
+        return makeSlicexEditor (engine, ref.locate, ref.index); // round 190r
     if (kind == InstrumentKind::synth)
         return std::make_unique<SynthPanel> (engine, ref);
     if (isModelKind (kind))
@@ -5357,6 +5360,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::vfx:
         case InstrumentKind::wavetraveller:
         case InstrumentKind::fruityslicer:
+        case InstrumentKind::slicex:
             return true;
         default:
             return false;
@@ -5446,6 +5450,10 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeFruitySlicerEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
         }, channel); // round 180c
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::slicex)
+        return makeSlicexEditor (engine, [channel] (Song& s) -> ChannelDef* {
+            return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
+        }, channel); // round 190r
     if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
         kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor

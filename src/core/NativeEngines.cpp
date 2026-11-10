@@ -13,6 +13,7 @@
 #include "core/MidiOut.h"
 #include "core/MixSuite.h"
 #include "core/PhysicalModels.h"
+#include "core/Slicex.h"
 #include "flp/Flp.h"
 
 namespace lynx::natives
@@ -136,6 +137,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", fl, false },
         { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
         { InstrumentKind::fruityslicer, "Fruity Slicer", "Fruity Slicer", own, false },
+        { InstrumentKind::slicex, "Slicex", "", own, false }, // (round 190r: a new one is FL's Default preset values, decks empty)
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
@@ -344,6 +346,8 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
     ChannelDef def; // LYNX's own default: the engine plays from an empty state
     def.name = engine->name;
     def.instrument = kind;
+    if (kind == InstrumentKind::slicex)
+        def.pluginState = slicex::write (slicex::fresh());
     return def;
 }
 
