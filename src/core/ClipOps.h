@@ -11,13 +11,22 @@
 #include <limits>
 #include <vector>
 
+#include "core/SamplePrecompute.h"
 #include "core/Song.h"
 
 namespace lynx::clipops
 {
+// The part of its file an audio clip's channel plays (its Trim; a clip plays the whole region): a clip's offsets count from
+// its first frame, and TIME stretches its length (FL: FUN_00ff9d70, REA round 180d). Pass its `frames` as `fileFrames`
+// below and add `first` to a frame drawn from them, so that drawing, clip lengths and playback agree.
+inline precompute::PlayedSpan clipSpan (const ChannelDef& channel, const std::shared_ptr<const SampleData>& data)
+{
+    return precompute::playedSpan (data, channel.sampler, channel.instrument == InstrumentKind::audioClip);
+}
+
 // Audio frames of the file per Playlist tick for an audio clip's channel: the file's own speed, or, when the
-// channel is stretched (stretchBeats > 0, with or without keeping the pitch), the whole file spread over that
-// many beats.
+// channel is stretched (stretchBeats > 0, with or without keeping the pitch), the played span (clipSpan) spread over
+// that many beats.
 inline double framesPerTick (const SamplerSettings& sampler, double fileFrames, double fileRate, double bpm) noexcept
 {
     if (sampler.stretchBeats > 0.0f && fileFrames > 0.0)
@@ -270,6 +279,8 @@ inline void updateCrossfades (std::vector<Clip>& clips, bool on)
         auto& b = clips[(std::size_t) order[k]];
         if (a.track != b.track || b.start <= a.start || b.start >= a.end() || b.end() <= a.end())
             continue;
+        if ((a.fadeCurve & 2) != 0 && (b.fadeCurve & 1) != 0) // a comp crossfade (round 177c) keeps its own curve
+            continue;
         const auto overlap = a.end() - b.start;
         a.crossfadeOut = std::max (a.crossfadeOut, overlap);
         b.crossfadeIn = std::max (b.crossfadeIn, overlap);
@@ -281,11 +292,65 @@ inline void updateCrossfades (Song& song)
     song.forEachClipList ([on = song.autoCrossfades] (std::vector<Clip>& clips) { updateCrossfades (clips, on); });
 }
 
+// Issue #87 (round 178a): an audio clip that does not follow the tempo (its channel's Time stretch is off,
+// stretchBeats == 0: FL's default Resample with no Time set) plays its audio at the file's own speed, so it lasts the
+// same seconds whatever the tempo. FL keeps such a clip's region in milliseconds (the .flp's playlist item start / end
+// offsets, REA_rodada110 §1 and REA_rodada178a §1) and resizes the clip when the project tempo changes: a lower tempo
+// makes it shorter in bars, a higher one longer. LYNX keeps clips in ticks, so a tempo change rescales those clips'
+// length, start offset and fades by new / old tempo (their position stays). Clips whose channel follows the tempo
+// (stretchBeats > 0) keep their length in beats, as in FL. Every arrangement's clips follow. Call it for a change of the
+// project tempo itself (the tempo display, tap tempo, the project settings), not for tempo automation.
+inline void followTempo (Song& song, double newBpm)
+{
+    const auto oldBpm = song.bpm;
+    song.bpm = newBpm;
+    if (! (oldBpm > 0.0) || ! (newBpm > 0.0) || oldBpm == newBpm)
+        return;
+    const auto factor = newBpm / oldBpm;
+    const auto scaled = [factor] (std::int64_t ticks) { return (std::int64_t) std::llround ((double) ticks * factor); };
+    song.forEachClipList ([&] (std::vector<Clip>& clips) {
+        for (auto& c : clips)
+        {
+            if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size()
+                || song.channels[(std::size_t) c.channel].sampler.stretchBeats > 0.0f)
+                continue;
+            c.length = std::max<std::int64_t> (1, scaled (c.length));
+            const auto offset = ((double) c.offset + (double) c.offsetFraction) * factor;
+            c.offset = std::max<std::int64_t> (0, (std::int64_t) std::llround (offset));
+            c.offsetFraction = c.offset > 0 ? (float) (offset - (double) c.offset) : 0.0f;
+            c.fadeIn = std::clamp<std::int64_t> (scaled (c.fadeIn), 0, c.length);
+            c.fadeOut = std::clamp<std::int64_t> (scaled (c.fadeOut), 0, c.length - c.fadeIn);
+        }
+    });
+}
+
 // FL's crossfade curve (round 166e): an S (raised cosine) whose fade-in and fade-out add up to 1 at every point.
 inline float crossfadeCurve (float x) noexcept
 {
     x = std::clamp (x, 0.0f, 1.0f);
     return 0.5f - 0.5f * std::cos (3.14159265358979f * x);
+}
+
+// FL's fade tension on a fade's curve y (0..1), as its voices apply it (REA round 180d, FUN_006774b0 / FUN_00977870 / FUN_00677540):
+// the raw value from the file, rounded to 0.01; 0 leaves the curve alone. A 200 ms fade-out at -812.933 reproduces FL's render
+// within 0.012 RMS.
+inline float fadeTensionCurve (float y, float tension) noexcept
+{
+    const auto t = std::round ((double) tension * 100.0) * 0.01;
+    if (t == 0.0)
+        return y;
+    const auto a = std::abs (t);
+    const auto range = std::log (a + 1.0);
+    return t > 0.0 ? (float) (1.0 - (std::exp ((1.0 - (double) y) * range) - 1.0) / a)
+                   : (float) ((std::exp ((double) y * range) - 1.0) / a);
+}
+
+// A comp crossfade (round 177c): sin(x·π/2) — the fade-in and the fade-out (the same curve, mirrored) keep constant
+// power (sin² + cos² = 1), the right sum for two different takes (uncorrelated) where an S curve would dip ~3 dB.
+inline float equalPowerCurve (float x) noexcept
+{
+    x = std::clamp (x, 0.0f, 1.0f);
+    return std::sin (1.57079632679490f * x);
 }
 
 // FL's audio clip gain handle (round 166e §2): −96.1 dB (shown "-INF") … +36 dB, 0.05 dB per pixel of drag.

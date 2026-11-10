@@ -1,4 +1,5 @@
 #include "ui/PluginSkin.h"
+#include "ui/ImageCaches.h"
 
 #include "core/Effects.h"
 #include "ui/I18n.h"
@@ -42,30 +43,33 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate: case EffectKind::nebula: case EffectKind::halo:
         case EffectKind::horizon:
             return colour::violet;
-        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank:
+        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay:
         case EffectKind::multibandDelay: case EffectKind::echoform: case EffectKind::spiralEcho: case EffectKind::geminiDoubler:
         case EffectKind::newtime:
             return colour::azure;
         case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
         case EffectKind::fruityFlanger: case EffectKind::fruityFlangus: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:
         case EffectKind::orbit: case EffectKind::latticeMod: case EffectKind::autoPan: case EffectKind::fruityPanOMatic:
-        case EffectKind::effector: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
+        case EffectKind::effector: case EffectKind::pocketMultiFx: case EffectKind::pocketWowFlutter: case EffectKind::pocketPhaser: case EffectKind::pocketFlanger: case EffectKind::pocketTremolo: case EffectKind::pocketChorus: case EffectKind::freqShift: case EffectKind::grossBeat: case EffectKind::volumeGate: case EffectKind::rhythmGain:
             return colour::teal;
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
-        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor:
-        case EffectKind::maximus: case EffectKind::peakController:
+        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper:
+        case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
+        case EffectKind::pocketAutoduck:
+        case EffectKind::pocketCompressor:
             return colour::amber;
-        case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel:
+        case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
-        case EffectKind::lofi: case EffectKind::squeeze:
+        case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
         case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:
         case EffectKind::voiceShift:
             return colour::rose;
         case EffectKind::utility: case EffectKind::stereoShaper: case EffectKind::stereoEnhancer: case EffectKind::spreader:
-        case EffectKind::fruityBalance: case EffectKind::fruitySend:
+        case EffectKind::fruityBalance: case EffectKind::fruitySend: case EffectKind::pocketSpacer: case EffectKind::pocketStereoizer:
+        case EffectKind::pocketSpreader:
             return colour::lime;
         default:
             return colour::crimson;
@@ -93,7 +97,10 @@ bool motion = true;
 // a deterministic grain tile (white and black specks at a few % alpha) laid over the canvases
 const juce::Image& grainTile()
 {
-    static juce::Image tile = [] {
+    static juce::Image tile;
+    static const bool registered = lynx::ui::registerImageCache ([] { tile = {}; }); (void) registered;
+    if (tile.isNull())
+        tile = [] {
         juce::Image img (juce::Image::ARGB, 128, 128, true);
         juce::Random rnd (126);
         juce::Image::BitmapData px (img, juce::Image::BitmapData::writeOnly);
@@ -106,7 +113,7 @@ const juce::Image& grainTile()
                 px.setPixelColour (x, y, (light ? juce::Colours::white : juce::Colours::black).withAlpha (a));
             }
         return img;
-    }();
+        }();
     return tile;
 }
 
@@ -130,6 +137,7 @@ void cachedLayer (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour acce
     key = key * 11u + (std::uint64_t) currentArt;
     key ^= (std::uint64_t) accent.getARGB() * 0x9e3779b97f4a7c15ull;
     static std::map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     auto it = cache.find (key);
     if (it == cache.end())
     {
@@ -278,7 +286,7 @@ Style plainStyleFor (int key)
             return G;
         // analogue / vintage-modelled roles: Hardware
         case K::glowLeveler: case K::ridgeStrip: case K::foilPlate: case K::echoform: case K::vintageChorus: case K::vintagePhaser: case K::maximus:
-        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel:
+        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel: case K::fretChannel: case K::shellChannel: case K::strikeShaper:
             return H;
         // creative, pitch and fun: Vivid
         case K::geminiDoubler: case K::voiceShift: case K::ember: case K::grossBeat: case K::flPitchShifter: case K::fruityFastDist: case K::effector:
@@ -375,6 +383,7 @@ void bloom (juce::Graphics& g, juce::Point<float> c, float radius, juce::Colour 
     const auto level = juce::jlimit (1, 64, (int) std::lround (alpha * 64.0f));
     const auto key = (std::uint64_t) colour.withAlpha ((juce::uint8) 255).getARGB() * 67u + (std::uint64_t) level;
     static std::unordered_map<std::uint64_t, juce::Image> sprites;
+    static const bool registered = lynx::ui::registerImageCache ([] { sprites.clear(); }); (void) registered;
     auto it = sprites.find (key);
     if (it == sprites.end())
     {
@@ -496,6 +505,7 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
     if (d < 6.0f) return;
     // the logo resampled once per size (×2 for high-DPI)
     static std::map<int, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     const auto px = juce::jlimit (8, 128, (int) std::ceil (d * 2.0f));
     auto& img = cache[px];
     if (img.isNull())
@@ -913,6 +923,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
     key ^= (std::uint64_t) k.capTint.getARGB() * 0xc2b2ae3d27d4eb4full;
 
     static std::unordered_map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
     auto it = cache.find (key);
     if (it == cache.end())
     {

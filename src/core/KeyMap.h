@@ -139,6 +139,10 @@ public:
     // actions (a panel's keys belong to the panel), and nothing a text field types (`typingIntoText`: a text field has
     // the focus, so its unmodified letters, Space, arrows, Enter... stay text editing).
     std::string findFromSecondaryWindow (const Chord& chord, bool typingIntoText, bool typingPiano) const;
+    // Issue #117: a key the typing piano takes (`pianoTakes`: typing keyboard to piano on and the layout plays it) plays
+    // its note from a secondary window too (a LYNX instrument's or effect's window, a tool window), as over the main
+    // window and as FL does; only a focused text field keeps it.
+    static bool secondaryWindowPlaysNote (bool pianoTakes, bool typingIntoText) noexcept { return pianoTakes && ! typingIntoText; }
 
     // True when the chord plays a note (piano on, unmodified, mapped key).
     static bool playsNote (const Chord& chord, bool typingPiano) noexcept;

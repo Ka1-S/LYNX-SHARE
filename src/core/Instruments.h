@@ -104,7 +104,8 @@ public:
     // the next audio clip's stretch (FL 2026's clip stretch, round 167l): its audio lasts that many times longer
     virtual void setNextClipStretch (float /*stretch*/) noexcept {}
     virtual void setClipShift (bool) {}
-    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
+    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0,
+                                  float /*inTension*/ = 0.0f, float /*outTension*/ = 0.0f) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
     virtual void setNextNoteExpression (float /*pan*/, float /*cents*/, bool /*porta*/ = false) noexcept {}
@@ -116,6 +117,10 @@ public:
     // right before it. Ignored if unsupported (hosted plugins: FL's wrapper MIDI options).
     virtual void setNextNoteModulation (float /*modX*/, float /*modY*/) noexcept {}
     virtual void setNextNoteRelease (float /*velocity*/) noexcept {}
+    // The next note's own fine pitch (cents, the piano roll's, without the channel's tuning; issue #63), called right
+    // before noteOn. Hosted plugins send it as FL's wrapper does (core/HostNotePitch.h: the key it rounds to, the rest as
+    // the VST3 note's tuning); native engines take it with the channel's in setNextNoteExpression.
+    virtual void setNextNoteFinePitch (float /*cents*/) noexcept {}
     // Playback stopped: the held notes stop (hosted plugins may send "All Notes Off" or only those notes' note offs:
     // FL's wrapper option). The panic button: everything stops (a hosted plugin may also be reset).
     virtual void transportStopped() noexcept { allNotesOff(); }

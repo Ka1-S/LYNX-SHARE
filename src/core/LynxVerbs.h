@@ -63,6 +63,8 @@ struct Settings
     double earlyModDepthMs = 0.0;  //   0 = fixed taps, every other front-end)
     // build-up: the tank is fed through taps spread over buildSec (0 = fed at once)
     double buildSec = 0.0;
+    double buildRise = -1.0;       // round tp172d: ≥ 1 = the taps' energy grows as u^(rise − 1) over the span (1 = flat);
+                                   //   < 0 = the rise-and-fall bloom every other verb uses
     // late tank (8-line FDN)
     int shape = 0;                 // line-length set (see LynxVerbs.cpp)
     double lineScale = 1.0;        // multiplier of the shape's lengths
@@ -98,6 +100,7 @@ struct Settings
     double lowShelfHz = 200.0, lowShelfDb = 0.0;
     double highShelfHz = 6000.0, highShelfDb = 0.0;
     double toneHighHz = 8000.0, toneHighDb = 0.0;          // a second high shelf (an algorithm's own tone)
+    double toneLowHz = 100.0, toneLowDb = 0.0;             // round 183b: a second low shelf (an algorithm's own tone)
     double toneMidHz = 1000.0, toneMidDb = 0.0, toneMidQ = 0.7; // a bell (an algorithm's own tone)
     double gain = 1.0;
 };

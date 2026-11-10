@@ -1,9 +1,12 @@
 #include "core/Song.h"
+#include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
 #include "core/MidiOut.h"
 #include "core/PatternBlocks.h"
+#include "core/MidiControls.h"
+#include "core/SessionIds.h"
 
 #include <algorithm>
 #include <iterator>
@@ -83,7 +86,12 @@ std::int64_t Song::songLength() const noexcept
     // Pattern Blocks (round 170f) play with the clips
     const auto blocksEnd = patternblocks::end (*this);
     end = std::max (end, blocksEnd);
-    const bool arranged = ! playlist.empty() || blocksEnd > 0;
+    // video clips (round 174d): a project with only its picture so far plays to the picture's end, not one bar
+    std::int64_t videoEndTicks = 0;
+    if (const auto videoSeconds = videotrack::videoEnd (videoTracks); videoSeconds > 0.0)
+        videoEndTicks = (std::int64_t) std::ceil (videotrack::ticksForSeconds (*this, videoSeconds) - 1e-6);
+    end = std::max (end, videoEndTicks);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0 || videoEndTicks > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
@@ -201,7 +209,7 @@ bool Song::insertInUse (int t) const
         return true;
     // round 163 (hiding unused inserts): a fader, pan, mute or colour moved by hand, or automation on it, counts too
     const auto& m = mixer[(std::size_t) t];
-    if (m.volume != unityFader || m.pan != 0.0f || m.muted || m.solo || m.colour != 0 || m.stereo != 0.0f || m.eq.active()
+    if (m.volume != unityFader || m.pan != 0.0f || m.muted || m.solo || m.colour != 0 || m.stereo != 0.0f || m.eq.hasBoostOrCut()
         || m.outputChannel != outputDefault)
         return true;
     if (std::any_of (mixer.begin(), mixer.end(), [t] (const MixerTrack& o) {
@@ -403,7 +411,7 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 
 int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
-    if (slot.kind == EffectKind::transmitter)
+    if (slot.kind == EffectKind::transmitter || (slot.kind == EffectKind::equo && output == 0)) // (EQUO: its band sends, round 173d3)
         return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
     return output == 0 ? fruitySendTarget (slot) : -1;
 }
@@ -418,7 +426,8 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
         for (int o = 0; o < maxSlotSends; ++o)
             if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
-                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter });
+                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter
+                                                                                       || slots[(std::size_t) s].kind == EffectKind::equo });
     return out;
 }
 
@@ -734,6 +743,15 @@ void Song::removeAutomation (int index)
 
     automations.erase (automations.begin() + index);
 
+    for (auto& track : playlistTracks) // round 177b: lanes follow the renumbering; the removed one's lane goes
+    {
+        track.lanes.erase (std::remove_if (track.lanes.begin(), track.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
+                           track.lanes.end());
+        for (auto& l : track.lanes)
+            if (l.automation > index)
+                --l.automation;
+    }
+
     forEachClipList ([index] (std::vector<Clip>& clips) {
         clips.erase (std::remove_if (clips.begin(), clips.end(),
                                      [index] (const Clip& c) { return c.kind == ClipKind::automation && c.automation == index; }),
@@ -1029,6 +1047,8 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        ? mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].mix
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
+        case AutomationTargetKind::vcaLevel:
+            return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
@@ -1048,6 +1068,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
+        case AutomationTargetKind::vcaLevel:
+            if (t.index < 0 || t.index >= (int) vcas.size())
+                return false;
+            vcas[(std::size_t) t.index].level = v;
+            return true;
         case AutomationTargetKind::mixerSend:
             if (! validTrack || ! routes (t.index, t.slot))
                 return false;
@@ -1121,62 +1146,40 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
     return false;
 }
 
-float Song::automationValueAt (int index, double tick) const
+float Song::targetValueAt (const AutomationTarget& target, double tick) const
 {
-    if (index < 0 || index >= (int) automations.size())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::vector<const Clip*> clips;
-
+    // the same rule as playback (RackRenderer's automationValueAt, issue #97)
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
     for (const auto& c : playlist)
-        if (c.kind == ClipKind::automation && c.automation == index && c.length > 0 && ! c.muted && ! isTrackMuted (c.track))
-            clips.push_back (&c);
-
-    if (clips.empty())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start < b->start; });
-    const auto& automation = automations[(std::size_t) index];
-    const Clip* before = nullptr;
-
-    // same rule as playback: inside a clip the curve; between clips the last value; before, the first
-    for (const auto* c : clips)
     {
-        if (tick < (double) c->start)
-            break;
-
-        if (tick < (double) c->end())
-            return automation.valueAt (tick - (double) c->start + (double) c->offset);
-
-        before = c;
+        if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) automations.size() || c.length <= 0 || c.muted
+            || isTrackMuted (c.track) || ! (automations[(std::size_t) c.automation].target == target) || tick < (double) c.start)
+            continue;
+        if (tick < (double) c.end())
+        {
+            if (playing == nullptr || c.start > playing->start || (c.start == playing->start && c.automation < playing->automation))
+                playing = &c;
+        }
+        else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+            ended = &c;
     }
-
-    if (before != nullptr)
-        return automation.valueAt ((double) (before->length + before->offset));
-
-    return automation.valueAt ((double) clips.front()->offset);
+    if (playing != nullptr)
+        return automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick);
+    if (ended != nullptr)
+        return automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end());
+    return std::numeric_limits<float>::quiet_NaN();
 }
 
 double Song::tempoAt (double tick) const
 {
-    if (mode != PlayMode::song)
-        return bpm;
-
-    for (int i = (int) automations.size() - 1; i >= 0; --i) // the last tempo automation wins
-        if (automations[(std::size_t) i].target.kind == AutomationTargetKind::tempo)
-            if (const auto v = automationValueAt (i, tick); ! std::isnan (v))
-                return tempoFromValue (v);
-
-    return bpm;
+    // tempo automation and FL's pattern Tempo events (issue #86, core/TempoMap.h)
+    return tempomap::tempoAt (*this, tick);
 }
 
 double Song::secondsForTicks (std::int64_t ticks) const
 {
-    const auto hasTempo = mode == PlayMode::song
-                          && std::any_of (automations.begin(), automations.end(),
-                                          [] (const Automation& a) { return a.target.kind == AutomationTargetKind::tempo; });
-
-    if (! hasTempo)
+    if (! tempomap::active (*this))
         return (double) ticks * 60.0 / (std::max (1.0, bpm) * ppq);
 
     // integrate in 1/16 steps (playback changes tempo block by block; the difference is minimal)
@@ -1215,6 +1218,11 @@ float PatternEvents::valueAt (double tick) const noexcept
 
 float Automation::valueAt (double tick) const noexcept
 {
+    return automationCurveAt (points, tick);
+}
+
+float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept
+{
     if (points.empty())
         return 0.5f;
 
@@ -1240,6 +1248,152 @@ float Automation::valueAt (double tick) const noexcept
     }
 
     return points.back().value;
+}
+
+// --- FL's automation clip LFO (REA round 177b; FUN_00ba1700, FUN_00ba0710, FUN_00ba03d0, FUN_00677660/820) ---------
+bool AutomationLfo::isDefault() const noexcept
+{
+    return *this == AutomationLfo {};
+}
+
+double AutomationLfo::cyclesPerBeat (int speed) noexcept
+{
+    // rate = (10001^(speed/65536) − 1) · 2^32/625 phase units per beat (FL: 45819 = 1 beat, 40898 = 2, 26257 = 16)
+    return (std::pow (10001.0, (double) speed / 65536.0) - 1.0) / 625.0;
+}
+
+int AutomationLfo::speedForBeats (double beatsPerCycle) noexcept
+{
+    if (beatsPerCycle <= 0.0)
+        return 65536;
+    const auto speed = 65536.0 * std::log (625.0 / beatsPerCycle + 1.0) / std::log (10001.0);
+    return (int) std::clamp (std::lround (speed), 512L, 65536L);
+}
+
+float AutomationLfo::shape (std::uint32_t phase, int tensionKnob, int skewKnob, int pulseWidthKnob, bool unipolar) noexcept
+{
+    constexpr double full = 4294967296.0; // 2^32: one cycle
+    const auto p = (double) pulseWidthKnob / 128.0;
+    const auto s = (double) skewKnob / 256.0;
+    const auto s7 = p > 0.0 ? std::round ((1.0 - p) * full - 1.0) : 4294967295.0;
+    const auto d = std::clamp (((1.0 - p) * 0.5 - s * (1.0 - std::abs (p))) * full, 1.0, s7 - 1.0);
+    const auto s5 = std::round (d);
+    const auto s6 = p < 0.0 ? std::max (1.0, std::round (d + p * full)) : s5;
+    const auto phi = (double) phase;
+
+    double x;
+    if (phi > s7)
+        return 1.0f; // the pulse's top (p > 0)
+    if (phi < s6)
+        x = 1.0 - phi * (2.0 / s6); // falling +1 → −1
+    else if (phi < s5)
+        return -1.0f; // the pulse's bottom (p < 0)
+    else
+        x = (phi - s5) * (2.0 / (s7 - s5)) - 1.0; // rising −1 → +1
+
+    // tension (FUN_00ba0250): T = sign(t)·((1e18)^((21^(|t|/128) − 1)·0.05) − 1)
+    const auto t = (double) tensionKnob;
+    const auto T = t == 0.0 ? 0.0 : (t > 0.0 ? 1.0 : -1.0) * (std::pow (9.99999984e17, (std::pow (21.0, std::abs (t) / 128.0) - 1.0) * 0.05) - 1.0);
+    auto curve = [T] (double a) {
+        if (T == 0.0)
+            return a;
+        if (T > 0.0)
+            return 1.0 - (std::pow (T + 1.0, 1.0 - a) - 1.0) / T;
+        return (std::pow (-T + 1.0, a) - 1.0) / -T;
+    };
+    const auto y = unipolar ? 2.0 * curve ((x + 1.0) * 0.5) - 1.0 : (x < 0.0 ? -curve (-x) : curve (x));
+    return (float) std::clamp (y, -1.0, 1.0);
+}
+
+float AutomationLfo::output (double clipTick, double songTick) const noexcept
+{
+    constexpr double full = 4294967296.0;
+    // the amplitude points are bipolar: 0.5 = no swing, 1 = full, 0 = full and inverted (FL's renders, round 177b:
+    // a single point at 0.5 plays no LFO; points 0 → 1 swing, pass through nothing at the middle and swing back)
+    const auto amplitude = 2.0f * automationCurveAt (amp, clipTick) - 1.0f;
+    // the start: the middle of the rising ramp (the LFO starts at 0 going up) plus the phase knob (FUN_00ba06a0)
+    const auto p = (double) pulseWidth / 128.0, sk = (double) skew / 256.0;
+    const auto s7 = p > 0.0 ? std::round ((1.0 - p) * full - 1.0) : 4294967295.0;
+    const auto s5 = std::round (std::clamp (((1.0 - p) * 0.5 - sk * (1.0 - std::abs (p))) * full, 1.0, s7 - 1.0));
+    const auto start = std::fmod (s5 + (s7 - s5) * 0.5 + 1.0 + (double) phase, full);
+    // frozen: no movement inside the clip; global: the phase runs with the song instead of restarting with the clip
+    const auto frozen = (flags & 8) != 0, global = (flags & 2) != 0;
+    const auto beats = frozen ? 0.0 : std::max (0.0, global ? songTick : clipTick) / (double) ppq;
+    auto cycles = beats * cyclesPerBeat (speed);
+    cycles -= std::floor (cycles);
+    const auto at = (std::uint32_t) (std::uint64_t) std::fmod (start + cycles * full, full);
+    return amplitude * shape (at, tension, skew, pulseWidth, (flags & 4) != 0);
+}
+
+float AutomationLfo::apply (float value, double clipTick, double songTick) const noexcept
+{
+    // TACArticulator.Compute (FUN_00ba1700): add mode out += L·amount; multiply mode out *= 1 + 2·L·amount, with L
+    // at half the waveform: FL's own renders (round 177b, lfo/meas: default, level 128, add and shaped clips) match
+    // only with the LFO's swing at ±0.5 × its amplitude, in both modes
+    const auto amount = (float) level / 128.0f * range;
+    const auto l = 0.5f * output (clipTick, songTick);
+    const auto out = add ? value + l * amount : value * (1.0f + 2.0f * l * amount);
+    return std::clamp (out, 0.0f, 1.0f);
+}
+
+// --- modulators (round 177b) ------------------------------------------------------------------------------------
+namespace
+{
+float modNoise (std::uint32_t seed, std::int64_t step) noexcept
+{
+    // a hash of (seed, step) to -1..1: the same output at the same song position, whatever was played before
+    auto x = (std::uint64_t) (std::uint32_t) step * 0x9E3779B97F4A7C15ull ^ ((std::uint64_t) seed << 32 | (std::uint32_t) (step >> 32));
+    x ^= x >> 30;
+    x *= 0xBF58476D1CE4E5B9ull;
+    x ^= x >> 27;
+    x *= 0x94D049BB133111EBull;
+    x ^= x >> 31;
+    return (float) ((double) (x >> 11) / 9007199254740992.0 * 2.0 - 1.0);
+}
+} // namespace
+
+float Modulator::output (double cycles) const noexcept
+{
+    const auto c = cycles + (double) phase;
+    const auto whole = std::floor (c);
+    const auto f = (float) (c - whole); // 0..1 within the cycle
+    float y = 0.0f;
+    switch (shape)
+    {
+        case ModShape::sine: y = std::sin (f * 6.28318530718f); break;
+        case ModShape::triangle: y = f < 0.25f ? f * 4.0f : (f < 0.75f ? 2.0f - f * 4.0f : f * 4.0f - 4.0f); break;
+        case ModShape::sawUp: y = f * 2.0f - 1.0f; break;
+        case ModShape::sawDown: y = 1.0f - f * 2.0f; break;
+        case ModShape::square: y = f < 0.5f ? 1.0f : -1.0f; break;
+        case ModShape::random: y = modNoise (seed, (std::int64_t) whole); break;
+        case ModShape::smoothRandom:
+        {
+            const auto a = modNoise (seed, (std::int64_t) whole), b = modNoise (seed, (std::int64_t) whole + 1);
+            const auto s = f * f * (3.0f - 2.0f * f);
+            y = a + (b - a) * s;
+            break;
+        }
+    }
+    return unipolar ? (y + 1.0f) * 0.5f : y;
+}
+
+bool Modulator::canModulate (const Song& song, const AutomationTarget& t) noexcept
+{
+    // LYNX's own controls: not the tempo, not a plugin's parameters (their value lives in the plugin)
+    if (t.kind == AutomationTargetKind::none || t.kind == AutomationTargetKind::tempo || song.targetValue (t) < 0.0f)
+        return false;
+    if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0
+        && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())
+    {
+        const auto kind = song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind;
+        return kind != EffectKind::plugin && kind != EffectKind::patcher;
+    }
+    if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size())
+    {
+        const auto kind = song.channels[(std::size_t) t.index].instrument;
+        return kind != InstrumentKind::plugin && kind != InstrumentKind::patcher && ! midictl::isMidiParam (t.param);
+    }
+    return true;
 }
 
 std::int64_t Automation::length() const noexcept
@@ -1394,14 +1548,31 @@ Song makeBounceSong (const Song& song, int track)
     auto& insert = out.mixer[(std::size_t) track];
     insert.sends.clear();
     insert.toMaster = true;
+    insert.masterLevel = 1.0f; // the insert's own output: its route level to Master is the route's (Render to audio keeps the
+                               // route on the new insert; rendering it too played a route at 50 % at 25 %, round 186b)
     insert.muted = false;
     insert.solo = true; // it and whatever feeds it are audible
 
+    // the Master neutral: the render plays through the song's Master again (Render to audio), so nothing of it may be in
+    // the file — effects, fader, pan, separation, phase / swap, EQ and its automation (round 186b, as StandIns' stems)
     auto& master = out.mixer[0];
     master.effects.clear();
     master.volume = unityFader;
     master.pan = 0.0f;
     master.muted = false;
+    master.stereo = 0.0f;
+    master.invertPhase = master.swapChannels = false;
+    master.eq = {};
+    auto onMaster = [] (const AutomationTarget& t) { return refs::targetsInsert (t) && t.index == 0; };
+    for (auto& a : out.automations)
+        if (onMaster (a.target))
+            a.target = {};
+    for (auto& p : out.patterns)
+        p.events.erase (std::remove_if (p.events.begin(), p.events.end(), [&] (const PatternEvents& lane) { return onMaster (lane.target); }),
+                        p.events.end());
+    out.initialValues.erase (std::remove_if (out.initialValues.begin(), out.initialValues.end(),
+                                             [&] (const Song::InitialValue& v) { return onMaster (v.target); }),
+                             out.initialValues.end());
     out.mode = PlayMode::song;
     return out;
 }
@@ -1426,7 +1597,7 @@ int applyBounce (Song& song, int track, const std::string& samplePath, std::int6
     c.instrument = InstrumentKind::audioClip;
     c.samplePath = samplePath;
     c.mixerTrack = newTrack;
-    c.volume = 1.0f;
+    c.volume = audioClipUnityVolume; // the render plays at the level of what it replaces (1.0 was +5.18 dB, round 186b)
     song.channels.push_back (c);
 
     int lane = 0;

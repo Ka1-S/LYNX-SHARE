@@ -135,6 +135,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },
         { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", fl, false },
         { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
+        { InstrumentKind::fruityslicer, "Fruity Slicer", "Fruity Slicer", own, false },
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
@@ -371,6 +372,16 @@ std::optional<ChannelDef> autogunShotChannel (const FlAccess& access)
     return std::nullopt;
 }
 
+FlDataReader flDataReader (const FlAccess& access)
+{
+    return [&access] (const std::string& relative) -> std::vector<std::uint8_t> {
+        const auto p = resolveFlPath ("%FLStudioFactoryData%\\" + relative, access.roots);
+        if (p.empty() || ! access.readFile || (access.fileExists && ! access.fileExists (p)))
+            return {};
+        return access.readFile (p);
+    };
+}
+
 std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& access, double bpm)
 {
     const auto* engine = effectEngine (kind);
@@ -385,14 +396,8 @@ std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& access, dou
             const auto project = flp::parseProject (bytes, true);
             if (! project.channels.empty() && ! project.channels.front().pluginState.empty())
             {
-                const FlDataReader data = [&access] (const std::string& relative) -> std::vector<std::uint8_t> {
-                    const auto p = resolveFlPath ("%FLStudioFactoryData%\\" + relative, access.roots);
-                    if (p.empty() || ! access.readFile || (access.fileExists && ! access.fileExists (p)))
-                        return {};
-                    return access.readFile (p);
-                };
                 auto slot = effectFromFl (project.channels.front().pluginName.empty() ? engine->presetFolder : project.channels.front().pluginName,
-                                          project.channels.front().pluginState, bpm, data);
+                                          project.channels.front().pluginState, bpm, flDataReader (access));
                 if (slot && slot->kind == kind)
                 {
                     if (kind == EffectKind::grossBeat)

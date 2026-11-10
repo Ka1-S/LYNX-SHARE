@@ -46,6 +46,7 @@ const std::vector<Allowed>& allowed()
 {
     static const std::vector<Allowed> a {
         { "Echoform", "Filter link", "inert", "editor-only: moving one cut moves the other (core/EchoSuite.cpp linkedEdit); no DSP of its own" },
+        { "Fret Channel", "EQ auto listen", "inert", "editor-only: solos the EQ band whose knob is held (a transient setting the editor makes); the original renders the same with it on (black-box, tp172c8)" },
         { "Kiln Channel", "Link I/O", "inert", "editor-only: an Input change moves Output the other way (kiln::linkedEdit); no DSP of its own" },
         { "Kiln Channel", "Group I/O", "inert", "editor-only: Input / Output edits reach the group's other channels; no DSP of its own" },
         { "Kiln Channel", "Group", "inert", "routing only: which group's Group bypass this channel follows (a lone instance sounds the same in every group, as the original)" },
@@ -87,29 +88,24 @@ const std::vector<Allowed>& allowed()
         { "Transmitter", "", "clip", "behaviour: FL's Transmitter, Bounce sums 32 taps and the delay its feedback (exact engine)" },
         { "Transmitter", "", "click", "behaviour: FL's Transmitter, a new section effect starts on the running part (exact engine)" },
         { "Transmitter", "", "dc", "behaviour: FL's Transmitter, Bounce's 32 taps of the kicks' tails (exact engine)" },
+        { "Fruity Love Philter", "Unit 1 on", "silent", "behaviour: FL's Love Philter outputs the sum of its units; its default has unit 1 on only, so unit 1 off is silence (exact engine)" },
+        // round 190g: FL Studio Mobile's own behaviours, kept by the Pocket engines (REA specs of round 189h)
+        { "Pocket Compressor", "RMS", "inert", "fl-inert: FLM's setter always clears the RMS flag (its RMS mode is unreachable), so the control does nothing there either" },
+        { "Pocket Compressor", "Auto gain", "clip", "behaviour: with Auto gain off FLM's Level runs 0…+40 dB instead of −20…+20 dB, so the default Level is +20 dB" },
+        { "Pocket Tremolo", "Stereo offset", "inert", "not-in-programme: the audit only tries the knob's end, 360°, a whole cycle = the same phase; 90° and 180° move the right channel (FlmImport189hBTests.inc)" },
+        { "Pocket Wow & Flutter", "Random rate", "inert", "not-in-programme: FLM writes the sync length after the free rate, so a loaded state takes its random interval from the sync length; the free rate acts when it is moved while playing" },
     };
     return a;
 }
 
-// NOT legitimately silent: FL-parity gaps scheduled for the 0.1.25 rounds (REPORT.md, "Known gaps", ids gap173d-1 …
-// gap173d-4). Each is a dead control today; listed so build-local stays green until its round lands, and every entry
-// here is an open item. Nothing else may be added without a tracker id.
+// NOT legitimately silent: FL-parity gaps scheduled for a later round (REPORT.md, "Known gaps", with a tracker id).
+// Each is a dead control today; listed so build-local stays green until its round lands, and every entry here is an
+// open item. Nothing else may be added without a tracker id.
 const std::vector<Allowed>& knownGaps()
 {
-    static const char* const philter = "gap173d-2: a new Love Philter has unit 1 only and no articulators; LYNX's editor can't set unit types / draw articulators";
-    static const std::vector<Allowed> a {
-        { "EQUO", "Master send *", "inert", "gap173d-1: EQUO's send levels feed a mixer track in FL; LYNX computes the send gains but routes nothing" },
-        { "EQUO", "Bank * send *", "inert", "gap173d-1: EQUO's send levels feed a mixer track in FL; LYNX computes the send gains but routes nothing" },
-        { "Fruity Love Philter", "Unit * envelope amount", "inert", philter },
-        { "Fruity Love Philter", "Unit 2 *", "inert", philter }, { "Fruity Love Philter", "Unit 3 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 4 *", "inert", philter }, { "Fruity Love Philter", "Unit 5 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 6 *", "inert", philter }, { "Fruity Love Philter", "Unit 7 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 8 *", "inert", philter }, { "Fruity Love Philter", "Follower *", "inert", philter },
-        { "Fruity Love Philter", "Master LFO", "inert", philter }, { "Fruity Love Philter", "Mod X", "inert", philter },
-        { "Fruity Love Philter", "Mod Y", "inert", philter }, { "Fruity Love Philter", "Pattern", "inert", philter },
-        { "Fruity Convolver", "EQ", "inert", "gap173d-3: the amount of a drawn EQ curve; FL's default curve is flat at 0 dB (×1, REA_rodada60 §6) and LYNX's editor can't draw one" },
-        { "Vocodex", "Subtractive gate", "inert", "gap173d-4: how the gate map applies its threshold (both paths reproduced, REA_rodada35 §4.2); a new instance's gate map is flat at 0 and LYNX's editor can't draw Vocodex maps" },
-    };
+    // round 173d3: gap173d-1 (EQUO sends), gap173d-2 (Love Philter units / articulators), gap173d-3 (Convolver EQ
+    // curve) and gap173d-4 (Vocodex maps) are closed; the list stays for the next tracked gap
+    static const std::vector<Allowed> a {};
     return a;
 }
 
@@ -214,10 +210,127 @@ void auditRange (int from, int to)
 }
 } // namespace fxaudit173d
 
-TEST (fxaudit173d_effect_controls_a) { fxaudit173d::auditRange (0, 29); }
-TEST (fxaudit173d_effect_controls_b) { fxaudit173d::auditRange (30, 59); }
-TEST (fxaudit173d_effect_controls_c) { fxaudit173d::auditRange (60, 89); }
-TEST (fxaudit173d_effect_controls_d) { fxaudit173d::auditRange (90, 200); }
+// One test per effect kind (round speed185a; it was 4 ranges, one of them 6 minutes long: the parallel shards could not
+// spread it). The same kinds and checks; the last test takes every kind after 117 (new kinds land there first).
+TEST (fxaudit173d_effect_controls_000) { fxaudit173d::auditRange (0, 0); }
+TEST (fxaudit173d_effect_controls_001) { fxaudit173d::auditRange (1, 1); }
+TEST (fxaudit173d_effect_controls_002) { fxaudit173d::auditRange (2, 2); }
+TEST (fxaudit173d_effect_controls_003) { fxaudit173d::auditRange (3, 3); }
+TEST (fxaudit173d_effect_controls_004) { fxaudit173d::auditRange (4, 4); }
+TEST (fxaudit173d_effect_controls_005) { fxaudit173d::auditRange (5, 5); }
+TEST (fxaudit173d_effect_controls_006) { fxaudit173d::auditRange (6, 6); }
+TEST (fxaudit173d_effect_controls_007) { fxaudit173d::auditRange (7, 7); }
+TEST (fxaudit173d_effect_controls_008) { fxaudit173d::auditRange (8, 8); }
+TEST (fxaudit173d_effect_controls_009) { fxaudit173d::auditRange (9, 9); }
+TEST (fxaudit173d_effect_controls_010) { fxaudit173d::auditRange (10, 10); }
+TEST (fxaudit173d_effect_controls_011) { fxaudit173d::auditRange (11, 11); }
+TEST (fxaudit173d_effect_controls_012) { fxaudit173d::auditRange (12, 12); }
+TEST (fxaudit173d_effect_controls_013) { fxaudit173d::auditRange (13, 13); }
+TEST (fxaudit173d_effect_controls_014) { fxaudit173d::auditRange (14, 14); }
+TEST (fxaudit173d_effect_controls_015) { fxaudit173d::auditRange (15, 15); }
+TEST (fxaudit173d_effect_controls_016) { fxaudit173d::auditRange (16, 16); }
+TEST (fxaudit173d_effect_controls_017) { fxaudit173d::auditRange (17, 17); }
+TEST (fxaudit173d_effect_controls_018) { fxaudit173d::auditRange (18, 18); }
+TEST (fxaudit173d_effect_controls_019) { fxaudit173d::auditRange (19, 19); }
+TEST (fxaudit173d_effect_controls_020) { fxaudit173d::auditRange (20, 20); }
+TEST (fxaudit173d_effect_controls_021) { fxaudit173d::auditRange (21, 21); }
+TEST (fxaudit173d_effect_controls_022) { fxaudit173d::auditRange (22, 22); }
+TEST (fxaudit173d_effect_controls_023) { fxaudit173d::auditRange (23, 23); }
+TEST (fxaudit173d_effect_controls_024) { fxaudit173d::auditRange (24, 24); }
+TEST (fxaudit173d_effect_controls_025) { fxaudit173d::auditRange (25, 25); }
+TEST (fxaudit173d_effect_controls_026) { fxaudit173d::auditRange (26, 26); }
+TEST (fxaudit173d_effect_controls_027) { fxaudit173d::auditRange (27, 27); }
+TEST (fxaudit173d_effect_controls_028) { fxaudit173d::auditRange (28, 28); }
+TEST (fxaudit173d_effect_controls_029) { fxaudit173d::auditRange (29, 29); }
+TEST (fxaudit173d_effect_controls_030) { fxaudit173d::auditRange (30, 30); }
+TEST (fxaudit173d_effect_controls_031) { fxaudit173d::auditRange (31, 31); }
+TEST (fxaudit173d_effect_controls_032) { fxaudit173d::auditRange (32, 32); }
+TEST (fxaudit173d_effect_controls_033) { fxaudit173d::auditRange (33, 33); }
+TEST (fxaudit173d_effect_controls_034) { fxaudit173d::auditRange (34, 34); }
+TEST (fxaudit173d_effect_controls_035) { fxaudit173d::auditRange (35, 35); }
+TEST (fxaudit173d_effect_controls_036) { fxaudit173d::auditRange (36, 36); }
+TEST (fxaudit173d_effect_controls_037) { fxaudit173d::auditRange (37, 37); }
+TEST (fxaudit173d_effect_controls_038) { fxaudit173d::auditRange (38, 38); }
+TEST (fxaudit173d_effect_controls_039) { fxaudit173d::auditRange (39, 39); }
+TEST (fxaudit173d_effect_controls_040) { fxaudit173d::auditRange (40, 40); }
+TEST (fxaudit173d_effect_controls_041) { fxaudit173d::auditRange (41, 41); }
+TEST (fxaudit173d_effect_controls_042) { fxaudit173d::auditRange (42, 42); }
+TEST (fxaudit173d_effect_controls_043) { fxaudit173d::auditRange (43, 43); }
+TEST (fxaudit173d_effect_controls_044) { fxaudit173d::auditRange (44, 44); }
+TEST (fxaudit173d_effect_controls_045) { fxaudit173d::auditRange (45, 45); }
+TEST (fxaudit173d_effect_controls_046) { fxaudit173d::auditRange (46, 46); }
+TEST (fxaudit173d_effect_controls_047) { fxaudit173d::auditRange (47, 47); }
+TEST (fxaudit173d_effect_controls_048) { fxaudit173d::auditRange (48, 48); }
+TEST (fxaudit173d_effect_controls_049) { fxaudit173d::auditRange (49, 49); }
+TEST (fxaudit173d_effect_controls_050) { fxaudit173d::auditRange (50, 50); }
+TEST (fxaudit173d_effect_controls_051) { fxaudit173d::auditRange (51, 51); }
+TEST (fxaudit173d_effect_controls_052) { fxaudit173d::auditRange (52, 52); }
+TEST (fxaudit173d_effect_controls_053) { fxaudit173d::auditRange (53, 53); }
+TEST (fxaudit173d_effect_controls_054) { fxaudit173d::auditRange (54, 54); }
+TEST (fxaudit173d_effect_controls_055) { fxaudit173d::auditRange (55, 55); }
+TEST (fxaudit173d_effect_controls_056) { fxaudit173d::auditRange (56, 56); }
+TEST (fxaudit173d_effect_controls_057) { fxaudit173d::auditRange (57, 57); }
+TEST (fxaudit173d_effect_controls_058) { fxaudit173d::auditRange (58, 58); }
+TEST (fxaudit173d_effect_controls_059) { fxaudit173d::auditRange (59, 59); }
+TEST (fxaudit173d_effect_controls_060) { fxaudit173d::auditRange (60, 60); }
+TEST (fxaudit173d_effect_controls_061) { fxaudit173d::auditRange (61, 61); }
+TEST (fxaudit173d_effect_controls_062) { fxaudit173d::auditRange (62, 62); }
+TEST (fxaudit173d_effect_controls_063) { fxaudit173d::auditRange (63, 63); }
+TEST (fxaudit173d_effect_controls_064) { fxaudit173d::auditRange (64, 64); }
+TEST (fxaudit173d_effect_controls_065) { fxaudit173d::auditRange (65, 65); }
+TEST (fxaudit173d_effect_controls_066) { fxaudit173d::auditRange (66, 66); }
+TEST (fxaudit173d_effect_controls_067) { fxaudit173d::auditRange (67, 67); }
+TEST (fxaudit173d_effect_controls_068) { fxaudit173d::auditRange (68, 68); }
+TEST (fxaudit173d_effect_controls_069) { fxaudit173d::auditRange (69, 69); }
+TEST (fxaudit173d_effect_controls_070) { fxaudit173d::auditRange (70, 70); }
+TEST (fxaudit173d_effect_controls_071) { fxaudit173d::auditRange (71, 71); }
+TEST (fxaudit173d_effect_controls_072) { fxaudit173d::auditRange (72, 72); }
+TEST (fxaudit173d_effect_controls_073) { fxaudit173d::auditRange (73, 73); }
+TEST (fxaudit173d_effect_controls_074) { fxaudit173d::auditRange (74, 74); }
+TEST (fxaudit173d_effect_controls_075) { fxaudit173d::auditRange (75, 75); }
+TEST (fxaudit173d_effect_controls_076) { fxaudit173d::auditRange (76, 76); }
+TEST (fxaudit173d_effect_controls_077) { fxaudit173d::auditRange (77, 77); }
+TEST (fxaudit173d_effect_controls_078) { fxaudit173d::auditRange (78, 78); }
+TEST (fxaudit173d_effect_controls_079) { fxaudit173d::auditRange (79, 79); }
+TEST (fxaudit173d_effect_controls_080) { fxaudit173d::auditRange (80, 80); }
+TEST (fxaudit173d_effect_controls_081) { fxaudit173d::auditRange (81, 81); }
+TEST (fxaudit173d_effect_controls_082) { fxaudit173d::auditRange (82, 82); }
+TEST (fxaudit173d_effect_controls_083) { fxaudit173d::auditRange (83, 83); }
+TEST (fxaudit173d_effect_controls_084) { fxaudit173d::auditRange (84, 84); }
+TEST (fxaudit173d_effect_controls_085) { fxaudit173d::auditRange (85, 85); }
+TEST (fxaudit173d_effect_controls_086) { fxaudit173d::auditRange (86, 86); }
+TEST (fxaudit173d_effect_controls_087) { fxaudit173d::auditRange (87, 87); }
+TEST (fxaudit173d_effect_controls_088) { fxaudit173d::auditRange (88, 88); }
+TEST (fxaudit173d_effect_controls_089) { fxaudit173d::auditRange (89, 89); }
+TEST (fxaudit173d_effect_controls_090) { fxaudit173d::auditRange (90, 90); }
+TEST (fxaudit173d_effect_controls_091) { fxaudit173d::auditRange (91, 91); }
+TEST (fxaudit173d_effect_controls_092) { fxaudit173d::auditRange (92, 92); }
+TEST (fxaudit173d_effect_controls_093) { fxaudit173d::auditRange (93, 93); }
+TEST (fxaudit173d_effect_controls_094) { fxaudit173d::auditRange (94, 94); }
+TEST (fxaudit173d_effect_controls_095) { fxaudit173d::auditRange (95, 95); }
+TEST (fxaudit173d_effect_controls_096) { fxaudit173d::auditRange (96, 96); }
+TEST (fxaudit173d_effect_controls_097) { fxaudit173d::auditRange (97, 97); }
+TEST (fxaudit173d_effect_controls_098) { fxaudit173d::auditRange (98, 98); }
+TEST (fxaudit173d_effect_controls_099) { fxaudit173d::auditRange (99, 99); }
+TEST (fxaudit173d_effect_controls_100) { fxaudit173d::auditRange (100, 100); }
+TEST (fxaudit173d_effect_controls_101) { fxaudit173d::auditRange (101, 101); }
+TEST (fxaudit173d_effect_controls_102) { fxaudit173d::auditRange (102, 102); }
+TEST (fxaudit173d_effect_controls_103) { fxaudit173d::auditRange (103, 103); }
+TEST (fxaudit173d_effect_controls_104) { fxaudit173d::auditRange (104, 104); }
+TEST (fxaudit173d_effect_controls_105) { fxaudit173d::auditRange (105, 105); }
+TEST (fxaudit173d_effect_controls_106) { fxaudit173d::auditRange (106, 106); }
+TEST (fxaudit173d_effect_controls_107) { fxaudit173d::auditRange (107, 107); }
+TEST (fxaudit173d_effect_controls_108) { fxaudit173d::auditRange (108, 108); }
+TEST (fxaudit173d_effect_controls_109) { fxaudit173d::auditRange (109, 109); }
+TEST (fxaudit173d_effect_controls_110) { fxaudit173d::auditRange (110, 110); }
+TEST (fxaudit173d_effect_controls_111) { fxaudit173d::auditRange (111, 111); }
+TEST (fxaudit173d_effect_controls_112) { fxaudit173d::auditRange (112, 112); }
+TEST (fxaudit173d_effect_controls_113) { fxaudit173d::auditRange (113, 113); }
+TEST (fxaudit173d_effect_controls_114) { fxaudit173d::auditRange (114, 114); }
+TEST (fxaudit173d_effect_controls_115) { fxaudit173d::auditRange (115, 115); }
+TEST (fxaudit173d_effect_controls_116) { fxaudit173d::auditRange (116, 116); }
+TEST (fxaudit173d_effect_controls_117) { fxaudit173d::auditRange (117, 117); }
+TEST (fxaudit173d_effect_controls_118_up) { fxaudit173d::auditRange (118, 200); }
 
 // a new Fruity Delay Bank / Multiband Delay has no state yet: its bank controls still edit it (they did nothing)
 TEST (fxaudit173d_empty_state_controls_edit_the_defaults)

@@ -65,6 +65,9 @@
 #include "ui/VfxEditors.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/WaveTravellerEditor.h"
+#include "ui/FruitySlicerEditor.h"
+#include "ui/FlVoicePanel.h"
+#include "core/FruitySlicer.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -1130,6 +1133,15 @@ public:
         // FL's arrangement of the plugin's page (core/PluginLayout.cpp): the knobs at FL's places, faders and
         // switches drawn by the panel
         layout = plugui::instrumentLayout (def.instrument);
+        if (layout != nullptr && plugui::hostedElsewhere) // (round 180b: the plate prints the plugin's name)
+        {
+            hostedName = def.name;
+            hostedLayout = *layout;
+            for (auto& item : hostedLayout.items)
+                if ((item.style & plugui::enginePlate) != 0)
+                    item.label = hostedName.c_str();
+            layout = &hostedLayout;
+        }
         // a state the engine cannot read gives no knobs: keep the plain page then
         if (layout != nullptr && ! wasp && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
             layout = nullptr;
@@ -2130,6 +2142,8 @@ public:
     // the engine's description (what it is and where its data comes from)
     juce::String description() const
     {
+        if (plugui::hostedElsewhere)
+            return juce::String::fromUTF8 (hostedName.c_str());
         return drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
                                + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
                                              : tr (" (next hit; recorded waves not found: silent)"))
@@ -2641,6 +2655,8 @@ private:
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
+    plugui::Layout hostedLayout;
+    std::string hostedName;
     const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)
     InstrumentKind instrumentKind = InstrumentKind::synth;
     const plugui::LayoutItem* stepperDrag = nullptr; // (round 169h)
@@ -2938,6 +2954,12 @@ public:
         stretchMethod.addItem (tr ("General"), 1);
         stretchMethod.addItem (tr ("Drums / transients"), 2);
         stretchMethod.addItem (tr ("Vocal / mono"), 3);
+        // LYNX's warp modes modelled on Ableton Live's (round 175a, N4)
+        stretchMethod.addSeparator();
+        stretchMethod.addItem (tr ("Warp: Beats"), 4);
+        stretchMethod.addItem (tr ("Warp: Tones"), 5);
+        stretchMethod.addItem (tr ("Warp: Texture"), 6);
+        stretchMethod.addItem (tr ("Warp: Complex"), 7);
         stretchMethod.setTooltip (tr ("How the stretch keeping pitch is computed: General for full mixes and chords, Drums for loops and percussive sounds (attacks kept sharp), Vocal for a single voice or instrument"));
         stretchMethod.onChange = [this] { apply(); };
         addAndMakeVisible (stretchMethod);
@@ -3238,8 +3260,12 @@ private:
         if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
             s.stretchBeats = (float) (shownStretch = stretch.getValue());
         s.keepPitch = keepPitch.getToggleState();
-        s.stretchMethod = (StretchMethod) juce::jlimit (0, 2, stretchMethod.getSelectedId() - 1);
+        s.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, stretchMethod.getSelectedId() - 1);
         stretchMethod.setEnabled (s.keepPitch);
+        // leaving Beats (or Keep length): an imported clip's offline transposition moves to the Pitch knob, which the other
+        // modes apply in real time, so the sample stays at its pitch
+        if (s.moveBakedPitchToKnob())
+            pitch.setValue (s.pitch, juce::dontSendNotification);
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
         s.release = (float) release.getValue();
@@ -5105,6 +5131,34 @@ bool hasEnvelopeTab (InstrumentKind kind) noexcept
     return kind == InstrumentKind::synth || kind == InstrumentKind::sampler;
 }
 
+// The channel's Envelope / instrument settings page: LYNX's own for the synth and the sampler; FL's (the plugin voice
+// processor's block in the generator's state) for Fruity Slicer (issue #129)
+std::unique_ptr<juce::Component> makeEnvelopePage (AudioEngine& engine, const ChannelRef& ref, InstrumentKind kind)
+{
+    if (hasEnvelopeTab (kind))
+        return std::make_unique<ModulationPanel> (engine, ref);
+    if (kind != InstrumentKind::fruityslicer)
+        return nullptr;
+    return makeFlVoicePanel (
+        engine,
+        [&engine, ref] () -> std::optional<flvoice::Settings> {
+            const auto* def = ref.get (engine);
+            if (def == nullptr || def->instrument != InstrumentKind::fruityslicer)
+                return std::nullopt;
+            const auto state = fslicer::parse (def->pluginState);
+            return fslicer::voiceSettings (state ? *state : fslicer::State {});
+        },
+        [&engine, ref] (const flvoice::Settings& settings) {
+            ref.edit (engine, [settings] (ChannelDef& def) {
+                if (auto state = fslicer::parse (def.pluginState))
+                {
+                    fslicer::setVoiceSettings (*state, settings);
+                    def.pluginState = fslicer::write (*state);
+                }
+            });
+        });
+}
+
 void showModulationFor (juce::Component& from, AudioEngine& engine, int channel)
 {
     if (auto* frame = from.findParentComponentOfClass<ChannelFrame>(); frame != nullptr && frame->tabCount() >= 2)
@@ -5142,6 +5196,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeVideoPlayerEditor (engine, ref.locate, ref.index); // round 165g
     if (kind == InstrumentKind::wavetraveller)
         return makeWaveTravellerEditor (engine, ref.locate, ref.index); // round 167f
+    if (kind == InstrumentKind::fruityslicer)
+        return makeFruitySlicerEditor (engine, ref.locate, ref.index); // round 180c
     if (kind == InstrumentKind::synth)
         return std::make_unique<SynthPanel> (engine, ref);
     if (isModelKind (kind))
@@ -5330,6 +5386,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::voltage:
         case InstrumentKind::vfx:
         case InstrumentKind::wavetraveller:
+        case InstrumentKind::fruityslicer:
             return true;
         default:
             return false;
@@ -5382,7 +5439,7 @@ std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int chan
 {
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
     auto frame = std::make_unique<ChannelFrame> (engine, ChannelRef::rack (channel), makeChannelSettingsPanel (engine, channel),
-                                                 hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel)) : nullptr);
+                                                 makeEnvelopePage (engine, ChannelRef::rack (channel), kind));
     frame->showTab (tab < 0 ? frame->tabCount() - 1 : tab);
     return frame;
 }
@@ -5415,6 +5472,10 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeVideoPlayerEditor (engine, channel); // round 165g
     if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::wavetraveller)
         return makeWaveTravellerEditor (engine, channel); // round 167f
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::fruityslicer)
+        return makeFruitySlicerEditor (engine, [channel] (Song& s) -> ChannelDef* {
+            return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
+        }, channel); // round 180c
     if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
         kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
@@ -5448,7 +5509,7 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
     if (page == nullptr)
         return nullptr;
     const auto kind = def->instrument;
-    return std::make_unique<ChannelFrame> (engine, ref, std::move (page), hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ref) : nullptr);
+    return std::make_unique<ChannelFrame> (engine, ref, std::move (page), makeEnvelopePage (engine, ref, kind));
 }
 std::function<void (int)>& openMixerInsertHandler()
 {

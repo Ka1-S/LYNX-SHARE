@@ -17,6 +17,7 @@
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
+#include "ui/VideoMedia.h"
 #include "ui/VisualEditors.h"
 
 namespace lynx
@@ -30,412 +31,20 @@ juce::File resolveVideo (const std::string& path)
     return platform::localFile (path);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// ffmpeg's report (stderr of "ffmpeg -i"), per path
-struct Probe
-{
-    juce::String report;
-    video::Info info;
-};
-
-std::mutex probeLock;
-std::map<juce::String, Probe> probes;
-
-Probe probe (const juce::String& path)
-{
-    {
-        std::lock_guard<std::mutex> lock (probeLock);
-        if (const auto it = probes.find (path); it != probes.end())
-            return it->second;
-    }
-    Probe p;
-    const auto ffmpeg = findFfmpeg();
-    if (ffmpeg.existsAsFile() && juce::File (path).existsAsFile())
-    {
-        juce::ChildProcess process;
-        if (process.start (juce::StringArray { ffmpeg.getFullPathName(), "-hide_banner", "-nostdin", "-i", path }, juce::ChildProcess::wantStdErr))
-        {
-            p.report = process.readAllProcessOutput();
-            process.waitForProcessToFinish (2000);
-        }
-        p.info = video::parseFfmpegReport (p.report.toStdString());
-        std::lock_guard<std::mutex> lock (probeLock);
-        probes[path] = p; // (not cached without ffmpeg / the file: they may appear later)
-    }
-    return p;
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// The sound tracks (48 kHz stereo int16), decoded once per video in the background
-constexpr double trackRate = 48000.0;
-
-std::shared_ptr<const video::AudioTrack> decodeTrack (const juce::File& file)
-{
-    const auto ffmpeg = findFfmpeg();
-    if (! ffmpeg.existsAsFile() || ! file.existsAsFile())
-        return nullptr;
-    const auto info = probe (file.getFullPathName()).info;
-    if (! info.hasAudio)
-        return nullptr;
-    juce::ChildProcess process;
-    if (! process.start (juce::StringArray { ffmpeg.getFullPathName(), "-nostdin", "-v", "quiet", "-i", file.getFullPathName(), "-vn", "-sn",
-                                             "-ac", "2", "-ar", juce::String ((int) trackRate), "-f", "s16le", "-" },
-                         juce::ChildProcess::wantStdOut))
-        return nullptr;
-    auto track = std::make_shared<video::AudioTrack>();
-    track->rate = trackRate;
-    if (info.duration > 0.0)
-        track->samples.reserve ((std::size_t) (info.duration * trackRate * 2.0) + 4096);
-    std::vector<char> bytes;
-    char buffer[1 << 16];
-    std::size_t odd = 0; // a byte of a sample split between two reads
-    char carry = 0;
-    for (;;)
-    {
-        const auto got = process.readProcessOutput (buffer, (int) sizeof (buffer));
-        if (got <= 0)
-            break;
-        int i = 0;
-        if (odd != 0)
-        {
-            const auto lo = (unsigned char) carry, hi = (unsigned char) buffer[0];
-            track->samples.push_back ((std::int16_t) (lo | (hi << 8)));
-            odd = 0;
-            i = 1;
-        }
-        for (; i + 1 < got; i += 2)
-            track->samples.push_back ((std::int16_t) ((unsigned char) buffer[i] | ((unsigned char) buffer[i + 1] << 8)));
-        if (i < got)
-        {
-            carry = buffer[i];
-            odd = 1;
-        }
-    }
-    process.waitForProcessToFinish (2000);
-    if (track->samples.size() % 2 != 0)
-        track->samples.pop_back();
-    if (track->samples.empty())
-        return nullptr;
-    return track;
-}
-
-struct TrackEntry
-{
-    std::shared_ptr<const video::AudioTrack> track;
-    bool pending = false, done = false;
-};
-
-std::mutex trackLock;
-std::map<std::string, TrackEntry> tracks;
 AudioEngine* installedEngine = nullptr;
-juce::ThreadPool& trackPool()
-{
-    static juce::ThreadPool pool (1);
-    return pool;
-}
+
+// (the decoders: ui/VideoMedia, round 174d)
+using media::FrameDecoder;
+media::Probe probe (const juce::String& path) { return media::probe (path); }
 
 std::shared_ptr<const video::AudioTrack> provideTrack (const std::string& path, bool wait)
 {
-    {
-        std::lock_guard<std::mutex> lock (trackLock);
-        auto& e = tracks[path];
-        if (e.done)
-            return e.track;
-        if (! wait)
-        {
-            if (! e.pending)
-            {
-                e.pending = true;
-                trackPool().addJob ([path] {
-                    auto track = decodeTrack (resolveVideo (path));
-                    {
-                        std::lock_guard<std::mutex> l (trackLock);
-                        auto& entry = tracks[path];
-                        entry.track = track;
-                        entry.done = true;
-                        entry.pending = false;
-                    }
-                    // the channel's instrument takes it at the next snapshot
-                    juce::MessageManager::callAsync ([] {
-                        if (installedEngine != nullptr)
-                            installedEngine->editSong ([] (Song&) {}, false);
-                    });
-                });
-            }
-            return nullptr;
-        }
-    }
-    // exporting: decode now (the export must have the sound)
-    auto track = decodeTrack (resolveVideo (path));
-    std::lock_guard<std::mutex> lock (trackLock);
-    auto& e = tracks[path];
-    if (! e.done)
-    {
-        e.track = track;
-        e.done = true;
-    }
-    return e.track;
+    return media::provideTrack (path, wait, [] {
+        // the channel's instrument takes it at the next snapshot
+        if (installedEngine != nullptr)
+            installedEngine->editSong ([] (Song&) {}, false);
+    });
 }
-
-// ---------------------------------------------------------------------------------------------------------------
-// The frames: ffmpeg decodes from the wanted time at the shown size (BGRA), one process per stretch of playback;
-// a still (stopped transport) is one frame.
-class FrameDecoder final : public juce::Thread
-{
-public:
-    FrameDecoder() : juce::Thread ("LYNX video frames") {}
-    ~FrameDecoder() override
-    {
-        signalThreadShouldExit();
-        notify();
-        {
-            std::lock_guard<std::mutex> lock (procLock);
-            if (process != nullptr)
-                process->kill(); // (our own child process)
-        }
-        stopThread (4000);
-    }
-
-    void setSource (const juce::String& p, const video::Info& i)
-    {
-        std::lock_guard<std::mutex> lock (want);
-        if (p == path)
-            return;
-        path = p;
-        info = i;
-        restart = true;
-        notify();
-    }
-
-    void setSize (int w, int h)
-    {
-        std::lock_guard<std::mutex> lock (want);
-        w = juce::jlimit (16, 1920, w & ~1);
-        h = juce::jlimit (16, 1080, h & ~1);
-        if (w == width && h == height)
-            return;
-        width = w;
-        height = h;
-        restart = true;
-        notify();
-    }
-
-    // the time to show (seconds) and whether it moves
-    void request (double t, bool moving)
-    {
-        std::lock_guard<std::mutex> lock (want);
-        if (std::abs (t - wantTime) < 1e-6 && moving == wantMoving)
-            return;
-        wantTime = t;
-        wantMoving = moving;
-        notify();
-    }
-
-    // the latest frame (UI thread)
-    juce::Image frame (double& time)
-    {
-        std::lock_guard<std::mutex> lock (out);
-        time = shownTime;
-        return shown;
-    }
-
-    int frameCount() const noexcept { return frames.load(); }
-
-    void run() override
-    {
-        double streamStart = -1.0, nextTime = 0.0, eofTime = -1.0, fps = 30.0;
-        int w = 0, h = 0;
-        bool streaming = false;
-        juce::String current;
-        std::vector<std::uint8_t> bytes;
-        while (! threadShouldExit())
-        {
-            double t;
-            bool moving, fresh;
-            juce::String p;
-            {
-                std::lock_guard<std::mutex> lock (want);
-                t = juce::jmax (0.0, wantTime);
-                moving = wantMoving;
-                fresh = restart;
-                restart = false;
-                p = path;
-                if (fresh)
-                {
-                    w = width;
-                    h = height;
-                    fps = info.fps > 1.0 && info.fps < 240.0 ? info.fps : 30.0;
-                }
-            }
-            if (p.isEmpty() || w <= 0 || h <= 0)
-            {
-                stopProcess();
-                streaming = false;
-                wait (100);
-                continue;
-            }
-            const auto frameTime = 1.0 / fps;
-            if (fresh || p != current)
-            {
-                eofTime = -1.0;
-                lastShown = -1e9;
-            }
-            bytes.resize ((std::size_t) w * (std::size_t) h * 4);
-            if (! moving)
-            {
-                // a still: one frame at t (once)
-                if (std::abs (t - lastShown) < frameTime * 0.5)
-                {
-                    if (streaming)
-                    {
-                        stopProcess();
-                        streaming = false;
-                    }
-                    wait (50);
-                    continue;
-                }
-                startProcess (p, t, w, h, fps, false);
-                current = p;
-                streaming = false;
-                if (readFrame (bytes))
-                    publish (bytes, w, h, t);
-                lastShown = t; // (past the end: the last frame stays)
-                stopProcess();
-                continue;
-            }
-            // playing: one ffmpeg per stretch; started again when the time jumps
-            if (! streaming && eofTime >= 0.0 && p == current && t >= eofTime - frameTime)
-            {
-                wait (50); // past the video's end
-                continue;
-            }
-            if (! streaming || p != current || t < streamStart - 1e-3 || t > nextTime + 1.0)
-            {
-                startProcess (p, t, w, h, fps, true);
-                current = p;
-                streamStart = nextTime = t;
-                eofTime = -1.0;
-                streaming = process != nullptr;
-                if (! streaming)
-                {
-                    wait (200);
-                    continue;
-                }
-            }
-            if (nextTime > t + 0.04)
-            {
-                wait (juce::jlimit (2, 30, (int) ((nextTime - t - 0.04) * 1000.0)));
-                continue;
-            }
-            if (! readFrame (bytes))
-            {
-                stopProcess();
-                streaming = false;
-                eofTime = nextTime;
-                continue;
-            }
-            const auto ft = nextTime;
-            nextTime += frameTime;
-            if (nextTime <= t)
-                continue; // late: on to the frame of now
-            publish (bytes, w, h, ft);
-            lastShown = ft;
-        }
-        stopProcess();
-    }
-
-private:
-    void startProcess (const juce::String& p, double t, int w, int h, double fps, bool moving)
-    {
-        stopProcess();
-        const auto ffmpeg = findFfmpeg();
-        if (! ffmpeg.existsAsFile())
-            return;
-        juce::StringArray args { ffmpeg.getFullPathName(), "-nostdin", "-v", "quiet", "-ss", juce::String (t, 3), "-i", p, "-an", "-sn" };
-        if (! moving)
-            args.addArray ({ "-frames:v", "1" });
-        args.addArray ({ "-vf", "fps=" + juce::String (fps, 6) + ",scale=" + juce::String (w) + ":" + juce::String (h) + ":flags=bilinear",
-                         "-pix_fmt", "bgra", "-f", "rawvideo", "-" });
-        auto proc = std::make_unique<juce::ChildProcess>();
-        if (! proc->start (args, juce::ChildProcess::wantStdOut))
-            return;
-        std::lock_guard<std::mutex> lock (procLock);
-        process = std::move (proc);
-    }
-
-    void stopProcess()
-    {
-        std::unique_ptr<juce::ChildProcess> old;
-        {
-            std::lock_guard<std::mutex> lock (procLock);
-            old = std::move (process);
-        }
-        if (old != nullptr && old->isRunning())
-            old->kill();
-    }
-
-    bool readFrame (std::vector<std::uint8_t>& bytes)
-    {
-        std::size_t got = 0;
-        while (got < bytes.size() && ! threadShouldExit())
-        {
-            juce::ChildProcess* p;
-            {
-                std::lock_guard<std::mutex> lock (procLock);
-                p = process.get();
-            }
-            if (p == nullptr)
-                return false;
-            const auto n = p->readProcessOutput (bytes.data() + got, (int) juce::jmin<std::size_t> (bytes.size() - got, 1 << 20));
-            if (n <= 0)
-                return false;
-            got += (std::size_t) n;
-        }
-        return got == bytes.size();
-    }
-
-    void publish (const std::vector<std::uint8_t>& bytes, int w, int h, double t)
-    {
-        // a buffer neither shown nor still held by a window (the UI keeps the frame it drew)
-        juce::Image* free = nullptr;
-        for (auto& img : pool)
-            if (img.isValid() && img.getWidth() == w && img.getHeight() == h && img.getReferenceCount() == 1)
-                free = &img;
-        if (free == nullptr)
-        {
-            auto* slot = &pool[0];
-            for (auto& img : pool)
-                if (img.isNull() || img.getReferenceCount() == 1)
-                    slot = &img;
-            *slot = juce::Image (juce::Image::ARGB, w, h, false);
-            free = slot;
-        }
-        auto back = *free;
-        {
-            juce::Image::BitmapData data (back, juce::Image::BitmapData::writeOnly);
-            for (int y = 0; y < h; ++y)
-                std::memcpy (data.getLinePointer (y), bytes.data() + (std::size_t) y * (std::size_t) w * 4, (std::size_t) w * 4);
-        }
-        {
-            std::lock_guard<std::mutex> lock (out);
-            shown = back;
-            shownTime = t;
-        }
-        ++frames;
-    }
-
-    std::mutex want, out, procLock;
-    juce::String path;
-    video::Info info;
-    int width = 0, height = 0;
-    double wantTime = 0.0;
-    bool wantMoving = false, restart = false;
-    std::unique_ptr<juce::ChildProcess> process;
-    juce::Image shown;
-    std::array<juce::Image, 3> pool;
-    double shownTime = -1.0, lastShown = -1e9;
-    std::atomic<int> frames { 0 };
-};
 
 // ---------------------------------------------------------------------------------------------------------------
 // Where the video is drawn (the editor's area or the detached window)
@@ -462,7 +71,7 @@ public:
         }
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::body));
-        g.drawFittedText (message, getLocalBounds().reduced (16), juce::Justification::centred, 4);
+        g.drawFittedText (message, getLocalBounds().reduced (16), juce::Justification::centred, 12);
     }
 
     void resized() override
@@ -482,28 +91,67 @@ public:
 class IconButton final : public juce::Button
 {
 public:
-    enum class Icon { load, options, play, pause, stop, loop, sound, mute, detach, start, end };
+    enum class Icon { load, options, play, pause, stop, loop, sound, mute, detach, start, end, link };
+    // FL's panel (round 174d, FL 2026 on screen): a round folder button, bare icons (▾, the chain, the speaker), the
+    // transport as one pill [∞ | ▶ | ■], small square ◂ / ▸ beside the start / end times
+    enum class Shape { circle, bare, pillLeft, pillMid, pillRight, small };
 
-    IconButton (Icon i) : juce::Button ({}), icon (i) {}
+    IconButton (Icon i, Shape sh = Shape::bare) : juce::Button ({}), icon (i), shape (sh) {}
     Icon icon;
+    Shape shape;
 
     void paintButton (juce::Graphics& g, bool over, bool down) override
     {
         auto r = getLocalBounds().toFloat().reduced (1.0f);
         const auto on = getToggleState();
-        g.setColour (down ? theme::colour::bg6 : over ? theme::colour::bg5 : theme::colour::bg4);
-        g.fillRoundedRectangle (r, 4.0f);
-        if (on)
+        const auto fill = down ? theme::colour::bg6 : over ? theme::colour::bg5 : theme::colour::bg4;
+        switch (shape)
         {
-            g.setColour (theme::colour::accent);
-            g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.2f);
+            case Shape::circle:
+                r = r.withSizeKeepingCentre (juce::jmin (r.getWidth(), r.getHeight()), juce::jmin (r.getWidth(), r.getHeight()));
+                g.setColour (fill);
+                g.fillEllipse (r);
+                break;
+            case Shape::pillLeft: case Shape::pillMid: case Shape::pillRight:
+            {
+                const auto left = shape == Shape::pillLeft, right = shape == Shape::pillRight;
+                const auto radius = r.getHeight() * 0.5f;
+                juce::Path bg;
+                bg.addRoundedRectangle (r.getX(), r.getY(), r.getWidth() + (right ? 0.0f : 1.0f), r.getHeight(), radius, radius,
+                                        left, right, left, right);
+                g.setColour (fill);
+                g.fillPath (bg);
+                if (! left)
+                {
+                    g.setColour (theme::colour::bg2);
+                    g.fillRect (r.getX(), r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f);
+                }
+                break;
+            }
+            case Shape::small:
+                g.setColour (fill);
+                g.fillRoundedRectangle (r, 3.0f);
+                break;
+            case Shape::bare:
+                break;
         }
-        g.setColour (on ? theme::colour::accent : theme::colour::textPrimary);
+        g.setColour (on ? theme::colour::accent : over && shape == Shape::bare ? juce::Colours::white : theme::colour::textPrimary);
         const auto c = r.getCentre();
-        const auto s = juce::jmin (r.getWidth(), r.getHeight()) * 0.30f;
+        const auto s = juce::jmin (r.getWidth(), r.getHeight()) * (shape == Shape::small ? 0.26f : 0.30f);
         juce::Path p;
         switch (icon)
         {
+            case Icon::link:
+                // two chain links, crossing at 45°
+                for (const auto d : { -1.0f, 1.0f })
+                {
+                    juce::Path l;
+                    l.addRoundedRectangle (-s * 0.95f, -s * 0.42f, s * 1.9f, s * 0.84f, s * 0.42f);
+                    l.applyTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::pi * 0.25f)
+                                          .translated (c.x + d * s * 0.45f, c.y - d * s * 0.45f));
+                    g.strokePath (l, juce::PathStrokeType (1.6f));
+                }
+                break;
             case Icon::play:
                 p.addTriangle (c.x - s * 0.8f, c.y - s, c.x - s * 0.8f, c.y + s, c.x + s, c.y);
                 g.fillPath (p);
@@ -516,15 +164,21 @@ public:
                 g.fillRect (juce::Rectangle<float> (c.x - s * 0.8f, c.y - s * 0.8f, s * 1.6f, s * 1.6f));
                 break;
             case Icon::loop:
-                p.addCentredArc (c.x, c.y, s, s * 0.8f, 0.0f, 0.6f, 5.6f, true);
-                g.strokePath (p, juce::PathStrokeType (1.6f));
+            {
+                // FL's loop: ∞
+                for (int k = 0; k <= 64; ++k)
                 {
-                    juce::Path a;
-                    const auto tip = juce::Point<float> (c.x + s * std::sin (0.6f), c.y - s * 0.8f * std::cos (0.6f));
-                    a.addTriangle (tip.x - s * 0.45f, tip.y - s * 0.35f, tip.x + s * 0.2f, tip.y + s * 0.45f, tip.x + s * 0.4f, tip.y - s * 0.4f);
-                    g.fillPath (a);
+                    const auto t = (float) k / 64.0f * juce::MathConstants<float>::twoPi;
+                    const auto d = 1.0f + std::sin (t) * std::sin (t);
+                    const auto x = c.x + s * 1.25f * std::cos (t) / d, y = c.y + s * 1.25f * std::sin (t) * std::cos (t) / d;
+                    if (k == 0)
+                        p.startNewSubPath (x, y);
+                    else
+                        p.lineTo (x, y);
                 }
+                g.strokePath (p, juce::PathStrokeType (1.7f));
                 break;
+            }
             case Icon::sound:
             case Icon::mute:
                 p.startNewSubPath (c.x - s, c.y - s * 0.35f);
@@ -570,10 +224,9 @@ public:
             case Icon::start:
             case Icon::end:
             {
-                const auto dir = icon == Icon::start ? 1.0f : -1.0f;
-                const auto x = c.x - dir * s * 0.8f;
-                g.drawLine (x, c.y - s, x, c.y + s, 1.6f);
-                p.addTriangle (x + dir * s * 0.3f, c.y, x + dir * s * 1.5f, c.y - s * 0.75f, x + dir * s * 1.5f, c.y + s * 0.75f);
+                // FL's small ◂ (set the start here) / ▸ (set the end here)
+                const auto dir = icon == Icon::start ? -1.0f : 1.0f;
+                p.addTriangle (c.x + dir * s, c.y, c.x - dir * s * 0.7f, c.y - s, c.x - dir * s * 0.7f, c.y + s);
                 g.fillPath (p);
                 break;
             }
@@ -590,23 +243,25 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const auto r = getLocalBounds().toFloat().reduced (6.0f, 0.0f);
-        const auto rail = r.withSizeKeepingCentre (r.getWidth(), 4.0f);
+        // FL's slider: a full-width groove, the start…end range in colour, a big round handle
+        const auto r = getLocalBounds().toFloat().reduced (10.0f, 0.0f);
+        const auto rail = r.withSizeKeepingCentre (r.getWidth(), 6.0f);
         g.setColour (theme::colour::bg4);
-        g.fillRoundedRectangle (rail, 2.0f);
-        if (duration <= 0.0)
-            return;
-        const auto x = [&] (double t) { return rail.getX() + (float) (juce::jlimit (0.0, 1.0, t / duration)) * rail.getWidth(); };
-        const auto e = end > 0.0 ? end : duration;
-        g.setColour (theme::colour::accentMuted);
-        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x (start), rail.getY(), x (e), rail.getBottom()));
-        g.setColour (theme::colour::accent);
-        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x (start), rail.getY(), x (juce::jlimit (start, e, now)), rail.getBottom()));
-        g.setColour (theme::colour::textSecondary);
-        g.fillRect (juce::Rectangle<float> (x (start) - 1.0f, r.getCentreY() - 7.0f, 2.0f, 14.0f));
-        g.fillRect (juce::Rectangle<float> (x (e) - 1.0f, r.getCentreY() - 7.0f, 2.0f, 14.0f));
+        g.fillRoundedRectangle (rail, 3.0f);
+        const auto x = [&] (double t) { return rail.getX() + (duration > 0.0 ? (float) (juce::jlimit (0.0, 1.0, t / duration)) : 0.0f) * rail.getWidth(); };
+        if (duration > 0.0)
+        {
+            // (FL: the start…end range in its colour, no progress fill)
+            const auto e = end > 0.0 ? end : duration;
+            g.setColour (theme::colour::accent);
+            g.fillRoundedRectangle (juce::Rectangle<float>::leftTopRightBottom (x (start), rail.getY(), x (e), rail.getBottom()), 3.0f);
+        }
+        const auto knob = juce::Rectangle<float> (18.0f, 18.0f).withCentre ({ x (juce::jmax (0.0, now)), r.getCentreY() });
+        g.setColour (theme::colour::bg5);
+        g.fillEllipse (knob);
         g.setColour (theme::colour::textPrimary);
-        g.fillEllipse (juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ x (juce::jmax (0.0, now)), r.getCentreY() }));
+        g.drawEllipse (knob.reduced (1.0f), 1.4f);
+        g.fillRect (knob.withSizeKeepingCentre (1.6f, 8.0f));
     }
 
     void mouseDown (const juce::MouseEvent& e) override { seekAt (e.x); }
@@ -617,7 +272,7 @@ private:
     {
         if (duration <= 0.0 || ! onSeek)
             return;
-        const auto r = getLocalBounds().toFloat().reduced (6.0f, 0.0f);
+        const auto r = getLocalBounds().toFloat().reduced (10.0f, 0.0f);
         onSeek (juce::jlimit (0.0, duration, (double) (px - r.getX()) / juce::jmax (1.0f, r.getWidth()) * duration));
     }
 };
@@ -656,29 +311,137 @@ public:
     }
 };
 
-std::optional<double> parseTime (const juce::String& typed)
+// FL's typed time (round 174d A2 [DECOMP SetTimeLabelClick 0x72a030]): whole numbers split at ':' — S, S:x, M:S:x or
+// H:M:S:x, where x is milliseconds, or frames in an SMPTE time display (frames → ms at the display's whole rate: 24 for
+// 23.976 / 24, 25, 30 for 29.97 drop / 30, the video's rate for Auto; FL takes 1 for the other rates, which drops the
+// frames — LYNX uses their whole rate); a '-' anywhere makes it negative. Not a number: nothing.
+int typingFps (int mode, double videoFps)
 {
-    // H:M:S:ms, M:S, S (seconds, decimals allowed)
-    auto parts = juce::StringArray::fromTokens (typed.trim(), ":", "");
-    parts.removeEmptyStrings();
+    switch (mode)
+    {
+        case video::smpte23976: case video::smpte24: return 24;
+        case video::smpte25: return 25;
+        case video::smpte2997drop: case video::smpte30: return 30;
+        case video::smpteAuto: return juce::jmax (1, juce::roundToInt (videoFps));
+        case video::hms: return 1;
+        default: return juce::jmax (1, juce::roundToInt (video::timeDisplayFps (mode, videoFps)));
+    }
+}
+
+std::optional<double> parseTime (const juce::String& typed, int mode = video::hms, double videoFps = 0.0)
+{
+    const auto negative = typed.containsChar ('-');
+    auto parts = juce::StringArray::fromTokens (typed.trim().removeCharacters ("-"), ":", "");
+    for (auto& p : parts)
+        p = p.trim();
     if (parts.isEmpty() || parts.size() > 4)
         return std::nullopt;
     for (const auto& p : parts)
-        if (! p.containsOnly ("0123456789.-"))
+        if (p.isEmpty() || ! p.containsOnly ("0123456789"))
             return std::nullopt;
-    double t = 0.0;
-    if (parts.size() == 4)
-        t = parts[0].getDoubleValue() * 3600.0 + parts[1].getDoubleValue() * 60.0 + parts[2].getDoubleValue() + parts[3].getDoubleValue() / 1000.0;
-    else if (parts.size() == 3)
-        t = parts[0].getDoubleValue() * 3600.0 + parts[1].getDoubleValue() * 60.0 + parts[2].getDoubleValue();
+    const auto frames = mode != video::hms;
+    const auto fps = typingFps (mode, videoFps);
+    const auto last = [&] (const juce::String& p) {
+        const auto v = p.getLargeIntValue();
+        return frames ? (double) juce::roundToInt ((double) ((v % fps) * 1000) / (double) fps) : (double) v;
+    };
+    double h = 0.0, m = 0.0, sec = 0.0, ms = 0.0;
+    if (parts.size() == 1)
+        sec = (double) parts[0].getLargeIntValue();
     else if (parts.size() == 2)
-        t = parts[0].getDoubleValue() * 60.0 + parts[1].getDoubleValue();
+        sec = (double) parts[0].getLargeIntValue(), ms = last (parts[1]);
+    else if (parts.size() == 3)
+        m = (double) parts[0].getLargeIntValue(), sec = (double) parts[1].getLargeIntValue(), ms = last (parts[2]);
     else
-        t = parts[0].getDoubleValue();
-    return t;
+        h = (double) parts[0].getLargeIntValue(), m = (double) parts[1].getLargeIntValue(), sec = (double) parts[2].getLargeIntValue(), ms = last (parts[3]);
+    const auto t = ((h * 60.0 + m) * 60.0 + sec) + ms / 1000.0;
+    return negative ? -t : t;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// FL's in-place type-in (round 174d, FL 2026 on screen): a right click on a time opens a text box over the panel's
+// left edge, prefilled with the label's text (selected), and under it a hint row "✓ ✕ <caption>". Enter or ✓ accepts;
+// Esc, ✕ or a click elsewhere cancels.
+class InlineTypeIn final : public juce::Component, private juce::FocusChangeListener
+{
+public:
+    InlineTypeIn (const juce::String& text, const juce::String& caption) : hint (caption)
+    {
+        editor.setFont (theme::font (theme::type::display));
+        editor.setText (text, false);
+        editor.setColour (juce::TextEditor::backgroundColourId, theme::colour::bg0);
+        editor.setColour (juce::TextEditor::textColourId, theme::colour::textPrimary);
+        editor.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        editor.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+        editor.setColour (juce::TextEditor::highlightColourId, juce::Colour (0xff1e6fd9));
+        editor.setColour (juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+        editor.setIndents (4, 2);
+        editor.onReturnKey = [this] { finish (true); };
+        editor.onEscapeKey = [this] { finish (false); };
+        addAndMakeVisible (editor);
+        setMouseClickGrabsKeyboardFocus (false); // (a click on ✓ / ✕ must not take the focus from the box first)
+        juce::Desktop::getInstance().addFocusChangeListener (this);
+    }
+    ~InlineTypeIn() override { juce::Desktop::getInstance().removeFocusChangeListener (this); }
+
+    static constexpr int boxHeight = 28, hintHeight = 22;
+
+    void start()
+    {
+        editor.grabKeyboardFocus();
+        editor.selectAll();
+    }
+
+    void resized() override { editor.setBounds (0, 0, getWidth(), boxHeight); }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().withTrimmedTop (boxHeight).toFloat();
+        g.setColour (theme::colour::bg0.withAlpha (0.92f));
+        g.fillRect (r);
+        g.setFont (theme::font (theme::type::small));
+        g.setColour (theme::colour::textSecondary);
+        g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), tickArea().toFloat(), juce::Justification::centred);
+        g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x95"), crossArea().toFloat(), juce::Justification::centred);
+        g.drawText (hint, r.withTrimmedLeft ((float) crossArea().getRight() + 8.0f), juce::Justification::centredLeft, true);
+    }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (tickArea().contains (e.getPosition()))
+            finish (true);
+        else if (crossArea().contains (e.getPosition()))
+            finish (false);
+    }
+
+private:
+    juce::Rectangle<int> tickArea() const { return { 4, boxHeight, 18, hintHeight }; }
+    juce::Rectangle<int> crossArea() const { return { 22, boxHeight, 18, hintHeight }; }
+
+    void globalFocusChanged (juce::Component* focused) override
+    {
+        if (focused != &editor && focused != this)
+            finish (false);
+    }
+
+    void finish (bool ok)
+    {
+        if (done)
+            return;
+        done = true;
+        if (onDone)
+            onDone (ok, editor.getText()); // (the owner removes this box asynchronously)
+    }
+
+public:
+    std::function<void (bool ok, const juce::String& text)> onDone;
+
+private:
+    juce::TextEditor editor;
+    juce::String hint;
+    bool done = false;
+};
+
 class VideoPlayerEditor final : public juce::Component,
                                 public juce::FileDragAndDropTarget,
                                 private juce::Timer,
@@ -720,12 +483,9 @@ public:
         icon (soundButton, tr ("Mute audio"), [this] { edit ([] (video::Settings& s) { s.mute = ! s.mute; }); });
         icon (detachButton, tr ("Show the video in its own window (double-click the video)"), [this] { detach(); });
 
-        slaveButton.setButtonText (tr ("Host"));
-        slaveButton.setClickingTogglesState (false);
-        slaveButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
-        slaveButton.onClick = [this] { edit ([] (video::Settings& s) { s.slave = ! s.slave; }); };
-        ui::setHint (slaveButton, tr ("Slave playback to host: the song position drives the video (off: the player's own Play / Stop)"));
-        addAndMakeVisible (slaveButton);
+        // FL's chain: Slave playback to host
+        icon (slaveButton, tr ("Slave playback to host: the song position drives the video (off: the player's own Play / Stop)"),
+              [this] { edit ([] (video::Settings& s) { s.slave = ! s.slave; }); });
 
         ui::ValueSpec vol;
         vol.name = tr ("Volume");
@@ -737,16 +497,19 @@ public:
         volume = std::make_unique<ctlui::Knob> (&engine, vol, [this] { return (double) settings.volume; },
                                                 [this] (double v) { edit ([v] (video::Settings& s) { s.volume = juce::jlimit (0, 127, juce::roundToInt (v)); }); });
         volume->shortName = tr ("Vol");
+        volume->compact = true; // (FL: a small dial beside the speaker)
         addAndMakeVisible (*volume);
 
         for (auto* lab : { &startLabel, &endLabel, &nowLabel })
         {
-            lab->setFont (theme::font (theme::type::body));
+            lab->setFont (theme::font (theme::type::display)); // (FL: the times are the panel's big white text)
             lab->setColour (juce::Label::textColourId, theme::colour::textPrimary);
             lab->setJustificationType (juce::Justification::centred);
+            lab->setBorderSize ({});
             addAndMakeVisible (*lab);
         }
-        nowLabel.setColour (juce::Label::textColourId, theme::colour::accent);
+        startLabel.setJustificationType (juce::Justification::centredLeft);
+        endLabel.setJustificationType (juce::Justification::centredRight);
         ui::setHint (startLabel, tr ("Start time (click to go to, right click to set)"));
         ui::setHint (endLabel, tr ("End time (click to go to, right click to set)"));
         ui::setHint (nowLabel, tr ("Current time (right click to set)"));
@@ -782,42 +545,40 @@ public:
     void resized() override
     {
         auto r = getLocalBounds();
-        const auto panelHeight = 98;
+        const auto panelHeight = 102;
         panelArea = r.removeFromBottom (panelHeight);
         // FL's "Dock control panel": the panel below the video; else over the video's bottom
         surface.setBounds (settings.dock ? r : getLocalBounds());
         panelBack.overlay = ! settings.dock;
         panelBack.setBounds (panelArea);
         locateButton.setBounds (r.withSizeKeepingCentre (160, 28).translated (0, 40));
-        auto p = panelArea.reduced (8, 6);
-        auto row1 = p.removeFromTop (22);
-        startLabel.setBounds (row1.removeFromLeft (100));
-        endLabel.setBounds (row1.removeFromRight (100));
-        rail.setBounds (row1.reduced (4, 0));
-        p.removeFromTop (6);
-        auto row2 = p.removeFromTop (34);
-        const auto b = 30;
-        loadButton.setBounds (row2.removeFromLeft (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromLeft (4);
-        optionsButton.setBounds (row2.removeFromLeft (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromLeft (4);
-        detachButton.setBounds (row2.removeFromLeft (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromLeft (10);
-        setStartButton.setBounds (row2.removeFromLeft (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromLeft (4);
-        setEndButton.setBounds (row2.removeFromLeft (b).withSizeKeepingCentre (b, 28));
-        volume->setBounds (row2.removeFromRight (44));
-        row2.removeFromRight (4);
-        soundButton.setBounds (row2.removeFromRight (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromRight (10);
-        slaveButton.setBounds (row2.removeFromRight (52).withSizeKeepingCentre (52, 26));
-        row2.removeFromRight (6);
-        stopButton.setBounds (row2.removeFromRight (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromRight (4);
-        playButton.setBounds (row2.removeFromRight (b).withSizeKeepingCentre (b, 28));
-        row2.removeFromRight (4);
-        loopButton.setBounds (row2.removeFromRight (b).withSizeKeepingCentre (b, 28));
-        nowLabel.setBounds (row2.reduced (6, 2));
+        // FL's order (round 174d, FL 2026 on screen): folder, ▾, the chain, [∞ | ▶ | ■] … volume, speaker (LYNX's
+        // pop-out after them); the times under the buttons (start ◂ … now … ▸ end); the slider at the bottom
+        auto p = panelArea.reduced (10, 6);
+        auto row1 = p.removeFromTop (32);
+        loadButton.setBounds (row1.removeFromLeft (32));
+        row1.removeFromLeft (4);
+        optionsButton.setBounds (row1.removeFromLeft (18).withSizeKeepingCentre (18, 22));
+        row1.removeFromLeft (52);
+        slaveButton.setBounds (row1.removeFromLeft (26).withSizeKeepingCentre (26, 26));
+        row1.removeFromLeft (8);
+        for (auto* b : { &loopButton, &playButton, &stopButton })
+            b->setBounds (row1.removeFromLeft (32).withSizeKeepingCentre (32, 28));
+        detachButton.setBounds (row1.removeFromRight (20).withSizeKeepingCentre (20, 20));
+        row1.removeFromRight (6);
+        soundButton.setBounds (row1.removeFromRight (22).withSizeKeepingCentre (22, 22));
+        row1.removeFromRight (2);
+        volume->setBounds (row1.removeFromRight (30).withSizeKeepingCentre (30, 30));
+        p.removeFromTop (4);
+        auto row2 = p.removeFromTop (26);
+        const auto timeWidth = juce::jmin (130, row2.getWidth() / 3 - 20);
+        startLabel.setBounds (row2.removeFromLeft (timeWidth));
+        setStartButton.setBounds (row2.removeFromLeft (18).withSizeKeepingCentre (16, 16));
+        endLabel.setBounds (row2.removeFromRight (timeWidth));
+        setEndButton.setBounds (row2.removeFromRight (18).withSizeKeepingCentre (16, 16));
+        nowLabel.setBounds (row2.reduced (4, 0));
+        p.removeFromTop (2);
+        rail.setBounds (p.removeFromTop (24));
     }
 
     bool keyPressed (const juce::KeyPress& key) override
@@ -892,26 +653,28 @@ private:
         soundButton.icon = settings.mute ? IconButton::Icon::mute : IconButton::Icon::sound;
         soundButton.setToggleState (settings.mute, juce::dontSendNotification);
         surface.keepAspect = settings.keepAspect;
-        const auto noFfmpeg = ! findFfmpeg().existsAsFile();
-        locateButton.setVisible (noFfmpeg);
-        if (noFfmpeg)
-            surface.message = tr ("ffmpeg was not found. LYNX SHARE plays videos with ffmpeg: install it or locate it.");
+        const auto noDecoder = ! media::canDecodeVideo();
+        const auto unreadable = ! settings.path.empty() && resolveVideo (settings.path).existsAsFile() && ! info.hasVideo;
+        locateButton.setVisible (noDecoder || (unreadable && ! findFfmpeg().existsAsFile()));
+        if (noDecoder)
+            surface.message = media::ffmpegInstallHelp();
         else if (settings.path.empty())
             surface.message = tr ("No video") + "\n" + tr ("Load a video file (or drop one here)");
         else if (! resolveVideo (settings.path).existsAsFile())
             surface.message = tr ("The video was not found:") + "\n" + juce::String::fromUTF8 (settings.path.c_str());
-        else if (! info.hasVideo)
-            surface.message = tr ("ffmpeg could not read a video in this file");
+        else if (unreadable)
+            surface.message = media::cannotReadMessage (resolveVideo (settings.path).getFullPathName());
         else
             surface.message = {};
         juce::String s;
         if (info.hasVideo)
             s << info.width << "x" << info.height << ", " << juce::String (info.fps, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") << " fps, "
-              << juce::String (video::formatTime (info.duration, video::hms, info.fps)) << (info.hasAudio ? "" : ", " + tr ("no sound"));
+              << juce::String (video::formatTime (info.duration, video::hms, info.fps)) << (info.hasAudio ? "" : ", " + tr ("no sound"))
+              << ", " << probe (loadedPath).backend;
         if (settings.delay > 0)
             s << "  |  " << tr ("Delay playback by {0}", { juce::String (video::formatTime (seconds (settings.delay), settings.timeDisplay, info.fps)) });
         statusLine = s;
-        panelBack.status = s;
+        ui::setHint (surface, s); // (FL's panel has no status line: the details are the picture's hint)
         panelBack.repaint();
         if (panelBack.overlay == settings.dock)
             resized();
@@ -935,11 +698,9 @@ private:
 
     double songSeconds() const
     {
+        // FL's clock (round 174d A3): the song's real time, tempo changes included
         const auto ticks = engine.getTransport().positionTicks.load();
-        const auto& song = engine.getSong();
-        if (settings.ignoreTempo)
-            return song.secondsForTicks ((std::int64_t) ticks);
-        return ticks / (double) ppq * 60.0 / juce::jmax (1.0, song.bpm);
+        return engine.getSong().secondsForTicks ((std::int64_t) ticks);
     }
 
     void timerCallback() override
@@ -1074,32 +835,70 @@ private:
         });
     }
 
+    // FL's in-place box (InlineTypeIn) over the panel's left edge, above the time row
+    void typeInPlace (const juce::Component& label, const juce::String& text, const juce::String& caption,
+                      std::function<void (const juce::String&)> accept)
+    {
+        if (typeIn != nullptr)
+            return; // (one at a time)
+        typeIn = std::make_unique<InlineTypeIn> (text, caption);
+        juce::Component::SafePointer<VideoPlayerEditor> self (this);
+        typeIn->onDone = [self, accept = std::move (accept)] (bool ok, const juce::String& typed) {
+            juce::MessageManager::callAsync ([self, ok, typed, accept] {
+                if (self == nullptr)
+                    return;
+                self->typeIn.reset();
+                if (ok && accept)
+                    accept (typed);
+            });
+        };
+        const auto row = getLocalArea (label.getParentComponent(), label.getBounds());
+        const auto width = juce::jmin (getWidth() - 8, 200);
+        const auto height = InlineTypeIn::boxHeight + InlineTypeIn::hintHeight;
+        typeIn->setBounds (juce::jlimit (4, juce::jmax (4, getWidth() - width - 4), 10),
+                           juce::jlimit (0, juce::jmax (0, getHeight() - height), row.getCentreY() - InlineTypeIn::boxHeight / 2), width, height);
+        addAndMakeVisible (*typeIn);
+        typeIn->toFront (false);
+        typeIn->start();
+    }
+
     void typeTime (bool isStart)
     {
-        auto* w = new juce::AlertWindow (isStart ? tr ("Start time (H:M:S:MS)") : tr ("End time (H:M:S:MS)"), {}, juce::MessageBoxIconType::NoIcon, this);
-        w->addTextEditor ("t", video::formatTime (isStart ? seconds (settings.start) : endTime(), video::hms, info.fps));
-        w->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-        w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        const auto frames = settings.timeDisplay != video::hms;
+        const auto caption = isStart ? (frames ? tr ("Start time (H:M:S:Frame)") : tr ("Start time (H:M:S:MS)"))
+                                     : (frames ? tr ("End time (H:M:S:Frame)") : tr ("End time (H:M:S:MS)"));
         juce::Component::SafePointer<VideoPlayerEditor> self (this);
-        w->enterModalState (true, juce::ModalCallbackFunction::create ([self, w, isStart] (int r) {
-            if (r == 1 && self != nullptr)
-                if (const auto t = parseTime (w->getTextEditorContents ("t")))
-                    self->setRange (isStart, *t);
-        }), true);
+        // (FL: the box starts with the label's text, in the time display)
+        typeInPlace (isStart ? (const juce::Component&) startLabel : (const juce::Component&) endLabel,
+                     video::formatTime (isStart ? seconds (settings.start) : endTime(), settings.timeDisplay, info.fps), caption,
+                     [self, isStart] (const juce::String& typed) {
+                         if (self != nullptr)
+                             if (const auto t = parseTime (typed, self->settings.timeDisplay, self->info.fps))
+                                 self->setRange (isStart, juce::jmax (0.0, *t));
+                     });
     }
+
+public:
+    void openTypeIn (int which)
+    {
+        if (which == 0 || which == 1)
+            typeTime (which == 0);
+        else
+            typeNow();
+    }
+
+private:
 
     void typeNow()
     {
-        auto* w = new juce::AlertWindow (tr ("Current time (H:M:S:MS)"), {}, juce::MessageBoxIconType::NoIcon, this);
-        w->addTextEditor ("t", video::formatTime (juce::jmax (0.0, nowTime), video::hms, info.fps));
-        w->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-        w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
         juce::Component::SafePointer<VideoPlayerEditor> self (this);
-        w->enterModalState (true, juce::ModalCallbackFunction::create ([self, w] (int r) {
-            if (r == 1 && self != nullptr)
-                if (const auto t = parseTime (w->getTextEditorContents ("t")))
-                    self->seekVideo (*t);
-        }), true);
+        typeInPlace (nowLabel, video::formatTime (juce::jmax (0.0, nowTime), settings.timeDisplay, info.fps),
+                     settings.timeDisplay != video::hms ? tr ("Current time (H:M:S:Frame)") : tr ("Current time (H:M:S:MS)"),
+                     [self] (const juce::String& typed) {
+                         if (self != nullptr)
+                             if (const auto t = parseTime (typed, self->settings.timeDisplay, self->info.fps))
+                                 self->seekVideo (self->info.duration > 0.0 ? juce::jlimit (0.0, self->info.duration, *t) : juce::jmax (0.0, *t));
+                     });
     }
 
     void typeDelay()
@@ -1122,15 +921,24 @@ private:
         juce::PopupMenu m;
         m.addItem (tr ("Enable audio"), true, settings.enableAudio, [this] { edit ([] (video::Settings& s) { s.enableAudio = ! s.enableAudio; }); });
         m.addItem (tr ("Dock control panel"), true, settings.dock, [this] { edit ([] (video::Settings& s) { s.dock = ! s.dock; }); });
-        m.addItem (tr ("Ignore tempo changes"), true, settings.ignoreTempo, [this] { edit ([] (video::Settings& s) { s.ignoreTempo = ! s.ignoreTempo; }); });
+        // (FL 2026 hides "Ignore tempo changes" (Visible = False in its menu form, round 174d): the flag stays in the
+        // state, and FL's clock does not read it)
         m.addItem (tr ("Keep aspect ratio"), true, settings.keepAspect, [this] { edit ([] (video::Settings& s) { s.keepAspect = ! s.keepAspect; }); });
         juce::PopupMenu display;
         // FL's menu order (the modes' numbers are FL's)
         for (const auto mode : { video::hms, video::smpte23976, video::smpte24, video::smpte25, video::smpte2997drop, video::smpte2997, video::smpte30,
-                                 video::smpte48, video::smpte50, video::smpte5994drop, video::smpte5994, video::smpte60, video::smpte72, video::smpte120,
+                                 video::smpte48, video::smpte50, video::smpte5994drop, video::smpte5994, video::smpte72, video::smpte60, video::smpte120,
                                  video::smpteAuto })
-            display.addItem (mode == video::hms ? tr ("Hours:Minutes:Seconds:Ms") : juce::String (video::timeDisplayName (mode)), true, settings.timeDisplay == mode,
+        {
+            // FL's menu form (round 174d): 72 before 60; Auto reads "SMPTE (Auto : <fps> fps)" and is enabled for a video
+            // of 0 < fps <= 120 (OptionsMenuPopup 0x727970)
+            const auto autoItem = mode == video::smpteAuto;
+            const auto text = mode == video::hms ? tr ("Hours:Minutes:Seconds:Ms")
+                              : autoItem          ? "SMPTE (Auto : " + juce::String (info.fps, 2) + " fps)"
+                                                  : juce::String (video::timeDisplayName (mode));
+            display.addItem (text, ! autoItem || (info.fps > 0.0 && info.fps <= 120.0), settings.timeDisplay == mode,
                              [this, mode] { edit ([mode] (video::Settings& s) { s.timeDisplay = mode; }); });
+        }
         m.addSubMenu (tr ("Time display"), display);
         m.addSeparator();
         m.addItem (tr ("Send audio to playlist"), info.hasAudio, false, [this] { sendAudioToPlaylist(); });
@@ -1188,14 +996,7 @@ private:
             if (self == nullptr || ! fc.getResult().existsAsFile())
                 return;
             setFfmpegLocation (fc.getResult());
-            {
-                std::lock_guard<std::mutex> lock (probeLock);
-                probes.clear();
-            }
-            {
-                std::lock_guard<std::mutex> lock (trackLock);
-                tracks.clear();
-            }
+            media::clearCaches();
             self->loadedPath = {};
             self->reload();
             self->engine.editSong ([] (Song&) {}, false); // (the instrument asks for its sound track again)
@@ -1206,8 +1007,7 @@ private:
     void sendAudioToPlaylist()
     {
         const auto file = resolveVideo (settings.path);
-        const auto ffmpeg = findFfmpeg();
-        if (! file.existsAsFile() || ! ffmpeg.existsAsFile())
+        if (! file.existsAsFile() || ! info.hasAudio)
             return;
         auto folder = platform::cacheFolder ("video-audio");
         folder.createDirectory();
@@ -1216,19 +1016,10 @@ private:
         const auto delay = seconds (settings.delay);
         juce::Component::SafePointer<VideoPlayerEditor> self (this);
         statusLine = tr ("Extracting the sound...");
-        panelBack.status = statusLine;
+        ui::setHint (surface, statusLine);
         panelBack.repaint();
-        std::thread ([self, file, ffmpeg, wav, delay] {
-            bool ok = wav.existsAsFile();
-            if (! ok)
-            {
-                juce::ChildProcess p;
-                if (p.start (juce::StringArray { ffmpeg.getFullPathName(), "-nostdin", "-v", "quiet", "-y", "-i", file.getFullPathName(), "-vn", "-sn",
-                                                 "-ac", "2", "-c:a", "pcm_s16le", wav.getFullPathName() },
-                             0))
-                    p.waitForProcessToFinish (10 * 60 * 1000);
-                ok = wav.existsAsFile() && wav.getSize() > 44;
-            }
+        std::thread ([self, file, wav, delay] {
+            const bool ok = wav.existsAsFile() || media::extractAudioToWav (file, wav);
             juce::MessageManager::callAsync ([self, wav, ok, delay] {
                 if (self == nullptr)
                     return;
@@ -1346,13 +1137,17 @@ private:
     std::unique_ptr<DetachedWindow> window;
     juce::Rectangle<int> panelArea;
     PanelBack panelBack;
-    IconButton loadButton { IconButton::Icon::load }, optionsButton { IconButton::Icon::options }, setStartButton { IconButton::Icon::start },
-        setEndButton { IconButton::Icon::end }, loopButton { IconButton::Icon::loop }, playButton { IconButton::Icon::play },
-        stopButton { IconButton::Icon::stop }, soundButton { IconButton::Icon::sound }, detachButton { IconButton::Icon::detach };
-    juce::TextButton slaveButton, locateButton;
+    using Shape = IconButton::Shape;
+    IconButton loadButton { IconButton::Icon::load, Shape::circle }, optionsButton { IconButton::Icon::options },
+        slaveButton { IconButton::Icon::link }, loopButton { IconButton::Icon::loop, Shape::pillLeft },
+        playButton { IconButton::Icon::play, Shape::pillMid }, stopButton { IconButton::Icon::stop, Shape::pillRight },
+        soundButton { IconButton::Icon::sound }, detachButton { IconButton::Icon::detach },
+        setStartButton { IconButton::Icon::start, Shape::small }, setEndButton { IconButton::Icon::end, Shape::small };
+    juce::TextButton locateButton;
     std::unique_ptr<ctlui::Knob> volume;
     ClickLabel startLabel, endLabel, nowLabel;
     TimeRail rail;
+    std::unique_ptr<InlineTypeIn> typeIn; // FL's in-place type-in, while open
     std::unique_ptr<juce::FileChooser> chooser;
 };
 } // namespace
@@ -1368,6 +1163,12 @@ void install (AudioEngine& engine)
 juce::String report (const juce::String& path)
 {
     return probe (path).report;
+}
+
+void openTypeIn (juce::Component& editor, int which)
+{
+    if (auto* e = dynamic_cast<VideoPlayerEditor*> (&editor))
+        e->openTypeIn (which);
 }
 } // namespace videoview
 

@@ -68,7 +68,27 @@
 #    dispatchGuarded) runs a message for a third-party plugin's own window inside an SEH guard: a fault in the plugin's
 #    window procedure (the reporter's synth editor, 0xC0000005 under DispatchMessageW) closes that editor instead of
 #    ending LYNX. Without a hook (tests, other programs) it is JUCE's DispatchMessage as before.
-# 17. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 177b): a VST3 plugin that asks
+# 16. Windows only, juce_graphics/native/juce_Direct2DImage_windows.cpp (round 174e2): every Graphics drawing into a
+#    Direct2D image ends with a full GPU -> CPU readback of the image into its software copy (JUCE keeps both). For
+#    the Playlist's and the Mixer's cached pictures (redrawn while scrolling, 1920x1000 px) that readback cost more than
+#    the drawing. A context made while juce::lynxSkipImageReadback is set skips it; LYNX sets it only around images it
+#    never reads back (the picture is only drawn to the window; a new device gets a full repaint anyway).
+# 17. Windows only, juce_gui_basics/native/juce_FileChooser_windows.cpp (round 180a): at the first selection change in a
+#    native file dialog JUCE types Home and End with SendInput (its workaround for a cut-off file name), into whatever
+#    window has the focus at that moment: another program, if the user moved on while the dialog opened. The keys now go
+#    out only when the foreground window is one of LYNX's own. Without them the name may just show cut off.
+# 18. Every platform, juce_audio_processors/format_types/juce_VST3Common.h (issue #63, note fine pitch on VST3): FL's
+#    wrapper rounds a note's pitch (key + fine pitch) to a key and sends the rest as the VST3 note on's tuning (Fruity
+#    Wrapper 0x84d0e0 / 0x879a00, REA_rodada188g). JUCE builds note ons from MIDI (tuning 0); MidiEventList now asks
+#    LYNX's hook for each note on's tuning while LYNX has set a context on the thread (engine/Vst3NoteTuning.h). Needs
+#    fix 14 (it goes into its note numbering).
+# 19. Every platform, juce_graphics/fonts/juce_SimpleShapedText.cpp (issue #142, round 190d): text shaped with a font
+#    that has no typeface gets no glyphs. For a line break that is "unsafe" (every one is, with no glyphs) JUCE 8.0.4
+#    shapes the text up to the break again and walks back from the end of those glyphs to skip trailing spaces with
+#    `while (--it != glyphs.begin())`: on an empty vector that starts before its beginning and never stops (SIGSEGV
+#    at LYNX+0xf94c7a in 0.1.25, at start-up on NixOS, where JUCE's own font list had no monospaced family). No
+#    glyphs: nothing to walk over. LYNX also gives every font a typeface now (ui/Theme.cpp getTypefaceForFont).
+# 20. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 177b): a VST3 plugin that asks
 #    the host for a parameter's context menu (IComponentHandler3::createContextMenu with a ParamID, e.g. a right-click
 #    on a knob) gets the host's items at the top of it through `lynxVst3ParamMenuHook` (LYNX: Create automation clip,
 #    Link to controller…, as on its own knobs). JUCE built the menu from the plugin's items only. Without a hook, or
@@ -138,6 +158,16 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("menu accelerator keys" "LYNX patch (round 170a): accelerator letters"
             "            dismissMenu (nullptr);|NL|        }|NL|        else|NL|        {|NL|            return false;|NL|        }"
             "            dismissMenu (nullptr);|NL|        }|NL|        else if (! lynxMenuMnemonic (key)) // LYNX patch (round 170a): accelerator letters|NL|        {|NL|            return false;|NL|        }")
+    elseif(file MATCHES "juce_Direct2DImage_windows.cpp$")
+        lynx_juce_fix("image contexts without readback" "LYNX patch (round 174e2): no readback flag"
+            "/*  Returns new software bitmap storage with content matching the provided hardware bitmap. */"
+            "// LYNX patch (round 174e2): no readback flag. Contexts made while it is set do not copy the image back to its|NL|// software copy when they end (cmake/LynxPatchJuce.cmake, fix 15)|NL|bool lynxSkipImageReadback = false;|NL||NL|/*  Returns new software bitmap storage with content matching the provided hardware bitmap. */")
+        lynx_juce_fix("image contexts without readback (end)" "LYNX patch (round 174e2): readback skipped"
+            "            endFrame();|NL|            readFromDirect2DBitmap (storedContext, storedTarget, backup);"
+            "            endFrame();|NL|            if (! skipReadback) // LYNX patch (round 174e2): readback skipped when asked|NL|                readFromDirect2DBitmap (storedContext, storedTarget, backup);")
+        lynx_juce_fix("image contexts without readback (member)" "LYNX patch (round 174e2): the flag when made"
+            "        ImagePixelData::Ptr backup;|NL|    };"
+            "        ImagePixelData::Ptr backup;|NL|        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|    };")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"
@@ -170,6 +200,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("clip to an empty path" "LYNX patch (issue #11): clipping to an empty path"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL|"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL||NL|    // LYNX patch (issue #11): clipping to an empty path leaves nothing (Quartz would ignore it)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|    {|NL|        CGContextClipToRect (context.get(), CGRectZero);|NL|        lastClipRect.reset();|NL|        return;|NL|    }|NL|")
+    elseif(file MATCHES "juce_SimpleShapedText.cpp$")
+        lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
+            "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
+            "                        auto it = glyphs.cend();|NL||NL|                        // LYNX patch (issue #142): no glyphs (a font without a typeface), nothing to walk back over|NL|                        if (glyphs.empty())|NL|                            return it;|NL||NL|                        while (--it != glyphs.begin())")
     elseif(file MATCHES "juce_Messaging_windows.cpp$")
         lynx_juce_fix("dispatch hook" "LYNX patch (issue #32): the message dispatch hook"
             "CheckEventBlockedByModalComps isEventBlockedByModalComps = nullptr;"
@@ -190,10 +224,20 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 host items in the menu" "LYNX patch (round 177b): the host's items first"
             "    OwnedArray<PopupMenu> menuStack;|NL|    PopupMenu* topLevelMenu = menuStack.add (new PopupMenu());|NL|"
             "    OwnedArray<PopupMenu> menuStack;|NL|    PopupMenu* topLevelMenu = menuStack.add (new PopupMenu());|NL||NL|    // LYNX patch (round 177b): the host's items first (items with their own action: their result is 0)|NL|    if (lynxVst3ParamMenuHook != nullptr && lynxHasParam)|NL|        if (auto* param = owner.getParameterForID (lynxParamId))|NL|        {|NL|            lynxVst3ParamMenuHook (owner, static_cast<AudioProcessorParameter*> (param)->getParameterIndex(), *topLevelMenu);|NL|            if (topLevelMenu->getNumItems() > 0)|NL|                topLevelMenu->addSeparator();|NL|        }|NL|")
+    elseif(file MATCHES "juce_FileChooser_windows.cpp$")
+        lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
+            "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
+            "                    // LYNX patch (round 180a): only into LYNX, never into a program the user moved on to|NL|                    DWORD foregroundProcess = 0;|NL|                    GetWindowThreadProcessId (GetForegroundWindow(), &foregroundProcess);|NL||NL|                    if (foregroundProcess == GetCurrentProcessId())|NL|                        SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));|NL|")
     elseif(file MATCHES "juce_VST3Common.h$")
         lynx_juce_fix("VST3 note ids" "LYNX patch (issue #70): each note its own noteId"
             "        toEventList (result, midiBuffer, &mapping, callback);|NL|    }"
             "        toEventList (result, midiBuffer, &mapping, callback);|NL||NL|        // LYNX patch (issue #70): each note its own noteId (as FL), its note off the same one|NL|        if (auto* list = dynamic_cast<MidiEventList*> (&result))|NL|            list->lynxNumberNotes();|NL|    }|NL||NL|    // A plugin that keys its voices by noteId took every note (all -1) as one note. Each note on gets the next id;|NL|    // a note off (or poly pressure) the id of the oldest sounding note on its channel and key, else -1.|NL|    void lynxNumberNotes() noexcept|NL|    {|NL|        const ScopedLock sl (events.getLock());|NL|        for (auto& e : events)|NL|        {|NL|            if (e.type == Steinberg::Vst::Event::kNoteOnEvent)|NL|            {|NL|                auto& key = lynxKeys[jlimit (0, 15, (int) e.noteOn.channel)][jlimit (0, 127, (int) e.noteOn.pitch)];|NL|                const auto id = lynxNextId;|NL|                lynxNextId = lynxNextId >= 0x7fffffff ? 0 : lynxNextId + 1;|NL|                if (key.count == (int) key.ids.size()) // (notes that never ended: the oldest is forgotten)|NL|                {|NL|                    std::rotate (key.ids.begin(), key.ids.begin() + 1, key.ids.end());|NL|                    --key.count;|NL|                }|NL|                key.ids[(size_t) key.count++] = id;|NL|                e.noteOn.noteId = id;|NL|            }|NL|            else if (e.type == Steinberg::Vst::Event::kNoteOffEvent)|NL|            {|NL|                auto& key = lynxKeys[jlimit (0, 15, (int) e.noteOff.channel)][jlimit (0, 127, (int) e.noteOff.pitch)];|NL|                e.noteOff.noteId = -1;|NL|                if (key.count > 0)|NL|                {|NL|                    e.noteOff.noteId = key.ids[0];|NL|                    std::rotate (key.ids.begin(), key.ids.begin() + 1, key.ids.end());|NL|                    --key.count;|NL|                }|NL|            }|NL|            else if (e.type == Steinberg::Vst::Event::kPolyPressureEvent)|NL|            {|NL|                const auto& key = lynxKeys[jlimit (0, 15, (int) e.polyPressure.channel)][jlimit (0, 127, (int) e.polyPressure.pitch)];|NL|                e.polyPressure.noteId = key.count > 0 ? key.ids[0] : -1;|NL|            }|NL|        }|NL|    }|NL||NL|    struct LynxKey|NL|    {|NL|        std::array<Steinberg::int32, 4> ids {};|NL|        int count = 0;|NL|    };|NL|    std::array<std::array<LynxKey, 128>, 16> lynxKeys {};|NL|    Steinberg::int32 lynxNextId = 0;")
+        lynx_juce_fix("VST3 note tuning hook" "LYNX patch (issue #63): the note tuning hook"
+            "//==============================================================================|NL|class MidiEventList  : public Steinberg::Vst::IEventList"
+            "// LYNX patch (issue #63): the note tuning hook. LYNX (engine/Vst3NoteTuning.h, the same two declarations) sets|NL|// the hook and, while a plugin's block runs on this thread, the context: each note on then gets its tuning from it.|NL|inline float (*lynxNoteTuningHook) (void* context, int channel, int key) = nullptr;|NL|inline thread_local void* lynxNoteTuningContext = nullptr;|NL||NL|//==============================================================================|NL|class MidiEventList  : public Steinberg::Vst::IEventList")
+        lynx_juce_fix("VST3 note tuning" "LYNX patch (issue #63): the note's tuning"
+            "                e.noteOn.noteId = id;|NL|"
+            "                e.noteOn.noteId = id;|NL|                // LYNX patch (issue #63): the note's tuning (FL's wrapper sends a note's fine pitch there)|NL|                if (lynxNoteTuningHook != nullptr && lynxNoteTuningContext != nullptr)|NL|                    e.noteOn.tuning = lynxNoteTuningHook (lynxNoteTuningContext, (int) e.noteOn.channel, (int) e.noteOn.pitch);|NL|")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"
@@ -214,9 +258,15 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/desktop/juce_Displays.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/fonts/juce_SimpleShapedText.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
+    # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
+    if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
+    endif()
 endfunction()
 
 # run as a script: cmake -DJUCE_DIR=<dir> -P cmake/LynxPatchJuce.cmake

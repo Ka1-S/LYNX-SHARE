@@ -2,13 +2,28 @@
 
 #include "core/MenuMnemonic.h"
 
+#if LYNX_BUNDLED_FONT
+ #include <LynxFontData.h>
+#endif
+
+#if (JUCE_LINUX || JUCE_BSD) && __has_include(<fontconfig/fontconfig.h>)
+ #include <fontconfig/fontconfig.h>
+ #define LYNX_FONTCONFIG 1
+#endif
+
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <unordered_map>
 #include <vector>
 
 #include "core/MenuPlacement.h"
+#include "core/UiFontChoice.h"
+#include "platform/Paths.h"
 #include "ui/Icons.h"
+#include "ui/ImageCaches.h"
 #include "ui/PluginSkin.h"
 
 namespace lynx::theme
@@ -189,6 +204,7 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
     }
 
     static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const auto s = (float) scale;
     const auto rad = juce::jmin (corner, r.getWidth() * 0.5f, r.getHeight() * 0.5f) * s; // (the path clamps it the same way)
     const auto xl = r.getX() * s, xr = r.getRight() * s, yt = r.getY() * s, yb = r.getBottom() * s;
@@ -303,6 +319,7 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
     }
 
     static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const SpritePlace at (bounds, scale);
     const auto value = juce::roundToInt (juce::jlimit (0.0f, 1.0f, value01) * 1440.0f); // (a sixteenth of a degree of the ring)
     auto key = mix (mix (0x84222325cbf29ce4ull, (std::uint64_t) eighth (bounds.getWidth() * (float) scale)), (std::uint64_t) eighth (bounds.getHeight() * (float) scale));
@@ -437,14 +454,176 @@ themes::Palette currentPalette()
              c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff) };
 }
 
+namespace
+{
+// Linux (issue #142, round 190d): JUCE 8.0.4 makes its own list of the installed fonts from the <dir> entries of
+// /etc/fonts/fonts.conf alone; it does not follow that file's <include>s. NixOS names one folder there (DejaVu Sans
+// only) and adds every font package, each in its own /nix/store folder, through an included file: JUCE then knew no
+// monospaced family at all, the monospaced fonts LYNX asks for had no typeface, and drawing a text with one crashed
+// at start-up (cmake/LynxPatchJuce.cmake, fix 19). The folders now come from fontconfig itself, through JUCE's own
+// JUCE_FONT_PATH variable (one the user set is left alone). Must run before JUCE's first look at the fonts.
+[[maybe_unused]] void useFontconfigFontFolders()
+{
+   #if LYNX_FONTCONFIG
+    if (const auto* own = std::getenv ("JUCE_FONT_PATH"); own != nullptr && *own != 0)
+        return;
+    juce::StringArray folders;
+    if (auto* config = FcInitLoadConfig()) // (the configuration files only: no font is opened here)
+    {
+        if (auto* dirs = FcConfigGetFontDirs (config))
+        {
+            while (const auto* dir = FcStrListNext (dirs))
+                folders.add (juce::String::fromUTF8 (reinterpret_cast<const char*> (dir)));
+            FcStrListDone (dirs);
+        }
+        FcConfigDestroy (config);
+    }
+    folders = fontFoldersToScan (folders, [] (const juce::String& folder) { return juce::File (folder).isDirectory(); });
+    if (! folders.isEmpty())
+        ::setenv ("JUCE_FONT_PATH", folders.joinIntoString (";").toRawUTF8(), 1);
+   #endif
+}
+
+#if LYNX_BUNDLED_FONT
+// Open Sans, regular and bold (resources/fonts, SIL OFL). (The name finds a memory face only while it lives.)
+const std::array<juce::Typeface::Ptr, 2>& bundledFaces()
+{
+    static const std::array<juce::Typeface::Ptr, 2> faces {
+        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansRegular_ttf, (size_t) lynxfontdata::OpenSansRegular_ttfSize),
+        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansBold_ttf, (size_t) lynxfontdata::OpenSansBold_ttfSize)
+    };
+    return faces;
+}
+#endif
+
+bool typefaceFallbackOff = false; // (fontSelfTest only)
+} // namespace
+
+juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders, const std::function<bool (const juce::String&)>& exists)
+{
+    // JUCE splits its list at ';' and ',' and scans each folder with everything below it: a folder inside another
+    // one of the list would be read twice (every face twice in the font lists)
+    juce::StringArray kept;
+    for (const auto& raw : fontconfigFolders)
+    {
+        auto folder = raw.trim();
+        while (folder.length() > 1 && folder.endsWithChar ('/'))
+            folder = folder.dropLastCharacters (1);
+        if (folder.isEmpty() || folder.containsAnyOf (";,") || ! juce::File::isAbsolutePath (folder) || ! exists (folder))
+            continue;
+        const auto inside = [] (const juce::String& child, const juce::String& parent) {
+            return child == parent || parent == "/" || child.startsWith (parent + "/");
+        };
+        bool covered = false;
+        for (int i = kept.size(); --i >= 0;)
+        {
+            if (inside (folder, kept[i]))
+                covered = true;
+            else if (inside (kept[i], folder))
+                kept.remove (i);
+        }
+        if (! covered)
+            kept.add (folder);
+    }
+    return kept;
+}
+
 LookAndFeel::LookAndFeel()
     : juce::LookAndFeel_V4 (juce::LookAndFeel_V4::ColourScheme { bg1, bg2, bg3, borderStrong, textPrimary, bg4, onAccent, accent, textPrimary })
 {
     // Segoe UI on Windows (the JUCE default there is Verdana, wider and dated)
    #if JUCE_WINDOWS
     setDefaultSansSerifTypefaceName ("Segoe UI");
+   #elif LYNX_BUNDLED_FONT
+    // Linux: JUCE would take the first of Verdana, Bitstream Vera, Luxi, Liberation, DejaVu, 8-32 % wider than the font
+    // the layouts are made with. Open Sans comes with LYNX SHARE (resources/fonts, SIL OFL), so it looks the same everywhere.
+    useFontconfigFontFolders(); // (first: the memory faces below make JUCE read the font folders)
+    if (const auto& faces = bundledFaces(); faces[0] != nullptr)
+        setDefaultSansSerifTypefaceName (faces[0]->getName());
+   #else
+    useFontconfigFontFolders();
    #endif
     refreshColours();
+}
+
+// JUCE expects a typeface for every font ("the look and feel must return a typeface!") but, on Linux, has none for a
+// family that is not installed — nor for its own "monospaced" or "serif" placeholder on a system where it found no
+// such font (issue #142: text drawn with such a font crashed LYNX at start-up). Such a font now draws with the font
+// LYNX brings (Linux), else with the default sans-serif: plain, but there.
+juce::Typeface::Ptr LookAndFeel::getTypefaceForFont (const juce::Font& font)
+{
+    if (auto face = juce::LookAndFeel_V4::getTypefaceForFont (font); face != nullptr || typefaceFallbackOff)
+        return face;
+    const auto bold = font.isBold();
+   #if LYNX_BUNDLED_FONT
+    if (const auto& faces = bundledFaces(); faces[bold ? 1 : 0] != nullptr)
+        return faces[bold ? 1 : 0];
+    else if (faces[0] != nullptr)
+        return faces[0];
+   #endif
+    if (font.getTypefaceName() == juce::Font::getDefaultSansSerifFontName())
+        return {}; // (no font at all: nothing left to try)
+    return juce::LookAndFeel_V4::getTypefaceForFont (juce::Font (juce::FontOptions (font.getHeight(), bold ? juce::Font::bold : juce::Font::plain)));
+}
+
+juce::String fontSelfTest()
+{
+    // every font gets a typeface and glyphs: the default, the monospaced one, a family nobody has (issue #142). The
+    // text has places where a line may break: those took JUCE's crashing path
+    const juce::String text ("0 : 00 : 00 one-two three/four");
+    const std::pair<const char*, juce::FontOptions> fonts[] = {
+        { "default", font (type::body) },
+        { "bold", font (type::body, true) },
+        { "monospaced", monoFont (type::body) },
+        { "serif", juce::FontOptions (juce::Font::getDefaultSerifFontName(), type::body, juce::Font::plain) },
+        { "unknown family", juce::FontOptions ("LYNX no such family 142", type::body, juce::Font::bold) },
+    };
+    for (const auto& [name, options] : fonts)
+    {
+        const juce::Font f (options);
+        if (f.getTypefacePtr() == nullptr)
+            return juce::String ("ERROR no typeface: ") + name;
+        if (! (juce::GlyphArrangement::getStringWidth (f, text) > 1.0f))
+            return juce::String ("ERROR no glyphs: ") + name;
+    }
+    // without the fallback (what Linux gave LYNX 0.1.25 for such a family: no typeface): nothing drawn, no crash
+    // (cmake/LynxPatchJuce.cmake, fix 19; Windows and macOS substitute a font themselves)
+   #if JUCE_LINUX || JUCE_BSD
+    {
+        const juce::ScopedValueSetter<bool> off (typefaceFallbackOff, true);
+        const juce::Font none (juce::FontOptions ("LYNX no such family 142 b", type::body, juce::Font::plain));
+        juce::GlyphArrangement line, fitted;
+        line.addLineOfText (none, text, 0.0f, 0.0f);
+        fitted.addFittedText (none, text, 0.0f, 0.0f, 60.0f, 40.0f, juce::Justification::centredLeft, 3, 0.7f);
+        juce::AttributedString attributed;
+        attributed.append (text, none, juce::Colours::white);
+        juce::TextLayout layout;
+        layout.createLayout (attributed, 60.0f);
+        juce::Image image (juce::Image::ARGB, 80, 40, true);
+        juce::Graphics g (image);
+        g.setFont (none);
+        g.drawText (text, 0, 0, 80, 20, juce::Justification::centredLeft, true);
+        g.drawFittedText (text, 0, 20, 80, 20, juce::Justification::centredLeft, 2);
+        if (! std::isfinite (juce::GlyphArrangement::getStringWidth (none, text)) || ! std::isfinite (layout.getHeight()))
+            return "ERROR a font without a typeface";
+    }
+   #endif
+    // the font folders handed to JUCE: fontconfig's, without the missing ones and the ones inside another
+    // (POSIX paths: on Windows "/usr/..." is not an absolute path, and fontconfig is not used there)
+   #if ! JUCE_WINDOWS
+    {
+        const auto all = [] (const juce::String&) { return true; };
+        const auto notOpt = [] (const juce::String& folder) { return ! folder.startsWith ("/opt"); };
+        const auto joined = [] (const juce::StringArray& folders) { return folders.joinIntoString (";"); };
+        if (joined (fontFoldersToScan ({ "/usr/share/fonts/truetype", "/usr/share/fonts/", "/nix/store/a-dejavu/share/fonts", "/usr/share/fonts",
+                                         "/usr/share/fontsx", "relative/fonts", "/a;b", "/opt/fonts", "" }, notOpt))
+                != "/usr/share/fonts;/nix/store/a-dejavu/share/fonts;/usr/share/fontsx"
+            || joined (fontFoldersToScan ({ "/a/b", "/", "/c" }, all)) != "/"
+            || ! fontFoldersToScan ({}, all).isEmpty())
+            return "ERROR font folders";
+    }
+   #endif
+    return "OK";
 }
 
 juce::String uiFontForLanguage (const juce::String& languageId)
@@ -492,6 +671,57 @@ juce::String LookAndFeel::applyLanguageFont (const juce::String& languageId)
     if (family.isNotEmpty())
         setDefaultSansSerifTypefaceName (family);
     return family; // empty: JUCE's per-glyph font fallback still finds whatever CJK font the OS has
+}
+
+juce::String defaultUiFont()
+{
+   #if JUCE_WINDOWS
+    return "Segoe UI";
+   #elif LYNX_BUNDLED_FONT
+    return "Open Sans";
+   #else
+    return {}; // macOS: what JUCE picks there, unchanged
+   #endif
+}
+
+juce::StringArray installedUiFonts()
+{
+    auto names = juce::Font::findAllTypefaceNames();
+    names.removeDuplicates (false);
+    names.removeEmptyStrings();
+    names.sortNatural();
+    return names;
+}
+
+static juce::File uiFontFile() { return platform::settingsFile ("ui-font.txt"); }
+
+juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
+
+void saveUiFont (const juce::String& family)
+{
+    if (family.isEmpty())
+        uiFontFile().deleteFile();
+    else
+        uiFontFile().replaceWithText (family);
+}
+
+juce::String LookAndFeel::applyInterfaceFont (const juce::String& languageId, const juce::String& runOverride)
+{
+    const auto saved = runOverride.isNotEmpty() ? runOverride : savedUiFont();
+    if (saved.isNotEmpty())
+    {
+        const auto installed = juce::Font::findAllTypefaceNames(); // (only when a font was chosen: it costs a scan)
+        const auto family = chooseUiFont (saved.toStdString(), [&installed] (const std::string& name) {
+            return installed.contains (juce::String::fromUTF8 (name.c_str()));
+        });
+        if (! family.empty())
+        {
+            // the user's font also in Chinese, Japanese and Korean: what it lacks comes from JUCE's per-glyph fallback
+            setDefaultSansSerifTypefaceName (juce::String::fromUTF8 (family.c_str()));
+            return juce::String::fromUTF8 (family.c_str());
+        }
+    }
+    return applyLanguageFont (languageId);
 }
 
 void LookAndFeel::refreshColours()
@@ -611,7 +841,8 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     g.setColour (base);
     g.fillPath (p);
 
-    if (button.hasKeyboardFocus (false) && button.getWantsKeyboardFocus())
+    if ((button.hasKeyboardFocus (false) || button.getProperties().contains ("lynxSnapshotFocus")) // (--snapshot: see saveWindow)
+        && button.getWantsKeyboardFocus())
     {
         g.setColour (accent.withAlpha (0.6f));
         g.strokePath (p, juce::PathStrokeType (1.0f));
@@ -692,7 +923,7 @@ void LookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool, 
     const auto hover = box.isMouseOver (true) && box.isEnabled();
     fillRounded (g, bounds, radius::md, hover ? bg5 : box.findColour (juce::ComboBox::backgroundColourId));
 
-    if (box.hasKeyboardFocus (true) && box.getWantsKeyboardFocus())
+    if ((box.hasKeyboardFocus (true) || box.getProperties().contains ("lynxSnapshotFocus")) && box.getWantsKeyboardFocus())
         outlineRounded (g, bounds, radius::md, accent.withAlpha (0.7f));
     else if (! box.findColour (juce::ComboBox::outlineColourId).isTransparent())
         outlineRounded (g, bounds, radius::md, box.findColour (juce::ComboBox::outlineColourId));
@@ -1364,7 +1595,7 @@ void LookAndFeel::drawFileBrowserRow (juce::Graphics& g, int width, int height, 
         iconKind = Icon::folder;
     else if (file.hasFileExtension ("wav;aif;aiff;flac;ogg;mp3;wv"))
         iconKind = Icon::audioFile;
-    else if (file.hasFileExtension ("lynx;flp;dawproj"))
+    else if (file.hasFileExtension ("lynx;flp;als;flm;dawproj"))
         iconKind = Icon::project;
     else if (file.hasFileExtension ("mid;midi"))
         iconKind = Icon::pianoRoll;

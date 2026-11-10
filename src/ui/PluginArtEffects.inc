@@ -89,6 +89,16 @@ inline void vfill (juce::Graphics& g, Rectangle<float> a, Colour top, Colour bot
     g.fillRect (a);
 }
 
+// round tp172b4: the references' fields — light under the header, darkest a little past the middle, lifting again
+// toward the bottom bar
+inline void valley (juce::Graphics& g, Rectangle<float> a, Colour top, Colour mid, Colour bottom, float at)
+{
+    ColourGradient grad (top, 0.0f, a.getY(), bottom, 0.0f, a.getBottom(), false);
+    grad.addColour (juce::jlimit (0.05, 0.95, (double) at), mid);
+    g.setGradientFill (grad);
+    g.fillRect (a);
+}
+
 // fine horizontal hairlines (brushed metal); deterministic
 inline void brushedLines (juce::Graphics& g, Rectangle<float> a, juce::int64 seed, float alpha)
 {
@@ -512,6 +522,198 @@ inline void canvasKiln (juce::Graphics& g, Rectangle<float> a, bool display)
     vignette (g, mod, 0.3f);
 }
 
+// === Fret Channel (guitar / bass channel strip role, round tp172c8): a mid-grey brushed panel between near-black input /
+// output columns, darker recessed sections (phase correction, EQ, comp, drive), teal read-out screens, colour-coded caps
+// (blue mid band, red high gain and drive, silver trims)
+inline void canvasFret (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff6a6c70), Colour (0xff505256));
+    if (display) return;
+    const auto sx = a.getWidth() / 976.0f, sy = a.getHeight() / 540.0f;
+    brushedLines (g, a, 225, 0.03f);
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 100.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 100.0f * sx, a.getY(), 100.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff35363a), Colour (0xff26272a));
+        g.setColour (Colour (0xff0f1012));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 20.0f * sx, col.getY() + 50.0f * sy, 60.0f * sx, 310.0f * sy), 3.0f);
+    }
+    for (const auto r : { Rectangle<float> (118.0f, 160.0f, 168.0f, 190.0f), Rectangle<float> (300.0f, 160.0f, 170.0f, 190.0f),
+                          Rectangle<float> (560.0f, 110.0f, 150.0f, 140.0f), Rectangle<float> (204.0f, 368.0f, 92.0f, 166.0f),
+                          Rectangle<float> (556.0f, 368.0f, 232.0f, 166.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        g.setColour (Colour (0xff47494d));
+        g.fillRoundedRectangle (rr, 4.0f);
+    }
+    g.setColour (Colour (0xff0d2622));
+    g.fillRoundedRectangle (Rectangle<float> (a.getX() + 504.0f * sx, a.getY() + 270.0f * sy, 356.0f * sx, 84.0f * sy), 3.0f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour fretCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Mid freq." || n == "Mid gain") return Colour (0xff2f6fb3);
+    if (n == "High gain" || n == "Guitar drive" || n == "Bass drive") return Colour (0xffb3262b);
+    if (n == "Low gain" || n == "Boost" || n == "Punch" || n == "Edge" || n == "Bass punch" || n == "Bass shape" || n == "Threshold" || n == "Delay"
+        || n == "Input" || n == "Output")
+        return Colour (0xff1c1d20);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& fretTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Fret Channel";
+        x.pal = { Colour (0xff626468), Colour (0xff4c4e52), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xfff1f1ef),
+                  Colour (0xff2a2b2e), Colour (0xff47494d), Colour (0xff3a3c40), Colour (0xff8a8c90), Colour (0xfff4f4f2),
+                  Colour (0xff3a3c40) };
+        x.canvas = canvasFret;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = fretCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffd0d2d6);
+        x.captionCol = Colour (0xffeeeeec);
+        x.valueCol = Colour (0xffd0d2d6);
+        x.headerCol = Colour (0xff3a3b3f);
+        return x;
+    }();
+    return t;
+}
+
+// === Shell Channel (drum channel strip role, round tp172c8): charcoal modules on a near-black frame, a lighter header
+// band, green-capped gate / speed / comp knobs, a blue low and a red high frequency cap, silver amounts, and the five
+// chevrons of the process order along the bottom
+inline void canvasShell (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff2c2d30), Colour (0xff1e1f21));
+    if (display) return;
+    const auto sx = a.getWidth() / 1000.0f, sy = a.getHeight() / 500.0f;
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 110.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 110.0f * sx, a.getY(), 110.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff232427), Colour (0xff18191b));
+        g.setColour (Colour (0xff0a0b0c));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 30.0f * sx, col.getY() + 24.0f * sy, 50.0f * sx, 270.0f * sy), 2.0f);
+    }
+    for (const auto r : { Rectangle<float> (112.0f, 20.0f, 484.0f, 212.0f), Rectangle<float> (598.0f, 20.0f, 290.0f, 212.0f),
+                          Rectangle<float> (112.0f, 236.0f, 240.0f, 164.0f), Rectangle<float> (356.0f, 236.0f, 240.0f, 164.0f),
+                          Rectangle<float> (600.0f, 236.0f, 288.0f, 164.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        vfill (g, rr, Colour (0xff3a3b3e), Colour (0xff2f3033));
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.drawRect (rr, 1.0f);
+    }
+    // the process order's chevrons
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto r = Rectangle<float> (a.getX() + (186.0f + 130.0f * i) * sx, a.getY() + 440.0f * sy, 124.0f * sx, 22.0f * sy);
+        juce::Path p;
+        p.startNewSubPath (r.getX(), r.getY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getY());
+        p.lineTo (r.getRight(), r.getCentreY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getBottom());
+        p.lineTo (r.getX(), r.getBottom());
+        p.lineTo (r.getX() + 10.0f * sx, r.getCentreY());
+        p.closeSubPath();
+        g.setColour (Colour (0xff3d3e42));
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
+    vignette (g, a, 0.3f);
+}
+
+inline Colour shellCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Gate hold" || n == "Gate attack" || n == "Gate release" || n == "Shaper speed" || n == "LMC comp") return Colour (0xff1f7a4c);
+    if (n == "Low freq.") return Colour (0xff2f6fb3);
+    if (n == "High freq.") return Colour (0xffb3262b);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& shellTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Shell Channel";
+        x.pal = { Colour (0xff2c2d30), Colour (0xff1e1f21), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe8e8e6),
+                  Colour (0xff0a0b0c), Colour (0xff3a3b3e), Colour (0xff2f3033), Colour (0xff6a6c70), Colour (0xfff4f4f2),
+                  Colour (0xff2f3033) };
+        x.canvas = canvasShell;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = shellCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffe2e2e0);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff8c8d90);
+        return x;
+    }();
+    return t;
+}
+
+// === Strike Shaper (the two-knob transient designer role, round trans189d): brushed silver modules round black
+// capsules, silver knobs, lit square keys
+inline void canvasStrike (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff2a2c30), Colour (0xff141518));
+    if (display) return;
+    const auto sx = a.getWidth() / 540.0f, sy = a.getHeight() / 300.0f;
+    const auto frame = Rectangle<float> (a.getX() + 6.0f * sx, a.getY() + 6.0f * sy, 528.0f * sx, 288.0f * sy);
+    vfill (g, frame, Colour (0xffe9ebee), Colour (0xffa4a7ac));
+    juce::Random rnd (228);
+    for (int i = 0; i < 400; ++i) // vertical brushing
+    {
+        const auto x = frame.getX() + rnd.nextFloat() * frame.getWidth();
+        const auto y = frame.getY() + rnd.nextFloat() * frame.getHeight();
+        g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.04f));
+        g.drawVerticalLine ((int) x, y, juce::jmin (frame.getBottom(), y + 10.0f + 30.0f * rnd.nextFloat()));
+    }
+    const auto cap = frame.reduced (16.0f * sx, 16.0f * sy);
+    vfill (g, cap, Colour (0xff24262b), Colour (0xff0b0c0e));
+    g.setColour (Colours::black.withAlpha (0.8f));
+    g.drawRoundedRectangle (cap, juce::jmin (cap.getHeight() * 0.5f, 60.0f * sy), 1.4f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour strikeCapTint (const char*) { return Colour (0xffd6d9de); }
+
+inline const Theme& strikeTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Strike Shaper";
+        x.pal = { Colour (0xff24262b), Colour (0xff0b0c0e), Colour (0xffff8a2a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe9eaec),
+                  Colour (0xff0a0b0c), Colour (0xff3a3c41), Colour (0xff1a1b1e), Colour (0xff9a9ea6), Colour (0xfff4f4f2),
+                  Colour (0xff2a2c30) };
+        x.canvas = canvasStrike;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = strikeCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffe9eaec);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff9a9ea6);
+        return x;
+    }();
+    return t;
+}
+
 inline Colour kilnCapTint (const char* param)
 {
     const juce::String n (param);
@@ -574,12 +776,12 @@ inline void canvasCrest (juce::Graphics& g, Rectangle<float> a, bool display)
             else { const auto d = x - th + knee; y = x + (1.0f / ratio - 1.0f) * d * d / (4.0f * knee); }
             curve.lineTo (o.x + x * s, o.y - y * s);
         }
-        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.08f));
+        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.03f)); // (tp172b4: fainter, the field reads plain)
         g.strokePath (curve, juce::PathStrokeType (1.4f));
     }
-    softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.10f);
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
+    softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.04f);
+    // round tp172b4: no dimming — the reference's display is its graphite field itself (sampled #242225 … #323134)
+    juce::ignoreUnused (display);
 }
 
 inline void crestEmblem (juce::Graphics& g, Point<float> c, float r) // a knee
@@ -599,15 +801,18 @@ inline const Theme& crestTheme()
         Theme x;
         x.name = "Crest Compressor";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1c1e24), Colour (0xff0a0b0e), Colour (0xffffb340), Colour (0xff7fe3ff), Colour (0x9c1a1c22), Colour (0xb80c0d10),
-                  Colour (0xff6e6450), Colour (0xfff2e6cf), Colour (0xff07080a), Colour (0xff2c2e33), Colour (0xff111215), Colour (0xff22242a),
-                  Colour (0xfffff3d9), Colour (0xff191b20) };
+        // round tp172b4: the reference's warm graphite field, dark caps and a thin yellow arc (sampled: arc #f8c838,
+        // caps #29252a, field #262429)
+        x.pal = { Colour (0xff2b292e), Colour (0xff1c1a1e), Colour (0xfff8c838), Colour (0xff7fe3ff), Colour (0x9c2a282d), Colour (0xb81c1a1e),
+                  Colour (0xff4e4a50), Colour (0xffd6d0d6), Colour (0xff1f1d21), Colour (0xff353136), Colour (0xff1f1c20), Colour (0xff151316),
+                  Colour (0xfff8c838), Colour (0xff2e2b30) };
         x.canvas = canvasCrest;
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
         x.pointer = Pointer::glowLine;
         x.arcGlow = 0.06f;
         x.thin = true; // round tp172b: the reference's look
+        x.arcInCap = true; // round tp172b4: caps as big as the reference's, the arc inside the rim
         return x;
     }();
     return t;
@@ -617,10 +822,11 @@ inline const Theme& crestTheme()
 
 inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's plum-graphite field, plain (sampled: #262228 under the header, #19171a in the
+    // valley, #2a262c over the bottom bar); our ceiling motif stays as a faint silhouette
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
+    valley (g, a, p.bgTop, Colour (0xff19171a), p.bgBottom, 0.3f);
     const auto ceil = a.getY() + a.getHeight() * 0.3f;
-    // a waveform's silhouette pressing up, flat-topped at the ceiling
     juce::Path wave;
     juce::Random rnd (909);
     wave.startNewSubPath (a.getX(), a.getBottom());
@@ -633,22 +839,8 @@ inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
     }
     wave.lineTo (a.getRight(), a.getBottom());
     wave.closeSubPath();
-    g.setGradientFill (ColourGradient (p.accent2.withAlpha (0.13f), 0.0f, ceil, p.accent2.withAlpha (0.01f), 0.0f, a.getBottom(), false));
+    g.setColour (p.accent2.withAlpha (display ? 0.018f : 0.03f));
     g.fillPath (wave);
-    // the ceiling: a line of light, a glow under it and a hint of red where the peaks touch
-    if (! reduced)
-    {
-        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.0f), 0.0f, ceil - 14.0f, p.accent.withAlpha (0.18f), 0.0f, ceil, false));
-        g.fillRect (Rectangle<float> (a.getX(), ceil - 14.0f, a.getWidth(), 14.0f));
-    }
-    ColourGradient line (p.accent.withAlpha (0.0f), a.getX(), ceil, p.accent.withAlpha (0.0f), a.getRight(), ceil, false);
-    line.addColour (0.2, p.accent.withAlpha (0.55f));
-    line.addColour (0.5, Colour (0xffff5a5a).withAlpha (0.5f));
-    line.addColour (0.8, p.accent.withAlpha (0.55f));
-    g.setGradientFill (line);
-    g.fillRect (Rectangle<float> (a.getX(), ceil - 0.75f, a.getWidth(), 1.5f));
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
 }
 
 inline void apexEmblem (juce::Graphics& g, Point<float> c, float r) // bars under a line
@@ -671,9 +863,11 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1d1b1e), Colour (0xff0d0c0e), Colour (0xffe0404a), Colour (0xffd8d8de), Colour (0x9c1e1c20), Colour (0xb80c0b0d),
-                  Colour (0xff5a4f55), Colour (0xfff0e8ea), Colour (0xff09080a), Colour (0xff3a373b), Colour (0xff1d1b1e), Colour (0xff2a2629),
-                  Colour (0xfff2f0f2), Colour (0xff1f1d21) };
+        // round tp172b4: the reference's field (sampled #262228 / #19171a / #2a262c), its dim red ceiling (#a93d49) as
+        // the accent's darker side, graphite caps
+        x.pal = { Colour (0xff272329), Colour (0xff2a262c), Colour (0xffd2404e), Colour (0xffd8d8de), Colour (0xe0262228), Colour (0xf01c1a1e),
+                  Colour (0xff4a4250), Colour (0xffe6e0e8), Colour (0xff1d1a1e), Colour (0xff3a363c), Colour (0xff1f1c21), Colour (0xff141215),
+                  Colour (0xfff2f0f2), Colour (0xff2b272d) };
         x.canvas = canvasApex;
         x.titleEmblem = apexEmblem;
         x.arcGlow = 0.08f;
@@ -687,17 +881,13 @@ inline const Theme& apexTheme()
 
 inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's neutral graphite field (sampled #3c3c3c under the header, #10100f in the valley,
+    // #2a2a2a over the bottom bar); our prism and its fan stay as a faint watermark
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
+    valley (g, a, p.bgTop, Colour (0xff111110), p.bgBottom, 0.68f);
     const auto pc = Point<float> (a.getX() + a.getWidth() * 0.28f, a.getY() + a.getHeight() * 0.42f);
     const auto pr = juce::jmin (a.getWidth(), a.getHeight()) * 0.16f;
-    // the white beam coming in
-    juce::Path beam;
-    beam.startNewSubPath (a.getX(), pc.y + pr * 0.35f);
-    beam.lineTo (pc.x - pr * 0.4f, pc.y + pr * 0.05f);
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.0f), a.getX(), 0.0f, Colours::white.withAlpha (0.35f), pc.x, 0.0f, false));
-    g.strokePath (beam, juce::PathStrokeType (3.0f));
-    // four bands fanning out to the right, low (warm) to high (cool)
+    const auto k = display ? 0.12f : 0.2f;
     const Colour bands[] { Colour (0xffff5a4e), Colour (0xffffc04a), Colour (0xff4fe08a), Colour (0xff4fa8ff) };
     for (int i = 0; i < 4; ++i)
     {
@@ -710,18 +900,13 @@ inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
         fan.lineTo (a.getRight(), yb);
         fan.lineTo (pc.x + pr * 0.45f, y0 + pr * 0.08f);
         fan.closeSubPath();
-        g.setGradientFill (ColourGradient (bands[i].withAlpha (0.30f), pc.x, 0.0f, bands[i].withAlpha (0.03f), a.getRight(), 0.0f, false));
+        g.setGradientFill (ColourGradient (bands[i].withAlpha (0.30f * k), pc.x, 0.0f, bands[i].withAlpha (0.0f), a.getRight(), 0.0f, false));
         g.fillPath (fan);
     }
-    // the prism: a glass triangle with a bright edge
     juce::Path tri;
     tri.addTriangle (pc.x, pc.y - pr, pc.x - pr * 0.9f, pc.y + pr * 0.6f, pc.x + pr * 0.9f, pc.y + pr * 0.6f);
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.16f), pc.x, pc.y - pr, Colour (0xff8ab4ff).withAlpha (0.05f), pc.x, pc.y + pr, false));
-    g.fillPath (tri);
-    g.setColour (Colours::white.withAlpha (0.35f));
-    g.strokePath (tri, juce::PathStrokeType (1.2f));
-    vignette (g, a, 0.35f);
-    displayDim (g, a, display);
+    g.setColour (Colours::white.withAlpha (0.25f * k));
+    g.strokePath (tri, juce::PathStrokeType (1.0f));
 }
 
 inline void prismEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -744,9 +929,11 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff222124), Colour (0xff0f0f11), Colour (0xffffc23a), Colour (0xff8fd0ff), Colour (0x9c242326), Colour (0xb80e0e10),
-                  Colour (0xff5d5a60), Colour (0xfff2efe8), Colour (0xff0a0a0b), Colour (0xff38363a), Colour (0xff1c1b1e), Colour (0xff2b2a2e),
-                  Colour (0xfffff3d6), Colour (0xff1f1e22) };
+        // round tp172b4: the reference's neutral graphite (sampled #3c3c3c / #10100f / #2a2a2a), its orange 0 dB line
+        // (#f3af44) as the accent
+        x.pal = { Colour (0xff3d3d3d), Colour (0xff2a2a2a), Colour (0xfff3af44), Colour (0xff8fd0ff), Colour (0xe02e2e2e), Colour (0xf01b1b1b),
+                  Colour (0xff5a5a5a), Colour (0xffe8e8e8), Colour (0xff121212), Colour (0xff3a3a3a), Colour (0xff1e1e1e), Colour (0xff161616),
+                  Colour (0xfff3af44), Colour (0xff2a2a2a) };
         x.canvas = canvasPrism;
         x.titleEmblem = prismEmblem;
         x.twoTone = false;
@@ -762,36 +949,19 @@ inline const Theme& prismTheme()
 
 inline void canvasSentry (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's slate-blue field, plain (sampled #2f2d42 under the header to #1c1f2f over the
+    // bottom bar); our gate stays as a faint row of bars behind the display
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    // stone courses
-    for (float y = a.getY(); y < a.getBottom(); y += 26.0f)
-    {
-        const auto shift = ((int) ((y - a.getY()) / 26.0f)) % 2 == 0 ? 0.0f : 34.0f;
-        g.setColour (Colours::black.withAlpha (0.18f));
-        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
-        for (float x = a.getX() - shift; x < a.getRight(); x += 68.0f)
-            g.fillRect (Rectangle<float> (x, y, 1.0f, 26.0f));
-    }
-    // the lantern's light, upper left
-    softLight (g, { a.getX() + a.getWidth() * 0.1f, a.getY() + a.getHeight() * 0.18f }, a.getWidth() * 0.45f, p.accent, 0.16f);
-    // the gate: iron bars with spear tips and two rails
     const auto gate = Rectangle<float> (a.getX() + a.getWidth() * 0.35f, a.getY() + a.getHeight() * 0.08f, a.getWidth() * 0.6f, a.getHeight() * 0.92f);
-    g.setColour (Colour (0xff05080a).withAlpha (0.55f));
+    g.setColour (Colour (0xff05080a).withAlpha (display ? 0.03f : 0.05f));
     for (float x = gate.getX(); x < gate.getRight(); x += 22.0f)
     {
-        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 4.0f, gate.getHeight() - 10.0f));
+        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 3.0f, gate.getHeight() - 10.0f));
         juce::Path tip;
-        tip.addTriangle (x - 3.0f, gate.getY() + 11.0f, x + 7.0f, gate.getY() + 11.0f, x + 2.0f, gate.getY());
+        tip.addTriangle (x - 3.0f, gate.getY() + 11.0f, x + 6.0f, gate.getY() + 11.0f, x + 1.5f, gate.getY());
         g.fillPath (tip);
     }
-    for (const auto f : { 0.18f, 0.82f })
-        g.fillRect (Rectangle<float> (gate.getX() - 4.0f, gate.getY() + gate.getHeight() * f, gate.getWidth(), 5.0f));
-    g.setColour (p.accent.withAlpha (0.10f)); // the lantern's glint on the bars
-    for (float x = gate.getX(); x < gate.getRight(); x += 22.0f)
-        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 1.0f, gate.getHeight() - 10.0f));
-    vignette (g, a, 0.45f);
-    displayDim (g, a, display);
 }
 
 inline void sentryEmblem (juce::Graphics& g, Point<float> c, float r) // a keyhole
@@ -822,14 +992,17 @@ inline const Theme& sentryTheme()
         Theme x;
         x.name = "Sentry Gate";
         x.base = Style::glow;
-        x.pal = { Colour (0xff3d4560), Colour (0xff262b3d), Colour (0xff8fb4ff), Colour (0xffe8ecf6), Colour (0x9c434b66), Colour (0xb82a3043),
-                  Colour (0xff6c7593), Colour (0xffeef1fa), Colour (0xff1c2030), Colour (0xffd7dced), Colour (0xff8a93ad), Colour (0xff2b3146),
-                  Colour (0xff1d2232), Colour (0xff30364b) };
+        // round tp172b4: the reference's slate field (#2f2d42 → #1c1f2f), blue-grey grip caps (#7b839f) with a light
+        // thumb, dark ticked rings (#34344a)
+        x.pal = { Colour (0xff2f2d42), Colour (0xff1c1f2f), Colour (0xff9fb0e0), Colour (0xffe8ecf6), Colour (0xe0363650), Colour (0xf0222336),
+                  Colour (0xff5d6380), Colour (0xffd8dbe6), Colour (0xff1e2030), Colour (0xff8e96b2), Colour (0xff5f667e), Colour (0xff2e2e42),
+                  Colour (0xffe6e6ec), Colour (0xff2b2a3e) };
         x.canvas = canvasSentry;
         x.titleEmblem = sentryEmblem;
         x.pointer = Pointer::line;
-        x.arcGlow = 0.05f;
-        x.cap = Cap::porcelain; // round tp172b: the reference's look
+        x.arcGlow = 0.0f;
+        x.cap = Cap::porcelain;
+        x.gripKnob = true;
         return x;
     }();
     return t;
@@ -862,6 +1035,44 @@ inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // th
     g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.15f, -r * 0.15f)));
 }
 
+// round tp172d (slice 8): the opto leveler's knob — a black knurled skirt round a polished chrome dome
+inline void glowLevelerCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    g.setGradientFill (ColourGradient (Colour (0xff3a3b3e).brighter (hover * 0.1f), c.x, cap.getY(), Colour (0xff0b0b0c), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx) // the knurling round the skirt: lit ridges, so the black skirt reads on the charcoal strip too
+    {
+        const int n = capR > 30.0f ? 48 : 28;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto a = juce::MathConstants<float>::twoPi * (float) i / (float) n;
+            const Point<float> d { std::sin (a), -std::cos (a) };
+            g.setColour (Colours::white.withAlpha (0.08f + 0.14f * juce::jmax (0.0f, -d.y))); // brighter on the top half
+            g.drawLine ({ c + d * capR * 0.8f, c + d * capR * 0.98f }, 1.0f);
+        }
+    }
+    g.setColour (Colour (0xff76797e)); // the skirt's turned edge
+    g.drawEllipse (cap.reduced (0.6f), 1.2f);
+    // the chrome dome: a dark rim, then rings of light and shade (a spun metal cap) — half the skirt, as on the original
+    const auto dome = capR * 0.5f;
+    g.setColour (Colour (0xff17181a));
+    g.fillEllipse (Rectangle<float> (dome * 2.16f, dome * 2.16f).withCentre (c));
+    g.setGradientFill (ColourGradient (Colour (0xfff4f5f6), c.x - dome * 0.5f, c.y - dome * 0.7f, Colour (0xff6c7075), c.x + dome * 0.6f, c.y + dome * 0.9f, false));
+    g.fillEllipse (Rectangle<float> (dome * 2.0f, dome * 2.0f).withCentre (c));
+    if (fx)
+    {
+        g.setGradientFill (ColourGradient (Colour (0xffa9adb2), c.x - dome * 0.5f, c.y - dome * 0.5f, Colour (0xffeceef0), c.x + dome * 0.5f, c.y + dome * 0.5f, false));
+        g.fillEllipse (Rectangle<float> (dome * 1.3f, dome * 1.3f).withCentre (c));
+        g.setColour (Colours::white.withAlpha (0.55f));
+        g.fillEllipse (Rectangle<float> (dome * 0.7f, dome * 0.4f).withCentre (c.translated (-dome * 0.32f, -dome * 0.5f)));
+    }
+}
+
+inline Colour glowLevelerCapTint (const char* param)
+{
+    return param != nullptr && juce::String (param) == "Emphasis" ? Colour (0xffe9dfc4) : Colour();
+}
+
 inline const Theme& glowLevelerTheme()
 {
     static const Theme t = []
@@ -874,8 +1085,10 @@ inline const Theme& glowLevelerTheme()
                   Colour (0xfff4f4f4), Colour (0xff45484c) };
         x.canvas = canvasGlowLeveler;
         x.titleEmblem = glowLevelerEmblem;
-        x.cap = Cap::bakelite;
-        x.pointerFrom = 0.15f;
+        x.drawCap = glowLevelerCap;        // round tp172d (slice 8): chrome domes in knurled black skirts
+        x.pointerFrom = 0.56f;             // ... the white line on the skirt
+        x.capTint = glowLevelerCapTint;    // ... HI FREQ is a cream chicken-head pointer knob
+        x.pointerKnobTint = Colour (0xffe9dfc4);
         x.ticks = 11;
         x.boldTicks = false;
         x.buttTrack = true;
@@ -883,6 +1096,8 @@ inline const Theme& glowLevelerTheme()
         x.knobScale = 1.04f;
         x.thumbPointer = true;
         x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.numerals = true;                 // round tp172d (look slice): the reference's printed 0 … 100
+        x.numeralStep = 10;
         x.flatSections = true;             // one faceplate: no cards
         x.rimWidth = 0.0f;
         x.captionCol = Colour (0xff1c1d1f);
@@ -890,7 +1105,10 @@ inline const Theme& glowLevelerTheme()
         x.offLabelCol = Colour (0xff2e3033);
         x.hwKeys = true;
         x.headerCol = Colour (0xff2b2d30);
-        x.sectionFills[1] = Colour (0xff17181a); // the dark lower strip (Analog, HF emphasis, Mix, Trim)
+        x.sectionFills[1] = Colour (0xff2d2e30); // the charcoal lower strip (Analog, HF emphasis, Mix, Trim)
+        x.goldKeys = true;                 // round tp172d (slice 8): its gold 50Hz / 60Hz / OFF keys
+        x.numeralLit = true;               // ... the number at the pointer printed red
+        x.vuBezelDark = true;              // ... the meter in a gunmetal frame
         return x;
     }();
     return t;
@@ -900,31 +1118,18 @@ inline const Theme& glowLevelerTheme()
 
 inline void canvasHush (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's charcoal field (sampled #3b3a3a under the header, #141414 at the display's foot,
+    // #2f2f2f under the knobs); our S ribbon stays as a faint watermark
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    juce::Random rnd (5);
-    for (float x = a.getX() + a.getWidth() * 0.35f; x < a.getRight(); x += 3.0f)
-    {
-        const auto u = (x - a.getX()) / a.getWidth();
-        const auto h = a.getHeight() * (0.15f + 0.5f * rnd.nextFloat() * (1.0f - u));
-        g.setColour (p.accent2.withAlpha (0.05f * (1.2f - u)));
-        g.fillRect (Rectangle<float> (x, a.getCentreY() - h * 0.5f, 1.0f, h));
-    }
-    juce::Path s; // the S ribbon
+    valley (g, a, p.bgTop, Colour (0xff151515), p.bgBottom, 0.45f);
+    juce::Path s;
     const auto c = Point<float> (a.getX() + a.getWidth() * 0.22f, a.getCentreY());
     const auto r = a.getHeight() * 0.28f;
     s.startNewSubPath (c.x + r * 0.8f, c.y - r * 1.1f);
     s.cubicTo (c.x - r * 0.4f, c.y - r * 1.6f, c.x - r * 1.4f, c.y - r * 0.2f, c.x, c.y);
     s.cubicTo (c.x + r * 1.4f, c.y + r * 0.2f, c.x + r * 0.4f, c.y + r * 1.6f, c.x - r * 0.8f, c.y + r * 1.1f);
-    if (! reduced)
-    {
-        g.setColour (p.accent.withAlpha (0.06f));
-        g.strokePath (s, stroke (r * 0.5f));
-    }
-    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.25f), c.x, c.y - r, p.accent2.withAlpha (0.05f), c.x, c.y + r * 1.2f, false));
+    g.setColour (p.accent.withAlpha (display ? 0.025f : 0.04f));
     g.strokePath (s, stroke (r * 0.12f));
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
 }
 
 inline void hushEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -944,14 +1149,17 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff3a3a33), Colour (0xff23231f), Colour (0xffe8b923), Colour (0xff9fd36a), Colour (0x9c3d3d36), Colour (0xb8262622),
-                  Colour (0xff6b6a5c), Colour (0xffeeeadb), Colour (0xff1b1b18), Colour (0xfff5cf45), Colour (0xffb88a10), Colour (0xff2e2e29),
-                  Colour (0xfffff6d8), Colour (0xff34342e) };
+        // round tp172b4: the reference's charcoal field (#3b3a3a / #141414 / #2f2f2f), big amber grip caps (#e2aa12)
+        // with a white thumb on dark ticked rings (#262425); the small knobs grey (their own cap tint)
+        x.pal = { Colour (0xff3b3a3a), Colour (0xff2f2f2f), Colour (0xffe2aa12), Colour (0xff9fd36a), Colour (0xe0333232), Colour (0xf0222222),
+                  Colour (0xff5a5856), Colour (0xffdedcd8), Colour (0xff1c1c1c), Colour (0xfff2bc1c), Colour (0xffc68c06), Colour (0xff232122),
+                  Colour (0xffe9e9e9), Colour (0xff302f2f) };
         x.canvas = canvasHush;
         x.titleEmblem = hushEmblem;
         x.twoTone = false;
-        x.cap = Cap::orb; // round tp172b: the reference's look
-        x.arcGlow = 0.06f; // round tp172b: the reference's look
+        x.cap = Cap::orb;
+        x.arcGlow = 0.0f;
+        x.gripKnob = true;
         return x;
     }();
     return t;
@@ -1066,6 +1274,17 @@ inline const Theme& foilTheme()
 
 // === Halo (ValhallaShimmer role): the original's light minimal look — pale grey ground, graphite disc knobs, dark type ===
 
+// round tp172d (look slice): the original's row of flat discs runs from black to a light grey in signal order
+inline Colour haloCapTint (const char* param)
+{
+    static const char* const order[] = { "Mix", "Shift", "Feedback", "Diffusion", "Size", "Low cut", "High cut", "Mod rate", "Mod depth" };
+    if (param != nullptr)
+        for (int i = 0; i < 9; ++i)
+            if (std::strcmp (param, order[i]) == 0)
+                return Colour::greyLevel (0.02f + 0.48f * (float) i / 8.0f);
+    return {};
+}
+
 inline const Theme& haloTheme()
 {
     static const Theme t = []
@@ -1088,6 +1307,15 @@ inline const Theme& haloTheme()
         x.rimWidth = 0.0f;
         x.headerCol = Colour (0xff3a3a3f);
         x.pal.accent2 = Colour (0xff3a3a40);
+        // round tp172d (look slice): big discs shading across the row, no value ring, a short light tick at the edge,
+        // lower-case captions and modes
+        x.capTint = haloCapTint;
+        x.discRing = false;
+        x.pointerFrom = 0.62f;
+        x.pal.pointer = Colour (0xffc4c4c8);
+        x.pal.capBottom = x.pal.capTop;
+        x.lowerCaptions = true;
+        x.captionScale = 1.7f; // the original's legends: captions and values about a quarter of the knob's radius tall
         return x;
     }();
     return t;
@@ -1287,6 +1515,86 @@ inline const Theme& luxeTheme()
     return t;
 }
 
+// === LuxeVerb, Space page (round tp172b4, the Pro-R role): a night-navy strip of knobs across the top whose lower
+// edge swells under the big SPACE dial, lit from below by a thin blue line; the field under it near black ============
+
+inline void canvasLuxeSpace (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, Colour (0xff040305), p.bgBottom); // the field (sampled #030203 at the top of the display, #121013 low)
+    if (display) return;
+    // the strip: its edge 150 px into the 456 px page (under a 26 px header), swelling to 180 under the centre
+    const auto edgeY = [&] (float u) {
+        const auto d = (u - 0.497f) / 0.2f;
+        return a.getY() + a.getHeight() * (176.0f + 30.0f * std::exp (-d * d * 2.2f)) / 482.0f;
+    };
+    juce::Path strip, edge;
+    strip.startNewSubPath (a.getX(), a.getY());
+    strip.lineTo (a.getRight(), a.getY());
+    for (int i = 64; i >= 0; --i)
+    {
+        const auto u = (float) i / 64.0f;
+        const juce::Point<float> pt { a.getX() + a.getWidth() * u, edgeY (u) };
+        strip.lineTo (pt);
+    }
+    strip.closeSubPath();
+    for (int i = 0; i <= 64; ++i)
+    {
+        const auto u = (float) i / 64.0f;
+        const juce::Point<float> pt { a.getX() + a.getWidth() * u, edgeY (u) };
+        if (i == 0) edge.startNewSubPath (pt); else edge.lineTo (pt);
+    }
+    const auto bottom = edgeY (0.497f);
+    ColourGradient sg (p.bgTop, 0.0f, a.getY(), Colour (0xff0d1622), 0.0f, bottom, false);
+    sg.addColour (0.55, p.bgTop);
+    g.setGradientFill (sg);
+    g.fillPath (strip);
+    if (! reduced)
+    {
+        g.setColour (p.accent2.withAlpha (0.10f)); // the glow along the edge
+        g.strokePath (edge, juce::PathStrokeType (6.0f));
+    }
+    g.setColour (p.accent2.withAlpha (0.55f));
+    g.strokePath (edge, juce::PathStrokeType (1.0f));
+}
+
+inline void capNavy (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (p.accent2.withAlpha (0.18f)); // a cold glint along the rim
+        g.drawEllipse (cap.reduced (0.5f), 1.0f);
+    }
+}
+
+inline const Theme& luxeSpaceTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "LuxeVerb Space";
+        x.base = Style::glow;
+        // sampled from the reference: strip #130f16, caps #171d29, rings #165a85 (the blue glow round them), arcs #dfad34,
+        // the decay curve's blue #2d7ca7
+        x.pal = { Colour (0xff130f16), Colour (0xff121013), Colour (0xffdfad34), Colour (0xff2d8cc0), Colour (0xe0141a26), Colour (0xf00c1018),
+                  Colour (0xff1d4a6e), Colour (0xffd8dce4), Colour (0xff070608), Colour (0xff1b2130), Colour (0xff141924), Colour (0xff165a85),
+                  Colour (0xffe8e4d8), Colour (0xff161b26) };
+        x.canvas = canvasLuxeSpace;
+        x.titleEmblem = luxeEmblem;
+        x.drawCap = capNavy;
+        x.thin = true;
+        x.arcGlow = 0.0f;
+        x.pointerFrom = 0.55f;
+        x.captionCol = Colour (0xffd2d6de);
+        x.valueCol = Colour (0xff8e97a8);
+        return x;
+    }();
+    return t;
+}
+
 // === Fruity Reeverb (v1): a little tiled echo chamber in perspective ==============================================
 
 inline void canvasReeverb1 (juce::Graphics& g, Rectangle<float> a, bool display)
@@ -1351,10 +1659,12 @@ inline const Theme& echoformTheme()
     // round tp172d: EchoBoy's hardware look (its role) — black face, walnut cheeks, bold white rounded outlines, red LEDs
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xfff2f2ef), 3.0f); // (slice 8 review: thicker, whiter pod outlines)
         x.cornerScale = 4.0f; // the original's three rounded pods
+        x.bow = 0.05f;        // round tp172d (look slice): with bowed sides
         x.hwKeys = true;
         x.cheek = 30.0f; // (the layout leaves room for them)
+        x.ledReadouts = true; // round tp172d (look slice): the time, tap tempo and style on red LED read-outs
         return x;
     }();
     return t;
@@ -1814,7 +2124,15 @@ inline const Theme& emberTheme()
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
         x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
         x.cheek = 30.0f;
-        x.captionScale = 1.25f;
+        x.numerals = true; // round tp172d (look slice): the big Drive's printed 0 … 10
+        // round tp172d (look slice): the original's chunky black caps on a ring of dots, no lit arc; bigger spaced
+        // legends; the name between two rules; the VU in a chrome bezel
+        x.cap = Cap::bakelite;
+        x.noValueArc = true;
+        x.dotTicks = true;
+        x.captionScale = 1.45f;
+        x.titleRules = true;
+        x.vuBezel = true;
         return x;
     }();
     return t;
@@ -3704,12 +4022,15 @@ inline const Theme& voiceShiftTheme()
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
         // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
-        x.sectionFills[0] = Colour (0xffc39a1a);
-        x.sectionFills[1] = Colour (0xff1d5a6c);
-        x.sectionFills[2] = Colour (0xffb51d1d);
+        // round tp172d (look slice): the black face that frames them comes first
+        x.sectionFills[0] = Colour (0xff131416);
+        x.sectionFills[1] = Colour (0xffc39a1a);
+        x.sectionFills[2] = Colour (0xff1d5a6c);
+        x.sectionFills[3] = Colour (0xffb51d1d);
         x.hwKeys = true;
         x.cheek = 30.0f;
         x.cornerScale = 0.5f;
+        x.captionScale = 1.45f; // round tp172d (look slice): the original's big legends
         return x;
     }();
     return t;
@@ -4480,8 +4801,9 @@ inline const Theme& autoPanTheme()
     // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xff6a6a6c), 2.0f);
         x.cornerScale = 4.0f;
+        x.bow = 0.05f; // round tp172d (look slice): PanMan's bowed pods, a grey bevel instead of the white outline
         x.hwKeys = true;
         x.cheek = 30.0f;
         return x;
@@ -4525,6 +4847,9 @@ const Theme* effectTheme (Art a)
         case Art::ridge: return &ridgeTheme();
         case Art::ridge4k: return &ridge4kTheme();
         case Art::kiln: return &kilnTheme();
+        case Art::fret: return &fretTheme();
+        case Art::shell: return &shellTheme();
+        case Art::strike: return &strikeTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4538,6 +4863,7 @@ const Theme* effectTheme (Art a)
         case Art::horizon: return &horizonTheme();
         case Art::reeverb2: return &reeverb2Theme();
         case Art::luxe: return &luxeTheme();
+        case Art::luxeSpace: return &luxeSpaceTheme();
         case Art::reeverb1: return &reeverb1Theme();
         case Art::echoform: return &echoformTheme();
         case Art::spiralEcho: return &spiralTheme();
@@ -4653,6 +4979,9 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fruityDelayBank: return Art::delayBank;
         case EffectKind::ember: return Art::ember;
         case EffectKind::kilnChannel: return Art::kiln;
+        case EffectKind::fretChannel: return Art::fret;
+        case EffectKind::shellChannel: return Art::shell;
+        case EffectKind::strikeShaper: return Art::strike;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;

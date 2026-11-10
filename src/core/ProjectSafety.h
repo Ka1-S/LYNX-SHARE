@@ -91,4 +91,27 @@ std::map<std::string, std::string> packagePlan (const Song& song, const std::str
 // that are missing where the project saved them are looked for next to the project (the folder itself, then its
 // "samples", "Samples", "Audio" and "Audio/Recorded" subfolders) by file name. Returns how many references changed.
 int resolveProjectSamples (Song& song, const std::string& projectFolder, const std::function<bool (const std::string&)>& fileExists);
+// --- versions (pain point 37, round 177d) ---------------------------------------------------------------------------
+// Compares two LYNX version strings ("0.1.25-alpha", "0.1.9"): the dotted numbers in order, so "0.1.10" is newer than
+// "0.1.9"; a suffix after the numbers ("-alpha") does not count. < 0: a is older, 0: same, > 0: a is newer.
+// An empty or unreadable string counts as 0.0.0.
+int compareVersions (const std::string& a, const std::string& b);
+// True when a project written by `savedBy` may hold things this build (`running`) does not know, and so would drop if
+// the project were saved here. False for projects from before "savedBy" was written (savedBy empty).
+inline bool savedByNewerVersion (const std::string& savedBy, const std::string& running)
+{
+    return ! savedBy.empty() && compareVersions (savedBy, running) > 0;
+}
+
+// --- opening files from outside LYNX (D#92, round 180a) ------------------------------------------------------------
+// `name` with `extension` (".lynx") added unless it already ends with it, in any case. A dot inside the name stays:
+// "beat.v2" -> "beat.v2.lynx", never "beat.lynx" (which could be another project).
+std::string withProjectExtension (const std::string& name, const std::string& extension);
+
+// Whether a start-up argument names a file rather than an option ("--lang", macOS's "-psn_0_123").
+bool isFileArgument (const std::string& argument);
+
+// The files in the string the operating system hands to a running application (macOS: one string, a path with spaces
+// in double quotes, a quote inside a path as \"). Options are left out.
+std::vector<std::string> filesInCommandLine (const std::string& commandLine);
 } // namespace lynx::safety

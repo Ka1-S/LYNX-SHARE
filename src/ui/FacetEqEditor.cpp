@@ -1,5 +1,7 @@
+#include "core/PluginLayout.h"
 #include "ui/SlotWatch.h"
 #include "ui/FacetEqEditor.h"
+#include "core/MixerOps.h"
 #include "core/ShownEffectSlot.h"
 
 #include <juce_dsp/juce_dsp.h>
@@ -272,7 +274,8 @@ public:
         out.push_back ({ Ctl::piano, { 8.0f, cy - 10.0f, 26.0f, 20.0f } });
         out.push_back ({ Ctl::phase, { 44.0f, cy - 11.0f, 150.0f, 22.0f }, phaseParam });
         out.push_back ({ Ctl::analyzer, { 202.0f, cy - 11.0f, 170.0f, 22.0f }, analyzerParam });
-        out.push_back ({ Ctl::detector, { 380.0f, cy - 11.0f, 150.0f, 22.0f }, detectorParam });
+        if (! plugui::hostedElsewhere) // (a plugin in another host has no sidechain input yet, round 180b)
+            out.push_back ({ Ctl::detector, { 380.0f, cy - 11.0f, 150.0f, 22.0f }, detectorParam });
         out.push_back ({ Ctl::match, { 536.0f, cy - 11.0f, 48.0f, 22.0f } }); // round 152: EQ match
         out.push_back ({ Ctl::output, { bar.getRight() - 100.0f, cy - 11.0f, 92.0f, 22.0f }, outputParam });
         out.push_back ({ Ctl::scale, { bar.getRight() - 190.0f, cy - 11.0f, 84.0f, 22.0f }, scaleParam });
@@ -474,8 +477,10 @@ public:
         juce::PopupMenu from;
         const auto assign = [this] (int source) {
             engine.editSong ([tk = track, sl = slot, source] (Song& s) {
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
                 auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source;
                 if (source >= 0) target.params[(std::size_t) detectorParam] = 1.0f;
             });
         };
@@ -525,8 +530,10 @@ public:
         juce::PopupMenu from;
         const auto assign = [this, thenListen] (int source) {
             engine.editSong ([tk = track, sl = slot, source, thenListen] (Song& s) {
-                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source; // (the same input the dynamic bands' sidechain detector hears)
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
+                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl]; // (the same input the dynamic bands' sidechain detector hears)
                 if (source < 0 && listen (target.params[(std::size_t) listenParam]) == Listen::target) target.params[(std::size_t) listenParam] = listenValue (Listen::eq);
                 if (source >= 0 && thenListen) target.params[(std::size_t) listenParam] = listenValue (Listen::target);
             }, false);
@@ -536,7 +543,8 @@ public:
         for (int t = 1; t < (int) song.mixer.size(); ++t)
             if (t != track)
                 from.addItem (juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), true, fx->sidechain == t, [assign, t] { assign (t); });
-        menu.addSubMenu (tr ("Target track (sidechain)"), from);
+        if (! plugui::hostedElsewhere) // (no other tracks around a plugin in another host; Capture below still makes a target)
+            menu.addSubMenu (tr ("Target track (sidechain)"), from);
         menu.addItem (tr ("Match the target's level to this track"), true, param01 (targetLevelParam) >= 0.5f,
                       [this] { set ({ { targetLevelParam, param01 (targetLevelParam) >= 0.5f ? 0.0f : 1.0f } }); });
         menu.addItem (tr ("Show the target's spectrum"), hasTarget(), showTarget, [this] { showTarget = ! showTarget; repaint(); });
@@ -1091,8 +1099,9 @@ public:
         const auto w = skin::titleText (g, juce::Rectangle<float> (46.0f, 0.0f, 120.0f, h.getHeight()), "Facet EQ", colour::accent);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
-        g.drawText (trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) }), juce::Rectangle<float> (58.0f + w, 0.0f, 300.0f, h.getHeight()),
-                    juce::Justification::centredLeft, true);
+        if (! plugui::hostedElsewhere) // (no mixer around a plugin in another host, round 180b)
+            g.drawText (trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) }), juce::Rectangle<float> (58.0f + w, 0.0f, 300.0f, h.getHeight()),
+                        juce::Justification::centredLeft, true);
         // the preset bar (undo / redo, A / B, presets) on the right, the graph's gestures between
         const auto left = bar.place (h.withTrimmedLeft (w + 300.0f));
         bar.paint (g, colour::accent);

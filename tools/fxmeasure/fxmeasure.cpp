@@ -15,7 +15,8 @@
 //   params <out.tsv> [steps]          parameter table: index, id, name, label, default, steps, texts at k/steps
 //   texts <name|#index> <out.tsv> [steps]   value -> text for one parameter at a finer grid
 //   set <name|#index> <normalized>    set a parameter (normalized 0..1)
-//   settext <name|#index> <text>      set a parameter from its text (plugin's own text -> value)
+//   settext <name|#index> <text>      set a parameter from its text (plugin's own text -> value); a text that no value
+//                                     shows (or an unknown parameter in set/settext) stops the script, exit code 3
 //   get <name|#index>                 print value and text
 //   defaults                          every parameter back to its default value
 //   reset                             AudioProcessor::reset
@@ -28,9 +29,15 @@
 //   pump <ms>                         deliver the plugin's pending Win32 messages for a while
 //   editor <out.png> [ms] [x y]       open the plugin's own editor in a window, let it draw (default 1500 ms), optionally
 //                                     click at (x, y) as a user would (a trial's "Evaluate"), save a PNG (PrintWindow)
+//   editor <out.png> <ms> [action]...  (round tp172b6) each action runs in order, posted to the editor's own window (no
+//                                     injected input): x y (click), drag x0 y0 x1 y1, hover x y, wheel x y delta, dblclick x y, play <wav> (run the file
+//                                     through the plugin while the editor draws), shot <out.png> (a picture now). Every
+//                                     parameter an action changed is logged ("changed <name> a -> b (text)")
 //   echo <text>
 //   editor <ms> [x y]                 show the plugin's own editor in a window at (x, y) for ms milliseconds (for screenshots
 //                                     taken from outside, e.g. with a screen-capture script); prints its screen bounds
+#include <thread>
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_events/juce_events.h>
@@ -45,6 +52,7 @@ struct Host
 {
     juce::AudioPluginFormatManager formats;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
+    bool failed = false; // a set/settext the script cannot apply: the run stops, exit code 3
     double rate = 48000.0;
     int block = 512;
     bool sidechain = false;
@@ -156,7 +164,7 @@ struct Host
 
 
     // the plugin's editor in a top-level window, captured with PrintWindow (round 108: reference screenshots)
-    void editorShot (const juce::File& out, int ms, int clickX = -1, int clickY = -1)
+    void editorShot (const juce::File& out, int ms, const juce::StringArray& actions = {})
     {
         std::unique_ptr<juce::AudioProcessorEditor> ed (plugin->createEditorIfNeeded());
         if (ed == nullptr) { log ("error: no editor"); return; }
@@ -169,9 +177,9 @@ struct Host
         runSilence ((int) rate / 4);
         pump (ms);
         auto* hwnd = (HWND) w.getPeer()->getNativeHandle();
-        if (clickX >= 0) // a click as the user would make it (e.g. a trial's "Evaluate" button)
+        // the deepest child window at a client point of hwnd, and the point in that child's coordinates
+        const auto hit = [hwnd] (POINT pt, LPARAM& lp)
         {
-            POINT pt { clickX, clickY };
             HWND target = hwnd;
             for (;;)
             {
@@ -183,13 +191,159 @@ struct Host
             }
             POINT local = pt;
             MapWindowPoints (hwnd, target, &local, 1);
-            const auto lp = MAKELPARAM (local.x, local.y);
-            PostMessageW (target, WM_MOUSEMOVE, 0, lp);
-            PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
-            pump (80);
-            PostMessageW (target, WM_LBUTTONUP, 0, lp);
-            pump (ms);
+            lp = MAKELPARAM (local.x, local.y);
+            return target;
+        };
+        std::vector<float> before;
+        const auto remember = [&] { before.clear(); for (auto* p : plugin->getParameters()) before.push_back (p->getValue()); };
+        const auto logChanges = [&]
+        {
+            const auto& ps = plugin->getParameters();
+            for (int i = 0; i < ps.size() && i < (int) before.size(); ++i)
+                if (std::abs (ps[i]->getValue() - before[(size_t) i]) > 1.0e-5f)
+                    log ("changed " + ps[i]->getName (256) + " " + norm (before[(size_t) i]) + " -> " + norm (ps[i]->getValue()) + " (" + ps[i]->getCurrentValueAsText() + ")");
+        };
+        for (int i = 0; i < actions.size();)
+        {
+            remember();
+            if (actions[i] == "shot")
+            {
+                windowPicture (hwnd, juce::File (actions[i + 1]));
+                i += 2;
+            }
+            else if (actions[i] == "play")
+            {
+                playWhileDrawing (juce::File (actions[i + 1]));
+                i += 2;
+            }
+            else if (actions[i] == "hover")
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (ms);
+                i += 3;
+            }
+            else if (actions[i] == "wheel") // wheel x y <delta, 120 = one notch up>
+            {
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                POINT screen = pt;
+                ClientToScreen (hwnd, &screen);
+                LPARAM lp;
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (60);
+                PostMessageW (target, WM_MOUSEWHEEL, MAKEWPARAM (0, (short) actions[i + 3].getIntValue()), MAKELPARAM (screen.x, screen.y));
+                pump (ms);
+                i += 4;
+            }
+            else if (actions[i] == "menu") // menu x y: a click that opens a native pop-up menu: its items go to the log, then it is cancelled
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                std::atomic<bool> done { false };
+                std::thread reader ([&done] {
+                    for (int tries = 0; tries < 200 && ! done.load(); ++tries)
+                    {
+                        Sleep (25);
+                        HWND popup = nullptr;
+                        while ((popup = FindWindowExW (nullptr, popup, L"#32768", nullptr)) != nullptr)
+                        {
+                            DWORD pid = 0;
+                            GetWindowThreadProcessId (popup, &pid);
+                            if (pid != GetCurrentProcessId() || ! IsWindowVisible (popup))
+                                continue;
+                            Sleep (150);
+                            logMenu ((HMENU) SendMessageW (popup, 0x01E1 /* MN_GETHMENU */, 0, 0), 0);
+                            PostMessageW (popup, WM_KEYDOWN, VK_ESCAPE, 0);
+                            return;
+                        }
+                    }
+                    std::printf ("menu: no pop-up menu opened\n");
+                    std::fflush (stdout);
+                });
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                done = true;
+                reader.join();
+                i += 3;
+            }
+            else if (actions[i] == "dblclick")
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                PostMessageW (target, WM_LBUTTONDBLCLK, MK_LBUTTON, lp);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                i += 3;
+            }
+            else if (actions[i] == "drag")
+            {
+                const POINT a { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() }, b { actions[i + 3].getIntValue(), actions[i + 4].getIntValue() };
+                LPARAM lp;
+                auto* target = hit (a, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (60);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                POINT origin { 0, 0 };
+                MapWindowPoints (hwnd, target, &origin, 1); // the target keeps the mouse for the whole drag
+                for (int k = 1; k <= 12; ++k)
+                {
+                    const auto x = (int) a.x + ((int) b.x - (int) a.x) * k / 12 + (int) origin.x, y = (int) a.y + ((int) b.y - (int) a.y) * k / 12 + (int) origin.y;
+                    PostMessageW (target, WM_MOUSEMOVE, MK_LBUTTON, MAKELPARAM (x, y));
+                    pump (25);
+                }
+                PostMessageW (target, WM_LBUTTONUP, 0, MAKELPARAM ((int) b.x + (int) origin.x, (int) b.y + (int) origin.y));
+                pump (ms);
+                i += 5;
+            }
+            else // x y: a click as the user would make it (a trial's "Evaluate" button, then a panel tab)
+            {
+                LPARAM lp;
+                const POINT pt { actions[i].getIntValue(), actions[i + 1].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                i += 2;
+            }
+            logChanges();
         }
+        windowPicture (hwnd, out);
+        w.clearContentComponent();
+        ed.reset();
+        pump (100);
+    }
+
+    static void logMenu (HMENU menu, int depth)
+    {
+        for (int k = 0, n = GetMenuItemCount (menu); k < n; ++k)
+        {
+            wchar_t name[256] {};
+            GetMenuStringW (menu, (UINT) k, name, 255, MF_BYPOSITION);
+            const auto state = GetMenuState (menu, (UINT) k, MF_BYPOSITION);
+            std::printf ("menu %*s%s%s%s\n", depth * 2, "", juce::String (name).toRawUTF8(), (state & MF_CHECKED) ? " [checked]" : "", (state & MF_GRAYED) ? " [greyed]" : "");
+            if (auto* sub = GetSubMenu (menu, k))
+                logMenu (sub, depth + 1);
+        }
+        std::fflush (stdout);
+    }
+
+    // a picture of the window's client area (PrintWindow)
+    void windowPicture (HWND hwnd, const juce::File& out)
+    {
         RECT rc;
         GetClientRect (hwnd, &rc);
         const int width = rc.right - rc.left, height = rc.bottom - rc.top;
@@ -220,9 +374,33 @@ struct Host
         juce::FileOutputStream os (out);
         juce::PNGImageFormat().writeImageToStream (img, os);
         log ("editor " + juce::String (width) + "x" + juce::String (height) + " -> " + out.getFullPathName());
-        w.clearContentComponent();
-        ed.reset();
-        pump (100);
+    }
+
+    // a file through the plugin at about real time, with the editor's messages delivered between blocks (so its meters
+    // and live displays move as they do in a host); the output is thrown away
+    void playWhileDrawing (const juce::File& in)
+    {
+        juce::AudioBuffer<float> input;
+        if (! readWav (in, input)) { log ("error: cannot read " + in.getFullPathName()); return; }
+        const int mainIn = juce::jmax (1, plugin->getMainBusNumInputChannels());
+        const int totalIn = plugin->getTotalNumInputChannels();
+        const int ch = juce::jmax (totalIn, plugin->getTotalNumOutputChannels());
+        juce::AudioBuffer<float> buf (ch, block);
+        const auto start = juce::Time::getMillisecondCounter();
+        for (int pos = 0; pos < input.getNumSamples(); pos += block)
+        {
+            const int n = juce::jmin (block, input.getNumSamples() - pos);
+            buf.setSize (ch, n, false, false, true);
+            buf.clear();
+            for (int c = 0; c < juce::jmin (mainIn, totalIn); ++c)
+                buf.copyFrom (c, 0, input, juce::jmin (c, input.getNumChannels() - 1), pos, n);
+            midi.clear();
+            plugin->processBlock (buf, midi);
+            playHead.samples += n;
+            const auto due = start + (juce::uint32) ((double) (pos + n) * 1000.0 / rate);
+            do pump (1); while (juce::Time::getMillisecondCounter() < due);
+        }
+        log ("played " + in.getFileName());
     }
 
     void runSilence (int samples)
@@ -327,8 +505,20 @@ struct Host
         log ("texts " + p->getName (256) + " -> " + out.getFileName());
     }
 
+    // whether a parameter text shows the asked text: names equal (case ignored), numbers within 0.1 % ("12.0 kHz" = 12000)
+    static bool shows (const juce::String& shown, const juce::String& text)
+    {
+        const auto first = text.trimStart()[0];
+        if (! ((first >= '0' && first <= '9') || first == '-' || first == '+' || first == '.'))
+            return shown.trim().equalsIgnoreCase (text.trim());
+        const double want = text.getDoubleValue();
+        const double got = shown.getDoubleValue() * (shown.containsIgnoreCase ("khz") && ! text.containsIgnoreCase ("k") ? 1000.0 : 1.0);
+        return std::abs (got - want) <= 1e-3 * juce::jmax (1.0, std::abs (want));
+    }
+
     // text -> normalized value: numbers go through the plugin's own parser; names (enumerations) are found by scanning
-    // the value -> text mapping (the middle of the range that shows the text)
+    // the value -> text mapping (the middle of the range that shows the text). −1 when no value shows the text (round
+    // tp172b7: Pro-MB's "Minimum Phase" was not a text of its mode; the old fallback set 0 = Linear Phase silently)
     static float textToValue (juce::AudioProcessorParameter* p, const juce::String& text)
     {
         const auto first = text.trimStart()[0];
@@ -337,20 +527,19 @@ struct Host
         {
             const double want = text.getDoubleValue();
             const float v = p->getValueForText (text);
-            const double got = p->getText (v, 256).getDoubleValue();
-            if (std::abs (got - want) <= 1e-3 * juce::jmax (1.0, std::abs (want)))
+            if (v >= 0.0f && v <= 1.0f && shows (p->getText (v, 256), text)) // (a parser may return an unnormalized value)
                 return v;
             int lo = -1, hi = -1; // stepped numbers the parser does not take: scan for the value
             for (int k = 0; k <= n; ++k)
                 if (std::abs (p->getText ((float) k / n, 256).getDoubleValue() - want) <= 1e-6 * juce::jmax (1.0, std::abs (want))) { if (lo < 0) lo = k; hi = k; }
                 else if (lo >= 0) break;
-            return lo < 0 ? v : (float) (lo + hi) / (2.0f * n);
+            return lo < 0 ? -1.0f : (float) (lo + hi) / (2.0f * n);
         }
         int lo = -1, hi = -1;
         for (int k = 0; k <= n; ++k)
             if (p->getText ((float) k / n, 256).trim().equalsIgnoreCase (text.trim())) { if (lo < 0) lo = k; hi = k; }
             else if (lo >= 0) break;
-        return lo < 0 ? p->getValueForText (text) : (float) (lo + hi) / (2.0f * n);
+        return lo < 0 ? -1.0f : (float) (lo + hi) / (2.0f * n);
     }
 
     void setParam (juce::AudioProcessorParameter* p, float v)
@@ -484,11 +673,24 @@ struct Host
             else if (cmd == "set" || cmd == "settext")
             {
                 auto* p = find (a[1]);
-                if (p == nullptr) { log ("error: no parameter " + a[1]); continue; }
+                if (p == nullptr) { log ("error: no parameter " + a[1] + " (script stopped)"); failed = true; return; }
                 const auto valueText = line.fromFirstOccurrenceOf (a[1], false, false).trim().unquoted();
                 const float v = cmd == "set" ? valueText.getFloatValue() : textToValue (p, valueText);
+                if (cmd == "settext" && v < 0.0f)
+                {
+                    log ("error: no value of " + p->getName (256) + " shows the text \"" + valueText + "\" (script stopped)");
+                    failed = true;
+                    return;
+                }
                 setParam (p, juce::jlimit (0.0f, 1.0f, v));
                 log ("set " + p->getName (256) + " = " + norm (p->getValue()) + " (" + p->getCurrentValueAsText() + ")");
+                if (cmd == "settext" && ! shows (p->getCurrentValueAsText(), valueText))
+                {
+                    // round tp172b7: the plugin now shows another text than asked (its value -> text scan misled us)
+                    log ("error: " + p->getName (256) + " shows \"" + p->getCurrentValueAsText() + "\", not \"" + valueText + "\" (script stopped)");
+                    failed = true;
+                    return;
+                }
             }
             else if (cmd == "get")
             {
@@ -511,7 +713,13 @@ struct Host
             }
             else if (cmd == "settle") runSilence ((int) (a[1].getDoubleValue() * rate));
             else if (cmd == "process") process (juce::File (a[1]), juce::File (a[2]), a.size() > 3 ? juce::File (a[3]) : juce::File());
-            else if (cmd == "editor") editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, a.size() > 4 ? a[3].getIntValue() : -1, a.size() > 4 ? a[4].getIntValue() : -1);
+            else if (cmd == "editor")
+            {
+                juce::StringArray actions; // see the header: clicks, drag, hover, play, shot, in order
+                for (int i = 3; i < a.size(); ++i)
+                    actions.add (a[i]);
+                editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, actions);
+            }
             else if (cmd == "latency") { pump (50); log ("latency " + juce::String (plugin->getLatencySamples())); }
             else if (cmd == "savestate")
             {
@@ -574,6 +782,6 @@ int main (int argc, char** argv)
     std::printf ("%d lines\n", lines.size()); std::fflush (stdout);
     host.run (lines);
     host.plugin.reset();
-    std::printf ("done\n"); std::fflush (stdout);
-    std::_Exit (0); // skip global teardown (some plugins hang there)
+    std::printf (host.failed ? "FAILED\n" : "done\n"); std::fflush (stdout);
+    std::_Exit (host.failed ? 3 : 0); // skip global teardown (some plugins hang there)
 }

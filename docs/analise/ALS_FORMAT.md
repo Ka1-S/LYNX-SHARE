@@ -1,0 +1,297 @@
+# Live set (.als) format — Live 11 / 12 (round 175a)
+
+Clean-room notes for LYNX's .als import/export. Evidence tags:
+- **[DATA]**: read from the sets that ship with Live 12 Trial (19 sets decompressed into `/mnt/e/lynx-work/ableton/xml/`: `DefaultLiveSet`, the Core Library templates, lessons and the Live 12 Suite demo song, 60 KB–27 MB of XML). Schema skeletons came from the scripts in the round's scratchpad (`skel.py`, `tree.py`, `where.py`, `devs.py`).
+- **[BIN]**: string and RTTI tables of `Ableton Live 12 Trial.exe` (Live 12.4). `live-exe-strings.txt` holds the ASCII strings and `live-exe-strings-u16.txt` the UTF-16 ones. The serializer writes each class member `mFoo` as the element `<Foo>`, so the member-name lists give the element names of records the shipped sets never contain, such as third-party plugins.
+- **[LIVE]**: checked in the running Live 12.4.16 Trial (sets saved by Live, or LYNX-written sets opened in it).
+- **[TODO-LIVE]**: still has to be checked in the running app after "resume". Save a set with a VST2, a VST3 and a warped vocal, and re-open LYNX's exported sets.
+
+## 1. Container
+- An `.als` file is **gzip** (RFC 1952) around UTF-8 XML. No other wrapper. **[DATA]**
+- Root element: `<Ableton MajorVersion="5" MinorVersion="12.0_12117" SchemaChangeCount="10" Creator="Ableton Live 12.1d1" Revision="…">`. Live 11 writes `MinorVersion="11.0_…"`. Live refuses a set without `MinorVersion` ("MinorVersion attribute missing from 'Ableton' root node", and "Unsupported MinorVersion ($1)" for unknown ones). **[DATA][BIN]**
+- Scalars use one form throughout: `<Name Value="…"/>`. Booleans are `true`/`false`, numbers use `.` as decimal point at full precision, and enums are integers. **[DATA]**
+- `Id` attributes number list items (unique per list). `NextPointeeId` (at the LiveSet top) must be greater than every `AutomationTarget`/`ModulationTarget`/`Pointee` Id in the file. Automation refers to those Ids. **[DATA]**
+- `LomId`, `LomIdView`, `*ListWrapper LomId`, `ViewData` (JSON), `ViewState*`, `IsContentSelectedInDocument` and the scroll/zoom values are UI state, and `0`/`{}` are safe defaults. **[DATA]**
+
+## 2. Time
+- Every arrangement/clip time is in **beats (quarter notes), as a double**. LYNX ticks = beats × 960. **[DATA]**
+- Automation events may carry `Time="-63072000"`. That is the "before the song" point which holds the initial value. **[DATA]**
+- Tempo: `LiveSet/MainTrack/DeviceChain/Mixer/Tempo/Manual` (BPM). Its `MidiControllerRange` is 60–200, while the stored range is 10–999. Tempo automation is an `AutomationEnvelope` on MainTrack whose `PointeeId` = `Tempo/AutomationTarget@Id`. **[DATA]**
+- Time signature: `MainTrack/DeviceChain/Mixer/TimeSignature/Manual` = `(numerator − 1) + 99 × log2(denominator)`. For example 4/4 = 201, 3/4 = 200 and 6/8 = 302. Range 0–494: numerator 1–99, denominator 1–16. Clips carry their own `TimeSignature/TimeSignatures/RemoteableTimeSignature{Numerator,Denominator,Time}`. **[DATA]**
+- **Live 11** names the main track `MasterTrack`, and **Live 12** names it `MainTrack` (`AutoColorPickerForReturnAndMasterTracks` → `…AndMainTracks`). Live 12 still knows the old names (`MasterTrack/MasterChain/…` legacy paths in the binary). **[DATA][BIN]**
+
+## 3. LiveSet top level (selected)
+| Element | Meaning |
+|---|---|
+| `Tracks` | `MidiTrack`, `AudioTrack`, `GroupTrack`, `ReturnTrack` in display order (returns last) |
+| `MainTrack` (11: `MasterTrack`) | master channel. Its Mixer holds Tempo and TimeSignature |
+| `PreHearTrack` | browser preview track (ignore) |
+| `Locators/Locators/Locator{Time, Name, Annotation, IsSongStart}` | arrangement markers |
+| `Scenes/Scene{Name, Color, Tempo, IsTempoEnabled, TimeSignatureId, IsTimeSignatureEnabled, FollowAction}` | Session scene rows. ClipSlot *i* of every track belongs to Scene *i* |
+| `Transport{LoopOn, LoopStart, LoopLength, CurrentTime}` | arrangement loop (beats) |
+| `GroovePool/Grooves/Groove` | grooves (each holds a MIDI clip pattern, Base, Quantization, Timing, Random, Velocity) |
+| `ScaleInformation{Root, Name}`, `InKey` | Live 12 project scale |
+| `SendsPre/SendPreBool` | per return: send is pre-fader |
+| `Grid`, `ViewStates`, `SequencerNavigator` | UI state |
+
+## 4. Tracks
+All track kinds share **[DATA]**:
+- `@Id` (unique).
+- `Name{EffectiveName, UserName}`: use `UserName` when it is not empty. Live puts `#` in a name for auto numbering.
+- `Color` (index into Live's 70-colour palette).
+- `TrackGroupId` (= the `@Id` of the enclosing `GroupTrack`, −1 = none) and `TrackUnfolded`.
+- `AutomationEnvelopes/Envelopes/AutomationEnvelope`.
+- `TakeLanes/TakeLanes/TakeLane{Name, ClipAutomation/Events/(MidiClip|AudioClip)}`: Live 11+ comping lanes.
+- `LinkedTrackGroupId`.
+- `Freeze`.
+- `DeviceChain`, which contains:
+  - `AudioInputRouting`/`MidiInputRouting`/`AudioOutputRouting`/`MidiOutputRouting{Target, UpperDisplayString, LowerDisplayString}`. Output targets:
+    - `AudioOut/Main`;
+    - `AudioOut/GroupTrack` (to its group);
+    - `AudioOut/External/S0` (hardware pair 1/2);
+    - `AudioOut/None`;
+    - `AudioOut/Track.<Id>/TrackIn` / `…/DeviceIn…` (to another track or a sidechain).
+  - `Mixer` (§6).
+  - `MainSequencer` (clips, §5).
+  - `FreezeSequencer` (frozen audio).
+  - `DeviceChain/Devices` (§7).
+
+Kind specifics:
+- `MidiTrack`: `PitchbendRange`, `IsTuned`, MPE settings. Notes go to its instrument.
+- `AudioTrack`: arrangement clips in `MainSequencer/Sample/ArrangerAutomation/Events/AudioClip`.
+- `MidiTrack`: arrangement clips in `MainSequencer/ClipTimeable/ArrangerAutomation/Events/MidiClip`.
+- Session clips (both): `MainSequencer/ClipSlotList/ClipSlot[i]/ClipSlot/Value/(MidiClip|AudioClip)`. An empty slot has an empty `Value`. `HasStop` marks the slot's stop button.
+- `GroupTrack`: no clips. Children route to it with `AudioOut/GroupTrack`.
+- `ReturnTrack`: its index among the return tracks = index of the matching `TrackSendHolder` in every track's `Mixer/Sends`.
+
+## 5. Clips
+Common (MidiClip and AudioClip) **[DATA]**:
+- `@Time`: the clip's position in the arrangement (beats). Session clips have `Time="0"`.
+- `CurrentStart`, `CurrentEnd`: arrangement span (beats).
+- `Loop{LoopStart, LoopEnd, StartRelative, LoopOn, OutMarker, HiddenLoopStart, HiddenLoopEnd}` in clip-content beats:
+  - `LoopOn` true: playback starts at `LoopStart + StartRelative` and loops `[LoopStart, LoopEnd)` until `CurrentEnd`.
+  - `LoopOn` false: it plays from `LoopStart` up to `OutMarker` (end marker).
+- `Name`, `Color`, `Disabled` (clip deactivated = muted).
+- Session settings: `LaunchMode` (0 trigger, 1 gate, 2 toggle, 3 repeat), `LaunchQuantisation` (0 = global), `Legato`, `Ram`.
+- `GrooveSettings/GrooveId` (−1 none), `VelocityAmount`.
+- `FollowAction{FollowTime, IsLinked, LoopIterations, FollowActionA, FollowActionB, FollowChanceA, FollowChanceB, JumpIndexA, JumpIndexB, FollowActionEnabled}`.
+- `Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events}`: clip automation and modulation, in clip time.
+- `IsWarped`, `TakeId`.
+
+MidiClip **[DATA]**:
+- `Notes/KeyTracks/KeyTrack{MidiKey, Notes/MidiNoteEvent{Time, Duration, Velocity, OffVelocity, NoteId, [VelocityDeviation, Probability, IsEnabled]}}`. Times are relative to the clip content (beats). Velocity is 0–127, as a float.
+- `Notes/PerNoteEventStore/EventLists/PerNoteEventList{@NoteId, @CC}`: MPE per-note pitch bend/slide/pressure.
+- `BankSelectCoarse/Fine`, `ProgramChange` (−1 none).
+- `ScaleInformation`, `IsInKey`.
+
+AudioClip **[DATA]**:
+- `SampleRef/FileRef`:
+  - `RelativePathType` (0 none, 1 relative to the set folder, 3 user library, 5 Live pack / Core Library), `RelativePath`, `Path` (absolute, as saved), `Type` (2 = file), `LivePackName`, `LivePackId`, `OriginalFileSize`, `OriginalCrc`.
+  - Next to FileRef: `DefaultDuration` (frames), `DefaultSampleRate`.
+  - Live 11 sets may hold `RelativePathElement` lists instead of `RelativePath`, and the reader accepts both.
+- `WarpMode`:
+  - 0 Beats, 1 Tones, 2 Texture, 3 Re-Pitch, 4 Complex, 6 Complex Pro. 5 is not used. In the shipped sets: 573× Beats, 35× Complex, 28× Re-Pitch, 6× Complex Pro.
+  - Per-mode parameters: `GranularityTones`, `GranularityTexture`, `FluctuationTexture`, `TransientResolution`, `TransientLoopMode`, `TransientEnvelope`, `ComplexProFormants`, `ComplexProEnvelope`.
+- `WarpMarkers/WarpMarker{@SecTime, @BeatTime}`: the mapping between sample seconds and clip beats, piecewise linear between markers. Live writes one extra marker past the last real one to give the final segment's rate. `IsWarped=false`: the clip plays at its own speed, and Loop/Start values are in **seconds**.
+- `PitchCoarse` (semitones), `PitchFine` (cents), `SampleVolume` (linear gain).
+- `Fades{FadeInLength, FadeOutLength, FadeIn/OutCurveSkew/Slope}`, in beats in the arrangement.
+- `Onsets/UserOnsets` (transient markers), `Sync`, `HiQ`, `IsSongTempoLeader`.
+
+## 6. Mixer (`DeviceChain/Mixer`) [DATA]
+| Element | Meaning | LYNX |
+|---|---|---|
+| `Volume/Manual` | linear gain, 0.000316 (−70 dB = −inf) … 1.99526 (+6 dB); 1 = 0 dB | `MixerTrack::volume = gain × unityFader` |
+| `Pan/Manual` | −1…1 (`PanMode` 1 = split stereo: `SplitStereoPanL/R`) | `pan` |
+| `Speaker/Manual` | track on (false = muted) | `muted = !on` |
+| `SoloSink` | solo | `solo` |
+| `Sends/TrackSendHolder[i]{Send/Manual, EnabledByUser}` | send level to return *i*, linear gain (0.000316 = off) | `MixerSend` |
+| `CrossFadeState` | DJ crossfader A/B | dropped |
+| `Tempo`, `TimeSignature`, `GlobalGrooveAmount`, `CrossFade` | main track only | song |
+
+Every automatable parameter has the form `{Manual, [MidiControllerRange{Min,Max}], AutomationTarget@Id, ModulationTarget@Id}`. Automation: `AutomationEnvelope{EnvelopeTarget/PointeeId = AutomationTarget@Id, Automation/Events/(FloatEvent|BoolEvent|EnumEvent){@Time, @Value}}`. Float events are linear between points (Live 11+ curves: `CurveControl1X/Y`, `CurveControl2X/Y` on an event). **[DATA]**
+
+## 7. Devices
+`DeviceChain/DeviceChain/Devices/*`, in signal order. Every device has `On{Manual}`, `UserName`, `LastPresetRef`, `SourceContext` and its parameters (same automatable form). **[DATA]**
+
+Native devices found in the shipped sets, with counts **[DATA]**:
+- Instruments:
+  - OriginalSimpler 330, Operator 25, InstrumentVector 23, Drift 23, MultiSampler 3;
+  - StringStudio 8, UltraAnalog 7, InstrumentMeld 2, LoungeLizard 2, Tension, Collision.
+- Racks:
+  - InstrumentGroupDevice 129, AudioEffectGroupDevice 115, DrumGroupDevice 12, MidiEffectGroupDevice 2.
+  - Each has `Branches/(InstrumentBranch|AudioEffectBranch|DrumBranch|MidiEffectBranch){DeviceChain/…/Devices, MixerDevice, KeyRange, VelocityRange, BranchSelectorRange, ReceivingNote (drum pad)}` and `MacroControls.0–15`.
+- Audio effects:
+  - Eq8 181, Compressor2 149, Reverb 98, Delay 63, MultibandDynamics 63, AutoFilter(2) 50, StereoGain 38, Hybrid 34, DrumBuss 33, Saturator 29, GlueCompressor 24, Overdrive 22, GrainDelay 15, Limiter 14, FilterEQ3 12, Gate 12, Echo 12, Spectral 12, Roar 11, ChannelEq 10, Chorus2 10, AutoPan 9, Amp 9, Cabinet 7, Chorus 6, Redux2 6, Vinyl 5, Vocoder 3, Transmute 10, Erosion, Pedal, Tube, FilterDelay, BeatRepeat, Phaser, Flanger, FrequencyShifter, AutoShift, Tuner, SpectrumAnalyzer.
+- MIDI effects: MidiVelocity 17, MidiArpeggiator 13, MidiChord 6, MidiScale 5, MidiPitcher, MidiNoteLength.
+- Max devices: MxDeviceAudioEffect, MxDeviceMidiEffect, MxDeviceInstrument (patch embedded or referenced). Black box: kept by reference only.
+
+Simpler (`OriginalSimpler`) **[DATA]**:
+- `Player/MultiSampleMap/SampleParts/MultiSamplePart{KeyRange, VelocityRange, RootKey, Detune, Volume, Panorama, SampleStart, SampleEnd, SustainLoop, ReleaseLoop, SampleRef, SampleWarpProperties{WarpMarkers, WarpMode, IsWarped…}}`;
+- `Player/PlaybackMode` (0 classic, 1 one-shot, 2 slicing), `Player/SlicingStyle`, `Player/SlicingSensitivity`;
+- `Envelope`, `Filter`, `Lfo` blocks.
+
+Sampler (`MultiSampler`) uses the same `MultiSampleMap` with many parts. Drum Rack: `DrumBranch/BranchInfo/ReceivingNote` = `128 − MIDI note` of the pad (92 ↔ C1 = 36) **[DATA]**, confirmed against the pad names and clip notes of the shipped kits.
+
+Third-party plugins **[BIN]**. The shipped sets contain none. Member names come from the binary's UTF-16 member table, next to RTTI `AVstPluginInfo`, `AVst3PluginInfo`, `AVst3Preset`, `AVstPreset`, `AAuPluginInfo`:
+```
+PluginDevice (VST2/VST3)  |  AuPluginDevice (macOS AU)
+  On, ParameterList/PluginFloatParameter{ParameterName, ParameterId, VisualIndex, ParameterValue{Manual…}}
+  PluginDesc
+    VstPluginInfo { Path, PlugName, UniqueId, Inputs, Outputs, NumberOfParameters, NumberOfPrograms,
+                    Flags, Category, VstVersion, IsShellClient, Preset/VstPreset{…, Buffer (hex text), ProgramNumber, ParameterSettings} }
+    Vst3PluginInfo { Name, Uid{Fields.0..3 (signed int32 each)}, DeviceType (1 instrument, 2 effect),
+                    Preset/Vst3Preset{ ProcessorState (hex text), ControllerState (hex text), MpeEnabled, ParameterSettings } }
+    AuPluginInfo { ComponentType, ComponentSubType, ComponentManufacturer, ComponentFlags, Manufacturer, Name,
+                    Preset/AuPreset{ Buffer… } }
+  MpeEnabled, ParameterSettings/PluginParameterSettings{ParameterId, VisualIndex, MacroControlIndex}
+```
+- The VST2 `Buffer` is the plugin's `effGetChunk` data (or the parameter bank).
+- **[LIVE] VST2 layout written by Live 12.4.16** (kHs Gain VST2):
+  - `VstPluginInfo{WinPosX, WinPosY, NumAudioInputs, NumAudioOutputs, IsPlaceholderDevice, Path (absolute, '/'), PlugName, UniqueId (the VST2 id as a decimal int: 1802725230 = 'ksgn'), Inputs, Outputs, NumberOfParameters, NumberOfPrograms, Flags (1280: Live's own bits, not effFlags), Preset/VstPreset{OverwriteProtectionNumber, MpeEnabled, MpeSettings, ParameterSettings, IsOn, PowerMacroControlIndex, PowerMacroMappingRange{Min,Max}, IsFolded, StoredAllParameters, DeviceLomId, DeviceViewLomId, IsOnLomId, ParametersListWrapperLomId, Type, ProgramCount, ParameterCount, ProgramNumber, Buffer, Name, PluginVersion, UniqueId, ByteOrder (2), PresetRef}, Version, VstVersion (2400), IsShellClient, Category}`.
+  - `Type` is the fxp four-character code: 1178747752 = 'FBCh' (bank chunk). `Buffer` is then the raw chunk as hex text; kHs Gain's starts `504B0304`, a zip.
+  - LYNX reads 'FBCh'/'FPCh' as a chunk. Any other type is read as parameter floats; their byte order (ByteOrder) is still **[TODO-LIVE]**.
+- VST3 `ProcessorState`/`ControllerState` are the component and controller `IBStream` bytes, which are exactly what LYNX's `flVst3State` pair carries.
+- The four `Fields.N` are the FUID's four 32-bit words in its string order. For kHs Gain, Fields.0 = −1481959855 = 0xA7AB1651 is the first eight hex digits of the class id; `BranchDeviceId` reads `device:vst3:audiofx:a7ab1651-…`. JUCE's normalised `uniqueId` is `Σ Fields·31ⁿ`, and it equals the plugin list's `878ab867` **[LIVE]**. LYNX: `alsVst3ClassId`/`alsVst3Fields` convert to and from the COM memory layout of `ForeignPlugin::classId`.
+- **[LIVE] layout written by Live 12.4.16** (kHs Gain VST3 on an audio track, saved by Live):
+```
+PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiCCOnOffThresholds}, ModulationSourceCount,
+  Pointee, LastSelectedTimeableIndex, LastSelectedClipEnvelopeIndex, LastPresetRef, LockedScripts, IsFolded,
+  ShouldShowPresetName, UserName, Annotation,
+  SourceContext/Value/BranchSourceContext{OriginalFileRef, BrowserContentPath, LocalFiltersJson, PresetRef, BranchDeviceId "device:vst3:audiofx:<uid>"},
+  MpePitchBendUsesTuning, ViewData,
+  PluginDesc/Vst3PluginInfo{ WinPosX, WinPosY, NumAudioInputs, NumAudioOutputs, IsPlaceholderDevice,
+    Preset/Vst3Preset{ OverwriteProtectionNumber, MpeEnabled, MpeSettings, ParameterSettings, IsOn, PowerMacroControlIndex,
+      PowerMacroMappingRange, IsFolded, StoredAllParameters, Uid{Fields.0..3}, DeviceType, ProcessorState, ControllerState, Name, PresetRef },
+    Name, Uid{Fields.0..3}, DeviceType (2 = audio effect) },
+  MpeEnabled, MpeSettings, ParameterList, AxisX, AxisY, SideChain{…} }
+```
+- `ProcessorState`/`ControllerState` are element **text**: uppercase hex, 40 bytes (80 digits) per line, indented. They hold the raw `IComponent::getState` / `IEditController::getState` bytes. kHs Gain's starts `01000000 0E020000 504B0304…`, which is the plugin's own header followed by a zip.
+- Blobs are written as hex text inside the element, line-wrapped with whitespace. The reader ignores whitespace.
+
+## 8. What LYNX maps (summary)
+| Live | LYNX |
+|---|---|
+| MidiTrack + instrument | channel (instrument) + mixer insert + Playlist track |
+| MidiClip (arrangement) | its own pattern (the clip's notes) + pattern clip; looped clip = clip longer than the pattern (stretched clips loop) |
+| AudioTrack + AudioClip | audioClip channel per sample + audio clip; `PitchCoarse/Fine` → clip pitch; `SampleVolume` → clip gain; warp → clip `stretch` (one rate between first and last marker), or, when the clip is stretched offline (keeps its pitch, file length known), the channel stretches the file to its content beats; markers that bend the tempo stay as the channel's warp markers and each segment is stretched at its own rate in one pass (round 175a, M1; export writes them back) |
+| GroupTrack | mixer insert. Children route to it (`toMaster` off + send) and their Playlist tracks are grouped under a header track |
+| ReturnTrack + sends | mixer insert + `MixerSend` from every track with level > −70 dB |
+| Mixer Volume/Pan/Speaker/Solo | insert volume/pan/mute/solo |
+| Tempo / TimeSignature + automation | `Song::bpm`, `beatsPerBar` + tempo automation clip; signature changes → markers |
+| Locators | Playlist markers |
+| Session clips / Scenes | the clip grid (round 181c, section 13; the default by the user's choice of 2026-11-08); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
+| Volume/Pan/Send/plugin-param automation | automation clips on the matching target |
+| PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
+| Native devices | closest LYNX engine (slice N3 table), otherwise dropped and listed in the import report |
+
+## 9. What Live's loader requires (found by experiment, 2026-11-06) [LIVE]
+Live crashes on a set that is merely well-formed. It either exits or shows "A serious program error". A set written by another program must follow these rules:
+1. **Complete objects.** Every object has all of its children, in Live's own order. Missing members are not defaulted.
+2. **Unique ids.** Every `Id` on `Pointee`, `*Target` (AutomationTarget, ModulationTarget, …) and `ControllerTargets.N` element is unique.
+3. **`NextPointeeId`.** It must be greater than the largest id in the file, or Live reports "NextPointeeId is too low: X must be bigger than Y".
+4. **Envelopes.** An `AutomationEnvelope` whose `EnvelopeTarget/PointeeId` names a missing id is fatal ("Invalid Pointee ID … in APtr …").
+5. **Sends.** `Mixer/Sends` and the set's `SendsPre` have exactly one entry per ReturnTrack.
+6. **Clip slots.** Each MIDI and audio track's `ClipSlotList`, and its `FreezeSequencer` `ClipSlotList`, has exactly one `ClipSlot` per Scene. Group and return tracks have none: their `FreezeSequencer` `ClipSlotList` is empty, and a return track's own `Mixer/Sends` holders are `EnabledByUser` false, as Live saves them (round 182b: Live 12.4 crashed with an access violation on exports whose return track broke this).
+7. **Saving.** Live saves only inside a project folder: `<name> Project/<name>.als`, next to `Ableton Project Info/`. The exporter writes that layout.
+
+LYNX's exporter (slice N2) therefore emits each element kind from its own generator. The generator writes every member name in Live's order with default values (format facts recorded here), then numbers the ids and sets `NextPointeeId`. It does not ship or copy Live's own files. A prototype (`tools/complete.py`) produced `probe/p1/probeD6.als`, which opens in Live with a MIDI clip, a warped audio clip and a locator.
+
+## 10. Warp behaviour measured in Live 12.4 (2026-11-06) [LIVE]
+The reference renders are in `warp-refs/`: one vocal, 6 warp modes, played at 0.8× speed, 1.25× speed and +5 st. LYNX's import was compared with them using `LYNX.exe --render` on single-track sets (`/mnt/e/lynx-work/ableton175a/render-compare.txt`).
+- **Re-Pitch ignores the clip's transpose** (`PitchCoarse`/`PitchFine`). The tempo alone sets the pitch: +5 st renders at the source's 184 Hz. The import sets the clip pitch to 0 for WarpMode 3.
+- **Level.** Every mode keeps the source level (±0.4 dB), except Complex Pro transposed +5 st, which is 3 dB quieter with a tilted spectrum (formant handling, Formants = 100). That case goes to N4.
+- **Unity gain in LYNX.** A Playlist audio clip plays at unity when its channel volume is 10000/12800 (FL's default), so imported audio-clip channels are set to that value.
+- **How the import matches today** (envelope correlation over the clip):
+  - Re-Pitch: 1.000.
+  - Complex / Complex Pro: 0.95–0.97.
+  - Texture: 0.92–0.94.
+  - Tones: 0.88–0.92.
+  - Beats: 0.76–0.94.
+  - The N4 own-DSP modes target these numbers.
+
+## 11. Export (slice N2, 2026-11-06)
+File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in> <folder> [--live11] [--reference] [--scan]` write `<folder>/<name> Project/<name>.als`. The samples are copied to `Samples/Imported/` and referenced through `RelativePath`; with "Refer to them where they are" (`--reference`) they keep their absolute `Path`. The other way, `LYNX.exe --export-flp <set.als> <out.flp|zip>` opens a Live set and writes it as an FL Studio project (round 182b). `--export <set.als> <out.wav>` and `--stems <set.als> <base.wav>` render a set the same way.
+
+**Skeletons.** Each element starts from its kind's skeleton in `src/core/AlsSkeleton.h`, which `tools/als_skeleton.py` generates from sets saved by Live (kept local, never committed):
+- **Live 12:** the 12.4 shipped sets, plus two probe sets saved on this machine.
+- **Live 11:** a public 11.0.12 set (MIT) holds most kinds. GroupTrack, AudioClip and the VST3 PluginDevice come from a public 11.0.12 set (MPL-2.0). Locator comes from a public 11.3.3 set.
+- **Why real Live 11 samples:** the earlier Live 12→11 downgrade (`to11`) differed from the real Live 11 objects. GroupTrack missed 36 members and AudioClip had 7 wrong ones (for example `IsSongTempoMaster`, not `IsSongTempoLeader`). Only Locator matched.
+
+**Rules found while exporting** [LIVE, Live 12.4]. These add to §9:
+8. **Numbers stay numbers.** A member that holds a number never gets an empty value. `ScaleInformation/Name` is the scale index in Live 12 ("Unexpected value for int node" when empty) and a name such as "Major" in Live 11.
+9. **Group slots.** A GroupTrack has one `GroupTrackSlot` per scene in its own `Slots` list, and an *empty* `FreezeSequencer/ClipSlotList`. Live 11.0–12.2 save it that way. With freeze slots present, Live 12.4 refuses the set: "List of group track freeze sequencer slots not empty".
+9b. **List ids.** Items of one list have unique `Id`s ("Non-unique list ids"). The skeletons keep Live's own ids inside an object and reset only the object's own id.
+10. **Note attributes.** Live 11 writes every `MidiNoteEvent` attribute: Time Duration Velocity VelocityDeviation OffVelocity Probability IsEnabled NoteId. Live 12 leaves out the default ones but keeps the same order [DATA].
+11. **Before-the-song event.** An envelope opens with the "before the song" event at −63072000. A point at time 0 *is* that event; it is not written twice [DATA].
+12. **Routings point at this set.** Every routing `Target` is `AudioIn/…`, `AudioOut/…`, `MidiIn/…` or `MidiOut/…`. A track path (`p46251/p41230/p36996`) left over from the set a skeleton came from makes Live 12.4 crash on load with "A serious program error" (`std::out_of_range`, "invalid map<K, T> key" in Log.txt). The Live 11 GroupTrack skeleton carried one in its `AudioInputRouting`; the exporter now writes `AudioIn/External/S0` ("Ext. In", "1/2"), as Live saves groups. Found by bisecting the Live 11 export: ungrouped it loads, one plain group crashes, a real Live 11.3 group transplanted in loads, and the fixed group loads [LIVE, Live 12.4.16].
+13. **Sample formats.** Live reads WAV, AIFF, FLAC, Ogg and MP3. It does not read WavPack (`.wv`) or Ogg-in-WAV (format tags 0x674F–0x6751, logged as "Unknown unsupported format 26447"). The exporter decodes such samples and writes them as 32-bit float `.wav` in `Samples/Imported/`, also with "Refer to them where they are" [LIVE].
+
+**Mapping from LYNX:**
+- **Tracks:**
+  - A channel with notes, or with a plugin, becomes a MIDI track.
+  - A Playlist track with audio clips becomes an audio track. Its gain is the channel gain relative to the unity value 0.78125.
+  - An insert with one track folds into that track.
+  - An insert shared by several tracks becomes a GroupTrack.
+  - An insert with no track that other inserts route into (no Master output, single route) becomes a GroupTrack. Groups nest when they are routed into another bus.
+  - Any other insert with no track that is fed by sends becomes a ReturnTrack.
+- **Plugins:** loaded plugins export through `PluginHost::flWrapperRecord`, giving VST3 class id plus component/controller state, or the VST2 id plus chunk.
+- **Not converted yet:** LYNX's own instruments and effects (N3). They are listed in the export report.
+
+**Offline checks** (scratchpad `schema_check.py` / `loader_check.py`):
+- The export is compared, element by element, with real sets of its version: parent/tag pairs, child layouts, attribute sets and value kinds.
+- The §9 rules are checked on every exported file.
+- References:
+  - Live 11: two 11.0.12 sets (ML-Ableton, MIT), two abletoolz fixtures (11.0.0 and 11.0.12, MPL-2.0), and an 11.3.3 sample set.
+  - Live 12: the 12.4 shipped sets and a 12.2.1 public set.
+
+## 12. Warp modes (slice N4, 2026-11-06)
+Reference: Live 12.4.16 renders of a test voice (`warp-refs/`, 48 kHz, clip warped 0.8×, 1.25×, and +5 st), compared by RMS-envelope correlation and mean spectral deviation (24 log bands).
+- **Live's Beats, measured** (output→source time map by cross-correlation, forward and reversed): the audio is cut at transients only (no cut at every 1/16 on sustained material); each piece starts where the warp map puts its cut and plays at 1× speed. Faster: cut where the next piece begins. Slower: after its end the piece plays backwards, then forwards ("back and forth", `TransientLoopMode` 2), until the next piece. A tone is cut at its very start; a swell at its steepest rise.
+- **LYNX `StretchMethod::beats`** (`TimeStretch.cpp` `beatsStretch`, `stretchdetail::beatsCuts`): LYNX's attack detector, each cut moved to the start of the 10 ms window before the steepest 10 ms RMS rise (−30…+50 ms); 16 ms linear crossfades (1–4 ms: clicks Live has not; 16 ms: 0.2–0.3 dB spectral deviation). Envelope correlation 0.90/0.98 (old transients preset) → 0.967/0.999.
+- **Tones / Texture / Complex** use the spectral stretcher with 40 / 60 / 90 ms blocks, overlap 6, no attack splicing: 0.977 / 0.985 / 0.994 correlation, about 1 dB spectral deviation (2 dB before).
+- Mapping: import WarpMode 0→beats, 1→tones, 2→texture, 4 and 6→complex, 3→Re-Pitch (no pitch keep); export beats/transients→0, tones/mono→1, texture→2, else 4.
+- **Beats transposed** (round 175a, the Beats-transpose slice): Live resamples each piece by the clip's transpose (2^(st/12) faster, so higher and shorter), starts it at its own place on the grid and fills the gap back and forth. LYNX renders the same offline: `timeStretch (…, beats, semitones)` reads each piece with 4-point Hermite interpolation. An imported Beats clip with a transpose stores it in its channel's `sampler.stretchPitch` (saved in .lynx as `stretchPitch`). The stretched-sample cache keys on it, in memory and on disk, and the clip plays untransposed. On export the value is written back as `PitchCoarse`/`PitchFine`. Beats-up5 against Live: envelope correlation 0.754 → 0.944, spectral deviation 1.54 → 0.95 dB (the stretcher alone, outside the app). The other modes still transpose in real time.
+- Open: the `TransientResolution`, `TransientEnvelope` and Texture `FluctuationTexture` parameters are not modelled.
+
+## Live's .asd analysis files (round 175a, M2)
+
+Live writes `<sample>.asd` next to each sample it has analysed (3,567 in the trial's Core Library). It uses the same binary
+serialisation as `Preferences.cfg`: a schema of named records, then the data. Two records matter for auto-warp:
+
+- `OnSets` (`Positions`, `TransitionEnergies`, `IsSet`): Live's transients. The data is a u32 count N, N u32 positions
+  (sample frames, increasing), then N f32 energies.
+- `WarpMarker` (`SecTime`, `BeatTime`, both f64): the warp markers Live stores for the sample. Data records are 0x0A
+  "WarpMarker", a u32, then the two doubles. The loops store their start (0, 0) and one marker that gives the rate.
+
+Read by `/mnt/e/lynx-work/ableton175a/m2/asd.py`. Measured against LYNX on the Core Library loops (`m2/onsets.txt`,
+`m2/warp.txt`):
+
+- Transients (±10 ms): LYNX's attack detector matches Live with F 0.81 on drums, but only 0.31 on tonal and 0.36 on
+  textures. Live marks many soft onsets that LYNX doesn't. Lowering the threshold to 3 or 4.5 dB changed nothing.
+- Tempo: Live uses the tempo in the file name for 148 of 156 named loops. For the others it mostly takes the length as
+  a power of two of beats (33 of 47).
+- Beat 0: the file's start, for 195 of 203 loops.
+- LYNX's auto-warp agrees with Live's stored tempo for 162 of 203 loops without names, 148 of 156 with them, and on the
+  start for 194 of 203.
+
+## 13. Session view ↔ clip grid (round 181c, 2026-11-07)
+Launch numbers read in Live 12's own Clip View on a set we wrote [LIVE: docs/analise/REA_rodada181a.md, 181b]:
+- `LaunchQuantisation` 0…14 = Global, None, 8 Bars, 4 Bars, 2 Bars, 1 Bar, 1/2, 1/2T, 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32 = `LaunchQuant`.
+- `LaunchMode` 0…3 = Trigger, Gate, Toggle, Repeat = `LaunchMode`.
+- `FollowActionA` 0…9 = No Action, Stop, Again, Previous, Next, First, Last, Any, Other, Jump = `FollowKind`. [INFERRED] `FollowActionB` uses the same numbers. `JumpIndexA/B`: Live shows the stored number itself, 1-based (5 shows "5", 0 an empty field) [LIVE, 181c]; LYNX's jump row = the number − 1. [INFERRED] it counts scenes from the top, not clips of the group.
+- `GlobalQuantisation` (LiveSet) has no Global entry: it is the clip number − 1 (9 = 1/8; the default 4 = 1 Bar).
+
+Import (the default, the user's choice of 2026-11-08; `AlsImportOptions::sessionOnPlaylist`, Settings › General › Workflow › Session clips of Live sets: Playlist, keeps 175a's placement):
+- Each MIDI or audio track's `ClipSlotList` slot *s* → grid column = the track's Playlist track, row *s*. One clip per slot.
+- A looping clip → one pass of its loop region `[LoopStart, LoopEnd)` with the slot's Loop on; a start marker inside the loop (`StartRelative` ≠ 0) is reported as approximated. A one-shot → `[LoopStart + StartRelative, OutMarker)` with Loop off. MIDI clips get their own pattern, audio clips the same channel and warp handling as arrangement clips.
+- `LaunchMode`, `LaunchQuantisation`, `Legato`, `Name`, `Color`, and `FollowAction{FollowActionEnabled, FollowActionA/B, FollowChanceA/B, JumpIndexA/B, IsLinked, LoopIterations, FollowTime}` → the slot's settings.
+- An empty slot with `HasStop` false → no stop button.
+- Scenes: `Name`, `Color`, `Tempo` when `IsTempoEnabled`, the numerator of `TimeSignatureId` when `IsTimeSignatureEnabled` (n/4 only; other denominators reported). Scene follow actions are reported (not built).
+- A set whose slots are all empty adds no grid.
+
+Export:
+- The set gets one scene per grid row; every MIDI and audio track one `ClipSlot` per scene in the main and the freeze sequencer, a group one `GroupTrackSlot` per scene [§9 rule 6].
+- A grid pattern clip → a MIDI clip in each channel track it has notes for (the arrangement's mapping); two grid clips of one channel in one scene keep the first (noted). A grid audio clip → the audio track of its Playlist track.
+- Session clips have `Time` 0, the clip span as the loop region (`LoopOn` = the slot's Loop) and the slot's launch settings and follow actions. An empty slot without its LYNX stop button gets `HasStop` false (MIDI tracks use their channel's Playlist track).
+- Scenes: name, colour, tempo and n/4 time signature with their enable flags; `GlobalQuantisation` = grid quantisation − 1.
+- A song whose grid has clips but no Playlist clips exports no arrangement clip (the current-pattern fallback is for songs with neither).

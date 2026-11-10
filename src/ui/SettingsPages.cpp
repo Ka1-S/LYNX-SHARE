@@ -3,15 +3,20 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/LayoutStyle.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/LinuxRealtime.h"
 #include "ui/AutomationUi.h"
+#include "ui/Dialogs.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/NewProjectDialog.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
+
+#include <algorithm>
 
 namespace lynx
 {
@@ -101,15 +106,39 @@ public:
         else
             options.language = i18n::current(); // --snapshot: the language of the run
 
-        for (auto* c : std::initializer_list<juce::Component*> { &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
+        for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &editInLabel, &editInBox, &undoLabel,
-                                                                 &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &unusedTakes,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
+        setupFontRow();
+        styleLabel (layoutStyleLabel, tr ("Layout style"));
+        layoutStyleBox.setComponentID ("layoutStyle"); // (--simpleshot finds it)
+        layoutStyleBox.addItem (tr ("Pattern workflow (default)"), layoutstyle::comboId (layoutstyle::Style::pattern));
+        layoutStyleBox.addItem (tr ("Clip-launch workflow"), layoutstyle::comboId (layoutstyle::Style::clipLaunch));
+        layoutStyleBox.addItem (tr ("Simple workflow"), layoutstyle::comboId (layoutstyle::Style::simple));
+        layoutStyleBox.setSelectedId (layoutstyle::comboId ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, options.layoutStyle)), juce::dontSendNotification);
+        layoutStyleBox.onChange = [this] {
+            options.layoutStyle = (int) layoutstyle::fromComboId (layoutStyleBox.getSelectedId());
+            if (hooks.setGeneral)
+                hooks.setGeneral (options);
+        };
+        styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
+                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.") + "\n"
+                                        + tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."));
+        styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
+        alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
+        alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
+        alsSessionBox.setSelectedId (options.alsSessionOnPlaylist ? 2 : 1, juce::dontSendNotification);
+        alsSessionBox.onChange = [this] {
+            options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2;
+            if (hooks.setGeneral)
+                hooks.setGeneral (options);
+        };
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -175,12 +204,61 @@ public:
                 [this] (bool on) { options.artMotion = on; });
         toggle (reducedEffects, tr ("Reduced effects in plugin editors (no glows or animations, for slower graphics cards)"), options.reducedEffects,
                 [this] (bool on) { options.reducedEffects = on; });
+        // round 179a: FL's General › Animations, as one switch (REA_rodada179a.md part D)
+        toggle (uiAnimations, tr ("Animations: panels fade in and out, buttons light up gently, the wheel glides"), options.uiAnimations,
+                [this] (bool on) { options.uiAnimations = on; });
+        // round 174e2: how often the playhead, meters and scopes move (the display's refresh by default, as FL)
+        styleLabel (animationLabel, tr ("Animation rate"));
+        animationBox.addItem (tr ("Display (default)"), 1);
+        animationBox.addItem (tr ("60 Hz"), 2);
+        animationBox.addItem (tr ("30 Hz"), 3);
+        animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : 1, juce::dontSendNotification);
+        animationBox.onChange = [this] {
+            change ([&] { options.animationRate = animationBox.getSelectedId() == 3 ? 30 : animationBox.getSelectedId() == 2 ? 60 : 0; });
+        };
+        styleNote (animationNote, tr ("How often the playhead, meters and scopes move. Display follows your screen's refresh rate "
+                                      "(smoothest); 60 Hz or 30 Hz use less CPU on slower computers."));
         toggle (gpuRendering, tr ("Draw with the GPU (Direct2D). Turn off if LYNX SHARE crashes in the graphics driver or the screen flickers"),
                 options.gpuRendering, [this] (bool on) { options.gpuRendering = on; });
        #if ! JUCE_WINDOWS
         gpuRendering.setVisible (false);
        #endif
 
+        // FL's Options › General › Miscellaneous › "Default template" (REA_rodada186a; issue #123)
+        styleLabel (templateLabel, tr ("Default template"));
+        templateChoices = availableTemplates();
+        for (int i = 0; i < (int) templateChoices.size(); ++i)
+        {
+            if (i == 1 || (templateChoices[(std::size_t) i].kind == TemplateChoice::Kind::user && templateChoices[(std::size_t) i - 1].kind != TemplateChoice::Kind::user))
+                templateBox.addSeparator();
+            templateBox.addItem (i == 0 ? tr ("Default (LYNX SHARE)") : templateChoiceName (templateChoices[(std::size_t) i]), i + 1);
+        }
+        {
+            const auto current = TemplateChoice::parse (options.defaultTemplate.toStdString());
+            auto at = std::find (templateChoices.begin(), templateChoices.end(), current);
+            if (at == templateChoices.end()) // a user template whose file is gone: shown, so it can be changed
+            {
+                templateChoices.push_back (current);
+                templateBox.addItem (tr ("{0} (not found)", { templateChoiceName (current) }), (int) templateChoices.size());
+                at = templateChoices.end() - 1;
+            }
+            templateBox.setSelectedId ((int) (at - templateChoices.begin()) + 1, juce::dontSendNotification);
+        }
+        templateBox.setTooltip (tr ("Select default project template"));
+        templateBox.onChange = [this] {
+            const auto index = templateBox.getSelectedId() - 1;
+            if (juce::isPositiveAndBelow (index, (int) templateChoices.size()))
+                change ([&] { options.defaultTemplate = juce::String::fromUTF8 (templateChoices[(std::size_t) index].toText().c_str()); });
+        };
+        // FL's "Startup project", under it (FL's order)
+        styleLabel (startupProjectLabel, tr ("Startup project"));
+        startupProjectBox.addItem (tr ("Empty project"), 1);
+        startupProjectBox.addItem (tr ("Default template"), 2);
+        startupProjectBox.addItem (tr ("Last used project"), 3);
+        startupProjectBox.setSelectedId (juce::jlimit (0, 2, options.startupProject) + 1, juce::dontSendNotification);
+        startupProjectBox.onChange = [this] { change ([&] { options.startupProject = startupProjectBox.getSelectedId() - 1; }); };
+        styleNote (templateNote, tr ("The default template opens with File › New, and at start-up when Startup project is \"Default template\", "
+                                     "as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own."));
         toggle (splash, tr ("Show the splash screen at startup"), options.splash, [this] (bool on) { options.splash = on; });
         toggle (startupSound, tr ("Play the startup sound"), options.startupSound, [this] (bool on) { options.startupSound = on; });
         toggle (scanAtStart, tr ("Look for new plugins in the background at every start"), options.scanAtStart,
@@ -195,12 +273,22 @@ public:
                 [this] (bool on) { options.keepEditorsOpen = on; });
         toggle (firstChannel, tr ("Select first channel with notes when the pattern changes"), options.selectFirstChannelWithNotes,
                 [this] (bool on) { options.selectFirstChannelWithNotes = on; });
+        // FL's next Miscellaneous box, DisablePlugFocusDefaultBox (off; round 187a, issue #96)
+        toggle (noTypingPriority, tr ("Disable typing keyboard priority by default"), options.disableTypingPriority,
+                [this] (bool on) { options.disableTypingPriority = on; });
+        noTypingPriority.setTooltip (tr ("Disable typing keyboard priority for all newly added plugins by default"));
         toggle (rememberSeek, tr ("Remember seek time: Stop goes back to the position clicked on the Playlist ruler"), options.rememberSeek,
                 [this] (bool on) { options.rememberSeek = on; });
+        toggle (hoverValues, tr ("Show a control's value next to the mouse when hovering over it (LYNX)"), options.hoverValues,
+                [this] (bool on) { options.hoverValues = on; });
         // LYNX extra (issue #25): FL plays a stretched pattern clip once; off = FL's behaviour
         toggle (clipsLoop, tr ("Stretched pattern clips loop their pattern (LYNX)"), options.stretchedClipsLoop,
                 [this] (bool on) { options.stretchedClipsLoop = on; });
         clipsLoop.setTooltip (tr ("On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio"));
+        // FL's Options › General › Miscellaneous (round 177b): where "Create automation clip" puts the clip
+        toggle (autoClipsAtPlayback, tr ("Create automation clips at the playback position"), options.autoClipsAtPlayback,
+                [this] (bool on) { options.autoClipsAtPlayback = on; });
+        autoClipsAtPlayback.setTooltip (tr ("On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song"));
 
         styleLabel (editInLabel, tr ("Double-click on a pattern clip opens"));
         const char* choices[] = { TR_NOOP ("Piano Roll when it has piano-roll notes, else Channel Rack"), TR_NOOP ("Channel Rack"), TR_NOOP ("Piano Roll") };
@@ -240,6 +328,17 @@ public:
             autosaveFolder().startAsProcess();
         };
 
+        toggle (backupQuiet, tr ("Wait with backups while the song plays or a MIDI keyboard is being played"), options.backupWaitsForQuiet,
+                [this] (bool on) {
+                    options.backupWaitsForQuiet = on;
+                    longestWaitBox.setEnabled (on);
+                });
+        styleLabel (longestWaitLabel, tr ("Longest wait between backups") /* (fits the label column, as the other rows) */);
+        for (const auto minutes : prefs::backupLongestWaitChoices)
+            longestWaitBox.addItem (tr ("{0} minutes", { juce::String (minutes) }), minutes);
+        selectNearest (longestWaitBox, options.backupLongestWaitMinutes);
+        longestWaitBox.setEnabled (options.backupWaitsForQuiet);
+        longestWaitBox.onChange = [this] { change ([&] { options.backupLongestWaitMinutes = longestWaitBox.getSelectedId(); }); };
         toggle (unusedTakes, tr ("When a project closes, offer to delete the recordings it no longer uses"), options.askUnusedRecordings,
                 [this] (bool on) { options.askUnusedRecordings = on; });
 
@@ -249,6 +348,11 @@ public:
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        // FL's "Manage messages" (round 186c): which questions are asked; a ticked "Remember my choice" unticks its message
+        manageMessages.onClick = [this] {
+            messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
+        };
+        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
         managePlugins.onClick = [this] {
             if (hooks.managePlugins)
                 hooks.managePlugins();
@@ -277,7 +381,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &languageBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &editInBox, &undoBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -286,11 +390,25 @@ private:
     int layout (int width) override
     {
         Rows r (width);
-        r.section (languageTitle, true);
+        r.section (workflowTitle, true);
+        layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
+        layoutStyleNote.setBounds (r.indented (66).translated (0, -3));
+        alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
+        r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
         languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
         if (translationLink.isVisible())
             translationLink.setBounds (r.indented (18).translated (0, -4).withWidth (juce::jmin (420, width - 40)));
+        {
+            // (the reset button as wide as its text: "Auf Standard zurücksetzen" wrapped at a fixed width)
+            const auto resetWidth = juce::jlimit (110, 240, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                getLookAndFeel().getTextButtonFont (fontReset, 24), fontReset.getButtonText())) + 24);
+            auto row = r.row (fontLabel, 228 + resetWidth);
+            fontBox.setBounds (row.removeFromLeft (220));
+            fontReset.setBounds (row.withTrimmedLeft (8));
+        }
+        fontPreview.setBounds (r.indented (22).translated (0, -3));
+        fontNote.setBounds (r.indented (16).translated (0, -5));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -303,22 +421,36 @@ private:
         pluginStyleBox.setBounds (r.row (pluginStyleLabel, 300));
         artMotion.setBounds (r.full (24));
         reducedEffects.setBounds (r.full (24));
+        uiAnimations.setBounds (r.full (24));
+        animationBox.setBounds (r.row (animationLabel, 180));
+        animationNote.setBounds (r.indented (32).translated (0, -3));
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
        #endif
 
         r.section (startupTitle);
+        templateBox.setBounds (r.row (templateLabel, 260));
+        startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
+        templateNote.setBounds (r.indented (32).translated (0, -3));
         for (auto* t : { &splash, &startupSound, &scanAtStart })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel })
+        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &noTypingPriority, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
         alternateUndo.setBounds (r.full (24));
+
+        r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
+        {
+            auto row = r.full();
+            manageMessages.setBounds (row.removeFromLeft (180));
+            row.removeFromLeft (12);
+            messagesNote.setBounds (row.withTrimmedTop (6));
+        }
 
         r.section (backupTitle);
         {
@@ -328,6 +460,8 @@ private:
             openBackups.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), 170)));
         }
         keepBox.setBounds (r.row (keepLabel, 120));
+        backupQuiet.setBounds (r.full (24));
+        longestWaitBox.setBounds (r.row (longestWaitLabel, 120));
         unusedTakes.setBounds (r.full (24));
 
         r.section (pluginsTitle);
@@ -382,6 +516,43 @@ private:
             hooks.setGeneral (options);
     }
 
+    // The interface font: the platform's default or any installed family, saved at once, applied by the next start
+    // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
+    void setupFontRow()
+    {
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote })
+            add (*c);
+        styleLabel (fontLabel, tr ("Interface font"));
+        styleNote (fontNote, tr ("A new interface font is applied when LYNX SHARE restarts."));
+        const auto fallback = theme::defaultUiFont();
+        fontBox.addItem (fallback.isNotEmpty() ? tr ("Default ({0})", { fallback }) : tr ("Default"), 1);
+        fontBox.addSeparator();
+        fontNames = theme::installedUiFonts();
+        for (int i = 0; i < fontNames.size(); ++i)
+            fontBox.addItem (fontNames[i], i + 2);
+        // (a saved font that is gone reads as the default here too, as at start-up)
+        const auto at = fontNames.indexOf (options.uiFont);
+        fontBox.setSelectedId (at >= 0 ? at + 2 : 1, juce::dontSendNotification);
+        fontBox.onChange = [this] {
+            const auto index = fontBox.getSelectedId() - 2;
+            change ([&] { options.uiFont = juce::isPositiveAndBelow (index, fontNames.size()) ? fontNames[index] : juce::String(); });
+            updateFontPreview();
+        };
+        fontReset.onClick = [this] { fontBox.setSelectedId (1, juce::sendNotificationSync); };
+        fontPreview.setText ("LYNX SHARE  AaBbCc  0123456789", juce::dontSendNotification);
+        fontPreview.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        updateFontPreview();
+    }
+
+    void updateFontPreview()
+    {
+        const auto index = fontBox.getSelectedId() - 2;
+        const auto family = juce::isPositiveAndBelow (index, fontNames.size()) ? fontNames[index] : theme::defaultUiFont();
+        fontPreview.setFont (family.isNotEmpty() ? juce::Font (juce::FontOptions (family, 14.0f, juce::Font::plain))
+                                                 : juce::Font (juce::FontOptions (14.0f)));
+        fontReset.setEnabled (fontBox.getSelectedId() != 1);
+    }
+
     void updateTranslationLink()
     {
         // shown in the language just picked when it is already running, else in the current one
@@ -405,14 +576,27 @@ private:
     SettingsHooks hooks;
     bool persistent;
     GeneralOptions options;
+    SectionTitle workflowTitle { tr ("Workflow") };
+    juce::Label layoutStyleLabel, layoutStyleNote;
+    juce::ComboBox layoutStyleBox;
+    juce::Label alsSessionLabel;
+    juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
-        backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
-    juce::Label languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+    juce::Label fontLabel, fontPreview, fontNote;
+    juce::ComboBox fontBox;
+    juce::Label templateLabel, templateNote, startupProjectLabel;
+    juce::ComboBox templateBox, startupProjectBox;
+    std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
+    juce::TextButton fontReset { tr ("Reset to default") };
+    juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
-    juce::ComboBox crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, alternateUndo, sandbox, substitutes, unusedTakes, checkUpdates;
+    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates, noTypingPriority;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
-        checkNow { tr ("Check now") };
+        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
+    juce::Label messagesNote;
 };
 
 // ================================================================================================================
@@ -1178,11 +1362,11 @@ public:
     MidiPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
     {
         for (auto* c : std::initializer_list<juce::Component*> { &inputsTitle, &notesTitle, &controllersTitle, &inputsNote, &refresh, &noDevices,
-                                                                 &velocityLabel, &velocityBox, &velocityNote, &perfLabel, &perfBox, &perfNote, &typeLabel, &typeValue, &pickup,
+                                                                 &velocityLabel, &velocityBox, &velocityNote, &perfLabel, &perfBox, &perfNote, &typeLabel, &typeValue, &pickup, &footPedal,
                                                                  &pickupNote, &linksLabel, &links, &removeLink, &removeAll, &outputsTitle,
                                                                  &outputsNote, &noOutputs, &syncTitle, &clockLabel, &clockBox, &clockOffsetLabel,
                                                                  &clockOffset, &clockStatusLabel, &clockStatus, &clockNote, &jumpLabel, &jumpBox,
-                                                                 &jumpNote })
+                                                                 &jumpNote, &gamepadToggle, &gamepadNote })
             add (*c);
         styleNote (outputsNote, tr ("Send master sync drives drum machines, synths and other software from LYNX SHARE's transport: MIDI clock "
                                     "with Song Position Pointer, or MIDI Time Code."));
@@ -1274,6 +1458,15 @@ public:
         styleNote (jumpNote, tr ("Notes on this channel move the song to a marker instead of playing: note 0 goes to the first "
                                  "marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)."));
 
+        // FL's MIDI input panel: "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a)
+        styleToggle (footPedal, tr ("Foot pedal controls note off"));
+        footPedal.setTooltip (tr ("Disable to send sustain to plugins"));
+        footPedal.onClick = [this] {
+            auto p = engine.getMidiPrefs();
+            p.footPedalNoteOff = footPedal.getToggleState();
+            set (p);
+        };
+
         styleLabel (typeLabel, tr ("Controller type"));
         typeLabel.setJustificationType (juce::Justification::topLeft);
         styleLabel (typeValue, tr ("Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller."), false);
@@ -1286,6 +1479,15 @@ public:
             set (p);
         };
         styleNote (pickupNote, tr ("A controller moves a parameter only after reaching its current value, so nothing jumps."));
+        // round 184a, S16: a game controller as one more controller (core/GamepadMap.h)
+        styleToggle (gamepadToggle, tr ("Use a game controller"));
+        gamepadToggle.onClick = [this] {
+            auto p = engine.getMidiPrefs();
+            p.gamepad = gamepadToggle.getToggleState();
+            set (p);
+        };
+        styleNote (gamepadNote, tr ("A plays and stops, B records, X undoes, the D-pad picks the track and moves by bars, the triggers set the "
+                                    "track's volume. Hold Back to see the whole map. Every button and stick can be linked like a MIDI control."));
 
         styleLabel (linksLabel, tr ("Links (this project, then global)"));
         linksLabel.setJustificationType (juce::Justification::topLeft);
@@ -1381,6 +1583,9 @@ private:
         }
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.full (16).translated (0, -3));
+        footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
+        gamepadToggle.setBounds (r.full (24));
+        gamepadNote.setBounds (r.full (32).translated (0, -3));
         {
             auto row = r.row (linksLabel, 0, 110);
             linksLabel.setBounds (linksLabel.getBounds().withTrimmedTop (4));
@@ -1409,6 +1614,8 @@ private:
         const auto& p = engine.getMidiPrefs();
         velocityBox.setSelectedId ((int) p.velocity + 1, juce::dontSendNotification);
         pickup.setToggleState (p.pickup, juce::dontSendNotification);
+        footPedal.setToggleState (p.footPedalNoteOff, juce::dontSendNotification);
+        gamepadToggle.setToggleState (p.gamepad, juce::dontSendNotification);
         jumpBox.setSelectedId (p.songMarkerJumpChannel + 1, juce::dontSendNotification);
         perfBox.setSelectedId (p.performanceChannel + 1, juce::dontSendNotification);
         {
@@ -1572,7 +1779,8 @@ private:
     juce::Label inputsNote, noDevices, velocityLabel, velocityNote, perfLabel, perfNote, typeLabel, typeValue, pickupNote, linksLabel, jumpLabel, jumpNote;
     juce::TextButton refresh { tr ("Refresh device list") }, removeLink { tr ("Remove link") }, removeAll { tr ("Remove all") };
     juce::ComboBox velocityBox, perfBox, jumpBox;
-    juce::ToggleButton pickup;
+    juce::ToggleButton pickup, footPedal, gamepadToggle;
+    juce::Label gamepadNote;
     juce::ListBox links;
 };
 } // namespace

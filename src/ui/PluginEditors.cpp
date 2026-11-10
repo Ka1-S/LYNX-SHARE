@@ -36,6 +36,7 @@
 #include "core/EquoFx.h"
 #include "core/MultibandDelayFx.h"
 #include "core/Vocodex.h"
+#include "core/LovePhilter.h"
 #include "core/HardwareInsert.h"
 #include "engine/Text.h"
 #include "ui/DynamicsDisplays.h"
@@ -65,7 +66,7 @@ using plugui::LayoutItem;
 
 constexpr float headerHeight = 26.0f; // the presets bar (not scaled with the body)
 
-bool hasStyle (const LayoutItem& item, std::uint16_t flag) noexcept
+bool hasStyle (const LayoutItem& item, std::uint32_t flag) noexcept
 {
     return (item.style & flag) != 0;
 }
@@ -294,6 +295,8 @@ public:
     skin::Art artNow() const
     {
         const auto art = skin::artForEffect (kind);
+        if (art == skin::Art::luxe) // round tp172b4: the Space page has the Pro-R role's own look
+            return page == 1 ? skin::Art::luxeSpace : art;
         if (art != skin::Art::ridge) return art;
         const auto* fx = current();
         if (fx == nullptr) return art;
@@ -319,7 +322,7 @@ public:
     // wide option menus of LYNX's own panels get step arrows at both ends (round 114)
     bool hasStepArrows (const LayoutItem& item) const
     {
-        return item.type == Item::menu && item.w >= 110.0f && kind != EffectKind::parametricEq && kind != EffectKind::fruitySend && kind != EffectKind::hardwareInsert
+        return item.type == Item::menu && item.w >= 110.0f && ! hasStyle (item, plugui::plainMenu) && kind != EffectKind::parametricEq && kind != EffectKind::fruitySend && kind != EffectKind::hardwareInsert
                && kind != EffectKind::flTransporter
                && std::find (plugui::ownLayoutKinds().begin(), plugui::ownLayoutKinds().end(), kind) != plugui::ownLayoutKinds().end();
     }
@@ -337,7 +340,7 @@ public:
             r.removeFromBottom (13.0f * s);
         }
         else if (! hasStyle (item, plugui::noCaption))
-            r.removeFromBottom ((hasStyle (item, plugui::showValue) ? 26.0f : 14.0f) * s);
+            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::hoverValue) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
     }
@@ -679,10 +682,19 @@ public:
             text = bar.place (area, true, ledC.x + 10.0f - area.getX() + skin::titleMinWidth (name, area.getHeight())).withLeft (ledC.x + 10.0f);
         const auto nameWidth = skin::titleText (g, text.withHeight (area.getHeight()), name, accent);
         text.removeFromLeft (nameWidth);
+        // round 177b: the "Sidechain from" picker at the right end of the title space (when it fits)
+        sidechainChip = {};
+        if (showsSidechain())
+            if (constexpr float w = 118.0f; text.getWidth() >= w + 14.0f)
+            {
+                sidechainChip = { text.getRight() - w, 3.0f, w, 20.0f };
+                text.setRight (sidechainChip.getX() - 4.0f);
+                paintSidechainChip (g, fx);
+            }
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
         // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
-        if (const auto where = "(" + trackName() + ")"; juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
+        if (const auto where = "(" + trackName() + ")"; ! plugui::hostedElsewhere && juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
             g.drawText (where, text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, false);
 
         if (usesBar())
@@ -705,6 +717,29 @@ public:
         drawArrow (g, prevButton(), juce::MathConstants<float>::pi, hoverHeader == 3 ? accent : colour::textSecondary);
         drawArrow (g, nextButton(), 0.0f, hoverHeader == 4 ? accent : colour::textSecondary);
     }
+
+    // round 177b: a mixer slot's effect with a side input shows its "Sidechain from" picker in the header
+    bool showsSidechain() const { return ! node.locate && pluginheader::takesSidechain (engine, track, slot); }
+    void paintSidechainChip (juce::Graphics& g, const EffectSlot& fx)
+    {
+        using namespace theme;
+        const auto box = sidechainChip;
+        const auto source = pluginheader::sidechainSourceText (engine.getSong(), fx);
+        skin::valuePlate (g, box, radius::md);
+        if (hoverHeader == 6 || source.isNotEmpty())
+        {
+            g.setColour (accent.withAlpha (hoverHeader == 6 ? 0.7f : 0.45f));
+            g.drawRoundedRectangle (box.reduced (0.5f), radius::md, 1.0f);
+        }
+        const auto modulator = kind == EffectKind::vocoder || kind == EffectKind::vocodex;
+        const auto text = (modulator ? tr ("Modulator") : tr ("SC")) + ": " + (source.isNotEmpty() ? source : tr ("None"));
+        g.setColour (source.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
+        ui::drawFittingText (g, text, box.reduced (7.0f, 0.0f).withTrimmedRight (9.0f), juce::Justification::centredLeft,
+                             font (type::small, source.isNotEmpty()), 8.0f, 0.0f, 0.75f);
+        drawArrow (g, { box.getRight() - 14.0f, box.getY(), 10.0f, box.getHeight() }, juce::MathConstants<float>::halfPi,
+                   hoverHeader == 6 ? accent : colour::textSecondary);
+    }
+    juce::Rectangle<float> sidechainChip; // where the header drew it (empty: not shown)
 
     static void drawArrow (juce::Graphics& g, juce::Rectangle<float> r, float angle, juce::Colour c)
     {
@@ -737,7 +772,10 @@ public:
             g.drawRoundedRectangle (r.withSizeKeepingCentre (w, r.getHeight()), 3.0f, 1.0f);
         }
         g.setColour (locked ? theme::colour::textPrimary : hasStyle (item, plugui::dim) ? colour::textDisabled : skin::captionColour());
-        ui::drawFittingText (g, caps (tr (item.label)), r.expanded (0.0f, (skin::captionScale() - 1.0f) * 6.0f * scale()), j,
+        // tp172d (look slice): a printed scale word with a unit ("20 Hz", "-24 dB") keeps its case
+        const auto text = tr (item.label);
+        const auto printedUnit = hasStyle (item, plugui::dim) && text.containsAnyOf ("0123456789");
+        ui::drawFittingText (g, skin::lowerCaptions() ? text.toLowerCase() : printedUnit ? text : caps (text), r.expanded (0.0f, (skin::captionScale() - 1.0f) * 6.0f * scale()), j,
                             font (juce::jmax (8.0f, 9.5f * scale() * skin::captionScale()), true), 7.0f); // (round 165: fit, no "..."; tp172d: themed size)
     }
 
@@ -792,10 +830,57 @@ public:
             }
 
             case Item::label:
+                if (hasStyle (item, plugui::bigCaption) && item.label != nullptr) // round tp172d (slice 8): a hardware strip's big
+                {                                                                    // caption, or (big) the model name plate
+                    const auto heavy = hasStyle (item, plugui::big);
+                    auto f = juce::Font (font (r.getHeight() * (heavy ? 0.92f : 0.62f), heavy));
+                    if (heavy)
+                    {
+                        f.setHorizontalScale (0.82f); // a condensed, stencil-like plate
+                        f.setExtraKerningFactor (0.04f);
+                        g.setFont (f);
+                        g.setColour (juce::Colours::white.withAlpha (0.35f)); // the engraving's lit lower edge
+                        g.drawText (caps (tr (item.label)), r.translated (0.0f, 1.0f * s), juce::Justification::centred, false);
+                        g.setColour (juce::Colour (0xff2c2d2f).withAlpha (fx.enabled ? 1.0f : 0.6f));
+                        g.drawText (caps (tr (item.label)), r, juce::Justification::centred, false);
+                        break;
+                    }
+                    g.setColour (skin::captionColour().withAlpha (fx.enabled ? 0.92f : 0.5f));
+                    ui::drawFittingText (g, caps (tr (item.label)), r, juce::Justification::centredRight, f, 7.0f);
+                    break;
+                }
+                if (hasStyle (item, plugui::wordmark) && item.label != nullptr) // round tp172d: a wide-spaced title in two tones
+                {
+                    const auto text = juce::String (item.label);
+                    const auto first = text.upToFirstOccurrenceOf ("|", false, false), second = text.fromFirstOccurrenceOf ("|", false, false);
+                    auto f = juce::Font (font (r.getHeight() * 0.78f, false));
+                    f.setExtraKerningFactor (0.55f);
+                    const auto gap = r.getHeight() * 0.35f;
+                    const auto w1 = juce::GlyphArrangement::getStringWidth (f, first), w2 = juce::GlyphArrangement::getStringWidth (f, second);
+                    auto x = r.getCentreX() - (w1 + gap + w2) * 0.5f;
+                    g.setFont (f);
+                    g.setColour (skin::captionColour().withAlpha (0.42f));
+                    g.drawText (first, juce::Rectangle<float> (x, r.getY(), w1 + 4.0f, r.getHeight()), juce::Justification::centredLeft, false);
+                    g.setColour (skin::captionColour());
+                    g.drawText (second, juce::Rectangle<float> (x + w1 + gap, r.getY(), w2 + 4.0f, r.getHeight()), juce::Justification::centredLeft, false);
+                    break;
+                }
                 if (hasStyle (item, plugui::dim) && ! hasStyle (item, plugui::boxed) && item.h > 30.0f && item.label != nullptr)
                 {
                     // the plugin's name, big and readable (FL's logos are not reproduced; round 168q2)
                     g.setColour (skin::captionScale() > 1.0f ? skin::captionColour() : colour::textSecondary); // (tp172d: a themed panel's type)
+                    if (skin::titleRules()) // round tp172d (look slice): the name centred between two rules (a hardware title bar)
+                    {
+                        juce::Font f (font (r.getHeight() * 0.62f, true));
+                        f.setExtraKerningFactor (0.12f);
+                        const auto tw = juce::jmin (r.getWidth() * 0.7f, juce::GlyphArrangement::getStringWidth (f, item.label));
+                        g.setFont (f);
+                        g.drawText (item.label, r, juce::Justification::centred, false);
+                        const auto gap = 8.0f * s, y = r.getCentreY() - 1.0f * s;
+                        g.fillRect (juce::Rectangle<float> (r.getX(), y, juce::jmax (0.0f, (r.getWidth() - tw) * 0.5f - gap), 2.0f * s));
+                        g.fillRect (juce::Rectangle<float> (r.getCentreX() + tw * 0.5f + gap, y, juce::jmax (0.0f, (r.getWidth() - tw) * 0.5f - gap), 2.0f * s));
+                        break;
+                    }
                     ui::drawFittingText (g, item.label, r, hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centredRight,
                                          font (r.getHeight() * 0.62f, true), r.getHeight() * 0.25f, 0.0f, 0.8f); // (smaller, never "Wav...")
                     break;
@@ -806,10 +891,16 @@ public:
                 break;
 
             case Item::value:
+                if (hasStyle (item, plugui::boxed) && skin::ledReadouts()) // round tp172d: a red LED read-out
+                {
+                    ledReadout (g, r, valueText (param, value), s, fx.enabled);
+                    break;
+                }
                 if (hasStyle (item, plugui::boxed)) // a read-out plate (FL's value boxes)
                     skin::valuePlate (g, r, radius::sm * s);
                 g.setColour (hot ? accent : (fx.enabled ? (skin::captionScale() > 1.0f ? skin::valueColour (false) : colour::textPrimary) : colour::textDisabled));
-                g.setFont (font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
+                g.setFont (hasStyle (item, plugui::big) ? font (juce::jmax (12.0f, 19.0f * s)) // round tp172b4: a big read-out (LuxeVerb's Space time)
+                                                       : font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
                 g.drawFittedText (valueText (param, value), r.toNearestInt(),
                                   hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.7f);
                 break;
@@ -838,9 +929,22 @@ public:
                 if (hasStyle (item, plugui::captionAbove))
                 {
                     caption (g, item, r.withHeight (13.0f * s).expanded (10.0f * s, 0.0f));
+                    if (! hasStyle (item, plugui::showValue)) // round tp172d: the value only while dragged (its tip), as PanMan does
+                        break;
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
                     g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
                     g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                }
+                else if (hasStyle (item, plugui::hoverValue)) // round tp172b5: the caption, the value under it on hover / drag
+                {
+                    caption (g, item, below.withHeight (12.0f * s));
+                    if (hot || index == dragItem)
+                    {
+                        g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s).expanded (12.0f * s, 0.0f).toNearestInt(),
+                                          juce::Justification::centred, 1, 0.7f);
+                    }
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -951,10 +1055,101 @@ public:
                 const auto count = (float) juce::jmax (1, (int) labels.size());
                 const auto w = vertical ? r.getWidth() : r.getWidth() / count;
                 const auto h = vertical ? r.getHeight() / count : r.getHeight();
+                if (hasStyle (item, plugui::batToggle) && texts.size() >= 2) // round tp172d (slice 8): COMPRESS / LIMIT — a bat toggle,
+                {                                                             // option 0 above (lever up), option 1 under; the chosen word lit
+                    const auto line = juce::jmin (13.0f * s, r.getHeight() * 0.2f);
+                    const auto f = font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true);
+                    for (int o = 0; o < 2; ++o)
+                    {
+                        const auto band = o == 0 ? r.withHeight (line) : r.withTop (r.getBottom() - line);
+                        g.setColour (o == chosen && fx.enabled ? accent : skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), band.expanded (14.0f * s, 0.0f), juce::Justification::centred, f, 7.0f);
+                    }
+                    const auto body = r.withTrimmedTop (line).withTrimmedBottom (line);
+                    skin::batToggle (g, juce::Rectangle<float> (body.getHeight() * 0.36f, body.getHeight() * 0.36f).withCentre (body.getCentre()), chosen == 0, hot, fx.enabled);
+                    break;
+                }
+                if (hasStyle (item, plugui::rotarySelector) && ! texts.empty()) // round tp172d (slice 8): VU DISPLAY — a black pointer
+                {                                                                  // knob, its options printed round it, the chosen one lit
+                    const auto line = 12.0f * s;
+                    const auto knobArea = selectorKnobArea (item);
+                    const auto f = font (juce::jmax (8.0f, 10.0f * s * skin::captionScale()), true);
+                    const auto n = (int) texts.size();
+                    for (int o = 0; o < n; ++o)
+                    {
+                        const auto a = selectorAngle (o, n);
+                        const auto q = knobArea.getCentre() + juce::Point<float> { std::sin (a), -std::cos (a) } * (knobArea.getWidth() * 0.5f + 9.0f * s);
+                        auto band = juce::Rectangle<float> (r.getWidth() * 0.5f, line).withCentre (q);
+                        auto j = juce::Justification::centred;
+                        if (std::sin (a) < -0.3f) { band = band.withRightX (q.x + 8.0f * s); j = juce::Justification::centredRight; }
+                        if (std::sin (a) > 0.3f) { band = band.withX (q.x - 8.0f * s); j = juce::Justification::centredLeft; }
+                        band = band.translated (0.0f, std::abs (std::sin (a)) > 0.3f ? -line * 0.9f : -2.0f * s);
+                        g.setColour (o == chosen && fx.enabled ? accent : skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), band, j, f, 7.0f);
+                    }
+                    skin::selectorKnob (g, knobArea, selectorAngle (juce::jmax (0, chosen), n), hot, fx.enabled);
+                    break;
+                }
+                if (skin::goldKeys() && ! vertical) // round tp172d (slice 8): the opto leveler's strip — gold keys side by side
+                {
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto cell = juce::Rectangle<float> (r.getX() + w * (float) o, r.getY(), w, h).reduced (1.5f * s, 0.0f);
+                        const auto lit = o == chosen && fx.enabled;
+                        skin::goldKey (g, cell, lit, hot);
+                        g.setColour (juce::Colour (0xff23211a));
+                        g.setFont (font (juce::jmax (7.0f, juce::jmin (h * 0.58f, 11.0f * s)), false));
+                        g.drawFittedText (texts[(std::size_t) o].toUpperCase() == texts[(std::size_t) o] || texts[(std::size_t) o].containsAnyOf ("0123456789") ? texts[(std::size_t) o] : caps (texts[(std::size_t) o]),
+                                          cell.toNearestInt(), juce::Justification::centred, 1, 0.7f); // ("50Hz" as printed, "OFF" in caps)
+                    }
+                    break;
+                }
                 if (skin::hwKeys() && ! vertical) // round tp172d: a row of square keys joined by a line (or wide keys for words)
                 {
                     bool letters = true; // A / E / N / T / P: square keys; words: wide keys
                     for (const auto& t : texts) letters = letters && t.length() <= 2;
+                    // round tp172d (look slice): PanMan's direction keys — "<", "<  >", ">" draw as vector arrows on
+                    // square amber-lit keys, side by side (no joining line); a short word among them ("8") shares the style
+                    bool arrows = false;
+                    for (const auto& t : labels) arrows = arrows || t == "<  >";
+                    if (arrows)
+                    {
+                        const auto amber = juce::Colour (0xffe8a632);
+                        const auto side = juce::jmin (w - 6.0f * s, h);
+                        for (int o = 0; o < (int) labels.size(); ++o)
+                        {
+                            const auto cell = juce::Rectangle<float> (side, side).withCentre ({ r.getX() + w * ((float) o + 0.5f), r.getCentreY() });
+                            const auto lit = o == chosen && fx.enabled;
+                            skin::hwKey (g, cell, lit, hot, amber);
+                            const juce::String raw (labels[(std::size_t) o]);
+                            const auto ink = lit ? juce::Colour (0xff2a1a04) : juce::Colours::white.withAlpha (0.9f);
+                            const auto tri = side * 0.22f;
+                            auto arrow = [&] (juce::Point<float> c, bool left)
+                            {
+                                juce::Path p;
+                                const auto d = left ? -1.0f : 1.0f;
+                                p.addTriangle (c.x + d * tri, c.y, c.x - d * tri * 0.75f, c.y - tri, c.x - d * tri * 0.75f, c.y + tri);
+                                g.fillPath (p);
+                            };
+                            g.setColour (ink);
+                            const auto c = cell.getCentre();
+                            if (raw == "<")
+                                arrow (c, true);
+                            else if (raw == ">")
+                                arrow (c, false);
+                            else if (raw == "<  >")
+                            {
+                                arrow (c.translated (-tri * 0.95f, 0.0f), true);
+                                arrow (c.translated (tri * 0.95f, 0.0f), false);
+                            }
+                            else
+                            {
+                                g.setFont (font (juce::jmax (8.0f, side * 0.42f), true));
+                                g.drawText (caps (texts[(std::size_t) o]), cell.toNearestInt(), juce::Justification::centred, false);
+                            }
+                        }
+                        break;
+                    }
                     const auto key = juce::jmin (w * 0.62f, h);
                     if (letters)
                     {
@@ -967,6 +1162,18 @@ public:
                         const auto cell = letters ? juce::Rectangle<float> (key, key).withCentre (centre)
                                                   : juce::Rectangle<float> (w - 4.0f * s, h).withCentre (centre);
                         skin::hwKey (g, cell, o == chosen && fx.enabled, hot);
+                        if (hasStyle (item, plugui::compactKeys)) // round tp172d (slice 8): LYNX's extras on a hardware face — small,
+                        {                                          // muted until hovered, the chosen key lit
+                            if (o != chosen && ! hot)
+                            {
+                                g.setColour (juce::Colour (0xffc8cbce).withAlpha (0.55f)); // (a veil of the light faceplate it sits on)
+                                g.fillRoundedRectangle (cell, 2.0f * s);
+                            }
+                            g.setColour (o == chosen && fx.enabled ? juce::Colours::white : juce::Colours::white.withAlpha (hot ? 0.95f : 0.75f));
+                            g.setFont (font (juce::jmax (7.0f, juce::jmin (h * 0.58f, 8.5f * s)), true));
+                            g.drawFittedText (caps (texts[(std::size_t) o]), cell.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                            continue;
+                        }
                         g.setColour (juce::Colours::black.withAlpha (0.5f));
                         g.setFont (font (letters ? juce::jmax (8.0f, key * 0.46f) : juce::jmax (7.0f, juce::jmin (h * 0.5f, 10.0f * s)), true));
                         g.drawText (caps (texts[(std::size_t) o]), cell.translated (0.0f, 1.0f).toNearestInt(), juce::Justification::centred, false);
@@ -999,6 +1206,23 @@ public:
             case Item::toggle:
             {
                 const auto on = (value >= 0.5f) != hasStyle (item, plugui::inverted) && ! hasStyle (item, plugui::momentary);
+                if (hasStyle (item, plugui::batToggle)) // round tp172d (slice 8): AUTO MAKEUP — a bat toggle, the caption above
+                {                                        // (lit while on, lever up), OFF under it (lit while off)
+                    const auto f = font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true);
+                    const auto line = juce::jmin (13.0f * s, r.getHeight() * 0.16f);
+                    const auto top = r.withHeight (line * 2.0f);
+                    g.setColour (on && fx.enabled ? accent : skin::captionColour());
+                    if (item.label != nullptr)
+                    {
+                        g.setFont (f);
+                        g.drawFittedText (caps (tr (item.label)), top.expanded (14.0f * s, 0.0f).toNearestInt(), juce::Justification::centredBottom, 2, 0.8f);
+                    }
+                    g.setColour (! on && fx.enabled ? accent : skin::captionColour());
+                    ui::drawFittingText (g, caps (tr ("Off")), r.withTop (r.getBottom() - line), juce::Justification::centred, f, 7.0f);
+                    const auto body = r.withTrimmedTop (line * 2.0f).withTrimmedBottom (line);
+                    skin::batToggle (g, juce::Rectangle<float> (body.getHeight() * 0.38f, body.getHeight() * 0.38f).withCentre (body.getCentre()), on, hot, fx.enabled);
+                    break;
+                }
                 if (hasStyle (item, plugui::boxed) || hasStyle (item, plugui::momentary)) // a small lit button with its letter (FL's T / L buttons)
                 {
                     if (on)
@@ -1014,6 +1238,19 @@ public:
                     g.setColour (on ? colour::onAccent : colour::textSecondary);
                     if (item.label != nullptr)
                         ui::drawFittingText (g, caps (tr (item.label)), r, juce::Justification::centred, font (juce::jmax (8.0f, r.getHeight() * 0.8f), true), 6.5f);
+                    break;
+                }
+                if (skin::hwKeys() && hasStyle (item, plugui::captionAbove)) // round tp172d (look slice): Little AlterBoy's LINK —
+                {                                                               // a small square key joined to its neighbours by a line, the caption under it
+                    const auto k = juce::jmin (r.getHeight() * 0.5f, 22.0f * s);
+                    const auto key = juce::Rectangle<float> (k, k).withCentre ({ r.getCentreX(), r.getY() + k * 0.5f + 2.0f * s });
+                    g.setColour (juce::Colours::black.withAlpha (0.75f));
+                    g.fillRect (juce::Rectangle<float> (r.getX(), key.getCentreY() - 1.0f * s, r.getWidth(), 2.0f * s));
+                    skin::hwKey (g, key, on && fx.enabled, hot);
+                    g.setColour (skin::captionColour().getAlpha() > 0 ? skin::captionColour() : colour::textPrimary);
+                    if (item.label != nullptr)
+                        ui::drawFittingText (g, caps (tr (item.label)), r.withTop (key.getBottom() + 3.0f * s), juce::Justification::centredTop,
+                                             font (juce::jmax (8.0f, 10.0f * s * skin::captionScale()), true), 7.0f);
                     break;
                 }
                 if (skin::hwKeys()) // round tp172d: a square key (lit when on), its caption beside it
@@ -1060,7 +1297,11 @@ public:
                 drawSmallArrow (g, arrows, false);
                 g.setColour (colour::textPrimary);
                 g.setFont (font (juce::jmax (8.0f, 11.0f * s), true));
-                g.drawFittedText (valueText (param, value), box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                // (Love Philter's type box: FL's short names; the hint and the list keep the long ones)
+                g.drawFittedText (kind == EffectKind::lovePhilter && juce::String (item.param).endsWith (" type")
+                                      ? juce::String (philter::typeShortName (juce::roundToInt (value * 11.0f)))
+                                      : valueText (param, value),
+                                  box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                 break;
             }
 
@@ -1094,6 +1335,34 @@ public:
                     break;
                 }
                 const auto chosen = plugui::optionAt (item, value);
+                if (hasStyle (item, plugui::plainMenu)) // round tp172d: the value as plain text (a click opens the menu)
+                {
+                    const auto labels = plugui::optionLabels (item);
+                    auto t = chosen < (int) labels.size() ? tr (labels[(std::size_t) chosen]) : valueText (param, value);
+                    if (skin::lowerCaptions())
+                        t = t.toLowerCase();
+                    g.setColour (skin::captionColour().withAlpha (hot ? 0.85f : 0.55f));
+                    g.setFont (font (juce::jmax (9.0f, r.getHeight() * 0.62f), false));
+                    g.drawFittedText (t, r.toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+                    if (hot)
+                        g.fillRect (juce::Rectangle<float> (r.getX(), r.getBottom() - 2.0f * s, juce::jmin (r.getWidth(), juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), t)), 1.0f * s));
+                    break;
+                }
+                if (skin::ledReadouts() && hasStepArrows (item)) // round tp172d: EchoBoy's style display — a red LED window, step arrows left
+                {
+                    const auto labels = plugui::optionLabels (item);
+                    const auto arrows = r.withWidth (14.0f * s);
+                    for (const auto up : { true, false })
+                    {
+                        const auto half = up ? arrows.withTrimmedBottom (arrows.getHeight() * 0.5f) : arrows.withTrimmedTop (arrows.getHeight() * 0.5f);
+                        skin::hwKey (g, half.reduced (1.0f * s), false, half.contains (mouseAt));
+                        g.setColour (juce::Colours::white.withAlpha (0.85f));
+                        drawSmallArrow (g, half.reduced (3.0f * s), up);
+                    }
+                    ledReadout (g, r.withTrimmedLeft (16.0f * s), chosen < (int) labels.size() ? tr (juce::String::fromUTF8 (labels[(std::size_t) chosen].c_str())) : valueText (param, value),
+                                s, fx.enabled, juce::Justification::centredLeft);
+                    break;
+                }
                 const auto off = chosen == 0 && kind == EffectKind::parametricEq;
                 if (item.colour >= 0)
                 {
@@ -1139,6 +1408,38 @@ public:
                 break;
             }
         }
+    }
+
+    // round tp172d (slice 8): a rotary selector's knob (the lower part of its box, under the top option's word) and the
+    // angle of option k of n (spread over ±75 degrees round the top)
+    juce::Rectangle<float> selectorKnobArea (const LayoutItem& item) const
+    {
+        const auto r = rectOf (item);
+        const auto d = juce::jmin (r.getWidth() * 0.44f, r.getHeight() - 26.0f * scale());
+        return juce::Rectangle<float> (d, d).withCentre ({ r.getCentreX(), r.getBottom() - d * 0.5f - 2.0f * scale() });
+    }
+    static float selectorAngle (int k, int n)
+    {
+        if (n <= 1) return 0.0f;
+        const auto span = juce::degreesToRadians (150.0f);
+        return -span * 0.5f + span * (float) k / (float) (n - 1);
+    }
+
+    // round tp172d (look slice): a red LED read-out (EchoBoy's time, tempo and style displays): a black window, a faint
+    // ghost of unlit segments, the text in lit red
+    static void ledReadout (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, float s, bool enabled, juce::Justification j = juce::Justification::centred)
+    {
+        g.setColour (juce::Colour (0xff050505));
+        g.fillRoundedRectangle (r, 2.0f * s);
+        g.setColour (juce::Colour (0xff2a0a08));
+        g.fillRoundedRectangle (r.reduced (2.0f * s), 1.5f * s);
+        g.setColour (juce::Colours::black.withAlpha (0.8f));
+        g.drawRoundedRectangle (r.reduced (0.5f), 2.0f * s, 1.0f);
+        juce::Font f (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), juce::jmax (8.0f, r.getHeight() * 0.62f), juce::Font::bold));
+        g.setFont (f);
+        const auto area = r.reduced (5.0f * s, 0.0f).toNearestInt();
+        g.setColour (juce::Colour (0xffff3020).withAlpha (enabled ? 1.0f : 0.45f));
+        g.drawFittedText (text, area, j, 1, 0.6f);
     }
 
     // a small drawing of an EQ band's response (peak, shelves, cuts, band-pass, notch)
@@ -2127,13 +2428,118 @@ public:
             return;
         juce::PopupMenu menu;
         const auto chosen = fx->sendTracks[(std::size_t) part];
-        auto choose = [this, part] (int t) { editSlot ([part, t] (EffectSlot& e) { e.sendTracks[(std::size_t) part] = t; }); };
-        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
+        auto choose = [this, part] (int t) {
+            editSlot ([part, t] (EffectSlot& e) {
+                e.sendTracks[(std::size_t) part] = t;
+                if (e.kind == EffectKind::equo) // (EQUO keeps its send track in its state too, as FL saves it)
+                    equofx::setSendInsert (e.state, t);
+            });
+        };
         const auto& mixer = engine.getSong().mixer;
+        if (fx->kind == EffectKind::equo) // FL's EQUO send box: (none) and the tracks this insert routes to (round 173d3)
+        {
+            menu.addItem ("(" + tr ("none") + ")", true, chosen <= 0, [choose] { choose (0); });
+            for (int t = 1; t < (int) mixer.size(); ++t)
+                if (t != track && (engine.getSong().routes (track, t) || t == chosen))
+                    menu.addItem (insertName (t), true, t == chosen, [choose, t] { choose (t); });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+            return;
+        }
+        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
         for (int t = 1; t < (int) mixer.size(); ++t)
             if (t != track)
                 menu.addItem (juce::String (t) + "  " + insertName (t), engine.getSong().canRoute (track, t) || t == chosen, t == chosen, [choose, t] { choose (t); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+    }
+
+    // round tp172b4: the Space engine's decay-rate EQ, the reference reverb's main display: the decay rate (100 % =
+    // the SPACE time) from 20 Hz to 20 kHz on a log grid, shaped by the low and high decay multipliers past their
+    // frequencies; percent on the left, hertz along the bottom
+    void paintDecayEq (juce::Graphics& g, juce::Rectangle<float> r, const EffectSlot& fx)
+    {
+        using namespace theme;
+        namespace sp = luxeverb::sp;
+        const auto s = scale();
+        const auto at = [&] (int i) { return valueOf (luxeVerbSpaceFirst + i); };
+        const auto plot = r.withTrimmedLeft (44.0f * s).withTrimmedRight (14.0f * s).withTrimmedTop (22.0f * s).withTrimmedBottom (20.0f * s);
+        const auto lo = std::log (20.0), hi = std::log (20000.0);
+        const auto xOf = [&] (double hz) { return plot.getX() + plot.getWidth() * (float) ((std::log (hz) - lo) / (hi - lo)); };
+        constexpr float topOct = 1.5f, bottomOct = -3.4f; // log2 of the rate: 283 % … 9.5 %
+        const auto yOf = [&] (double rate) {
+            const auto o = (float) std::log2 (juce::jmax (1.0e-3, rate));
+            return plot.getY() + plot.getHeight() * juce::jlimit (0.0f, 1.0f, (topOct - o) / (topOct - bottomOct));
+        };
+        const auto blue = skin::artAccent2 (skin::art());
+        g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
+        // the frequency grid (1-2-5 marks a decade, the labelled ones brighter)
+        for (double dec = 10.0; dec <= 10000.0; dec *= 10.0)
+            for (int m = 1; m <= 9; ++m)
+            {
+                const auto hz = dec * m;
+                if (hz < 20.0 || hz > 20000.0) continue;
+                const auto x = xOf (hz);
+                const auto major = m == 1 || m == 2 || m == 5;
+                g.setColour (juce::Colours::white.withAlpha (major ? 0.05f : 0.022f));
+                g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+                if (major)
+                {
+                    g.setColour (colour::textDisabled);
+                    g.drawText (hz >= 1000.0 ? juce::String ((int) (hz / 1000.0)) + "k" : juce::String ((int) hz),
+                                juce::Rectangle<float> (x - 20.0f * s, plot.getBottom() + 3.0f * s, 40.0f * s, 14.0f * s), juce::Justification::centred, false);
+                }
+            }
+        // the rate grid: an octave a line, labelled on the left
+        for (int o = 1; o >= -3; --o)
+        {
+            const auto y = yOf (std::pow (2.0, o));
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawHorizontalLine ((int) y, plot.getX(), plot.getRight());
+            g.setColour (blue.withAlpha (0.85f));
+            g.drawText (juce::String ((int) std::lround (100.0 * std::pow (2.0, o))) + "%", juce::Rectangle<float> (r.getX() + 2.0f * s, y - 7.0f * s, 38.0f * s, 14.0f * s),
+                        juce::Justification::centredLeft, false);
+        }
+        g.setColour (blue);
+        g.setFont (font (juce::jmax (8.0f, 11.0f * s)));
+        g.drawText (tr ("Decay EQ"), juce::Rectangle<float> (r.getX() + 2.0f * s, r.getY() + 2.0f * s, 200.0f * s, 16.0f * s), juce::Justification::centredLeft, false);
+        // the curve: the rate, times a smooth shelf to the low multiplier under the low frequency and to the high one over
+        // the high frequency (half an octave of transition)
+        const auto rate = sp::rateOf (at (sp::rate));
+        const auto lowMult = sp::multOf (at (sp::lowMult)), highMult = sp::multOf (at (sp::highMult));
+        const auto lowHz = sp::lowHz (at (sp::lowFreq)), highHz = sp::highHz (at (sp::highFreq));
+        const auto shelf = [] (double hz, double corner, double mult, bool below) {
+            const auto o = std::log2 (hz / corner) * (below ? -1.0 : 1.0);
+            const auto w = 1.0 / (1.0 + std::exp (-o * 4.0));
+            return std::pow (mult, w);
+        };
+        juce::Path curve;
+        const auto steps = juce::jmax (64, (int) (plot.getWidth() / (3.0f * s)));
+        for (int i = 0; i <= steps; ++i)
+        {
+            const auto hz = std::exp (lo + (hi - lo) * (double) i / (double) steps);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            const auto x = plot.getX() + plot.getWidth() * (float) i / (float) steps;
+            if (i == 0) curve.startNewSubPath (x, y);
+            else curve.lineTo (x, y);
+        }
+        auto fill = curve;
+        fill.lineTo (plot.getRight(), plot.getBottom());
+        fill.lineTo (plot.getX(), plot.getBottom());
+        fill.closeSubPath();
+        const auto line = fx.enabled ? blue : colour::textDisabled;
+        g.setGradientFill (juce::ColourGradient (line.withAlpha (0.10f), 0.0f, plot.getY(), line.withAlpha (0.0f), 0.0f, plot.getBottom(), false));
+        g.fillPath (fill);
+        g.setColour (line);
+        g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.2f, 1.5f * s)));
+        // the two corner frequencies, as handles on the curve
+        for (const auto hz : { lowHz, highHz })
+        {
+            const auto x = xOf (hz);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            g.setColour (line.withAlpha (0.25f));
+            g.fillEllipse (juce::Rectangle<float> (14.0f * s, 14.0f * s).withCentre ({ x, y }));
+            g.setColour (line);
+            g.drawEllipse (juce::Rectangle<float> (9.0f * s, 9.0f * s).withCentre ({ x, y }), 1.4f);
+        }
     }
 
     void paintDisplay (juce::Graphics& g, const LayoutItem& item, juce::Rectangle<float> r, const EffectSlot& fx)
@@ -2141,7 +2547,7 @@ public:
         using namespace theme;
         const auto s = scale();
         const juce::String id (item.display != nullptr ? item.display : "");
-        if (id != "faderscale") // round 137: the fader scale is bare text beside its fader
+        if (id != "faderscale" && id != "decayeq") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
             skin::well (g, r, radius::md * s, fx.enabled ? accent : juce::Colours::transparentBlack);
         const auto curveColour = fx.enabled ? accent : colour::textDisabled;
         const auto inner = r.reduced (6.0f * s);
@@ -2152,6 +2558,22 @@ public:
         if (id == "tssenvelope")
         {
             paintTransmitterEnvelope (g, inner, fx);
+            return;
+        }
+        if (id == "equosend") // FL's send track box: "---" (none) or the insert's number, with its up / down marks
+        {
+            const auto t = fx.sendTracks[0];
+            g.setColour (theme::colour::bg0.withAlpha (0.35f));
+            g.fillRect (r);
+            g.setColour (t > 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
+            g.setFont (theme::font (juce::jmax (8.0f, 10.0f * scale())));
+            g.drawText (t > 0 ? juce::String (t) : juce::String ("---"), r.withTrimmedRight (9.0f * scale()).toNearestInt(), juce::Justification::centredRight, false);
+            const auto ar = r.removeFromRight (9.0f * scale()).reduced (1.5f * scale(), r.getHeight() * 0.22f);
+            juce::Path up, down;
+            up.addTriangle (ar.getX(), ar.getCentreY() - 1.0f, ar.getRight(), ar.getCentreY() - 1.0f, ar.getCentreX(), ar.getY());
+            down.addTriangle (ar.getX(), ar.getCentreY() + 1.0f, ar.getRight(), ar.getCentreY() + 1.0f, ar.getCentreX(), ar.getBottom());
+            g.fillPath (up);
+            g.fillPath (down);
             return;
         }
         if (id == "tsssend0" || id == "tsssend1")
@@ -2246,6 +2668,11 @@ public:
                 g.setColour (bandColours[b].withAlpha (fx.enabled ? 0.9f : 0.3f));
                 g.drawHorizontalLine ((int) band.getY(), band.getX(), band.getRight());
             }
+        }
+        else if (id == "decayeq") // round tp172b4: LuxeVerb's Space engine — the decay time across the spectrum
+        {
+            paintDecayEq (g, r, fx);
+            return;
         }
         else if (id == "envelope") // decay shape of a reverb / delay tail
         {
@@ -2473,6 +2900,10 @@ public:
         }
         else if (id == "maxcurve") // Maximus: the selected band's compression curve, edited with FL's gestures (round 168x)
             paintMaximusCurve (g, inner, fx);
+        else if (id == "lpcurve" || id == "cvcurve" || id == "vxcurve") // Love Philter's articulators, Convolver's EQ, Vocodex's maps (round 173d3)
+            paintPhilterCurve (g, inner, fx);
+        else if (id == "vxmapsel") // Vocodex: the map shown (round 173d3)
+            paintVxMapSelector (g, r);
         else if (id == "maxbands") // Maximus: the three bands over 20 Hz…20 kHz with their crossovers and the low cut
         {
             const auto raw = [&] (int p) { return maximusfx::stateParam (fx.state, p).value_or (maximusfx::stateParams()[(std::size_t) p].defaultValue); };
@@ -2858,6 +3289,22 @@ public:
         else if (id == "taptempo") // round 129: a tap pad (H-Delay's TAP): tap twice or more to set the delay time
         {
             const auto lit = juce::Time::getMillisecondCounter() - lastTap < 150;
+            if (skin::ledReadouts()) // round tp172d: EchoBoy's TAP TEMPO — a square key and the tempo on a red LED read-out
+            {
+                const auto key = r.withWidth (r.getHeight());
+                skin::hwKey (g, key, lit, false);
+                auto bpm = tapBpm;
+                if (bpm <= 0.0)
+                {
+                    const auto timeParam = plugui::paramIndex (kind, item.param);
+                    const auto t = timeParam >= 0 ? valueText (timeParam, fx.params[(std::size_t) timeParam]) : juce::String();
+                    const auto ms = t.endsWith (" ms") ? t.getDoubleValue() : t.endsWith (" s") ? t.getDoubleValue() * 1000.0 : 0.0;
+                    bpm = ms > 0.0 ? 60000.0 / ms : 0.0;
+                }
+                ledReadout (g, r.withTrimmedLeft (key.getWidth() + 4.0f * s).reduced (0.0f, r.getHeight() * 0.18f),
+                            bpm > 0.0 ? juce::String (bpm, 1) + " bpm" : juce::String ("--- bpm"), s, fx.enabled);
+                return;
+            }
             skin::button (g, r, lit, false, accent, radius::sm * s);
             g.setColour (lit ? colour::textPrimary : colour::textSecondary);
             g.setFont (font (juce::jmax (7.0f, 10.0f * s), true));
@@ -2873,7 +3320,20 @@ public:
             const auto target = vuMode != 0 ? -juce::jlimit (-3.0f, 30.0f, -(20.0f * std::log10 (juce::jmax (1e-6f, level)) + 18.0f))
                                             : -juce::jlimit (0.0f, 1.0f, liveMeter (item.steps)) * 30.0f;
             vuNeedle += (-target - vuNeedle) * 0.35f; // a meter's inertia (~300 ms at the 30 Hz refresh)
-            const auto face = r.reduced (2.0f * s);
+            auto face = r.reduced (2.0f * s);
+            if (skin::vuBezel()) // round tp172d (look slice): a chrome bezel round the meter window
+            {
+                g.setColour (juce::Colours::black.withAlpha (0.6f));
+                g.fillRoundedRectangle (r.translated (0.0f, 2.0f * s), 10.0f * s);
+                const auto dark = skin::vuBezelDark(); // (slice 8: an opto leveler's gunmetal frame)
+                g.setGradientFill (juce::ColourGradient (juce::Colour (dark ? 0xff5a5c60 : 0xffe6e8ea), 0.0f, r.getY(), juce::Colour (dark ? 0xff1c1d1f : 0xff4a4c50), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, 10.0f * s);
+                g.setGradientFill (juce::ColourGradient (juce::Colour (dark ? 0xff202124 : 0xff2e3034), 0.0f, r.getY(), juce::Colour (dark ? 0xff4b4d51 : 0xffb8babe), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r.reduced (4.0f * s), 8.0f * s);
+                g.setColour (juce::Colour (0xff101010));
+                g.fillRoundedRectangle (r.reduced (6.0f * s), 7.0f * s);
+                face = r.reduced (9.0f * s);
+            }
             g.setColour (juce::Colour (0xffd9cfb4).withAlpha (fx.enabled ? 1.0f : 0.5f));
             g.fillRoundedRectangle (face, radius::lg * s);
             if (kind == EffectKind::kilnChannel) // round tp172c7: the console's lamp-lit amber face, warmer in the middle
@@ -3085,6 +3545,7 @@ public:
 
 #include "ui/GrossBeatEditor.inc"
 #include "ui/MaximusCurveEditor.inc"
+#include "ui/LovePhilterEditor.inc"
 
     // --- the parametric EQ's graph (FL's Parametric EQ 2 arrangement) -----------------------------------
 
@@ -3784,6 +4245,8 @@ public:
             return 0;
         if (menuButton().expanded (2.0f).contains (p))
             return 1;
+        if (! sidechainChip.isEmpty() && sidechainChip.contains (p))
+            return 6;
         if (usesBar())
             return bar.contains (p) ? 5 : 0;
         if (presetBox().contains (p))
@@ -3817,6 +4280,8 @@ public:
         if (kind == EffectKind::grossBeat && i >= 0 && gbMouseMove (activeLayout().items[(std::size_t) i], p)) // round 168m
             return;
         if (kind == EffectKind::maximus && mxMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 168x
+            return;
+        if ((kind == EffectKind::lovePhilter || kind == EffectKind::convolver || kind == EffectKind::vocodex) && lpMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 173d3
             return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
@@ -3857,6 +4322,11 @@ public:
 
         if (const auto h = headerItemAt (e.position); h > 0)
         {
+            if (h == 6)
+            {
+                pluginheader::showSidechainPicker (engine, track, slot, this, sidechainChip.getSmallestIntegerContainer());
+                return;
+            }
             if (h == 5)
             {
                 const auto flFiles = presetFiles(); // round 168r: ◀ ▶ also run through FL's presets after LYNX's bank
@@ -3931,6 +4401,22 @@ public:
         {
             if (mxMouseDown (e, item))
                 dragItem = index;
+            return;
+        }
+        if (isPhilterCurve (item)) // round 173d3: Love Philter's articulator editor
+        {
+            if (lpMouseDown (e, item))
+                dragItem = index;
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "vxmapsel") // round 173d3: Vocodex's map dropdown
+        {
+            vxMapMenu (rectOf (item));
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: EQUO's send box
+        {
+            showTransmitterSendMenu (0, rectOf (item));
             return;
         }
         if (item.type == Item::display && (juce::String (item.display) == "tsssend0" || juce::String (item.display) == "tsssend1"))
@@ -4193,6 +4679,17 @@ public:
                 const auto n = juce::jmax (1, (int) plugui::optionLabels (item).size());
                 auto o = item.type == Item::radio || isVertical (item) ? (int) ((e.position.y - r.getY()) / r.getHeight() * (float) n)
                                                   : (int) ((e.position.x - r.getX()) / r.getWidth() * (float) n);
+                if (hasStyle (item, plugui::batToggle) && n == 2) // round tp172d (slice 8): a click flips the bat toggle
+                    o = plugui::optionAt (item, valueOf (param)) == 0 ? 1 : 0;
+                if (hasStyle (item, plugui::rotarySelector)) // ... and turns the selector to the printed option nearest the click
+                {
+                    const auto c = selectorKnobArea (item).getCentre();
+                    const auto a = std::atan2 (e.position.x - c.x, c.y - e.position.y);
+                    auto best = 1e9f;
+                    for (int k = 0; k < n; ++k)
+                        if (const auto d = std::abs (a - selectorAngle (k, n)); d < best)
+                            best = d, o = k;
+                }
                 if (item.type == Item::radio && item.columns > 0)
                     for (int k = 0; k < n; ++k)
                         if (gridCell (item, k, n).contains (e.position))
@@ -4236,6 +4733,11 @@ public:
         if (mxDragging && dragItem >= 0) // round 168x: Maximus' curve
         {
             mxMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
+            return;
+        }
+        if (lpDragging && dragItem >= 0) // round 173d3: Love Philter's articulator curve
+        {
+            lpMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
         if (wsDragState && dragItem >= 0) // round 165: the WaveShaper's curve
@@ -4333,6 +4835,11 @@ public:
             mxMouseUp();
             dragItem = -1;
         }
+        if (lpDragging) // round 173d3
+        {
+            lpMouseUp();
+            dragItem = -1;
+        }
         if (gbDragging) // round 168m
         {
             gbEnvelopeUp();
@@ -4398,7 +4905,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -4641,7 +5148,7 @@ private:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -4725,6 +5232,8 @@ private:
             case 3: return { tr ("Previous preset"), {}, false, false };
             case 4: return { tr ("Next preset"), {}, false, false };
             case 5: return { bar.hintFor (bar.partAt (p)), bar.presetLabel(), false, true };
+            case 6: return { tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose"),
+                             {}, false, true };
             default: break;
         }
         const auto index = itemAt (p);
@@ -4760,6 +5269,10 @@ private:
             return { wsHint (item, p), {}, false, true };
         if (isMaximusCurve (item)) // round 168x
             return { mxHint (item, p), {}, false, true };
+        if (isPhilterCurve (item)) // round 173d3
+            return { lpHint (item, p), {}, false, true };
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: FL's hint
+            return { tr ("Send track number"), current() != nullptr && current()->sendTracks[0] > 0 ? insertName (current()->sendTracks[0]) : juce::String ("---"), false, false };
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
@@ -4798,7 +5311,7 @@ private:
         if (! f.loadFileAsData (data))
             return;
         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm);
+        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
         if (! fx || fx->kind != kind)
             return;
         presetName = f.getFileNameWithoutExtension();
@@ -4877,6 +5390,12 @@ private:
         juce::PopupMenu menu;
         if (presets.getNumItems() > 0)
             menu.addSubMenu (tr ("Presets"), presets);
+        if (showsSidechain()) // round 177b
+        {
+            juce::PopupMenu side;
+            pluginheader::addSidechainPicker (side, engine, track, slot);
+            menu.addSubMenu (kind == EffectKind::vocoder || kind == EffectKind::vocodex ? tr ("Modulator from") : tr ("Sidechain from"), side);
+        }
         skin::addStyleMenu (menu, styleKey(), [safe = juce::Component::SafePointer<NativeEffectEditor> (this)] {
             if (safe != nullptr) safe->repaint();
         });

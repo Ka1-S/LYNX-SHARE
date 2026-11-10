@@ -1,5 +1,7 @@
 #include "engine/AudioEngine.h"
+#include "core/VideoPlayer.h"
 
+#include "core/Comping.h"
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -23,6 +25,8 @@
 #include "ui/I18n.h"
 
 #include "core/FlpImport.h"
+#include "core/AlsImport.h"
+#include "core/FlmImport.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -37,6 +41,7 @@
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
+#include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
 #include "flp/Flp.h"
 
@@ -68,6 +73,12 @@ FlPathRoots findFlStudioRoots()
 
     if (fl.userData.isDirectory())
         roots.userData = fl.userData.getFullPathName().toStdString();
+    // FL's Shared data folder and its Downloads (issue #124: FL Cloud sounds and other samples kept there)
+    if (fl.sharedData.isDirectory())
+    {
+        roots.sharedData = fl.sharedData.getFullPathName().toStdString();
+        roots.downloadsData = fl.sharedData.getChildFile ("Downloads").getFullPathName().toStdString();
+    }
 
     roots.home = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getFullPathName().toStdString();
     return roots;
@@ -224,8 +235,9 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice)
-    : workers (std::make_unique<WorkerPool> (workerCount(), raiseAudioThreadPriority)),
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+      plugins (userPluginList),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -654,6 +666,8 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
 
 ProcessTimes* AudioEngine::getProcessTimes() noexcept
 {
+    if (externalTimes != nullptr)
+        return externalTimes;
     return rackProcessor != nullptr ? &rackProcessor->processTimes() : nullptr;
 }
 
@@ -744,12 +758,22 @@ void AudioEngine::startPlayback()
         const auto punching = recordOptions.punchLoopRegion && song.mode == PlayMode::song && song.hasLoop();
         const auto in = punching ? song.loopStart : here;
         const auto out = punching ? song.loopEnd : std::numeric_limits<std::int64_t>::max() / 4;
-        const auto pre = recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
+        // (seconds: the ADR window's pre-roll, round 174d)
+        auto secondsBack = [this] (std::int64_t at, double seconds) {
+            const auto from = std::max (0.0, song.secondsForTicks (at) - seconds);
+            return std::max<std::int64_t> (0, at - (std::int64_t) std::llround (videotrack::ticksForSeconds (song, from)));
+        };
+        auto secondsOn = [this] (std::int64_t at, double seconds) {
+            return std::max<std::int64_t> (0, (std::int64_t) std::llround (videotrack::ticksForSeconds (song, song.secondsForTicks (at) + seconds)) - at);
+        };
+        const auto pre = recordOptions.preRollSeconds >= 0.0 ? secondsBack (in, recordOptions.preRollSeconds)
+                         : recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
         if (punching || pre > 0)
         {
             activePunch = PunchRange { in, out };
             if (punching)
-                punchStopAt = out + (recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
+                punchStopAt = out + (recordOptions.postRollSeconds >= 0.0 ? secondsOn (out, recordOptions.postRollSeconds)
+                                     : recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
             startAt = std::max<std::int64_t> (0, in - pre);
             transport.seekRequest.store ((double) startAt);
         }
@@ -937,11 +961,11 @@ double AudioEngine::getPreviewPosition() const noexcept
     return preview != nullptr ? preview->getPlayPosition() : -1.0;
 }
 
-void AudioEngine::markHeldKey (int key, bool on) noexcept
+void AudioEngine::markHeldKey (int midiChannel, int key, bool on) noexcept
 {
-    if (key < 0 || key > 127)
+    if (key < 0 || key > 127 || midiChannel < 0 || midiChannel > 15)
         return;
-    auto& count = heldKeyCount[(std::size_t) key];
+    auto& count = heldKeyCount[midiChannel][(std::size_t) key];
     auto before = count.load();
     std::uint8_t after = 0;
     do
@@ -949,9 +973,9 @@ void AudioEngine::markHeldKey (int key, bool on) noexcept
     while (! count.compare_exchange_weak (before, after));
     const auto bit = std::uint64_t { 1 } << (key & 63);
     if (after > 0)
-        heldKeyBits[key >> 6].fetch_or (bit);
+        heldKeyBits[midiChannel][key >> 6].fetch_or (bit);
     else
-        heldKeyBits[key >> 6].fetch_and (~bit);
+        heldKeyBits[midiChannel][key >> 6].fetch_and (~bit);
 }
 
 void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, double tick, bool recorded)
@@ -1009,21 +1033,34 @@ NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 std::vector<int> AudioEngine::heldInputKeys() const
 {
     std::vector<int> keys;
+    std::uint64_t all[2] {};
+    for (const auto& channel : heldKeyBits)
+        for (int word = 0; word < 2; ++word)
+            all[word] |= channel[word].load();
     for (int word = 0; word < 2; ++word)
-    {
-        const auto bits = heldKeyBits[word].load();
         for (int b = 0; b < 64; ++b)
-            if ((bits >> b & 1u) != 0)
+            if ((all[word] >> b & 1u) != 0)
                 keys.push_back (word * 64 + b);
-    }
     return keys;
+}
+
+std::array<std::uint64_t, 2> AudioEngine::heldInputKeyBits (int midiChannel) const noexcept
+{
+    if (midiChannel < 0 || midiChannel > 15)
+        return {};
+    return { heldKeyBits[midiChannel][0].load (std::memory_order_relaxed), heldKeyBits[midiChannel][1].load (std::memory_order_relaxed) };
+}
+
+RollingAudioLog& AudioEngine::getRollingLog() noexcept
+{
+    return meters.rollingLog;
 }
 
 void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, bool record)
 {
     if (record) // played notes (the PC keyboard) follow the scale snap; previews don't
     {
-        markHeldKey (key, on);
+        markHeldKey (0, key, on); // (FL sends the typing keyboard as MIDI channel 1)
         // the note-off stops the key its note-on started, even if the snap changed in between
         const auto requested = key;
         if (on)
@@ -1058,10 +1095,12 @@ void AudioEngine::panic()
     e.type = NoteEvent::Type::choke;
     e.channel = -1; // every channel
     liveEvents.push (e);
-    for (auto& c : heldKeyCount)
-        c.store (0);
-    for (auto& w : heldKeyBits)
-        w.store (0);
+    for (auto& channel : heldKeyCount)
+        for (auto& c : channel)
+            c.store (0);
+    for (auto& channel : heldKeyBits)
+        for (auto& w : channel)
+            w.store (0);
 }
 
 void AudioEngine::stopSound()
@@ -1146,6 +1185,77 @@ double AudioEngine::estimatedPositionNow() const noexcept
     return tick;
 }
 
+AudioEngine::LiveRecording AudioEngine::liveRecording() const
+{
+    LiveRecording live;
+    if (! isLiveRecording())
+        return live;
+    live.punch = activePunch;
+
+    // the note take
+    if (recorder.isActive() && song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size())
+    {
+        const auto now = transport.playing.load() ? estimatedPositionNow() : lastPlayingTick;
+        auto preview = recorder.preview (song, now);
+        live.notes = true;
+        live.pattern = song.currentPattern;
+        live.held = std::move (preview.notes);
+        if (song.mode == PlayMode::song && preview.origin >= 0)
+        {
+            // the take's clip (placed with its first finished note) or, before it, where it will be placed
+            const Clip* clip = nullptr;
+            for (const auto& c : song.playlist)
+                if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && c.start - c.offset == preview.origin
+                    && (clip == nullptr || c.end() > clip->end()))
+                    clip = &c;
+            live.track = clip != nullptr ? clip->track : patternClipTrack (song, song.barAt (preview.origin).tick);
+            live.from = clip != nullptr ? clip->start : preview.origin;
+            live.origin = preview.origin;
+            auto to = preview.reach;
+            for (const auto& n : live.held)
+                to = std::max (to, preview.origin + n.start + n.length);
+            if (! preview.fromClip && noteTakeLinear)
+                to = std::max (to, (std::int64_t) now); // (a linear take: the region follows the playhead)
+            live.to = std::max (live.from, to);
+        }
+    }
+
+    // the audio takes
+    const auto startTick = takeStartTick.load();
+    const auto frames = takeFrames.load();
+    if (! openTakes.empty() && startTick >= 0.0 && frames > 0)
+    {
+        const auto wraps = takeWrapCount.load();
+        const auto lastWrap = song.mode == PlayMode::song && song.hasLoop() && wraps > 0 ? (std::int64_t) takeWraps[(std::size_t) wraps - 1].load() : -1;
+        const auto span = liverec::audioSpan (startTick, frames, takeTicksPerSample, takeLatency, lastWrap, song.loopStart);
+        if (liveTakeTracks.size() != openTakes.size())
+        {
+            // the tracks takes::placeTakeClips will pick (each file's insert, one track each)
+            liveTakeTracks.clear();
+            const auto from = (std::int64_t) span.start, to = from + std::max<std::int64_t> (1, (std::int64_t) span.length);
+            for (const auto& take : openTakes)
+            {
+                auto track = takes::takeTrack (song, take->playThrough > 0 ? take->playThrough : -1, from, to);
+                for (const auto used : liveTakeTracks)
+                    if (used >= track)
+                        track = used + 1;
+                liveTakeTracks.push_back (track);
+            }
+        }
+        if (span.valid())
+            for (std::size_t k = 0; k < openTakes.size(); ++k)
+            {
+                LiveRecording::Audio a;
+                a.track = liveTakeTracks[k];
+                a.span = span;
+                a.peaks = openTakes[k]->peaks;
+                a.name = openTakes[k]->file.getFileNameWithoutExtension();
+                live.audio.push_back (std::move (a));
+            }
+    }
+    return live;
+}
+
 void AudioEngine::updateAudioRecording()
 {
     const auto wantTake = audioArmed && recordOptions.recordAudio && transport.recording.load();
@@ -1201,6 +1311,7 @@ bool AudioEngine::Take::drain()
             failed.store (true);
             break;
         }
+        peaks->append (in, stream->channels(), got);
     }
     return any;
 }
@@ -1559,6 +1670,7 @@ void AudioEngine::writeJournals()
 
 void AudioEngine::finishAudioTake()
 {
+    liveTakeTracks.clear();
     {
         const juce::SpinLock::ScopedLockType lock (takeLock);
         takes.fill (nullptr);
@@ -1627,7 +1739,7 @@ void AudioEngine::finishAudioTake()
     for (int k = 0, count = takeWrapCount.exchange (0); k < count; ++k)
         wraps.push_back ((double) takeWraps[(std::size_t) k].load() * takeTicksPerSample);
 
-    if (frames <= 0 || startTick < 0.0)
+    if (frames <= 0 || startTick < 0.0 || discardAudioTakes) // (Cancel recording drops the takes, round 187a)
     {
         for (auto& take : done)
         {
@@ -1648,7 +1760,9 @@ void AudioEngine::finishAudioTake()
     if (keepPunch.has_value()) // pre-roll / punch in-out: only the range (the rest stays in the file)
         parts = takes::punch (placement, { *keepPunch });
     else if (song.mode == PlayMode::song && song.hasLoop())
-        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, ppq / 4, wraps); // one part per pass of the loop
+        // one part per pass of the loop; FL keeps a pass of any length (REA round 177c: a 1-tick pass got its own track),
+        // round 163's option drops one a 1/16 note long or less
+        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, recordOptions.lastLoopPassPlays ? ppq / 4 : 0, wraps);
     else if (recordOptions.recordingMarkers && song.mode == PlayMode::song)
         parts = takes::punch (placement, punchRanges (song.markers())); // FL's "Enable recording markers"
     else
@@ -1669,7 +1783,10 @@ void AudioEngine::finishAudioTake()
     for (const auto& take : kept)
         made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
 
-    editSong ([made, parts] (Song& s) { takes::placeTakeClips (s, made, parts); });
+    // FL: Loop record over a loop region, without a punch
+    const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.hasLoop();
+    const takes::TakeOptions takeOptions { loopRecorded, recordOptions.mode == RecordMode::overdub, recordOptions.lastLoopPassPlays };
+    editSong ([made, parts, takeOptions] (Song& s) { takes::placeTakeClips (s, made, parts, takeOptions); });
     dropJournals();
 }
 
@@ -1950,6 +2067,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
 
     midiActivity.fetch_add (1, std::memory_order_relaxed); // the toolbar's MIDI input light
+    if (m.getRawDataSize() > 0 && prefs::midiMeansPlaying (m.getRawData()[0]))
+        midiPlayed.fetch_add (1, std::memory_order_relaxed); // what holds a backup back (not clock or active sensing)
 
     // FL's "Song marker jump (MIDI channel)": notes on that channel move the song to a marker instead of playing
     if (jumpChannel > 0 && m.getChannel() == jumpChannel && m.isNoteOnOrOff())
@@ -2007,6 +2126,37 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     {
         const auto cc = m.getControllerNumber();
         controllerQueue.push ({ cc, m.getChannel() - 1, m.getControllerValue() });
+        // FL's "Foot pedal controls note off" (round 187a [DECOMP FUN_00fdb260]): with it on, CC 64 / CC 66 hold the
+        // played channels' notes and don't reach the plugins
+        if (const auto mode = PedalHold::modeFor (cc, m.getControllerValue()); mode >= 0 && footPedalNoteOff.load (std::memory_order_relaxed))
+        {
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto stamped = m.getTimeStamp() * 1000.0;
+            const auto tick = recordTickFor (std::abs (stamped - now) < 1000.0 ? stamped : now);
+            const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+            auto pedal = [&] (int channel) {
+                pedalHold.setMode (channel, mode, [&] (int key) {
+                    NoteEvent e;
+                    e.type = NoteEvent::Type::off;
+                    e.channel = channel;
+                    e.key = key;
+                    midiEvents.push (e);
+                    logPlayedNote (channel, key, 0.0f, false, transport.playing.load() ? tick : -1.0, taking);
+                    if (taking) // (the recorded note lasts until the pedal comes up, as in FL)
+                        midiRecordQueue.push ({ tick, channel, key, 0.0f, false });
+                });
+            };
+            if (device.target >= 0)
+                pedal (device.target);
+            else
+            {
+                const auto extra = juce::jlimit (0, maxLiveChannels, extraLiveCount.load());
+                for (int i = -1; i < extra; ++i)
+                    if (const auto channel = i < 0 ? liveChannel.load() : extraLiveChannels[(std::size_t) i].load(); channel >= 0)
+                        pedal (channel);
+            }
+            return;
+        }
         // (120…127 are channel mode messages: All Sound / Notes Off, reset…)
         if (cc >= 0 && cc < 120 && (linkedCcs[(std::size_t) (cc >> 6)].load (std::memory_order_relaxed) >> (cc & 63) & 1u) == 0)
             playControl (cc, (float) m.getControllerValue() / 127.0f);
@@ -2035,7 +2185,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
 
     const auto on = m.isNoteOn();
-    markHeldKey (m.getNoteNumber(), on);
+    markHeldKey (m.getChannel() - 1, m.getNoteNumber(), on);
 
     if (on)
         startOnInput();
@@ -2089,7 +2239,14 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         push (stale[i], false, 0.0f);
 
     for (int i = 0; i < count; ++i)
+    {
+        // the foot pedal (round 187a): a held note struck again is released first; a note-off it holds waits for it
+        if (on && pedalHold.noteOn (targets[i].channel, targets[i].key))
+            push (targets[i], false, 0.0f);
+        if (! on && pedalHold.noteOff (targets[i].channel, targets[i].key))
+            continue;
         push (targets[i], on, on ? prefs::mapVelocity (m.getFloatVelocity(), velocityCurve) : 0.0f);
+    }
 }
 
 void AudioEngine::enableAllMidiInputs()
@@ -2136,6 +2293,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         midiPrefsShared = p;
     }
     performanceMidiChannel.store (p.performanceChannel);
+    footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
         pickups.clear();
     if (prefetcher != nullptr) // (only with an audio device: the real app)
@@ -2198,6 +2356,38 @@ void AudioEngine::setRecording (bool shouldRecord)
     sendChangeMessage();
 }
 
+bool AudioEngine::cancelRecording()
+{
+    if (! transport.recording.load())
+        return false;
+    // FL [DECOMP 0xf1d7e0]: the recorded-event buffers are emptied, every disk-recording take is dropped and its track
+    // re-armed, the record button is released; playback is not stopped. LYNX writes a take into the song as it goes, so
+    // the pass's edits are undone instead (one undo step per take; a step the user made while recording goes too).
+    updateRecording(); // (what was played up to now, and the start of this pass if the timer hasn't seen it yet)
+    const auto armed = armedInserts;
+    const auto inPass = recordPassActive && recordPassMarked; // (record on but stopped: the last pass is already kept)
+    discardAudioTakes = true;
+    setRecording (false); // (the takes close here: the notes still held are committed, the audio files deleted)
+    discardAudioTakes = false;
+    for (const auto t : armed)
+        if (std::find (armedInserts.begin(), armedInserts.end(), t) == armedInserts.end())
+            setInsertArmed (t, true);
+    if (inPass && ! sessionHistory)
+    {
+        const auto made = undoStack.size() + recordPassTrimmed;
+        const auto steps = made > recordPassUndoBase ? made - recordPassUndoBase : 0;
+        for (std::size_t i = 0; i < steps && ! undoStack.empty(); ++i)
+        {
+            undo();
+            if (! redoStack.empty())
+                redoStack.pop_back(); // (nothing to redo: the pass is gone)
+        }
+    }
+    recordPassMarked = false;
+    sendChangeMessage();
+    return true;
+}
+
 void AudioEngine::updateRecording()
 {
     const auto playing = transport.playing.load();
@@ -2212,6 +2402,14 @@ void AudioEngine::updateRecording()
     // (round 170d: a take starts with its count-in, so the notes played during it are kept)
     const auto counting = isCountingIn();
     const auto active = transport.recording.load() && (playing || counting);
+    // a recording pass starts: what Cancel recording goes back to (round 187a)
+    if (active && ! recordPassActive)
+    {
+        recordPassMarked = true;
+        recordPassUndoBase = undoStack.size();
+        recordPassTrimmed = 0;
+    }
+    recordPassActive = active;
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
@@ -2319,8 +2517,34 @@ void AudioEngine::updateRecording()
     takeHasUndoStep = true;
 }
 
+void AudioEngine::launcherCommand (const launcher::Command& command)
+{
+    if (clipLauncher == nullptr || ! song.clipGrid)
+        return;
+    using T = launcher::Command::Type;
+    const auto starts = command.type == T::launch || command.type == T::launchScene;
+    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::reset)
+        return;
+    if (starts && song.mode != PlayMode::song) // the grid plays with the song
+        editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+    // a scene with its own tempo and bar length: the song takes them when it is launched
+    if (command.type == T::launchScene && command.scene >= 0 && command.scene < (int) song.clipGrid->scenes.size())
+        if (const auto& scene = song.clipGrid->scenes[(std::size_t) command.scene]; scene.tempo > 0.0 || scene.beatsPerBar > 0)
+            editSong ([tempo = scene.tempo, bar = scene.beatsPerBar] (Song& s) {
+                if (tempo > 0.0)
+                    s.bpm = tempo;
+                if (bar > 0)
+                    s.beatsPerBar = bar;
+            }, false);
+    if (starts && ! transport.playing.load())
+        play();
+    clipLauncher->commands.push (command);
+}
+
 void AudioEngine::setSong (Song newSong)
 {
+    if (clipLauncher != nullptr)
+        clipLauncher->commands.push ({ launcher::Command::Type::reset });
     undoStack.clear();
     redoStack.clear();
     sessionUndo.clear();
@@ -2385,7 +2609,11 @@ void AudioEngine::saveUndoStep()
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
+        {
             undoStack.pop_front();
+            if (recordPassMarked)
+                ++recordPassTrimmed;
+        }
         if (sessionHistory)
         {
             closeSessionStep();
@@ -2408,9 +2636,20 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     }
 
     const auto lengthsBefore = patternLengths (song);
+    const auto auditioned = comp::auditionedTrack (song);
     edit (song);
+    comp::checkAudition (song, auditioned);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
+    publishSong();
+}
+
+void AudioEngine::editSongPatternOrder (const std::function<void (Song&)>& edit)
+{
+    saveUndoStep();
+    modified = true;
+    edit (song);
+    clipops::updateCrossfades (song);
     publishSong();
 }
 
@@ -2520,6 +2759,7 @@ void AudioEngine::undo()
     redoStack.push_back (std::move (song));
     song = std::move (undoStack.back());
     undoStack.pop_back();
+    comp::setAudition (song, -1); // (not an edit: whatever an old state had auditioned stays out of it)
     modified = true;
     lastUndoPress = {};
     publishSong();
@@ -2535,6 +2775,7 @@ void AudioEngine::redo()
     undoStack.push_back (std::move (song));
     song = std::move (redoStack.back());
     redoStack.pop_back();
+    comp::setAudition (song, -1);
     modified = true;
     lastUndoPress = {};
     publishSong();
@@ -2664,6 +2905,44 @@ std::string userOf (const Song& song, std::size_t track)
 }
 } // namespace
 
+namespace
+{
+// Where a Live set's library-relative samples live (Core Library, packs, User Library), newest install first; only
+// folders that exist. Read-only: nothing is ever written there.
+std::vector<std::string> liveLibraryRoots()
+{
+    std::vector<std::string> roots;
+    auto add = [&roots] (const juce::File& f) {
+        if (f.isDirectory())
+            roots.push_back (f.getFullPathName().toStdString());
+    };
+   #if JUCE_WINDOWS
+    const juce::File programData ("C:\\ProgramData\\Ableton");
+   #elif JUCE_MAC
+    const juce::File programData ("/Applications");
+   #else
+    const juce::File programData;
+   #endif
+    if (programData.isDirectory())
+    {
+        auto installs = programData.findChildFiles (juce::File::findDirectories, false, "Live*");
+        std::sort (installs.begin(), installs.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName() > b.getFileName(); });
+        for (const auto& install : installs)
+        {
+            add (install.getChildFile ("Resources").getChildFile ("Core Library"));
+            add (install.getChildFile ("Contents").getChildFile ("App-Resources").getChildFile ("Core Library"));
+        }
+    }
+    const auto docs = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Ableton");
+    add (docs.getChildFile ("User Library"));
+    add (docs.getChildFile ("Factory Packs"));
+    const auto music = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("Ableton");
+    add (music.getChildFile ("User Library"));
+    add (music.getChildFile ("Factory Packs"));
+    return roots;
+}
+} // namespace
+
 void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                     PreparedFlp& out)
 {
@@ -2681,7 +2960,14 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
     {
         loadtrace::stage (0.20, 0.30, TR_NOOP ("Reading the project..."));
         const auto started = std::chrono::steady_clock::now();
-        const auto project = flp::parseProject ({ static_cast<const std::uint8_t*> (data.getData()), data.getSize() });
+        const auto* fileBytes = static_cast<const std::uint8_t*> (data.getData());
+        // a Live set (.als, round 175a) takes the same pipeline: samples, plugins, report and Missing files window
+        const auto liveSet = file.hasFileExtension ("als");
+        // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
+        const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
+        std::optional<flp::Project> project;
+        if (! liveSet && ! mobileProject)
+            project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
         FlpImportOptions options;
@@ -2746,7 +3032,41 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         options.relocations = relocations;
         {
             const auto t = std::chrono::steady_clock::now();
-            out.song = importFlp (project, options);
+            if (mobileProject)
+            {
+                FlmImportOptions flmOptions;
+                flmOptions.common = options;
+                if (! options.roots.factoryData.empty())
+                    if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
+                        flmOptions.resourceRoot = root;
+                std::string flmError;
+                auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
+                if (! song)
+                {
+                    out.error = utf8 (flmError.empty() ? "not a readable FL Studio Mobile project" : flmError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (liveSet)
+            {
+                AlsImportOptions alsOptions;
+                alsOptions.common = options;
+                alsOptions.libraryRoots = liveLibraryRoots();
+                alsOptions.sessionOnPlaylist = alsSessionOnPlaylist.load();
+                std::string alsError;
+                auto song = importAls (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), alsOptions, &alsError);
+                if (! song)
+                {
+                    out.error = utf8 (alsError.empty() ? "not a readable Live set" : alsError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else
+            {
+                out.song = importFlp (*project, options);
+            }
             loadtrace::add ("import", loadtrace::msSince (t));
         }
         loadtrace::add ("missing_roots", 0.0, (int) roots->missingRoots().size());
@@ -2790,7 +3110,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         for (const auto& c : out.song.channels)
         {
             if (c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip || c.instrument == InstrumentKind::granulizer
-                || c.instrument == InstrumentKind::wavetraveller
+                || c.instrument == InstrumentKind::wavetraveller || c.instrument == InstrumentKind::fruityslicer
                 || c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
                 addPath (c.samplePath);
             for (const auto& z : c.zones)
@@ -2837,6 +3157,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::string path;
             double ratio;
             StretchMethod method;
+            double semitones;
+            StretchMap map;
+            std::string variant; // non-empty: the precomputed span is stretched (RackRenderer, round 180d)
+            std::shared_ptr<const SampleData> span;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -2845,10 +3169,32 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (const auto data = library.load (juce::String::fromUTF8 (c.samplePath.c_str())); data != nullptr && data->frames() > 0)
                 {
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
-                    const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
-                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) { return x.path == c.samplePath && x.ratio == ratio && x.method == method; }))
-                        stretches.push_back ({ c.samplePath, ratio, method });
+                    const auto semitones = (double) c.sampler.stretchPitch;
+                    // the same stretch as RackRenderer: the precomputed span when there is one (round 180d), else the file
+                    const auto clip = c.instrument == InstrumentKind::audioClip;
+                    auto settings = c.sampler;
+                    if (clip)
+                        settings.regionStart = 0.0f, settings.regionEnd = 1.0f;
+                    const auto precomputes = clip ? c.sampler.precompute.any() : precompute::needed (c.sampler);
+                    if (precomputes && c.sampler.warp.empty())
+                    {
+                        if (std::shared_ptr<const SampleData> span = precompute::apply (*data, settings); span != nullptr && span->frames() > 0)
+                        {
+                            const auto ratio = target / ((double) span->frames() / span->sampleRate);
+                            auto variant = precompute::variantKey (settings, clip);
+                            if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
+                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
+                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span) });
+                        }
+                        continue;
+                    }
+                    const auto ratio = target / ((double) precompute::stretchedFrames (data, c.sampler, clip) / data->sampleRate);
+                    // (the same map the rack asks for: RackState::build)
+                    auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
+                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
+                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {} });
                 }
         if (! stretches.empty())
         {
@@ -2856,7 +3202,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method))
+                    if (auto stretched = ! stretches[i].variant.empty()
+                                             ? library.loadStretchedSpan (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].variant,
+                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones)
+                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3056,10 +3405,31 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 
 void AudioEngine::publishSong()
 {
+    // Issue #134: a hosted plugin may run the message loop while it is created (a licence or trial box, COM, a splash
+    // window), and what that loop dispatches can ask for a publish while this one is still building its rack: the
+    // engine's own timer (after a device change to another sample rate it sees the old rate until this publish ends, so
+    // it started a second rebuild of every plugin inside the first one's, and another inside each of those, as deep as
+    // the plugins kept running the loop), or an edit. The nested one waits: when this publish is done, one more runs
+    // with the song as it then is.
+    if (publishing)
+    {
+        publishAgain = true;
+        ++nestedPublishes;
+        return;
+    }
+    publishing = true;
+    const juce::ScopeGuard published { [this] {
+        publishing = false;
+        if (std::exchange (publishAgain, false))
+            publishSong();
+    } };
     ++songStamp;
     ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
+    // round 174d A3: the Video Player's clock follows the song's tempo map (FL: the song's real time)
+    if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::videoplayer; }))
+        video::publishTempo (song);
     // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
     song.uniqueInstances();
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log
@@ -3127,12 +3497,25 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
     };
-    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
-    factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
+    factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
+                                       double ratio, StretchMethod method, double semitones) {
+        const loadtrace::Scope timing ("rack_stretch");
+        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
+    };
+    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeInstrument (ref, sr);
+    };
+    factories.pluginEffects = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeEffect (ref, sr);
+    };
 
     const auto buildStart = juce::Time::getMillisecondCounterHiRes();
     const auto tracePhases = traceEdits && ! loadtrace::active(); // the build's phases (an open traces its own)
@@ -3148,6 +3531,12 @@ void AudioEngine::publishSong()
     const Song& played = projectedSong ? *projectedSong : song;
     standInChannels = std::move (projected.channels);
     standInInserts = std::move (projected.inserts);
+    if (played.clipGrid)
+    {
+        if (clipLauncher == nullptr)
+            clipLauncher = std::make_unique<launcher::Runtime>();
+        factories.clipLauncher = clipLauncher.get();
+    }
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -3222,6 +3611,24 @@ void AudioEngine::removeGlobalLink (const AutomationTarget& target)
     setMidiPrefs (p, saveGlobalLinks);
 }
 
+void AudioEngine::setMultilink (bool on)
+{
+    if (on)
+        multilink.emplace();
+    else
+        multilink.reset();
+    sendChangeMessage();
+}
+
+void AudioEngine::multilinkToControllers (bool global)
+{
+    if (! multilink)
+        return;
+    multilink->collecting = false;
+    multilink->global = global;
+    sendChangeMessage();
+}
+
 void AudioEngine::learnMidiController (const AutomationTarget& target)
 {
     learning = target;
@@ -3235,6 +3642,18 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
 {
     if (target.kind == AutomationTargetKind::none)
         return;
+
+    if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
+        multilink->add (target);
+
+    // FL [EXEC round 185b, issue #125]: a moved control leaves its automation until playback starts again (stopped: the
+    // value stays; playing: the clip no longer drives it). While recording automation the touch rule applies instead.
+    const auto recordingAutomation = transport.recording.load() && transport.playing.load() && recordOptions.recordAutomation;
+    if (! recordingAutomation && std::find (releasedTargets.begin(), releasedTargets.end(), target) == releasedTargets.end())
+    {
+        releasedTargets.push_back (target);
+        publishReleasedTargets();
+    }
 
     if (! (lastTweaked[0] == target))
     {
@@ -3251,6 +3670,21 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     }
     it->lastMs = now;
     it->held = it->held || held;
+}
+
+void AudioEngine::publishReleasedTargets()
+{
+    if (rackProcessor == nullptr)
+        return;
+    std::vector<int> slots, one;
+    for (const auto& t : releasedTargets)
+    {
+        RackState::slotsOfTarget (song, t, one);
+        for (const auto a : one) // (a link to an internal controller keeps driving it)
+            if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
+                slots.push_back (a);
+    }
+    rackProcessor->getRenderer().setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -3507,6 +3941,36 @@ void AudioEngine::applyControllers()
             learningGlobal = false;
             setMidiPrefs (p, saveGlobalLinks);
         }
+        else if (learning.kind == AutomationTargetKind::none && multilink)
+        {
+            // FL's Multilink (round 177b-4): the first message of each controller links the next queued control
+            if (const auto link = multilink->controller (e.cc, e.channel))
+            {
+                if (multilink->global) // "Override global links": as "Override global link...", for every project
+                {
+                    auto p = midiPrefs;
+                    const prefs::GlobalLink g { link->cc, link->channel, (int) link->target.kind, link->target.index, link->target.slot,
+                                                link->target.param };
+                    p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
+                                                         [&] (const prefs::GlobalLink& l) {
+                                                             return l.kind == g.kind && l.index == g.index && l.slot == g.slot && l.param == g.param;
+                                                         }),
+                                         p.globalLinks.end());
+                    p.globalLinks.push_back (g);
+                    setMidiPrefs (p, saveGlobalLinks);
+                }
+                else
+                    editSong ([l = *link] (Song& s) {
+                        s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& m) { return m.target == l.target; }),
+                                           s.midiLinks.end());
+                        s.midiLinks.push_back ({ l.cc, l.channel, l.target });
+                    });
+                if (multilink->complete())
+                    multilink.reset(); // FL: "the process will auto-close once the number of hardware controls tweaked
+                                       // equals the number of software targets"
+                sendChangeMessage();
+            }
+        }
         else if (learning.kind != AutomationTargetKind::none)
         {
             // MIDI learn: replace the old link for the same target with the new one
@@ -3604,10 +4068,17 @@ void AudioEngine::timerCallback()
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     applyControllers();
+    // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
+    if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
+        releasedTargets.clear();
+    else if (! releasedTargets.empty())
+        publishReleasedTargets(); // (the slots follow the song: an automation added or removed renumbers them)
     if (const auto note = pendingMarkerNote.exchange (-1); note >= 0)
         jumpToMarker (note); // FL's "Song marker jump": note 0 = the first marker
     updateRecording();
     updatePerformanceRecording();
+    if (clipLauncher != nullptr)
+        updateLauncherRecording();
     rackExchange.collectGarbage();
     if (levelsPending && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
         flushLevels(); // a level drag ended: the full snapshot catches up (round 171c)
@@ -3616,8 +4087,12 @@ void AudioEngine::timerCallback()
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.
     const auto rateChanged = std::abs (transport.sampleRate.load() - lastPublishedShape.sampleRate) > 0.5;
     const auto latencies = lastPublishedShape.currentLatencies();
-    if (rateChanged || latencies != lastPublishedShape.latencies)
+    if (! publishing && (rateChanged || latencies != lastPublishedShape.latencies)) // (not inside a publish: see publishSong)
     {
+        // the plugins made for the new rate start from what the running ones hold now (issue #134: they started from
+        // the state of the last save or export, so a device at another rate undid every change made in their windows)
+        if (rateChanged)
+            capturePluginStates();
         // (diagnostics: which unit's latency moved)
         if (! rateChanged)
             for (std::size_t i = 0; i < latencies.size() && i < lastPublishedShape.latencies.size(); ++i)
@@ -3670,6 +4145,43 @@ void AudioEngine::updatePerformanceRecording()
         }
     }, ! perfTakeHasUndoStep);
     perfTakeHasUndoStep = true;
+}
+
+// The clip grid's recording (round 181a): while recording, what is launched is written into the Playlist. Every pass that
+// ended becomes a copy of its clip on its track, where the song was when the pass began, replacing what was under it.
+void AudioEngine::updateLauncherRecording()
+{
+    auto& runtime = *clipLauncher;
+    const auto on = transport.recording.load() && transport.playing.load() && song.clipGrid && song.mode == PlayMode::song && recordOptions.recordClips;
+    if (on && ! runtime.recording.load (std::memory_order_relaxed))
+        launcherTakeHasUndoStep = false;
+    runtime.recording.store (on, std::memory_order_relaxed);
+
+    std::vector<Clip> clips;
+    launcher::RecordedPass pass;
+    while (runtime.recorded.pop (pass))
+        if (Clip c; song.clipGrid && launcher::recordedClip (*song.clipGrid, pass, c))
+            clips.push_back (c);
+    if (clips.empty())
+        return;
+    editSong ([&clips] (Song& s) {
+        for (const auto& c : clips)
+        {
+            const auto end = c.end();
+            for (auto& o : s.playlist)
+                if (o.track == c.track && o.start < end && o.end() > c.start)
+                {
+                    if (o.start >= c.start)
+                        o.length = 0; // removed below
+                    else
+                        o.length = c.start - o.start;
+                }
+            s.playlist.erase (std::remove_if (s.playlist.begin(), s.playlist.end(), [] (const Clip& o) { return o.length <= 0; }),
+                              s.playlist.end());
+            s.playlist.push_back (c);
+        }
+    }, ! launcherTakeHasUndoStep);
+    launcherTakeHasUndoStep = true;
 }
 
 void AudioEngine::choosePreferredDriver()
@@ -4003,6 +4515,9 @@ std::shared_ptr<Instrument> AudioEngine::getChannelInstrument (int channel) cons
 
 std::shared_ptr<Effect> AudioEngine::getEffect (int track, int slot) const
 {
+    if (externalEffect)
+        return externalEffect();
+
     const auto& effects = lastPublishedShape.effects;
 
     if (track < 0 || track >= (int) effects.size() || slot < 0 || slot >= (int) effects[(std::size_t) track].size())
@@ -4483,6 +4998,7 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     rtStats.deviceRestarted();
     rt::resetForNewDevice();
     transport.sampleRate.store (device->getCurrentSampleRate());
+    meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
     // what is heard comes out one output buffer + the driver's output latency after it was rendered (round 170d, as
     // the MIDI clock output counts it)

@@ -1,4 +1,5 @@
 #include "ui/Icons.h"
+#include "ui/Motion.h"
 
 #include <cmath>
 #include <map>
@@ -633,6 +634,11 @@ Shape make (Icon icon)
             polyline (st, { { 15.5f, 6.0f }, { 20.0f, 6.0f }, { 20.0f, 10.5f } });
             break;
         }
+        case Icon::note: // an eighth note: a solid head, its stem and a flag
+            fi.addEllipse (4.5f, 14.5f, 7.5f, 5.5f);
+            line (st, 11.5f, 17.0f, 11.5f, 4.0f);
+            polyline (st, { { 11.5f, 4.0f }, { 17.0f, 7.5f }, { 17.5f, 11.5f } });
+            break;
         case Icon::chord: // three notes stacked on one start (a chord)
             fi.addRoundedRectangle (4.0f, 4.5f, 12.0f, 4.0f, 1.25f);
             fi.addRoundedRectangle (4.0f, 10.0f, 16.0f, 4.0f, 1.25f);
@@ -832,6 +838,13 @@ void IconButton::buttonStateChanged()
     juce::Button::buttonStateChanged();
 
     const auto target = isOver() || isDown() ? 1.0f : 0.0f;
+
+    if (! ui::motion::enabled()) // Settings › General › Animations off: no fade, no timer
+    {
+        stopTimer();
+        hover = target;
+        return;
+    }
 
     if (target != hover && ! isTimerRunning())
         startTimerHz (60);

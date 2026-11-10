@@ -728,7 +728,9 @@ struct Engine::Psola
             mag[(std::size_t) i] = (float) std::pow (p, ex);
         }
         int count = 0;
-        for (int k = binLo; k < binHi && count != 100; ++k)
+        // (the peak search reads a bin on each side: at device rates far above 192 kHz the 60 Hz bin is bin 0 and the
+        // search read before the spectrum — issue #134's audit; unchanged at every rate FL runs at)
+        for (int k = std::max (binLo, 1); k < std::min (binHi, fftN - 1) && count != 100; ++k)
         {
             const float m0 = mag[(std::size_t) k], mm = mag[(std::size_t) k - 1], mp = mag[(std::size_t) k + 1];
             if (! (m0 > mm) || ! (m0 > mp))
@@ -1226,9 +1228,23 @@ namespace
 class PitchShifterEffect final : public Effect
 {
 public:
+    // `initial` (may be null): the slot's parameters, loaded in prepare() as process() would on its first block, so
+    // the engine's latency is known before it (issue #113)
+    explicit PitchShifterEffect (const EffectParams* initial = nullptr)
+    {
+        if (initial != nullptr)
+            params0 = *initial;
+        hasParams0 = initial != nullptr;
+    }
+
     void prepare (double sampleRate) noexcept override
     {
         rate = sampleRate;
+        if (hasParams0 && ! loaded)
+        {
+            state = fromParams (params0), loaded = true;
+            engine.setState (state);
+        }
         engine.prepare (sampleRate);
     }
 
@@ -1261,10 +1277,11 @@ public:
 private:
     Engine engine;
     State state;
-    bool loaded = false;
+    EffectParams params0 {};
+    bool loaded = false, hasParams0 = false;
     double rate = 44100.0, tempo = 120.0;
 };
 } // namespace
 
-std::unique_ptr<Effect> make() { return std::make_unique<PitchShifterEffect>(); }
+std::unique_ptr<Effect> make (const EffectParams* params) { return std::make_unique<PitchShifterEffect> (params); }
 } // namespace lynx::psfl

@@ -220,9 +220,10 @@ std::uint64_t fnv (const void* data, std::size_t bytes, std::uint64_t h = 146959
 
 std::uint64_t stretchFingerprint (StretchMethod method)
 {
-    static std::array<std::once_flag, 3> once;
-    static std::array<std::uint64_t, 3> prints {};
-    const auto m = (std::size_t) juce::jlimit (0, 2, (int) method);
+    // one print per method (round 175a: the warp modes 3…6 shared method 2's, so a change to them kept stale files)
+    static std::array<std::once_flag, (std::size_t) stretchMethodCount> once;
+    static std::array<std::uint64_t, (std::size_t) stretchMethodCount> prints {};
+    const auto m = (std::size_t) juce::jlimit (0, stretchMethodCount - 1, (int) method);
     std::call_once (once[m], [m] {
         SampleData test;
         test.sampleRate = 44100.0;
@@ -237,18 +238,36 @@ std::uint64_t stretchFingerprint (StretchMethod method)
         }
         const auto out = timeStretch (test, 2.6, (StretchMethod) m); // (beyond 2x: the seeded randomised steps count too)
         auto h = fnv (out->left.data(), out->left.size() * sizeof (float));
-        prints[m] = fnv (out->right.data(), out->right.size() * sizeof (float), h);
+        h = fnv (out->right.data(), out->right.size() * sizeof (float), h);
+        if ((StretchMethod) m == StretchMethod::beats) // and Beats' transposed pieces
+        {
+            const auto up = timeStretch (test, 2.6, StretchMethod::beats, 5.0);
+            h = fnv (up->left.data(), up->left.size() * sizeof (float), h);
+        }
+        prints[m] = h;
     });
     return prints[m];
 }
 
-juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMethod method)
+// A warp map's part of a cache key ("" for none). "wm1": the mapped renderer's version — raise it when its output changes
+juce::String stretchMapKey (const StretchMap& map)
+{
+    if (map.empty())
+        return {};
+    juce::String s;
+    for (const auto& [x, y] : map)
+        s << juce::String (x, 3) << ',' << juce::String (y, 3) << ';';
+    return "|wm1:" + juce::String::toHexString (s.hashCode64());
+}
+
+juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMethod method, double semitones, const StretchMap& map)
 {
     const auto source = platform::localFile (path);
     if (! source.existsAsFile())
         return {};
     const auto key = source.getFullPathName() + "|" + juce::String (source.getSize()) + "|" + juce::String (source.getLastModificationTime().toMilliseconds())
-                   + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method));
+                   + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
+                   + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map);
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -344,10 +363,14 @@ void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleDa
 }
 } // namespace
 
-std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::String& path, double ratio, StretchMethod method)
+std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::String& path, double ratio, StretchMethod method, double semitones,
+                                                               const StretchMap& map)
 {
+    if (method != StretchMethod::beats)
+        semitones = 0.0; // (only Beats renders a transposition offline)
     // 10 significant digits: ratios within 0.1 % of 1 are resampled to the exact length, so 4 decimals were too coarse
-    const auto key = path + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method);
+    const auto key = path + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method)
+                     + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map);
     auto& shared = sharedCache();
 
     {
@@ -357,7 +380,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
     }
 
     static const bool useDisk = [] { const auto* e = std::getenv ("LYNX_STRETCH_DISK"); return e == nullptr || e[0] != '0'; }();
-    const auto onDisk = useDisk ? stretchCacheFile (path, ratio, method) : juce::File();
+    const auto onDisk = useDisk ? stretchCacheFile (path, ratio, method, semitones, map) : juce::File();
     std::shared_ptr<const SampleData> stretched;
     {
         const loadtrace::Scope timing ("stretch_disk_read");
@@ -373,7 +396,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
         std::shared_ptr<SampleData> made;
         {
             const loadtrace::Scope timing ("stretch_compute");
-            made = timeStretch (*original, ratio, method);
+            made = map.empty() ? timeStretch (*original, ratio, method, semitones) : timeStretchMapped (*original, map, method, semitones);
         }
         stretched = std::move (made);
         if (stretched != nullptr && onDisk != juce::File())
@@ -388,6 +411,36 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
     for (auto it = shared.stretched.begin(); it != shared.stretched.end();)
         it = it->first.startsWith (path + "|") && it->second.use_count() == 1 ? shared.stretched.erase (it) : std::next (it);
 
+    shared.stretched[key] = stretched;
+    return stretched;
+}
+
+std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::String& path, const std::string& variantKey,
+                                                                   const std::shared_ptr<const SampleData>& span, double ratio,
+                                                                   StretchMethod method, double semitones)
+{
+    if (span == nullptr || span->frames() == 0)
+        return nullptr;
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+    const auto key = path + "|span|" + juce::String::fromUTF8 (variantKey.c_str()) + "|" + juce::String (ratio, 10) + "|"
+                     + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String());
+    auto& shared = sharedCache();
+    {
+        const std::scoped_lock l (shared.stretchLock);
+        if (auto it = shared.stretched.find (key); it != shared.stretched.end())
+            return it->second;
+    }
+    std::shared_ptr<const SampleData> stretched;
+    {
+        const loadtrace::Scope timing ("stretch_compute");
+        stretched = timeStretchSpan (*span, ratio, method, semitones);
+    }
+    if (stretched == nullptr)
+        return nullptr;
+    const std::scoped_lock l (shared.stretchLock);
+    for (auto it = shared.stretched.begin(); it != shared.stretched.end();)
+        it = it->first.startsWith (path + "|") && it->second.use_count() == 1 ? shared.stretched.erase (it) : std::next (it);
     shared.stretched[key] = stretched;
     return stretched;
 }

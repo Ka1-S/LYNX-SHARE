@@ -568,6 +568,64 @@ void MidiActivityLight::update (std::uint32_t count, const juce::StringArray& ac
         repaint();
 }
 
+void ChordPanel::setText (const juce::String& newText)
+{
+    if (newText != text)
+    {
+        text = newText;
+        repaint();
+    }
+}
+
+void ChordPanel::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds();
+    g.setColour (colour::bg1);
+    g.fillRoundedRectangle (area.toFloat(), radius::md);
+    g.setColour (colour::textPrimary);
+    // past eight characters the name gets smaller, down to what fits (FL: its size minus 1.15 per character)
+    const auto base = juce::jmin (20.0f, (float) area.getHeight() * 0.55f);
+    auto readoutFont = monoFont (juce::jmax (9.0f, base - 1.15f * (float) juce::jmax (0, text.length() - 8)));
+    for (int i = 0; i < 10 && juce::GlyphArrangement::getStringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
+        readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
+    g.setFont (readoutFont);
+    g.drawText (text, area, juce::Justification::centred, false);
+}
+
+void ChordPanel::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu() && onMenu)
+        onMenu();
+}
+
+ui::Hint ChordPanel::hintAt (juce::Point<int>)
+{
+    return { tr ("Detected chord"), {}, false, false };
+}
+
+void ChordHint::setText (const juce::String& newText)
+{
+    if (newText != text)
+    {
+        text = newText;
+        repaint();
+    }
+}
+
+void ChordHint::paint (juce::Graphics& g)
+{
+    juce::GlyphArrangement glyphs;
+    glyphs.addFittedText (theme::font (theme::type::body, true).withHeight (17.0f), text, 2.0f, 0.0f, (float) getWidth() - 4.0f, (float) getHeight(),
+                          juce::Justification::centredLeft, 1, 1.0f);
+    juce::Path outline;
+    glyphs.createPath (outline);
+    g.setColour (juce::Colours::black);
+    g.strokePath (outline, juce::PathStrokeType (2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (juce::Colours::white);
+    g.fillPath (outline);
+}
+
 void MidiActivityLight::paint (juce::Graphics& g)
 {
     const auto size = juce::jmin ((float) getWidth(), (float) getHeight()) * 0.36f;
@@ -841,8 +899,45 @@ void OutputMonitor::paint (juce::Graphics& g)
             wave.lineTo (scope.getX() + (float) x, y);
     }
 
-    g.setColour (lineColour);
-    g.strokePath (wave, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    const auto stroke = juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+    // round 174e2: the same stroke drawn by the software renderer into a small image, then the image to the window.
+    // Direct2D builds and tessellates a new path geometry (and stroke style) for every strokePath: at the display's
+    // rate that was the toolbar's biggest cost. LYNX_SCOPE_IMAGE=0: the direct stroke, for comparisons.
+    static const bool viaImage = [] {
+        const auto* v = std::getenv ("LYNX_SCOPE_IMAGE");
+        return v == nullptr || juce::String (v) != "0";
+    }();
+    if (! viaImage)
+    {
+        g.setColour (lineColour);
+        g.strokePath (wave, stroke);
+        return;
+    }
+    const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto box = scope.expanded (2.0f).getSmallestIntegerContainer();
+    const auto w = juce::jmax (1, juce::roundToInt ((float) box.getWidth() * scale)), h = juce::jmax (1, juce::roundToInt ((float) box.getHeight() * scale));
+    if (scopeImage.getWidth() != w || scopeImage.getHeight() != h)
+        scopeImage = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+    else
+        scopeImage.clear (scopeImage.getBounds());
+    {
+        juce::Graphics ig (scopeImage);
+        ig.addTransform (juce::AffineTransform::translation ((float) -box.getX(), (float) -box.getY()).scaled (scale));
+        ig.setColour (lineColour);
+        ig.strokePath (wave, stroke);
+    }
+    // into a persistent window-type image (drawing the software image itself would convert it to a new GPU bitmap on
+    // every frame): a write marks it for a small upload of these few pixels
+    if (scopeNative.getWidth() != w || scopeNative.getHeight() != h)
+        scopeNative = juce::Image (juce::Image::ARGB, w, h, true);
+    {
+        const juce::Image::BitmapData from (scopeImage, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData to (scopeNative, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < h; ++y)
+            std::memcpy (to.getLinePointer (y), from.getLinePointer (y), (std::size_t) w * (std::size_t) from.pixelStride);
+    }
+    g.setColour (juce::Colours::black);
+    g.drawImage (scopeNative, box.toFloat());
 }
 
 ui::Hint OutputMonitor::hintAt (juce::Point<int>)
@@ -1056,6 +1151,8 @@ Icon EditOverlay::groupIcon (toolbarlayout::Group g)
         case Group::file: return Icon::save;
         case Group::meters: return Icon::settings;
         case Group::output: return Icon::listen;
+        case Group::chord: return Icon::pianoRoll;
+        case Group::multilink: return Icon::link;
         case Group::count_: break;
     }
     return Icon::none;

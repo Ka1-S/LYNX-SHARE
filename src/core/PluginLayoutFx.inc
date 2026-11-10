@@ -178,10 +178,10 @@ Layout fruityDelayBankLayout()
     {
         const auto p = [&] (const char* control) { return stateName (k, stateparams::bankControl (b, control)); };
         const auto add = [&] (LayoutItem i) { v.push_back (onPage (std::move (i), b)); };
-        const auto dial = [&] (float cx, float cy, const char* control, const char* caption, std::uint16_t style = 0) {
+        const auto dial = [&] (float cx, float cy, const char* control, const char* caption, std::uint32_t style = 0) {
             add (knob (cx, cy, 30, p (control), caption, cy + 29, style));
         };
-        const auto fader = [&] (float cx, const char* control, const char* caption, std::uint16_t style = 0) {
+        const auto fader = [&] (float cx, const char* control, const char* caption, std::uint32_t style = 0) {
             add (slider (Item::vslider, cx - 10, 140, 20, 108, p (control), nullptr, noCaption | style));
             add (label (cx - 18, 255, 36, 12, caption));
         };
@@ -255,7 +255,10 @@ Layout equoLayout()
     v.push_back (knob (457, 100, 30, "Smoothness", TR_NOOP ("Smooth"), 126));
     v.push_back (knob (515, 100, 30, "Volume", TR_NOOP ("Vol"), 126));
     v.push_back (section (407, 138, 155, 105, TR_NOOP ("Setup")));
-    v.push_back (toggle (410, 160, 100, 12, "Send only", TR_NOOP ("Send only")));
+    v.push_back (toggle (410, 160, 84, 12, "Send only", TR_NOOP ("Send only")));
+    // the send's track (round 173d3, FL shot: a "---" box right of SEND ONLY; right-click lists the tracks the insert routes to)
+    v.push_back (label (496, 160, 32, 12, "SEND"));
+    v.push_back (display (529, 156, 33, 20, "equosend"));
     v.push_back (toggle (410, 205, 100, 12, "Add mode", TR_NOOP ("Add mode")));
     v.push_back (toggle (410, 224, 100, 12, "Oversample", TR_NOOP ("Oversample")));
     v.push_back (knob (539, 200, 28, "Bandwidth", TR_NOOP ("BW"), 229));
@@ -312,8 +315,9 @@ Layout multibandDelayLayout()
 Layout convolverLayout()
 {
     // dry, in (input separation), wet, wet separation · delay, self-conv, stretch, eq (the state's knobs); NORMALIZE;
-    // the impulse response's waveform with its rate, format and length. FL's sample editor tools and its equalizer page
-    // are not reproduced (LYNX keeps the state's EQ curve as it is).
+    // the impulse response's waveform with its rate, format and length on the impulse page; the equalizer page draws and
+    // edits the EQ curve over FL's frequency axis (round 173d3, FL shot: the "impulse | equalizer" switch under the
+    // logo). FL's sample editor tools are not reproduced.
     constexpr auto k = EffectKind::convolver;
     Layout l;
     l.fl = "Fruity Convolver";
@@ -331,8 +335,10 @@ Layout convolverLayout()
     v.push_back (knob (456, 32, 40, stateName (k, "EQ"), TR_NOOP ("EQ"), 68));
     v.push_back (toggle (622, 8, 90, 12, stateName (k, "Normalize"), TR_NOOP ("Normalize")));
     v.push_back (label (560, 28, 150, 40, "Fruity Convolver", dim));
-    v.push_back (display (5, 104, 712, 20, "irinfo"));
-    v.push_back (display (5, 128, 712, 168, "irwave"));
+    v.push_back (pageTabs (540, 76, 170, 18, TR_NOOP ("Impulse|Equalizer")));
+    v.push_back (onPage (display (5, 104, 712, 20, "irinfo"), 0));
+    v.push_back (onPage (display (5, 128, 712, 168, "irwave"), 0));
+    v.push_back (onPage (display (5, 104, 712, 192, "cvcurve"), 1));
     return l;
 }
 
@@ -349,7 +355,7 @@ Layout pitchShifterLayout()
     auto& v = l.items;
     const auto voice = [&] (LayoutItem i) { v.push_back (when (std::move (i), "Granular", 0.0f, 0.5f)); };
     const auto music = [&] (LayoutItem i) { v.push_back (when (std::move (i), "Granular", 0.5f, 1.0f)); };
-    const auto fader = [&] (float cx, float bottom, const char* param, const char* caption, std::uint16_t style, auto add) {
+    const auto fader = [&] (float cx, float bottom, const char* param, const char* caption, std::uint32_t style, auto add) {
         add (plate (cx - 21, 17, 42, 18, param));
         add (slider (Item::vslider, cx - 10, 46, 20, bottom - 46, param, nullptr, noCaption | style));
         add (label (cx - 30, 250, 60, 12, caption));
@@ -517,8 +523,9 @@ Layout vocodexLayout()
 {
     // Mixer (WET, SG, MOD, CAR, +NOISE faders, the three filters, MOD / CAR inputs, L-R ENCODING), Contour (from car /
     // consonants, to mod / noise), DRAFT, THREADED; the envelope follower (HOLD, ATT, REL, their curves, PEAK / RMS,
-    // MIN TIMES, freeze), ORDER, the band and unison knobs, the number of bands; then the band map (read-only: FL's map
-    // editor and the carrier synthesizer's patch browser are not reproduced). All controls live in the slot state.
+    // MIN TIMES, freeze), ORDER, the band and unison knobs, the number of bands; then FL's map editor (round 173d3: the
+    // map dropdown over the 13 maps, the page = the map shown; the carrier synthesizer's patch browser is not
+    // reproduced). All controls live in the slot state.
     constexpr auto k = EffectKind::vocodex;
     const auto p = [] (const char* name) { return stateName (EffectKind::vocodex, name); };
     Layout l;
@@ -582,7 +589,8 @@ Layout vocodexLayout()
     v.push_back (label (537, 250, 48, 12, TR_NOOP ("Uni. pan")));
     v.push_back (stepper (266, 262, 36, 17, p ("Bands"), nullptr, 95));
     v.push_back (label (306, 262, 130, 17, TR_NOOP ("Bands - distribution"), alignLeft));
-    v.push_back (display (10, 288, 578, 280, "vcxmap"));
+    v.push_back (display (10, 288, 160, 17, "vxmapsel"));
+    v.push_back (display (10, 308, 578, 260, "vxcurve"));
     v.push_back (display (10, 574, 578, 22, "vcxcarrier"));
     l.menuSwitches = { p ("Subtractive gate") };
     (void) k;

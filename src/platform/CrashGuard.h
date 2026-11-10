@@ -103,6 +103,13 @@ std::string describeAddress (const void* address);
 // `folderUtf8`/hang <time>.txt and adds a session step ("UI not responding ..."); a second sample follows if the stall
 // lasts, and "UI responding again after N s" when it ends. stopHangWatch ends the thread (before quitting).
 void startHangWatch (const std::string& folderUtf8, int stallMs = 2000) noexcept;
+// Issue #115 (Linux / macOS; nothing on Windows). Call after the crash handler is installed (JUCE's
+// setApplicationCrashHandler), on the message thread:
+// - an alternate signal stack for this thread, and the crash handler's signals moved onto it, so a stack overflow on the
+//   message thread still writes its crash file;
+// - SIGTERM / SIGHUP (the session logging out, the terminal that started LYNX closed, `kill`) leave a session step
+//   ("ended by SIGTERM ...") before LYNX ends as it did before. Without them the report could only say "closed".
+void hardenSignals() noexcept;
 void heartbeat() noexcept;
 void stopHangWatch() noexcept;
 // --symbolize: the "LYNX.exe+0x…" frames of a crash / hang file named with this very build's symbols (LYNX.pdb of
@@ -110,4 +117,12 @@ void stopHangWatch() noexcept;
 std::string symbolizeOwnFrames (const std::string& text);
 // Test: the last hang file written by this process ("" when none)
 std::string lastHangFile();
+
+// Message-thread sampling profiler (round 174f; LYNX_PROFILE_MAIN=<file>). Called on the message thread: a thread samples
+// it every `intervalUs` (Windows x64: suspended for a moment and unwound, as the hang watch does) and only counts the
+// samples where the thread ran since the last one (its cycle counter moved), so waiting in the message loop does not
+// count. Every `windowS` seconds it appends that window's functions by self and by total samples to the file (LYNX.exe
+// named with LYNX.pdb next to it; system DLLs by their nearest export or module). Other platforms: nothing.
+void startMainProfiler (const std::string& fileUtf8, int intervalUs = 1000, int windowS = 5) noexcept;
+void stopMainProfiler() noexcept;
 } // namespace lynx::crashguard

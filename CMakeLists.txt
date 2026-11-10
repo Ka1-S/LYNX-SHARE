@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.24 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.25 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,14 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_
     set_source_files_properties(src/core/Slayer.cpp PROPERTIES COMPILE_OPTIONS "-fno-inline")
 endif()
 
+# The plugins are shared libraries: everything they link must be position independent (the option is declared below)
+if(LYNX_BUILD_PLUGINS)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections) # (what the plugins' --gc-sections can drop)
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # JUCE-free core: model, sequencer, built-in instruments and .flp reader
 
@@ -30,24 +38,36 @@ add_library(lynx_core STATIC
     src/core/Scheduler.cpp
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
+    src/core/ClipLauncher.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
+    src/core/RollingAudioLog.cpp
+    src/core/ChordReadout.cpp
     src/core/LoadTrace.cpp
     src/core/ModuleWarmup.cpp
     src/core/FlpImport.cpp
     src/core/FlpExport.cpp
+    src/core/XmlLite.cpp
+    src/core/Gzip.cpp
+    src/core/AlsImport.cpp
+    src/core/FlmFormat.cpp
+    src/core/FlmImport.cpp
+    src/core/FlmEffects.cpp
+    src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
     src/core/Recorder.cpp
     src/core/TakeRecording.cpp
+    src/core/Comping.cpp
     src/core/Pdc.cpp
     src/core/WorkerPool.cpp
     src/core/TimeStretch.cpp
     src/core/Arpeggiator.cpp
     src/core/SynthPresets.cpp
     src/core/Slicer.cpp
+    src/core/AudioToMidi.cpp
     src/core/Templates.cpp
     src/core/FlWrapper.cpp
     src/core/FlPluginDb.cpp
@@ -64,6 +84,9 @@ add_library(lynx_core STATIC
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
+    src/core/SimpleTracks.cpp
+    src/core/GamepadMap.cpp
+    src/core/ExportBundle.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -86,6 +109,7 @@ add_library(lynx_core STATIC
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
     src/core/WaveTraveller.cpp
+    src/core/FruitySlicer.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -104,12 +128,19 @@ add_library(lynx_core STATIC
     src/core/LowLifterFl.cpp
     src/core/TransporterFl.cpp
     src/core/FlLegacyFx.cpp
+    src/core/PocketFx.cpp
+    src/core/PocketMultiFx.cpp
+    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
     src/core/Dvs.cpp
     src/core/Transmitter.cpp
     src/core/VideoPlayer.cpp
+    src/core/VideoTime.cpp
+    src/core/VideoTrack.cpp
+    src/core/Adr.cpp
+    src/core/DialogueAlign.cpp
     src/core/FruityDance.cpp
     src/core/Reeverb2.cpp
     src/core/LuxeVerb.cpp
@@ -243,6 +274,7 @@ target_sources(lynx_core PRIVATE
     src/core/PlaylistOps.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
+    src/core/AutoWarp.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
     src/core/PatternBlocks.cpp
@@ -353,8 +385,8 @@ if(LYNX_BUILD_APP)
         HARDENED_RUNTIME_ENABLED FALSE
         PLIST_TO_MERGE "<plist><dict><key>CFBundleName</key><string>LYNX SHARE</string><key>CFBundleDisplayName</key><string>LYNX SHARE</string><key>LSMinimumSystemVersion</key><string>11.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>")
 
-    target_sources(LYNX PRIVATE
-        src/Main.cpp
+    # (a list: the plugin build, cmake/LynxPlugins.cmake, compiles the same sources without Main.cpp)
+    set(LYNX_APP_SOURCES
         src/platform/FileTypes.cpp
         src/platform/CrashGuard.cpp
         src/platform/Paths.cpp
@@ -374,11 +406,15 @@ if(LYNX_BUILD_APP)
         src/engine/LiveSessions.cpp
         src/engine/MediaPack.cpp
         src/engine/LiveTest.cpp
+        src/engine/DeviceChangeTest.cpp
+        src/engine/ShortExportTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
+        src/engine/SandboxWorker.cpp
+        src/engine/Bridge32Test.cpp
         src/engine/Exporter.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp
@@ -402,6 +438,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPresetMenu.cpp
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
+        src/ui/PluginKeysTest.cpp
         src/ui/ParametricEqEditor.cpp
         src/ui/FacetEqEditor.cpp
         src/ui/ProEditors.cpp
@@ -412,6 +449,9 @@ if(LYNX_BUILD_APP)
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
+        src/ui/AlsExportDialog.cpp
+        src/ui/GamepadInput.cpp
+        src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
@@ -421,7 +461,13 @@ if(LYNX_BUILD_APP)
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/VideoMedia.cpp
+        src/ui/VideoMediaWindows.cpp
+        src/ui/VideoTracks.cpp
+        src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
+        src/ui/FruitySlicerEditor.cpp
+        src/ui/FlVoicePanel.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp
@@ -439,26 +485,28 @@ if(LYNX_BUILD_APP)
         src/ui/EditorTools.cpp)
 
     # workflow shell: workspace desktop, control contract, dialogs
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
+        src/ui/NativeChild.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp
         src/ui/Splash.cpp)
 
     # main window chrome: hint bar and toolbar widgets
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/HintBar.cpp
         src/ui/Toolbar.cpp)
 
     # spectral waveforms: background analysis cache and drawing
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/WaveformView.cpp)
 
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
+        src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
@@ -466,6 +514,7 @@ if(LYNX_BUILD_APP)
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
+        src/ui/SimpleWorkflow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
@@ -475,6 +524,8 @@ if(LYNX_BUILD_APP)
         src/ui/NewProjectDialog.cpp
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
+        src/ui/ClipGridComponent.cpp
+        src/ui/DetailView.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
@@ -482,7 +533,9 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
-        src/ui/StemExtract.cpp)
+        src/ui/StemExtract.cpp
+        src/ui/AudioToMidi.cpp)
+    target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
@@ -506,8 +559,13 @@ if(LYNX_BUILD_APP)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
         target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
+        # the system's video decoder (round 174d, ui/VideoMediaMac.mm; manual retain / release)
+        target_sources(LYNX PRIVATE src/ui/VideoMediaMac.mm)
+        set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
@@ -515,6 +573,16 @@ if(LYNX_BUILD_APP)
         # LYNX's own PipeWire driver (round 161): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
         target_include_directories(LYNX SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+
+    # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files
+    if(UNIX AND NOT APPLE)
+        juce_add_binary_data(LynxFontData
+            HEADER_NAME LynxFontData.h
+            NAMESPACE lynxfontdata
+            SOURCES resources/fonts/OpenSans-Regular.ttf resources/fonts/OpenSans-Bold.ttf)
+        target_link_libraries(LYNX PRIVATE LynxFontData)
+        target_compile_definitions(LYNX PRIVATE LYNX_BUNDLED_FONT=1)
     endif()
 
     target_link_libraries(LYNX
@@ -525,8 +593,20 @@ if(LYNX_BUILD_APP)
             juce::juce_dsp
             juce::juce_opengl
         PUBLIC
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_lto_flags)
+            juce::juce_recommended_config_flags)
+    # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
+    # minutes of a cached CI App build). -DLYNX_LTO=OFF
+    option(LYNX_LTO "Link the app with link-time optimisation" ON)
+    if(LYNX_LTO)
+        target_link_libraries(LYNX PUBLIC juce::juce_recommended_lto_flags)
+    endif()
+endif()
+
+# LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by
+# default: nothing of it is configured or compiled in the normal build.
+option(LYNX_BUILD_PLUGINS "Build LYNX's own plugins as VST3 and CLAP" OFF)
+if(LYNX_BUILD_APP AND LYNX_BUILD_PLUGINS)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/LynxPlugins.cmake)
 endif()
 
 if(LYNX_BUILD_APP AND UNIX AND NOT APPLE)

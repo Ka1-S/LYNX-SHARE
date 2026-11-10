@@ -346,7 +346,7 @@ TEST (patcher_generator_runs_inside_the_rack_with_extra_outputs)
 TEST (patcher_state_from_fl_becomes_the_graph)
 {
     using namespace patcher141;
-    // IN → Fruity Balance "Left" → OUT ×0.5 and IN → OUT, a Peak Controller's output 0 on the Balance's volume
+    // IN → Fruity Balance "Left" → OUT ×0.5 and IN → OUT, a Peak Controller's output 0 (Peak+LFO) on the Balance's volume
     // (FL parameter 1), the node positions and an extra output named "Insert 5"
     FlBlob blob;
     std::vector<std::uint8_t> balance;
@@ -404,7 +404,7 @@ TEST (patcher_state_from_fl_becomes_the_graph)
         return w.kind == lynx::PatchWire::Kind::audio && w.from == 0 && w.to == lynx::patchToHost && w.toPort == 0 && w.gain == 0.5f;
     }));
     CHECK (std::any_of (doc.wires.begin(), doc.wires.end(), [] (const lynx::PatchWire& w) {
-        return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.to == 0 && w.fromPort == 1; // FL's "peak" = LYNX output 1
+        return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.to == 0 && w.fromPort == 0; // FL's 0 "Peak+LFO" = LYNX's 0
     }));
     CHECK (doc.outputTracks.size() == 1 && doc.outputTracks[0] == 5);
     CHECK (doc.published.size() == 1 && doc.published[0].node == 0);

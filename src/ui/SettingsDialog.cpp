@@ -1,7 +1,9 @@
 #include "ui/SettingsDialog.h"
+#include "core/Comping.h"
 #include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
 
+#include "core/ClipOps.h"
 #include "core/MissingFiles.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
@@ -63,7 +65,7 @@ public:
         };
         addAndMakeVisible (timeMode);
 
-        tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { s.bpm = v; }); };
+        tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { clipops::followTempo (s, v); }); };
         beats.onValueChange = [this] { edit ([v = (int) beats.getValue()] (Song& s) { s.beatsPerBar = v; }); };
         swing.onValueChange = [this] { edit ([v = (float) (swing.getValue() / 100.0)] (Song& s) { s.swing = v; }); };
         pitch.onValueChange = [this] { edit ([v = (float) pitch.getValue()] (Song& s) { s.masterPitch = v; }); };
@@ -74,7 +76,7 @@ public:
             l->setFont (theme::font (theme::type::small));
             addAndMakeVisible (l);
         }
-        ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Projects from FL Studio are converted to it.", { juce::String (ppq) }),
+        ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Imported projects (.flp, .als, .flm) are converted to it.", { juce::String (ppq) }),
                          juce::dontSendNotification);
         signatureText.setText (tr ("Time signature changes along the song: add a time signature marker on the Playlist ruler."),
                                juce::dontSendNotification);
@@ -95,6 +97,18 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         addAndMakeVisible (crossfadesNew);
+        // Comping (round 177c): the crossfade at a comp's switches, re-applied to every comp when it changes
+        styleLabel (compFadeLabel, tr ("Comp crossfade"));
+        addAndMakeVisible (compFadeLabel);
+        setup (compFade, 0.0, 100.0, 0.5, " ms", (double) Song::defaultCompCrossfadeMs);
+        compFade.onValueChange = [this] {
+            edit ([v = (float) compFade.getValue()] (Song& s) {
+                s.compCrossfadeMs = v;
+                for (int t = 0; t < (int) s.playlistTracks.size(); ++t)
+                    if (comp::isComp (s, t))
+                        comp::applyCrossfades (s, t, comp::crossfadeTicks (s));
+            });
+        };
         // FL's Project › "Play truncated notes in clips" (round 167g)
         truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
         truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
@@ -150,6 +164,9 @@ public:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        auto compRow = area.removeFromTop (26);
+        compFadeLabel.setBounds (compRow.removeFromLeft (150));
+        compFade.setBounds (compRow.removeFromLeft (180));
         truncated.setBounds (area.removeFromTop (26));
         fastDeclick.setBounds (area.removeFromTop (26));
         area.removeFromTop (4);
@@ -175,6 +192,7 @@ private:
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        compFade.setValue (s.compCrossfadeMs, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
         panLaw.setSelectedId (s.panTriangular ? 2 : 1, juce::dontSendNotification);
@@ -206,6 +224,8 @@ private:
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel, timeModeLabel;
     juce::Slider tempo, beats, swing, pitch;
     juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
+    juce::Label compFadeLabel;
+    juce::Slider compFade;
     juce::ComboBox panLaw, timeMode;
 };
 

@@ -3,7 +3,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/NoteTools.h"
+#include "core/PianoKeys.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
@@ -80,6 +82,7 @@ public:
     bool isScaleSnapOn() const noexcept { return scaleSnap; }
     void setScaleSnap (bool on);
     bool hasScale() const { return scaleIndex() > 0; } // a scale is chosen in the toolbar
+    int scaleTonic() const { return hasScale() ? scaleRoot() : -1; } // its root (pitch class), or -1
     // "Fold to the scale" (round 166d, issue #14; LYNX's own — FL only highlights the scale): only the in-scale keys
     // are shown, and the notes on the other keys are hidden and left alone by the edits.
     bool isFoldedToScale() const noexcept { return foldToScale; }
@@ -106,6 +109,13 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
+    // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
+    static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
+    void setKeyStyle (pianokeys::Style style);
+    static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
+    // the keys of the selection, on every change (the toolbar's chord panel)
+    static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
     // pattern's start at the song tempo (FL's FUN_00e70bf0 / FUN_00e45a00); one for every editor, not saved.
     static bool isBackgroundWaveShown() noexcept;
@@ -146,8 +156,14 @@ public:
     std::vector<int> noteIndicesForSnapshot() const { return selectionOrAll(); }
     std::int64_t gridForSnapshot() const { return gridTicks(); }
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
+    juce::PopupMenu getStampMenuForSnapshot() { return stampMenu(); }
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
+    // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
+    static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
+                         laneVelocityRange = 8, laneLast = 8;
+    // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
+    void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
 
     static constexpr int keyboardWidth = 72;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
@@ -155,7 +171,26 @@ public:
     static constexpr int timelineHeight = 22;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int velocityHeight = 72;
+    static constexpr int defaultVelocityHeight = 72;
+    static constexpr int compactVelocityHeight = 30; // docked in the Clip-launch detail view (round 183a): the reference's lane is ~30 px
+    int velocityHeight = defaultVelocityHeight;
+    // docked in the Clip-launch detail view (round 183a): a short lane, and the keys fitted to the notes when it scrolls to them;
+    // the floating panel's key height comes back when it goes home
+    void setDocked (bool docked)
+    {
+        if (fitKeysToNotes == docked)
+            return;
+        fitKeysToNotes = docked;
+        velocityHeight = docked ? compactVelocityHeight : defaultVelocityHeight;
+        if (docked)
+            undockedRowHeight = rowHeight;
+        else
+            rowHeight = undockedRowHeight;
+        resized();
+        repaint();
+    }
+    bool fitKeysToNotes = false;
+    int undockedRowHeight = 14;
     int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 
@@ -187,6 +222,7 @@ private:
     double xToTick (int x) const;
     int keyToY (int key) const;
     int yToKey (int y) const;
+    int keyboardKeyAt (int x, int y) const; // the key a point of the keyboard plays (the keyboard style decides)
     int rowFor (int key) const noexcept;  // the key's row from the top (a folded-away key: the row above it)
     void updateKeyRows();                 // after the scale or the fold changed
     notetools::KeyRows rows = notetools::keyRows (0, 0, false);
@@ -229,11 +265,15 @@ private:
     float laneValue (const Note& n) const;          // 0..1 of the chosen property
     void setLaneValue (Note& n, float value) const; // inverse
     bool laneIsBipolar() const;
+    bool laneIsChance() const;
+    void addNoteLanes();
     void setNotesMuted (bool mute); // the selection (or all notes)
     void togglePorta(); // porta notes glide from the previous note (toggles the channel's porta)
 
     void deleteSelection();
     void copySelection();
+    std::vector<Note> visibleGhostNotes() const; // round 177d: the ghost notes on show, as notes (song pattern ticks)
+    void copyGhostNotes();
     void paste();
     void duplicateSelection();
     void nudge (std::int64_t ticks, int keys);
@@ -359,6 +399,7 @@ private:
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
     double playheadTick = -1.0;
+    juce::Rectangle<int> liveHeldArea; // round 177d: where the held notes of a take were last drawn
 
     std::vector<int> selection;     // indices into Pattern::notes, sorted
     std::vector<int> selectionBefore; // selection at the start of a Shift+rectangle
@@ -402,6 +443,7 @@ private:
     juce::Label chordBubble;                   // "Show chord name for selection"
     juce::uint32 chordBubbleUntil = 0;
     std::vector<int> chordBubbleSelection;     // the selection it was shown for
+    std::vector<int> chordPanelSelection;      // the selection the toolbar's chord panel last heard of
     void updateChordBubble();
     void paintBackgroundWave (juce::Graphics& g, juce::Rectangle<int> grid);
     void spaceOperation (int kind);            // 0 insert, 1 slice & insert, 2 delete, 3 trim
@@ -411,6 +453,7 @@ private:
     juce::PopupMenu fileMenu();
     juce::PopupMenu editMenu();
     juce::PopupMenu viewMenu();
+    juce::PopupMenu stampMenu(); // the chord stamp's list (the toolbar chord box's items)
     // FL's Piano roll › Time markers on the pattern's own markers (round 168g)
     juce::PopupMenu markersMenu();
     std::int64_t markerKeyTick() const;   // Alt+T / Ctrl+T: the time selection's start, the playhead in view, else a bar
@@ -420,5 +463,6 @@ private:
     void showPatternMarkerMenu (int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 } // namespace lynx

@@ -1,5 +1,10 @@
 #include "engine/MidiFileIo.h"
 
+#include "core/NoteChance.h"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
 #include <limits>
 #include <map>
 
@@ -18,7 +23,23 @@ struct Parsed
     std::vector<std::vector<int>> midiChannels; // per track, per note: its MIDI channel 0..15
     double bpm = 120.0;
     int numerator = 0, denominator = 4; // the first time signature (0 = none)
+    std::vector<PatternEvent> tempos; // every Set Tempo (issue #86)
 };
+
+// The file's Set Tempo events in time order (FL's whole BPM) and the first one as the song's tempo (issue #86: it was
+// the first one found while the tempo was still 120, so a file starting at exactly 120 took its second tempo)
+template <typename Out>
+void collectTempos (const juce::MidiFile& midi, Out& out, const std::function<std::int64_t (double)>& toTicks)
+{
+    for (int t = 0; t < midi.getNumTracks(); ++t)
+    {
+        const auto& track = *midi.getTrack (t);
+        for (int i = 0; i < track.getNumEvents(); ++i)
+            if (const auto& m = track.getEventPointer (i)->message; m.isTempoMetaEvent() && m.getTempoSecondsPerQuarterNote() > 0.0)
+                out.tempos.push_back ({ toTicks (m.getTimeStamp()), valueFromTempo (midiimport::midiTempoBpm (m.getTempoSecondsPerQuarterNote())) });
+    }
+    std::stable_sort (out.tempos.begin(), out.tempos.end(), [] (const PatternEvent& a, const PatternEvent& b) { return a.tick < b.tick; });
+}
 
 std::optional<Parsed> parse (const juce::File& file, juce::String& error)
 {
@@ -58,9 +79,9 @@ std::optional<Parsed> parse (const juce::File& file, juce::String& error)
             const auto* e = track.getEventPointer (i);
             const auto& m = e->message;
 
-            if (m.isTempoMetaEvent() && out.bpm == 120.0 && m.getTempoSecondsPerQuarterNote() > 0.0)
-                out.bpm = juce::jlimit (20.0, 999.0, 60.0 / m.getTempoSecondsPerQuarterNote());
-            else if (m.isTimeSignatureMetaEvent() && out.numerator == 0)
+            if (m.isTempoMetaEvent())
+                continue; // (collectTempos)
+            if (m.isTimeSignatureMetaEvent() && out.numerator == 0)
             {
                 int num = 0, den = 0;
                 m.getTimeSignatureInfo (num, den);
@@ -93,6 +114,10 @@ std::optional<Parsed> parse (const juce::File& file, juce::String& error)
             out.midiChannels.push_back (std::move (channels));
         }
     }
+
+    collectTempos (midi, out, toTicks);
+    if (! out.tempos.empty())
+        out.bpm = std::nearbyint (tempoFromValue (out.tempos.front().value)); // (FL's whole BPM, exact)
 
     if (out.tracks.empty())
     {
@@ -133,6 +158,7 @@ std::optional<Song> loadSong (const juce::File& file, juce::String& error)
         }
     }
 
+    midiimport::setTempoEvents (pattern, parsed->tempos, 0); // every Set Tempo as the pattern's Tempo events (issue #86)
     pattern.sortNotes();
     return song;
 }
@@ -160,9 +186,9 @@ static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& in,
         for (int i = 0; i < track.getNumEvents(); ++i)
         {
             const auto& m = track.getEventPointer (i)->message;
-            if (m.isTempoMetaEvent() && out.bpm == 120.0 && m.getTempoSecondsPerQuarterNote() > 0.0)
-                out.bpm = juce::jlimit (20.0, 999.0, 60.0 / m.getTempoSecondsPerQuarterNote());
-            else if (m.isTimeSignatureMetaEvent() && out.numerator == 0)
+            if (m.isTempoMetaEvent())
+                continue; // (collectTempos)
+            if (m.isTimeSignatureMetaEvent() && out.numerator == 0)
             {
                 int num = 0, den = 0;
                 m.getTimeSignatureInfo (num, den);
@@ -183,6 +209,9 @@ static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& in,
         }
         out.trackNames.push_back (name);
     }
+    collectTempos (midi, out, toTicks);
+    if (! out.tempos.empty())
+        out.bpm = std::nearbyint (tempoFromValue (out.tempos.front().value)); // (FL's whole BPM, exact)
     return out;
 }
 
@@ -201,7 +230,8 @@ std::optional<midiimport::ParsedMidi> parseBytes (const void* data, std::size_t 
 juce::MemoryBlock writeNotes (const Song& song, const std::vector<Note>& notes, const std::string& trackName)
 {
     juce::MidiMessageSequence seq;
-    for (const auto& n : notes)
+    // notes with Chance or a Velocity Range: as they play (round 187c, core/NoteChance.h)
+    for (const auto& n : chance::realised (notes, song.chanceSeed))
     {
         if (n.muted)
             continue;
@@ -270,7 +300,7 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
     const auto& pattern = song.patterns[(std::size_t) patternIndex];
     std::map<int, juce::MidiMessageSequence> byChannel;
 
-    for (const auto& n : pattern.notes)
+    for (const auto& n : chance::realised (pattern.notes, song.chanceSeed))
     {
         auto& seq = byChannel[n.channel];
         const auto velocity = (juce::uint8) juce::jlimit (1, 127, juce::roundToInt (n.velocity * 127.0f));

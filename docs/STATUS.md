@@ -8,7 +8,7 @@ exports the 30 demo projects shipped with FL Studio 2026.
 
 Windows x64, macOS 11+ (universal: Apple Silicon + Intel) and Linux x86_64 build from the same source; CI builds and
 self-tests the app on all three (`docs/PLATFORMS.md`). Windows-only: ASIO and the LYNX ASIO driver. VST2 hosting on
-Windows and Linux; the out-of-process plugin sandbox on Windows and Linux (round 161: POSIX shared memory, crash noticed
+Windows and Linux; the out-of-process plugin sandbox on all three (round 161: POSIX shared memory, crash noticed
 at once through a pidfd, LV2/VST3 and yabridge-bridged Windows plugins). macOS adds Audio Units, Linux LV2; drivers
 Core Audio / ALSA + JACK (PipeWire).
 
@@ -192,6 +192,28 @@ Core Audio / ALSA + JACK (PipeWire).
 - FL presets: 169 3x Osc channel presets, ~2800 `.fst` synth presets and the effect presets of the supported
   effects.
 - An import report lists what was converted, approximated or left out.
+
+### Export to FL Studio (`.flp`)
+- File › Export › FL Studio project: an FL Studio 2026 `.flp` (or a zip with the samples). FL's own channels, plugins
+  (native, and third-party ones inside Fruity Wrapper), patterns, Playlist, mixer and automation go over as FL data;
+  LYNX-only instruments and effects are rendered to audio (default) or replaced by the nearest FL plugin. Format:
+  `docs/analise/REA_rodada171e.md`.
+
+### Ableton Live sets (`.als`, Live 11 / 12)
+- Import and export (`docs/analise/ALS_FORMAT.md`): MIDI / audio / group / return tracks, clips and notes, warp
+  markers and modes, mixer and sends with their automation, tempo, time signature, locators; Session clips and scenes
+  ↔ the clip grid (launch settings, follow actions, stop buttons).
+- Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler / Drum Rack / Instrument Rack
+  import as the closest LYNX instrument; other Live devices are listed in the report. LYNX's own instruments and
+  effects are not converted in exported sets yet (listed in the export report).
+- In progress for 0.1.26: racks (chains, zones, macros), note chance and velocity range in `.als`.
+
+### FL Studio Mobile import (`.flm`, partial)
+- `docs/analise/FLM_FORMAT.md`: tempo, time signature, title; note, drum and audio lanes → patterns, clips and audio
+  clips; samples (the project's folder and FL Studio's copy of the app's resources), drum kits, DirectWave
+  single-sample programs; rack level, pan and routes on the mixer inserts.
+- In progress for 0.1.26: mute / solo, automation lanes and the main effects (EQ, Filter, Autoduck, reverbs). Other
+  instruments play LYNX's built-in synth for now; what is not converted is listed in the import report.
 
 ## Confirmed vs approximated (FL import)
 

@@ -15,6 +15,8 @@ LOG="$CACHE/fl/render.log"
 mkdir -p "$CACHE/fl"
 
 flRunning () { tasklist.exe /FI "IMAGENAME eq FL64.exe" /NH < /dev/null 2> /dev/null | grep -qi 'FL64.exe'; }
+# the Windows PID of the FL64.exe running now (this script starts FL only when no other one runs)
+flPid () { tasklist.exe /FI "IMAGENAME eq FL64.exe" /FO CSV /NH < /dev/null 2> /dev/null | tr -d '\r' | awk -F'","' 'NF>1{print $2; exit}'; }
 pause1 () { timeout 1 tail -f /dev/null; } # (no sleep builtin needed)
 
 while IFS= read -r flp <&3; do
@@ -38,10 +40,11 @@ while IFS= read -r flp <&3; do
     "$FL_ROOT/FL64.exe" /R /Ewav "/O$(wslpath -w "$out")" "$(wslpath -w "$flp")" < /dev/null > /dev/null 2>&1 &
     # the launcher may return before FL exits: wait for FL64.exe to appear, then to disappear
     for _ in $(seq 1 20); do flRunning && break; pause1; done
+    pid=$(flPid)
     status=ok
     while flRunning; do
         if (( $(date +%s) - ${start%.*} > TMO )); then
-            taskkill.exe /F /IM FL64.exe < /dev/null > /dev/null 2>&1; status=timeout; pause1; rm -f "$out/$name.wav"; break
+            [[ -n "$pid" ]] && taskkill.exe /F /PID "$pid" < /dev/null > /dev/null 2>&1; status=timeout; pause1; rm -f "$out/$name.wav"; break
         fi
         pause1
     done

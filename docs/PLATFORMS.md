@@ -18,7 +18,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 | FL Studio installation (factory samples, plugin database) | registry, else `Program Files\Image-Line\FL Studio*` | `/Applications/FL Studio*.app/Contents/Resources/FL` (layout not confirmed) | a Windows FL Studio under Wine: `$WINEPREFIX` or `~/.wine`, `drive_c/Program Files/Image-Line/FL Studio*` |
 
 `LYNX_FL_INSTALL=<folder>` points LYNX SHARE at an FL Studio installation anywhere (the folder that contains `Data`).
-Importing `.flp` projects works everywhere; the installation only adds FL's factory samples and plugin database.
+Importing `.flp`, `.als` and `.flm` projects works everywhere; the FL Studio installation only adds FL's factory samples and plugin database.
 
 ## Platform helpers (`src/platform/`)
 
@@ -44,11 +44,20 @@ Other per-OS code, kept small and guarded in place:
   through RLIMIT_RTPRIO, RealtimeKit or the desktop portal (`libdbus-1.so.3` through dlopen); no-ops elsewhere.
 - `engine/DllAsioDevice.cpp`, `asio/` — ASIO and the LYNX ASIO driver: Windows only (ASIO is a Windows driver model).
 - `engine/PluginSandbox.cpp` — out-of-process plugins: Win32 shared memory and events (Windows), POSIX shared memory
-  (`shm_open`) and process-shared semaphores (Linux); on Linux a `pidfd` notices a crashed child at once. Not macOS yet.
+  (`shm_open`) and process-shared semaphores (Linux), the same shared memory with two named FIFOs as doorbells (macOS);
+  a `pidfd` (Linux) or a kqueue (macOS) notices a crashed child at once.
 - `engine/Vst2Format.cpp` — VST2 hosting loads Windows DLLs and Linux shared objects (`.so`, yabridge bridges included); not macOS (VST2 is deprecated and rare there).
 - `ui/WindowOwner.cpp` — dark native title bar and owned tool windows (Windows); JUCE defaults elsewhere.
 - `ui/Theme.cpp` — Segoe UI on Windows; the system sans-serif elsewhere. On Linux (JUCE's software renderer) knobs and
   rounded plates are drawn from cached pre-rendered sprites, which are much cheaper there than path filling.
+  Linux fonts (issue #142): JUCE 8.0.4 lists the installed fonts from the `<dir>` entries of `/etc/fonts/fonts.conf`
+  only, without its `<include>`s, so on NixOS (each font package in its own `/nix/store` folder, added by an included
+  file) it found DejaVu Sans alone and no monospaced font; a font whose family is not installed has no typeface on
+  Linux, and drawing text with one crashed (0.1.25). LYNX now hands JUCE fontconfig's own folder list (through JUCE's
+  `JUCE_FONT_PATH`; a value the user set is kept), gives every font without a typeface the bundled Open Sans
+  (`LookAndFeel::getTypefaceForFont`), and JUCE fix 19 (`cmake/LynxPatchJuce.cmake`) makes a font without a typeface
+  draw nothing instead of crashing. `FONTS=none scripts/check-appimage-start.sh <AppImage>` starts the AppImage with
+  no font on the system; `--selftest` reports `fonts=`.
 - `ui/Toolbar.cpp` — process memory (Windows API, `/proc/self/statm` on Linux).
 
 ## Floating point

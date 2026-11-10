@@ -1,7 +1,15 @@
 #include "core/MixerOps.h"
 #include "core/ClipOps.h"
+#include "core/FlpExport.h"
+#include "core/RackOps.h"
+#include "core/Transmitter.h"
+#include "core/SoundFont.h"
+#include "core/TransporterFl.h"
+#include "core/VoltageController.h"
 
 #include <algorithm>
+#include <cmath>
+#include <functional>
 #include <numeric>
 
 namespace lynx::mixerops
@@ -51,15 +59,17 @@ bool isInsert (const Song& song, int t) noexcept
     return t > 0 && t < (int) song.mixer.size();
 }
 
+// every effect slot, also inside containers and Patchers (a Fruity Send in a Patcher, a nested Patcher...)
 template <typename Fn>
-void forEachSlot (std::vector<EffectSlot>& slots, Fn&& fn)
+void forEachSlot (EffectSlot& slot, Fn& fn)
 {
-    for (auto& slot : slots)
-    {
-        fn (slot);
-        for (auto& branch : slot.branches)
-            forEachSlot (branch.chain, fn);
-    }
+    fn (slot);
+    for (auto& branch : slot.branches)
+        for (auto& child : branch.chain)
+            forEachSlot (child, fn);
+    for (auto& node : slot.patcher.nodes)
+        if (! node.generator)
+            forEachSlot (node.effect, fn);
 }
 
 bool isTrackTarget (AutomationTargetKind k) noexcept
@@ -67,46 +77,221 @@ bool isTrackTarget (AutomationTargetKind k) noexcept
     return k == AutomationTargetKind::mixerVolume || k == AutomationTargetKind::mixerPan || k == AutomationTargetKind::effectParam
            || k == AutomationTargetKind::effectMix || k == AutomationTargetKind::mixerSend;
 }
+
+// A "send to insert" parameter stored as insert / (maxMixerTracks - 1) (Fruity Send's "Send to", the Transporter's
+// loops send; 0 = none)
+void remapTrackParam (float& value, const std::function<int (int)>& map)
+{
+    const auto track = (int) std::lround (std::clamp ((double) value, 0.0, 1.0) * (maxMixerTracks - 1));
+    if (track <= 0)
+        return;
+    const auto to = map (track);
+    value = to > 0 ? (float) to / (float) (maxMixerTracks - 1) : 0.0f;
+}
+
+// The extra outputs of a generator Patcher (doc.outputTracks: an insert, or -1 = "the k-th insert after the channel's
+// own", FL's relative routing). A chosen insert follows its track; a relative output that would land on another insert
+// after the move is pinned to the one it fed (the logical track), one that still lands right stays relative.
+// `base` = the channel's insert before the move.
+void remapPatcherOutputs (ChannelDef& channel, int base, const std::function<int (int)>& map)
+{
+    auto& doc = channel.patcher;
+    int outputs = (int) doc.outputTracks.size();
+    for (const auto& w : doc.wires)
+        if (w.kind == PatchWire::Kind::audio && w.to == patchToHost)
+            outputs = std::max (outputs, w.toPort);
+    const auto newBase = std::max (0, map (base));
+    for (int k = 1; k <= outputs; ++k)
+    {
+        if (k <= (int) doc.outputTracks.size() && doc.outputTracks[(std::size_t) k - 1] >= 0)
+        {
+            auto& t = doc.outputTracks[(std::size_t) k - 1];
+            if (t > 0)
+                t = std::max (0, map (t)); // (its insert deleted: the Master, as a channel's)
+            continue;
+        }
+        const auto now = std::max (0, map (std::min (base + k, maxMixerTracks - 1)));
+        if (now == std::min (newBase + k, maxMixerTracks - 1))
+            continue;
+        if ((int) doc.outputTracks.size() < k)
+            doc.outputTracks.resize ((std::size_t) k, -1);
+        doc.outputTracks[(std::size_t) k - 1] = now;
+    }
+}
+
+// An effect / instrument imported from FL keeps FL's own state for the export (FlOrigin, exported while its fingerprint
+// matches). The insert numbers that state holds are rewritten with the remap, so a moved track still exports to the
+// track it was linked to and the rest of the state stays byte for byte (round 177a).
+void putI32 (std::vector<std::uint8_t>& d, std::size_t at, int v)
+{
+    if (at + 4 <= d.size())
+        for (int b = 0; b < 4; ++b)
+            d[at + (std::size_t) b] = (std::uint8_t) (((std::uint32_t) v >> (8 * b)) & 0xFF);
+}
+
+void patchOriginTracks (EffectSlot& slot)
+{
+    auto& d = slot.flOrigin.state;
+    if (slot.kind == EffectKind::fruitySend && slot.flOrigin.plugin == "Fruity Send") // pan, vol, dry, insert (REA_rodada105_send §1)
+        putI32 (d, 12, std::max (0, fruitySendTarget (slot)));
+    else if (slot.kind == EffectKind::transmitter && slot.flOrigin.plugin == "Transmitter") // version, 42 controls, the two sends
+    {
+        putI32 (d, 4 + 4 * (std::size_t) transmitter::count, slot.sendTracks[0]);
+        putI32 (d, 8 + 4 * (std::size_t) transmitter::count, slot.sendTracks[1]);
+    }
+    else if (slot.kind == EffectKind::flTransporter && slot.flOrigin.plugin == "Transporter" && d.size() >= 4)
+    {
+        // version, 20 / 22 controls, two flag bytes, source, stereo, send track, input track (REA_rodada167f)
+        const auto version = (int) ((std::uint32_t) d[0] | (std::uint32_t) d[1] << 8 | (std::uint32_t) d[2] << 16 | (std::uint32_t) d[3] << 24);
+        const std::size_t controls = version >= 8 ? 22 : 20;
+        putI32 (d, 4 + 4 * controls + 2 + 8, std::max (0, fruitySendTarget (slot)));
+    }
+}
+
+void patchOriginTracks (ChannelDef& c)
+{
+    // FL's Soundfont Player: version, 13 controls, the font path (length byte, or 0xFF + i32), then the reverb and
+    // chorus "send to" tracks (insert − 1, −1 = none), each followed by a flag byte (REA_rodada158 §1)
+    if (c.instrument != InstrumentKind::soundfont || c.flOrigin.plugin != "Fruity Soundfont Player")
+        return;
+    auto& d = c.flOrigin.state;
+    std::size_t at = 4 + 52;
+    if (at >= d.size())
+        return;
+    std::size_t len = d[at++];
+    if (len == 0xFF)
+    {
+        if (at + 4 > d.size())
+            return;
+        len = (std::size_t) ((std::uint32_t) d[at] | (std::uint32_t) d[at + 1] << 8 | (std::uint32_t) d[at + 2] << 16 | (std::uint32_t) d[at + 3] << 24);
+        at += 4;
+    }
+    at += len;
+    const auto fl = [&c] (int p) {
+        const auto v = (int) std::lround (c.modelParams[(std::size_t) p]);
+        return v > 0 ? v - 1 : -1;
+    };
+    if ((std::size_t) sf::pChorusTrack < c.modelParams.size())
+    {
+        putI32 (d, at, fl (sf::pReverbTrack));
+        putI32 (d, at + 5, fl (sf::pChorusTrack));
+    }
+}
+
+template <typename T>
+bool originMatches (const T& x)
+{
+    return ! x.flOrigin.empty() && x.flOrigin.fingerprint == flpexport::fingerprint (x);
+}
 } // namespace
 
 namespace
 {
-// every reference to an insert (channels, Playlist tracks, sends, side-chains, automation) through `map`
-template <typename Map>
-void remapTrackReferences (Song& song, Map&& map)
+// Every reference to an insert through `map` (old insert -> its new number, or -1 when the insert was deleted), so a
+// move, an insert or a delete never re-wires anything (round 177a): channels, Playlist tracks, sends, side-chains,
+// slot sends (Transmitter, Fruity Send, Transporter, a Patcher's "To LYNX" outputs, also inside containers and
+// Patchers), plugins' own "send to insert" settings (Soundfont reverb / chorus, Voltage Controller outputs),
+// automation, links, initial values, pattern events and controller sources. FL keeps the mixer's own routes,
+// channels, Playlist tracks and automation / links (FUN_012a4030, FUN_012cb6c0) but leaves the plugin-side numbers
+// alone, so its Fruity Send / Patcher outputs end on another track; LYNX keeps those too (REA_rodada177a §1).
+// A reference to a deleted insert is dropped: sends removed, side-chains and slot sends cleared, channels to the
+// Master, automation / links without a target (FL marks them -1 too).
+void remapTrackReferences (Song& song, const std::function<int (int)>& map)
 {
     for (auto& c : song.channels)
-        c.mixerTrack = map (c.mixerTrack);
+    {
+        const auto exportsOrigin = originMatches (c);
+        if (c.instrument == InstrumentKind::patcher)
+            remapPatcherOutputs (c, c.mixerTrack, map);
+        c.mixerTrack = std::max (0, map (c.mixerTrack));
+
+        if (c.instrument == InstrumentKind::soundfont)
+            for (const auto p : { sf::pReverbTrack, sf::pChorusTrack })
+                if ((std::size_t) p < c.modelParams.size() && c.modelParams[(std::size_t) p] > 0.5f)
+                    c.modelParams[(std::size_t) p] = (float) map ((int) std::lround (c.modelParams[(std::size_t) p]));
+        if (c.instrument == InstrumentKind::voltage)
+            if (auto vs = voltage::parse (c.pluginState))
+            {
+                auto changed = false;
+                for (auto& t : vs->tracks)
+                    if (t > 0)
+                    {
+                        const auto to = std::max (0, map (t));
+                        changed = changed || to != t;
+                        t = to;
+                    }
+                if (changed)
+                    c.pluginState = voltage::write (*vs);
+            }
+        if (exportsOrigin && flpexport::fingerprint (c) != c.flOrigin.fingerprint)
+        {
+            patchOriginTracks (c);
+            if (c.instrument == InstrumentKind::voltage) // (its state is FL's own: the export writes it)
+                c.flOrigin.state = c.pluginState;
+            c.flOrigin.fingerprint = flpexport::fingerprint (c);
+        }
+    }
+    for (auto& vca : song.vcas) // VCA members (round 177a slice 3)
+    {
+        for (auto& m : vca.members)
+            m = map (m);
+        vca.members.erase (std::remove_if (vca.members.begin(), vca.members.end(), [] (int m) { return m <= 0; }), vca.members.end());
+        std::sort (vca.members.begin(), vca.members.end());
+    }
     for (auto& pt : song.playlistTracks) // audio / instrument tracks (round 146a)
         if (pt.mixerTrack > 0)
+        {
             pt.mixerTrack = map (pt.mixerTrack);
+            if (pt.mixerTrack < 0 && pt.mode == PlaylistTrackMode::audio) // its insert deleted: the link goes
+                pt.mode = PlaylistTrackMode::unassigned;
+        }
 
     for (auto& track : song.mixer)
     {
         for (auto& send : track.sends)
             send.target = map (send.target);
+        track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [] (const MixerSend& s) { return s.target <= 0; }),
+                           track.sends.end());
 
-        forEachSlot (track.effects, [&map] (EffectSlot& slot) {
-            if (slot.sidechain > 0)
-                slot.sidechain = map (slot.sidechain);
-            if (slot.sidechain2 > 0)
-                slot.sidechain2 = map (slot.sidechain2);
+        auto fix = [&map] (EffectSlot& slot) {
+            const auto exportsOrigin = originMatches (slot);
+            for (auto* source : { &slot.sidechain, &slot.sidechain2 })
+                if (*source > 0)
+                    *source = std::max (-1, map (*source));
             for (auto& send : slot.sendTracks)
                 if (send > 0)
-                    send = map (send);
-        });
+                    send = std::max (0, map (send));
+            for (auto& t : slot.patcher.outputTracks)
+                if (t > 0)
+                    t = std::max (0, map (t));
+            if (slot.kind == EffectKind::fruitySend)
+                remapTrackParam (slot.params[3], map);
+            else if (slot.kind == EffectKind::flTransporter)
+                remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
+            if (exportsOrigin)
+            {
+                patchOriginTracks (slot); // (unchanged numbers write the same bytes)
+                slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
+            }
+        };
+        for (auto& slot : track.effects)
+            forEachSlot (slot, fix);
     }
 
     song.forEachTarget ([&map] (AutomationTarget& t) {
-        if (isTrackTarget (t.kind))
-            t.index = map (t.index);
+        if (! isTrackTarget (t.kind))
+            return;
+        t.index = map (t.index);
         if (t.kind == AutomationTargetKind::mixerSend && t.slot > 0) // (the route's destination)
             t.slot = map (t.slot);
+        if (t.index < 0 || t.slot < 0)
+            t = AutomationTarget {}; // its insert deleted: no target
     });
+    song.removeDeadMidiLinks();
 
     for (auto& automation : song.automations)
         if (automation.source.track > 0)
-            automation.source.track = map (automation.source.track);
+            automation.source.track = map (automation.source.track); // -1 = no longer live
 }
 } // namespace
 
@@ -193,41 +378,132 @@ bool deleteTrack (Song& song, int t)
     if (t < 1 || t >= count)
         return false;
 
-    for (auto& c : song.channels)
-        if (c.mixerTrack == t)
-            c.mixerTrack = 0;
-    for (auto& pt : song.playlistTracks) // an audio track loses its link (round 146a)
-        if (pt.mixerTrack == t)
-        {
-            pt.mixerTrack = -1;
-            if (pt.mode == PlaylistTrackMode::audio)
-                pt.mode = PlaylistTrackMode::unassigned;
-        }
-
-    for (auto& track : song.mixer)
-    {
-        track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [t] (const MixerSend& s) { return s.target == t; }), track.sends.end());
-        forEachSlot (track.effects, [t] (EffectSlot& slot) {
-            if (slot.sidechain == t)
-                slot.sidechain = 0;
-            if (slot.sidechain2 == t)
-                slot.sidechain2 = 0;
-            for (auto& send : slot.sendTracks)
-                if (send == t)
-                    send = 0;
-        });
-    }
-
-    for (auto& automation : song.automations)
-        if (automation.source.track == t)
-            automation.source.track = -1; // no longer live
-
-    song.mixer[(std::size_t) t] = MixerTrack {};
-    for (int i = t; i + 1 < count; ++i)
-        swapTracks (song, i, i + 1);
+    // one shift of every reference: the deleted insert's links go, the following inserts move one place left and a
+    // blank insert takes the last place (the count stays)
+    remapTrackReferences (song, [t] (int x) { return x == t ? -1 : x > t ? x - 1 : x; });
+    song.mixer.erase (song.mixer.begin() + t);
+    song.mixer.emplace_back();
     renumberDefaultNames (song, t, -1);
     song.mixer.back().name = "Insert " + std::to_string (count - 1);
     return true;
+}
+
+bool reconnectLostSend (Song& song, int track, int index, int to)
+{
+    if (! isInsert (song, track) || index < 0 || index >= (int) song.mixer[(std::size_t) track].lostSends.size() || to < 1
+        || to >= (int) song.mixer.size() || to == track || (! song.routes (track, to) && ! song.canRoute (track, to)))
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto lost = t.lostSends[(std::size_t) index];
+    t.lostSends.erase (t.lostSends.begin() + index);
+    if (const auto it = std::find_if (t.sends.begin(), t.sends.end(), [to] (const MixerSend& s) { return s.target == to; }); it != t.sends.end())
+        it->level = lost.level;
+    else
+        t.sends.push_back ({ to, lost.level });
+    return true;
+}
+
+void removeLostSends (Song& song, int track, int index)
+{
+    if (! isInsert (song, track))
+        return;
+    auto& lost = song.mixer[(std::size_t) track].lostSends;
+    if (index < 0)
+        lost.clear();
+    else if (index < (int) lost.size())
+        lost.erase (lost.begin() + index);
+}
+
+std::vector<int> playlistTracksLinkedTo (const Song& song, const std::vector<int>& tracks)
+{
+    const auto among = [&tracks] (int t) { return t > 0 && std::find (tracks.begin(), tracks.end(), t) != tracks.end(); };
+    std::vector<int> result;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) i];
+        auto insert = -1;
+        if (pt.mode == PlaylistTrackMode::audio)
+            insert = pt.mixerTrack;
+        else if (pt.mode == PlaylistTrackMode::instrument) // (FL: the channel's own mixer track)
+            insert = pt.channel >= 0 && pt.channel < (int) song.channels.size() ? song.channels[(std::size_t) pt.channel].mixerTrack : pt.mixerTrack;
+        if (among (insert))
+            result.push_back (i);
+    }
+    return result;
+}
+
+namespace
+{
+// FL 21 (fix 19603): the tracks that sent into `t` send to `t`'s destinations instead (at their send's level)
+void rerouteFeeders (Song& song, int t)
+{
+    const auto& gone = song.mixer[(std::size_t) t];
+    const auto destinations = gone.sends;
+    const auto toMaster = gone.toMaster;
+    for (int x = 1; x < (int) song.mixer.size(); ++x)
+    {
+        if (x == t)
+            continue;
+        auto& track = song.mixer[(std::size_t) x];
+        const auto it = std::find_if (track.sends.begin(), track.sends.end(), [t] (const MixerSend& s) { return s.target == t; });
+        if (it == track.sends.end() || it->level <= 0.0f) // (a level-0 sidechain link carries no signal)
+            continue;
+        const auto level = it->level;
+        if (toMaster)
+            track.toMaster = true;
+        for (const auto& d : destinations)
+            if (d.target != x && d.target != t
+                && std::none_of (track.sends.begin(), track.sends.end(), [&d] (const MixerSend& s) { return s.target == d.target; }))
+                track.sends.push_back ({ d.target, level });
+    }
+}
+} // namespace
+
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked, bool keepLostLinks)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&song] (int t) { return t < 1 || t >= (int) song.mixer.size(); }), tracks.end());
+    if (tracks.empty())
+        return 0;
+
+    const auto playlist = playlistTracksLinkedTo (song, tracks);
+    std::vector<int> channels; // instrument tracks' channels, for "Delete tracks and channels"
+    for (const auto i : playlist)
+    {
+        auto& pt = song.playlistTracks[(std::size_t) i];
+        if (linked == LinkedPlaylistTracks::deleteToo && pt.mode == PlaylistTrackMode::instrument && pt.channel >= 0
+            && pt.channel < (int) song.channels.size())
+            channels.push_back (pt.channel);
+        if (linked == LinkedPlaylistTracks::deleteToo) // FL resets the track: "Track N", unassigned
+        {
+            pt.name.clear();
+            pt.colour = 0;
+            pt.icon = 0;
+        }
+        pt.mode = PlaylistTrackMode::unassigned; // (FL "Unlink": the track keeps its name)
+        pt.mixerTrack = -1;
+        pt.channel = -1;
+    }
+
+    int deleted = 0;
+    for (auto it = tracks.rbegin(); it != tracks.rend(); ++it) // from the right: the numbers still to delete stay valid
+    {
+        if (keepLostLinks) // (round 186c's option) each send into it stays, greyed, under the deleted insert's name
+        {
+            const auto name = song.mixer[(std::size_t) *it].name.empty() ? "Insert " + std::to_string (*it) : song.mixer[(std::size_t) *it].name;
+            for (int x = 1; x < (int) song.mixer.size(); ++x)
+                for (const auto& send : song.mixer[(std::size_t) x].sends)
+                    if (x != *it && send.target == *it)
+                        song.mixer[(std::size_t) x].lostSends.push_back ({ name, send.level });
+        }
+        rerouteFeeders (song, *it);
+        if (deleteTrack (song, *it))
+            ++deleted;
+    }
+    if (! channels.empty() && channels.size() < song.channels.size()) // (at least one channel stays, as in the Channel rack)
+        removeChannels (song, channels);
+    return deleted;
 }
 
 std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int track, bool startingHere)
@@ -349,6 +625,24 @@ bool listensToSidechain (EffectKind kind) noexcept
            || kind == EffectKind::vocoder;
 }
 
+bool reportsGainReduction (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor:
+        case EffectKind::apexLimiter:
+        case EffectKind::crestCompressor:
+        case EffectKind::sentryGate:
+        case EffectKind::quellDenoiser:
+        case EffectKind::ridgeStrip:
+        case EffectKind::glowLeveler:
+        case EffectKind::hushDeEsser:
+            return true;
+        default:
+            return false;
+    }
+}
+
 int soleSidechainSender (const Song& song, int to)
 {
     if (! isInsert (song, to))
@@ -381,6 +675,47 @@ bool linkAddedSidechain (Song& song, int to, int slot)
         return false;
     fx.sidechain = from;
     return true;
+}
+
+bool acceptsSidechain (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
+        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::facetEq: case EffectKind::apexLimiter:
+        case EffectKind::hushDeEsser: case EffectKind::crestCompressor: case EffectKind::prismMultiband:
+        case EffectKind::sentryGate: case EffectKind::luxeVerb: case EffectKind::patcher: case EffectKind::transmitter:
+        case EffectKind::flTransporter:
+            return true;
+        default:
+            return false;
+    }
+}
+
+SidechainPick sidechainFrom (Song& song, int to, int slot, int from, bool second)
+{
+    if ((to != 0 && ! isInsert (song, to)) || song.mixer.empty() || slot < 0 || slot >= (int) song.mixer[(std::size_t) to].effects.size())
+        return SidechainPick::invalid;
+    if (from < 0)
+    {
+        auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+        (second ? fx.sidechain2 : fx.sidechain) = -1;
+        return SidechainPick::cleared;
+    }
+    if (! isInsert (song, from) || from == to)
+        return SidechainPick::invalid;
+    // (the Master is processed after every insert: it needs no route)
+    if (to != 0 && ! song.routes (from, to))
+    {
+        if (! song.canRoute (from, to))
+            return SidechainPick::cycle;
+        song.setRoute (from, to, true, 0.0f);
+    }
+    auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+    (second ? fx.sidechain2 : fx.sidechain) = from;
+    if (fx.kind == EffectKind::vocoder)
+        fx.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
+    return SidechainPick::linked;
 }
 
 namespace
@@ -705,6 +1040,7 @@ void resetRouting (Song& song, const std::vector<int>& tracks)
         {
             auto& m = song.mixer[(std::size_t) t];
             m.sends.clear();
+            m.lostSends.clear();
             m.toMaster = true;
             m.masterLevel = 1.0f;
         }
@@ -813,6 +1149,351 @@ std::vector<int> groupOf (const Song& song, int track)
     return out;
 }
 
+bool canFold (const Song& song, int track)
+{
+    const auto group = groupOf (song, track);
+    if (group.size() < 2)
+        return false;
+    if (song.mixer[(std::size_t) group.front()].separator)
+        return true;
+    const auto order = displayOrder (song);
+    const auto after = std::find (order.begin(), order.end(), group.back()) + 1;
+    return after != order.end() && *after > 0 && song.mixer[(std::size_t) *after].separator
+           && song.mixer[(std::size_t) *after].dock == song.mixer[(std::size_t) group.back()].dock;
+}
+
+int groupBus (const Song& song, const std::vector<int>& group)
+{
+    for (const auto bus : group)
+    {
+        auto all = true;
+        for (const auto t : group)
+        {
+            if (t == bus)
+                continue;
+            const auto& m = song.mixer[(std::size_t) t];
+            if (m.toMaster || m.sends.size() != 1 || m.sends.front().target != bus)
+            {
+                all = false;
+                break;
+            }
+        }
+        if (all)
+            return bus;
+    }
+    return -1;
+}
+
+bool isFolded (const Song& song, int track)
+{
+    const auto group = groupOf (song, track);
+    return ! group.empty() && song.mixer[(std::size_t) group.front()].folded && canFold (song, track);
+}
+
+std::vector<FoldShow> foldView (const Song& song)
+{
+    std::vector<FoldShow> out (song.mixer.size(), FoldShow::strip);
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+    {
+        if (! song.mixer[t].folded || out[t] != FoldShow::strip)
+            continue;
+        const auto group = groupOf (song, (int) t);
+        if (group.empty() || group.front() != (int) t || ! canFold (song, (int) t))
+            continue;
+        const auto bus = groupBus (song, group);
+        for (const auto m : group)
+            out[(std::size_t) m] = m == bus ? FoldShow::strip : FoldShow::hidden;
+        if (bus < 0)
+            out[(std::size_t) group.front()] = FoldShow::tab;
+    }
+    return out;
+}
+
+bool toggleFold (Song& song, int track)
+{
+    if (! canFold (song, track))
+        return false;
+    const auto head = groupOf (song, track).front();
+    auto& flag = song.mixer[(std::size_t) head].folded;
+    flag = ! flag;
+    return flag;
+}
+
+int foldAll (Song& song, bool fold)
+{
+    int changed = 0;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto group = groupOf (song, t);
+        if (group.empty() || group.front() != t || ! canFold (song, t) || song.mixer[(std::size_t) t].folded == fold)
+            continue;
+        song.mixer[(std::size_t) t].folded = fold;
+        ++changed;
+    }
+    return changed;
+}
+
+std::vector<int> vcasOf (const Song& song, int track)
+{
+    std::vector<int> out;
+    const auto n = (int) song.vcas.size();
+    for (int v = 0; v < n; ++v)
+        if (std::binary_search (song.vcas[(std::size_t) v].members.begin(), song.vcas[(std::size_t) v].members.end(), track))
+            for (int p = v, guard = 0; p >= 0 && p < n && guard <= n; p = song.vcas[(std::size_t) p].parent, ++guard) // (a cycle stops)
+                if (std::find (out.begin(), out.end(), p) == out.end())
+                    out.push_back (p);
+    return out;
+}
+
+float vcaGain (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return 1.0f;
+    auto g = 1.0f;
+    for (const auto v : vcasOf (song, track))
+        g *= faderGain (song.vcas[(std::size_t) v].level);
+    return g;
+}
+
+bool vcaMuted (const Song& song, int track)
+{
+    if (song.vcas.empty())
+        return false;
+    const auto list = vcasOf (song, track);
+    return std::any_of (list.begin(), list.end(), [&song] (int v) { return song.vcas[(std::size_t) v].muted; });
+}
+
+int assignToVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    int changed = 0;
+    for (const auto t : tracks)
+        if (isInsert (song, t) && ! std::binary_search (members.begin(), members.end(), t))
+        {
+            members.insert (std::lower_bound (members.begin(), members.end(), t), t);
+            ++changed;
+        }
+    return changed;
+}
+
+int removeFromVca (Song& song, const std::vector<int>& tracks, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return 0;
+    auto& members = song.vcas[(std::size_t) vca].members;
+    const auto before = members.size();
+    members.erase (std::remove_if (members.begin(), members.end(),
+                                   [&tracks] (int m) { return std::find (tracks.begin(), tracks.end(), m) != tracks.end(); }),
+                   members.end());
+    return (int) (before - members.size());
+}
+
+int createVca (Song& song, const std::vector<int>& tracks, const std::string& name)
+{
+    Vca vca;
+    vca.name = name.empty() ? "VCA " + std::to_string (song.vcas.size() + 1) : name;
+    song.vcas.push_back (vca);
+    const auto index = (int) song.vcas.size() - 1;
+    assignToVca (song, tracks, index);
+    return index;
+}
+
+bool deleteVca (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    song.vcas.erase (song.vcas.begin() + vca);
+    for (auto& v : song.vcas)
+        v.parent = v.parent == vca ? -1 : v.parent > vca ? v.parent - 1 : v.parent;
+    song.forEachTarget ([vca] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::vcaLevel)
+            return;
+        if (t.index == vca)
+            t = AutomationTarget {};
+        else if (t.index > vca)
+            --t.index;
+    });
+    song.removeDeadMidiLinks();
+    return true;
+}
+
+std::vector<int> vcaReach (const Song& song, int vca)
+{
+    std::vector<int> out;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto list = vcasOf (song, t);
+        if (std::find (list.begin(), list.end(), vca) != list.end())
+            out.push_back (t);
+    }
+    return out;
+}
+
+bool mergeVcaIntoMembers (Song& song, int vca)
+{
+    if (vca < 0 || vca >= (int) song.vcas.size())
+        return false;
+    const auto gain = faderGain (song.vcas[(std::size_t) vca].level);
+    if (gain == 1.0f)
+        return false;
+    auto scaled = [gain] (float position) { return std::clamp (faderPosition (faderGain (position) * gain), 0.0f, 1.0f); };
+    for (const auto t : vcaReach (song, vca))
+    {
+        auto& m = song.mixer[(std::size_t) t];
+        m.volume = scaled (m.volume);
+        for (auto& a : song.automations) // the member's own volume automation carries the gain too
+            if (a.target.kind == AutomationTargetKind::mixerVolume && a.target.index == t)
+                for (auto& p : a.points)
+                    p.value = scaled (p.value);
+    }
+    song.vcas[(std::size_t) vca].level = unityFader;
+    return true;
+}
+
+namespace
+{
+int linkedInsert (const Song& song, const PlaylistTrack& pt)
+{
+    if (pt.mode == PlaylistTrackMode::audio)
+        return pt.mixerTrack;
+    if (pt.mode == PlaylistTrackMode::instrument)
+        return pt.channel >= 0 && pt.channel < (int) song.channels.size() ? song.channels[(std::size_t) pt.channel].mixerTrack : pt.mixerTrack;
+    return -1;
+}
+} // namespace
+
+std::vector<int> playlistOrderInserts (const Song& song)
+{
+    std::vector<int> out;
+    for (const auto& pt : song.playlistTracks)
+        if (const auto t = linkedInsert (song, pt); t > 0 && t < (int) song.mixer.size() && std::find (out.begin(), out.end(), t) == out.end())
+            out.push_back (t);
+    return out;
+}
+
+std::vector<PlaylistGroupInserts> playlistGroupInserts (const Song& song)
+{
+    std::vector<PlaylistGroupInserts> groups;
+    std::vector<int> seen;
+    const auto& tracks = song.playlistTracks;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        if (tracks[i].grouped)
+            continue; // (a member: handled with its header)
+        auto end = i + 1;
+        while (end < tracks.size() && tracks[end].grouped)
+            ++end;
+        if (end == i + 1)
+            continue; // an ungrouped track on its own
+        PlaylistGroupInserts g;
+        g.collapsed = tracks[i].collapsed;
+        for (auto k = i; k < end; ++k)
+            if (const auto t = linkedInsert (song, tracks[k]); t > 0 && t < (int) song.mixer.size() && std::find (seen.begin(), seen.end(), t) == seen.end())
+            {
+                seen.push_back (t);
+                g.inserts.push_back (t);
+            }
+        if (! g.inserts.empty())
+            groups.push_back (std::move (g));
+    }
+    return groups;
+}
+
+namespace
+{
+// the separator / fold flags followPlaylistGroups wants, per mixer track
+void followedFlags (const Song& song, std::vector<bool>& separator, std::vector<bool>& folded)
+{
+    const auto count = song.mixer.size();
+    separator.assign (count, false);
+    folded.assign (count, false);
+    for (std::size_t t = 0; t < count; ++t)
+    {
+        separator[t] = song.mixer[t].separator;
+        folded[t] = song.mixer[t].folded;
+    }
+    for (const auto t : playlistOrderInserts (song)) // the follow owns these
+        separator[(std::size_t) t] = folded[(std::size_t) t] = false;
+
+    const auto order = displayOrder (song);
+    const auto at = [&order] (int t) { return (int) (std::find (order.begin(), order.end(), t) - order.begin()); };
+    for (const auto& g : playlistGroupInserts (song))
+    {
+        if (g.inserts.size() < 2)
+            continue;
+        auto positions = g.inserts;
+        for (auto& p : positions)
+            p = at (p);
+        std::sort (positions.begin(), positions.end());
+        const auto dock = song.mixer[(std::size_t) order[(std::size_t) positions.front()]].dock;
+        auto runs = positions.back() - positions.front() + 1 == (int) positions.size();
+        for (const auto p : positions)
+            runs = runs && song.mixer[(std::size_t) order[(std::size_t) p]].dock == dock;
+        if (! runs)
+            continue; // not side by side: "Arrange inserts like the Playlist" puts them together
+        const auto first = order[(std::size_t) positions.front()];
+        separator[(std::size_t) first] = true;
+        folded[(std::size_t) first] = g.collapsed;
+        if (const auto next = positions.back() + 1; next < (int) order.size() && order[(std::size_t) next] > 0
+                                                     && song.mixer[(std::size_t) order[(std::size_t) next]].dock == dock)
+            separator[(std::size_t) order[(std::size_t) next]] = true;
+    }
+}
+} // namespace
+
+bool followsPlaylistGroups (const Song& song)
+{
+    std::vector<bool> separator, folded;
+    followedFlags (song, separator, folded);
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+        if (song.mixer[t].separator != separator[t] || song.mixer[t].folded != folded[t])
+            return false;
+    return true;
+}
+
+bool followPlaylistGroups (Song& song)
+{
+    std::vector<bool> separator, folded;
+    followedFlags (song, separator, folded);
+    auto changed = false;
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+    {
+        auto& m = song.mixer[t];
+        changed = changed || m.separator != separator[t] || m.folded != folded[t];
+        m.separator = separator[t];
+        m.folded = folded[t];
+    }
+    return changed;
+}
+
+int arrangeLikePlaylist (Song& song)
+{
+    const auto linked = playlistOrderInserts (song);
+    std::vector<int> wanted = linked; // the new order of inserts 1..n: the linked ones, then the rest as they are
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+        if (std::find (linked.begin(), linked.end(), t) == linked.end())
+            wanted.push_back (t);
+
+    // place by place, the wanted insert swaps in (swapTracks carries every reference along)
+    std::vector<int> now (song.mixer.size()); // now[t] = which original insert sits at t
+    std::iota (now.begin(), now.end(), 0);
+    int moved = 0;
+    for (int place = 1; place <= (int) wanted.size(); ++place)
+    {
+        const auto from = (int) (std::find (now.begin() + 1, now.end(), wanted[(std::size_t) place - 1]) - now.begin());
+        if (from == place)
+            continue;
+        swapTracks (song, place, from);
+        std::swap (now[(std::size_t) place], now[(std::size_t) from]);
+    }
+    for (int t = 1; t < (int) now.size(); ++t)
+        moved += now[(std::size_t) t] != t ? 1 : 0;
+    followPlaylistGroups (song);
+    return moved;
+}
+
 void createGroup (Song& song, const std::vector<int>& tracks, int current)
 {
     const auto order = displayOrder (song);
@@ -849,6 +1530,134 @@ int autoColorGroup (Song& song, int track)
         if (song.mixer[(std::size_t) t].colour != colour)
         {
             song.mixer[(std::size_t) t].colour = colour;
+            ++changed;
+        }
+    return changed;
+}
+
+std::uint32_t gradientColourStep (std::uint32_t from, std::uint32_t to, int k, int n) noexcept
+{
+    if (n < 2)
+        return from;
+    const auto amount = (k << 8) / (n - 1); // FL: shl 8, idiv
+    std::uint32_t out = 0xff000000u;
+    for (int shift = 0; shift <= 16; shift += 8)
+    {
+        const auto a = (int) ((from >> shift) & 0xffu), b = (int) ((to >> shift) & 0xffu);
+        // FL blends with pmulhw on (b - a) * 16 and amount * 16: the high word, an arithmetic shift (floor)
+        const auto c = a + (((b - a) * 16 * (amount * 16)) >> 16);
+        out |= (std::uint32_t) std::clamp (c, 0, 255) << shift;
+    }
+    return out;
+}
+
+int gradientColour (Song& song, std::vector<int> tracks, std::uint32_t from, std::uint32_t to)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [&] (int t) { return t < 0 || t >= (int) song.mixer.size(); }),
+                  tracks.end());
+    const auto n = (int) tracks.size();
+    if (n < 2)
+        return 0;
+    int changed = 0;
+    for (int k = 0; k < n; ++k)
+    {
+        auto& colour = song.mixer[(std::size_t) tracks[(std::size_t) k]].colour;
+        const auto next = gradientColourStep (from, to, k, n);
+        if (colour != next)
+        {
+            colour = next;
+            ++changed;
+        }
+    }
+    return changed;
+}
+
+namespace
+{
+constexpr int audioTrackScan = 500; // FL: playlist tracks 1..500
+
+std::vector<int> sortedInserts (const Song& song, std::vector<int> inserts)
+{
+    std::sort (inserts.begin(), inserts.end());
+    inserts.erase (std::unique (inserts.begin(), inserts.end()), inserts.end());
+    inserts.erase (std::remove_if (inserts.begin(), inserts.end(), [&] (int t) { return t <= 0 || t >= (int) song.mixer.size(); }),
+                   inserts.end());
+    return inserts;
+}
+
+// FL skips an insert that any Playlist track already points at (0x12a76e0: any mode), or whose one and only channel
+// already has an instrument track (0x12a7620 with 0xffac90 / 0xffae00; audio clip channels don't count).
+bool hasPlaylistTrack (const Song& song, int insert)
+{
+    for (const auto& pt : song.playlistTracks)
+        if (pt.mode != PlaylistTrackMode::unassigned && pt.mixerTrack == insert)
+            return true;
+    int sole = -1, count = 0;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == insert)
+        {
+            sole = c;
+            ++count;
+        }
+    if (count != 1 || song.channels[(std::size_t) sole].instrument == InstrumentKind::audioClip)
+        return false;
+    return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [sole] (const PlaylistTrack& pt) {
+        return pt.mode == PlaylistTrackMode::instrument && pt.channel == sole;
+    });
+}
+
+int audioTrackOf (const Song& song, int insert)
+{
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) i];
+        if (pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert)
+            return i;
+    }
+    return -1;
+}
+} // namespace
+
+int assignNewAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int assigned = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+    {
+        if (hasPlaylistTrack (song, t))
+            continue;
+        for (int i = 0; i < audioTrackScan; ++i)
+        {
+            const auto untouched = i >= (int) song.playlistTracks.size()
+                                   || (song.playlistTracks[(std::size_t) i].name.empty() && song.playlistTracks[(std::size_t) i].colour == 0
+                                       && song.playlistTracks[(std::size_t) i].mode == PlaylistTrackMode::unassigned);
+            if (! untouched || std::any_of (song.playlist.begin(), song.playlist.end(), [i] (const Clip& c) { return c.track == i; }))
+                continue;
+            if ((int) song.playlistTracks.size() <= i)
+                song.playlistTracks.resize ((std::size_t) i + 1);
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            const auto& insert = song.mixer[(std::size_t) t];
+            pt.mode = PlaylistTrackMode::audio;
+            pt.mixerTrack = t;
+            pt.name = insert.name.empty() ? "Insert " + std::to_string (t) : insert.name;
+            pt.colour = insert.colour;
+            ++assigned;
+            break;
+        }
+    }
+    return assigned;
+}
+
+int unassignAudioTracks (Song& song, std::vector<int> inserts)
+{
+    int changed = 0;
+    for (auto t : sortedInserts (song, std::move (inserts)))
+        if (const auto i = audioTrackOf (song, t); i >= 0)
+        {
+            auto& pt = song.playlistTracks[(std::size_t) i];
+            pt.mode = PlaylistTrackMode::unassigned;
+            pt.mixerTrack = -1;
             ++changed;
         }
     return changed;

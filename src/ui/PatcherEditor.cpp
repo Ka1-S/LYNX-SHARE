@@ -1,6 +1,7 @@
 #include "ui/VideoPlayerView.h"
 #include "ui/FileChoosers.h"
 #include "ui/WaveTravellerEditor.h"
+#include "ui/FruitySlicerEditor.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -1628,7 +1629,7 @@ private:
             case InstrumentKind::boobass: case InstrumentKind::flkeys: case InstrumentKind::soundfont:
                 return "Misc";
             case InstrumentKind::granulizer: case InstrumentKind::directwave: case InstrumentKind::sampler:
-            case InstrumentKind::wavetraveller:
+            case InstrumentKind::wavetraveller: case InstrumentKind::fruityslicer:
                 return "Sampler";
             case InstrumentKind::beepmap: case InstrumentKind::harmor: case InstrumentKind::morphine: case InstrumentKind::ogun:
             case InstrumentKind::autogun: case InstrumentKind::plucked: case InstrumentKind::sakura: case InstrumentKind::slayer:
@@ -1649,14 +1650,14 @@ private:
             case EffectKind::delay: case EffectKind::reverb: case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate:
             case EffectKind::nebula: case EffectKind::halo: case EffectKind::horizon: case EffectKind::echoform: case EffectKind::spiralEcho:
             case EffectKind::reeverb2: case EffectKind::reeverb1: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3:
-            case EffectKind::fruityDelayBank: case EffectKind::luxeVerb: case EffectKind::multibandDelay: case EffectKind::flDelay1: case EffectKind::convolver:
+            case EffectKind::fruityDelayBank: case EffectKind::luxeVerb: case EffectKind::multibandDelay: case EffectKind::flDelay1: case EffectKind::convolver: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay:
                 return "Delay reverb";
             case EffectKind::distortion: case EffectKind::lofi: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
-            case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::hardcore: case EffectKind::distructor:
-            case EffectKind::ember: case EffectKind::kilnChannel:
+            case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
+            case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
                 return "Distortion";
             case EffectKind::compressor: case EffectKind::limiter: case EffectKind::apexLimiter: case EffectKind::volumeGate:
-            case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::fruityLimiter:
+            case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate: case EffectKind::pocketCompressor: case EffectKind::pocketAutoduck: case EffectKind::shellChannel: case EffectKind::strikeShaper: case EffectKind::fruityLimiter:
             case EffectKind::fruityCompressor: case EffectKind::transientProcessor: case EffectKind::fruityMultiband: case EffectKind::maximus:
             case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::emphasizer: case EffectKind::flEmphasis: case EffectKind::squeeze:
                 return "Dynamics";
@@ -1667,7 +1668,8 @@ private:
                 return "Filter";
             case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
             case EffectKind::fruityFlangus: case EffectKind::fruityFlanger: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:
-            case EffectKind::orbit: case EffectKind::latticeMod:
+            case EffectKind::orbit: case EffectKind::latticeMod: case EffectKind::pocketMultiFx: case EffectKind::pocketChorus:
+            case EffectKind::pocketWowFlutter: case EffectKind::pocketPhaser: case EffectKind::pocketFlanger: case EffectKind::pocketTremolo:
                 return "Flanger";
             case EffectKind::patcher:
                 return "Patcher";
@@ -2241,6 +2243,11 @@ private:
         if (node.generator && node.channel.instrument == InstrumentKind::wavetraveller) // round 167f
         {
             openToolWindow (makeWaveTravellerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
+            return;
+        }
+        if (node.generator && node.channel.instrument == InstrumentKind::fruityslicer) // round 180c
+        {
+            openToolWindow (makeFruitySlicerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
             return;
         }
         if (node.generator && node.channel.instrument == InstrumentKind::midiOut)

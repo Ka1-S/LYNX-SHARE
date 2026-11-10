@@ -175,8 +175,10 @@ map = xml:HighEQFreq -> High EQ freq
 map = xml:EchoSync -> Echo sync | steps 0:0 0.4995:0.3333 0.7495:0.6667 0.9995:1
 map = xml:EchoNote -> Echo note | steps 0:0 0.1662:0.2 0.3328:0.4 0.4995:0.6 0.6662:0.8 0.8328:1
 map = xml:Routing -> Routing | steps 0:0 0.4995:1
-map = xml:EchoMode -> Echo mode | steps 0:0 0.0828:0.0909 0.1245:0.1818 0.1662:0.2727 0.2078:0.3636 0.2495:0.4545 0.2912:0.5455 0.3328:0.6364 0.3745:0.7273 0.4162:0.8182 0.4578:0.9091 0.4995:1 0.5412:0
-map = xml:ReverbMode -> Reverb mode | steps 0:0 0.0828:0.1429 0.1245:0.2857 0.1662:0.4286 0.2078:0.5714 0.2495:0.7143 0.2912:0.8571 0.3328:1 0.3745:0
+# round 183b: its modes sit at (k + 1) / 24 (its factory presets) and switch at those exact points (measured: 0.0833
+# plays Room, 0.08333 Chamber; 0.3333 Frozen, 0.33333 Nonlin)
+map = xml:EchoMode -> Echo mode | steps 0:0 0.083333:0.0909 0.125:0.1818 0.166667:0.2727 0.208333:0.3636 0.25:0.4545 0.291667:0.5455 0.333333:0.6364 0.375:0.7273 0.416667:0.8182 0.458333:0.9091 0.5:1 0.541667:0
+map = xml:ReverbMode -> Reverb mode | steps 0:0 0.083333:0.1429 0.125:0.2857 0.166667:0.4286 0.208333:0.5714 0.25:0.7143 0.291667:0.8571 0.333333:1 0.375:0
 map = xml:Color -> Color | steps 0:0 0.1662:0.3333 0.2495:0.6667 0.3328:1
 
 # ---------------------------------------------------------------- other reverbs -> Reeverb 2 / LuxeVerb
@@ -510,21 +512,22 @@ vendor = Complete Access (role)
 lynx = Ridge Strip
 names = Virtual Mix Rack; VBC Rack
 
-# round tp172c6: SSL Native Drumstrip -> Ridge's gate and trims (its transient shaper, enhancers and listen-mic
-# compressor not reproduced yet)
+# round tp172c6: SSL Native Drumstrip -> Ridge's gate and trims; tp172c8: onto Shell Channel, LYNX's drum channel strip
+# (gate, transient shaper, low / high enhancers, listen-mic compressor, process order, dry / wet)
 [ssl-drumstrip]
 product = Drumstrip (drum channel strip)
 vendor = Solid State Logic (Complete Access)
-lynx = Ridge Strip
+lynx = Shell Channel
 names = SSL Native Drumstrip v6; SSL Native Drumstrip; Drumstrip
 translate = ssl-drumstrip
 
 # round tp172c6: SSL Guitarstrip -> Ridge's own engine (EQ, filters, compressor) with the DRIVE section on the Guitar amp /
-# Bass amp models, measured black-box on its trial
+# Bass amp models, measured black-box on its trial; tp172c8: onto Fret Channel, LYNX's guitar / bass channel strip (phase
+# correction, EQ, compressor, amp with its voicings, output mix)
 [ssl-guitarstrip]
 product = Guitarstrip (guitar / bass channel strip)
 vendor = Solid State Logic (Complete Access)
-lynx = Ridge Strip
+lynx = Fret Channel
 names = SSL Guitarstrip; Guitarstrip
 translate = ssl-guitarstrip
 
@@ -668,6 +671,14 @@ product = Harrison De-Esser
 vendor = Harrison
 lynx = Hush De-esser
 names = Harrison De-Esser; Harrison DeEsser
+
+# round trans189d (issue #94): the two-knob transient designer role -> Strike Shaper (level-independent attack / sustain,
+# output, parallel mix, limiter, side-chain filter); its states are not read (no trial on this PC): Strike at its defaults
+[spl-transient-designer]
+product = Transient Designer
+vendor = SPL
+lynx = Strike Shaper
+names = SPL Transient Designer; SPL Transient Designer Plus; Transient Designer Plus; SPL TD Plus; UAD SPL Transient Designer; SPL Transient Designer (UAD)
 
 [slate-fresh-air]
 product = Fresh Air
@@ -1690,9 +1701,18 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
         const auto lift = compIn ? std::clamp (-40.0 - ridgeThr, 0.0, std::max (0.0, 20.0 - inDb)) : 0.0;
         p[r::compRatio] = ratioV (ratio);
         p[r::compThreshold] = linNorm (ridgeThr + lift, -40.0, 0.0);
-        p[r::compRelease] = logNorm (at ("compressor_release", 50.0) / 1000.0, 0.1, 4.0);
+        // tp172c11 (H32_dyn stairs and bursts, grid-scored): the reduction's release time constant is far longer than the
+        // dial (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, log-log between them), half that in Limiter mode; the attack
+        // is the dial itself, Limiter mode ~2.5 ms
+        const auto relDial = std::clamp (at ("compressor_release", 50.0), 1.0, 5000.0);
+        const auto relTau = relDial < 104.0 ? 0.25 * std::pow (0.35 / 0.25, std::log (relDial / 50.0) / std::log (104.0 / 50.0))
+                                            : 0.35 * std::pow (1.6 / 0.35, std::log (relDial / 104.0) / std::log (351.5 / 104.0));
+        p[r::compRelease] = logNorm (mode == 2 ? 0.5 * relTau : relTau, 0.1, 4.0);
         p[r::compFastAttack] = at ("compressor_attack", 20.0) < 3.0 ? 1.0f : 0.0f;
+        p[r::compAttackFine] = compIn ? (float) (std::clamp (mode == 2 ? 2.5 : at ("compressor_attack", 20.0), 0.1, 250.0) / 250.0) : 0.0f;
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
+        // tp172c10: its reduction stops at exactly 27.5 dB (H32_dyn stairs, Compressor and Limiter at low thresholds)
+        p[r::compGrCap] = compIn ? (float) (27.5 / 60.0) : 0.0f;
         if (compIn)
             outDb += at ("compressor_makeup_gain", 0.0) + (sw ("CompAutoMakeUp", true) ? harrison::autoMakeupDb (thr, ratio) : 0.0);
         // gate (gate_mode 1 = the 1:2 expander), depth = the range
@@ -1887,17 +1907,14 @@ int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slo
 }
 
 // round tp172c6: SSL Guitarstrip (its state: the SSL_PLUGIN_STATE XML, the A or B setting in its own units) -> Ridge's
-// own engine (brown curve) with the DRIVE section on the Guitar amp / Bass amp models, measured black-box on its trial
-// (GS_bank): EQ low / high first-order shelves ±12 dB (read as Ridge's shelves at their best-fitting corner and gain),
-// mid bell ±12 dB at Q 0.5 (0.5 .. 7 kHz), 24 dB/oct high-pass (20 = out) and a steep low-pass (20 kHz = out) on Ridge's
-// slopes at the corners that fit best; the compressor's threshold in dB (RMS), its mode Fastest .. Slowest = 2 : 1 ..
-// 4 : 1 with ~1 / 10 / 30 ms attack and ~50 / 130 / 300 ms release; the amp's drive 0 .. 11 and the guitar pre-amp
-// (-6 .. +30 dB, on the drive input). Not read: Boost, Punch, Edge, the bass Punch / Shape, the EQ pre / post order
+// engine; round tp172c8: -> Fret Channel, whose controls have the original's own ranges and laws (core/StripSuite.inc):
+// every setting reads across one to one (Align Mode 0..2, Compressor Mode 0..4, All-Pass Order / Drive Type 0..1 as
+// indices; the filters' 20 = out). Bypass -> the slot off
 int translateSslGuitarstrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
-    namespace r = mixsuite::ridge;
+    namespace f = mixsuite::fret;
     const auto root = findBytes (state, "<SSL_PLUGIN_STATE");
-    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip)
+    if (root == std::string::npos || slot.kind != EffectKind::fretChannel)
         return 0;
     const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
     if (attributeIn (text, 0, "PluginName").find ("Guitarstrip") == std::string::npos)
@@ -1910,75 +1927,60 @@ int translateSslGuitarstrip (const std::vector<std::uint8_t>& state, EffectSlot&
     if (v.size() < 10)
         return 0;
     auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
-    auto sw = [&at] (const char* id, bool fallback) { return at (id, fallback ? 1.0 : 0.0) >= 0.5; };
+    auto sw = [&at] (const char* id, bool fallback) { return at (id, fallback ? 1.0 : 0.0) >= 0.5 ? 1.0f : 0.0f; };
     auto& p = slot.params;
-    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
-    p[r::curve] = 0.0f;
-    p[r::analog] = 0.0f;
-    p[r::eqToSidechain] = p[r::filtersToSidechain] = 0.0f;
-    p[r::gateRange] = 0.0f;
-    // EQ: the shelves (first order in the original) as Ridge's S 1 shelves: low cut 327 Hz x0.93, boost 450 Hz (its
-    // range's top) x1.0; high 4262 Hz x0.87
-    const bool eqIn = sw ("EQ", true);
-    p[r::eqOn] = eqIn ? 1.0f : 0.0f;
-    const auto loDb = std::clamp (at ("Low Gain", 0.0), -12.0, 12.0), hiDb = std::clamp (at ("High Gain", 0.0), -12.0, 12.0);
-    p[r::lfBell] = p[r::hfBell] = 0.0f;
-    p[r::lfGain] = linNorm (loDb * (loDb < 0.0 ? 0.928 : 1.0), -15.0, 15.0);
-    p[r::lfFreq] = logNorm (loDb < 0.0 ? 327.5 : 450.0, 30.0, 450.0);
-    p[r::hfGain] = linNorm (hiDb * 0.867, -15.0, 15.0);
-    p[r::hfFreq] = logNorm (4262.0, 1500.0, 16000.0);
-    const auto midHz = std::clamp (at ("Mid Frequency", 1.0), 0.5, 7.0) * 1000.0, midDb = std::clamp (at ("Mid Gain", 0.0), -12.0, 12.0);
-    const bool lowMid = midHz < 600.0;
-    p[r::lmfGain] = linNorm (lowMid ? midDb : 0.0, -15.0, 15.0);
-    p[r::lmfFreq] = logNorm (lowMid ? midHz : 1000.0, 200.0, 2500.0);
-    p[r::lmfQ] = 0.0f;
-    p[r::hmfGain] = linNorm (lowMid ? 0.0 : midDb, -15.0, 15.0);
-    p[r::hmfFreq] = logNorm (lowMid ? 3000.0 : midHz, 600.0, 7000.0);
-    p[r::hmfQ] = 0.0f;
-    // filters: the 24 dB/oct high-pass fits Ridge's 18 dB/oct at ~1.25x its corner; the steep low-pass Ridge's 12 dB/oct at
-    // 0.52x (3.6 kHz) .. 0.74x (11.3 kHz)
-    const auto hp = at ("High-Pass Filter", 20.0), lp = at ("Low-Pass Filter", 20.0);
-    const auto hpK = hp < 30.0 ? 1.03 : 1.25;
-    p[r::hpf] = eqIn && hp > 20.5 ? std::max (1e-4f, logNorm (hp * hpK, 16.0, 350.0)) : 0.0f;
-    const auto lpK = std::clamp (0.523 + (0.74 - 0.523) * std::log (std::max (lp, 3.0) / 3.6) / std::log (11.3 / 3.6), 0.5, 0.8);
-    p[r::lpf] = eqIn && lp < 19.5 ? std::max (1e-4f, logNorm (std::max (3000.0, lp * 1000.0 * lpK), 22000.0, 3000.0)) : 0.0f;
-    // compressor: threshold -36 .. 0 dB at the sine's RMS (Ridge reads the peak: +3), mode 0 .. 4 = Fastest .. Slowest
-    const bool compIn = sw ("Compressor", false);
-    const auto mode = std::clamp (at ("Compressor Mode", 2.0), 0.0, 4.0);
-    const auto thr = std::clamp (at ("Compressor Threshold", 0.0), -36.0, 0.0);
-    p[r::dynOn] = compIn ? 1.0f : 0.0f;
-    p[r::compRatio] = compIn ? (float) std::sqrt (std::clamp ((1.0 + 0.5 * mode) / 19.0, 0.0, 0.996)) : 0.0f;
-    p[r::compThreshold] = linNorm (thr + 3.0, -40.0, 0.0);
-    p[r::compFastAttack] = mode < 1.0 ? 1.0f : 0.0f;
-    p[r::compRelease] = logNorm (std::exp (std::log (0.1) + (std::log (0.3) - std::log (0.1)) * mode / 4.0), 0.1, 4.0);
-    p[r::compMix] = (float) std::clamp (at ("Compressor Mix", 100.0) / 100.0, 0.0, 1.0);
-    p[r::autoMakeup] = compIn && sw ("Compressor Auto Gain", false) ? 1.0f : 0.0f;
-    p[r::order] = 0.0f;
-    // the amp: Drive Type 0 = guitar, 1 = bass; drive 0 .. 11; the guitar pre-amp onto the drive input
-    const bool bass = at ("Drive Type", 0.0) >= 0.5;
-    const auto model = bass ? r::driveBassAmp : r::driveGuitarAmp;
-    p[r::driveOn] = sw ("Drive", false) ? 1.0f : 0.0f;
-    p[r::driveModel] = r::driveModelValue (model);
-    p[r::driveAmount] = r::driveAmountValue (model, at (bass ? "Bass Drive" : "Guitar Drive", 0.0));
-    p[r::driveInput] = linNorm (bass ? 0.0 : std::clamp (at ("Guitar Pre-Amp", 0.0), -24.0, 24.0), -24.0, 24.0);
-    p[r::driveTrim] = 0.5f;
-    p[r::driveMix] = (float) std::clamp (at ("Drive Mix", 100.0) / 100.0, 0.0, 1.0);
-    p[r::input] = linNorm (std::clamp (at ("Input Gain", 0.0), -20.0, 20.0), -20.0, 20.0);
-    p[r::output] = linNorm (std::clamp (at ("Output Gain", 0.0), -20.0, 20.0), -20.0, 20.0);
-    p[r::phase] = sw ("Phase Invert", false) ? 1.0f : 0.0f;
-    if (sw ("Bypass", false))
+    p[f::input] = linNorm (at ("Input Gain", 0.0), -24.0, 24.0);
+    p[f::output] = linNorm (at ("Output Gain", 0.0), -24.0, 24.0);
+    p[f::outputMix] = linNorm (at ("Output Mix", 100.0), 0.0, 100.0);
+    p[f::phaseCorrection] = sw ("Phase Correction", true);
+    p[f::alignMode] = (float) std::clamp (std::round (at ("Align Mode", 0.0)), 0.0, 2.0) / 2.0f;
+    p[f::delayIn] = sw ("Delay In", true);
+    p[f::delay] = linNorm (at ("Delay Amount", 0.0), -20.0, 20.0);
+    p[f::phaseInvert] = sw ("Phase Invert", false);
+    p[f::allPassIn] = sw ("All-Pass In", false);
+    p[f::allPassFreq] = logNorm (std::clamp (at ("All-Pass Frequency", 2000.0), 20.0, 20000.0), 20.0, 20000.0);
+    p[f::allPassQ] = logNorm (std::clamp (at ("All-Pass Q", 1.0), 0.1, 6.0), 0.1, 6.0);
+    p[f::allPassOrder] = sw ("All-Pass Order", true);
+    p[f::hpf] = f::hpfValue (at ("High-Pass Filter", 20.0));
+    p[f::eqIn] = sw ("EQ", true);
+    p[f::eqPrePost] = sw ("EQ Pre-Post", false);
+    p[f::lpf] = f::lpfValue (at ("Low-Pass Filter", 20.0));
+    p[f::lowGain] = linNorm (at ("Low Gain", 0.0), -12.0, 12.0);
+    p[f::midFreq] = f::midValue (std::clamp (at ("Mid Frequency", 1.0), 0.5, 7.0));
+    p[f::midGain] = linNorm (at ("Mid Gain", 0.0), -12.0, 12.0);
+    p[f::highGain] = linNorm (at ("High Gain", 0.0), -12.0, 12.0);
+    p[f::compIn] = sw ("Compressor", true);
+    p[f::compThreshold] = linNorm (at ("Compressor Threshold", 0.0), -36.0, 0.0);
+    p[f::compMix] = linNorm (at ("Compressor Mix", 100.0), 0.0, 100.0);
+    p[f::compAutoGain] = sw ("Compressor Auto Gain", false);
+    p[f::compMode] = f::modeValue ((int) std::lround (std::clamp (at ("Compressor Mode", 2.0), 0.0, 4.0)));
+    p[f::driveIn] = sw ("Drive", false);
+    p[f::driveModel] = sw ("Drive Type", false);
+    p[f::preAmp] = linNorm (at ("Guitar Pre-Amp", 0.0), -6.0, 30.0);
+    p[f::guitarDrive] = linNorm (at ("Guitar Drive", 0.0), 0.0, 11.0);
+    p[f::guitarBoost] = linNorm (at ("Guitar Boost", 0.0), -100.0, 100.0);
+    p[f::guitarPunch] = linNorm (at ("Guitar Punch", 0.0), -100.0, 100.0);
+    p[f::guitarEdge] = linNorm (at ("Guitar Edge", 0.0), 0.0, 10.0);
+    p[f::bassDrive] = linNorm (at ("Bass Drive", 0.0), 0.0, 11.0);
+    p[f::bassPunch] = linNorm (at ("Bass Punch", 0.0), -100.0, 100.0);
+    p[f::bassShape] = linNorm (at ("Bass Shape", 0.0), 0.0, 10.0);
+    p[f::driveMix] = linNorm (at ("Drive Mix", 100.0), 0.0, 100.0);
+    p[f::monoListen] = sw ("Mono Listen", false);
+    p[f::scListen] = sw ("Side-Chain Listen", false);
+    p[f::autoListen] = sw ("EQ Auto Listen", false);
+    if (sw ("Bypass", false) >= 0.5f)
         slot.enabled = false;
     return (int) v.size();
 }
 
-// round tp172c6: SSL Native Drumstrip (the SSL_PLUGIN_STATE XML, A / B) -> Ridge's own engine with its gate (open
-// threshold, range up to Ridge's 60 dB, release) and its input / output trims. Not reproduced yet: the transient shaper,
-// the HF / LF enhancers and the listen-mic compressor (Ridge stays flat for them)
+// round tp172c6: SSL Native Drumstrip (the SSL_PLUGIN_STATE XML, A / B) -> Ridge's gate; round tp172c8: -> Shell
+// Channel, whose controls have the original's own ranges and laws: every setting reads across one to one (processOrder
+// is stored as its 0..1 position over the 120 orders). bypass -> the slot off
 int translateSslDrumstrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
-    namespace r = mixsuite::ridge;
+    namespace s = mixsuite::shell;
     const auto root = findBytes (state, "<SSL_PLUGIN_STATE");
-    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip)
+    if (root == std::string::npos || slot.kind != EffectKind::shellChannel)
         return 0;
     const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
     if (attributeIn (text, 0, "PluginName").find ("Drumstrip") == std::string::npos)
@@ -1991,24 +1993,38 @@ int translateSslDrumstrip (const std::vector<std::uint8_t>& state, EffectSlot& s
     if (v.size() < 10)
         return 0;
     auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
+    auto sw = [&at] (const char* id) { return at (id, 0.0) >= 0.5 ? 1.0f : 0.0f; };
     auto& p = slot.params;
-    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
-    p[r::curve] = 0.0f;
-    p[r::analog] = p[r::autoMakeup] = 0.0f;
-    p[r::eqOn] = 0.0f;
-    p[r::hpf] = p[r::lpf] = 0.0f;
-    p[r::compRatio] = 0.0f;
-    const bool gateIn = at ("gateOn", 0.0) >= 0.5;
-    p[r::dynOn] = gateIn ? 1.0f : 0.0f;
-    p[r::expander] = 0.0f;
-    p[r::gateRange] = gateIn ? linNorm (std::clamp (at ("gateRange", 80.0), 0.0, 60.0), 0.0, 60.0) : 0.0f;
-    // the open threshold (Ridge closes 4 dB under it; the trial's sweep at the threshold stays open, as here)
-    p[r::gateThreshold] = linNorm (at ("gateOpen", -30.0), -80.0, 0.0);
-    p[r::gateRelease] = logNorm (std::clamp (at ("gateRelease", 0.2), 0.1, 4.0), 0.1, 4.0);
-    p[r::gateFastAttack] = at ("gateAttack", 0.05) < 0.5 ? 1.0f : 0.0f;
-    p[r::input] = linNorm (std::clamp (at ("input", 0.0), -20.0, 20.0), -20.0, 20.0);
-    p[r::output] = linNorm (std::clamp (at ("output", 0.0), -20.0, 20.0), -20.0, 20.0);
-    p[r::driveOn] = 0.0f;
+    p[s::input] = linNorm (at ("input", 0.0), -20.0, 20.0);
+    p[s::gateOn] = sw ("gateOn");
+    p[s::gateAttack] = linNorm (at ("gateAttack", 0.05), 0.0, 0.1);
+    p[s::gateHold] = linNorm (at ("gateHold", 0.0), 0.0, 4000.0);
+    p[s::gateRelease] = s::releaseValue (std::clamp (at ("gateRelease", 0.5), 0.01, 1.0));
+    p[s::gateOpen] = s::thresholdValue (at ("gateOpen", -15.0));
+    p[s::gateClose] = s::thresholdValue (at ("gateClose", -24.0));
+    p[s::gateRange] = linNorm (at ("gateRange", 80.0), 0.0, 80.0);
+    p[s::tsGain] = linNorm (at ("transGain", 0.0), -20.0, 20.0);
+    p[s::tsSpeed] = (float) std::clamp (at ("transSpeed", 0.5), 0.0, 1.0);
+    p[s::tsAmount] = linNorm (at ("transAmount", 0.0), 0.0, 100.0);
+    p[s::tsOn] = sw ("TransOn");
+    p[s::tsInvert] = sw ("transInvert");
+    p[s::tsListen] = sw ("transListen");
+    p[s::hfOn] = sw ("hfOn");
+    p[s::hfFreq] = s::hfValue (std::clamp (at ("hfFreq", 6225.0), 2000.0, 20000.0));
+    p[s::hfDrive] = linNorm (at ("hfDrive", 5.0), 0.0, 10.0);
+    p[s::hfAmount] = linNorm (at ("hfAmount", 0.0), 0.0, 100.0);
+    p[s::lfOn] = sw ("lfOn");
+    p[s::lfFreq] = s::lfValue (std::clamp (at ("lfFreq", 70.0), 20.0, 250.0));
+    p[s::lfDrive] = linNorm (at ("lfDrive", 5.0), 0.0, 10.0);
+    p[s::lfAmount] = linNorm (at ("lfAmount", 0.0), 0.0, 100.0);
+    p[s::lmcOn] = sw ("lmcOn");
+    p[s::lmcNarrow] = sw ("lmcNarrowband");
+    p[s::lmcComp] = linNorm (at ("lmcComp", 0.0), 0.0, 100.0);
+    p[s::lmcMakeup] = linNorm (at ("lmcMakeup", 0.0), -20.0, 20.0);
+    p[s::lmcMix] = linNorm (at ("lmcMix", 100.0), 0.0, 100.0);
+    p[s::output] = linNorm (at ("output", 0.0), -20.0, 20.0);
+    p[s::outputMix] = linNorm (at ("outputMix", 100.0), 0.0, 100.0);
+    p[s::processOrder] = s::orderValue (s::orderIndex ((float) std::clamp (at ("processOrder", 0.0), 0.0, 1.0)));
     if (at ("bypass", 0.0) >= 0.5)
         slot.enabled = false;
     return (int) v.size();

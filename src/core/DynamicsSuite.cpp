@@ -137,8 +137,8 @@ struct DcBlock
 
 struct LiveMeters
 {
-    std::array<std::atomic<float>, 8> v {};
-    float read (int k) const noexcept { return k >= 0 && k < 8 ? v[(std::size_t) k].load (std::memory_order_relaxed) : 0.0f; }
+    std::array<std::atomic<float>, 14> v {};
+    float read (int k) const noexcept { return k >= 0 && k < 14 ? v[(std::size_t) k].load (std::memory_order_relaxed) : 0.0f; }
     void set (int k, float x) noexcept { v[(std::size_t) k].store (x, std::memory_order_relaxed); }
 };
 
@@ -181,7 +181,9 @@ Style styleOf (const EffectParams& p) noexcept
 float styleValue (Style s) noexcept { return (int) s < styles ? (float) (int) s / (float) (styles - 1) : styleValue (Style::allround); }
 float voicingValue (Style s) noexcept { return (int) s < styles ? 0.0f : (float) ((int) s - styles + 1) / (float) (voicings - 1); }
 double thresholdDb (float v) noexcept { return lin (v, -60.0, 0.0); }
-double ratioOf (float v) noexcept { return ratioLaw (v); }
+// round tp172b6 [EXEC] (Pro-C 3, Clean, 1 kHz stair, threshold -30, knee 0): 24 -> 30 dB over adds 5.96 dB at the very top,
+// 5.89 dB at 91.9 : 1, so the top is a true limit whatever its parameter text says (100.00:1). Only the exact top changes.
+double ratioOf (float v) noexcept { return v >= 1.0f ? 1.0e9 : ratioLaw (v); }
 float ratioValue (double r) noexcept { return ratioLawValue (r); }
 double kneeDb (float v) noexcept { return lin (v, 0.0, 72.0); }
 double rangeDb (float v) noexcept { return lin (v, 0.0, 60.0); }
@@ -281,10 +283,17 @@ constexpr StyleDef styleDefs[allStyles] {
     { 0.334, 0.850, 1.080, 5.30, 0.607, Curve::downward, 0.0, 1.09, 1.000, 5.68, 0.464, 1.00, 0.00, 0.000 }, // clean
     { 0.796, 0.288, 0.814, 18.87, 0.360, Curve::downward, 0.0, 0.00, 1.000, 2.88, 1.616, 1.00, 0.00, 0.000 }, // allround
     { 0.310, 0.580, 0.722, 6.21, 0.800, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.71 }, // punch
-    { 0.000, 1.547, 0.696, 2.88, 0.000, Curve::upward, 0.0, -5.41, 0.812, 44.32, 0.807, 0.87, -0.80, 0.000 }, // upward
+    // round trial187b [EXEC]: upward and classic refitted (tp172b's crestfit3, 5 ms gain trajectories) on tp172b's bank plus
+    // the trial's new programme captures at threshold −24 / ratio 4 / auto gain off (stair, bursts, drums, music, vocal):
+    // upward 2.85 → 2.60 dB rms over 68 jobs (above the threshold it held −6.2 dB where the trial holds −2.8), classic
+    // 2.28 → 1.67 dB over 80 jobs (its release was too fast: −3.3 dB where the trial is still at −5.4 on the stair's way
+    // down; the attack scale stays round 108's, whose 50 % attack time it measured); both now smooth the gain rather
+    // than the level (gainBlend 1). Two-way and vari-mu refits gained as much on
+    // the bank but lost round 108's own stairs (0.4 → 4.9 / 0.8 → 6.8 dB): kept as they were
+    { 0.000, 1.787, 0.496, 0.96, 0.000, Curve::upward, 0.0, -3.84, 0.812, 0.00, 0.393, 1.00, -0.80, 0.000 }, // upward
     { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWay, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 }, // two-way (round 108's fit: the bank refit lost the −18 dB threshold stairs; recovers within about a millisecond)
     { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMu, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // vari-mu (round 108's fit)
-    { 0.300, 1.570, 0.530, 4.00, 0.170, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // classic (round 108's fit)
+    { 0.300, 0.555, 0.682, 6.11, 0.242, Curve::downward, 0.0, 0.29, 1.000, 5.18, 0.002, 1.00, 0.00, 0.000 }, // classic (round trial187b; attack as round 108 measured it)
     { 0.169, 0.789, 0.880, 7.27, 0.722, Curve::downward, 0.0, 0.77, 1.000, 2.88, 0.750, 0.39 }, // opto
     { 1.611, 0.712, 0.000, 8.40, 0.000, Curve::vocal, 0.0, -0.17, 3.000, 0.00, 0.002, 0.96, 0.00, 0.000 }, // vocal
     { 0.240, 3.570, 0.190, 0.00, 1.000, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // bus (round 108's fit)
@@ -454,7 +463,11 @@ public:
         for (auto& d : gainDelay)
             d.assign ((std::size_t) gainCapacity, 1.0f);
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
@@ -979,6 +992,10 @@ float thresholdValue (double db) noexcept
     return (float) (u * u);
 }
 double ratioOf (float v) noexcept { return ratioLaw (v); }
+bool isInfiniteRatio (float v) noexcept { return v >= 1.0f; }
+int auditionBand (const EffectParams& p) noexcept { return (int) std::lround (std::clamp (p[audition], 0.0f, 1.0f) * bands) - 1; }
+float levelMeterValue (double db) noexcept { return (float) std::clamp ((db + 120.0) / 120.0, 0.0, 1.0); }
+double levelMeterDb (float v) noexcept { return (double) v * 120.0 - 120.0; }
 double rangeDb (float v) noexcept { return lin (v, -30.0, 30.0); }
 double kneeDb (float v) noexcept { return lin (v, 0.0, 48.0); }
 double attackMs (float v) noexcept { return 0.11 + 89.0 * std::pow ((double) std::clamp (v, 0.0f, 1.0f), 3.9); }
@@ -1148,15 +1165,20 @@ double bandCurve (const EffectParams& p, int b, double x, bool soft = false) noe
         return 0.0;
     const bool expand = on (at (fMode));
     const auto limit = [&] (double v) { return soft ? softRange (v, std::abs (rng)) : std::min (std::abs (rng), v); };
+    // round tp172b6 [EXEC] (Pro-MB, 1 kHz stair, threshold -30, knee 0: -6.01 / -12.01 / -18.01 / -24.01 dB at 6 ... 24 dB
+    // over): the very top of the ratio is a true limit (slope 1, printed infinity : 1), whatever its parameter text
+    // says; 0.99 is still 91.9 : 1 (-5.95 dB). Only the exact top changes here; every value below keeps its law. The
+    // downward expander's top stays as it was: 54.8 : 1 and the top differ by under 0.1 dB on the same stair.
+    const auto squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / r;
     if (! expand)
     {
         if (rng < 0.0) // downward compression above the threshold
-            return -limit (kneeCurve (x - thr, 1.0 - 1.0 / r, kn));
-        return limit (kneeCurve (thr - x, 1.0 - 1.0 / r, kn)); // upward compression below it
+            return -limit (kneeCurve (x - thr, squeeze, kn));
+        return limit (kneeCurve (thr - x, squeeze, kn)); // upward compression below it
     }
     if (rng < 0.0) // downward expansion below the threshold
         return -limit (kneeCurve (thr - x, r - 1.0, kn));
-    return limit (kneeCurve (x - thr, 1.0 - 1.0 / r, kn)); // upward expansion above it
+    return limit (kneeCurve (x - thr, squeeze, kn)); // upward expansion above it
 }
 
 // round 150 [EXEC] the measured detector's time constants (fitted to Pro-MB's gain on 1 kHz steps −30 → −6 → −30 →
@@ -1206,6 +1228,17 @@ double linearShare (double wl, double wh, double ml, double mh, double w) noexce
         a *= x / (1.0 + x);
     }
     return a;
+}
+
+// round tp172b7 [EXEC] Pro-MB's Linear phase puts that shape on the analog axis x = f / fc, not the prewarped one: a
+// −12 dB band from 500 Hz to 8 kHz (24 dB/oct, 48 kHz) leaves 12 kHz at −1.2 dB and 16 kHz at −0.4 dB (analog: −1.14 /
+// −0.39; prewarped: −0.67 / −0.08); Minimum and Dynamic phase follow the prewarped curve within 0.1 dB (probe p18b).
+// analogBin: the frequency (radians / sample) where a bilinear crossover at fcHz shows its analog prototype's value at
+// w / wc, so the same LrSplit gives the analog magnitude of any slope.
+double analogBin (double w, double fcHz, double sr) noexcept
+{
+    const auto wc = 2.0 * pi * std::min (fcHz, sr * 0.45) / sr;
+    return 2.0 * std::atan (w / wc * std::tan (0.5 * wc));
 }
 
 using Split = LrSplit;
@@ -1264,13 +1297,15 @@ double responseDb (const EffectParams& p, const double* bandGainDb, double sampl
     const auto wOf = [&] (double edge) { return edge > 0.0 ? minphase::warp (std::min (edge, sampleRate * 0.45), sampleRate) : 0.0; };
     if (mode == Phase::linear && freeLayout (p))
     {
-        // round 150: each band's own linear-phase shape (Pro-MB's 1 / (1 + x^m), m = slope / 6, continuous)
+        // round 150: each band's own linear-phase shape (Pro-MB's 1 / (1 + x^m), m = slope / 6, continuous); round
+        // tp172b7: on the analog axis
+        const auto aOf = [&] (double edge) { return edge > 0.0 ? edge : 0.0; };
         std::complex<double> y = solo ? std::complex<double> {} : std::complex<double> { 1.0, 0.0 };
         for (int b = 0; b < nb; ++b)
         {
             if (L.segmentOf[(std::size_t) b] < 0)
                 continue;
-            const auto a = linearShare (wOf (L.loHz[(std::size_t) b]), wOf (L.hiHz[(std::size_t) b]), L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, om);
+            const auto a = linearShare (aOf (L.loHz[(std::size_t) b]), aOf (L.hiHz[(std::size_t) b]), L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, hz);
             const auto g = dbToGain (bandGainDb[b]);
             if (solo)
             {
@@ -1283,8 +1318,19 @@ double responseDb (const EffectParams& p, const double* bandGainDb, double sampl
         return gainToDb (std::abs (y)) + trimDb (p[output]);
     }
     if (mode == Phase::linear)
-        for (auto& b : band)
-            b = std::abs (b);
+    {
+        // the segments' magnitudes (zero phase), round tp172b7: each crossover on the analog axis, as the FIRs
+        double rest = 1.0;
+        for (int k = 0; k < ns - 1; ++k)
+        {
+            Split s;
+            s.design (sampleRate, L.xoverHz[(std::size_t) k], iirSlope (L.xoverSlope[(std::size_t) k]));
+            const auto wk = analogBin (w, L.xoverHz[(std::size_t) k], sampleRate);
+            band[(std::size_t) k] = rest * std::abs (s.response (false, wk));
+            rest *= std::abs (s.response (true, wk));
+        }
+        band[(std::size_t) (ns - 1)] = rest;
+    }
     else if (mode == Phase::minimum)
         for (int k = 0; k < ns - 2; ++k)
             for (int j = k + 1; j < ns - 1; ++j)
@@ -1437,7 +1483,11 @@ public:
     explicit Multiband (const EffectParams* initial)
     {
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
@@ -1474,6 +1524,7 @@ public:
             for (auto& s : row)
                 s.reset();
         delay.reset();
+        auditionDelay.reset();
         for (auto& d : bandDelay)
             d.reset();
         for (auto& d : gainDelay)
@@ -1520,10 +1571,25 @@ public:
             const auto m = std::min (chunk, n - i);
             const bool sc = sl != nullptr && sr2 != nullptr;
             processChunk (l + i, r + i, sc ? sl + i : nullptr, sc ? sr2 + i : nullptr, m, p);
+            // round tp172b6: Audition replaces the output with what the band's detector hears
+            if (auditionBand (p) >= 0 && auditionValid)
+            {
+                const auto outGain = (float) dbToGain (trimDb (p[output]));
+                for (int k = 0; k < m; ++k)
+                {
+                    l[i + k] = auditionBuffer[0][(std::size_t) k] * outGain;
+                    r[i + k] = auditionBuffer[1][(std::size_t) k] * outGain;
+                }
+            }
         }
         const auto nb = bandCount (p);
         for (int b = 0; b < bands; ++b)
+        {
             meters.set (bandMeter (b), b < nb ? (float) std::clamp (extreme[(std::size_t) b] / 30.0, -1.0, 1.0) : 0.0f);
+            // round tp172b6: the level each band's detector reads (peak), for the arc on the Threshold knob
+            meters.set (bandLevelMeter (b), b < nb ? levelMeterValue (20.0 * std::log10 (detectorPeak[(std::size_t) b] + 1.0e-12)) : 0.0f);
+            detectorPeak[(std::size_t) b] = 0.0;
+        }
         meters.set (4, inPeak);
         meters.set (5, blockPeak (l, r, n));
         scL = scR = nullptr;
@@ -1542,6 +1608,8 @@ private:
         for (int k = 0; k < ns - 1; ++k)
             slope[(std::size_t) k] = iirSlope (L.xoverSlope[(std::size_t) k]);
         const auto nb = bandCount (p);
+        const auto auditionNow = auditionBand (p) < nb ? auditionBand (p) : -1;
+        auditionValid = false;
         const auto md = (Phase) mode;
         const bool linear = md == Phase::linear, minimum = md == Phase::minimum;
         const bool freeLin = linear && freeLayout (p); // round 150: each band its own linear-phase FIR
@@ -1574,7 +1642,7 @@ private:
             if (freeLin)
                 designFreeKernels (L, nb);
             else
-                designKernels (ns);
+                designKernels (L, ns);
         }
         // the units the output sums: the segments, or (free linear phase) the bands' own FIR outputs
         const int nu = freeLin ? nb : ns;
@@ -1735,6 +1803,23 @@ private:
             for (int b = 0; b < nb; ++b)
             {
                 float g = 1.0f, g2 = 1.0f;
+                if (! enabled[(std::size_t) b] && b == auditionNow && L.segmentOf[(std::size_t) b] >= 0)
+                {
+                    // [EXEC] a switched-off band can still be auditioned: the same signals, its detector stays idle
+                    const auto unit = freeLin ? b : L.segmentOf[(std::size_t) b];
+                    float cl = bandExt[(std::size_t) b] ? sl0[L.segmentOf[(std::size_t) b]] : bl[unit];
+                    float cr = bandExt[(std::size_t) b] ? sr0[L.segmentOf[(std::size_t) b]] : br[unit];
+                    if (scFree[(std::size_t) b])
+                    {
+                        cl = bandExt[(std::size_t) b] ? extL : srcL;
+                        cr = bandExt[(std::size_t) b] ? extR : srcR;
+                        scFilter[(std::size_t) b].run (cl, cr);
+                    }
+                    auditionDelay.process (cl, cr);
+                    auditionBuffer[0][(std::size_t) i] = cl;
+                    auditionBuffer[1][(std::size_t) i] = cr;
+                    auditionValid = true;
+                }
                 if (enabled[(std::size_t) b])
                 {
                     const auto unit = freeLin ? b : L.segmentOf[(std::size_t) b];
@@ -1753,6 +1838,15 @@ private:
                         cl = ext ? sl0[seg] : bl[unit];
                         cr = ext ? sr0[seg] : br[unit];
                     }
+                    if (b == auditionNow)
+                    {
+                        float al = cl, ar = cr;
+                        auditionDelay.process (al, ar); // in time with the audio it replaces
+                        auditionBuffer[0][(std::size_t) i] = al;
+                        auditionBuffer[1][(std::size_t) i] = ar;
+                        auditionValid = true;
+                    }
+                    detectorPeak[(std::size_t) b] = std::max (detectorPeak[(std::size_t) b], (double) std::max (std::abs (cl), std::abs (cr)));
                     const auto follow = [&] (double& e, double& hold, double m) noexcept {
                         const auto x = std::max (-120.0, 20.0 * std::log10 (m + 1e-12));
                         e = x > e ? aA[(std::size_t) b] * e + (1.0 - aA[(std::size_t) b]) * x
@@ -2069,8 +2163,8 @@ private:
     }
 
     // the FIR of each segment below the top one: the magnitude of the segment in the IIR tree (the same crossovers),
-    // zero phase
-    void designKernels (int nb) noexcept
+    // zero phase; round tp172b7: each crossover read on the analog axis (analogBin), as the reference's Linear phase
+    void designKernels (const Layout& L, int nb) noexcept
     {
         kernelsDirty = false;
         if (linSize <= 0)
@@ -2084,8 +2178,8 @@ private:
                 const auto w = pi * (double) i / (double) (bins - 1);
                 double m = 1.0;
                 for (int j = 0; j < k; ++j)
-                    m *= std::abs (split[(std::size_t) j].response (true, w));
-                m *= std::abs (split[(std::size_t) k].response (false, w));
+                    m *= std::abs (split[(std::size_t) j].response (true, analogBin (w, L.xoverHz[(std::size_t) j], sr)));
+                m *= std::abs (split[(std::size_t) k].response (false, analogBin (w, L.xoverHz[(std::size_t) k], sr)));
                 t[(std::size_t) i] = (float) m;
             }
             lin[(std::size_t) k].setKernel (t);
@@ -2103,12 +2197,13 @@ private:
         {
             if (L.segmentOf[(std::size_t) b] < 0)
                 continue;
-            const auto wl = L.loHz[(std::size_t) b] > 0.0 ? minphase::warp (L.loHz[(std::size_t) b], sr) : 0.0;
-            const auto wh = L.hiHz[(std::size_t) b] > 0.0 ? minphase::warp (L.hiHz[(std::size_t) b], sr) : 0.0;
+            // round tp172b7: the analog axis (Hz), as the reference's Linear phase
+            const auto wl = std::max (L.loHz[(std::size_t) b], 0.0);
+            const auto wh = std::max (L.hiHz[(std::size_t) b], 0.0);
             auto& t = linTable[(std::size_t) b];
             for (int i = 0; i < bins; ++i)
             {
-                const auto w = std::tan (0.5 * pi * std::min ((double) i / (double) (bins - 1), 0.9999));
+                const auto w = 0.5 * sr * (double) i / (double) (bins - 1);
                 t[(std::size_t) i] = (float) linearShare (wl, wh, L.loSlope[(std::size_t) b] / 6.0, L.hiSlope[(std::size_t) b] / 6.0, w);
             }
             lin[(std::size_t) b].setKernel (t);
@@ -2162,6 +2257,7 @@ private:
             const auto s = (int) std::lround (la * 0.001 * sr);
             laSamples = s;
             delay.setLength (s);
+            auditionDelay.setLength (s);
             for (auto& d : bandDelay)
                 d.setLength (s);
         }
@@ -2192,7 +2288,10 @@ private:
     std::array<peqfl::FftConvolver, bands> lin; // the split layout: one per segment below the top; free: one per band
     std::array<std::vector<float>, bands> linTable;
     LongDelay linDry, linSc;
-    StereoDelay delay;
+    StereoDelay delay, auditionDelay;
+    std::array<std::array<float, chunk>, 2> auditionBuffer {};
+    bool auditionValid = false;
+    std::array<double, bands> detectorPeak {};
     std::array<StereoDelay, maxSegments> bandDelay;
     std::array<MonoDelay, bands> gainDelay, gainDelayB;
     // round 147: the stereo link (linked part, mid- / side-only part, side mode), the free side-chain filters
@@ -2318,7 +2417,11 @@ public:
     explicit Gate (const EffectParams* initial)
     {
         if (initial != nullptr)
+        {
+            // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
+            lastParams = *initial;
             configure (*initial);
+        }
     }
 
     void prepare (double rate) noexcept override
@@ -2693,6 +2796,7 @@ const EffectInfo& prismInfo()
         }
         i.params.push_back ({ "Detector", 1.0f });
         i.params.push_back ({ "Revision", 1.0f }); // round 152: gain-stage attack, narrow bands, minimum width (projects saved before keep round 150's)
+        i.params.push_back ({ "Audition", 0.0f }); // round tp172b6: off, or the band whose detector signal replaces the output
         return i;
     }();
     return info;
@@ -2756,7 +2860,7 @@ std::string paramText (EffectKind kind, int param, float v)
                 return names[(int) styleOf (v)];
             }
             case threshold: return fmt ("%.1f dB", thresholdDb (v));
-            case ratio: return ratioText (ratioOf (v));
+            case ratio: return v >= 1.0f ? std::string ("\xe2\x88\x9e : 1") : ratioText (ratioOf (v));
             case knee: return fmt ("%.1f dB", kneeDb (v));
             case range: return fmt ("%.1f dB", rangeDb (v));
             case attack: return msText (attackMs (v));
@@ -2819,7 +2923,7 @@ std::string paramText (EffectKind kind, int param, float v)
             switch ((param < band5 ? param : param - band5) % fieldsPerBand)
             {
                 case fThreshold: return fmt ("%.1f dB", thresholdDb (v));
-                case fRatio: return ratioText (ratioOf (v));
+                case fRatio: return isInfiniteRatio (v) ? std::string ("\xe2\x88\x9e : 1") : ratioText (ratioOf (v));
                 case fRange: return db (rangeDb (v));
                 case fMode: return on (v) ? "expand" : "compress";
                 case fKnee: return fmt ("%.1f dB", kneeDb (v));
@@ -2859,6 +2963,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case bandLayout: return on (v) ? "free" : "split";
             case detectorLaw: return on (v) ? "measured" : "classic";
             case rev152: return on (v) ? "round 152" : "round 150";
+            case audition: return std::lround (v * bands) > 0 ? fmt ("Band %.0f", (double) std::lround (v * bands)) : std::string ("off");
             case lookahead: return v <= 0.0f ? "off" : msText (lookaheadMs (v));
             case mix: return fmt ("%.0f%%", v * 100.0);
             case input: case output: return db (trimDb (v));

@@ -35,7 +35,7 @@ enum class Item : std::uint8_t
 };
 
 // style flags
-enum : std::uint16_t
+enum : std::uint32_t
 {
     bipolar = 1 << 0,     // knob arc grows from the centre
     showValue = 1 << 1,   // the value is written under the caption (FL's compressor style)
@@ -50,10 +50,27 @@ enum : std::uint16_t
     raised = 1 << 10,     // section: a lighter inset panel inside another one
     inverted = 1 << 11,   // toggle: lit while the value is off (FL's white "enabled" LEDs over mute switches)
     captionAbove = 1 << 12, // knob: the caption above the knob and the value under it (the reference reverbs' panels, round 114)
+                            // (tp172d: on a hardware-key toggle, a small key on a joining line, its caption under it)
     momentary = 1 << 13,  // toggle: a push button (never shown lit); each click flips the value, which the engine reads
                           // as "pressed" (Nebula's Clear, round 129)
-    springBack = 1 << 14, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
+    plainMenu = 1 << 14,  // menu: just its value as text (the originals' "reverb mode: mono"); a click opens the menu
+    wordmark = 1 << 15,   // label: the plugin's name as a wide-spaced title; "a|b" = a light first word, a dark second
+    springBack = 1 << 16, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
+    hoverValue = 1 << 17, // knob: the caption under it and the value under that only while hovered or dragged
+                          // (round tp172b5: the reference reverb prints captions only)
+    batToggle = 1 << 18,  // tabs (two options) / toggle: a metal bat-handle toggle switch, the options printed above and
+                          // under it (an opto leveler's COMPRESS / LIMIT and AUTO MAKEUP, round tp172d)
+    rotarySelector = 1 << 19, // tabs: a black pointer knob with its options printed round it (a VU DISPLAY selector, round tp172d)
+    bigCaption = 1 << 20, // label: a large plain caption sized to its box (a hardware strip's ANALOG / MIX / TRIM); with
+                          // `big`, a heavy name plate (the opto leveler's model name under its meter), round tp172d
+    compactKeys = 1 << 21, // tabs: small muted keys (full only while hovered; the chosen one lit) — LYNX's own extras
+                           // tucked into a hardware face (the opto leveler's voicing keys), round tp172d
+    enginePlate = 1 << 22, // label: the engine's name printed on its panel; a plugin in another host prints the plugin's name
 };
+
+// Round 180b: the editors run as a plugin inside another host: there is no mixer or FL Studio around them, and they show
+// the exported plugin's name (plugin/plugins.def), never the engine's name inside LYNX. Set once, before any editor opens.
+inline bool hostedElsewhere = false;
 
 struct LayoutItem
 {
@@ -63,8 +80,9 @@ struct LayoutItem
     const char* label = nullptr;       // caption / title (English; translated by the editor)
     const char* options = nullptr;     // radio / tabs: "|"-separated captions
     std::vector<float> values {};      // radio / tabs: the value of each option (empty = i / (n − 1))
-    std::uint16_t style = 0;
+    std::uint32_t style = 0;
     int page = -1;                     // only shown on this page (−1 = always)
+    int pageModulo = 0, pageStride = 1; // round 173d3: > 0 = `page` is one digit of the page: (page / stride) % modulo
     const char* display = nullptr;     // display: which graph ("limiter", "compressor", "eq", ...)
     int steps = 0;                     // discrete values: number of steps over 0..1 (stepper, stepped knobs)
     const char* whenParam = nullptr;   // only shown while this parameter is within [whenMin, whenMax) (1 included)

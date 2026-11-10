@@ -113,11 +113,12 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
 
     bool hasProject = false;
     for (int i = 0; i < zip.getNumEntries(); ++i)
-        if (const auto* e = zip.getEntry (i); e != nullptr && (e->filename.endsWithIgnoreCase (ProjectFile::extension) || e->filename.endsWithIgnoreCase (".flp")))
+        if (const auto* e = zip.getEntry (i); e != nullptr && (e->filename.endsWithIgnoreCase (ProjectFile::extension) || e->filename.endsWithIgnoreCase (".flp")
+                                                         || e->filename.endsWithIgnoreCase (".flm")))
             hasProject = true;
     if (! hasProject)
     {
-        error = "the package has no project file (.lynx or .flp)";
+        error = "the package has no project file (.lynx, .flp or .flm)";
         return {};
     }
 
@@ -134,14 +135,15 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
         return {};
     }
 
-    for (const auto* pattern : { "*.lynx", "*.flp" })
+    // (an FL Studio Mobile share-zip, round 182c: the .flm with its library tree, "My Samples/…", beside it)
+    for (const auto* pattern : { "*.lynx", "*.flp", "*.flm" })
     {
         auto found = folder.findChildFiles (juce::File::findFiles, true, pattern);
         found.sort();
         if (! found.isEmpty())
             return found.getFirst();
     }
-    error = "the package has no project file (.lynx or .flp)";
+    error = "the package has no project file (.lynx, .flp or .flm)";
     return {};
 }
 

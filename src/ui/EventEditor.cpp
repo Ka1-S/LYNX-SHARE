@@ -9,7 +9,14 @@
 #include <optional>
 
 #include "core/EventEdit.h"
+#include "core/MidiImport.h"
+#include "engine/FlStudio.h"
+#include "engine/MidiFileIo.h"
+#include "core/PianoRollTools.h"
+#include "ui/FileChoosers.h"
 #include "ui/AutomationUi.h"
+#include "ui/Dialogs.h"
+#include "ui/MidiClipboard.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -31,6 +38,7 @@ bool bipolarTarget (const AutomationTarget& t) noexcept
 
 class EventEditor final : public juce::Component,
                           private juce::ChangeListener,
+                          private juce::ScrollBar::Listener,
                           private juce::Timer
 {
 public:
@@ -48,6 +56,7 @@ public:
             {
                 target = targets[(std::size_t) i];
                 selectionStart = selectionEnd = -1;
+                targetChanged();
                 repaint();
             }
         };
@@ -132,8 +141,17 @@ public:
         toAutoButton.onClick = [this] { showConvertToAutomation(); };
         addAndMakeVisible (toAutoButton);
 
+        // FL's event editor File menu: Open automation / Save automation as (issue #86, seen in FL 2026): an event .fsc of the shown target
+        fileButton.setButtonText (tr ("File"));
+        fileButton.setTooltip (tr ("Open or save the events of this control as a .fsc file"));
+        fileButton.onClick = [this] { showFileMenu(); };
+        addAndMakeVisible (fileButton);
+
+        valueBar.addListener (this);
+        addChildComponent (valueBar);
         rebuildTargets();
-        setSize (900, 400);
+        setSize (980, 400);
+        targetChanged();
         setWantsKeyboardFocus (true);
         startTimerHz (30);
     }
@@ -183,6 +201,10 @@ public:
             }
         }
 
+        // (a zoomed lane has values above its top: nothing of them may reach the toolbar)
+        g.saveState();
+        g.reduceClipRegion (area);
+
         for (auto v : { 0.25f, 0.5f, 0.75f })
         {
             g.setColour (colour::gridStep.brighter (v == 0.5f && bipolarTarget (target) ? 0.4f : 0.15f));
@@ -223,7 +245,9 @@ public:
             const auto& ev = lane->events;
             for (std::size_t i = 0; i < ev.size(); ++i)
             {
-                const auto end = i + 1 < ev.size() ? ev[i + 1].tick : juce::jmax (length, ev[i].tick + gridTicks());
+                // the last value holds to the pattern's end; a Tempo event's to the visible edge, as in FL (seen in two projects)
+                const auto holdTo = target.kind == AutomationTargetKind::tempo ? juce::jmax (length, (std::int64_t) std::ceil (xToTick (area.getRight()))) : length;
+                const auto end = i + 1 < ev.size() ? ev[i + 1].tick : juce::jmax (holdTo, ev[i].tick + gridTicks());
                 const auto x0 = (float) tickToX ((double) ev[i].tick) + 1.0f, x1 = (float) tickToX ((double) end) - 1.0f;
 
                 if (x1 < (float) area.getX() || x0 > (float) area.getRight())
@@ -252,6 +276,8 @@ public:
             g.drawLine ((float) tickToX ((double) lineFrom->first), valueToY (lineFrom->second), (float) lineTo.x, (float) lineTo.y, 1.5f);
         }
 
+        g.restoreState();
+
         // playback position
         if (playhead >= 0.0)
         {
@@ -264,7 +290,9 @@ public:
         {
             g.setColour (colour::textPrimary);
             g.setFont (font (type::small));
-            g.drawText (juce::String (juce::roundToInt (hoverValue * 100.0f)) + "%", area.getRight() - 60, area.getY() + 4, 54, 16,
+            g.drawText (target.kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (hoverValue), 3) + " BPM" // (issue #86: as FL's hint)
+                                                                : juce::String (juce::roundToInt (hoverValue * 100.0f)) + "%",
+                        area.getRight() - 90, area.getY() + 4, 84, 16,
                         juce::Justification::centredRight);
         }
 
@@ -288,8 +316,9 @@ public:
             modeWidth[i++] = theme::buttonWidth (*b, 64, 120);
         const auto clearWidth = theme::buttonWidth (clearButton, 70, 120);
         const auto toAutoWidth = theme::buttonWidth (toAutoButton, 120, 180); // (round 165l)
+        const auto fileWidth = theme::buttonWidth (fileButton, 60, 110);      // (issue #86)
         const auto gridWidth = theme::labelColumnWidth ({ &gridLabel }, 40, 110);
-        const auto fixedTop = 240 + 12 + modeWidth[0] + modeWidth[1] + modeWidth[2] + 12 + gridWidth + 110 + clearWidth + 4 + toAutoWidth;
+        const auto fixedTop = 240 + 12 + modeWidth[0] + modeWidth[1] + modeWidth[2] + 12 + gridWidth + 110 + clearWidth + 4 + toAutoWidth + 4 + fileWidth;
         auto titleWidth = juce::jlimit (120, 230, top.getWidth() - fixedTop), boxWidth = 240;
         // a title longer than its room ("Événements - Pattern 1") takes up to 80 px from the target box
         const auto titleNeeds = juce::jmin (230, theme::labelColumnWidth ({ &title }, 0, 400));
@@ -299,22 +328,40 @@ public:
             titleWidth += taken;
             boxWidth -= taken;
         }
+        // the target box gives way down to 150 px; below that the toolbar wraps, so nothing becomes unreachable (issue #86)
+        boxWidth = juce::jmax (150, boxWidth - juce::jmax (0, titleWidth + boxWidth + fixedTop - 240 - top.getWidth()));
+        const auto modesWidth = modeWidth[0] + modeWidth[1] + modeWidth[2];
+        const auto rightWidth = fileWidth + 4 + toAutoWidth + 4 + clearWidth;
+        const auto roomFor = [&r, &top] (int width) {
+            if (width > top.getWidth())
+                top = r.removeFromTop (30);
+        };
         title.setBounds (top.removeFromLeft (titleWidth));
         targetBox.setBounds (top.removeFromLeft (boxWidth).reduced (0, 2));
+        roomFor (12 + modesWidth);
         top.removeFromLeft (12);
         i = 0;
         for (auto* b : { &drawButton, &lineButton, &selectButton })
             b->setBounds (top.removeFromLeft (modeWidth[i++]).reduced (1, 2));
+        roomFor (12 + gridWidth + 110);
         top.removeFromLeft (12);
         gridLabel.setBounds (top.removeFromLeft (gridWidth));
         gridBox.setBounds (top.removeFromLeft (110).reduced (0, 2));
+        roomFor (rightWidth);
         clearButton.setBounds (top.removeFromRight (clearWidth).reduced (0, 2));
         top.removeFromRight (4);
         toAutoButton.setBounds (top.removeFromRight (toAutoWidth).reduced (0, 2));
+        top.removeFromRight (4);
+        fileButton.setBounds (top.removeFromRight (fileWidth).reduced (0, 2));
 
         auto tools = r.removeFromBottom (32);
         r.removeFromBottom (6);
         canvas = r.withTrimmedTop (4);
+        if (valueBar.isVisible())
+        {
+            auto bar = canvas.removeFromRight (14);
+            valueBar.setBounds (bar.withTrimmedTop (rulerHeight));
+        }
 
         const auto scaleW = theme::labelColumnWidth ({ &scaleLabel }, 42, 120), offsetW = theme::labelColumnWidth ({ &offsetLabel }, 44, 120),
                    randomW = theme::labelColumnWidth ({ &randomLabel }, 66, 140), lfoW = theme::labelColumnWidth ({ &lfoLabel }, 28, 80);
@@ -469,6 +516,19 @@ public:
             return true;
         }
 
+        if (target.kind != AutomationTargetKind::none && key == juce::KeyPress ('m', juce::ModifierKeys::commandModifier, 0))
+        {
+            chooseMidi();
+            return true;
+        }
+
+        if (target.kind != AutomationTargetKind::none && midiclipboard::hasMidi()
+            && key == juce::KeyPress ('v', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0))
+        {
+            pasteMidi();
+            return true;
+        }
+
         if (key == juce::KeyPress ('a', juce::ModifierKeys::commandModifier, 0))
         {
             selectionStart = 0;
@@ -519,7 +579,7 @@ private:
         const auto& song = engine.getSong();
         targets.clear();
         const auto add = [this] (const AutomationTarget& t) {
-            if (t.kind != AutomationTargetKind::none && t.kind != AutomationTargetKind::tempo
+            if (t.kind != AutomationTargetKind::none // (the tempo too: FL's pattern Tempo events, issue #86)
                 && std::none_of (targets.begin(), targets.end(), [&] (const AutomationTarget& o) { return sameTarget (o, t); }))
                 targets.push_back (t);
         };
@@ -545,12 +605,42 @@ private:
                 targetBox.setSelectedItemIndex ((int) i, juce::dontSendNotification);
         }
 
-        const auto newTitle = tr ("Events - {0}", { juce::String::fromUTF8 (currentPattern().name.c_str()) });
+        updateTitle();
+    }
+
+    // FL names the Tempo lane in its title ("Events - Tempo"); LYNX's other lanes keep the pattern's name
+    void updateTitle()
+    {
+        const auto name = target.kind == AutomationTargetKind::tempo ? describeAutomationTarget (engine, target)
+                                                                     : juce::String::fromUTF8 (currentPattern().name.c_str());
+        const auto newTitle = tr ("Events - {0}", { name });
         if (newTitle != title.getText())
         {
             title.setText (newTitle, juce::dontSendNotification);
             resized(); // the title's width follows its text
         }
+    }
+
+    // FL opens the Tempo lane zoomed 7x from its bottom: 10..83.14 BPM, the rest behind a scrollbar (REA_rodada178a §10);
+    // the other lanes show their whole range
+    void targetChanged()
+    {
+        const auto zoomed = target.kind == AutomationTargetKind::tempo;
+        viewLow = 0.0f;
+        viewHigh = zoomed ? 1.0f / 7.0f : 1.0f;
+        valueBar.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
+        valueBar.setCurrentRange (1.0 - viewHigh, viewHigh - viewLow, juce::dontSendNotification);
+        valueBar.setVisible (zoomed);
+        updateTitle();
+        resized();
+    }
+
+    void scrollBarMoved (juce::ScrollBar*, double start) override
+    {
+        const auto span = viewHigh - viewLow;
+        viewHigh = (float) (1.0 - start);
+        viewLow = viewHigh - span;
+        repaint();
     }
 
     // --- editing --------------------------------------------------------------------------------
@@ -614,67 +704,164 @@ private:
         commitGesture();
     }
 
+    // FL's event editor Open automation / Save automation as (REA_rodada178a §4): the shown target's events as an event score
+    // (.fsc, values normalised to 0..1); opening one replaces the shown target's events, whatever target it was saved
+    // from (FL's scores are target-agnostic: a Tempo curve can go onto a volume).
+    void showFileMenu()
+    {
+        const auto* lane = eventedit::findLane (currentPattern(), target);
+        const auto hasEvents = lane != nullptr && ! lane->events.empty();
+        juce::PopupMenu menu;
+        const auto canEdit = target.kind != AutomationTargetKind::none;
+        menu.addItem (theme::mnemonic (tr ("Open automation..."), 'O'), canEdit, false, [this] { openScore(); });
+        menu.addItem (theme::mnemonic (tr ("Browse automations"), 'B'), EventEditorHooks::onBrowseAutomations != nullptr, false,
+                      [] { EventEditorHooks::onBrowseAutomations(); });
+        menu.addItem (theme::mnemonic (tr ("Save automation as..."), 'S'), hasEvents, false, [this] { saveScore(); });
+        menu.addSeparator();
+        menu.addItem (theme::mnemonic (tr ("Import MIDI file..."), 'I') + "\tCtrl+M", canEdit, false, [this] { chooseMidi(); });
+        menu.addItem (theme::mnemonic (tr ("Paste from MIDI clipboard..."), 'P') + "\tShift+Ctrl+V", canEdit && midiclipboard::hasMidi(), false,
+                      [this] { pasteMidi(); });
+        menu.addSeparator();
+        // FL's item writes the same .fsc as Save automation as here: same dialog, byte-identical file (REA_rodada178a §11)
+        menu.addItem (theme::mnemonic (tr ("Export as score sheet..."), 'E'), hasEvents, false, [this] { saveScore(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&fileButton));
+    }
+
+    void openScore()
+    {
+        chooser = lynx::ui::makeFileChooser (tr ("Open automation"), juce::File(), "*.fsc;*.mid;*.midi");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     if (safe != nullptr && fc.getResult().existsAsFile())
+                                         safe->loadScore (fc.getResult());
+                                 });
+    }
+
+    bool loadScore (const juce::File& file)
+    {
+        juce::MemoryBlock data;
+        if (target.kind != AutomationTargetKind::none && (file.hasFileExtension ("mid") || file.hasFileExtension ("midi")))
+        {
+            // FL's Open automation takes a MIDI file too: the same "Import MIDI data" window (REA_rodada178a §11)
+            juce::String error;
+            if (const auto midi = MidiFileIo::parseFile (file, error))
+                importMidi (*midi, file.getFileName());
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", error);
+            return true;
+        }
+        if (target.kind == AutomationTargetKind::none || ! file.loadFileAsData (data))
+            return false;
+        const auto events = prtools::parseEventScore (std::span<const std::uint8_t> ((const std::uint8_t*) data.getData(), data.getSize()));
+        if (! events)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open automation"),
+                                                    tr ("This file is not an event score."));
+            return false;
+        }
+        beginGesture();
+        previewGesture ([&] (PatternEvents& l) { l.events = *events; });
+        commitGesture();
+        return true;
+    }
+
+    void chooseMidi()
+    {
+        // (FL's starts in the user's Presets\\Scores\\Automation; seen round 178a)
+        const auto automationScores = findFlStudio().userData.getChildFile ("Presets").getChildFile ("Scores").getChildFile ("Automation");
+        chooser = lynx::ui::makeFileChooser (tr ("Import MIDI file..."), automationScores.isDirectory() ? automationScores : juce::File(),
+                                             "*.mid;*.midi");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     if (safe == nullptr || ! fc.getResult().existsAsFile())
+                                         return;
+                                     juce::String error;
+                                     if (const auto midi = MidiFileIo::parseFile (fc.getResult(), error))
+                                         safe->importMidi (*midi, fc.getResult().getFileName());
+                                     else
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", error);
+                                 });
+    }
+
+    void pasteMidi()
+    {
+        const auto smf = midiclipboard::get();
+        if (! smf)
+            return;
+        juce::String error;
+        if (const auto midi = MidiFileIo::parseBytes (smf->getData(), smf->getSize(), error))
+            importMidi (*midi, tr ("MIDI from clipboard"));
+        else
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", tr ("Error parsing the MIDI data..."));
+    }
+
+    // FL replaces the shown lane with the chosen controller, value / 127 (REA_rodada178a §11), and adds the time signature to the
+    // pattern's markers; notes aren't imported here.
+    void importMidi (const midiimport::ParsedMidi& midi, const juce::String& name)
+    {
+        // (FL's window starts afresh every time: controller "---", Realign off, time signatures on; seen round 178a)
+        showEventLaneMidiImportDialog (name, midi, midiimport::Options {}, [safe = juce::Component::SafePointer<EventEditor> (this), midi] (const midiimport::Options& o) {
+            if (safe == nullptr)
+                return;
+            const auto events = midiimport::controllerEvents (midi, o); // (none in the file: FL leaves the lane empty)
+            safe->beginGesture();
+            safe->previewGesture ([&] (PatternEvents& l) { l.events = events; });
+            safe->commitGesture();
+            if (o.timeSignatures)
+                safe->engine.editSong ([&] (Song& s) {
+                    auto& markers = currentPattern (s).markers;
+                    if (std::none_of (markers.begin(), markers.end(), [] (const Marker& m) { return m.tick == 0 && m.numerator > 0; }))
+                    {
+                        Marker m;
+                        m.numerator = midi.numerator > 0 ? midi.numerator : 4;
+                        m.denominator = midi.numerator > 0 ? midi.denominator : 4;
+                        m.action = Marker::timeSignature;
+                        markers.push_back (m);
+                    }
+                });
+        });
+    }
+
+    void saveScore()
+    {
+        const auto name = describeAutomationTarget (engine, target);
+        chooser = lynx::ui::makeFileChooser (tr ("Save automation as"),
+                                             juce::File::getSpecialLocation (juce::File::userMusicDirectory)
+                                                 .getChildFile (juce::File::createLegalFileName (name) + ".fsc"),
+                                             "*.fsc");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     auto file = fc.getResult();
+                                     if (safe == nullptr || file == juce::File())
+                                         return;
+                                     if (! file.hasFileExtension ("fsc"))
+                                         file = file.withFileExtension (".fsc");
+                                     const auto* l = eventedit::findLane (safe->currentPattern(), safe->target);
+                                     const auto bytes = prtools::writeEventScore (l != nullptr ? l->events : std::vector<PatternEvent> {},
+                                                                                  safe->target.kind == AutomationTargetKind::tempo ? 5u : 0u);
+                                     if (l == nullptr || l->events.empty() || ! file.replaceWithData (bytes.data(), bytes.size()))
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save automation as"),
+                                                                                 tr ("There are no events to save, or the file could not be written."));
+                                 });
+    }
+
     void showConvertToAutomation()
     {
         const auto* lane = eventedit::findLane (currentPattern(), target);
         if (lane == nullptr || lane->events.empty())
             return;
-        struct Panel final : public juce::Component
-        {
-            Panel (EventEditor& o) : owner (&o)
-            {
-                label.setText (tr ("Sensitivity"), juce::dontSendNotification);
-                addAndMakeVisible (label);
-                slider.setRange (40.0, 100.0, 0.1);
-                slider.setValue (100.0, juce::dontSendNotification);
-                slider.setDoubleClickReturnValue (true, 100.0);
-                slider.setTextValueSuffix ("%");
-                slider.onValueChange = [this] { update(); };
-                addAndMakeVisible (slider);
-                info.setFont (theme::font (theme::type::small));
-                info.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-                addAndMakeVisible (info);
-                accept.setButtonText (tr ("Accept"));
-                accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-                cancel.setButtonText (tr ("Cancel"));
-                accept.onClick = [this] {
-                    if (owner != nullptr)
-                        owner->convertToAutomation ((float) slider.getValue() / 100.0f);
-                    closeToolWindowOf (*this);
-                };
-                cancel.onClick = [this] { closeToolWindowOf (*this); };
-                addAndMakeVisible (accept);
-                addAndMakeVisible (cancel);
-                setSize (380, 130);
-                update();
-            }
-            void update()
-            {
-                if (owner == nullptr)
-                    return;
-                const auto* l = eventedit::findLane (owner->currentPattern(), owner->target);
-                const auto n = l != nullptr ? eventedit::toAutomationPoints (*l, (float) slider.getValue() / 100.0f).size() : 0u;
-                info.setText (tr ("{0} events become {1} automation points", { juce::String (l != nullptr ? (int) l->events.size() : 0), juce::String ((int) n) }), juce::dontSendNotification);
-            }
-            void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
-            void resized() override
-            {
-                auto r = getLocalBounds().reduced (12);
-                auto row = r.removeFromTop (28);
-                label.setBounds (row.removeFromLeft (90));
-                slider.setBounds (row);
-                info.setBounds (r.removeFromTop (28));
-                auto b = r.removeFromBottom (28);
-                cancel.setBounds (b.removeFromRight (84));
-                b.removeFromRight (6);
-                accept.setBounds (b.removeFromRight (84));
-            }
-            juce::Component::SafePointer<EventEditor> owner;
-            juce::Label label, info;
-            juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-            juce::TextButton accept, cancel;
-        };
-        openToolWindow (std::make_unique<Panel> (*this), tr ("Convert to automation"), "eventeditor-toauto");
+        juce::Component::SafePointer<EventEditor> safe (this);
+        openConvertToAutomationPanel ((int) lane->events.size(), 100.0,
+                                      [safe] (float sensitivity) {
+                                          if (safe == nullptr)
+                                              return 0;
+                                          const auto* l = eventedit::findLane (safe->currentPattern(), safe->target);
+                                          return l != nullptr ? (int) eventedit::toAutomationPoints (*l, sensitivity).size() : 0;
+                                      },
+                                      [safe] (float sensitivity) {
+                                          if (safe != nullptr)
+                                              safe->convertToAutomation (sensitivity);
+                                      });
     }
 
     void convertToAutomation (float sensitivity)
@@ -797,12 +984,13 @@ private:
     float valueToY (float v) const
     {
         const auto a = plotArea().reduced (0, 6);
-        return (float) a.getBottom() - v * (float) a.getHeight();
+        return (float) a.getBottom() - (v - viewLow) / (viewHigh - viewLow) * (float) a.getHeight();
     }
     float yToValue (int y) const
     {
         const auto a = plotArea().reduced (0, 6);
-        return juce::jlimit (0.0f, 1.0f, (float) (a.getBottom() - y) / (float) juce::jmax (1, a.getHeight()));
+        const auto inView = juce::jlimit (0.0f, 1.0f, (float) (a.getBottom() - y) / (float) juce::jmax (1, a.getHeight()));
+        return viewLow + inView * (viewHigh - viewLow);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -847,13 +1035,16 @@ private:
 
     juce::Label title, gridLabel, scaleLabel, offsetLabel, randomLabel, lfoLabel;
     juce::ComboBox targetBox, gridBox, shapeBox, periodBox;
-    juce::TextButton drawButton, lineButton, selectButton, randomButton, lfoButton, clearButton, toAutoButton;
+    juce::TextButton drawButton, lineButton, selectButton, randomButton, lfoButton, clearButton, toAutoButton, fileButton;
+    std::unique_ptr<juce::FileChooser> chooser;
     juce::Slider scaleSlider, offsetSlider, amountSlider;
 
     juce::Rectangle<int> canvas;
     double pixelsPerTick = 0.05, scroll = 0.0, playhead = -1.0;
     bool fitted = false, resettingSliders = false;
     float hoverValue = -1.0f;
+    float viewLow = 0.0f, viewHigh = 1.0f; // the part of the 0..1 range the lane shows
+    juce::ScrollBar valueBar { true };
     std::int64_t selectionStart = -1, selectionEnd = -1, selectionAnchor = -1;
     std::optional<std::pair<std::int64_t, float>> lineFrom, lastDraw;
     juce::Point<int> lineTo;
@@ -861,6 +1052,73 @@ private:
     std::uint32_t seed = 1;
 };
 } // namespace
+
+void openConvertToAutomationPanel (int events, double initialPercent, std::function<int (float)> pointsFor, std::function<void (float)> onAccept)
+{
+    struct Panel final : public juce::Component
+    {
+        Panel (int eventCount, double percent, std::function<int (float)> points, std::function<void (float)> acceptFn)
+            : events (eventCount), pointsFor (std::move (points)), onAccept (std::move (acceptFn))
+        {
+            label.setText (tr ("Sensitivity"), juce::dontSendNotification);
+            addAndMakeVisible (label);
+            slider.setRange (40.0, 100.0, 0.1);
+            slider.setValue (percent, juce::dontSendNotification);
+            slider.setDoubleClickReturnValue (true, percent);
+            slider.setTextValueSuffix ("%");
+            slider.onValueChange = [this] { update(); };
+            addAndMakeVisible (slider);
+            info.setFont (theme::font (theme::type::small));
+            info.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            addAndMakeVisible (info);
+            accept.setButtonText (tr ("Accept"));
+            accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+            cancel.setButtonText (tr ("Cancel"));
+            accept.onClick = [this] {
+                const auto fn = onAccept;
+                const auto sensitivity = (float) slider.getValue() / 100.0f;
+                closeToolWindowOf (*this); // (deletes this)
+                if (fn)
+                    fn (sensitivity);
+            };
+            cancel.onClick = [this] { closeToolWindowOf (*this); };
+            addAndMakeVisible (accept);
+            addAndMakeVisible (cancel);
+            setSize (380, 130);
+            update();
+        }
+        void update()
+        {
+            const auto n = pointsFor ? pointsFor ((float) slider.getValue() / 100.0f) : 0;
+            info.setText (tr ("{0} events become {1} automation points", { juce::String (events), juce::String (n) }), juce::dontSendNotification);
+        }
+        void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+        void resized() override
+        {
+            auto r = getLocalBounds().reduced (12);
+            auto row = r.removeFromTop (28);
+            label.setBounds (row.removeFromLeft (90));
+            slider.setBounds (row);
+            info.setBounds (r.removeFromTop (28));
+            auto b = r.removeFromBottom (28);
+            cancel.setBounds (b.removeFromRight (84));
+            b.removeFromRight (6);
+            accept.setBounds (b.removeFromRight (84));
+        }
+        int events;
+        std::function<int (float)> pointsFor;
+        std::function<void (float)> onAccept;
+        juce::Label label, info;
+        juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+        juce::TextButton accept, cancel;
+    };
+    openToolWindow (std::make_unique<Panel> (events, initialPercent, std::move (pointsFor), std::move (onAccept)), tr ("Convert to automation"), "eventeditor-toauto");
+}
+
+namespace EventEditorHooks
+{
+std::function<void()> onBrowseAutomations;
+}
 
 void openEventEditor (AudioEngine& engine, const AutomationTarget& target)
 {

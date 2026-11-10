@@ -23,6 +23,10 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp
       - run: /usr/bin/python3 -m unittest discover -s server/tests -p 'test_*.py' -v
 
+  # Round speed185a: a Core job took 76-130 min, ~90 % of it compiling the core again for every tool (now once, in
+  # parallel: scripts/cxx-once.sh) and the rest running the tests one by one (now in parallel shards, then the
+  # timing-sensitive ones alone: scripts/run-tests.sh). ccache keeps the objects between runs: main saves the cache,
+  # every other branch starts from main's. Every test still runs in every job.
   core:
     name: Core (${{ matrix.os }}, ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
@@ -33,12 +37,45 @@ jobs:
           - { os: ubuntu-24.04, compiler: g++ }
           - { os: ubuntu-24.04, compiler: clang++ }
           - { os: macos-15, compiler: clang++ }
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
     steps:
       - uses: actions/checkout@v5
+      - name: ccache
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then sudo apt-get install -y -q ccache > /dev/null || { sudo apt-get update -q && sudo apt-get install -y -q ccache; }
+          else brew list ccache > /dev/null 2>&1 || brew install ccache; fi
+      - uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-core-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          restore-keys: ccache-core-${{ matrix.os }}-${{ matrix.compiler }}-
       - name: Build and test the core (no JUCE)
         env:
-          CXX: ${{ matrix.compiler }}
-        run: ./scripts/build-local.sh
+          CXX: ccache ${{ matrix.compiler }}
+          LYNX_TEST_JOBS: auto
+        run: |
+          ccache --zero-stats > /dev/null # (after the restore: the statistics live in the cache folder)
+          ./scripts/build-local.sh
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats || true
+      - uses: actions/cache/save@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          path: .ccache
+          key: ccache-core-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-logs-${{ matrix.os }}-${{ matrix.compiler }}
+          path: build-local/lynx_tests.shards
+          retention-days: 7
+          if-no-files-found: ignore
 
   # The whole app (JUCE) on Linux and macOS: it must build and pass its self-test. Windows is built by release.yml.
   app:
@@ -48,6 +85,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15]
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
     steps:
       - uses: actions/checkout@v5
 
@@ -55,12 +96,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build pkg-config xvfb libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev \
+          sudo apt-get install -y -q ccache ninja-build pkg-config xvfb libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev
 
       - name: macOS build dependencies
         if: runner.os == 'macOS'
-        run: brew list ninja > /dev/null 2>&1 || brew install ninja
+        run: |
+          brew list ninja > /dev/null 2>&1 || brew install ninja
+          brew list ccache > /dev/null 2>&1 || brew install ccache
+
+      # (round speed185a) ccache between runs: main saves it, other branches start from main's
+      - uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-app-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: ccache-app-${{ matrix.os }}-
 
       - name: JUCE (checksum verified)
         shell: bash
@@ -72,8 +122,18 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce"
+          ccache --zero-stats > /dev/null
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
+            -DLYNX_LTO=OFF
           cmake --build build --target LYNX -- -k 0
+          ccache --show-stats || true
+
+      - uses: actions/cache/save@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          path: .ccache
+          key: ccache-app-${{ matrix.os }}-${{ github.sha }}
 
       - name: Self-test
         shell: bash
@@ -86,6 +146,15 @@ jobs:
           "${run[@]}" "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
           cat selftest.txt
           grep -q '^result=OK' selftest.txt
+
+      # Issue #85: no LV2 child while nothing changed, one when something did; a child that fails changes nothing
+      - name: LV2 scan
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          LYNX_PROFILE_DIR="$PWD/lv2-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --lv2scantest "$PWD/lv2scan.txt" || true
+          cat lv2scan.txt
+          grep -q '^result=OK' lv2scan.txt
 
       # Round 170c (issue #11): the plugin editors as this platform draws them (macOS = CoreGraphics), one PNG each,
       # and the renderer probe (gradient text / empty paths must stay inside their shapes). Kept as an artifact.
@@ -113,3 +182,14 @@ jobs:
           name: editor-pictures-${{ runner.os }}
           path: editor-pictures
           retention-days: 14
+
+      # A plugin that kills the scan's child process is blacklisted, not described again at every start
+      - name: Crashing plugin
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir crash-plugin
+          echo 'void __attribute__ ((constructor)) crash (void) { __builtin_trap(); }' | cc -shared -fPIC -x c - -o crash-plugin/crash.clap
+          LYNX_PROFILE_DIR="$PWD/crash-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --scantest "$PWD/crash-plugin" "$PWD/crash.txt" || true
+          cat crash.txt
+          grep -q 'blacklisted: .*crash.clap' crash.txt

@@ -93,3 +93,24 @@ Ordered to get something usable as early as possible without ever breaking the a
   with the sequencer and effects (round 57)
 - [x] Harmor resonance: types, mask and offset (round 25) as an SVF peak
 - [x] FLEX by preset name only (its packs are encrypted and never opened)
+
+## Phase 7: Ableton Live interop (round 175a)
+- [x] Import Live 11/12 sets (.als): tracks, clips, warp, mixer, devices (`docs/analise/ALS_FORMAT.md`)
+- [x] Export Live 12 and Live 11 sets, with samples collected (N2)
+- [x] Warp modes Beats, Tones, Texture and Complex as LYNX stretch methods (N4)
+- [x] Beats transposition: each piece resampled offline by the clip's pitch, as Live does
+- [ ] Complex Pro formants (Live keeps formants when transposing; LYNX's +5 st is 3 dB louder with a different tilt)
+- [ ] Excess level at 60–95 Hz in the stretched renders
+- [ ] Beats and Texture parameters (Transient Loop Mode/Envelope, Grain Size, Flux) beyond the defaults
+- [x] Clips with several warp markers at different rates: kept, rendered segment by segment (round 175a, M1; editing them = M3)
+- [ ] LYNX's built-in instruments and effects in exported sets (N3; listed in the export report for now)
+- [x] Session view ↔ LYNX's clip grid in .als import and export: scenes, launch modes, quantisation, follow actions (round 181c)
+- [x] Optional Clip-launch workflow layout style beside the default Pattern workflow (round 181a)
+- [ ] Live-style Detail View for clips, racks and note chance (0.1.26, in progress)
+- [ ] Simple workflow layout style for beginners (0.1.26, in progress)
+
+## Phase 8: FL Studio Mobile import (round 182c)
+- [x] `.flm` reader: tempo, time signature, arrangement (note, drum and audio lanes), samples, drum kits (`docs/analise/FLM_FORMAT.md`)
+- [x] DirectWave single-sample programs, rack level / pan / routes on the inserts
+- [ ] Mute / solo, automation lanes and the main effects (0.1.26, in progress)
+- [ ] FL Studio Mobile's other instruments (they play LYNX's built-in synth for now)

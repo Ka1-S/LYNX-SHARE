@@ -7,8 +7,11 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <cerrno>
+#include <cstring>
 #include <ctime>
 #include <deque>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -18,6 +21,7 @@
  #define NOMINMAX
  #include <windows.h>
  #include <dbghelp.h>
+ #include <mmsystem.h>
 #else
  #include <signal.h>
  #include <unistd.h>
@@ -646,6 +650,79 @@ void watchLoop()
 }
 } // namespace
 
+#if ! defined(_WIN32)
+namespace
+{
+int endSignalPipe[2] = { -1, -1 };
+
+void onEndSignal (int sig)
+{
+    // async-signal-safe: only write(); the thread below notes it (the note takes a lock and allocates)
+    const auto byte = (unsigned char) sig;
+    if (endSignalPipe[1] >= 0)
+        (void) ::write (endSignalPipe[1], &byte, 1);
+}
+
+std::string endSignalStep (int sig)
+{
+    return sig == SIGTERM ? "ended by SIGTERM (the system or another program asked LYNX to close)"
+         : sig == SIGHUP  ? "ended by SIGHUP (the terminal or session that started LYNX closed)"
+                          : "ended by signal " + std::to_string (sig);
+}
+} // namespace
+#endif
+
+void hardenSignals() noexcept
+{
+#if ! defined(_WIN32)
+    try
+    {
+        // the alternate stack (the handler writes files and a backtrace: generous)
+        static std::vector<char> altStack (std::max<std::size_t> (2u << 20, (std::size_t) SIGSTKSZ));
+        stack_t ss {};
+        ss.ss_sp = altStack.data();
+        ss.ss_size = altStack.size();
+        ss.ss_flags = 0;
+        if (sigaltstack (&ss, nullptr) == 0)
+            for (const auto sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGSYS })
+            {
+                struct sigaction action {};
+                if (sigaction (sig, nullptr, &action) == 0 && action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN)
+                {
+                    action.sa_flags |= SA_ONSTACK;
+                    sigaction (sig, &action, nullptr);
+                }
+            }
+
+        if (endSignalPipe[0] < 0 && ::pipe (endSignalPipe) == 0)
+        {
+            std::thread ([] {
+                unsigned char byte = 0;
+                while (::read (endSignalPipe[0], &byte, 1) != 1)
+                    if (errno != EINTR)
+                        return;
+                const int sig = byte;
+                note (endSignalStep (sig)); // (the session file is written and closed here)
+                ::signal (sig, SIG_DFL);
+                ::raise (sig); // ends as before
+            }).detach();
+            for (const auto sig : { SIGTERM, SIGHUP })
+            {
+                struct sigaction action {};
+                if (sigaction (sig, nullptr, &action) == 0 && action.sa_handler == SIG_IGN)
+                    continue; // (started with it ignored, e.g. nohup: keep that)
+                action = {};
+                action.sa_handler = onEndSignal;
+                sigemptyset (&action.sa_mask);
+                action.sa_flags = SA_RESTART;
+                sigaction (sig, &action, nullptr);
+            }
+        }
+    }
+    catch (...) {}
+#endif
+}
+
 void startHangWatch (const std::string& folderUtf8, int stallMs) noexcept
 {
     try
@@ -731,6 +808,283 @@ std::string symbolizeOwnFrames (const std::string& text)
     out = text;
 #endif
     return out;
+}
+
+// --- message-thread sampling profiler (round 174f) ----------------------------------------------------------------
+
+namespace
+{
+struct MainProfiler
+{
+    std::mutex lock;
+    std::condition_variable wake;
+    std::thread thread;
+    bool quit = false;
+    std::string file;
+    int intervalUs = 1000, windowS = 5;
+#if defined(_WIN32)
+    HANDLE uiThread = nullptr;
+    std::uintptr_t stackBase = 0; // the message thread's stack top (its TEB)
+#endif
+};
+MainProfiler& mainProfiler()
+{
+    static MainProfiler p;
+    return p;
+}
+
+#if defined(LYNX_UNWIND)
+// "function" of a frame: its symbol without the offset, else the module
+std::string functionOf (std::uintptr_t address)
+{
+    auto name = symbolOf ((DWORD64) address);
+    if (const auto plus = name.rfind (" + 0x"); plus != std::string::npos)
+        name.resize (plus);
+    auto module = describeAddress (reinterpret_cast<const void*> (address));
+    if (const auto plus = module.find ("+0x"); plus != std::string::npos)
+        module.resize (plus);
+    return name.empty() ? module + " (?)" : module + "!" + name;
+}
+
+void writeProfileWindow (const std::string& file, double fromS, double toS, long samples, long ticks, double cpuPercent,
+                         const std::map<std::uintptr_t, long>& self, const std::map<std::uintptr_t, long>& total)
+{
+    std::map<std::string, long> selfByName, totalByName, byModule;
+    std::map<std::uintptr_t, std::string> names;
+    auto nameOf = [&names] (std::uintptr_t a) -> const std::string& {
+        auto it = names.find (a);
+        if (it == names.end())
+            it = names.emplace (a, functionOf (a)).first;
+        return it->second;
+    };
+    for (const auto& [a, n] : self)
+    {
+        selfByName[nameOf (a)] += n;
+        auto module = describeAddress (reinterpret_cast<const void*> (a));
+        if (const auto plus = module.find ("+0x"); plus != std::string::npos)
+            module.resize (plus);
+        byModule[module] += n;
+    }
+    for (const auto& [a, n] : total)
+        totalByName[nameOf (a)] += n;
+    auto top = [] (const std::map<std::string, long>& m, std::size_t count) {
+        std::vector<std::pair<long, std::string>> v;
+        for (const auto& [k, n] : m)
+            v.emplace_back (n, k);
+        std::sort (v.begin(), v.end(), [] (const auto& x, const auto& y) { return x.first > y.first; });
+        if (v.size() > count)
+            v.resize (count);
+        return v;
+    };
+    auto* out = std::fopen (file.c_str(), "ab");
+    if (out == nullptr)
+        return;
+    std::fprintf (out, "=== window %.1f-%.1f s: %ld ticks, message thread CPU %.1f %% (shares below: by CPU cycles)\n", fromS, toS, ticks, cpuPercent);
+    std::fprintf (out, "-- by module (self)\n");
+    for (const auto& [n, k] : top (byModule, 12))
+        std::fprintf (out, "%6.1f %%  %s\n", 100.0 * (double) n / (double) std::max (1L, samples), k.c_str());
+    std::fprintf (out, "-- self\n");
+    for (const auto& [n, k] : top (selfByName, 40))
+        std::fprintf (out, "%6.1f %%  %s\n", 100.0 * (double) n / (double) std::max (1L, samples), k.c_str());
+    std::fprintf (out, "-- total (self + callees)\n");
+    for (const auto& [n, k] : top (totalByName, 70))
+        std::fprintf (out, "%6.1f %%  %s\n", 100.0 * (double) n / (double) std::max (1L, samples), k.c_str());
+    std::fclose (out);
+}
+
+// One unwind step on a copied stack. The copy holds whatever the thread had: a frame register can point anywhere, so
+// the unwinder may read an unmapped address (an access violation in RtlVirtualUnwind killed LYNX at start-up, round 174f).
+// A fault only ends this sample's stack. No C++ objects in this frame (SEH and C++ unwinding must not share one function).
+bool unwindStepGuarded (DWORD64 imageBase, DWORD64 rip, PRUNTIME_FUNCTION function, CONTEXT* context) noexcept
+{
+    __try
+    {
+        void* handlerData = nullptr;
+        DWORD64 establisher = 0;
+        RtlVirtualUnwind (UNW_FLAG_NHANDLER, imageBase, rip, function, context, &handlerData, &establisher, nullptr);
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return false;
+    }
+}
+
+// One sample of the message thread without unwinding it while it is suspended: suspended, only its registers and the
+// used part of its stack are copied (no locks, no allocation); resumed; then unwound on the copy. Unwinding needs the
+// loader's function tables, whose lock the suspended thread may hold (a profiler that unwound the suspended thread
+// hung LYNX at start-up while DLLs were loading).
+std::vector<std::uintptr_t> sampleByCopy (HANDLE thread, std::uintptr_t stackBase, std::vector<std::uint8_t>& copy)
+{
+    constexpr std::size_t maxCopy = 256 * 1024;
+    if (copy.size() < maxCopy)
+        copy.resize (maxCopy);
+    CONTEXT context {};
+    context.ContextFlags = CONTEXT_FULL;
+    std::size_t length = 0;
+    if (SuspendThread (thread) == (DWORD) -1)
+        return {};
+    if (GetThreadContext (thread, &context) && context.Rsp != 0 && context.Rsp < stackBase)
+    {
+        length = std::min ((std::size_t) (stackBase - context.Rsp), maxCopy);
+        std::memcpy (copy.data(), reinterpret_cast<const void*> (context.Rsp), length);
+    }
+    ResumeThread (thread);
+    if (length == 0)
+        return {};
+
+    const auto low = (std::uintptr_t) context.Rsp, high = low + length;
+    const auto delta = (std::intptr_t) ((std::uintptr_t) copy.data() - low);
+    auto inStack = [&] (DWORD64 v) { return v >= low && v < high; };
+    // registers pointing into the stack (the frame pointer, saved stack addresses) are moved onto the copy; the ones an
+    // unwind step restores from the copy point at the real stack again, and any of them can be a function's frame register
+    auto rebase = [&] {
+        for (auto* r : { &context.Rbp, &context.Rbx, &context.Rsi, &context.Rdi, &context.R12, &context.R13, &context.R14, &context.R15 })
+            if (inStack (*r))
+                *r = (DWORD64) ((std::intptr_t) *r + delta);
+    };
+    context.Rsp = (DWORD64) ((std::intptr_t) context.Rsp + delta);
+    rebase();
+    const auto copyLow = (DWORD64) (std::uintptr_t) copy.data(), copyHigh = copyLow + length;
+
+    std::vector<std::uintptr_t> frames;
+    for (int count = 0; count < 64 && context.Rip != 0; ++count)
+    {
+        frames.push_back ((std::uintptr_t) context.Rip);
+        if (context.Rsp < copyLow || context.Rsp + 8 > copyHigh)
+            break;
+        DWORD64 imageBase = 0;
+        auto* function = RtlLookupFunctionEntry (context.Rip, &imageBase, nullptr);
+        if (function == nullptr)
+        {
+            context.Rip = *reinterpret_cast<DWORD64*> (context.Rsp); // a leaf: the return address on top of the stack
+            context.Rsp += 8;
+            continue;
+        }
+        if (! unwindStepGuarded (imageBase, context.Rip, function, &context))
+            break;
+        rebase();
+    }
+    return frames;
+}
+
+void profileLoop()
+{
+    auto& p = mainProfiler();
+    std::map<std::uintptr_t, long> self, total;
+    long samples = 0, ticks = 0; // (samples: CPU cycles / 1000 attributed to the sampled stacks)
+    ULONG64 lastCycles = 0;
+    QueryThreadCycleTime (p.uiThread, &lastCycles);
+    auto threadCpu100ns = [&p] {
+        FILETIME created, exited, kernel, user;
+        if (! GetThreadTimes (p.uiThread, &created, &exited, &kernel, &user))
+            return 0.0;
+        const auto v = [] (FILETIME f) { return (double) (((ULONG64) f.dwHighDateTime << 32) | f.dwLowDateTime); };
+        return v (kernel) + v (user);
+    };
+    auto windowCpu = threadCpu100ns();
+    const auto start = std::chrono::steady_clock::now();
+    auto windowStart = start;
+    std::vector<std::uintptr_t> seen;
+    std::vector<std::uint8_t> stackCopy;
+    timeBeginPeriod (1);
+    for (;;)
+    {
+        {
+            std::unique_lock<std::mutex> l (p.lock);
+            if (p.wake.wait_for (l, std::chrono::microseconds (p.intervalUs), [&p] { return p.quit; }))
+                break;
+        }
+        ++ticks;
+        ULONG64 cycles = 0;
+        QueryThreadCycleTime (p.uiThread, &cycles);
+        // the cycles the thread used since the last sample, charged to the stack it is in now (a thread that only
+        // woke for a moment and sleeps again weighs almost nothing)
+        const auto weight = (long) ((cycles - lastCycles) / 1000u);
+        if (weight > 0)
+        {
+            const auto frames = sampleByCopy (p.uiThread, p.stackBase, stackCopy);
+            QueryThreadCycleTime (p.uiThread, &lastCycles); // (after the sample: its own suspend is not counted next time)
+            if (! frames.empty())
+            {
+                samples += weight;
+                self[frames.front()] += weight;
+                seen.clear();
+                for (const auto f : frames)
+                    if (std::find (seen.begin(), seen.end(), f) == seen.end())
+                    {
+                        seen.push_back (f);
+                        total[f] += weight;
+                    }
+            }
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (now - windowStart >= std::chrono::seconds (p.windowS))
+        {
+            const auto s0 = std::chrono::duration<double> (windowStart - start).count(), s1 = std::chrono::duration<double> (now - start).count();
+            const auto cpu = threadCpu100ns();
+            writeProfileWindow (p.file, s0, s1, samples, ticks, (cpu - windowCpu) / 1.0e5 / std::max (1.0e-3, s1 - s0), self, total);
+            windowCpu = cpu;
+            self.clear();
+            total.clear();
+            samples = ticks = 0;
+            windowStart = now;
+        }
+    }
+    timeEndPeriod (1);
+}
+#endif
+} // namespace
+
+void startMainProfiler (const std::string& fileUtf8, int intervalUs, int windowS) noexcept
+{
+#if defined(LYNX_UNWIND)
+    try
+    {
+        auto& p = mainProfiler();
+        if (p.thread.joinable())
+            return;
+        p.file = fileUtf8;
+        p.intervalUs = std::max (200, intervalUs);
+        p.windowS = std::max (1, windowS);
+        p.quit = false;
+        DuplicateHandle (GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &p.uiThread,
+                         THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, 0);
+        p.stackBase = (std::uintptr_t) reinterpret_cast<NT_TIB*> (NtCurrentTeb())->StackBase;
+        if (auto* out = std::fopen (p.file.c_str(), "wb"))
+        {
+            std::fprintf (out, "LYNX message-thread profile: a sample every %d us while the thread runs, windows of %d s\n", p.intervalUs, p.windowS);
+            std::fclose (out);
+        }
+        p.thread = std::thread (profileLoop);
+    }
+    catch (...) {}
+#else
+    (void) fileUtf8;
+    (void) intervalUs;
+    (void) windowS;
+#endif
+}
+
+void stopMainProfiler() noexcept
+{
+#if defined(LYNX_UNWIND)
+    try
+    {
+        auto& p = mainProfiler();
+        if (! p.thread.joinable())
+            return;
+        {
+            const std::lock_guard<std::mutex> l (p.lock);
+            p.quit = true;
+        }
+        p.wake.notify_all();
+        p.thread.join();
+        CloseHandle (p.uiThread);
+        p.uiThread = nullptr;
+    }
+    catch (...) {}
+#endif
 }
 
 // --- plugin editor windows (issue #32, round 174a) ----------------------------------------------------------------

@@ -26,12 +26,22 @@ struct RecordedEvent
 // playing there (or, without a clip, as if it were the pattern loop).
 std::int64_t patternPositionForTick (const Song& song, double tick, std::int64_t loopLength);
 
-// Song mode, a take inside pattern clip `c` at song `tick`: its place in the pattern. With stretchedClipsLoop() on and
-// `c` longer than its pattern, folded into the pattern (modulo its length, from the clip's offset; 0.1.23); else the
-// place along the clip (FL: the pattern grows, round 168k). clipLoopLength = the pattern's length when `c` loops it
-// that way, else 0.
+// Song mode, a take inside pattern clip `c` at song `tick`: its place in the pattern, along the clip (FL: the pattern
+// grows, round 168k), also when `c` loops its pattern with stretchedClipsLoop() on (issue #126: a take is not folded).
+// clipLoopLength = the pattern's length when `c` loops it that way, else 0.
 std::int64_t clipPatternTick (const Song& song, const Clip& c, std::int64_t tick);
 std::int64_t clipLoopLength (const Song& song, const Clip& c);
+
+// The hybrid rule (issue #126 follow-up, the user's choice): with stretchedClipsLoop() on, a take into a clip that loops
+// a pattern which already has notes folds into the loop (0.1.23) when the place in the loop falls inside that content;
+// an empty pattern, or a place past the content, keeps the note where it was played (FL's rule: the pattern grows).
+// `content` = the pattern's notes when the take began, to their end, in whole bars, at most the loop length.
+std::int64_t patternContentLength (const Song& song, int pattern);
+// pattern tick `t` (along the clip) folded by that rule: `loop` = clipLoopLength at the take's start (0: no loop)
+inline std::int64_t foldedTakeTick (std::int64_t t, std::int64_t loop, std::int64_t content) noexcept
+{
+    return loop > 0 && content > 0 && t >= loop && t % loop < content ? t % loop : t;
+}
 
 // --- recording options (docs/WORKFLOW_FL.md P2: recording set) ---------------------------------
 
@@ -44,6 +54,15 @@ enum class RecordMode : std::uint8_t
 // Commits finished notes of a take into `pattern`: starts quantised to the nearest multiple of `grid`
 // (grid <= 1: as played; lengths kept). In replace mode, `clearedChannels` remembers the channels already
 // cleared during this take, so later notes of the same take stay.
+// What "Blend recorded notes" starts as (round 177c). A new install starts off, as FL Studio's factory form does.
+// Before 0.1.25 the switch wasn't saved and every session started on, so a settings file that has no answer yet keeps it on.
+[[nodiscard]] constexpr RecordMode startingRecordMode (bool settingsFileExists, bool hasSavedBlend, bool savedBlend) noexcept
+{
+    if (hasSavedBlend)
+        return savedBlend ? RecordMode::overdub : RecordMode::replace;
+    return settingsFileExists ? RecordMode::overdub : RecordMode::replace;
+}
+
 void commitTake (Pattern& pattern, std::vector<Note> notes, RecordMode mode, std::int64_t grid, std::vector<int>& clearedChannels);
 
 // FL's record menu "Quantize" section (REA round 139, FLEngine FUN_012ca7b0; settings QuantizeNoteStartTime,
@@ -108,6 +127,9 @@ std::vector<ClipPart> punchParts (const std::vector<PunchRange>& ranges, std::in
 // Song mode: makes sure a clip of `pattern` plays at `tick`. If none does, one is placed at the start of
 // that bar, on the first track with nothing from there on (it grows while recording). Returns true when a clip was added.
 bool placePatternClipAt (Song& song, int pattern, std::int64_t tick);
+// The Playlist track such a clip starting at `start` goes to (round 177d: the live display shows the take there before
+// the clip is placed).
+int patternClipTrack (const Song& song, std::int64_t start);
 
 // Length of a count-in of `bars` bars at the song position `tick` (bars follow the time signature there).
 std::int64_t countInLength (const Song& song, int bars, std::int64_t tick = 0);
@@ -237,6 +259,10 @@ public:
     bool originFromClip() const noexcept { return fromClip; }
     // Song mode: the song position of the latest note start placed from the origin (outside every clip), -1: none.
     std::int64_t originReach() const noexcept { return reach; }
+    // Song mode, a take from a clip that loops its pattern (stretchedClipsLoop()): the loop length and the pattern's
+    // content at the take's first note (foldedTakeTick); 0 when there is no fold
+    std::int64_t foldLoop() const noexcept { return takeFoldLoop; }
+    std::int64_t foldContent() const noexcept { return takeFoldContent; }
 
     // Delivers an event; when it's the "off" of a held note, the finished note goes to finished().
     void add (const Song& song, const RecordedEvent& e);
@@ -247,6 +273,19 @@ public:
     // Notes completed since the last call.
     std::vector<Note> takeFinished();
 
+    // Round 177d (live display while recording; MusicTech's FL 2025 review: "recorded MIDI is not shown while
+    // recording"): the notes still held, as they would be committed if released at transport position `nowTick` (pattern
+    // positions, not quantised), with the take's origin and reach including them (Song mode; -1: none yet). Const: the
+    // take is not changed.
+    struct Preview
+    {
+        std::vector<Note> notes;
+        std::int64_t origin = -1, reach = -1;
+        bool fromClip = false;
+    };
+    Preview preview (const Song& song, double nowTick) const;
+    bool hasHeldNotes() const noexcept { return ! held.empty(); }
+
 private:
     struct Held
     {
@@ -255,6 +294,8 @@ private:
     };
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);
+    Note makeNote (const Song& song, int channel, int key, const Held& h, double endTick, std::int64_t& takeOrigin, bool& takeFromClip,
+                   std::int64_t& takeReach) const;
 
     std::int64_t songTick (const Song& song, double tick) const;
 
@@ -265,6 +306,7 @@ private:
     std::int64_t origin = -1;
     std::int64_t reach = -1;
     bool fromClip = false;
+    std::int64_t takeFoldLoop = 0, takeFoldContent = 0;
     std::map<std::pair<int, int>, Held> held; // (channel, key)
     std::vector<Note> finished;
 };

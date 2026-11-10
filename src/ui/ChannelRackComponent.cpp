@@ -1,3 +1,4 @@
+#include "core/RackLayout.h"
 #include "core/RackFilter.h"
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
@@ -106,6 +107,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::vfx: return "VFX";
         case InstrumentKind::videoplayer: return "Fruity Video Player";
         case InstrumentKind::wavetraveller: return "Wave Traveller";
+        case InstrumentKind::fruityslicer: return "Fruity Slicer";
     }
     return "?";
 }
@@ -156,7 +158,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 ChannelRackComponent::~ChannelRackComponent()
@@ -661,8 +663,8 @@ ChannelRackComponent::Area ChannelRackComponent::areaAt (int x, int y, int& row)
     if (laneBounds().contains (x, y))
         return x < gridLeft() ? Area::laneLevels : Area::lane;
 
-    if (row == channels)
-        return x < gridLeft() ? Area::addRow : Area::none;
+    if (row == channels) // only the "+ add channel" box opens the menu (issue #116: as FL's + button)
+        return racklayout::addChannelBox (nameLeft(), nameWidth, rowY (row), rowHeight).contains (x, y) ? Area::addRow : Area::none;
 
     if (advancedLoopShown() && x >= loopBoxBounds (row).getX() - 3) // the column covers the steps under it
         return loopBoxBounds (row).expanded (2, 3).contains (x, y) ? Area::loop : Area::none;
@@ -988,7 +990,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
         paintLane (g);
         {
-            const auto addArea = juce::Rectangle<float> ((float) nameLeft(), (float) addY + 3, (float) nameWidth, (float) rowHeight - 6);
+            const auto box = racklayout::addChannelBox (nameLeft(), nameWidth, addY, rowHeight);
+            const auto addArea = juce::Rectangle<float> ((float) box.x, (float) box.y, (float) box.width, (float) box.height);
             const float dash[] = { 3.0f, 3.0f };
             juce::Path outline, dashed;
             outline.addRoundedRectangle (addArea.reduced (0.5f), theme::radius::md);

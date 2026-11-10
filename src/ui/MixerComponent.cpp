@@ -2,6 +2,7 @@
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
 #include "ui/FileChoosers.h"
+#include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
@@ -17,6 +18,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "ui/PluginHeader.h"
 #include "core/ProjectSafety.h"
 #include "core/Templates.h"
 #include "core/RackOps.h"
@@ -130,9 +132,91 @@ ui::ValueSpec sendSpec (const juce::String& name)
 }
 } // namespace
 
+// The Mixer strips' picture (round 174e2): JUCE's buffered-to-image cache for the visible part of the strips (they are
+// as wide as all the inserts), plus the meter levels drawn over it and the meters' own repaints leaving it valid
+class MixerStrips::MeterCache final : public juce::CachedComponentImage
+{
+public:
+    explicit MeterCache (MixerStrips& o) : owner (o) {}
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        auto visible = owner.getLocalBounds();
+        if (auto* parent = owner.getParentComponent())
+            visible = visible.getIntersection (owner.getLocalArea (parent, parent->getLocalBounds()));
+        if (visible.isEmpty())
+            return;
+        const auto imageSize = (visible.withZeroOrigin().toFloat() * scale).getSmallestIntegerContainer();
+
+        if (visible != shown || image.isNull() || image.getBounds() != imageSize)
+        {
+            if (image.isNull() || image.getBounds() != imageSize)
+                image = juce::Image (juce::Image::RGB, juce::jmax (1, imageSize.getWidth()), juce::jmax (1, imageSize.getHeight()), false);
+            shown = visible;
+            valid.clear();
+        }
+
+        if (! valid.containsRectangle (visible))
+        {
+            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            juce::Graphics imageGraphics (image);
+            auto& context = imageGraphics.getInternalContext();
+            context.addTransform (juce::AffineTransform::translation ((float) -visible.getX(), (float) -visible.getY()).scaled (scale));
+            for (const auto& r : valid)
+                context.excludeClipRectangle (r);
+            context.clipToRectangle (visible);
+            ++owner.pictureRefills;
+            owner.cachePainting = true;
+            owner.paintEntireComponent (imageGraphics, true);
+            owner.cachePainting = false;
+        }
+        valid = visible;
+
+        g.setColour (juce::Colours::black);
+        g.drawImageTransformed (image,
+                                juce::AffineTransform::scale ((float) visible.getWidth() / (float) imageSize.getWidth(),
+                                                              (float) visible.getHeight() / (float) imageSize.getHeight())
+                                    .translated ((float) visible.getX(), (float) visible.getY()),
+                                false);
+        owner.paintMeterLevels (g);
+    }
+
+    bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
+    {
+        if (! owner.meterRepaintOnly)
+        {
+            ++owner.pictureInvalidations;
+            valid.clear();
+        }
+        return true;
+    }
+    bool invalidate (const juce::Rectangle<int>& area) override
+    {
+        if (! owner.meterRepaintOnly)
+        {
+            ++owner.pictureInvalidations;
+            valid.subtract (area);
+        }
+        return true;
+    }
+    void releaseResources() override { image = {}; }
+
+private:
+    MixerStrips& owner;
+    juce::Image image;
+    juce::Rectangle<int> shown; // the visible part the picture holds
+    juce::RectangleList<int> valid;
+};
+
 MixerStrips::MixerStrips (AudioEngine& e)
     : engine (e)
 {
+    if (const auto* v = std::getenv ("LYNX_MIXER_CACHE"); v == nullptr || juce::String (v) != "0")
+    {
+        setCachedComponentImage (new MeterCache (*this)); // (owned by the component)
+        meterCacheOn = true;
+    }
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
@@ -172,8 +256,39 @@ void MixerStrips::layoutStrips()
     if (showUsedOnly)
         for (int t = 1; t < tracks; ++t)
             hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    // folded groups (round 177a): nothing is computed unless a group is folded
+    foldShow.clear();
+    tabOf.clear();
+    foldHead.assign ((std::size_t) tracks + 1, false);
+    for (int t = 1; t < tracks; ++t)
+        if (song.mixer[(std::size_t) t].separator || (t + 1 < tracks && song.mixer[(std::size_t) t + 1].separator))
+        {
+            // the first strip of a group that can fold carries the chevron (a separator sets groups off)
+            const auto group = mixerops::groupOf (song, t);
+            if (! group.empty() && group.front() == t && mixerops::canFold (song, t))
+                foldHead[(std::size_t) t] = true;
+        }
+    if (std::any_of (song.mixer.begin() + std::min<std::ptrdiff_t> (1, (std::ptrdiff_t) song.mixer.size()), song.mixer.end(),
+                     [] (const MixerTrack& m) { return m.folded; }))
+    {
+        foldShow = mixerops::foldView (song);
+        tabOf.assign ((std::size_t) tracks, -1);
+        for (int t = 1; t < tracks; ++t)
+        {
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::hidden)
+                hidden[(std::size_t) t] = true;
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::tab)
+                for (const auto m : mixerops::groupOf (song, t))
+                    tabOf[(std::size_t) m] = t;
+        }
+        for (int t = 1; t < tracks; ++t) // a folded summing group: its bus strip carries the chevron (to unfold it)
+            if (foldHead[(std::size_t) t] && hidden[(std::size_t) t] && song.mixer[(std::size_t) t].folded)
+                if (const auto bus = mixerops::groupBus (song, mixerops::groupOf (song, t)); bus > 0)
+                    foldHead[(std::size_t) bus] = true;
+    }
     dockGaps.clear();
     separatorLines.clear();
+    vcaXs.clear();
 
     int x = 4;
     bool any = false, afterMaster = false;
@@ -206,6 +321,15 @@ void MixerStrips::layoutStrips()
             }
             else if (afterMaster)
                 x += 8;
+            if (t == 0 && ! song.vcas.empty()) // the VCA strips: their own block left of the Master (round 177a)
+            {
+                for (std::size_t i = 0; i < song.vcas.size(); ++i)
+                {
+                    vcaXs.push_back (x);
+                    x += spec().stripWidth;
+                }
+                x += 8;
+            }
             stripXs[(std::size_t) t] = x;
             x += stripWidthOf (t);
             any = true;
@@ -253,6 +377,11 @@ int MixerStrips::pinOffset (MixerDock dock) const noexcept
 
 int MixerStrips::stripX (int track) const noexcept
 {
+    if (track <= -2) // a VCA strip (vcaStrip): it follows the Master's dock
+    {
+        const auto i = (std::size_t) (-2 - track);
+        return i < vcaXs.size() ? vcaXs[i] + pinOffset (dockOf (0)) : hiddenX;
+    }
     if (track >= 0 && track < (int) stripXs.size())
         return stripXs[(std::size_t) track] + pinOffset (dockOf (track));
     return track == 0 ? 4 : 4 + spec().masterWidth + 8 + (track - 1) * spec().stripWidth;
@@ -384,6 +513,480 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     return r;
 }
 
+juce::Rectangle<int> MixerStrips::foldArea (int t) const
+{
+    // the chevron left of the number on a group's first strip (round 177a)
+    return { stripX (t) + 1, 3, 12, 15 };
+}
+
+float MixerStrips::tabLevel (int t) const noexcept
+{
+    float level = 0.0f;
+    for (std::size_t m = 0; m < tabOf.size(); ++m)
+        if (tabOf[m] == t)
+            for (std::size_t ch = 0; ch < 2; ++ch)
+                if (const auto i = m * 2 + ch; i < levels.size())
+                    level = juce::jmax (level, levels[i].level);
+    return level;
+}
+
+void MixerStrips::paintFoldTab (juce::Graphics& g, int t)
+{
+    // a folded group without a bus (round 177a): a slim tab in the group's colour with its name, how many inserts it
+    // holds and the loudest member's level; a click unfolds it. The members are never hidden without a trace.
+    using namespace theme;
+    const auto& song = engine.getSong();
+    const auto& head = song.mixer[(std::size_t) t];
+    const auto x = stripX (t);
+    const auto area = juce::Rectangle<int> (x, 2, foldTabWidth - 2, laneTop() - 2).toFloat();
+    const auto hoveredTab = hoverTrack == t;
+    auto plate = hoveredTab ? colour::bg3 : colour::bg2;
+    if (head.colour != 0)
+        plate = plate.interpolatedWith (tame (juce::Colour (head.colour)), 0.3f);
+    theme::fillRoundRect (g, area, radius::md, plate);
+    if (head.colour != 0)
+        theme::fillRoundRect (g, area.withHeight (3.0f).reduced (3.0f, 0.0f), 1.5f, tame (juce::Colour (head.colour)));
+    g.setColour (hoveredTab ? colour::borderStrong : colour::border);
+    g.drawRoundedRectangle (area.reduced (0.5f), radius::md, 1.0f);
+    icons::draw (g, Icon::chevronDown, juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ area.getCentreX(), 12.0f }).transformedBy (
+                                           juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, area.getCentreX(), 12.0f)),
+                 hoveredTab ? colour::textPrimary : colour::textSecondary);
+
+    const auto members = (int) mixerops::groupOf (song, t).size();
+    g.setColour (colour::textSecondary);
+    g.setFont (font (9.0f, true));
+    textcache::drawText (g, juce::String (members), (int) area.getX(), 22, (int) area.getWidth(), 12, juce::Justification::centred);
+
+    // the loudest member's level: one thin bar along the fader rows
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> (area.getRight() - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    theme::fillRoundRect (g, bar, 1.0f, colour::bg0);
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintFoldTabLevel (g, t);
+
+    // the group's name, bottom to top
+    const auto name = juce::String::fromUTF8 (head.name.c_str());
+    const auto column = juce::Rectangle<int> ((int) area.getX() + 1, 40, (int) area.getWidth() - 8, juce::jmax (20, rail.getY() - 46));
+    juce::Graphics::ScopedSaveState state (g);
+    g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
+    g.setColour (colour::textPrimary.withAlpha (0.9f));
+    g.setFont (font (type::small, false));
+    textcache::drawFittedText (g, name, juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre()),
+                               juce::Justification::centredLeft, 1, 0.8f);
+}
+
+void MixerStrips::paintFoldTabLevel (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> ((float) (stripX (t) + foldTabWidth - 2) - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    const auto level = tabLevel (t);
+    g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+    g.fillRect (bar.withTop (bar.getBottom() - meterPosition (level) * bar.getHeight()));
+}
+
+// --- VCA strips (round 177a slice 3; REA_rodada177a §3) ---------------------------------------------------------------
+// A VCA strip carries no audio: its fader scales its members' faders, its mute mutes them, its solo solos them. It has
+// no slots, pan, EQ or routing; a dashed outline and the "VCA" label set it apart from an insert.
+
+int MixerStrips::vcaAt (int x) const noexcept
+{
+    for (int i = 0; i < (int) vcaXs.size(); ++i)
+        if (const auto left = stripX (vcaStrip (i)); x >= left && x < left + spec().stripWidth)
+            return i;
+    return -1;
+}
+
+MixerStrips::Part MixerStrips::vcaPartAt (int i, juce::Point<int> p) const
+{
+    const auto v = vcaStrip (i);
+    if (headerArea (v).contains (p) || nameArea (v).contains (p))
+        return Part::header;
+    if (muteArea (v).contains (p))
+        return Part::mute;
+    if (soloArea (v).contains (p))
+        return Part::solo;
+    if (meterArea (v).contains (p))
+        return Part::meter;
+    if (faderRail (v).expanded (0, 6).contains (p))
+        return Part::fader;
+    return Part::body;
+}
+
+float MixerStrips::vcaMeter (int i, int channel) const noexcept
+{
+    const auto& song = engine.getSong();
+    float level = 0.0f;
+    if (i < 0 || i >= (int) song.vcas.size())
+        return level;
+    for (const auto m : mixerops::vcaReach (song, i))
+        if (const auto index = (std::size_t) m * 2 + (std::size_t) channel; index < levels.size())
+            level = juce::jmax (level, levels[index].level);
+    return level;
+}
+
+float MixerStrips::vcaShownLevel (int i) const noexcept
+{
+    const auto& vcas = engine.getSong().vcas;
+    if (i < 0 || i >= (int) vcas.size())
+        return unityFader;
+    return engine.getAutomationDisplay().shown (AutomationTarget { AutomationTargetKind::vcaLevel, i }, vcas[(std::size_t) i].level);
+}
+
+ui::ValueSpec MixerStrips::vcaSpec (int i) const
+{
+    const auto& vcas = engine.getSong().vcas;
+    const auto name = i >= 0 && i < (int) vcas.size() ? juce::String::fromUTF8 (vcas[(std::size_t) i].name.c_str()) : juce::String();
+    auto spec = ui::faderSpec (name + " - " + tr ("VCA level"), unityFader);
+    spec.pixelsForRange = juce::jmax (60, faderRail (vcaStrip (i)).getHeight());
+    spec.target = AutomationTarget { AutomationTargetKind::vcaLevel, i };
+    return spec;
+}
+
+void MixerStrips::setVcaLevel (int i, double value)
+{
+    if (i < 0 || i >= (int) engine.getSong().vcas.size())
+        return;
+    // like an insert's fader: only the live levels move during a drag (the gain path reads them lock-free)
+    engine.editLevels ([i, v = juce::jlimit (0.0f, 1.0f, (float) value)] (Song& s) {
+        if (i < (int) s.vcas.size())
+            s.vcas[(std::size_t) i].level = v;
+    });
+}
+
+void MixerStrips::repaintVca (int i)
+{
+    if (i < 0 || i >= (int) vcaXs.size())
+        return;
+    repaint (stripX (vcaStrip (i)) - 2, 0, spec().stripWidth + 4, laneTop());
+    // the members' ticks (the level that plays) move with it
+    for (const auto m : mixerops::vcaReach (engine.getSong(), i))
+        if (m > 0 && m < (int) stripXs.size() && ! isHidden (m))
+        {
+            const auto fader = faderArea (m);
+            repaint (stripX (m), fader.getY() - 9, stripWidthOf (m), fader.getHeight() + 18);
+        }
+}
+
+void MixerStrips::soloVca (int i)
+{
+    const auto reach = mixerops::vcaReach (engine.getSong(), i);
+    if (! reach.empty())
+        engine.editSong ([reach] (Song& s) { mixerops::soloSelected (s, reach, false); });
+}
+
+juce::String MixerStrips::vcaNote (int track) const
+{
+    const auto& song = engine.getSong();
+    if (song.vcas.empty() || track <= 0 || track >= (int) song.mixer.size())
+        return {};
+    const auto chain = mixerops::vcasOf (song, track);
+    if (chain.empty())
+        return {};
+    juce::StringArray parts;
+    for (const auto v : chain)
+    {
+        const auto& vca = song.vcas[(std::size_t) v];
+        parts.add ("VCA '" + juce::String::fromUTF8 (vca.name.c_str()) + "' " + faderToDb (vca.level) + " dB" + (vca.muted ? " (" + tr ("Muted") + ")" : juce::String()));
+    }
+    const auto playing = faderPosition (faderGain (song.mixer[(std::size_t) track].volume) * mixerops::vcaGain (song, track));
+    return "(" + parts.joinIntoString (", ") + juce::String::fromUTF8 (" \xe2\x86\x92 ") + faderToDb (playing) + " dB)";
+}
+
+ui::Hint MixerStrips::vcaHint (int i, juce::Point<int> p) const
+{
+    ui::Hint h;
+    const auto& song = engine.getSong();
+    if (i < 0 || i >= (int) song.vcas.size())
+        return h;
+    const auto& vca = song.vcas[(std::size_t) i];
+    const auto name = juce::String::fromUTF8 (vca.name.c_str());
+    const auto part = dragVca >= 0 ? Part::fader : vcaPartAt (i, p);
+    switch (part)
+    {
+        case Part::fader:
+            return ui::valueHint (vcaSpec (i), vcaShownLevel (i), ui::valueGestures());
+        case Part::mute: h.text = name + " - " + tr ("Click: mute the VCA's members.  Right-click or Ctrl+click: solo"); break;
+        case Part::solo: h.text = name + " - " + tr ("Solo the VCA's members"); break;
+        case Part::meter: h.text = name + " - " + tr ("The loudest member's level"); break;
+        default:
+            h.text = name + " - " + tr ("VCA fader: moves the level of its {0} inserts (they keep their own faders)  [LMB] selects them  [RMB] VCA menu",
+                                        { juce::String ((int) vca.members.size()) });
+            h.hasMenu = true;
+            break;
+    }
+    return h;
+}
+
+void MixerStrips::vcaMouseDown (const juce::MouseEvent& e, int i)
+{
+    const auto& song = engine.getSong();
+    if (i >= (int) song.vcas.size())
+        return;
+    const auto v = vcaStrip (i);
+    const auto part = vcaPartAt (i, e.getPosition());
+
+    if (part == Part::mute && (flmods::popup (e.mods) || flmods::ctrl (e.mods)))
+    {
+        soloVca (i);
+        return;
+    }
+    if (flmods::popup (e.mods))
+    {
+        showVcaMenu (i);
+        return;
+    }
+    switch (part)
+    {
+        case Part::mute:
+            engine.editSong ([i] (Song& s) {
+                if (i < (int) s.vcas.size())
+                    s.vcas[(std::size_t) i].muted = ! s.vcas[(std::size_t) i].muted;
+            });
+            return;
+        case Part::solo:
+            soloVca (i);
+            return;
+        case Part::fader:
+        {
+            if (ui::isResetClick (e))
+            {
+                setVcaLevel (i, unityFader);
+                return;
+            }
+            const auto start = song.vcas[(std::size_t) i].level;
+            if (! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse (as an insert's)
+            {
+                const auto rail = faderRail (v);
+                if (std::abs ((float) e.y - ((float) rail.getBottom() - start * (float) rail.getHeight())) > 9.0f)
+                {
+                    pressRail (v, e.y);
+                    return;
+                }
+            }
+            dragVca = i;
+            drag.begin (e, start);
+            ui::showValueTip (*this, faderRail (v), vcaSpec (i).text (start));
+            return;
+        }
+        default:
+        {
+            // the header or the body selects the members (so the insert menu's VCA items act on them)
+            std::vector<int> members;
+            for (const auto m : song.vcas[(std::size_t) i].members)
+                if (m > 0 && m < (int) song.mixer.size())
+                    members.push_back (m);
+            if (! members.empty())
+                setSelection (members, members.front());
+            return;
+        }
+    }
+}
+
+void MixerStrips::showVcaMenu (int i)
+{
+    const auto& song = engine.getSong();
+    if (i < 0 || i >= (int) song.vcas.size())
+        return;
+    const auto& vca = song.vcas[(std::size_t) i];
+    juce::PopupMenu menu;
+    auto rename = [this, i] {
+        if (i >= (int) engine.getSong().vcas.size())
+            return;
+        const auto& item = engine.getSong().vcas[(std::size_t) i];
+        showNameAndColourDialog (tr ("Rename VCA"), juce::String::fromUTF8 (item.name.c_str()), item.colour,
+                                 [this, i] (const juce::String& name, std::uint32_t colour) {
+                                     engine.editSong ([i, n = name.trim().toStdString(), colour] (Song& s) {
+                                         if (i >= (int) s.vcas.size())
+                                             return;
+                                         if (! n.empty())
+                                             s.vcas[(std::size_t) i].name = n;
+                                         s.vcas[(std::size_t) i].colour = colour;
+                                     });
+                                 });
+    };
+    ui::addItemHeader (menu, tr ("VCA"), juce::String::fromUTF8 (vca.name.c_str()), vca.colour != 0 ? juce::Colour (vca.colour) : juce::Colour(), rename);
+    menu.addItem (tr ("Rename and color..."), rename);
+
+    // the selected inserts (not the Master) join or leave this VCA
+    std::vector<int> picked;
+    for (const auto m : selection)
+        if (m > 0 && m < (int) song.mixer.size())
+            picked.push_back (m);
+    const auto in = [&vca] (int m) { return std::binary_search (vca.members.begin(), vca.members.end(), m); };
+    menu.addItem (tr ("Assign selected inserts"), ! picked.empty() && ! std::all_of (picked.begin(), picked.end(), in), false, [this, picked, i] {
+        engine.editSong ([picked, i] (Song& s) { mixerops::assignToVca (s, picked, i); });
+    });
+    menu.addItem (tr ("Remove selected inserts"), std::any_of (picked.begin(), picked.end(), in), false, [this, picked, i] {
+        engine.editSong ([picked, i] (Song& s) { mixerops::removeFromVca (s, picked, i); });
+    });
+
+    // nesting: this VCA follows another one (never one that already follows it)
+    juce::PopupMenu follow;
+    follow.addItem (tr ("None"), true, vca.parent < 0, [this, i] {
+        engine.editSong ([i] (Song& s) {
+            if (i < (int) s.vcas.size())
+                s.vcas[(std::size_t) i].parent = -1;
+        });
+    });
+    for (int other = 0; other < (int) song.vcas.size(); ++other)
+    {
+        if (other == i)
+            continue;
+        bool loops = false; // `other` follows `i` (directly or through others)
+        for (int up = other, guard = 0; up >= 0 && up < (int) song.vcas.size() && guard <= (int) song.vcas.size(); up = song.vcas[(std::size_t) up].parent, ++guard)
+            if (up == i)
+            {
+                loops = true;
+                break;
+            }
+        follow.addItem (juce::String::fromUTF8 (song.vcas[(std::size_t) other].name.c_str()), ! loops, vca.parent == other, [this, i, other] {
+            engine.editSong ([i, other] (Song& s) {
+                if (i < (int) s.vcas.size() && other < (int) s.vcas.size())
+                    s.vcas[(std::size_t) i].parent = other;
+            });
+        });
+    }
+    menu.addSubMenu (tr ("Follow VCA"), follow, song.vcas.size() > 1);
+    menu.addSeparator();
+    menu.addItem (tr ("Merge VCA into members"), ! vca.members.empty(), false, [this, i] {
+        engine.editSong ([i] (Song& s) { mixerops::mergeVcaIntoMembers (s, i); });
+    });
+    menu.addItem (tr ("Delete VCA"), [this, i] {
+        engine.editSong ([i] (Song& s) { mixerops::deleteVca (s, i); });
+        updateSize();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+void MixerStrips::paintVcaMeter (juce::Graphics& g, int i) const
+{
+    using namespace theme;
+    const auto& sp = spec();
+    const auto meters = meterArea (vcaStrip (i));
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
+        const auto level = vcaMeter (i, ch);
+        const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
+        g.setColour ((level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow).withAlpha (0.8f));
+        g.fillRect (bar.withTop (bar.getBottom() - h));
+    }
+}
+
+void MixerStrips::paintVcaStrip (juce::Graphics& g, int i)
+{
+    using namespace theme;
+    const auto& song = engine.getSong();
+    if (i < 0 || i >= (int) song.vcas.size())
+        return;
+    const auto& vca = song.vcas[(std::size_t) i];
+    const auto v = vcaStrip (i);
+    const auto x = stripX (v);
+    const auto& sp = spec();
+    const auto w = sp.stripWidth;
+    if (! g.clipRegionIntersects ({ x, 0, w, laneTop() }))
+        return;
+    const auto plateWidth = w - sp.gap;
+    const auto compactLayout = mixerlayout::isCompact (layout);
+    const auto strip = juce::Rectangle<int> (x, 2, plateWidth, laneTop() - 2).toFloat();
+    const auto hovered = [this, v] (Part p) { return hoverTrack == v && hoverPart == p; };
+    const auto colourOf = vca.colour != 0 ? tame (juce::Colour (vca.colour)) : colour::info;
+
+    auto plate = hoverTrack == v ? colour::bg3 : colour::bg2;
+    plate = plate.interpolatedWith (colourOf, 0.12f);
+    theme::fillRoundRect (g, strip, radius::md, plate);
+    theme::fillRoundRect (g, strip.withHeight (3.0f).reduced (6.0f, 0.0f), 1.5f, colourOf);
+    {
+        // a dashed outline: this strip carries no audio
+        juce::Path outline;
+        outline.addRoundedRectangle (strip.reduced (0.5f), radius::md);
+        juce::Path dashed;
+        const float dashes[] = { 3.0f, 3.0f };
+        juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+        g.setColour (colourOf.withAlpha (0.55f));
+        g.fillPath (dashed);
+    }
+
+    // header: "VCA" where an insert shows its number, the member count under it, the name as on an insert
+    g.setColour (colour::textSecondary);
+    g.setFont (font (compactLayout ? 9.5f : type::caption, true));
+    textcache::drawFittedText (g, "VCA", juce::Rectangle<int> (x, 4, plateWidth, 13), juce::Justification::centred, 1, 0.6f);
+    g.setFont (font (9.0f));
+    textcache::drawFittedText (g, juce::String::fromUTF8 ("\xc3\x97") + juce::String ((int) vca.members.size()), iconArea (v),
+                               juce::Justification::centred, 1, 0.6f);
+
+    const auto name = juce::String::fromUTF8 (vca.name.c_str());
+    g.setColour (vca.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.9f));
+    g.setFont (font (compactLayout ? 10.0f : type::small));
+    if (const auto box = nameArea (v); ! sp.verticalName)
+        textcache::drawFittedText (g, name, box, juce::Justification::centred, 1, 0.7f);
+    else
+    {
+        const auto column = box.reduced (2, 4);
+        juce::Graphics::ScopedSaveState state (g);
+        g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
+        const auto rotated = juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre());
+        textcache::drawFittedText (g, name, rotated, juce::Justification::centredLeft, 1, 0.8f);
+    }
+
+    // mute (the members) and solo (the members)
+    {
+        const auto led = compactLayout ? 10.0f : 12.0f;
+        const auto m = muteArea (v).toFloat().withSizeKeepingCentre (led, led);
+        g.setColour (muteLed (vca.muted));
+        g.fillEllipse (m);
+        if (! vca.muted || hovered (Part::mute))
+        {
+            g.setColour (hovered (Part::mute) ? colour::textSecondary : colour::ledOn.withAlpha (0.25f));
+            g.drawEllipse (m.expanded (2.0f), 1.0f);
+        }
+        const auto reach = mixerops::vcaReach (song, i);
+        const auto soloed = ! reach.empty() && std::all_of (reach.begin(), reach.end(), [&song] (int t) {
+            return t > 0 && t < (int) song.mixer.size() && song.mixer[(std::size_t) t].solo;
+        });
+        const auto s = soloArea (v).toFloat().reduced (2.0f);
+        theme::fillRoundRect (g, s, radius::sm, soloed ? colour::accent : hovered (Part::solo) ? colour::bg5 : colour::bg0);
+        g.setColour (soloed ? colour::onAccent : hovered (Part::solo) ? colour::textPrimary : colour::textSecondary);
+        g.setFont (font (type::caption, true));
+        textcache::drawText (g, "S", s.toNearestInt(), juce::Justification::centred);
+    }
+
+    // the loudest member's meter and the VCA's fader
+    const auto area = faderArea (v);
+    const auto meters = meterArea (v);
+    const auto fader = faderRail (v);
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
+        theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
+    }
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintVcaMeter (g, i);
+    const auto railX = (float) fader.getCentreX();
+    const auto level = vcaShownLevel (i);
+    const auto capY = (float) fader.getBottom() - level * (float) fader.getHeight();
+    theme::fillRoundRect (g, { railX - 2.0f, (float) fader.getY(), 4.0f, (float) fader.getHeight() }, 2.0f, colour::bg0);
+    theme::fillRoundRect (g, { railX - 2.0f, capY, 4.0f, juce::jmax (0.0f, (float) fader.getBottom() - capY) }, 2.0f, colourOf.withAlpha (vca.muted ? 0.35f : 0.8f));
+    const auto unityY = (float) fader.getBottom() - unityFader * (float) fader.getHeight();
+    g.setColour (colour::textDisabled);
+    g.drawHorizontalLine ((int) unityY, (float) fader.getX(), railX - 5.0f);
+    g.drawHorizontalLine ((int) unityY, railX + 5.0f, (float) fader.getRight());
+    const auto capActive = hovered (Part::fader) || dragVca == i;
+    const auto capWidth = juce::jmin ((float) fader.getWidth() + 2.0f, 26.0f);
+    const auto cap = juce::Rectangle<float> (capWidth, 12.0f).withCentre ({ railX, capY });
+    theme::fillRoundRect (g, cap.translated (0.0f, 1.5f), radius::sm, juce::Colours::black.withAlpha (0.35f));
+    theme::fillRoundRect (g, cap, radius::sm, capActive ? juce::Colour (0xffffffff) : juce::Colour (0xffd4d7dd));
+    g.setColour (colourOf);
+    g.fillRect (cap.withSizeKeepingCentre (capWidth - 8.0f, 2.0f));
+    if (sp.dbReadout)
+    {
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::caption));
+        textcache::drawFittedText (g, faderToDb (level) + " dB", juce::Rectangle<int> (x, area.getBottom() + 3, plateWidth, 14), juce::Justification::centred, 1, 0.7f);
+    }
+}
+
 juce::Rectangle<int> MixerStrips::headerArea (int t) const
 {
     return { stripX (t), 0, stripWidthOf (t) - spec().gap, rows().header };
@@ -480,6 +1083,32 @@ juce::Rectangle<int> MixerStrips::meterArea (int t) const
     return faderArea (t).withWidth (spec().meterWidth * 2 + 2);
 }
 
+juce::Rectangle<int> MixerStrips::grArea (int t) const
+{
+    // in the gap between the meters and the fader (compact layouts have none: over the right meter's edge)
+    const auto meters = meterArea (t);
+    return mixerlayout::isCompact (layout) ? meters.withTrimmedLeft (meters.getWidth() - 2) : meters.withX (meters.getRight() + 1).withWidth (3);
+}
+
+float MixerStrips::gainReduction (int t) const
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (t <= 0 || t >= (int) mixer.size())
+        return -1.0f;
+    const auto* times = engine.getProcessTimes();
+    auto gr = -1.0f;
+    const auto& slots = mixer[(std::size_t) t].effects;
+    for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
+    {
+        if (! slots[(std::size_t) s].enabled || ! mixerops::reportsGainReduction (slots[(std::size_t) s].kind))
+            continue;
+        const auto key = (std::size_t) (t * maxEffectSlots + s) * ProcessTimes::meterOutputs;
+        const auto v = times != nullptr && key < times->effectMeters.size() ? times->effectMeters[key].load (std::memory_order_relaxed) : 0.0f;
+        gr = juce::jmax (gr, juce::jlimit (0.0f, 1.0f, v));
+    }
+    return gr;
+}
+
 juce::Rectangle<int> MixerStrips::faderRail (int t) const
 {
     return faderArea (t).withTrimmedLeft (spec().meterWidth * 2 + (mixerlayout::isCompact (layout) ? 3 : 6) + (t == 0 ? masterScaleWidth : 0));
@@ -507,6 +1136,11 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
         return Part::none;
 
     const auto sending = selected > 0 && t != selected && selected < (int) song.mixer.size();
+
+    if (isFoldTab (t))
+        return Part::tab;
+    if (t > 0 && t < (int) foldHead.size() && foldHead[(std::size_t) t] && foldArea (t).contains (p))
+        return Part::fold;
 
     if (t > 0 && armArea (t).expanded (1).contains (p))
         return Part::arm;
@@ -577,7 +1211,7 @@ void MixerStrips::setHover (Part part, int t)
         return;
 
     auto dirty = [this] (int track) {
-        if (track >= 0)
+        if (track >= 0 || track <= -2) // (≤ -2: a VCA strip)
             repaint (stripX (track) - 2, 0, stripWidthOf (track) + 4, getHeight());
     };
 
@@ -589,6 +1223,11 @@ void MixerStrips::setHover (Part part, int t)
 
 void MixerStrips::mouseMove (const juce::MouseEvent& e)
 {
+    if (const auto i = vcaAt (e.x); i >= 0)
+    {
+        setHover (vcaPartAt (i, e.getPosition()), vcaStrip (i));
+        return;
+    }
     const auto t = trackAt (e.x);
     setHover (t >= 0 ? partAt (t, e.getPosition()) : Part::none, t);
 }
@@ -662,6 +1301,12 @@ void MixerStrips::paint (juce::Graphics& g)
 
         if (x > clip.getRight() || x + w < clip.getX())
             continue;
+
+        if (isFoldTab (t))
+        {
+            paintFoldTab (g, t);
+            continue;
+        }
 
         const auto& track = song.mixer[(std::size_t) t];
         const auto& sp = spec();
@@ -740,6 +1385,17 @@ void MixerStrips::paint (juce::Graphics& g)
         textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
                                    juce::Justification::centred, 1, 0.6f);
 
+        if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
+        {
+            const auto folded = mixerops::isFolded (song, t);
+            const auto box = foldArea (t).toFloat();
+            const auto c = box.getCentre();
+            icons::draw (g, Icon::chevronDown,
+                         juce::Rectangle<float> (10.0f, 10.0f).withCentre (c).transformedBy (
+                             juce::AffineTransform::rotation ((folded ? -1.0f : 1.0f) * juce::MathConstants<float>::halfPi, c.x, c.y)),
+                         hovered (Part::fold) ? colour::textPrimary : colour::textSecondary);
+        }
+
         if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
             ui::drawTrackIcon (g, icon, iconArea (t).toFloat(), track.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.88f));
 
@@ -785,21 +1441,11 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
-        if (sp.verticalName && ! sp.nameLow && ! compactLayout && t > 0)
+        if (const auto bars = nameBars (t); ! bars.isEmpty())
         {
-            const auto box = nameArea (t);
-            const auto bars = juce::Rectangle<int> (box.getRight() + 2, box.getY() + 6, plateWidth - box.getWidth() - 6, box.getHeight() - 12);
             theme::fillRoundRect (g, bars.toFloat(), 2.0f, colour::bg0.withAlpha (0.8f));
-            for (int ch = 0; ch < 2; ++ch)
-            {
-                const auto index = (std::size_t) t * 2 + (std::size_t) ch;
-                const auto level = index < levels.size() ? levels[index].level : 0.0f;
-                const auto bw = (bars.getWidth() - 3) / 2;
-                const auto bar = juce::Rectangle<int> (bars.getX() + 1 + ch * (bw + 1), bars.getY() + 1, bw, bars.getHeight() - 2);
-                const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
-                g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
-                g.fillRect (bar.withTop (bar.getBottom() - h));
-            }
+            if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+                paintNameBars (g, t);
         }
         }
 
@@ -859,37 +1505,24 @@ void MixerStrips::paint (juce::Graphics& g)
             {
                 const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
                 theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
-
-                const auto index = (std::size_t) t * 2 + (std::size_t) ch;
-                const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
-                const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
-                const auto lit = bar.withTop (bar.getBottom() - h);
-                juce::ColourGradient gradient (colour::meterClip, (float) bar.getX(), (float) bar.getY(), colour::meterLow, (float) bar.getX(),
-                                               (float) bar.getBottom(), false);
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
-                g.setGradientFill (gradient);
-                g.fillRect (lit);
-
-                if (meter.peak > 0.001f) // peak hold line
-                {
-                    const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-                    g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
-                    g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
-                }
-
-                if (meter.clipped) // clip latch: stays until the meter is clicked
-                {
-                    g.setColour (colour::meterClip);
-                    g.fillRect (bar.withHeight (4));
-                }
+                if (! cachePainting) // (cached: the levels are drawn over the picture, paintMeterLevels)
+                    paintMeterLevel (g, t, ch, bar);
             }
 
             if (hovered (Part::meter))
             {
                 g.setColour (colour::textSecondary.withAlpha (0.5f));
                 g.drawRect (meters.expanded (1), 1);
+            }
+
+            // round 177d: gain reduction of the strip's own dynamics, hanging down from the top (deeper = more)
+            if (const auto gr = gainReduction (t); gr >= 0.0f)
+            {
+                const auto bar = grArea (t);
+                g.setColour (colour::bg0.withAlpha (0.6f));
+                g.fillRect (bar);
+                g.setColour (colour::meterMid);
+                g.fillRect (bar.withHeight (juce::roundToInt (gr * (float) bar.getHeight())));
             }
 
             // the master's dB scale (FL prints it beside the master meter): as many values as fit without overlapping
@@ -931,6 +1564,16 @@ void MixerStrips::paint (juce::Graphics& g)
             g.setColour ((dragging (Part::fader) ? colour::accent : colour::bg0).withAlpha (0.8f));
             g.fillRect (cap.withSizeKeepingCentre (capWidth - 8.0f, 1.5f));
 
+            // a VCA member (round 177a): a tick where the level that plays sits (the fader times its VCAs)
+            if (t > 0 && ! song.vcas.empty())
+                if (const auto gain = mixerops::vcaGain (song, t); gain != 1.0f)
+                {
+                    const auto playing = faderPosition (faderGain (volume) * gain);
+                    const auto tickY = (float) fader.getBottom() - playing * (float) fader.getHeight();
+                    g.setColour (colour::info);
+                    g.fillRect (juce::Rectangle<float> (railX - 7.0f, tickY - 1.0f, 14.0f, 2.0f));
+                }
+
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption));
             if (sp.dbReadout)
@@ -947,6 +1590,23 @@ void MixerStrips::paint (juce::Graphics& g)
                 g.setFont (font (9.0f, true));
                 textcache::drawFittedText (g, text, badge.toNearestInt(), juce::Justification::centred, 1, 0.7f);
             }
+        }
+
+        // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
+        // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
+        if (t == selected && t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty() && needs (routeArea (t)))
+        {
+            const auto& lost = song.mixer[(std::size_t) t].lostSends;
+            const auto r = routeArea (t).toFloat().reduced (0.5f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r, radius::sm);
+            const float dashes[] = { 2.5f, 2.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::textDisabled);
+            g.fillPath (dashed);
+            g.setFont (font (10.0f));
+            textcache::drawFittedText (g, juce::String::fromUTF8 ("\xc3\x97 ") + (lost.size() == 1 ? juce::String::fromUTF8 (lost[0].to.c_str()) : juce::String ((int) lost.size())),
+                                       r.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
         }
 
         // routing lane: send switch from the selected insert to this one, and its level knob
@@ -987,6 +1647,9 @@ void MixerStrips::paint (juce::Graphics& g)
             }
         }
     }
+    if (pass == dockOf (0))
+        for (int i = 0; i < (int) vcaXs.size(); ++i)
+            paintVcaStrip (g, i);
     paintDividers (pass);
     }
 
@@ -1037,6 +1700,12 @@ void MixerStrips::paintRouting (juce::Graphics& g)
 
 void MixerStrips::mouseDown (const juce::MouseEvent& e)
 {
+    if (const auto i = vcaAt (e.x); i >= 0)
+    {
+        vcaMouseDown (e, i);
+        return;
+    }
+
     const auto t = trackAt (e.x);
 
     if (t < 0)
@@ -1101,6 +1770,20 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             updateSize();
             selectTrack (added);
         }
+        return;
+    }
+
+    if ((part == Part::fold || part == Part::tab) && ! flmods::popup (e.mods))
+    {
+        // round 177a: fold / unfold the group; Alt: every group (to the state this one takes)
+        const auto all = e.mods.isAltDown();
+        engine.editSong ([t, all] (Song& s) {
+            const auto folded = mixerops::toggleFold (s, t);
+            if (all)
+                mixerops::foldAll (s, folded);
+        });
+        updateSize();
+        repaint();
         return;
     }
 
@@ -1282,19 +1965,6 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             dragTrack = t;
             dragStartValue = part == Part::pan ? track.pan : track.volume;
 
-            if (part == Part::fader && ! flmods::ctrl (e.mods)) // clicking the track jumps the fader there
-            {
-                const auto area = faderRail (t);
-                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
-
-                if (std::abs ((float) e.y - capY) > 9.0f)
-                {
-                    dragStartValue = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - e.y) / (float) area.getHeight());
-                    engine.editSong ([t, v = dragStartValue] (Song& s) { s.mixer[(std::size_t) t].volume = v; });
-                }
-            }
-
-            drag.begin (e, dragStartValue);
             groupStart.clear();
             groupGrab = dragStartValue;
             if (selection.size() > 1) // the selected strips follow, keeping their offsets
@@ -1302,6 +1972,21 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                     if (s != t && s < (int) engine.getSong().mixer.size())
                         groupStart.push_back ({ s, part == Part::pan ? engine.getSong().mixer[(std::size_t) s].pan
                                                                       : engine.getSong().mixer[(std::size_t) s].volume });
+
+            if (part == Part::fader && ! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse
+            {
+                const auto area = faderRail (t);
+                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
+
+                if (std::abs ((float) e.y - capY) > 9.0f)
+                {
+                    pressRail (t, e.y);
+                    showTip (part, t, false);
+                    return;
+                }
+            }
+
+            drag.begin (e, dragStartValue);
             showTip (part, t, false);
             return;
 
@@ -1341,8 +2026,67 @@ void MixerStrips::dragSelectTo (int t)
     setSelection ({ s.begin(), s.end() }, primary);
 }
 
+void MixerStrips::pressRail (int strip, int mouseY)
+{
+    railStrip = strip;
+    railMouseY = mouseY;
+    railPressMs = juce::Time::getMillisecondCounterHiRes();
+    stepRailOnce();
+    railSteps = 1;
+    railRepeat.startTimer (16); // (a poll: the steps themselves follow the time since the press)
+}
+
+float MixerStrips::railTarget (int strip) const
+{
+    const auto rail = faderRail (strip);
+    return juce::jlimit (0.0f, 1.0f, (float) (rail.getBottom() - railMouseY) / (float) rail.getHeight());
+}
+
+void MixerStrips::stepHeldRail()
+{
+    if (! railRepeat.isTimerRunning()) // (a direct call, as the offscreen check makes: one step)
+    {
+        stepRailOnce();
+        return;
+    }
+    // the repeat stops as soon as the button is up, even before the release reaches us
+    if (! juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+    {
+        railRepeat.stopTimer();
+        return;
+    }
+    const auto due = faderRailStepsForHold ((int) (juce::Time::getMillisecondCounterHiRes() - railPressMs));
+    for (int guard = 0; railSteps < due && guard < 64; ++guard, ++railSteps)
+        stepRailOnce();
+}
+
+void MixerStrips::stepRailOnce()
+{
+    const auto& song = engine.getSong();
+    if (railStrip <= vcaStrip (0))
+    {
+        const auto i = -2 - railStrip;
+        if (i < (int) song.vcas.size())
+        {
+            setVcaLevel (i, faderRailStepTowards (song.vcas[(std::size_t) i].level, railTarget (railStrip)));
+            ui::showValueTip (*this, faderRail (railStrip), vcaSpec (i).text (vcaShownLevel (i)));
+        }
+    }
+    else if (railStrip >= 0 && railStrip < (int) song.mixer.size())
+    {
+        setValue (Part::fader, railStrip, faderRailStepTowards (song.mixer[(std::size_t) railStrip].volume, railTarget (railStrip)));
+        showTip (Part::fader, railStrip, false);
+    }
+}
+
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (railStrip != railNone) // the cap goes on towards where the mouse is now
+    {
+        railMouseY = e.y;
+        return;
+    }
+
     if (selectAnchor > 0)
     {
         if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
@@ -1368,6 +2112,13 @@ void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 
         headerDragTrack = selected;
         repaint();
+        return;
+    }
+
+    if (dragVca >= 0)
+    {
+        setVcaLevel (dragVca, drag.update (e, vcaSpec (dragVca)));
+        ui::showValueTip (*this, faderRail (vcaStrip (dragVca)), vcaSpec (dragVca).text (vcaShownLevel (dragVca)));
         return;
     }
 
@@ -1492,6 +2243,69 @@ bool MixerStrips::moveSelected (int delta)
     return ok;
 }
 
+// FL's "Delete" on the selected mixer tracks (round 186c; REA FUN_012a5b60, FL 2026 checked by hand): an error while
+// audio is being recorded; "Delete tracks|This will |delete| %d selected mixer track(s). Are you sure?" (Yes / No and
+// "Remember my choice": a remembered Yes skips it, No is never remembered; Settings › General › Manage messages shows
+// it again); then, when a Playlist audio / instrument track is linked to one of them, "Playlist tracks" with "Delete
+// tracks and channels" / "Unlink tracks and channels" / "Cancel" (nothing remembered). One undo step.
+void MixerStrips::deleteTracks (std::vector<int> tracks)
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count] (int t) { return t < 1 || t >= count; }), tracks.end());
+    if (tracks.empty())
+        return;
+
+    if (engine.isRecording() && ! engine.getArmedInserts().empty())
+    {
+        showFlMessage ({ tr ("Error"), tr ("It isn't possible to delete mixer tracks during audio recording."), { tr ("OK") }, false }, nullptr);
+        return;
+    }
+
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
+        if (safe == nullptr)
+            return;
+        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
+        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        safe->setSelection ({ first }, first);
+    };
+    auto confirmed = [safe, tracks, run] {
+        if (safe == nullptr)
+            return;
+        if (mixerops::playlistTracksLinkedTo (safe->engine.getSong(), tracks).empty())
+        {
+            run (mixerops::LinkedPlaylistTracks::unlink);
+            return;
+        }
+        showFlMessage ({ tr ("Playlist tracks"),
+                         tr ("One or more mixer tracks that will be deleted are connected to instrument/audio tracks.") + "\n"
+                             + tr ("Do you want to unlink the tracks and channels or delete them?"),
+                         { tr ("Delete tracks and channels"), tr ("Unlink tracks and channels"), tr ("Cancel") }, false },
+                       [run] (int button, bool) {
+                           if (button == 1)
+                               run (mixerops::LinkedPlaylistTracks::deleteToo);
+                           else if (button == 2)
+                               run (mixerops::LinkedPlaylistTracks::unlink);
+                       });
+    };
+
+    if (! messages::shown ("DeleteMixerTrack"))
+    {
+        confirmed();
+        return;
+    }
+    // (FL marks "delete" in its accent colour: the |bars| of its own string)
+    showFlMessage ({ tr ("Delete tracks"), tr ("This will |delete| {0} selected mixer track(s). Are you sure?", { juce::String ((int) tracks.size()) }),
+                     { tr ("Yes"), tr ("No") }, true },
+                   [confirmed] (int button, bool remember) {
+                       if (button != 1)
+                           return;
+                       if (remember)
+                           messages::setShown ("DeleteMixerTrack", false);
+                       confirmed();
+                   });
+}
+
 void MixerStrips::linkSelectedChannels (bool startingHere)
 {
     const auto channels = engine.getSelectedChannels();
@@ -1570,6 +2384,16 @@ void MixerStrips::showSendMenu (int t)
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
+    if (const auto i = vcaAt (e.x); i >= 0 && ! ui::wheelScrolling() && vcaPartAt (i, e.getPosition()) == Part::fader)
+    {
+        if (const auto v = ui::wheelValue (engine.getSong().vcas[(std::size_t) i].level, e, wheel, vcaSpec (i)))
+        {
+            setVcaLevel (i, *v);
+            ui::flashValueTip (*this, faderRail (vcaStrip (i)), vcaSpec (i).text (*v));
+        }
+        return;
+    }
+
     const auto t = trackAt (e.x);
 
     if (t > 0 && t < (int) engine.getSong().mixer.size() && e.mods.isShiftDown())
@@ -1599,6 +2423,10 @@ void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
 
 ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 {
+    if (dragVca >= 0)
+        return vcaHint (dragVca, p);
+    if (const auto i = vcaAt (p.x); i >= 0 && dragPart == Part::none)
+        return vcaHint (i, p);
     const auto active = dragPart == Part::pan || dragPart == Part::fader || dragPart == Part::stereo || dragPart == Part::send;
     const auto t = active ? dragTrack : trackAt (p.x);
     const auto& song = engine.getSong();
@@ -1642,8 +2470,15 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 
     switch (part)
     {
-        case Part::pan:
         case Part::fader:
+            if (const auto note = vcaNote (t); note.isNotEmpty())
+            {
+                h = ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
+                h.text << "   " << note;
+                return h;
+            }
+            return ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
+        case Part::pan:
         case Part::stereo:
         case Part::send:
             return ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
@@ -1654,6 +2489,13 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
+        case Part::fold:
+            h.text = name + " - " + (mixerops::isFolded (song, t) ? tr ("Unfold this group  [Alt]+[LMB] all groups")
+                                                                : tr ("Fold this group to its bus strip, or to a slim tab  [Alt]+[LMB] all groups"));
+            break;
+        case Part::tab:
+            h.text = tr ("Folded group: {0} ({1} inserts)  [LMB] unfold", { name, juce::String ((int) mixerops::groupOf (song, t).size()) });
+            break;
         case Part::header:
             h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
@@ -1672,11 +2514,15 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 
 void MixerStrips::mouseUp (const juce::MouseEvent&)
 {
+    railRepeat.stopTimer();
+    railStrip = railNone;
+
     if (headerDragged)
         setMouseCursor (juce::MouseCursor::NormalCursor);
 
-    if (dragPart != Part::none || headerDragged)
+    if (dragPart != Part::none || headerDragged || dragVca >= 0)
         repaint();
+    dragVca = -1;
 
     headerDragTrack = -1;
     headerDragged = false;
@@ -1691,6 +2537,13 @@ void MixerStrips::mouseUp (const juce::MouseEvent&)
 
 void MixerStrips::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    if (const auto i = vcaAt (e.x); i >= 0)
+    {
+        if (vcaPartAt (i, e.getPosition()) == Part::fader)
+            setVcaLevel (i, unityFader);
+        return;
+    }
+
     const auto t = trackAt (e.x);
 
     if (t < 0 || t >= (int) engine.getSong().mixer.size())
@@ -2159,19 +3012,45 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     };
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
-    ui::addItemHeader (menu, t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }), trackName,
+    // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
+    const auto several = targets.size() > 1;
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+                       several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
     menu.addItem (tr ("Rename and color...") + "\tF2", rename);
-    menu.addSubMenu (tr ("Change color"), ui::colourMenu (song.mixer[(std::size_t) t].colour, [this, t] (std::uint32_t colour) {
-                         if (t < (int) engine.getSong().mixer.size())
-                             engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
-                     }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
+    menu.addItem (tr ("Change color..."), [this, t] { // (FL: the colour selector at once)
+        const auto current = engine.getSong().mixer[(std::size_t) t].colour;
+        const auto mouse = juce::Desktop::getMousePosition();
+        const auto set = [this, t] (std::uint32_t colour) {
+            if (t < (int) engine.getSong().mixer.size())
+                engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+        };
+        ui::showColourPickerPopup ({ mouse.x, mouse.y, 1, 1 }, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
+                                   [set] (juce::Colour c) { set (c.getARGB()); }, {}, [set] { set (0); });
+    });
     menu.addItem (tr ("Random color"), [this, t] {
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+    });
+    // FL's "Gradient color..." (SetGradientColorMenuClick, REA_rodada177a §5): greyed below two selected tracks; the
+    // Gradient editor starts from the first and the last selected track's colours
+    menu.addItem (tr ("Gradient color..."), targets.size() > 1, false, [this, targets] {
+        auto sorted = targets;
+        std::sort (sorted.begin(), sorted.end());
+        const auto& mixer = engine.getSong().mixer;
+        const auto colourOf = [&mixer] (int track) {
+            const auto c = track >= 0 && track < (int) mixer.size() ? mixer[(std::size_t) track].colour : 0u;
+            return c != 0 ? juce::Colour (c) : juce::Colour (lynxPalette()[0]);
+        };
+        showGradientColourDialog (colourOf (sorted.front()), colourOf (sorted.back()), (int) sorted.size(),
+                                  [this, sorted] (juce::Colour first, juce::Colour last) {
+                                      engine.editSong ([sorted, a = first.getARGB(), b = last.getARGB()] (Song& s) {
+                                          mixerops::gradientColour (s, sorted, a, b);
+                                      });
+                                  });
     });
     // FL's "Change icon..." (SetIconMenuClick, REA round 168h: every selected track gets it); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, t, targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t }] {
@@ -2183,6 +3062,20 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             });
         });
     });
+    // FL's "Assign to new Audio track(s)" / "Unassign from Audio track(s)" (AssignAudiotrackMenuClick, REA_rodada177a §6)
+    {
+        const auto linked = [&song] (int insert) {
+            return std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [insert] (const PlaylistTrack& pt) {
+                return pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert;
+            });
+        };
+        const auto anyLinked = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && linked (x); });
+        const auto anyFree = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && ! linked (x); });
+        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree, false,
+                      [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::assignNewAudioTracks (s, targets); }); });
+        menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
+                      [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
+    }
     menu.addSeparator();
 
     // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list
@@ -2236,7 +3129,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                                  : tr ("none");
         menu.addItem (tr ("Audio input: {0}...", { current }), [this, t] { mixerinput::showMenu (engine, t, this); });
     }
-    menu.addItem (tr ("Open audio editor"), [this] { openAudioEditor (engine); });
+    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
+    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
+    menu.addSeparator(); // (FL: a line before Reset)
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
     // --- FL's "Routing" section -----------------------------------------------------------------------
@@ -2256,32 +3151,6 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                               [this, channel, t] { engine.editSong ([channel, t] (Song& s) { s.channels[(std::size_t) channel].mixerTrack = t; }); });
         menu.addSubMenu (tr ("Channel routing"), channels);
     }
-    {
-        juce::PopupMenu select;
-        select.addItem (tr ("Channels routed to this track") + "\tAlt+L", ! mixerops::channelsOn (song, t).empty(), false, [this, t] {
-            setSelection (selection, t);
-            selectLinkedChannels();
-        });
-        select.addSeparator();
-        const auto destinations = mixerops::destinationsOf (song, t);
-        const auto sources = mixerops::sourcesOf (song, t);
-        select.addItem (tr ("Tracks this one is routed to"), ! destinations.empty(), false, [this, t, destinations] { setSelection (destinations, t); });
-        select.addItem (tr ("Tracks routed to this one"), ! sources.empty(), false, [this, t, sources] { setSelection (sources, t); });
-        select.addSeparator();
-        select.addItem (tr ("Group"), t > 0, false, [this, t] {
-            auto group = mixerops::groupOf (engine.getSong(), t);
-            std::sort (group.begin(), group.end());
-            setSelection (group, t);
-        });
-        select.addItem (tr ("All"), [this, t] {
-            std::vector<int> all ((std::size_t) engine.getSong().mixer.size());
-            std::iota (all.begin(), all.end(), 0);
-            setSelection (all, t);
-        });
-        menu.addSubMenu (tr ("Select"), select);
-    }
-    menu.addItem (tr ("Reset selected track(s) routing"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetRouting (s, targets); }); });
-    menu.addItem (tr ("Unroute tracks routed to the selected track(s)"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unrouteInto (s, targets); }); });
     {
         // FL's Routing submenu (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950): selected tracks ⇄ this track
         std::vector<int> others;
@@ -2316,8 +3185,55 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Route this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::routeOnly); });
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
-        menu.addSubMenu (tr ("Selected tracks ⇄ this track"), routing);
+        menu.addSubMenu (tr ("Track routing"), routing, any);
+        // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
+        if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
+        {
+            juce::PopupMenu lost;
+            const auto& lostSends = song.mixer[(std::size_t) t].lostSends;
+            for (int i = 0; i < (int) lostSends.size(); ++i)
+            {
+                juce::PopupMenu one;
+                juce::PopupMenu to;
+                for (int x = 1; x < (int) song.mixer.size(); ++x)
+                    if (x != t)
+                        to.addItem (juce::String (x) + ". " + juce::String::fromUTF8 (song.mixer[(std::size_t) x].name.c_str()), song.routes (t, x) || song.canRoute (t, x),
+                                    false, [this, t, i, x] { engine.editSong ([t, i, x] (Song& s) { mixerops::reconnectLostSend (s, t, i, x); }); });
+                one.addSubMenu (tr ("Reconnect to"), to);
+                one.addItem (tr ("Remove"), [this, t, i] { engine.editSong ([t, i] (Song& s) { mixerops::removeLostSends (s, t, i); }); });
+                lost.addSubMenu (tr ("Send to {0} (deleted)", { juce::String::fromUTF8 (lostSends[(std::size_t) i].to.c_str()) }), one);
+            }
+            lost.addSeparator();
+            lost.addItem (tr ("Remove all"), [this, t] { engine.editSong ([t] (Song& s) { mixerops::removeLostSends (s, t); }); });
+            menu.addSubMenu (tr ("Disconnected links"), lost);
+        }
     }
+    {
+        juce::PopupMenu select;
+        select.addItem (tr ("Channels routed to this track") + "\tAlt+L", ! mixerops::channelsOn (song, t).empty(), false, [this, t] {
+            setSelection (selection, t);
+            selectLinkedChannels();
+        });
+        select.addSeparator();
+        const auto destinations = mixerops::destinationsOf (song, t);
+        const auto sources = mixerops::sourcesOf (song, t);
+        select.addItem (tr ("Tracks this one is routed to"), ! destinations.empty(), false, [this, t, destinations] { setSelection (destinations, t); });
+        select.addItem (tr ("Tracks routed to this one"), ! sources.empty(), false, [this, t, sources] { setSelection (sources, t); });
+        select.addSeparator();
+        select.addItem (tr ("Group"), t > 0, false, [this, t] {
+            auto group = mixerops::groupOf (engine.getSong(), t);
+            std::sort (group.begin(), group.end());
+            setSelection (group, t);
+        });
+        select.addItem (tr ("All"), [this, t] {
+            std::vector<int> all ((std::size_t) engine.getSong().mixer.size());
+            std::iota (all.begin(), all.end(), 0);
+            setSelection (all, t);
+        });
+        menu.addSubMenu (tr ("Select"), select);
+    }
+    menu.addItem (tr ("Reset selected track(s) routing"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetRouting (s, targets); }); });
+    menu.addItem (tr ("Unroute tracks routed to the selected track(s)"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unrouteInto (s, targets); }); });
     if (selected > 0 && selected != t && (t == 0 || song.canRoute (selected, t) || song.routes (selected, t)))
         menu.addItem (tr ("Send \"{0}\" only to this track", { juce::String::fromUTF8 (song.mixer[(std::size_t) selected].name.c_str()) }),
                       [this, from = selected, t] {
@@ -2355,6 +3271,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     engine.setInsertArmed (x, false);
         });
     }
+    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
+        engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].compensateMasterLatency = ! s.mixer[(std::size_t) t].compensateMasterLatency; });
+    });
     // FL's track latency (the "Track latency compensation" label's menu, REA round 165f-mixer)
     menu.addSubMenu (tr ("Track latency: {0}", { manualLatencyText (engine, song.mixer[(std::size_t) t]) }), trackLatencyMenu (engine, t));
 
@@ -2394,6 +3313,51 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Create group"), [this, targets, t] { engine.editSong ([targets, t] (Song& s) { mixerops::createGroup (s, targets, t); }); });
         menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0, false,
                       [this, t] { engine.editSong ([t] (Song& s) { mixerops::autoColorGroup (s, t); }); });
+        // LYNX's addition (round 177a): a group folds to its bus strip, or to a slim tab when it has no bus
+        const auto canFold = mixerops::canFold (song, t);
+        const auto folded = mixerops::isFolded (song, t);
+        menu.addItem (folded ? tr ("Unfold group") : tr ("Fold group"), canFold, false, [this, t] {
+            engine.editSong ([t] (Song& s) { mixerops::toggleFold (s, t); });
+            updateSize();
+        });
+        menu.addItem (tr ("Fold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, true); });
+            updateSize();
+        });
+        menu.addItem (tr ("Unfold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, false); });
+            updateSize();
+        });
+
+        // LYNX's addition (round 177a): VCA faders, their strips left of the Master
+        std::vector<int> members;
+        for (const auto m : targets)
+            if (m > 0)
+                members.push_back (m);
+        juce::PopupMenu vcaMenu;
+        vcaMenu.addItem (tr ("New VCA from selected"), [this, members] {
+            engine.editSong ([members] (Song& s) { mixerops::createVca (s, members, {}); });
+            updateSize();
+        });
+        juce::PopupMenu assign, remove;
+        for (int i = 0; i < (int) song.vcas.size(); ++i)
+        {
+            const auto& vca = song.vcas[(std::size_t) i];
+            const auto in = [&vca] (int m) { return std::binary_search (vca.members.begin(), vca.members.end(), m); };
+            const auto all = std::all_of (members.begin(), members.end(), in);
+            const auto any = std::any_of (members.begin(), members.end(), in);
+            const auto name = juce::String::fromUTF8 (vca.name.c_str());
+            assign.addItem (name, ! all, all, [this, members, i] {
+                engine.editSong ([members, i] (Song& s) { mixerops::assignToVca (s, members, i); });
+            });
+            if (any)
+                remove.addItem (name, [this, members, i] {
+                    engine.editSong ([members, i] (Song& s) { mixerops::removeFromVca (s, members, i); });
+                });
+        }
+        vcaMenu.addSubMenu (tr ("Assign to VCA"), assign, assign.getNumItems() > 0);
+        vcaMenu.addSubMenu (tr ("Remove from VCA"), remove, remove.getNumItems() > 0);
+        menu.addSubMenu (tr ("VCA"), vcaMenu);
     }
 
     // --- FL's "Layout" section --------------------------------------------------------------------------
@@ -2420,10 +3384,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             moveSelected (1);
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete") + "\tDel", [this, t] {
-            engine.editSong ([t] (Song& s) { mixerops::deleteTrack (s, t); });
-            setSelection ({ t }, t);
-        });
+        menu.addItem (tr ("Delete") + "\tDel", [this, targets] { deleteTracks (targets); });
         const auto room = (int) song.mixer.size() < maxMixerTracks;
         menu.addItem (tr ("Insert one"), room, false, [this, t] {
             engine.editSong ([t] (Song& s) { mixerops::insertTrack (s, t); });
@@ -2515,6 +3476,14 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
     const auto& mixer = engine.getSong().mixer;
     if (engine.getPublishCount() == seenPublish && shownLevels.size() == mixer.size())
     {
+        const auto& vcas = engine.getSong().vcas;
+        if (vcaLevelsShown.size() == vcas.size())
+            for (std::size_t i = 0; i < vcas.size(); ++i)
+                if (vcas[i].level != vcaLevelsShown[i])
+                {
+                    vcaLevelsShown[i] = vcas[i].level;
+                    repaintVca ((int) i);
+                }
         for (std::size_t t = 0; t < mixer.size(); ++t)
         {
             const std::array<float, 3> now { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
@@ -2537,6 +3506,24 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         return;
     }
     seenPublish = engine.getPublishCount();
+    // "Mixer groups follow the Playlist" (round 186c): a Playlist group edit regroups the mixer, outside the undo history
+    // (an undo of the Playlist edit brings the old groups back through this same path)
+    if (followPlaylist && ! followPending)
+    {
+        if (! mixerops::followsPlaylistGroups (engine.getSong()))
+        {
+            followPending = true;
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MixerStrips> (this)] {
+                if (safe == nullptr)
+                    return;
+                safe->engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); }, false);
+                safe->followPending = false;
+            });
+        }
+    }
+    vcaLevelsShown.clear();
+    for (const auto& vca : engine.getSong().vcas)
+        vcaLevelsShown.push_back (vca.level);
     shownLevels.resize (mixer.size());
     for (std::size_t t = 0; t < mixer.size(); ++t)
         shownLevels[t] = { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
@@ -2567,12 +3554,18 @@ void MixerStrips::repaintAutomatedStrips()
     shownAutomation = shown.getGeneration();
 
     std::vector<int> strips;
+    sendAutomatedStrips.clear();
     for (const auto& t : shown.automatedTargets())
     {
         if (t.kind == AutomationTargetKind::mixerVolume || t.kind == AutomationTargetKind::mixerPan)
             strips.push_back (t.index);
         else if (t.kind == AutomationTargetKind::mixerSend && t.index == selected)
+        {
             strips.push_back (t.slot); // (the route knob sits under the destination)
+            sendAutomatedStrips.push_back (t.slot);
+        }
+        else if (t.kind == AutomationTargetKind::vcaLevel && isShowing())
+            repaintVca (t.index);
     }
     std::vector<int> all = strips;
     all.insert (all.end(), automatedStrips.begin(), automatedStrips.end());
@@ -2586,21 +3579,148 @@ void MixerStrips::repaintAutomatedStrips()
     automatedShown.resize (mixer.size(), { -1.0f, -1.0f });
     for (const auto t : all)
     {
-        if (t < 0 || t >= count)
+        if (t < 0 || t >= count || isHidden (t) || isFoldTab (t)) // (a folded member has no control on screen to move)
             continue;
         const std::array<float, 2> now { shownVolume (t),
                                          shown.shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (mixer[(std::size_t) t].pan + 1.0f) * 0.5f) };
         auto& was = automatedShown[(std::size_t) t];
         if (now[0] != was[0])
         {
-            const auto fader = faderArea (t);
-            repaint (stripX (t), fader.getY() - 9, stripWidthOf (t), fader.getHeight() + 9 + 20);
+            // round 174e2: the cap's rail when the cap moved by an eighth of a pixel, the dB readout when its text changed
+            // (not the strip's whole column: the meters beside it stay in the cached picture)
+            const auto rail = faderRail (t);
+            const auto pixels = [&rail] (float v) { return juce::roundToInt (v * (float) rail.getHeight() * 8.0f); };
+            if (was[0] < 0.0f || pixels (now[0]) != pixels (was[0]))
+                repaint (rail.getX() - 3, rail.getY() - 9, rail.getWidth() + 6, rail.getHeight() + 18);
+            if (spec().dbReadout && (was[0] < 0.0f || faderToDb (now[0]) != faderToDb (was[0])))
+                repaint (stripX (t), faderArea (t).getBottom() + 3, stripWidthOf (t) - spec().gap, 14);
         }
         if (now[1] != was[1])
             repaint (panArea (t).expanded (2));
-        repaint (routeArea (t).expanded (2)); // (a send knob: small)
+        if (std::find (sendAutomatedStrips.begin(), sendAutomatedStrips.end(), t) != sendAutomatedStrips.end())
+            repaint (routeArea (t).expanded (2)); // (a send knob: small; round 174e2: only when a send is automated)
         was = now;
     }
+}
+
+// The two thin level bars beside a vertical name (Wide layouts); empty when the layout has none
+juce::Rectangle<int> MixerStrips::nameBars (int t) const
+{
+    const auto& sp = spec();
+    if (! sp.verticalName || sp.nameLow || mixerlayout::isCompact (layout) || t <= 0)
+        return {};
+    const auto box = nameArea (t);
+    const auto plateWidth = stripWidthOf (t) - sp.gap;
+    return { box.getRight() + 2, box.getY() + 6, plateWidth - box.getWidth() - 6, box.getHeight() - 12 };
+}
+
+void MixerStrips::paintNameBars (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto bars = nameBars (t);
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto index = (std::size_t) t * 2 + (std::size_t) ch;
+        const auto level = index < levels.size() ? levels[index].level : 0.0f;
+        const auto bw = (bars.getWidth() - 3) / 2;
+        const auto bar = juce::Rectangle<int> (bars.getX() + 1 + ch * (bw + 1), bars.getY() + 1, bw, bars.getHeight() - 2);
+        const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
+        if (h <= 0)
+            continue;
+        g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+        g.fillRect (bar.withTop (bar.getBottom() - h));
+    }
+}
+
+// One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
+void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Rectangle<int> bar) const
+{
+    using namespace theme;
+    const auto index = (std::size_t) t * 2 + (std::size_t) ch;
+    const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
+    const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
+    if (h > 0)
+    {
+        const auto lit = bar.withTop (bar.getBottom() - h);
+        // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
+        juce::ColourGradient gradient (colour::meterClip, 0.0f, (float) bar.getY(), colour::meterLow, 0.0f, (float) bar.getBottom(), false);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
+        g.setGradientFill (gradient);
+        g.fillRect (lit);
+    }
+
+    if (meter.peak > 0.001f) // peak hold line
+    {
+        const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
+        g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
+        g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
+    }
+
+    if (meter.clipped) // clip latch: stays until the meter is clicked
+    {
+        g.setColour (colour::meterClip);
+        g.fillRect (bar.withHeight (4));
+    }
+}
+
+// The levels over the cached picture: every meter the clip reaches, except where a pinned dock block covers a scrolled
+// strip (paint() draws the pinned blocks over the middle one)
+void MixerStrips::paintMeterLevels (juce::Graphics& g) const
+{
+    const auto clip = g.getClipBounds();
+    const auto& sp = spec();
+    std::vector<juce::Rectangle<int>> pinned;
+    for (auto dock : { MixerDock::left, MixerDock::right })
+        if (const auto shift = pinOffset (dock); shift != 0)
+        {
+            const auto d = (int) dock;
+            pinned.emplace_back (blockStart[d] + shift, 0, blockEnd[d] - blockStart[d], getHeight());
+        }
+    const auto tracks = (int) engine.getSong().mixer.size();
+    for (int t = 0; t < tracks; ++t)
+    {
+        if (isHidden (t))
+            continue;
+        if (isFoldTab (t)) // (a folded group's tab: one bar, and no meter of its own)
+        {
+            const auto rail = faderRail (t);
+            if (const juce::Rectangle<int> bar (stripX (t), rail.getY(), foldTabWidth, rail.getHeight()); bar.intersects (clip))
+            {
+                const juce::Graphics::ScopedSaveState state (g);
+                if (dockOf (t) == MixerDock::middle)
+                    for (const auto& r : pinned)
+                        g.excludeClipRegion (r);
+                paintFoldTabLevel (g, t);
+            }
+            continue;
+        }
+        const auto meters = meterArea (t);
+        const auto bars = nameBars (t);
+        const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
+        const auto barsShown = ! bars.isEmpty() && bars.intersects (clip) && g.clipRegionIntersects (bars);
+        if (! meterShown && ! barsShown)
+            continue;
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (t) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        if (meterShown)
+            for (int ch = 0; ch < 2; ++ch)
+                paintMeterLevel (g, t, ch, juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight()));
+        if (barsShown)
+            paintNameBars (g, t);
+    }
+    for (int i = 0; i < (int) vcaXs.size(); ++i)
+        if (meterArea (vcaStrip (i)).intersects (clip))
+        {
+            const juce::Graphics::ScopedSaveState state (g);
+            if (dockOf (0) == MixerDock::middle) // (the VCA block sits in the Master's dock)
+                for (const auto& r : pinned)
+                    g.excludeClipRegion (r);
+            paintVcaMeter (g, i);
+        }
 }
 
 bool MixerStrips::liveFrame (double nowMs)
@@ -2629,6 +3749,26 @@ bool MixerStrips::liveFrame (double nowMs)
         }
     }
 
+    // round 177d: the gain-reduction meters (strips with one of LYNX's own dynamics only; nothing while hidden)
+    if (showing)
+    {
+        grShown.resize (mixer.size(), -1);
+        for (int t = 1; t < (int) mixer.size(); ++t)
+        {
+            const auto gr = gainReduction (t);
+            const auto h = gr < 0.0f ? -1 : juce::roundToInt (gr * (float) grArea (t).getHeight());
+            if (h != grShown[(std::size_t) t])
+            {
+                grShown[(std::size_t) t] = h;
+                repaint (grArea (t).expanded (1));
+            }
+            moving = moving || h > 0;
+        }
+    }
+
+    // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
+    // against one repaint per meter favoured the single rectangle, within the noise of the machine)
+    juce::Rectangle<int> dirty;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
@@ -2643,19 +3783,55 @@ bool MixerStrips::liveFrame (double nowMs)
         // the Wide layouts the two thin bars beside the name, which follow the same level (round 173f)
         const auto t = (int) (i / 2);
         const auto ch = (int) (i % 2);
+        if (t < (int) tabOf.size() && tabOf[(std::size_t) t] > 0 && m.level != before.level) // a folded group's tab
+        {
+            const auto tab = tabOf[(std::size_t) t];
+            const auto rail = faderRail (tab);
+            const juce::Rectangle<int> bar (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
+        }
+        if (isHidden (t) || isFoldTab (t))
+            continue;
         const auto area = meterArea (t);
         const auto& sp = spec();
         const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
         if (! rows.empty())
         {
-            repaint (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2, rows.bottom - rows.top + 2);
-            if (sp.verticalName && ! sp.nameLow && ! mixerlayout::isCompact (layout) && t > 0
+            const juce::Rectangle<int> bar (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2,
+                                            rows.bottom - rows.top + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
+            // the thin bars beside the name: only the bar that moved, and (cached) over the picture as well (round 174e2)
+            if (const auto bars = nameBars (t); ! bars.isEmpty()
                 && (int) (meterPosition (m.level) * 64.0f) != (int) (meterPosition (before.level) * 64.0f))
             {
-                const auto box = nameArea (t);
-                repaint (box.getRight(), box.getY() + 5, stripWidthOf (t) - sp.gap - box.getWidth(), box.getHeight() - 10);
+                const auto bw = (bars.getWidth() - 3) / 2;
+                dirty = dirty.getUnion ({ bars.getX() + 1 + ch * (bw + 1) - 1, bars.getY(), bw + 2, bars.getHeight() });
             }
         }
+    }
+
+    // the VCA strips' meters show their loudest member (round 177a; nothing to do without a VCA)
+    if (const auto count = engine.getSong().vcas.size(); count > 0 && showing)
+    {
+        vcaMetersShown.resize (count * 2, 0.0f);
+        for (int i = 0; i < (int) count; ++i)
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const auto level = vcaMeter (i, ch);
+                auto& was = vcaMetersShown[(std::size_t) i * 2 + (std::size_t) ch];
+                if ((int) (meterPosition (level) * 256.0f) != (int) (meterPosition (was) * 256.0f))
+                {
+                    const auto area = meterArea (vcaStrip (i)).expanded (1);
+                    dirty = dirty.isEmpty() ? area : dirty.getUnion (area);
+                }
+                was = level;
+            }
+    }
+    if (! dirty.isEmpty())
+    {
+        meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
+        repaint (dirty);
+        meterRepaintOnly = false;
     }
     return moving;
 }
@@ -2672,12 +3848,17 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
                                       EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate, // LYNX's dynamics suite
                                       EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::voiceShift, // LYNX's voice tools
+                                      EffectKind::pocketDistortion, EffectKind::pocketLimiterClassic, EffectKind::pocketLimiter, EffectKind::pocketLeveller,
+                                      EffectKind::pocketGate, EffectKind::pocketTranceDelay, EffectKind::pocketTapeDelay, EffectKind::pocketMultiFx, // Pocket: FL Studio Mobile's effects (round 188h)
+                                      EffectKind::pocketAutoduck, EffectKind::pocketChorus, EffectKind::pocketSpacer, EffectKind::pocketStereoizer, // Pocket (round 189h)
+                                      EffectKind::pocketWowFlutter, EffectKind::pocketPhaser, EffectKind::pocketFlanger, EffectKind::pocketTremolo, // Pocket (round 189h)
+                                      EffectKind::pocketWaveshaper, EffectKind::pocketCompressor, EffectKind::pocketSpreader, // Pocket (round 189h)
                                       EffectKind::formulaController, EffectKind::peakController, EffectKind::xyController, EffectKind::xyzController,
                                       EffectKind::controlSurface, // controllers (link their output to any knob)
                                       EffectKind::patcher, // FL's Patcher: a graph of effects / instruments / plugins (REA_rodada141)
@@ -2756,7 +3937,7 @@ EffectsPanel::EffectsPanel (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 EffectsPanel::~EffectsPanel()
@@ -3055,7 +4236,7 @@ void EffectsPanel::paintEq (juce::Graphics& g)
     if (eqShown())
     {
         const auto bar = eqFoldBounds().toFloat();
-        const auto active = eq.gainDb[0] != 0.0f || eq.gainDb[1] != 0.0f || eq.gainDb[2] != 0.0f;
+        const auto active = eq.active();
         auto chevron = bar.withWidth (14.0f).withSizeKeepingCentre (12.0f, 12.0f);
         {
             juce::Graphics::ScopedSaveState state (g);
@@ -3066,7 +4247,13 @@ void EffectsPanel::paintEq (juce::Graphics& g)
         g.setFont (font (type::small, true));
         g.setColour (colour::textSecondary);
         textcache::drawText (g, tr ("EQ"), bar.withTrimmedLeft (18.0f).toNearestInt(), juce::Justification::centredLeft);
-        if (eqFolded && active) // a folded EQ that still changes the sound says so
+        if (eq.bypassed && eq.hasBoostOrCut()) // round 177d: bypassed, its settings kept
+        {
+            g.setColour (colour::textDisabled);
+            g.setFont (font (type::caption));
+            textcache::drawText (g, tr ("bypassed"), bar.withTrimmedLeft (44.0f).toNearestInt(), juce::Justification::centredLeft);
+        }
+        else if (eqFolded && active) // a folded EQ that still changes the sound says so
         {
             g.setColour (colour::accent);
             g.setFont (font (type::caption));
@@ -3227,6 +4414,23 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
         ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+    });
+    // LYNX's option (round 186c, pain point 1; off = FL, which drops them): a deleted insert's incoming sends stay greyed
+    menu.addItem (tr ("Keep links to deleted inserts, greyed (LYNX)"), true, MixerStrips::keepLostLinks, [] {
+        MixerStrips::keepLostLinks = ! MixerStrips::keepLostLinks;
+        notifyChanged();
+    });
+    // LYNX's addition (round 186c, pain point 4; off by default): the mixer's groups mirror the Playlist's track groups
+    menu.addItem (tr ("Mixer groups follow the Playlist (LYNX)"), true, MixerStrips::followPlaylist, [&engine] {
+        MixerStrips::followPlaylist = ! MixerStrips::followPlaylist;
+        if (MixerStrips::followPlaylist)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        notifyChanged();
+    });
+    menu.addItem (tr ("Arrange inserts like the Playlist"), ! mixerops::playlistOrderInserts (song).empty(), false, [&engine] {
+        int moved = 0;
+        engine.editSongStructural ([&moved] (Song& s) { moved = mixerops::arrangeLikePlaylist (s); });
+        ui::postHint ({ tr ("{0} insert(s) moved to follow the Playlist", { juce::String (moved) }), {}, false, false }, 3000);
     });
 
     if (! newProjects)
@@ -3891,6 +5095,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
         textcache::drawText (g, quickpick::slotName (engine, slot), button.translated (0, 34), juce::Justification::centred);
+        paintSidechainButton (g, slot);
         return;
     }
 
@@ -3953,7 +5158,8 @@ void EffectsPanel::paint (juce::Graphics& g)
     const auto tune = slot.kind == EffectKind::lynxTune;
     const auto editorButton = ! gate && ! vocoder && NativeEffectWindows::canOpen (slot.kind);
     const auto titleY = (gate ? gateStepsBounds().getY() : vocoder ? bandLevelsBounds().getY() : tune ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
-    const auto titleRight = getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0);
+    const auto scButton = sidechainButtonBounds();
+    const auto titleRight = scButton.isEmpty() ? getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0) : scButton.getX() - 6;
     textcache::drawText (g, juce::String::fromUTF8 (info.name), 10, titleY, titleRight - 10, 20, juce::Justification::centredLeft, true);
     if (slot.isSubstitute()) // which missing plugin this stands in for (the project keeps it)
     {
@@ -3976,6 +5182,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setFont (font (type::small));
         textcache::drawFittedText (g, tr ("Editor"), b.withTrimmedLeft (24.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
     }
+    paintSidechainButton (g, slot);
 
     if (tune) // the scale's notes on one octave; a note switched off is never a target
     {
@@ -4083,6 +5290,27 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
     if (s == nullptr)
         return;
 
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
+    {
+        pluginheader::showSidechainPicker (engine, track, selectedSlot, this, sc);
+        return;
+    }
+
+    // round 177d (LYNX's own; FL's insert EQ has no bypass): right-click the EQ's title bar to bypass it, its settings kept
+    if (eqShown() && eqFoldBounds().contains (e.getPosition()) && flmods::popup (e.mods) && track >= 0 && track < (int) engine.getSong().mixer.size())
+    {
+        const auto bypassed = engine.getSong().mixer[(std::size_t) track].eq.bypassed;
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Bypass the EQ (its settings are kept)"), true, bypassed, [this, t = track] {
+            engine.editSong ([t] (Song& song) {
+                if (t >= 0 && t < (int) song.mixer.size())
+                    song.mixer[(std::size_t) t].eq.bypassed = ! song.mixer[(std::size_t) t].eq.bypassed;
+            });
+            repaint();
+        });
+        menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+        return;
+    }
     if (eqFoldBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown())
     {
         eqFoldChoice = eqFolded ? 1 : 2;
@@ -4487,7 +5715,8 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
     if (slots() != nullptr && eqFoldBounds().contains (p))
     {
         ui::Hint h;
-        h.text = eqFolded ? tr ("Insert EQ (folded): [LMB] unfold it") : tr ("Insert EQ: [LMB] fold it (it folds by itself when the mixer is short)");
+        h.text = (eqFolded ? tr ("Insert EQ (folded): [LMB] unfold it") : tr ("Insert EQ: [LMB] fold it (it folds by itself when the mixer is short)"))
+                 + "  " + tr ("[RMB] bypass");
         return h;
     }
 
@@ -4512,6 +5741,12 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         return ui::valueHint (specFor (param, selectedSlot), valueOf (param, selectedSlot), gesture);
 
     ui::Hint h;
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (p))
+    {
+        h.text = tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose");
+        h.hasMenu = true;
+        return h;
+    }
     if (const auto* s = slots(); s != nullptr && selectedSlot >= 0 && selectedSlot < (int) s->size()
                                  && NativeEffectWindows::canOpen ((*s)[(std::size_t) selectedSlot].kind) && editorButtonBounds().contains (p))
     {
@@ -4674,6 +5909,12 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
     if (slot >= 0)
         led = ledBounds (slot).contains (p);
 
+    if (const auto sc = sidechainButtonBounds(); sc.contains (p) != hoverSidechain) // round 177b
+    {
+        hoverSidechain = ! hoverSidechain;
+        repaint (sc);
+    }
+
     if (slot != hoverSlot || param != hoverParam || led != hoverLed || input != hoverInput || eq != hoverEq || output != hoverOutput || arrow != hoverArrow)
     {
         hoverEq = eq;
@@ -4807,7 +6048,7 @@ bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position
         return false;
 
     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-    const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm);
+    const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
 
     if (! fx)
     {
@@ -4931,6 +6172,62 @@ juce::Rectangle<int> EffectsPanel::editorButtonBounds() const
     return { getWidth() - 96, (tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 29, 86, 20 };
 }
 
+void EffectsPanel::paintSidechainButton (juce::Graphics& g, const EffectSlot& slot)
+{
+    using namespace theme;
+    const auto b = sidechainButtonBounds().toFloat();
+    if (b.isEmpty())
+        return;
+    const auto source = pluginheader::sidechainSourceText (engine.getSong(), slot);
+    const auto hover = b.contains (getMouseXYRelative().toFloat());
+    theme::fillRoundRect (g, b, radius::md, hover ? colour::bg5 : colour::bg4);
+    if (source.isNotEmpty()) // linked: the accent edge, as a lit route
+    {
+        g.setColour (colour::accent.withAlpha (0.8f));
+        g.drawRoundedRectangle (b.reduced (0.5f), radius::md, 1.0f);
+    }
+    icons::draw (g, Icon::link, b.withWidth (22.0f).withSizeKeepingCentre (13.0f, 13.0f).translated (4.0f, 0.0f),
+                 source.isNotEmpty() ? colour::accent : colour::textSecondary);
+    const auto modulator = slot.kind == EffectKind::vocoder || slot.kind == EffectKind::vocodex;
+    const auto text = (modulator ? tr ("Modulator") : tr ("SC")) + ": " + (source.isNotEmpty() ? source : tr ("None"));
+    g.setColour (source.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (type::small));
+    textcache::drawFittedText (g, text, b.withTrimmedLeft (24.0f).withTrimmedRight (14.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+    juce::Path tri; // ▾: it opens a list
+    const auto a = juce::Point<float> (b.getRight() - 9.0f, b.getCentreY());
+    tri.addTriangle (a.x - 3.5f, a.y - 2.0f, a.x + 3.5f, a.y - 2.0f, a.x, a.y + 2.5f);
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+}
+
+int EffectsPanel::titleRowY() const
+{
+    return (gateSelected() ? gateStepsBounds().getY() : vocoderSelected() ? bandLevelsBounds().getY()
+            : tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
+}
+
+juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
+{
+    const auto* s = slots();
+    if (s == nullptr || selectedSlot < 0 || selectedSlot >= (int) s->size() || track < 0)
+        return {};
+    const auto& slot = (*s)[(std::size_t) selectedSlot];
+    if (slot.kind == EffectKind::facetEq || slot.kind == EffectKind::parametricEq || slot.kind == EffectKind::parallel
+        || isSoundgoodizerApprox (slot)) // (Facet EQ: its own picker on its curve page)
+        return {};
+    if (! pluginheader::takesSidechain (engine, track, selectedSlot))
+        return {};
+    if (slot.kind == EffectKind::plugin) // under the plugin's name
+    {
+        const auto button = pluginButtonBounds();
+        return { button.getX(), button.getBottom() + 38, button.getWidth(), 22 };
+    }
+    const auto editorButton = slot.kind != EffectKind::volumeGate && ! vocoderSelected() && NativeEffectWindows::canOpen (slot.kind);
+    const auto right = editorButton ? editorButtonBounds().getX() - 6 : getWidth() - 10;
+    const auto width = juce::jmin (130, juce::jmax (0, right - 90));
+    return width < 60 ? juce::Rectangle<int>() : juce::Rectangle<int> (right - width, titleRowY(), width, 20);
+}
+
 void EffectsPanel::openPluginWindow (int slot)
 {
     auto effect = engine.getEffect (track, slot);
@@ -4950,7 +6247,7 @@ void EffectsPanel::openPluginWindow (int slot)
                                   if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
                                       return nullptr;
                                   return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
-                              } });
+                              }, false, track, slot });
         return;
     }
 
@@ -5020,7 +6317,7 @@ void EffectsPanel::showAddMenu (int row)
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
 
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
 }
 
 void EffectsPanel::showSlotMenu (int slot)
@@ -5038,6 +6335,8 @@ void EffectsPanel::showSlotMenu (int slot)
     quickpick::addFolderViewItems (replace, engine);
 
     juce::PopupMenu menu;
+    if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
+        extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
@@ -5059,7 +6358,7 @@ void EffectsPanel::showSlotMenu (int slot)
                     if (! f.loadFileAsData (data))
                         return;
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm))
+                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
                         engine.editSong ([t = track, slot, fx = *fx] (Song& song) {
                             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                             const auto enabled = target.enabled;
@@ -5078,35 +6377,21 @@ void EffectsPanel::showSlotMenu (int slot)
             menu.addSubMenu (tr ("FL presets"), presets);
     }
 
-    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier
+    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
+    // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
     const auto kind = (*slots())[(std::size_t) slot].kind;
     auto sideMenu = [&] (const juce::String& title, bool second) {
         juce::PopupMenu side;
-        const auto& fx = (*slots())[(std::size_t) slot];
-        const auto current = second ? fx.sidechain2 : fx.sidechain;
-        auto assign = [this, slot, second] (int source) {
-            engine.editSong ([tk = track, slot, second, source] (Song& s) {
-                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) slot];
-                (second ? target.sidechain2 : target.sidechain) = source;
-                if (target.kind == EffectKind::vocoder && source >= 0)
-                    target.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
-            });
-        };
-        side.addItem (tr ("None"), true, current < 0, [assign] { assign (-1); });
-        const auto& song = engine.getSong();
-        for (int t = 1; t < (int) song.mixer.size(); ++t)
-            if (t != track)
-                side.addItem (juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), true, current == t,
-                              [assign, t] { assign (t); });
+        pluginheader::addSidechainPicker (side, engine, track, slot, second);
         menu.addSubMenu (title, side);
     };
-    if (kind == EffectKind::compressor || kind == EffectKind::fruityLimiter || kind == EffectKind::fruityCompressor || kind == EffectKind::facetEq)
-        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::vocoder || kind == EffectKind::vocodex)
     {
         sideMenu (tr ("Modulator from"), false);
         sideMenu (tr ("Carrier from"), true);
     }
+    else if (pluginheader::takesSidechain (engine, track, slot))
+        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::newtone || kind == EffectKind::newtime)
     {
         // the sample the plugin plays in slave mode (REA_rodada73): FL's edits are kept in the state but not reproduced
@@ -5154,7 +6439,7 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [this, key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
     if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
@@ -5229,7 +6514,7 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
-    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), {},
+    quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {
                              if (! key.isKeyCode (juce::KeyPress::deleteKey) || safe == nullptr)
                                  return false;
@@ -5630,6 +6915,10 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.audioEditor")
+        return strips.runMenuItem (tr ("Open audio editor"));
+    else if (id == "mixer.audioEditorRecord")
+        return strips.runMenuItem (tr ("Open audio editor and record"));
     else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
         return strips.runMenuItem (tr ("Rename and color..."));
     else if (id == "mixer.soloSelected")
@@ -5640,6 +6929,8 @@ bool MixerComponent::runAction (const std::string& id)
         return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
     else if (id == "mixer.renderSelected")
         return strips.runMenuItem (tr ("Render selected tracks to wave file(s)..."));
+    else if (id == "mixer.deleteTracks") // FL's Del: the selected mixer tracks, after its question (round 186c)
+        strips.deleteSelectedTracks();
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
     else

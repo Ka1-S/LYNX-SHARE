@@ -16,6 +16,7 @@
 #include "core/PluginCatalog.h"
 #include "core/FixedBlock.h"
 #include "core/FlPluginDb.h"
+#include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
@@ -74,6 +75,8 @@ public:
     void allNotesOff() noexcept override;
     void setNextNoteModulation (float modX, float) noexcept override { nextModX = modX; }
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
+    // issue #63: the note's own fine pitch, sent as FL's wrapper sends it (core/HostNotePitch.h)
+    void setNextNoteFinePitch (float cents) noexcept override { nextFine = cents; }
     void transportStopped() noexcept override;
     void panic() noexcept override;
     void transportReset() noexcept override { panic(); }
@@ -125,7 +128,10 @@ private:
     std::array<MidiOutNote, 256> midiOut {};
     int midiOutCount = 0;
     HostedOptions options;
-    float nextModX = 0.5f, nextRelease = 0.5f;
+    float nextModX = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
+    hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes
+    bool takesTuning = false;     // a VST3 plugin (its note ons carry the tuning)
     bool bendRangeSent = false;
     std::atomic<bool> resetPending { false };     // panic with "Reset plugin": reset at the next render (audio thread)
     HostedKeys heldKeys; // per MIDI channel: the notes on (their note offs on stop / jump, round 169c)
@@ -181,23 +187,50 @@ public:
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
     bool usesFixedBlocks() const noexcept { return fixed != nullptr; }
+    // Round 177b: a plugin with a second input bus (its sidechain input) gets the slot's sidechain there; a slot without
+    // one (or a silent source) feeds it silence, as before.
+    void setSidechain (const float* left, const float* right) noexcept override
+    {
+        sideL = left;
+        sideR = right;
+    }
+    bool hasSideInput() const noexcept { return sideChannel >= 0; }
+    // Issue #109: the plugin has a side input bus. It is on only while the slot has a sidechain source
+    // (setSideInputActive, called by the rack build, never on the audio thread; the block that meets the change plays dry).
+    bool canTakeSideInput() const noexcept { return sideBus; }
+    void setSideInputActive (bool on) override;
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
 
 private:
     void failed (std::uint32_t code) noexcept;
     void flushMidiControls() noexcept;
+    void findSideChannel() noexcept;
 
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     juce::AudioBuffer<float> buffer;
     juce::MidiBuffer midi;
     midictl::State midiControls;
     int blockSize;
+    bool sideBus = false;   // the plugin has a second input bus (issue #109)
+    std::mutex layoutLock;  // held by process() (try_lock) and by setSideInputActive while it lays the buses out again
     std::string name;
     std::atomic<bool> crashed { false };
     std::unique_ptr<FixedBlock> fixed;
     HostedOptions options;
     std::atomic<bool> resetPending { false }; // "Reset plugins on transport": reset before the next block (audio thread)
+    int sideChannel = -1, sideCount = 0;      // the side input bus in the process buffer (round 177b); -1 = none
+    const float* sideL = nullptr;             // this block's sidechain (set before process(), cleared after it)
+    const float* sideR = nullptr;
+    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place)
 };
+
+// Round 177b: the channels of a plugin's second input bus (its sidechain input), 0 when it has none (or it is off).
+int sideInputChannels (const juce::AudioPluginInstance& plugin);
+// The plugin has a second input bus, on or off (issue #109: what decides whether the "Sidechain from" picker shows).
+bool hasSideBus (const juce::AudioPluginInstance& plugin);
+// --selftest: a stand-in plugin with a stereo sidechain bus (it outputs its side input) inside PluginEffect, plain and
+// with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
+juce::String pluginSidechainSelfTest();
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.
 // UI thread, except the scan functions (any thread; one scan at a time) and the background scan.
@@ -274,6 +307,9 @@ public:
     const plugincatalog::Folders& databaseFolders() const noexcept { return userFolders; }
     void setDatabaseFolders (const plugincatalog::Folders& folders);
 
+    // How many scan child processes this host has started (--lv2scantest).
+    int scanChildrenStarted() const noexcept { return scanChildren; }
+
     // Scan child mode: describes a file's plugins into `output` (XML). Returns the number found.
     static int scanOneFile (const juce::String& formatName, const juce::String& file, const juce::File& output);
 
@@ -287,6 +323,13 @@ public:
     void findLv2Plugins();
 
     std::unique_ptr<juce::PluginDescription> find (const juce::String& id) const;
+
+    // FL's "Combine 32 and 64 bit versions of a plugin" (round 176a): what the 32-bit and the 64-bit build of one plugin
+    // share (format, ID, name), and the other build of `description` when both are installed (null: there is none).
+    static std::string bitnessKey (const juce::PluginDescription& description);
+    std::unique_ptr<juce::PluginDescription> otherBuild (const juce::PluginDescription& description) const;
+    // The build `ref` loads: its "Bit size" (Native = the 64-bit build when there is one, else the one there is).
+    std::unique_ptr<juce::PluginDescription> buildFor (const PluginRef& ref) const;
 
     // Online Sessions (round 168a). The plugin of `ref` is installed here (scanned, its file still there); when it is
     // not, a part that has a stand-in render plays that instead (core/StandIns.h).
@@ -397,8 +440,9 @@ private:
     std::map<juce::String, bool> existsCache;
     std::mutex existsLock;
     void rememberEmptyScan (const juce::String& file);
+    bool describeLv2 (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     void save();
-    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file);
+    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file, const std::function<bool()>& keepGoing = {});
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
@@ -406,6 +450,7 @@ private:
 
     std::mutex scanLock, saveLock, flDbLock;
     std::atomic<bool> stopScan { false };
+    std::atomic<int> scanChildren { 0 };
     FlPluginDb flDb;
     int flDbFiles = 0;
     bool flDbLoaded = false;
@@ -436,7 +481,8 @@ std::unique_ptr<juce::AudioPluginInstance> createRightInstance (juce::AudioPlugi
                                                                 double sampleRate, int blockSize, juce::String& error);
 
 // Stereo layout (if the plugin accepts it), rate and block size; calls prepareToPlay.
-void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize);
+// `sideInput`: the second input bus (a sidechain input) on; off by default (issue #109).
+void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int blockSize, bool sideInput = false);
 
 // Current plugin state as base64 (for saving in the project).
 std::string capturePluginState (juce::AudioPluginInstance& plugin);

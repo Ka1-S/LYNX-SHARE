@@ -29,6 +29,8 @@ enum class Group
     file,      // new, open, save, export, undo, redo
     meters,    // CPU / memory / polyphony
     output,    // output scope and peak meter
+    chord,     // FL's Chord detection panel: the chord being played (round 181b)
+    multilink, // FL's Multilink controllers switch (MultiLinkBtn; round 177b-4): hidden by default, as in FL
     count_
 };
 
@@ -37,7 +39,7 @@ constexpr int groupCount = (int) Group::count_;
 // The id used in the settings line (stable; never translated).
 inline const char* groupId (Group g)
 {
-    static constexpr std::array<const char*, groupCount> ids { "transport", "master", "record", "snap", "windows", "file", "meters", "output" };
+    static constexpr std::array<const char*, groupCount> ids { "transport", "master", "record", "snap", "windows", "file", "meters", "output", "chord", "multilink" };
     return ids[(std::size_t) g];
 }
 
@@ -46,7 +48,8 @@ inline const char* groupName (Group g)
 {
     static constexpr std::array<const char*, groupCount> names {
         TR_NOOP ("Transport"), TR_NOOP ("Master volume and pitch"), TR_NOOP ("Recording options"), TR_NOOP ("Snap and pattern"),
-        TR_NOOP ("Window shortcuts"), TR_NOOP ("File and undo"), TR_NOOP ("CPU, memory and polyphony"), TR_NOOP ("Output monitor")
+        TR_NOOP ("Window shortcuts"), TR_NOOP ("File and undo"), TR_NOOP ("CPU, memory and polyphony"), TR_NOOP ("Output monitor"), TR_NOOP ("Chord detection"),
+        TR_NOOP ("Multilink to controllers")
     };
     return names[(std::size_t) g];
 }
@@ -56,12 +59,27 @@ inline const char* groupName (Group g)
 // Save / Undo are also in the File and Edit menus and their keys).
 inline int groupPriority (Group g)
 {
-    static constexpr std::array<int, groupCount> p { 100, 80, 70, 90, 75, 60, 55, 50 };
+    static constexpr std::array<int, groupCount> p { 100, 80, 70, 90, 75, 60, 55, 50, 45, 65 }; // (Multilink: one button, shown only on request)
     return p[(std::size_t) g];
 }
 
 // Groups that sit at the right end of the toolbar (after the spare room) by default.
-inline bool rightAligned (Group g) { return g == Group::meters || g == Group::output; }
+inline bool rightAligned (Group g) { return g == Group::meters || g == Group::output || g == Group::chord; }
+
+// Shown on a new install: every group but the Multilink switch (FL keeps its MultiLinkBtn off the default toolbar; it
+// is shown from the toolbar's edit mode).
+inline bool shownByDefault (Group g) { return g != Group::multilink; }
+
+// The toolbar's order on a new install. Round 181b: FL has its Chord detection panel on the default toolbar, on the
+// left of its meters (seen in FL 2026's toolbar edit mode).
+inline const std::array<Group, groupCount>& defaultOrder()
+{
+    // round 177b-4: FL's MultiLinkBtn sits in its bottom toolbar after the window, pattern and edit buttons (DFM:
+    // ... ParamCtrlBigBtn, DownloaderBtn, MultiLinkBtn, GopherBtn); LYNX's nearest neighbour is the window shortcuts
+    static constexpr std::array<Group, groupCount> order { Group::transport, Group::master, Group::record, Group::snap, Group::windows,
+                                                           Group::multilink, Group::file, Group::chord, Group::meters, Group::output };
+    return order;
+}
 
 enum class IconSize
 {
@@ -116,8 +134,8 @@ struct Layout
     static Layout makeDefault()
     {
         Layout l;
-        for (int i = 0; i < groupCount; ++i)
-            l.entries.push_back ({ (Group) i, true });
+        for (auto g : defaultOrder())
+            l.entries.push_back ({ g, shownByDefault (g) });
         return l;
     }
 
@@ -186,7 +204,7 @@ struct Layout
         if (iconSize != d.iconSize || uiScale != d.uiScale || separators != d.separators || visible != d.visible)
             return false;
         for (std::size_t i = 0; i < entries.size(); ++i)
-            if (entries[i].group != d.entries[i].group || ! entries[i].shown)
+            if (entries[i].group != d.entries[i].group || entries[i].shown != d.entries[i].shown)
                 return false;
         return true;
     }
@@ -207,7 +225,7 @@ struct Layout
     }
 
     // Reads an order line. Unknown ids are ignored, duplicates keep the first, and groups missing from the
-    // line (e.g. added in a newer version) are appended, shown, at their default place.
+    // line (e.g. added in a newer version) are appended at their default place, shown as on a new toolbar.
     void orderFromString (const std::string& text)
     {
         std::vector<Entry> parsed;
@@ -232,24 +250,42 @@ struct Layout
                     parsed.push_back ({ (Group) i, shown });
         }
 
-        for (int i = 0; i < groupCount; ++i)
-            if (std::none_of (parsed.begin(), parsed.end(), [i] (const Entry& e) { return e.group == (Group) i; }))
+        // Round 181b: the Chord detection panel is new. A line that is just the old default gets it as a new install
+        // does; a customised toolbar stays as its user made it (FL saves the list of placed panels, so one that isn't
+        // listed stays in the toolbar's edit mode). It can be shown from there.
+        const auto plainOldDefault = [&parsed] {
+            const std::array<Group, 8> old { Group::transport, Group::master, Group::record, Group::snap, Group::windows, Group::file, Group::meters, Group::output };
+            if (parsed.empty())
+                return true;
+            if (parsed.size() != old.size())
+                return false;
+            for (std::size_t i = 0; i < old.size(); ++i)
+                if (parsed[i].group != old[i] || ! parsed[i].shown)
+                    return false;
+            return true;
+        }();
+
+        const auto& order = defaultOrder();
+        for (std::size_t i = 0; i < order.size(); ++i)
+        {
+            const auto group = order[i];
+            if (std::any_of (parsed.begin(), parsed.end(), [group] (const Entry& e) { return e.group == group; }))
+                continue;
+
+            // after the group that precedes it by default, if present
+            auto at = i == 0 ? parsed.begin() : parsed.end();
+            for (std::size_t before = i; before-- > 0;)
             {
-                // after the group that precedes it by default, if present
-                auto at = parsed.end();
-                for (int before = i - 1; before >= 0; --before)
+                const auto previous = order[before];
+                auto it = std::find_if (parsed.begin(), parsed.end(), [previous] (const Entry& e) { return e.group == previous; });
+                if (it != parsed.end())
                 {
-                    auto it = std::find_if (parsed.begin(), parsed.end(), [before] (const Entry& e) { return e.group == (Group) before; });
-                    if (it != parsed.end())
-                    {
-                        at = it + 1;
-                        break;
-                    }
+                    at = it + 1;
+                    break;
                 }
-                if (i == 0)
-                    at = parsed.begin();
-                parsed.insert (at, { (Group) i, true });
             }
+            parsed.insert (at, { group, shownByDefault (group) && (group != Group::chord || plainOldDefault) });
+        }
 
         entries = parsed;
     }

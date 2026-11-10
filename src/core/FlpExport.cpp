@@ -1,3 +1,4 @@
+#include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 
 #include <algorithm>
@@ -9,8 +10,13 @@
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/FlWrapper.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
+#include "core/TimeStretch.h"
+#include "core/MixerOps.h"
+#include "core/Transmitter.h"
+#include "core/Vocodex.h"
 
 namespace lynx::flpexport
 {
@@ -18,6 +24,19 @@ namespace
 {
 // ---- small helpers ----
 int iround (double v) noexcept { return (int) std::lround (v); }
+
+// FL's time-stretching mode. Each one is a different algorithm in FL (Thief with −2 instead of its −1 renders at xcorr
+// 0.869 against FL's own, round 180d), so an imported channel goes back with its own mode, as long as that still is the
+// method it plays; otherwise FL's Stretch for General. Every mode but Resample (0) keeps the length, also without a TIME.
+int flStretchMode (const SamplerSettings& s) noexcept
+{
+    if (! s.keepPitch)
+        return 0;
+    if (s.flStretchMode != 0 && stretchMethodForFlMode (s.flStretchMode) == s.stretchMethod)
+        return s.flStretchMode;
+    const auto m = s.stretchMethod;
+    return m == StretchMethod::mono || m == StretchMethod::tones ? 2 : m == StretchMethod::transients || m == StretchMethod::beats ? 7 : -1;
+}
 
 std::uint32_t rgb (std::uint32_t argb) noexcept { return argb & 0xFFFFFFu; }
 
@@ -62,6 +81,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::midiOut, "MIDI Out", false },        { InstrumentKind::voltage, "Fruity Voltage Controller", false },
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
+    { InstrumentKind::fruityslicer, "Fruity Slicer", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -159,6 +179,7 @@ std::int32_t rawValue (const AutomationTarget& t, float v)
         case AutomationTargetKind::mixerSend: return iround (v * 16000.0);
         case AutomationTargetKind::mixerPan: return iround ((v * 2.0 - 1.0) * 6400.0);
         case AutomationTargetKind::effectMix: return iround (v * 12800.0);
+        case AutomationTargetKind::tempo: return iround (10000.0 + 512000.0 * v); // BPM × 1000 (issue #86, REA_rodada178a §2)
         default: return iround (v * 65536.0);
     }
 }
@@ -428,7 +449,10 @@ void applyFreeze (Song& song, int channel, const std::string& wav, std::int64_t 
     frozen.instrument = InstrumentKind::audioClip;
     frozen.samplePath = wav;
     frozen.mixerTrack = mixerTrack;
-    frozen.volume = 1.0f; // unity: the render holds the channel's level and pan
+    // unity: the render holds the channel's level and pan. A Playlist audio clip plays at unity at FL's default channel
+    // volume (10000 of 12800, Instruments.cpp audioClipUnity), in FL as in LYNX; 100 % played the render 5.2 dB louder
+    // (round 182b: Patience exported from a Live set rendered +4.3 dB in FL and in LYNX)
+    frozen.volume = audioClipUnityVolume;
     frozen.colour = colour;
     frozen.uid = c.uid;
     c = std::move (frozen);
@@ -556,8 +580,9 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
             set (0x800u, ref->sendLoopPosition);
             set (0x20000u, ref->modXAftertouch);
             set (0x02000000u, ! ref->resetOnFlush);
+            set (0x01000000u, ref->hostKeysFirst);
             fixed = (ref->maxSizeBuffers ? 1u : 0u) | (ref->hostMaxBuffer ? 2u : 0u);
-            flags2 = ref->allNotesOffOnStop ? 0u : 0x1000u;
+            flags2 = (ref->allNotesOffOnStop ? 0u : 0x1000u) | (ref->allowHostKeys ? 0x800u : 0u);
         }
         else if (p.hasWrapperOptions)
         {
@@ -638,8 +663,6 @@ struct Converter
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
-                if (c.muted)
-                    continue; // (left out)
                 use (c.start);
                 // (an audio clip's length goes unstretched, as playlistItem writes it)
                 use (c.kind == ClipKind::audio && c.stretch > 0.0 && c.stretch != 1.0 ? (std::int64_t) std::llround ((double) c.length / c.stretch)
@@ -772,6 +795,12 @@ struct Converter
         c.name = def.name;
         c.colour = def.colour != 0 ? rgb (def.colour) : 0;
         c.icon = def.icon;
+        // FL keeps a Smart disabled generator from running through silence, so it changes the phase of what it plays
+        // (Thief without FL's own flags: xcorr 0.891, same spectrum; round 180d)
+        c.wrapperFlags = def.flWrapperFlags;
+        // a hosted plugin's window: FL's "Detached" is flag 0x4 of the same record (issue #116, REA_rodada190i.md)
+        if (def.instrument == InstrumentKind::plugin || def.plugin.foreign.format != ForeignPlugin::Format::none)
+            c.wrapperFlags = withFlDetached (def.flWrapperFlags >= 0 ? def.flWrapperFlags : 0x150, def.plugin.detached);
         c.enabled = ! def.muted;
         c.soloLock = def.soloLock;
         c.ghostShown = ! def.ghostHidden;
@@ -787,11 +816,18 @@ struct Converter
             if (g > 1.0f)
                 report.notes.push_back (channelLabel (def, index) + ": the Sampler's Gain is above FL's channel volume range (capped at 100%)");
         }
+        // warp markers that bend the tempo inside the file (round 175a, M1): FL's channel stretch has one tempo
+        if (def.sampler.keepPitch && def.sampler.stretchBeats > 0.0f
+            && ! warpStretchMap (def.sampler.warp, 1.0e9, 1000.0, 1.0e9).empty()) // (any file length: do the markers bend)
+            report.notes.push_back (channelLabel (def, index) + ": its warp markers are written as one tempo (FL's sample channels have none)");
         c.hasLevels = true;
         c.volume = std::clamp (iround (volume * 12800.0), 0, 12800);
         c.pan = std::clamp (iround (6400.0 + def.pan * 6400.0), 0, 12800);
         const auto root = std::clamp (def.misc.rootNote, 0, 127);
-        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0);
+        // FL's stretch PITCH knob and the header pitch add up, but do not sound the same in FL's stretcher (Thief with all
+        // of it in the header: xcorr 0.934 against FL's own, round 180d), so what came from the knob goes back to the knob
+        c.stretchPitch = def.sampler.keepPitch ? def.sampler.flStretchPitch : 0;
+        const auto cents = iround (((double) def.sampler.pitch - (60.0 - root)) * 100.0) - c.stretchPitch;
         c.pitchCents = cents;
         c.rootNote = root;
         c.fineTune = iround (def.misc.fineTune);
@@ -974,8 +1010,8 @@ struct Converter
         {
             c.stretchTime = s.stretchBeats * 192.0f;
             c.stretchMul = 0;
-            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -2;
         }
+        c.stretchMode = flStretchMode (s);
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)
             c.cutGroup = c.cutBy = freeCutGroup++; // "cut itself"
     }
@@ -1209,6 +1245,36 @@ struct Converter
             }
             if (c.automation.empty())
                 c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
+            // FL's clip LFO (round 177b): the fields back as they were read; the level carries the clip's range (FL scales
+            // the LFO by its channel range, written whole here)
+            if (const auto& lfo = src.lfo; ! lfo.isDefault())
+            {
+                auto& f = c.automationLfo;
+                f.present = true;
+                f.enabled = lfo.on ? -1 : 0;
+                f.level = std::abs (lfo.range - 1.0f) < 1.0e-6f ? lfo.level : (int) std::lround (lfo.level * lfo.range);
+                f.mode = lfo.add ? 1 : 0;
+                f.flags = lfo.flags;
+                f.speed = lfo.speed;
+                f.tension = lfo.tension;
+                f.skew = lfo.skew;
+                f.pulseWidth = lfo.pulseWidth;
+                f.phase = lfo.phase;
+                if (lfo.fl.present)
+                {
+                    f.mainFlags = lfo.fl.mainFlags;
+                    f.mainEnabled = lfo.fl.mainEnabled;
+                    f.mainLoop = lfo.fl.mainLoop;
+                    f.adsr = lfo.fl.adsr;
+                    f.lfoLoop = lfo.fl.lfoLoop;
+                }
+                f.points.clear();
+                for (std::size_t i = 0; i < lfo.amp.size(); ++i)
+                    f.points.push_back ({ (double) lfo.amp[i].tick / ppq, (double) std::clamp (lfo.amp[i].value, 0.0f, 1.0f),
+                                          i > 0 ? -lfo.amp[i - 1].tension : 0.0f, 0 });
+                if (lfo.amp == lfo.fl.rawAmp && lfo.fl.rawPoints.size() == lfo.amp.size() * 24)
+                    f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
+            }
             automationChannel[a] = c.index;
             if (id)
                 out.automationLinks.push_back ({ c.index, *id });
@@ -1236,19 +1302,9 @@ struct Converter
             a.name = arrangement.name;
             for (const auto& m : current ? song.markers() : arrangement.markers)
                 a.markers.push_back (marker (m));
-            int muted = 0;
             for (const auto& clip : clips)
-            {
-                if (clip.muted)
-                {
-                    ++muted; // (FL's clip mute is not in the model: a muted clip is left out, as it is heard)
-                    continue;
-                }
                 if (auto item = playlistItem (clip))
                     a.items.push_back (*item);
-            }
-            if (muted > 0)
-                report.notes.push_back ("Arrangement '" + a.name + "': " + std::to_string (muted) + " muted clip(s) left out");
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
                 a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
@@ -1263,6 +1319,8 @@ struct Converter
         item.track = std::clamp (clip.track, 0, 499);
         item.position = ticks (clip.start);
         item.length = std::max<std::uint32_t> (1, ticks (clip.length));
+        // FL's clip mute: bit 0x2000 of the item flags (issue #110, REA round 182e)
+        item.flags = (std::uint16_t) (flp::PlaylistItem::defaultFlags | (clip.muted ? flp::PlaylistItem::mutedFlag : 0));
         switch (clip.kind)
         {
             case ClipKind::pattern:
@@ -1298,6 +1356,15 @@ struct Converter
                 item.endOffset = (float) ((offset + (double) clip.length / stretch) * msPerTick * factor);
                 item.fadeInMs = (float) ((double) clip.fadeIn * msPerTick);
                 item.fadeOutMs = (float) ((double) clip.fadeOut * msPerTick);
+                item.fadeInTension = clip.fadeIn > 0 ? clip.fadeInTension : 0.0f;
+                item.fadeOutTension = clip.fadeOut > 0 ? clip.fadeOutTension : 0.0f;
+                {
+                    // the shapes follow the clip, the rest of FL's bits stay as they came
+                    const auto shape = [&clip] (int side, std::uint32_t raw) -> std::uint32_t
+                    { return (clip.linearFades & (1 << side)) != 0 ? 1u : raw == 1u ? 0u : raw; };
+                    item.fadeFlags = (clip.flFadeFlags & ~((3u << 8) | (3u << 12)))
+                                     | (shape (0, (clip.flFadeFlags >> 8) & 3) << 8) | (shape (1, (clip.flFadeFlags >> 12) & 3) << 12);
+                }
                 item.gain = clip.gain;
                 item.pitch = clip.pitch;
                 item.reversed = clip.reversed;
@@ -1311,8 +1378,12 @@ struct Converter
                 item.kind = flp::PlaylistItem::Kind::channelClip;
                 item.index = found->second;
                 item.gain = 1.0f;
-                // the trim in beats (−1 = none)
-                if (clip.offset > 0)
+                // the trim in beats. −1 = none, and FL then takes the clip's whole content for its end, whatever the
+                // item's length says: a 20-beat clip of a 546-beat automation at beat 284 made Thief 208 bars long
+                // instead of 144 (round 180d). So only a clip that shows all its content goes without a trim, as in
+                // FL's own files.
+                if (clip.offset > 0 || (clip.automation >= 0 && clip.automation < (int) song.automations.size()
+                                        && clip.length != song.automations[(std::size_t) clip.automation].length()))
                 {
                     item.startOffset = (float) ((double) clip.offset / ppq);
                     item.endOffset = (float) ((double) (clip.offset + clip.length) / ppq);
@@ -1388,13 +1459,17 @@ struct Converter
 
             // the levels (FL ranges: volume 0..16000 with 12800 = 0 dB, pan ±6400, separation ±64, route levels on the fader curve)
             auto control = [&] (int slot, int param, std::int32_t value) { out.controls.push_back ({ { mixerId (t, slot, param) }, value }); };
-            control (0, flp::ControlId::mixerVolume, std::clamp (iround (track.volume * 16000.0), 0, 16000));
+            // FL has no VCA (round 177a): the VCAs' gain is baked into the member's fader
+            const auto vca = t > 0 ? mixerops::vcaGain (song, t) : 1.0f;
+            const auto volume = vca == 1.0f ? track.volume : std::clamp (faderPosition (faderGain (track.volume) * vca), 0.0f, 1.0f);
+            control (0, flp::ControlId::mixerVolume, std::clamp (iround (volume * 16000.0), 0, 16000));
             control (0, flp::ControlId::mixerPan, std::clamp (iround (track.pan * 6400.0), -6400, 6400));
             control (0, flp::ControlId::mixerStereo, std::clamp (iround (track.stereo * 64.0), -64, 64));
             for (int b = 0; b < 3; ++b)
             {
                 const auto& eq = track.eq;
-                control (0, flp::ControlId::mixerEqBase + b, std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
+                // (a bypassed EQ, LYNX's own: FL has no bypass, so it goes flat — what is heard stays the same)
+                control (0, flp::ControlId::mixerEqBase + b, eq.bypassed ? 0 : std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
                 const auto hz = std::clamp ((double) eq.hz[(std::size_t) b], 10.0, 16000.0);
                 control (0, flp::ControlId::mixerEqBase + 8 + b, std::clamp (iround (65536.0 * std::log ((hz - 10.0) / 159.9 + 1.0) / std::log (101.0)), 0, 65536));
                 control (0, flp::ControlId::mixerEqBase + 16 + b, std::clamp (iround (eq.width[(std::size_t) b] * 65536.0), 0, 65536));
@@ -1435,6 +1510,7 @@ struct Converter
                     {
                         slot.plugin = "Fruity Wrapper";
                         slot.state = writeWrapper (*record, false, fx.plugin.foreign.format == ForeignPlugin::Format::none ? &fx.plugin : nullptr);
+                        slot.wrapperFlags = withFlDetached (slot.wrapperFlags, fx.plugin.detached); // (issue #116)
                         what = record->name + " (Fruity Wrapper)";
                     }
                 }
@@ -1469,7 +1545,86 @@ struct Converter
             }
             out.mixer.push_back (std::move (m));
         }
+        fixSideInputs();
+        if (! song.vcas.empty())
+            report.notes.push_back ("VCA faders: FL Studio has none; their levels are baked into the member tracks' faders (their automation and mutes are left out)");
         report.exact.push_back ("Mixer: " + std::to_string (song.mixer.size()) + " tracks (names, colours, routes, sends, levels, EQ)");
+    }
+
+    // FL's plugins name a side input by its place k in the insert's inputs list (itself, then the inserts routing into
+    // it by number; REA_rodada22 §1). An effect exported as its imported FL state still holds the k it was imported
+    // with; when LYNX's side-chain source now sits at another place (an insert moved, round 177a, or a new source), k is
+    // rewritten. A k that still names LYNX's source, or an effect without a LYNX source, keeps its bytes.
+    void fixSideInputs()
+    {
+        std::map<int, std::vector<int>> inputs;
+        for (const auto& m : out.mixer)
+            for (const auto target : m.routes)
+                if (target > 0 && target != m.index)
+                    inputs[target].push_back (m.index);
+        auto sourceAt = [&inputs] (int track, int k) {
+            auto list = inputs[track];
+            std::sort (list.begin(), list.end());
+            list.erase (std::unique (list.begin(), list.end()), list.end());
+            list.insert (list.begin(), track);
+            return std::pair { list, k > 0 && k < (int) list.size() ? list[(std::size_t) k] : -1 };
+        };
+        auto rd = [] (const std::vector<std::uint8_t>& d, std::size_t at) {
+            std::int32_t v = 0;
+            if (at + 4 <= d.size())
+                std::memcpy (&v, d.data() + at, 4);
+            return (int) v;
+        };
+        auto fix = [&] (std::vector<std::uint8_t>& d, std::size_t at, int track, int source) {
+            if (source <= 0 || at + 4 > d.size())
+                return;
+            const auto [list, now] = sourceAt (track, rd (d, at));
+            if (now == source)
+                return;
+            const auto it = std::find (list.begin(), list.end(), source);
+            if (it == list.end())
+                return;
+            const auto k = (std::int32_t) (it - list.begin());
+            std::memcpy (d.data() + at, &k, 4);
+        };
+        for (auto& m : out.mixer)
+        {
+            const auto t = m.index;
+            if (t <= 0 || t >= (int) song.mixer.size())
+                continue;
+            const auto& effects = song.mixer[(std::size_t) t].effects;
+            for (int s = 0; s < (int) effects.size(); ++s)
+            {
+                const auto found = slotMap.find ({ t, s });
+                if (found == slotMap.end())
+                    continue;
+                const auto& fx = effects[(std::size_t) s];
+                if (! originMatches (fx))
+                    continue;
+                auto slot = std::find_if (m.slots.begin(), m.slots.end(), [row = found->second] (const flp::MixerInsert::Slot& x) { return x.index == row; });
+                if (slot == m.slots.end() || slot->plugin != fx.flOrigin.plugin)
+                    continue;
+                auto& d = slot->state;
+                if (slot->plugin == "Fruity Limiter" && rd (d, 0) >= 6)
+                    fix (d, 0xA4, t, fx.sidechain);
+                else if (slot->plugin == "Fruity Compressor" && rd (d, 0) == 3)
+                    fix (d, 0x20, t, fx.sidechain);
+                else if (slot->plugin == "LuxeVerb")
+                    fix (d, 4, t, fx.sidechain);
+                else if (slot->plugin == "Transmitter")
+                    fix (d, 12 + 4 * (std::size_t) transmitter::count, t, fx.sidechain);
+                else if (slot->plugin == "Transporter" && d.size() >= 4)
+                    fix (d, 4 + 4 * (std::size_t) (rd (d, 0) >= 8 ? 22 : 20) + 2 + 12, t, fx.sidechain);
+                else if (slot->plugin == "Vocodex")
+                    if (const auto v = vocodex::parseState (d))
+                    {
+                        if (! v->lrEncoding)
+                            fix (d, v->paramsAt + 80 + 20, t, fx.sidechain);
+                        if (v->carIn >= 0)
+                            fix (d, v->paramsAt + 80 + 24, t, fx.sidechain2);
+                    }
+            }
+        }
     }
 
     void run()
@@ -1497,6 +1652,14 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
+    if (const auto n = autolanes::lanesToClips (song); n > 0)
+        report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
+    // modulators (round 177b): FL has none; the modulated controls keep their own values
+    for (const auto& m : song.modulators)
+        if (! m.routes.empty())
+            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
+                                      + " target(s)): FL has no modulators; the targets keep their own values");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);

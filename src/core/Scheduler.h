@@ -4,6 +4,7 @@
 // an audio block. Runs on the audio thread: no allocation, no locks.
 
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <vector>
 
@@ -41,7 +42,9 @@ struct NoteEvent
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
     // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);
     // bit 2: the audio clip itself is reversed (FL 2026's clip reverse, round 167k)
+    // bits 3 / 4: the fade-in / fade-out is an equal-power comp crossfade (Clip::fadeCurve, round 177c)
     std::uint8_t fadeShape = 0;
+    float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade tensions (clipops::fadeTensionCurve)
     // audio clips: FL 2026's clip pitch in semitones (keys 7/8): a pitch shift that keeps the length (round 167k)
     float clipPitch = 0.0f;
     // audio clips: FL 2026's clip stretch (the audio plays that many times longer; round 167l)
@@ -109,6 +112,19 @@ public:
         clock = 0.0;
     }
     void process (EventBuffer& events, int numSamples, double tps) noexcept;
+    // The sounding notes of (channel, key) end `offsetTicks` into the next process() block at the latest. False when
+    // none sounds. (A launched clip cut off, core/ClipLauncher.h.)
+    bool shorten (int channel, int key, double offsetTicks) noexcept
+    {
+        auto found = false;
+        for (int k = 0; k < count; ++k)
+            if (auto& entry = entries[(std::size_t) k]; entry.channel == channel && entry.key == key)
+            {
+                entry.end = std::min (entry.end, clock + offsetTicks);
+                found = true;
+            }
+        return found;
+    }
     // channels inserted, removed or moved: from[c] = the old index of channel c (−1 = a new channel)
     void moveChannels (const std::vector<int>& from) noexcept;
     int sounding() const noexcept { return count; }
@@ -141,7 +157,9 @@ void schedulePatternLoop (const Pattern& pattern,
                           float swing = 0.0f,
                           const std::vector<ChannelDef>* channels = nullptr,
                           bool chase = false,
-                          double linearOrigin = -1.0) noexcept;
+                          double linearOrigin = -1.0,
+                          std::uint32_t chanceSeed = 0) noexcept;
+// `chanceSeed` (round 187c): Song::chanceSeed, for the notes with Chance or a Velocity Range (core/NoteChance.h).
 // `linearOrigin` >= 0 (round 170e5, Loop record off in Pattern mode): the pattern plays once from that transport tick,
 // every note (also those past `patternLength`) and no repeat; before it nothing plays.
 // `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on
@@ -199,6 +217,15 @@ void scheduleSong (const Song& song,
                    const ScheduleIndex* index = nullptr,
                    bool wrap = true,
                    bool chase = false) noexcept;
+// The Playlist while clips of the grid hold tracks (Clip-launch workflow, core/ClipLauncher.h). As scheduleSong, except: on a
+// `taken` track nothing starts (the ends of what was sounding still come), and on a `givenBack` track what is in
+// progress at startTick starts there, in the middle.
+constexpr int scheduleMaskTracks = 500;
+using TrackMask = std::bitset<scheduleMaskTracks>;
+void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMask& givenBack, double startTick, int numSamples,
+                         double ticksPerSampleValue, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap,
+                         bool chase) noexcept;
+
 // One clip played once where it is (no song loop), its events in the block (not sorted): Performance mode's passes.
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
                          EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;

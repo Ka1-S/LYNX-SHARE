@@ -58,10 +58,15 @@ std::vector<Action> makeActions()
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
         { "view.typingPiano", TR_NOOP ("Typing keyboard to piano on/off"), Context::global, { chord ('T', ctrl) } },
+        // FL's Options › Switches › "Multilink to controllers" (OptionsToggleMultiLinkAction, Ctrl+J; round 177b-4)
+        { "options.multilink", TR_NOOP ("Multilink to controllers on/off"), Context::global, { chord ('J', ctrl) } },
         { "view.toolbar", TR_NOOP ("Show or hide the toolbar panels"), Context::global, { chord (f11, ctrl) } },
         { "view.audioEditor", TR_NOOP ("Open the audio editor"), Context::global, {} },
         { "view.tempoTapper", TR_NOOP ("Tempo tapper (tap the tempo)"), Context::global, { chord (f5, ctrl) } },
         { "view.sampleBrowser", TR_NOOP ("Sample browser (separate window)"), Context::global, {} },
+        // round 177d (an FL wishlist item): solo the selected channel from any window, no key by default (bind one in
+        // the shortcut editor); again = every channel plays (FL's channel solo)
+        { "channel.soloSelected", TR_NOOP ("Solo the selected channel (from any window)"), Context::global, {} },
 
         // workspace panels
         { "panel.playlist", TR_NOOP ("Show, focus or hide the Playlist"), Context::global, { chord (f5) } },
@@ -80,6 +85,12 @@ std::vector<Action> makeActions()
         { "view.midiSettings", TR_NOOP ("MIDI settings (press again to close)"), Context::global, { chord (f10) } },
         { "view.projectInfo", TR_NOOP ("Project info (press again to close)"), Context::global, { chord (f11) } },
         { "view.closeWindows", TR_NOOP ("Close all windows (plugins, channel settings, tools)"), Context::global, { chord (f12) } },
+        // Round 183a: the Clip-launch workflow's detail view, with the reference DAW's keys (its View menu, Live 12.4
+        // [SHOT] detail183a/live/d05). They do nothing in Pattern workflow, where the keys keep their old meaning.
+        { "view.detailToggle", TR_NOOP ("Clip-launch workflow: show or hide the detail view"), Context::global, { chord ('L', ctrl | alt) } },
+        { "view.detailClip", TR_NOOP ("Clip-launch workflow: clip view"), Context::global, { chord ('3', ctrl | alt) } },
+        { "view.detailDevices", TR_NOOP ("Clip-launch workflow: device view"), Context::global, { chord ('4', ctrl | alt) } },
+        { "view.detailSwitch", TR_NOOP ("Clip-launch workflow: switch between clip view and device view"), Context::global, { chord (tab, shift) } },
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
         // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
         { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
@@ -202,6 +213,7 @@ std::vector<Action> makeActions()
         { "pianoRoll.gridHighlights", TR_NOOP ("Note grid highlights on/off"), Context::pianoRoll, { chord ('B', alt) } },
         { "pianoRoll.backgroundWave", TR_NOOP ("Background waveform on/off"), Context::pianoRoll, { chord ('N', alt) } },
         { "pianoRoll.showChordName", TR_NOOP ("Show chord name for selection on/off"), Context::pianoRoll, {} },
+        { "pianoRoll.songBarsRuler", TR_NOOP ("Piano roll ruler: song bars on/off"), Context::pianoRoll, {} },
         { "pianoRoll.selectRandomOne", TR_NOOP ("Select one at random"), Context::pianoRoll, { chord ('R', shift) }, true },
         { "pianoRoll.selectRandomMore", TR_NOOP ("Select more at random"), Context::pianoRoll, { chord ('M', shift) }, true },
         { "pianoRoll.selectOddSteps", TR_NOOP ("Select odd (swung) notes"), Context::pianoRoll, { chord ('O', shift) }, true },
@@ -255,9 +267,12 @@ std::vector<Action> makeActions()
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
+        { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
+        // comping (round 177c, Live's select + Enter; no key yet: Enter is FL's "Maximize or restore the Playlist")
+        { "playlist.swipeSelectionToComp", TR_NOOP ("Send the time selection of the take lane to its comp"), Context::playlist, {} },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
         { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
@@ -290,6 +305,9 @@ std::vector<Action> makeActions()
         // round 168f: FL's Playlist keys and menu items ([DFM ShortcutsModule] EEMergeAction Ctrl+G, EEClonePLTracksAction
         // Ctrl+Shift+B, EEMakeUniqueAction Ctrl+Shift+V; the STRETCH button's hint "Shift+M")
         { "playlist.mergePatternClips", TR_NOOP ("Merge pattern clips"), Context::playlist, { chord ('G', ctrl) } },
+        // round 180c: [DFM ShortcutsModule] EEMergeSimAction Ctrl+Shift+G, EEMergeAutoClipsAction Ctrl+Alt+G
+        { "playlist.mergeSimilarClips", TR_NOOP ("Merge similar pattern clips"), Context::playlist, { chord ('G', ctrl | shift) } },
+        { "playlist.mergeAutomationClips", TR_NOOP ("Merge automation clips"), Context::playlist, { chord ('G', ctrl | alt) } },
         { "playlist.cloneTracks", TR_NOOP ("Clone selected playlist track(s)"), Context::playlist, { chord ('B', ctrl | shift) } },
         { "playlist.makeUnique", TR_NOOP ("Make the selected clips unique"), Context::playlist, { chord ('V', ctrl | shift) } },
         // FL's Alt+M / Shift+Alt+M (EEMuteAction / EEUnmuteAction, issue #53): the selected clips, or all of them
@@ -322,11 +340,16 @@ std::vector<Action> makeActions()
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
         { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
+        { "mixer.audioEditorRecord", TR_NOOP ("Open the audio editor and record"), Context::mixer, { chord ('E', shift) } },
         { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },
         { "mixer.altSoloSelected", TR_NOOP ("Alt solo the selected mixer track(s) (with the tracks that feed them)"), Context::mixer, { chord ('S', alt) } },
         { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },
         { "mixer.renderSelected", TR_NOOP ("Disk recording: render the selected tracks to wave file(s)"), Context::mixer, { chord ('R', shift | alt) } },
-        { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, { chord (del) } },
+        // FL 2026 (round 186c, checked by hand): Del deletes the selected mixer tracks (with FL's question); it never removes
+        // an effect, except with the slot's menu open (issue #11, handled by that menu). The effect action stays, unbound.
+        { "mixer.deleteTracks", TR_NOOP ("Delete the selected mixer tracks"), Context::mixer, { chord (del) } },
+        { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, {} },
     };
 
     // numeric keypad 1-9: select patterns 1-9

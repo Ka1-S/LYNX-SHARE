@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <numeric>
 
 #if defined(__clang__)
@@ -234,7 +235,9 @@ double correlation (const float* a, const float* b, long n)
 // Puts each detected attack of the input back, unstretched, over the spectral stretcher's output: the original from a
 // few ms before the attack to `hold` after it replaces the stretched signal (which smears attacks over its analysis
 // block), with short crossfades placed where both signals correlate best.
-void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRate, double minRiseDb, double holdSeconds)
+// `toOut`: where an input frame lands in the output (one ratio, or a warp map)
+void spliceAttacks (Planar& out, const Planar& in, const std::function<double (double)>& toOut, double sampleRate, double minRiseDb,
+                    double holdSeconds)
 {
     const auto mono = monoOf (in);
     const auto attacks = stretchdetail::detectAttacks (mono.data(), (long) mono.size(), sampleRate, minRiseDb);
@@ -257,11 +260,11 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
     for (std::size_t a = 0; a < attacks.size(); ++a)
     {
         const auto o = attacks[a];
-        const auto p = (long) std::llround ((double) o * ratio);
+        const auto p = (long) std::llround (toOut ((double) o));
         const auto shift = p - o; // output index = input index + shift inside the spliced region
 
         // room before the next attack (in output frames) and before the previous splice
-        const auto nextOut = a + 1 < attacks.size() ? (long) std::llround ((double) attacks[a + 1] * ratio) : m;
+        const auto nextOut = a + 1 < attacks.size() ? (long) std::llround (toOut ((double) attacks[a + 1])) : m;
         const auto room = nextOut - p - pre - fadeIn - fadeOut;
         if (room < fadeOut)
             continue;
@@ -307,10 +310,120 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
         }
     }
 }
+
+// LYNX's Beats warp mode (round 175a, N4), modelled on Ableton Live's Beats mode by measurement (Live 12.4 renders of a
+// test voice at 0.8×, 1.25× speed; /mnt/e/lynx-work/ableton175a/n4): the audio is cut at its attacks and each piece
+// keeps its own speed (no stretching at all inside a piece). Slower: when a piece has played to its end before the
+// next one starts, it plays on backwards from its end, then forwards again ("back and forth"), until the next piece.
+// Faster: the piece is cut where the next one begins. The pieces meet in 16 ms linear crossfades (the length that
+// matched Live's spectrum best: 0.2–0.3 dB mean deviation; 1–4 ms left clicks Live does not have).
+// Transposed (`semitones` ≠ 0: Live's clip transpose in Beats mode), each piece is resampled — read 2^(st/12) times
+// faster from its start, so it is shorter and higher — and still starts at its own place on the grid; the gap up to the
+// next piece is filled back and forth as when slower. Rendered offline per clip pitch (round 175a, the coordinator's
+// "match Live by resampling each piece").
+// With a warp map (`toOut`, round 175a M1) each piece starts where the map puts its attack.
+Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const std::function<double (double)>& toOut)
+{
+    const auto n = in.frames();
+    const auto mono = monoOf (in);
+    auto cuts = stretchdetail::beatsCuts (mono.data(), n, sampleRate);
+    cuts.insert (cuts.begin(), 0L);
+    cuts.push_back (n);
+    const auto fade = std::max (16L, (long) std::lround (sampleRate * 0.016));
+    const auto speed = semitones == 0.0 ? 1.0 : std::pow (2.0, semitones / 12.0);
+    const auto weight = [&] (std::size_t k, long i, long own) {
+        float w = 1.0f;
+        if (k > 0 && i < fade)
+            w = (float) i / (float) fade;
+        if (i >= own)
+            w *= 1.0f - (float) (i - own) / (float) fade;
+        return w;
+    };
+    // 4-point Hermite inside the piece [a, a + length): sample `at` + `f` of it, its edges held
+    const auto cubicAt = [] (const std::vector<float>& x, long a, long length, long at, float f) {
+        const auto get = [&] (long j) { return x[(std::size_t) (a + std::clamp (j, 0L, length - 1))]; };
+        const auto y0 = get (at - 1), y1 = get (at), y2 = get (at + 1), y3 = get (at + 2);
+        const auto c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3, c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
+        return ((c3 * f + c2) * f + c1) * f + y1;
+    };
+
+    Planar out;
+    out.ch.assign (in.ch.size(), std::vector<float> ((std::size_t) outFrames, 0.0f));
+    for (std::size_t k = 0; k + 1 < cuts.size(); ++k)
+    {
+        const auto a = cuts[k], length = cuts[k + 1] - a;
+        const auto o0 = std::clamp ((long) std::llround (toOut ((double) a)), 0L, outFrames);
+        const auto o1 = k + 2 == cuts.size() ? outFrames : std::clamp ((long) std::llround (toOut ((double) cuts[k + 1])), o0, outFrames);
+        const auto last = k + 2 == cuts.size();
+        const auto span = std::min (outFrames - o0, (o1 - o0) + (last ? 0L : fade));
+        if (length <= 0 || span <= 0)
+            continue;
+        if (speed == 1.0)
+        {
+            const auto period = 2 * length;
+            for (long i = 0; i < span; ++i)
+            {
+                const auto m = i % period;
+                const auto src = a + (m < length ? m : period - 1 - m);
+                const auto w = weight (k, i, o1 - o0);
+                for (std::size_t c = 0; c < in.ch.size(); ++c)
+                    out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
+            }
+            continue;
+        }
+        // the piece resampled: `played` output frames read it from a to its end, `speed` source frames per output frame
+        const auto played = std::max (1L, (long) std::floor ((double) (length - 1) / speed) + 1);
+        const auto period = 2 * played;
+        for (long i = 0; i < span; ++i)
+        {
+            const auto m = i % period;
+            const auto t = (double) (m < played ? m : period - 1 - m) * speed;
+            const auto w = weight (k, i, o1 - o0);
+            const auto at = (long) t;
+            const auto f = (float) (t - (double) at);
+            for (std::size_t c = 0; c < in.ch.size(); ++c)
+                out.ch[c][(std::size_t) (o0 + i)] += w * cubicAt (in.ch[c], a, length, at, f);
+        }
+    }
+    return out;
+}
 } // namespace
 
 namespace stretchdetail
 {
+std::vector<long> beatsCuts (const float* mono, long n, double sampleRate)
+{
+    auto cuts = detectAttacks (mono, n, sampleRate, 6.0);
+    // each cut moves to where the attack rises fastest: the start of the 10 ms window before the steepest 10 ms rise of
+    // the RMS level, within −30…+50 ms (Live cuts a tone at its very start and a swell at its steepest point; LYNX's
+    // attack detector marks the half-peak point, 16 ms late on a tone and 37 ms early on a swell) [measured]
+    {
+        std::vector<double> sum ((std::size_t) n + 1, 0.0);
+        for (long i = 0; i < n; ++i)
+            sum[(std::size_t) i + 1] = sum[(std::size_t) i] + (double) mono[i] * mono[i];
+        const auto w = std::max (8L, (long) std::lround (sampleRate * 0.010));
+        const auto hop = std::max (1L, (long) std::lround (sampleRate * 0.0005));
+        const auto rms = [&] (long at) { return std::sqrt ((sum[(std::size_t) (at + w)] - sum[(std::size_t) at]) / (double) w); };
+        for (auto& c : cuts)
+        {
+            const auto from = std::max (0L, c - (long) (sampleRate * 0.030));
+            const auto to = std::min (n - 2 * w, c + (long) (sampleRate * 0.050));
+            double steepest = -1.0;
+            for (long k = from; k < to; k += hop)
+                if (const auto rise = rms (k + w) - rms (k); rise > steepest)
+                {
+                    steepest = rise;
+                    c = k;
+                }
+        }
+        std::sort (cuts.begin(), cuts.end());
+        const auto minGap = (long) (sampleRate * 0.010);
+        cuts.erase (std::unique (cuts.begin(), cuts.end(), [minGap] (long a, long b) { return b - a < minGap; }), cuts.end());
+    }
+    cuts.erase (std::remove_if (cuts.begin(), cuts.end(), [n] (long c) { return c <= 0 || c >= n; }), cuts.end());
+    return cuts;
+}
+
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb)
 {
     // An attack = the (high-passed) RMS envelope rising by at least `minRiseDb` within ~3 ms over its level just before, above an
@@ -408,6 +521,15 @@ Preset presetFor (StretchMethod method) noexcept
     {
         case StretchMethod::transients: return { 0.06, 0.01, 6.0, 0.030 };
         case StretchMethod::mono: return { 0.06, 0.01, 9.0, 0.020 };
+        // LYNX's warp modes (round 175a, N4), fitted to Live 12's Tones / Texture / Complex renders of a voice at
+        // 0.8× and 1.25× (envelope correlation / mean spectral deviation): no attack splicing (it doubled Live's
+        // spectral deviation), tones 40 ms blocks (0.977 / 1.06 dB), texture 60 ms (0.985 / 0.98 dB), complex 90 ms
+        // (0.994 / 0.88 dB; full mixes and chords want long blocks, REA_rodada160 §2). Beats has its own engine
+        // (beatsStretch); its preset only picks the voice pitch shifter's block.
+        case StretchMethod::beats: return { 0.06, 0.01, 6.0, 0.030 };
+        case StretchMethod::tones: return { 0.04, 0.04 / 6.0, 0.0, 0.0 };
+        case StretchMethod::texture: return { 0.06, 0.01, 0.0, 0.0 };
+        case StretchMethod::complex: return { 0.09, 0.015, 0.0, 0.0 };
         case StretchMethod::general: break;
     }
     return { 0.12, 0.02, 9.0, 0.020 };
@@ -420,7 +542,10 @@ std::shared_ptr<SampleData> stretchWith (const SampleData& in, double ratio, con
     const auto outFrames = std::max (1L, (long) std::llround ((double) frames * ratio));
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
-        spliceAttacks (out, planar, (double) outFrames / (double) frames, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    {
+        const auto ratio = (double) outFrames / (double) frames;
+        spliceAttacks (out, planar, [ratio] (double x) { return x * ratio; }, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    }
     return sampleOf (std::move (out), in);
 }
 } // namespace stretchdetail
@@ -438,7 +563,7 @@ void VoicePitchShifter::allocate (double sampleRate, StretchMethod method)
     impl = std::make_unique<Impl>();
     // real time (measured round 162): 100 ms blocks, overlap 4 — pitch exact to 0.05 cent down to 55 Hz, about 2 % of a
     // core per voice and ~1 ms to prime a note (60 ms blocks missed low notes by 40 cents); drums: 80 ms
-    const auto block = method == StretchMethod::transients ? 0.08 : 0.1;
+    const auto block = method == StretchMethod::transients || method == StretchMethod::beats ? 0.08 : 0.1;
     impl->stretch.configure (2, (int) std::lround (sampleRate * block), (int) std::lround (sampleRate * block / 4.0));
     // one silent run sizes every internal buffer, so the audio thread's first note does not allocate
     std::vector<float> silence ((std::size_t) std::max (maxPrimeLength(), 1024), 0.0f), out (256, 0.0f);
@@ -490,9 +615,50 @@ StretchMethod stretchMethodForFlMode (int flMode) noexcept
     }
 }
 
-std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method)
+std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method, double semitones)
+{
+    auto out = timeStretch (span, ratio, method, semitones);
+    if (out == nullptr)
+        return out;
+    // FL ends a cut span at zero: after a trimmed, stretched span its clip is silent to the clip's end (FL render p62, round
+    // 180d), where the stretcher's last frame is not zero and the clip would hold it as DC. A raised-cosine over 1 ms, as
+    // FL's region declick (FUN_006a0760).
+    const auto fade = std::min<long> ((long) out->frames(), (long) std::llround (out->sampleRate * 0.001));
+    for (long i = 0; i < fade; ++i)
+    {
+        const auto g = (float) (0.5 - 0.5 * std::cos (3.141592653589793 * (double) i / (double) std::max (1L, fade)));
+        const auto at = (std::size_t) ((long) out->frames() - 1 - i);
+        out->left[at] *= g;
+        if (! out->right.empty())
+            out->right[at] *= g;
+    }
+    out->cropped = span.cropped;
+    out->cropFrom = span.cropFrom;
+    out->cropTo = span.cropTo;
+    out->acidBeats = span.acidBeats;
+    if (span.loopStart >= 0 && span.loopEnd > span.loopStart)
+    {
+        const auto scale = (double) out->frames() / (double) std::max<std::size_t> (1, span.frames());
+        out->loopStart = (std::int64_t) std::llround ((double) span.loopStart * scale);
+        out->loopEnd = std::max<std::int64_t> (out->loopStart + 1, (std::int64_t) std::llround ((double) span.loopEnd * scale));
+    }
+    return out;
+}
+
+std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones)
 {
     const auto frames = (long) in.frames();
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+
+    if (frames >= 4 && ratio > 0.0 && semitones != 0.0)
+    {
+        const auto outFrames = std::max (1L, (long) std::llround ((double) frames * std::clamp (ratio, 0.05, 20.0)));
+    {
+        const auto r = (double) outFrames / (double) frames;
+        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; }), in);
+    }
+    }
 
     if (frames < 4 || ! (ratio > 0.0) || std::abs (ratio - 1.0) < 1e-9)
     {
@@ -511,10 +677,160 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
     if (std::abs (ratio - 1.0) <= stretchdetail::resampleTolerance)
         return sampleOf (resampleTo (planar, outFrames), in);
 
+    const auto r = (double) outFrames / (double) frames;
+    const auto linear = [r] (double x) { return x * r; };
+    if (method == StretchMethod::beats)
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, 0.0, linear), in);
+
     const auto preset = stretchdetail::presetFor (method);
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
-        spliceAttacks (out, planar, (double) outFrames / (double) frames, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+        spliceAttacks (out, planar, linear, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    return sampleOf (std::move (out), in);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Warp maps (round 175a, warp markers M1)
+
+double stretchMapOutput (const StretchMap& map, double x) noexcept
+{
+    if (map.size() < 2)
+        return x;
+    std::size_t i = 1;
+    while (i + 1 < map.size() && x > map[i].first)
+        ++i;
+    const auto& a = map[i - 1];
+    const auto& b = map[i];
+    return a.second + (x - a.first) * (b.second - a.second) / std::max (1e-12, b.first - a.first);
+}
+
+double stretchMapSource (const StretchMap& map, double y) noexcept
+{
+    if (map.size() < 2)
+        return y;
+    std::size_t i = 1;
+    while (i + 1 < map.size() && y > map[i].second)
+        ++i;
+    const auto& a = map[i - 1];
+    const auto& b = map[i];
+    return a.first + (y - a.second) * (b.first - a.first) / std::max (1e-12, b.second - a.second);
+}
+
+StretchMap warpStretchMap (const std::vector<WarpPoint>& warp, double frames, double sampleRate, double outFrames)
+{
+    if (warp.size() < 2 || ! (frames > 0.0) || ! (sampleRate > 0.0) || ! (outFrames > 0.0))
+        return {};
+    // the markers, sorted, both coordinates strictly increasing
+    std::vector<WarpPoint> w (warp);
+    std::sort (w.begin(), w.end(), [] (const WarpPoint& a, const WarpPoint& b) { return a.seconds < b.seconds; });
+    std::vector<WarpPoint> m;
+    for (const auto& p : w)
+        if (m.empty() || (p.seconds > m.back().seconds + 1e-9 && p.beats > m.back().beats + 1e-9))
+            m.push_back (p);
+    if (m.size() < 2)
+        return {};
+    StretchMap beats; // sample seconds → beats
+    for (const auto& p : m)
+        beats.push_back ({ p.seconds, p.beats });
+    const auto end = frames / sampleRate;
+    const auto b0 = stretchMapOutput (beats, 0.0), b1 = stretchMapOutput (beats, end);
+    if (! (b1 > b0))
+        return {};
+    const auto scale = outFrames / (b1 - b0);
+    StretchMap map { { 0.0, 0.0 } };
+    for (const auto& p : m)
+        if (p.seconds > 0.0 && p.seconds < end)
+        {
+            const auto x = p.seconds * sampleRate, y = (p.beats - b0) * scale;
+            if (x > map.back().first + 0.5 && y > map.back().second + 0.5)
+                map.push_back ({ x, y });
+        }
+    if (map.size() > 1 && (! (outFrames > map.back().second + 0.5) || ! (frames > map.back().first + 0.5)))
+        map.pop_back();
+    map.push_back ({ frames, outFrames });
+    // one tempo: no map (the plain stretch, and the same cached file as before)
+    const auto overall = outFrames / frames;
+    bool bends = false;
+    for (std::size_t i = 1; i < map.size(); ++i)
+    {
+        const auto r = (map[i].second - map[i - 1].second) / (map[i].first - map[i - 1].first);
+        bends = bends || std::abs (r / overall - 1.0) > 1e-4;
+    }
+    return bends && map.size() >= 3 ? map : StretchMap {};
+}
+
+namespace
+{
+// Signalsmith Stretch along a warp map, in one pass (no seams): the stretcher's playback rate follows the map, 256
+// output frames at a time. As exact() does for one ratio, the input runs its analysis latency ahead and the output is
+// pre-rolled by outputSeek; past the end the input is silence, and the output is cut to the map's length.
+Planar spectralStretchMapped (const Planar& in, const StretchMap& map, double sampleRate, double blockSeconds, double intervalSeconds)
+{
+    const auto channels = (int) in.ch.size();
+    const auto outFrames = (long) std::llround (map.back().second);
+    signalsmith::stretch::SignalsmithStretch<float> stretch { 1651L };
+    stretch.configure (channels, (int) std::lround (sampleRate * blockSeconds), (int) std::lround (sampleRate * intervalSeconds));
+    const auto inLatency = (double) stretch.inputLatency(), outLatency = (double) stretch.outputLatency();
+    const auto inputFor = [&] (double outputFrame) { return (long) std::llround (stretchMapSource (map, outputFrame) + inLatency); };
+
+    Planar src = in;
+    const auto need = std::max (in.frames(), inputFor ((double) outFrames + outLatency) + 16);
+    for (auto& c : src.ch)
+        c.resize ((std::size_t) need, 0.0f);
+    std::vector<const float*> inputs ((std::size_t) channels);
+    const auto at = [&] (long frame) {
+        for (int c = 0; c < channels; ++c)
+            inputs[(std::size_t) c] = src.ch[(std::size_t) c].data() + frame;
+        return inputs.data();
+    };
+
+    Planar out;
+    out.ch.assign ((std::size_t) channels, std::vector<float> ((std::size_t) outFrames, 0.0f));
+    std::vector<float*> outputs ((std::size_t) channels);
+
+    auto inPos = std::max (0L, inputFor (outLatency));
+    stretch.outputSeek (at (0), (int) inPos);
+    constexpr long chunk = 256;
+    for (long o = 0; o < outFrames; o += chunk)
+    {
+        const auto length = std::min (chunk, outFrames - o);
+        const auto inEnd = std::clamp (inputFor ((double) (o + length) + outLatency), inPos, need);
+        for (int c = 0; c < channels; ++c)
+            outputs[(std::size_t) c] = out.ch[(std::size_t) c].data() + o;
+        stretch.process (at (inPos), (int) (inEnd - inPos), outputs.data(), (int) length);
+        inPos = inEnd;
+    }
+    return out;
+}
+} // namespace
+
+std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const StretchMap& map, StretchMethod method, double semitones)
+{
+    const auto frames = (long) in.frames();
+    const auto plain = [&] {
+        const auto ratio = frames > 0 && ! map.empty() ? map.back().second / (double) frames : 1.0;
+        return timeStretch (in, ratio, method, semitones);
+    };
+    if (map.size() < 3 || frames < 4 || std::abs (map.back().first - (double) frames) > 0.5 || map.front() != std::pair<double, double> { 0.0, 0.0 })
+        return plain();
+    for (std::size_t i = 1; i < map.size(); ++i)
+    {
+        const auto dx = map[i].first - map[i - 1].first, dy = map[i].second - map[i - 1].second;
+        if (! (dx > 0.0) || ! (dy > 0.0) || dy / dx < 0.05 || dy / dx > 20.0)
+            return plain();
+    }
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+    const auto outFrames = std::max (1L, (long) std::llround (map.back().second));
+    const auto planar = planarOf (in);
+    const auto toOut = [&map] (double x) { return stretchMapOutput (map, x); };
+    if (method == StretchMethod::beats)
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), toOut), in);
+
+    const auto preset = stretchdetail::presetFor (method);
+    auto out = spectralStretchMapped (planar, map, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
+    if (preset.attackRiseDb > 0.0)
+        spliceAttacks (out, planar, toOut, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
     return sampleOf (std::move (out), in);
 }
 } // namespace lynx

@@ -18,6 +18,7 @@
 namespace lynx
 {
 class PatternBlocksView;
+class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
@@ -62,6 +63,7 @@ public:
     int knownCurrentPattern = -1;
 
     explicit PlaylistComponent (AudioEngine& engine);
+    juce::String cacheSelfTest (const std::function<void()>& waitForWaveforms, const juce::File& dumpFolder = {}); // --cachetest (round 174f)
     ~PlaylistComponent() override;
     void visibilityChanged() override;
 
@@ -73,11 +75,20 @@ public:
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
     static inline int editPatternsIn = 0;
+    std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
     void paint (juce::Graphics& g) override;
     void paintOverChildren (juce::Graphics& g) override;
     void resized() override;
     void setTitleBarInsets (int left, int right) override;
+    void setToolbarFitsNarrow (bool on)
+    {
+        if (on != toolbarFitsNarrow)
+        {
+            toolbarFitsNarrow = on;
+            resized();
+        }
+    }
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
@@ -122,17 +133,23 @@ public:
 
     // For snapshots: the tool in use and a time selection over [fromBar, toBar).
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    EditTool currentTool() const noexcept { return tools.getTool(); }
     void setTimeSelectionForSnapshot (int fromBar, int toBar);
     // the selected clips (indices into the Playlist), for Tools › Consolidate playlist selection (round 168e)
     const std::vector<int>& getSelectedClips() const noexcept { return selection; }
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
+    void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
+    void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
 
-    static constexpr int headerWidth = 96;
+    // The track headers' width: FL's 96 px, or the Simple workflow's wider headers (round 184a). setSimpleHeaders sets
+    // it; everything else only reads it.
+    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232;
+    int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 24;
@@ -145,6 +162,15 @@ public:
 
     static juce::Colour patternColour (const Song& song, int pattern);
 
+    // The Simple workflow's track headers (round 184a, slice S4; core/SimpleTracks.h): wider headers whose controls act
+    // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
+    // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
+    void setSimpleHeaders (bool on);
+    bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
+    std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
+    // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
+    std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
+
     // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
     // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
     void setBlocksHeight (int height);
@@ -153,24 +179,47 @@ public:
     void turnBlocksIntoClips();       // FL's "Turn pattern instances into clips"
     void scrollTicksBy (double ticks); // (the blocks section's drag past its edges)
     PatternBlocksView* getBlocksViewForSnapshot() { return blocksView.get(); }
+    // Video tracks (round 174d, ui/VideoTracks.h): the section between the ruler and the clip tracks while the project
+    // has video tracks. `height` = the section's height (the divider drag; 0 = fit the lanes), clamped to the window.
+    void setVideoHeight (int height);
+    int videoSectionHeight() const;
+    int tracksTop() const { return headerHeight + videoSectionHeight(); } // the clip tracks' top edge
+    VideoLanesView* getVideoLanesForSnapshot() { return videoLanes.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
     // to show all of it (FL opens a project with the arrangement in view). Waits for a size if not laid out.
     void showSongAfterOpen();
 
+    // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
+    // click on its header does, without the menus, and scrolls it into view (round 184a, S4: a new Simple track; S16:
+    // the game controller's D-pad).
+    int getCurrentTrack() const noexcept { return currentTrack; }
+    void selectTrack (int track);
+
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
+                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+    void swipeTimeSelectionToComp (int lane);
+    // a swipe on a take lane (round 177c): the lane and the range so far
+    int swipeLane = -1;
+    std::int64_t swipeAnchor = 0, swipeEnd = 0;
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
     std::int64_t perfClip = -1;
     std::array<std::int64_t, 64> perfShown {}; // the zone's playing / pending state last painted, to repaint on change
     void paintPerformance (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLiveRecording (juce::Graphics& g); // round 177d
+    juce::Rectangle<float> liveBounds (int track, double from, double to) const;
+    juce::Rectangle<int> liveArea;
+    double liveRepaintMs = 0.0;
+    std::vector<float> liveColumns;
     void togglePerformanceMode();
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
     void mergePatternClipsByKey();               // Ctrl+G
+    void mergeSimilarClipsByKey();               // Ctrl+Shift+G
+    void mergeAutomationClipsByKey();            // Ctrl+Alt+G (Ctrl+G on a selection of automation clips too)
     void makeSelectionUnique();                  // Ctrl+Shift+V
     void cloneTracksWithDialog (std::vector<int> tracks); // Ctrl+Shift+B, track menu "Clone..."
     void lockAllTracks (bool lock);              // Tools › Lock / Unlock all playlist tracks (to / from) content
@@ -191,6 +240,34 @@ private:
     bool playheadOverlay = false;      // the cache is on: the playhead's own repaints keep its image
     bool playheadRepaintOnly = false;  // set around the playhead's own repaints: the image stays valid
     bool cachePainting = false;        // paint() is filling the image: no playhead in it
+    bool scrollRepaintOnly = false;    // set around a scroll's repaint: the cache shifts its picture (round 174e2)
+    struct CacheView
+    {
+        double scrollTicks = -1.0;
+        int scrollY = -1;
+        double pixelsPerTick = 0.0;
+        int tracksHeight = 0, tracks = 0;
+        bool overlays = false; // the Ripple / Performance tags in the grid's corner (they do not scroll)
+        int width = 0, height = 0;
+        bool operator== (const CacheView&) const = default;
+    };
+    struct CacheShift
+    {
+        juce::Rectangle<int> area, alsoChanged;
+        int dx = 0, dy = 0;
+    };
+    CacheView cacheView() const;
+    CacheShift cacheShift (const CacheView& from, const CacheView& to, float scale) const;
+    void repaintScrolled();
+    // a continuous zoom (round 174f): its frames scale the cached picture's lanes; exact once still for zoomSettleMs
+    void repaintZoomed();
+    void settleZoom();
+    bool zoomRecent (double nowMs) const;
+    juce::Rectangle<int> rulerArea() const;
+    static constexpr int zoomSettleMs = 120;
+    bool zoomGesture = false;
+    double zoomEndMs = -1.0e9;
+    juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
@@ -245,6 +322,13 @@ private:
     void deleteTimeSelection();
     // fade handle of an audio clip under the mouse: 1 = fade-in, 2 = fade-out, 0 = none
     int fadeHandleAt (int clip, juce::Point<int> p) const;
+    // warp markers (round 175a, M3; a LYNX extra, the user's choice: Live edits them only in its Clip View): an audio
+    // clip whose channel has markers that bend the tempo shows them as small flags on its top edge, to drag sideways
+    std::vector<WarpPoint> clipWarpMarkers (int clip) const; // as played (warpedit::playedMarkers); empty: none
+    double clipFileSeconds (int clip) const;
+    int warpMarkerAt (int clip, juce::Point<int> p) const; // the marker's index, or -1
+    int warpClip = -1, warpIndex = -1;
+    double warpBeat = 0.0; // the dragged marker's beat (shown while dragging, applied on release)
     void updateScrollBars();
     bool isSelected (int index) const;
     void setSelection (std::vector<int> indices);
@@ -286,12 +370,26 @@ private:
     void showTrackMenu (int track);
     juce::PopupMenu buildTrackMenu (int track);
     void openClipSource (int clip, bool other); // double click: the clip's pattern / automation (Alt: the other editor)
-    juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header
+    juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header (Simple headers: the M button)
+    // the Simple headers' controls (round 184a): empty with FL's headers, a row too short or a track without an insert
+    bool simpleHeaders = false;
+    static constexpr int simpleTrackHeight = 56, simpleTwoRows = 44; // the default row; the height that shows the second row
+    juce::Rectangle<int> trackSolo (int track) const;
+    juce::Rectangle<int> trackVolume (int track) const;
+    juce::Rectangle<int> trackPan (int track) const;
+    juce::Rectangle<int> trackFx (int track) const;
+    int simpleInsert (int track) const; // the insert a Simple header's controls act on, -1 none
+    void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
+    int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
+    // a level drag on a Simple header: 1 volume, 2 pan (0 none)
+    int levelDrag = 0, levelInsert = -1;
+    float levelStart = 0.0f;
     juce::Rectangle<int> trackArrow (int track) const; // a group header's fold arrow (empty for other tracks)
     // An audio track's buttons (FL 2026, issue #11), acting on its linked mixer track: "Arm/disarm recording" (left of
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.
     juce::Rectangle<int> trackArm (int track) const;
     juce::Rectangle<int> trackInput (int track) const;
+    juce::Rectangle<int> trackAudition (int track) const;
     static constexpr int inputButtonMinHeight = 52; // FL shows the row of buttons from 150 % of its track height
     void editTrack (int track, std::function<void (PlaylistTrack&)> change);
     int currentTrack = -1; // the track selected by a click on its header (FL marks it next to the LED)
@@ -313,6 +411,7 @@ private:
     void pitchSelectedAudioClips (int semitones);
     void reverseSelectedAudioClips();
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
+    bool toolbarFitsNarrow = false; // (round 181a; beside the clip grid only)
 
     double pixelsPerTick = 96.0 / (4 * ppq); // 96 px per 4-beat bar
     double scrollTicks = 0.0;
@@ -370,18 +469,40 @@ private:
     juce::Point<float> automationHandlePos (int clip, int point) const; // x < 0: no handle
     int automationHandleAt (int clip, juce::Point<int> p) const;
     void showAutomationPointMenu (int clip, int point);
+    // round 177b: optional automation lanes under a track (Playlist › Automation lanes; core autolanes). A track's
+    // lanes sit below its row (heightOf stays the row: clips never draw into lanes); trackTops include them.
+    int laneHeightOf (const AutomationLane& lane) const;
+    int laneBlockHeight (int track) const;                 // 0: none shown
+    struct LaneHit { int track = -1, lane = -1; };
+    LaneHit laneAt (juce::Point<int> p) const;             // a lane row under p (header or grid)
+    juce::Rectangle<int> laneRow (int track, int lane) const; // full width, from x = 0
+    juce::Rectangle<float> laneBody (int track, int lane) const; // the curve's area in the grid
+    int laneAutomation (int track, int lane) const;        // -1: none
+    int lanePointAt (int track, int lane, juce::Point<int> p) const;
+    juce::Rectangle<int> trackLaneArrow (int track) const; // empty: the track has no lanes or lanes are off
+    juce::Rectangle<int> trackAddLane (int track) const;   // "+A": empty when lanes are off or the row is too small
+    void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
+    bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    void showLaneMenu (int track, int lane);
+    void showAddLaneMenu (int track);
+    void toggleAutomationLanes();
+    bool laneButtonHover = false;
+    int laneTrack = -1, laneIndex = -1;                    // the lane a lanePoint / laneTension drag edits
     float tensionStart = 0.0f, tensionSign = 1.0f;
     // hover: what a click would hit (drives the cursor, the highlight and the hint)
     struct Hover
     {
         int clip = -1, track = -1;
         gesture::Target target = gesture::Target::empty;
-        bool header = false, led = false, arrow = false, arm = false, input = false;
+        bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
+        bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         bool operator== (const Hover& o) const
         {
             return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
-                   && arm == o.arm && input == o.input && divider == o.divider;
+                   && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
+                   && divider == o.divider;
         }
     };
     Hover hover;
@@ -415,6 +536,10 @@ private:
     std::unique_ptr<PatternBlocksView> blocksView;
     int blocksHeight = 0; // 0 = the default (a third of the grid)
     bool blocksShown = false;
+    // Video tracks (round 174d)
+    friend class VideoLanesView;
+    std::unique_ptr<VideoLanesView> videoLanes;
+    int videoHeight = 0; // 0 = fit the lanes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };
@@ -446,6 +571,12 @@ public:
     std::function<void()> onPatternMenu; // right click on a pattern (it is the current one by then)
     std::function<void()> onNewPattern;  // the "+" under the pattern list
     static constexpr int width = 150;
+
+    // Round 177d (pain point 31a): FL's Playlist menu › Picker panel › Tools items "Select unused › Patterns" and
+    // "Sort › Patterns › By name / By color" (EEPickerSelectUnusedPatternsMenu, EEPickerSortPatternsBy*Menu; FL's Audio
+    // and Automations entries are left out: the LYNX picker selects patterns only), then LYNX's own "Delete unused
+    // patterns" and "Merge identical patterns".
+    juce::PopupMenu pickerMenu();
 
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
@@ -499,9 +630,103 @@ public:
         resized();
     }
 
+    // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
+    // alone, or hidden while only the Playlist shows. Small windows give the grid at least what it needs to be usable.
+    enum class GridView { beside, grid, song };
+    void setClipGrid (juce::Component* grid, GridView view)
+    {
+        if (clipGrid != nullptr && clipGrid != grid)
+            removeChildComponent (clipGrid);
+        clipGrid = grid;
+        gridView = view;
+        if (clipGrid != nullptr)
+        {
+            addChildComponent (*clipGrid);
+            clipGrid->setVisible (view != GridView::song);
+        }
+        picker.setVisible (clipGrid == nullptr || view != GridView::grid);
+        playlist.setToolbarFitsNarrow (clipGrid != nullptr && view == GridView::beside);
+        playlist.setVisible (clipGrid == nullptr || view != GridView::grid);
+        resized();
+    }
+
+    // The Simple workflow (round 184a) has no pattern picker beside the Playlist: its tracks hold their own clips.
+    void setPickerHidden (bool hidden)
+    {
+        if (hidden == pickerHidden)
+            return;
+        pickerHidden = hidden;
+        picker.setVisible (! hidden && (clipGrid == nullptr || gridView != GridView::grid));
+        resized();
+        repaint();
+    }
+
+    // A component over everything under the toolbar band (round 184a: the Simple workflow's New track chooser); not
+    // owned, nullptr = none.
+    void setOverlay (juce::Component* c)
+    {
+        if (overlay != nullptr && overlay != c)
+            removeChildComponent (overlay);
+        overlay = c;
+        if (overlay != nullptr)
+        {
+            addAndMakeVisible (*overlay);
+            overlay->toFront (false);
+        }
+        resized();
+    }
+
+    // The Detail View (Clip-launch workflow, round 183a): not owned, nullptr in Pattern workflow. Docked at the bottom,
+    // under the grid and the Playlist; `heightFor` gives its height out of the panel's.
+    void setDetailView (juce::Component* detail, std::function<int (int)> heightFor)
+    {
+        if (detailView != nullptr && detailView != detail)
+            removeChildComponent (detailView);
+        detailView = detail;
+        detailHeightFor = std::move (heightFor);
+        if (detailView != nullptr)
+            addChildComponent (*detailView);
+        resized();
+    }
+
     void resized() override
     {
+        layoutChildren();
+        if (overlay != nullptr)
+            overlay->setBounds (getLocalBounds().withTrimmedTop (PlaylistComponent::toolbarHeight));
+    }
+
+    void layoutChildren()
+    {
         auto area = getLocalBounds();
+        if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
+            detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
+        if (pickerHidden)
+        {
+            picker.setVisible (false);
+            playlist.setBounds (area);
+            return;
+        }
+        if (clipGrid != nullptr && gridView != GridView::song)
+        {
+            // (under the band the title bar shares with the Playlist's toolbar)
+            const auto top = titleLeft > 0 ? PlaylistComponent::toolbarHeight : 0;
+            if (gridView == GridView::grid)
+            {
+                clipGrid->setBounds (area.withTrimmedTop (top));
+                return;
+            }
+            clipGrid->setBounds (area.removeFromLeft (juce::jmax (juce::jmin (420, area.getWidth()), area.getWidth() * 45 / 100)).withTrimmedTop (top));
+            // a small window: the Playlist's room goes to its tracks; the toolbar's pattern box still picks a pattern
+            const auto pickerFits = area.getWidth() >= PatternPicker::width + 480;
+            picker.setVisible (pickerFits);
+            if (! pickerFits)
+            {
+                picker.setBounds (area.withWidth (0));
+                playlist.setBounds (area);
+                return;
+            }
+        }
         auto column = area.removeFromLeft (PatternPicker::width);
         picker.setBounds (titleLeft > 0 ? column.withTrimmedTop (PlaylistComponent::toolbarHeight) : column);
         playlist.setBounds (area);
@@ -509,15 +734,25 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::colour::bg3); // the toolbar band above the picker
-        g.fillRect (0, 0, PatternPicker::width, PlaylistComponent::toolbarHeight);
+        if (pickerHidden)
+            return; // (the Playlist fills the area)
+        // the toolbar band above the picker (and above the grid, when one is beside the Playlist)
+        const auto bandWidth = clipGrid != nullptr ? picker.getRight() : PatternPicker::width;
+        g.setColour (theme::colour::bg3);
+        g.fillRect (0, 0, bandWidth, PlaylistComponent::toolbarHeight);
         g.setColour (theme::colour::border);
-        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, PatternPicker::width, 1);
+        g.fillRect (0, PlaylistComponent::toolbarHeight - 1, bandWidth, 1);
     }
 
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
     int titleLeft = 0;
+    juce::Component* clipGrid = nullptr;
+    GridView gridView = GridView::beside;
+    juce::Component* overlay = nullptr;
+    bool pickerHidden = false;
+    juce::Component* detailView = nullptr;
+    std::function<int (int)> detailHeightFor;
 };
 } // namespace lynx

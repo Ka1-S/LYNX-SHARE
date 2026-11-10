@@ -10,6 +10,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/Multilink.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
 #include "core/RecordLoop.h"
@@ -18,7 +19,9 @@
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
+#include "core/LiveRecordView.h"
 #include "core/Recorder.h"
+#include "core/PedalHold.h"
 #include "core/TakeRecording.h"
 #include "core/WorkerPool.h"
 #include "core/SerialJobs.h"
@@ -61,7 +64,18 @@ class AudioEngine final : private juce::AudioIODeviceCallback,
                           private juce::Timer
 {
 public:
-    explicit AudioEngine (bool openAudioDevice = true);
+    // workerThreads: extra audio threads (< 0 = by the CPU's cores). An engine that only serves an editor needs none.
+    // userPluginList = false: the plugin host neither reads nor writes LYNX's plugin list and settings, nor reads FL's
+    // plugin database in the background (round 180b: an editor inside another host must not, and its close must not
+    // wait for that reader)
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true);
+    // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
+    // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
+    void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
+    {
+        externalTimes = times;
+        externalEffect = std::move (effect);
+    }
     ~AudioEngine() override;
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
@@ -138,6 +152,12 @@ public:
         return performanceMidiChannel.load (std::memory_order_relaxed) == 1 && performanceMidiOn.load (std::memory_order_relaxed);
     }
     const perf::Live& performanceState() const noexcept { return *performanceLive; }
+    // The clip grid (round 181a, core/ClipLauncher.h; message thread). A launch while stopped starts the transport, as the
+    // first thing a launcher does; a stop while stopped does nothing. Without a grid in the project: nothing at all.
+    void launcherCommand (const launcher::Command& command);
+    // What plays per track, or nullptr while no project has had a grid (never with Pattern workflow).
+    const launcher::Runtime* launcherState() const noexcept { return clipLauncher.get(); }
+    launcher::Runtime* launcherStateForSnapshot() noexcept { return clipLauncher.get(); } // --gridshot: a sample of what plays
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
 
@@ -146,7 +166,7 @@ public:
     {
         int countInBars = 0;            // 0 = off
         bool waitForInput = false;      // playback starts at the first played note
-        RecordMode mode = RecordMode::overdub;
+        RecordMode mode = RecordMode::replace; // "Blend recorded notes" off, FL's factory default (round 177c)
         std::int64_t quantise = 0;      // record quantise in ticks (<= 1: as played); follows the global grid
         bool placeSongClip = true;      // song mode: a take puts a clip of the pattern where recording started
         // recording filter (FL's record button right-click, REA_rodada88): what a take records
@@ -190,11 +210,18 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // round 174d (ADR): pre / post-roll in seconds instead of bars while ≥ 0 (the ADR window sets them for its
+        // record cycle; not saved)
+        double preRollSeconds = -1.0;
+        double postRollSeconds = -1.0;
         // FL's "Loop record" (toolbar LoopRecordBtn / Options, round 170e3 [DECOMP 0xf1e2a0 toggles a global that
         // FUN_011d4800 reads: off while recording, the play end becomes "never", so playback runs on]): on, Song mode
         // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
         // and audio stay where they were played. Pattern mode always loops the pattern in LYNX.
         bool loopRecord = true;
+        // LYNX's own option (off = FL's result, REA round 177c): after loop recording only the last pass plays, on top
+        // of the other passes (muted, newest first, folded). Round 163's behaviour.
+        bool lastLoopPassPlays = false;
         // round 170d (the Busy Works video: the chord on the downbeat after the count-in was lost; Cubase's "MIDI Record
         // Catch Range", Logic keeps count-in notes): notes played during the count-in are recorded, and a note-on at most
         // this many ticks before the take's start goes onto the start (0 = off: they keep their real time)
@@ -254,6 +281,11 @@ public:
     // The keys held right now on MIDI inputs and the typing piano (as played, before the scale snap), ascending; for
     // the Piano Roll's chord readout (any thread).
     std::vector<int> heldInputKeys() const;
+    // The same for one MIDI channel (0-15; the typing keyboard plays on 0), as two 64-bit masks: the chord panel (round
+    // 181b) counts each channel's keys on its own, as FL does.
+    std::array<std::uint64_t, 2> heldInputKeyBits (int midiChannel) const noexcept;
+    // The Audio logger's memory (Tools › Audio logger, round 181b). The audio thread writes it from the Master.
+    RollingAudioLog& getRollingLog() noexcept;
     // The keys sounding on a channel right now (song / pattern notes, keyboard, MIDI): the Piano roll's keyboard lights
     // them (issue #14). Any thread.
     NoteMask soundingKeys (int channel) const noexcept;
@@ -283,9 +315,40 @@ public:
 
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);
+    // FL's Tools › Macros › Cancel recording (MacroCancelRecordingAction, REA round 169k §2.3 [DECOMP 0xf1d7e0]): what this
+    // recording pass wrote is thrown away (its notes, automation and audio takes; the take files are deleted), recording
+    // turns off, the armed inserts stay armed and playback goes on. false: not recording. UI thread.
+    bool cancelRecording();
     bool isRecording() const noexcept { return transport.recording.load(); }
     // Pattern mode, a take with Loop record off (round 170e5): the transport tick the pattern plays once from, < 0: none
     double patternLinearOrigin() const noexcept { return liveInput.patternOrigin.load (std::memory_order_relaxed); }
+
+    // Round 177d: the recording in progress as the editors draw it live (core/LiveRecordView.h). UI thread.
+    struct LiveRecording
+    {
+        // the note take: the notes still held (positions in `pattern`, as they would be committed now) and, in Song
+        // mode, the Playlist range the take covers so far: [from, to) on `track` (from = its clip's start or the origin)
+        bool notes = false;
+        int pattern = -1;
+        std::vector<Note> held;
+        int track = -1;
+        std::int64_t from = -1, to = -1;
+        std::int64_t origin = -1; // the song position of the pattern's start for `held`
+        // the audio takes: each on the Playlist track it will land on, its current pass and its waveform
+        struct Audio
+        {
+            int track = -1;
+            liverec::AudioSpan span;
+            std::shared_ptr<const liverec::LivePeaks> peaks;
+            juce::String name;
+        };
+        std::vector<Audio> audio;
+        std::optional<PunchRange> punch; // only this range is kept (pre-roll / punch in-out)
+        bool any() const noexcept { return notes || ! audio.empty(); }
+    };
+    // cheap: a take records (notes held or recorded, or audio)
+    bool isLiveRecording() const noexcept { return recorder.isActive() || takeCount > 0; }
+    LiveRecording liveRecording() const;
 
     // Audio recording from the interface input: with this on, recording (Rec + Play) writes the
     // input to a WAV and, on stop, the take becomes a Playlist clip (latency-compensated).
@@ -439,6 +502,14 @@ public:
     // Global links (FL's "Override global link...", REA round 146): links in the MIDI settings that every project
     // follows unless it links the same target or controller itself. The next CC received becomes `target`'s.
     void learnGlobalLink (const AutomationTarget& target);
+    // FL's "Multilink to controllers" (Options › Switches, Ctrl+J; round 177b-4, core/Multilink.h): the controls moved
+    // while it is on link, in that order, to the controllers moved next; it switches itself off when all are linked
+    void setMultilink (bool on);
+    bool isMultilinkOn() const noexcept { return multilink.has_value(); }
+    int multilinkQueued() const noexcept { return multilink ? (int) multilink->targets.size() : 0; }
+    // the switch's menu: "Link to controller" (false) / "Override global links" (true): no more controls are queued,
+    // the controllers moved next link to the queued ones (as project links / as global links)
+    void multilinkToControllers (bool global);
     void removeGlobalLink (const AutomationTarget& target);
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
     std::vector<MidiLink> getGlobalLinks() const;
@@ -466,6 +537,7 @@ public:
     juce::StringArray getActiveMidiInputs() const;
     // Counts the messages received from the enabled MIDI inputs (the toolbar's MIDI activity light).
     std::uint32_t getMidiActivity() const noexcept { return midiActivity.load (std::memory_order_relaxed); }
+    std::uint32_t getMidiPlayed() const noexcept { return midiPlayed.load (std::memory_order_relaxed); }
     // Closes and opens again every enabled MIDI input (the MIDI light's click; Settings › MIDI › Refresh).
     void reconnectMidiInputs();
     const prefs::MidiPrefs& getMidiPrefs() const noexcept { return midiPrefs; }
@@ -498,6 +570,9 @@ public:
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
     // rack matches them by instance tag, round 168s).
     void editSongStructural (const std::function<void (Song&)>& edit);
+    // An edit that gives the patterns other indices (sort, move): one undo step like editSong, but without
+    // followPatternLengths, which compares by index and would resize clips that were sized by hand (round 177d).
+    void editSongPatternOrder (const std::function<void (Song&)>& edit);
     // An edit that changes only levels (mixer volume / pan / separation, channel volume / pan), e.g. a fader drag: one
     // undo step per press like editSong, but the playing snapshot takes the values at once without a rebuild (round
     // 171c); the full publish follows when the mouse is released. Anything else falls back to editSong.
@@ -579,6 +654,8 @@ public:
         };
         std::vector<Use> uses;
     };
+    // Settings › General: a Live set's Session clips go to the clip grid (false, the default) or the Playlist (round 181c)
+    static inline std::atomic<bool> alsSessionOnPlaylist { false };
     static void prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                   PreparedFlp& out);
     // one hosted plugin of the queue (message thread); false when the queue is done
@@ -704,6 +781,12 @@ public:
     // --selftest "driver_panel": showDriverPanel with a fake device whose panel changes its buffer (and one whose panel
     // changes nothing). "OK" or what went wrong.
     static juce::String driverPanelSelfTest();
+    // --selftest "device_change" / --devicechangetest (issue #134, engine/DeviceChangeTest.cpp): a playing project while
+    // the output device, its sample rate and its buffer size change, on stand-in devices with real callback threads.
+    // "OK (...)" or "ERROR ...". `everyUnit`: every instrument and effect LYNX can make here (else a handful);
+    // `pluginFiles`: hosted plugins to add; `log` receives a line per change.
+    static juce::String deviceChangeSelfTest (int switches, bool everyUnit, const juce::StringArray& pluginFiles = {},
+                                              const std::function<void (const juce::String&)>& log = {});
     // %APPDATA%\LYNX\audio-glitches.log: a line each time callbacks run over their deadline (at most every 2 s).
     static juce::File glitchLogFile();
 
@@ -778,9 +861,11 @@ private:
     LiveEventQueue liveEvents;   // UI -> audio
     LiveEventQueue midiEvents;   // MIDI thread -> audio
     InputHeldNotes midiHeld;     // MIDI thread: what each held MIDI key started
-    std::atomic<std::uint64_t> heldKeyBits[2] {}; // keys held on MIDI inputs / the typing piano (chord readout)
-    std::atomic<std::uint8_t> heldKeyCount[128] {};
-    void markHeldKey (int key, bool on) noexcept;
+    PedalHold pedalHold;         // MIDI thread: FL's foot pedal hold per channel (round 187a)
+    std::atomic<bool> footPedalNoteOff { true }; // FL's Settings › MIDI "Foot pedal controls note off" (on)
+    std::atomic<std::uint64_t> heldKeyBits[16][2] {}; // keys held per MIDI channel on inputs / the typing piano (chord readout)
+    std::atomic<std::uint8_t> heldKeyCount[16][128] {};
+    void markHeldKey (int midiChannel, int key, bool on) noexcept;
     KeyLedger playedKeys;        // UI thread: the keys the typing piano started (after the scale snap)
     SpscQueue<RecordedEvent, 1024> midiRecordQueue; // MIDI thread -> UI (recording)
     // a controller's pitch wheel while recording (MIDI thread -> UI): key = its MIDI channel 0…15, velocity = 0..1;
@@ -798,6 +883,7 @@ private:
     // selected channel's instrument (round 162); written by applyControllers, read by the MIDI thread
     std::array<std::atomic<std::uint64_t>, 2> linkedCcs {};
     AutomationTarget learning;
+    std::optional<MultilinkSession> multilink;
     bool learningGlobal = false;
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
     void applyControllers();
@@ -820,6 +906,11 @@ private:
     int automationPattern = 0;
     int recordedAutomationPoints = 0;
     bool automationOverrideActive = false; // touched targets override their automation in the renderer
+    // FL (issue #125): the targets the user moved since playback last started; their automation does not drive them
+    // until it starts again (RackRenderer::setReleasedSlots). Not while recording automation (the touch rule above).
+    std::vector<AutomationTarget> releasedTargets;
+    bool releasedWasPlaying = false;
+    void publishReleasedTargets();
     // Song mode, no loop region: once a parameter moved while recording, the song plays on past its end (no wrap to
     // the start) until recording stops, and the take's clip grows with the playhead (issue #12: it cut itself)
     bool automationLinear = false;
@@ -828,8 +919,14 @@ private:
     std::int64_t lastAutomationTick = -1; // the song position of the take's last update (song mode)
     std::vector<AutomationWrite> takeWrites; // per target: where this take writes (its own clip grows)
     bool takeHasUndoStep = false;
+    // Cancel recording (round 187a): the undo depth when this recording pass started, and the steps trimmed off the
+    // stack's bottom since then (the depth then still counts them)
+    bool recordPassActive = false, recordPassMarked = false, discardAudioTakes = false;
+    std::size_t recordPassUndoBase = 0, recordPassTrimmed = 0;
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
+    void updateLauncherRecording();
+    bool launcherTakeHasUndoStep = false;
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
     std::atomic<bool> waitingForInput { false };
@@ -863,7 +960,7 @@ private:
     juce::MidiDeviceListConnection midiDevicesChanged;
     std::vector<std::string> lastMidiInputIds;       // the MIDI inputs available at the last check (UI thread)
     int midiCheckTicks = 0;
-    std::atomic<std::uint32_t> midiActivity { 0 };
+    std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     prefs::MidiPrefs midiPrefs;                      // UI thread
     juce::SpinLock midiPrefsLock;                    // guards midiPrefsShared (UI writes, MIDI thread reads)
     prefs::MidiPrefs midiPrefsShared;
@@ -918,6 +1015,7 @@ private:
         takes::WavTakeWriter writer;
         std::atomic<bool> failed { false };
         std::vector<float> scratch;
+        std::shared_ptr<liverec::LivePeaks> peaks = std::make_shared<liverec::LivePeaks>(); // the live waveform (round 177d)
         juce::CriticalSection drainMutex; // the recording thread vs the UI's final drain
         // recording thread: writes what arrived; false when the file could not be written
         bool drain();
@@ -933,6 +1031,7 @@ private:
     juce::SpinLock takeLock;                       // the audio thread only tries (never waits)
     LiveInput liveInput;
     std::unique_ptr<perf::Live> performanceLive = std::make_unique<perf::Live>(); // Performance mode (round 165m)
+    std::unique_ptr<launcher::Runtime> clipLauncher; // made when a project first has a clip grid (round 181a)
     std::atomic<int> performanceMidiChannel { 0 }; // MidiPrefs::performanceChannel (UI writes, MIDI thread reads)
     std::atomic<bool> performanceMidiOn { false }; // Performance mode is on with a zone (UI writes, MIDI thread reads)
     perf::MidiMapping performanceMidi;             // MIDI thread only
@@ -962,6 +1061,7 @@ private:
     std::atomic<double> takeTicks { 0.0 };         // ticks the transport moved while recording (not wrapped)
     std::array<std::atomic<juce::int64>, 256> takeWraps {}; // take frames at which the loop jumped back (loop recording)
     std::atomic<int> takeWrapCount { 0 };
+    mutable std::vector<int> liveTakeTracks;         // the Playlist tracks the open takes will land on (round 177d)
     double takeSampleRate = 44100.0;
     double takeTicksPerSample = 0.0;
     int takeLatency = 0;                           // takes::Latency::total() at the take's start, in samples
@@ -1017,7 +1117,16 @@ private:
     juce::ChangeBroadcaster levelsChanged;
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
+    // Issue #134: a publish asked for while one is still building its rack (a plugin being created ran the message
+    // loop: the engine's timer, an edit) waits until that one is done; see publishSong
+    bool publishing = false, publishAgain = false;
+    int nestedPublishes = 0; // (diagnostics / tests)
+    // tests: called for every hosted instrument / effect the rack asks for, in place of a plugin that runs the
+    // message loop while it is created (DeviceChangeTest)
+    std::function<void()> duringPluginCreation;
     void saveUndoStep();
+    ProcessTimes* externalTimes = nullptr;
+    std::function<std::shared_ptr<Effect>()> externalEffect;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

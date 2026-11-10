@@ -223,8 +223,8 @@ struct Engine::Impl
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
     float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
-    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, band[maxBandSections];
-    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, bandOn = false;
+    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, toneLow, band[maxBandSections];
+    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, toneLowOn = false, bandOn = false;
     int bandSections = 0;
 
     // tap patterns (unit times and gains), drawn once
@@ -267,7 +267,7 @@ struct Engine::Impl
         {
             pre[c].allocate ((int) (maxPreSec * sr) + 8);
             raw[c].allocate ((int) (1.05 * sr) + 8);
-            dif[c].allocate ((int) (2.05 * sr) + 8);
+            dif[c].allocate ((int) (2.65 * sr) + 8); // (Halo's build reaches 2.42 s)
             for (int k = 0; k < 4; ++k)
             {
                 inAp[c][k].len = std::max (1, (int) std::lround (inApMs[c][k] * ms));
@@ -320,6 +320,7 @@ struct Engine::Impl
         for (auto& b : band)
             b.reset();
         toneHigh.reset();
+        toneLow.reset();
         toneMid.reset();
         shiftState = 0.0f;
         first = true;
@@ -361,7 +362,9 @@ struct Engine::Impl
             {
                 bD[c][k] = std::clamp ((int) (bT[c][k] * span * sr), 0, dif[c].mask - 4);
                 const auto u = bT[c][k];
-                const auto a = gated ? 0.6 + 0.4 * u : std::sin (pi * std::sqrt (u)); // build: rises, then falls
+                const auto a = gated ? 0.6 + 0.4 * u
+                                     : s.buildRise >= 1.0 ? std::pow (std::max (u, 1e-6), 0.5 * (s.buildRise - 1.0)) // round tp172d
+                                                          : std::sin (pi * std::sqrt (u)); // build: rises, then falls
                 bW[c][k] = (float) (a * bG[c][k]);
                 b += a * a;
             }
@@ -433,6 +436,9 @@ struct Engine::Impl
             for (int k = 0; k < bandSections; ++k)
                 band[k].filter (sr, 0, s.bandLimit, 1.0 / (2.0 * std::cos ((2 * k + 1) * pi / (4.0 * bandSections))));
         }
+        toneLowOn = std::abs (s.toneLowDb) > 0.01;
+        if (toneLowOn)
+            toneLow.shelf (sr, s.toneLowHz, s.toneLowDb, false, 0.7);
         toneHighOn = std::abs (s.toneHighDb) > 0.01;
         if (toneHighOn)
             toneHigh.shelf (sr, std::min (s.toneHighHz, 0.45 * sr), s.toneHighDb, true, 0.7);
@@ -669,6 +675,8 @@ struct Engine::Impl
                 band[k].processBlock (L, R, n);
         if (toneHighOn)
             toneHigh.processBlock (L, R, n);
+        if (toneLowOn)
+            toneLow.processBlock (L, R, n);
         if (toneMidOn)
             toneMid.processBlock (L, R, n);
         if (shelfLowOn)
@@ -976,6 +984,13 @@ protected:
         s.buildSec = m.buildMs / 1000.0 * (0.25 + 1.5 * p[4]);
         s.gateSec = m.gate > 0.0 ? m.gate * decay + 0.05 : 0.0;
         s.gain = m.gain;
+        // round 183b (the reference's impulse at −20 dB, 17 settings; it is linear): its first 80 ms hold more of the
+        // energy at longer decays (−3.8 dB of the total at its default 4 s, ours −7.2; at 2 s round 100's −3.1 dB in the
+        // first 100 ms still holds), its modes sit denser low down (lines × 0.85: the −20 dB impulses and music both
+        // closer), and it is 0.7 dB lower
+        s.lineScale *= 0.85;
+        s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
+        s.gain *= 0.92;
     }
 };
 
@@ -1022,10 +1037,15 @@ protected:
         s.outHighCut = 100.0 + 14900.0 * p[3];
         s.bandLimit = t.cut;
         const auto earlyLate = (double) p[4]; // 0 = early only, 1 = late only
-        // round 172d: a linear crossfade like the reference's (its impulse energy per window at 0 / ¼ / ½ / ¾ / 1: the late
-        // tank grows in proportion and sits ≈ 6 dB above the old law at 50 %, the early part −3.7 dB at 0 %)
-        s.earlyLevel = t.early * 0.92 * (1.0 - earlyLate);
-        s.lateLevel = t.lateGain * 3.8 * earlyLate;
+        // round 183b: an equal-power crossfade (the reference's total level moves only 2.6 dB from early only to late
+        // only: −28.7 / −27.2 / −26.1 dB at 0 / 50 / 100 %, impulse at −20 dB; the old linear one moved 10.7 dB). The
+        // late level holds over Decay (the reference: −27.2 / −26.8 dB at RT 2.1 / 8.6 s, ours rose with the RT) and
+        // over Late size (0 % ran +3 dB, 100 % −1.2 dB)
+        const auto fade = 0.5 * pi * earlyLate;
+        s.earlyLevel = t.early * 0.92 * 1.46 * std::cos (fade);
+        const auto lateSizeDb = p[5] <= 0.5f ? -3.1 * (1.0 - 2.0 * p[5]) : 2.4 * (p[5] - 0.5);
+        s.lateLevel = t.lateGain * 3.8 * 0.575 * std::sin (fade) * std::sqrt (2.1 / std::max (0.1, atriumDecaySec (p[2]) * t.rtScale))
+                    * std::pow (10.0, lateSizeDb / 20.0);
         s.shape = t.shape;
         s.lineScale = t.scale * (0.35 + 0.9 * p[5]);
         s.crossFeed = 0.35 + 0.65 * p[6];
@@ -1047,11 +1067,11 @@ protected:
         s.loopDiffusion = 0.3 + 0.6 * p[18];
         const auto space = (double) p[20];
         s.buildSec = 0.02 + 0.06 * space;
-        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults)
+        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25 * 1.18; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults); 183b: +1.4 dB with the equal-power fade and the lower shelf
         // round 172d: the reference's late field holds far more below 100 Hz (impulse and music, octave bands: 31 / 63 Hz
         // +8 … +15 dB at the defaults) than this tank's few low modes give
         s.lowShelfHz = 90.0;
-        s.lowShelfDb = 10.0;
+        s.lowShelfDb = 5.0; // round 183b: +10 dB was 4 … 7 dB too much below 80 Hz with the louder early part (impulse at −20 dB, music)
         s.toneMidHz = 140.0; // (the tank's own hump around 125 … 160 Hz taken back)
         s.toneMidDb = -5.0;
         s.toneMidQ = 1.4;
@@ -1156,15 +1176,33 @@ protected:
         s.width = p[4] <= 0.5f ? 2.0 * p[4] : 1.0 + 0.48 * (p[4] - 0.5);
         s.modRateHz = skewLaw (p[5], 0.05, 5.0, 2.381);
         s.modDepthMs = 1.0 * p[6] / std::sqrt (std::max (0.3, s.modRateHz));
-        s.lowShelfHz = 20.0 + 1980.0 * p[7];
-        s.lowShelfDb = 0.75 * (-12.0 + 24.0 * p[8]);
-        s.highShelfHz = 200.0 + 19800.0 * p[9];
-        s.highShelfDb = -12.0 + 24.0 * p[10];
+        // round 183b: the reference's Low / High EQ (Mix 100 %, the impulse at −20 dB, gain at 0 / 100 %): the low shelf
+        // spans ±12 dB with its half-gain point at ~0.47 × the frequency law (−6 dB near 330 Hz at the default 711 Hz),
+        // the high one +12 dB with its half-gain point at ~0.5 × (5 kHz at the default) but only −4.5 dB down
+        s.lowShelfHz = 0.47 * (20.0 + 1980.0 * p[7]);
+        s.lowShelfDb = -12.0 + 24.0 * p[8];
+        s.highShelfHz = 0.5 * (200.0 + 19800.0 * p[9]);
+        s.highShelfDb = p[10] >= 0.5f ? 24.0 * (p[10] - 0.5) : -9.0 * (0.5 - p[10]);
         // the plate speaks at once after its own delay: a short, smeared early burst
         s.earlyLevel = t.early;
         s.earlySec = 0.015;
         s.earlyDiffusion = 0.8;
         s.gain = t.gain * 1.3; // round 172d: +2.3 dB (the reference plate at its defaults: music / drums RMS −3.6 / −4.2 dB)
+        // round 183b (the ValhallaPlate role, voicing off; the reference's impulse at −20 dB and music): Width keeps the
+        // level (the reference: −27.4 / −27.5 / −27.2 dB at 0 / 50 / 100 %, ours moved 4 dB), its tail is fuller below
+        // 80 Hz (+5 dB at 28 … 71 Hz) and less forward at 2.8 … 7 kHz (−3.5 dB), and it sits ~1 dB lower; shorter decays
+        // are no louder than the default
+        if (p[14] < 0.5f)
+        {
+            s.gain *= 0.9 * std::sqrt (2.0 / (1.0 + s.width * s.width));
+            // and shorter decays a little quieter (Decay 20 / 25 %: this tank ran +1.4 … +2.7 dB on music, +3 dB on the impulse)
+            s.gain *= std::pow (10.0, -2.5 * std::max (0.0, 0.5 - (double) p[2]) / 0.3 / 20.0);
+            s.toneLowHz = 60.0;
+            s.toneLowDb = 5.0;
+            s.toneMidHz = 4500.0;
+            s.toneMidDb = -3.5;
+            s.toneMidQ = 0.8;
+        }
         // round 135: a low cut on the plate's output, 20 Hz … 1 kHz (0 = off; 12 dB/oct)
         s.outLowCut = foil::lowCutHz (p[13]);
         s.outLowOrder = 2;
@@ -1188,8 +1226,19 @@ protected:
             // round 172d: it is darker above 2 kHz than this tank (third octaves 2.5 … 8 kHz −5 … −8 dB, both the impulse
             // and music, the decay per band already matched) and its first 80 ms hold 7 … 10 dB less of the energy
             s.toneHighHz = 2500.0;
-            s.toneHighDb = -5.0;
-            s.outHighCut = std::min (s.outHighCut > 0.0 ? s.outHighCut : 1.0e9, 7000.0); // (and from 8 kHz up −8 … −14 dB)
+            // round 172d slice 10: deeper at short decays (the trial's 2 … 8 kHz octaves, sweep and impulses at Decay 0.5 …
+            // 19 s, refcap0124: this tank was 7 … 9 dB too bright up to 1.7 s, 5 … 7 dB at 3 s, 2 … 3 dB from 5.7 s on). The
+            // shelf goes from −5 dB to −13.5 / −12 / −9 dB and the edge from 7 to 9 kHz (8 … 16 kHz then within 1 … 2.5 dB)
+            static constexpr double darkKnots[] = { -0.301, -13.5, 0.225, -13.0, 0.477, -12.0, 0.753, -9.0, 1.28, -9.0 };
+            s.toneHighDb = knotLaw (std::log10 (infinite ? 30.0 : std::max (0.5, rt)), darkKnots, 5);
+            s.outHighCut = std::min (s.outHighCut > 0.0 ? s.outHighCut : 1.0e9, 9000.0); // (and from 8 kHz up −8 … −14 dB)
+            // round 172d slice 10: the trial's plate has no sub-bass (20 … 32 Hz 11 … 16 dB, 32 … 40 Hz 2 … 8 dB under this tank's,
+            // 50 … 63 Hz level): a 12 dB/oct cut at 55 Hz unless the panel's Low Cut is higher
+            if (s.outLowCut < 55.0)
+            {
+                s.outLowCut = 55.0;
+                s.outLowOrder = 2;
+            }
             s.outHighOrder = 2;
             s.earlyLevel *= 0.35;
         }
@@ -1206,20 +1255,21 @@ struct NebulaMode
     const char* name;
     double dm0, dm100, mult0, mult100, corr, gain;
 };
-// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (measured, §4),
+// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (round 183b: the
+// reference's tail at its defaults, Mod depth 50 %; mono modes 1.0, one mode −1),
 // wet gain (round 172d: the reference's wet level per mode at Mix 100 %, impulse / bursts / music, defaults otherwise)
 LYNX_FIT_TABLE NebulaMode nebulaModes[nebula::modeCount] = {
-    { "Ripple", 1.03, 1.26, 1, 1, 0.93, 2.41 },        { "Swell", 3.43, 3.82, 1, 2, -0.31, 1.60 },
-    { "Fold", 1.33, 1.39, 1, 2, -0.25, 1.79 },       { "Drift", 2.56, 2.67, 1, 1, 0.25, 1.12 },
-    { "Abyss", 3.64, 3.97, 1, 2, -0.21, 1.26 },      { "Vortex", 7.04, 6.77, 2, 2, 0.29, 1.05 },
-    { "Glint", 1.03, 1.17, 1, 1, 0.77, 1.67 },        { "Pulse", 1.03, 1.22, 1, 1, 0.87, 1.93 },
-    { "Expanse", 4.29, 12.8, 8, 1, 0.39, 3.57 },       { "Haze", 2.14, 12.3, 4, 1, 0.63, 3.87 },
-    { "Veil", 2.02, 5.04, 2, 1, 0.72, 1.43 },  { "Mist", 1.00, 1.01, 1, 1, 0.47, 1.49 },
-    { "Monolith", 2.16, 16.3, 4, 1, 1.0, 3.84 },       { "Eternity", 20.0, 20.7, 8, 1, -0.30, 2.06 },
-    { "Tide", 1.00, 1.12, 1, 1, 0.54, 1.50 },      { "Shoal", 1.03, 1.30, 1, 1, 0.37, 1.51 },
-    { "Spark", 1.00, 1.05, 1, 1, 0.95, 2.43 },       { "Plateau", 2.10, 9.65, 4, 1, 0.0, 3.62 },
-    { "Dusk", 4.15, 12.65, 8, 1, 0.31, 2.86 },       { "Mirage", 1.00, 1.35, 1, 2, -0.43, 1.50 },
-    { "Cluster", 1.02, 1.01, 1, 1, -0.10, 2.56 },    { "Beacon", 1.16, 1.04, 1, 1, 0.84, 2.27 },
+    { "Ripple", 1.03, 1.26, 1, 1, 0.0, 2.41 },        { "Swell", 3.43, 3.82, 1, 2, 0.04, 1.60 },
+    { "Fold", 1.33, 1.39, 1, 2, 0.04, 1.79 },       { "Drift", 2.56, 2.67, 1, 1, 0.09, 1.12 },
+    { "Abyss", 3.64, 3.97, 1, 2, -0.01, 1.26 },      { "Vortex", 7.04, 6.77, 2, 2, 0.02, 1.05 },
+    { "Glint", 1.03, 1.17, 1, 1, 0.07, 1.67 },        { "Pulse", 1.03, 1.22, 1, 1, 0.0, 1.93 },
+    { "Expanse", 4.29, 12.8, 8, 1, 1, 3.57 },       { "Haze", 2.14, 12.3, 4, 1, 1, 3.87 },
+    { "Veil", 2.02, 5.04, 2, 1, 0.0, 1.43 },  { "Mist", 1.00, 1.01, 1, 1, 0.0, 1.49 },
+    { "Monolith", 2.16, 16.3, 4, 1, 1, 3.84 },       { "Eternity", 20.0, 20.7, 8, 1, -1, 2.06 },
+    { "Tide", 1.00, 1.12, 1, 1, 0.0, 1.50 },      { "Shoal", 1.03, 1.30, 1, 1, -0.04, 1.51 },
+    { "Spark", 1.00, 1.05, 1, 1, -0.02, 2.43 },       { "Plateau", 2.10, 9.65, 4, 1, 0.95, 3.62 },
+    { "Dusk", 4.15, 12.65, 8, 1, 0.99, 2.86 },       { "Mirage", 1.00, 1.35, 1, 2, 0.0, 1.50 },
+    { "Cluster", 1.02, 1.01, 1, 1, 0.02, 2.56 },    { "Beacon", 1.16, 1.04, 1, 1, -0.01, 2.27 },
 };
 double nebulaDelayMs (float v) { return knotLaw (v, nebulaDelayKnots, nebulaDelayCount); }
 const char* const syncNames[4] = { "ms", "Note", "Dotted", "Triplet" };
@@ -1271,8 +1321,11 @@ protected:
         s.loopDiffusion = 0.85 * dens;
         s.crossFeed = 0.3 + 0.7 * dens;
         s.parallelLines = dens < 0.02; // density 0: plain repeats of the delay
-        // stereo: plain echoes are mono (density 0); the shape's correlation at full density; warp decorrelates
-        const auto corr = (1.0 + (m.corr - 1.0) * dens) * (1.0 - std::min (1.0, 2.0 * warp));
+        // round 183b: stereo. The reference's tail is decorrelated whenever it modulates (L/R correlation −0.01 at the
+        // default Mod depth, 0.13 / 0.34 at 25 / 10 %, 1.0 at 0, at any Density) and this network decorrelates the
+        // same way through its modulated lines, so the width is the panel's; only the reference's mono modes (its
+        // correlation, measured per mode at the defaults) narrow it. Before, Density 0 played mono
+        const auto corr = m.corr;
         const auto w = std::sqrt ((1.0 - corr) / (1.0 + corr + 1e-3));
         s.width = (-1.0 + 2.0 * p[7]) * std::min (2.0, w);
         // round 172d: both cuts are first order in the reference (Mix 100 %, cuts at 5 … 70 % / 10 … 75 %: −3 dB at the
@@ -1291,6 +1344,11 @@ protected:
         s.gain = m.gain * std::pow (10.0, fbDb / 20.0);
         s.lowShelfHz = 220.0;
         s.lowShelfDb = 8.0 * std::min (1.0, dens / 0.15);
+        // round 183b: the reference's eight voices fall apart as they modulate (its tail ~9 dB louder and mono at Mod
+        // depth 0: +8.9 dB against 50 %, −3.6 dB at 10 %); this network's lines part less, so the rest comes in here.
+        // The level is re-measured with the full width: −0.9 dB at Density 0, −4.2 dB from Density 50 % up (the dense
+        // network's sides were nearly mono before)
+        s.gain *= (0.9 - 0.28 * std::min (1.0, dens / 0.5)) * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
     }
 };
 
@@ -1346,7 +1404,15 @@ protected:
         s.shiftSemis2 = s.shiftSemis - 24.0;
         s.inDiffusion = p[3];
         s.loopDiffusion = 0.2 + 0.7 * p[3];
-        s.buildSec = 0.15 + 0.5 * size * (1.0 - p[3] * 0.5); // round tp172d: the reference blooms over ~0.5 s
+        // round tp172d (refs/halo, 20 s impulses): the reference's energy builds for 0.6 / 0.9 / 1.3 s at Size 30 / 50 / 80 %
+        // (Diffusion 92 %) — an even feed over 0.62 + 1.8 × Size seconds into the tank fits its envelope within 0.7 dB.
+        // With less diffusion it gathers late (Diffusion 50 %: a cluster near 1.2 s; 0 %: one arrival at 1.217 s): the
+        // feed leans to the end of a span that shrinks to 0.8 × (a model between those three measured points)
+        {
+            const auto d = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
+            s.buildSec = (0.62 + 1.8 * size) * (0.8 + 0.2 * d);
+            s.buildRise = 1.0 + 15.0 * (1.0 - d) * (1.0 - d);
+        }
         s.shape = 0;
         s.lineScale = m.scale * (0.3 + 1.2 * size);
         // round tp172d: the reference's RT per Size and Feedback, measured (refs/halo: 20 s impulses; Size 30 / 50 / 80 %
@@ -1355,9 +1421,13 @@ protected:
         {
             const auto fb = (double) p[2], f = std::min (1.0, std::abs (s.shiftSemis) / 2.0);
             const auto mShift = 1.0 + 1.2 * std::pow (fb, 2.5), mPlain = 1.0 + 3.3 * fb * fb * fb;
-            s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f);
+            // with less diffusion the reference's tail is shorter (Diffusion 0 / 50 %: ~5.5 / 6 s against 9.8 s at 92 %)
+            const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
+            s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f) * (0.55 + 0.45 * dn * dn * dn);
         }
-        s.earlyLevel = 0.3; // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45
+        // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45; with less diffusion they are empty (Diffusion 50 %:
+        // −55 dB, 0 %: silent until the first arrival at 1.2 s)
+        s.earlyLevel = 0.3 * std::pow (std::clamp ((double) p[3] / 0.92, 0.0, 1.0), 8.0);
         s.earlySec = 0.03;
         s.earlyDiffusion = p[3];
         s.outLowCut = 250.0 * p[5]; // gentle: the reference's low cut barely shows at 63 Hz (§5, not confirmed)
@@ -1371,17 +1441,27 @@ protected:
         s.loopBandwidth = dark ? 5000.0 : 0.0;
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
-        // round tp172d: the wet level measured on music and drums (refs/halo): −2 dB up to Feedback 75 %, rising to 0 dB
+        // round tp172d: the wet level measured on music and drums (refs/halo): −3 dB up to Feedback 75 %, rising to +1 dB
         // at 100 % (the reference swells). Its impulse has a fuller low end than ours (+9 / +5 dB at 63 / 125 Hz) but its
         // music and drums don't (a shelf for the impulse made drums 5 dB loud there): left flat
         {
             const auto fb = (double) p[2];
-            const auto trimDb = fb <= 0.75 ? -2.0 : -2.0 + 8.0 * (fb - 0.75);
+            const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0); // less diffusion: louder (+4.5 / +5.4 dB measured at 0 / 50 %)
+            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + 5.0 * (1.0 - dn * dn * dn);
             s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, trimDb / 20.0);
         }
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
+        // round 183b: the reference's Mono mode (mono in) gives a partly correlated tail: L/R correlation 0.25 / 0.31 /
+        // 0.43 at Size 30 / 50 / 80 % (its stereo modes: ~0, as this tank's)
+        if (m.stereo == 1)
+        {
+            const auto c = 0.13 + 0.375 * size;
+            s.width = std::sqrt ((1.0 - c) / (1.0 + c));
+            s.gain *= std::sqrt (2.0 / (1.0 + s.width * s.width)); // (the same energy as the full width)
+            s.earlyLevel *= 0.4; // its first 80 ms hold 3.4 dB less of the energy than ours did (impulse at −20 dB)
+        }
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)
@@ -1409,17 +1489,27 @@ struct HorizonReverb
     const char* name;
     int shape;
     double scale, rtScale, preMs, buildMs, early, gain;
+    double lowMult, lowDb, highDb; // round 183b: bass decay multiple (below 500 Hz), the mode's own low / high shelf
 };
-// gain: round 172d re-fitted Room / Hall / Space against the reference's modes (Mix 100 %, impulse and music) with
-// the 1 / √RT level law below; the others keep their earlier values
+// round 183b, measured on the reference (Mix 100 %, Decay 3 s, Size 50 %, its default Chamber otherwise; refcap
+// verb183b): RT of each mode against Decay (Room 0.77, Plate 0.97, Hall 0.93, Space 1.06), its bass decay (Room
+// 0.82 × the mids, Chamber 1.2, Plate 1.12, Hall 1.3, Space 0.9), its own onset after the echo's pre-delay (Room 23,
+// Chamber 13, Plate 6, Hall 31, Space 74 ms; the table holds Size 50 %), Hall's darker top (−7 dB above 4 kHz) and
+// Space's fuller lows (+4 dB). gain: the wet level per mode (impulse at −20 dB and music, 100 % wet)
 LYNX_FIT_TABLE HorizonReverb horizonReverbs[horizon::reverbModeCount] = {
-    { "Room", 1, 1.0, 0.80, 50.0, 60.0, 0.3, 2.4 },  { "Chamber", 1, 1.2, 1.00, 45.0, 45.0, 0.3, 3.0 },
-    { "Plate", 2, 1.0, 1.00, 25.0, 8.0, 0.0, 3.6 },  { "Hall", 0, 1.0, 0.92, 35.0, 60.0, 0.2, 4.4 },
-    { "Cathedral", 0, 1.3, 1.05, 60.0, 80.0, 0.1, 1.6 }, { "Space", 0, 1.5, 1.10, 70.0, 90.0, 0.0, 2.8 },
-    { "Freeze", 0, 1.4, 3.30, 70.0, 900.0, 0.0, 0.4 },   { "Gated", 1, 0.8, 0.60, 30.0, 0.0, 0.1, 0.9 },
+    { "Room", 1, 1.6, 0.77, 23.0, 60.0, 0.3, 2.4, 0.82, 0.0, 0.0 },
+    { "Chamber", 1, 1.2, 1.00, 13.0, 45.0, 0.3, 3.0, 1.20, 0.0, 0.0 },
+    { "Plate", 2, 1.0, 0.97, 6.0, 0.0, 0.0, 4.6, 1.12, 0.0, -5.0 },
+    { "Hall", 0, 1.0, 0.93, 31.0, 60.0, 0.2, 2.64, 1.30, 0.0, -7.0 },
+    { "Cathedral", 0, 1.3, 1.05, 45.0, 80.0, 0.1, 3.2, 1.30, 3.0, -3.0 },
+    { "Space", 0, 1.5, 1.06, 24.0, 90.0, 0.0, 1.4, 0.90, 4.0, -4.0 },
+    { "Freeze", 0, 1.4, 3.30, 30.0, 300.0, 0.0, 4.0, 1.00, 0.0, 0.0 },
+    { "Gated", 1, 0.8, 0.60, 2.0, 0.0, 0.1, 3.6, 1.00, 0.0, 0.0 },
 };
-const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Vintage" };
-constexpr double horizonColourCut[4] = { 0.0, 16000.0, 11000.0, 9000.0 };
+// round 183b: the reference's colours (its manual and measured): Bright and Neutral play the same at these decays;
+// Dark adds a steep low-pass at 8 kHz (and −1.5 dB from 3 kHz up); the fourth (the reference's Studio) a steep
+// 600 Hz low cut (12 dB/oct, −3 dB at ~560 Hz) and a steep 10 kHz high cut (36 dB/oct at 12 kHz)
+const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Studio" };
 
 double horizonDecaySec (float v) { return knotLaw (v, horizonDecayKnots, horizonDecayCount); }
 double horizonEchoMs (float v) { return knotLaw (v, horizonEchoKnots, horizonEchoCount); }
@@ -1446,6 +1536,10 @@ public:
         for (auto& sh : shifters)
             sh.clear();
         tone[0].z = tone[1].z = 0.0f;
+        lowCutState[0].z = lowCutState[1].z = 0.0f;
+        compEnv = 0.0f;
+        compGain = 1.0f;
+        compTick = 0;
         wow = 0.0;
         crush[0] = crush[1] = 0.0f;
         crushPhase = 0.0;
@@ -1455,54 +1549,100 @@ protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[22], horizon::reverbModeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
-        const auto& m = horizonReverbs[choice (p[22], horizon::reverbModeCount)];
+        const auto mode = choice (p[22], horizon::reverbModeCount);
+        const auto& m = horizonReverbs[mode];
         mix = p[0];
         const auto size = (double) p[12];
         s.shape = m.shape;
         s.lineScale = m.scale * (0.5 + 0.8 * size);
-        s.predelaySec = m.preMs * (0.6 + 0.8 * size) / 1000.0;
+        // round 183b: the echo is the pre-delay (Echo time); the mode adds its own onset, which grows with Size
+        // (measured: 25 % / 100 % / 139 % of the Size 50 % value at 0 / 50 / 100 %)
+        s.predelaySec = m.preMs * (0.25 + 1.85 * size - 0.7 * size * size) / 1000.0;
         const auto decay = horizonDecaySec (p[11]);
-        s.rt60 = decay * m.rtScale;
+        s.rt60 = decay * m.rtScale * (1.03 - 0.12 * size) / 0.97; // (the reference's RT shortens ~10 % with Size)
         s.buildSec = m.buildMs / 1000.0 * (0.3 + 1.4 * p[13]);
         const auto earlyLate = (double) p[14];
         s.earlyLevel = m.early * (1.5 - earlyLate);
         s.earlySec = 0.04 * (0.5 + size);
-        s.lateLevel = 0.5 + earlyLate;
+        // round 183b: the reference's level barely moves with Early/Late (+1.6 / −1.3 dB at 0 / 100 %)
+        s.lateLevel = 1.1 - 0.2 * earlyLate;
         s.inDiffusion = 0.4 + 0.6 * p[15];
         s.loopDiffusion = 0.1 + 0.8 * p[15];
-        s.gateSec = choice (p[22], horizon::reverbModeCount) == 7 ? 0.5 * decay + 0.05 : 0.0;
+        // round 183b: the reference's Frozen and Nonlin modes take their length from Size, not Decay (its manual;
+        // measured at Size 0 / 50 / 100 %: Nonlin gates after ~0.1 / 0.33 / 1.05 s; Frozen holds with an RT of
+        // ~2 / 15 s at Size 0 / 50 %, "tens of seconds" at 100 %)
+        s.gateSec = mode == 7 ? 0.1 * std::pow (10.5, size) : 0.0;
+        if (mode == 6)
+            s.rt60 = 2.0 * std::pow (7.5, 2.0 * size);
         s.modRateHz = skewLaw (p[17], 0.01, 10.0, 2.328);
         s.modDepthMs = 1.0 * p[18] / std::sqrt (std::max (0.1, s.modRateHz));
-        s.outLowCut = skewLaw (p[19], 20.0, 1000.0, 1.807);
-        s.outHighCut = skewLaw (p[20], 1000.0, 20000.0, 1.078);
-        s.outLowOrder = 1; // round 172d: gentle EQ cuts (the reference's lows at 31 … 50 Hz and highs at 10 … 16 kHz)
+        // round 183b: Low EQ is the echo section's −6 dB/oct high-pass (Echo → Reverb: the reverb hears the echo,
+        // so it is cut once; Reverb → Echo: on the reverb's output here). High EQ is a −6 dB/oct low-pass in both the
+        // echo and the reverb and sets the reverb's high decay: measured RT(8 kHz) / RT(1 kHz) 0.47 / 0.65 / 0.90 /
+        // 0.99 at High EQ 1 / 4.5 / 11.9 / 20 kHz (this tank's own losses give ~0.65 with no damping)
+        const auto lowEq = skewLaw (p[19], 20.0, 1000.0, 1.807), highEq = skewLaw (p[20], 1000.0, 20000.0, 1.078);
+        s.outLowCut = choice (p[10], 2) == 1 ? lowEq : 0.0;
+        s.outHighCut = highEq;
+        s.outLowOrder = 1;
         s.outHighOrder = 1;
+        if (highEq < 4500.0)
+        {
+            s.highXover = highEq;
+            s.highMult = 0.5 + 0.45 * std::log2 (highEq / 1000.0) / std::log2 (4.5);
+        }
+        else
+        {
+            s.highXover = 3000.0;
+            s.highMult = 1.0 + 0.9 * std::log2 (highEq / 4500.0) / std::log2 (20000.0 / 4500.0);
+        }
+        s.lowMult = m.lowMult;
+        s.lowXover = 500.0;
+        // round 183b: the reference's tail is fuller below ~1.4 kHz than this tank's (impulse at −20 dB, music)
+        s.lowShelfHz = 1400.0;
+        s.lowShelfDb = 3.0 + m.lowDb;
+        s.highShelfHz = 4000.0;
+        s.highShelfDb = m.highDb;
         const auto colour = choice (p[23], 4);
-        if (horizonColourCut[colour] > 0.0)
-            s.outHighCut = std::min (s.outHighCut, horizonColourCut[colour]);
-        if (colour == 3)
-            s.outLowCut = std::max (s.outLowCut, 250.0);
+        if (colour == 2) // Dark
+        {
+            s.bandLimit = 8000.0;
+            s.bandLimitSections = 8;
+            s.toneHighHz = 3000.0;
+            s.toneHighDb = -1.5;
+        }
+        else if (colour == 3) // the reference's Studio
+        {
+            s.outLowCut = std::max (s.outLowCut, 560.0);
+            s.outLowOrder = 2;
+            s.bandLimit = 12000.0;
+            s.bandLimitSections = 3;
+        }
         s.width = -1.0 + 2.0 * p[1];
-        // round 172d: the reference holds its wet energy nearly constant over Decay (impulse, Mix 100 %, Decay 10 … 60 %:
-        // 22 … 24 dB while this tank's grows with the RT), so the level follows 1 / √RT; its highs die sooner (8 kHz
-        // RT ≈ 0.75 × this tank's at 2 … 8 s)
-        s.gain = m.gain * p[16] * 0.65 / std::sqrt (std::max (0.2, s.rt60));
-        s.highMult = 0.7;
-        s.highXover = 4000.0;
+        // round 172d: the reference holds its wet energy nearly constant over Decay, so the level follows 1 / √RT
+        s.gain = m.gain * p[16] * 0.65 * 1.25 / std::sqrt (std::max (0.2, s.rt60)); // (× 1.25: the compressor's make-up)
+        // round 183b: this tank's short lines (small Size) and lower Density run louder than the reference's
+        // (measured: Size 0 at −0.9 dB against Size 50 %; Density 0 / 50 % at +2.3 / +1.9 dB against 100 %)
+        s.gain *= std::min (1.0, 0.56 + 0.88 * size) * std::pow (10.0, 2.2 * std::min (1.0, 2.0 * (1.0 - (double) p[15])) / 20.0);
     }
 
-    // the echo before the reverb (routing "echo → reverb"), or after it
-    void echoStage (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
+    // round 183b: the echo section as the reference's manual has it. Echo → Reverb: the echo's output (not the dry
+    // input) is the reverb's input, and Level sets only how much of the echo is heard beside the reverb, so at Level 0
+    // and Feedback 0 the echo is the reverb's pre-delay (Echo time, 30 ms by default; the reference's onset follows
+    // it). Reverb → Echo: the reverb's output feeds the echo and Level sets the echo heard on top of it. The echo's
+    // Low EQ is a −6 dB/oct high-pass on what enters its line (input and feedback); Drive is used by the plain modes
+    // (Modern, Tape, Digital, Analog, Lo-fi) and Detune by the granular ones (Detune … Swarm), as the manual says
+    void echoStage (float* l, float* r, int n, const EffectParams& p, double bpm, bool beforeReverb) noexcept
     {
         const auto level = (float) p[9];
-        if (level <= 0.0f)
+        if (! beforeReverb && level <= 0.0f)
             return;
         const auto delay = std::max (1.0, syncedMs (choice (p[2], 4), std::min (5, choice (p[3], 6)), horizonEchoMs (p[4]), bpm)) * rate / 1000.0;
         const auto fb = (float) (0.98 * p[5]);
         const auto spread = (double) p[6];
-        const auto drive = std::pow (10.0, 24.0 * p[7] / 20.0);
-        const auto detune = (-30.0 + 60.0 * p[8]) / 100.0; // semitones
         const auto mode = choice (p[21], horizon::echoModeCount);
+        const auto granular = mode >= 4 && mode <= 10;
+        const auto drive = granular ? 1.0 : std::pow (10.0, 24.0 * p[7] / 20.0);
+        const auto detune = granular ? (-30.0 + 60.0 * p[8]) / 100.0 : 0.0; // semitones
         double ratio = 1.0, ratio2 = 1.0;
         bool shift = false, dual = false;
         double cut = 18000.0, wowDepth = 0.0;
@@ -1527,6 +1667,9 @@ protected:
         }
         tone[0].setLowpass (cut, rate);
         tone[1].a = tone[0].a;
+        const auto lowCut = skewLaw (p[19], 20.0, 1000.0, 1.807);
+        lowCutState[0].setLowpass (lowCut, rate);
+        lowCutState[1].a = lowCutState[0].a;
         const auto spreadL = delay * (1.0 - 0.25 * spread), spreadR = delay * (1.0 + 0.25 * spread);
         const auto wowInc = 2.0 * pi * 0.7 / rate;
         const auto hold = mode == 11 ? std::max (1.0, rate / 11025.0) : 1.0;
@@ -1550,7 +1693,7 @@ protected:
                 }
                 v = tone[c].lp (v);
                 if (drive > 1.0001)
-                    v = (float) (std::tanh (drive * v) / std::sqrt (drive));
+                    v = (float) (std::tanh (drive * v) / drive);
                 if (mode == 11)
                 {
                     if (c == 0)
@@ -1563,27 +1706,64 @@ protected:
             }
             if (crushPhase >= hold)
                 crushPhase -= hold;
-            echo[0].write (x[0] + fb * y[0]);
-            echo[1].write (x[1] + fb * y[1]);
-            l[i] = x[0] + level * y[0];
-            r[i] = x[1] + level * y[1];
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto in = x[c] + fb * y[c];
+                echo[c].write (in - lowCutState[c].lp (in));
+            }
+            if (beforeReverb)
+            {
+                echoOut[0][(std::size_t) i] = level * y[0];
+                echoOut[1][(std::size_t) i] = level * y[1];
+                l[i] = y[0];
+                r[i] = y[1];
+            }
+            else
+            {
+                l[i] = x[0] + level * y[0];
+                r[i] = x[1] + level * y[1];
+            }
         }
     }
 
     void preStage (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
+        // round 183b: the reference's wet runs 1 … 2 dB lower on loud programme than its response at −20 dB predicts
+        // (music, drums, noise and a decaying burst; ~1 dB with its clean echo mode): a gentle compressor on what
+        // enters the echo and reverb (mean-square follower, 30 ms; −30 dBFS, 1.25 : 1; gain updated every 32 samples)
+        const auto follow = (float) (1.0 - std::exp (-1.0 / (0.03 * rate)));
+        for (int i = 0; i < n; ++i)
+        {
+            compEnv += follow * (0.5f * (l[i] * l[i] + r[i] * r[i]) - compEnv);
+            if ((compTick++ & 31) == 0)
+            {
+                const auto level = 10.0f * std::log10 (compEnv + 1e-12f);
+                compGain = level > -30.0f ? std::pow (10.0f, -(level + 30.0f) * 0.2f / 20.0f) : 1.0f;
+            }
+            l[i] *= compGain;
+            r[i] *= compGain;
+        }
         if (choice (p[10], 2) == 0)
-            echoStage (l, r, n, p, bpm);
+            echoStage (l, r, n, p, bpm, true);
     }
     void postStage (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
         if (choice (p[10], 2) == 1)
-            echoStage (l, r, n, p, bpm);
+            echoStage (l, r, n, p, bpm, false);
+        else
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] += echoOut[0][(std::size_t) i];
+                r[i] += echoOut[1][(std::size_t) i];
+            }
     }
 
     Line echo[2];
     Shifter shifters[4];
-    OnePole tone[2];
+    OnePole tone[2], lowCutState[2];
+    float compEnv = 0.0f, compGain = 1.0f;
+    unsigned compTick = 0;
+    std::array<std::array<float, chunk>, 2> echoOut {};
     double wow = 0.0, crushPhase = 0.0;
     float crush[2] {};
 };

@@ -17,6 +17,8 @@ struct FlPathRoots
     std::string factoryData; // %FLStudioFactoryData%  e.g. C:\Program Files\Image-Line\FL Studio 2026
     std::string data;        // %FLStudioData%         e.g. ...\FL Studio 2026\Data
     std::string userData;    // %FLStudioUserData%     e.g. Documents\Image-Line\FL Studio
+    std::string sharedData;  // %ILSharedData%         e.g. Documents\Image-Line (FL's "Shared data" folder)
+    std::string downloadsData; // %FLStudioDownloadsData% e.g. Documents\Image-Line\Downloads (FL Cloud sounds...)
     std::string home;        // this user's profile (C:\Users\name): re-roots paths saved on another account/PC
 };
 
@@ -120,6 +122,8 @@ bool isFlSynthPresetPlugin (const std::string& pluginName);
 
 // Internal effect similar to a native FL effect (by the plugin's internal name).
 std::optional<EffectKind> effectForFlPlugin (const std::string& name);
+// FL's own spelling of a native effect's name (old presets and Patcher nodes keep other casings: "Fruity fast dist")
+std::string canonicalFlEffectName (const std::string& name);
 // FL's own Fruity effect saved as a VST2 inside Fruity Wrapper (FL 11): the native state FL 2026 opens it with, rebuilt
 // from the VST2 parameter floats (empty when the effect or its state is not known; REA_rodada170i §1)
 std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin);

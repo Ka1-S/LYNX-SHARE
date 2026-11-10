@@ -18,8 +18,10 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
-| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" | MIT (`third_party/onnxruntime/LICENSE`) |
+| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" and the Basic Pitch model of "Convert to MIDI" | MIT (`third_party/onnxruntime/LICENSE`) |
+| [Basic Pitch](https://github.com/spotify/basic-pitch) by Spotify (the ICASSP 2022 model `nmp.onnx` from commit fa5997a, unmodified, compiled in as `third_party/basic-pitch/nmp.onnx.inc`; its note-creation rules ported to C++ in `src/core/AudioToMidi.cpp`) | "Convert to MIDI": melody and harmony of audio clips | Apache-2.0, code and model weights (`third_party/basic-pitch/LICENSE`, `NOTICE`; text below) |
 | Libraries bundled inside JUCE's modules | text shaping, image and audio codecs, zip | HarfBuzz (MIT), SheenBidi (Apache-2.0), FLAC (BSD-3-Clause), Ogg/Vorbis (BSD-3-Clause), libpng (libpng/zlib licence), IJG libjpeg (IJG licence), zlib (zlib licence) |
+| [Open Sans](https://github.com/googlefonts/opensans) (`resources/fonts`, unmodified; Linux builds only) | the interface font on Linux | SIL Open Font License 1.1 (`resources/fonts/OFL.txt`, full text below) |
 
 The HT-Demucs model is not part of LYNX: on first use of "Extract stems from sample" LYNX shows its source and licence
 and downloads it only if you agree. The Demucs code is MIT; its authors state that the licence of the trained weights
@@ -36,8 +38,119 @@ from their official sources and checks their SHA-256.
 VST and ASIO are trademarks of Steinberg Media Technologies GmbH. FL Studio is a registered trademark of
 Image-Line Software; LYNX is not affiliated with Image-Line.
 
+## Basic Pitch (Apache-2.0)
+
+LYNX compiles in Basic Pitch's ONNX model (`basic_pitch/saved_models/icassp_2022/nmp.onnx`, 230 444 bytes, SHA-256
+2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec) and ports its note creation (`note_creation.py`) to
+C++. The repository publishes the code and the trained weights under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0; full text in `third_party/basic-pitch/LICENSE`). Its NOTICE file:
+
+```
+Basic Pitch
+Copyright 2022 Spotify AB
+
+This product includes software developed at
+Spotify AB (http://www.spotify.com/).
+```
+
+(The rest of Basic Pitch's NOTICE names Python libraries its own package uses — librosa, mir_eval, numpy, pretty-midi,
+resampy, scipy, tensorflow — and test audio from the Vocadito dataset; none of them is part of LYNX.)
+
 ## sse2neon (MIT)
 
 `third_party/sse2neon/sse2neon.h` v1.8.0 — https://github.com/DLTcollab/sse2neon. Translates the SSE intrinsics of the
 exact FL engines to NEON in the Apple Silicon (arm64) build. Copyright (c) 2015-2024 SSE2NEON Contributors; MIT
 licence in `third_party/sse2neon/LICENSE`.
+
+## Open Sans: SIL Open Font License 1.1
+
+```
+Copyright 2020 The Open Sans Project Authors (https://github.com/googlefonts/opensans)
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font
+creation efforts of academic and linguistic communities, and to
+provide a free and open framework in which fonts may be shared and
+improved in partnership with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply to
+any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software
+components as distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to,
+deleting, or substituting -- in part or in whole -- any of the
+components of the Original Version, by changing formats or by porting
+the Font Software to a new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed,
+modify, redistribute, and sell modified and unmodified copies of the
+Font Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components, in
+Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the
+corresponding Copyright Holder. This restriction only applies to the
+primary font name as presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created using
+the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+```
