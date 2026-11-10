@@ -294,16 +294,18 @@ public:
         g.fillRect (a.getCentreX(), a.getY(), 1.0f, a.getHeight());
         g.fillRect (a.getX(), a.getCentreY(), a.getWidth(), 1.0f);
         juce::Path path;
-        if (! options.points.empty())
+        auto started = ! options.points.empty();
+        if (started)
             path.startNewSubPath (toScreen (options.points.front().x, options.points.front().y)); // (a jump at the start shows as an edge)
         for (int i = 0; i <= 96; ++i)
         {
             const auto x = (double) i / 96.0;
             const juce::Point<float> p { a.getX() + (float) x * a.getWidth(), a.getBottom() - (float) miditools::velocityShape (options, x) * a.getHeight() };
-            if (path.isEmpty())
+            if (! started)
                 path.startNewSubPath (p);
             else
                 path.lineTo (p);
+            started = true;
         }
         g.setColour (colour::automation);
         g.strokePath (path, juce::PathStrokeType (1.4f));
