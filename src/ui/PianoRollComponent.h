@@ -156,6 +156,7 @@ public:
     std::vector<int> noteIndicesForSnapshot() const { return selectionOrAll(); }
     std::int64_t gridForSnapshot() const { return gridTicks(); }
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
+    juce::PopupMenu getStampMenuForSnapshot() { return stampMenu(); }
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
     // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
@@ -452,6 +453,7 @@ private:
     juce::PopupMenu fileMenu();
     juce::PopupMenu editMenu();
     juce::PopupMenu viewMenu();
+    juce::PopupMenu stampMenu(); // the chord stamp's list (the toolbar chord box's items)
     // FL's Piano roll › Time markers on the pattern's own markers (round 168g)
     juce::PopupMenu markersMenu();
     std::int64_t markerKeyTick() const;   // Alt+T / Ctrl+T: the time selection's start, the playhead in view, else a bar
