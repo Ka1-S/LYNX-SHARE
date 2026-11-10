@@ -1441,12 +1441,24 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::runUndoStep (undokeys::Step step)
+{
+    if (step != undokeys::Step::none)
+        undoRedo (step == undokeys::Step::redo);
+}
+
 void MainComponent::flUndo()
 {
-    if (alternateUndo)
-        undoRedo (false);
-    else
-        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+    // FL's default: undo, or redo when something is undone ("undo/redo on the same shortcut"); "Alternate undo mode":
+    // every press one more step back (core/UndoKeys.h)
+    runUndoStep (undokeys::undoKey (alternateUndo, engine.canUndo(), engine.canRedo()));
+}
+
+void MainComponent::flUndoBackwards()
+{
+    // FL's Undo backwards: one more step back; "Alternate undo mode" swaps the two shortcuts, so there it is the
+    // undo/redo key (round 190b)
+    runUndoStep (undokeys::backwardsKey (alternateUndo, engine.canUndo(), engine.canRedo()));
 }
 
 void MainComponent::undoRedo (bool redo)
@@ -1830,7 +1842,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
     else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
-    else if (is ("edit.undoBackwards")) undoRedo (false);
+    else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts"))
     {
@@ -2106,6 +2118,9 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
+            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
+                                                                                                                  : pianokeys::Style::flat;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2132,6 +2147,8 @@ void MainComponent::loadUiSettings()
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
             autoclipplace::setAtPlayback (on);
+        else if (key == "disableTypingPriority")
+            pluginkeys::newPluginsHostFirst() = on;
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready; "layoutStyle" wins)
             startStyle.legacyFlag (on);
         else if (key == "layoutStyle") // (round 184a)
@@ -2315,6 +2332,7 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -2324,6 +2342,7 @@ void MainComponent::saveUiSettings()
                                       + "\nkeyPanelFollowsStyle=" + juce::String (keyPanelFollowsStyle ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
+                                      + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (layoutstyle::legacyClipLaunchFlag (layoutStyle) ? 1 : 0)
                                       + "\nlayoutStyle=" + layoutstyle::id (layoutStyle)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
@@ -6070,6 +6089,7 @@ void MainComponent::openSettings (int page)
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
         o.autoClipsAtPlayback = autoclipplace::atPlayback();
+        o.disableTypingPriority = pluginkeys::newPluginsHostFirst().load();
         o.layoutStyle = (int) safe->layoutStyle;
         o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
@@ -6155,6 +6175,7 @@ void MainComponent::openSettings (int page)
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
+        pluginkeys::newPluginsHostFirst() = o.disableTypingPriority;
         self.setLayoutStyle ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, o.layoutStyle));
         AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())
@@ -6979,9 +7000,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     else if (index == 1)
     {
         // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
-        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
-        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
-                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
+        // ("Alternate undo mode" swaps the two shortcuts, as FL's menu does: round 190b)
+        const auto backwardsId = alternateUndo ? "edit.undo" : "edit.undoBackwards";
+        const auto toggleId = alternateUndo ? "edit.undoBackwards" : "edit.undo";
+        menu.addItem (tr ("Undo backwards") + shortcutText (backwardsId), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((engine.canRedo() ? tr ("Undo (redo)") : tr ("Undo")) + shortcutText (toggleId), engine.canUndo() || engine.canRedo(), false,
+                      [this] { runUndoStep (undokeys::toggle (engine.canUndo(), engine.canRedo())); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });

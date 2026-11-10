@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "core/FlVoiceSettings.h"
+
 namespace lynx
 {
 struct SampleData;
@@ -82,6 +84,11 @@ void declickEnd (SampleData& data, std::int64_t first, std::int64_t last);
 
 // What the sampler voice needs: the slice starts (fractions of the prepared sample), the first note and "play to end"
 void configureSampler (ChannelDef& def, const State& state, std::int64_t frames);
+
+// The voice settings (FL's Envelope / instrument settings page: the envelopes, LFOs and filter of the state's 364-byte
+// block). A state without the block reads as the plugin's defaults; setting them gives it one, as FL saves it.
+flvoice::Settings voiceSettings (const State& state);
+void setVoiceSettings (State& state, const flvoice::Settings& settings);
 
 // A new Fruity Slicer state for a sample: one slice at the start, FL's defaults
 State fresh (const std::string& path, int sampleRate);
