@@ -2338,11 +2338,15 @@ Not better: three Two-way pink-noise files at threshold −12, attack 10 ms (gai
 noise everywhere) and nine files whose 0–10 score fell by one or more steps with the gain error within 0.12 dB
 (pink noise that is hardly compressed, two attack-100 stairs, one vocal).
 
-Old projects: only these two styles change (every other style and voicing renders bit-identical, `hash/hash.md`).
-Level of the new law against the old one on the grid (mean over knees and attacks): Two-way −1 … +1 dB at thresholds
-−12 / −18, +2 dB at −24, +3.5 at −30, +5 at −36, +4.5 … +6 at −48 (more of the quiet parts is lifted, peaks up to
-19 dB apart in 5 ms windows at ratio 10); Vari-mu within 0.7 dB at −12 / −18, +1.5 dB at −24, +3 at −30, +5 at −36
-and +8 … +11 dB at −48 (it reduces far less at low thresholds, as the reference does).
+Old projects sound the same: the laws are versioned by Crest's appended `Law` parameter (on = measured, for new
+instances and for reference states translated on load; a project or preset saved before has no such parameter and
+loads with it off = round 108's laws, `upgradeLoadedEffectParams`, like Prism's `Detector`). No control in the editor;
+the parameter list shows it as measured / classic. `hash/hash.md`: all 36 legacy-state renders (every style and
+voicing of Crest and Sentry) are bit-identical to 0.1.25; a new instance differs only in the three refitted styles.
+No factory preset uses Two-way, Vari-mu or Sentry's Vocal style, so none moved.
+For reference, the level of the measured law against the classic one on the grid (mean over knees and attacks):
+Two-way −1 … +1 dB at thresholds −12 / −18, +2 dB at −24, +3.5 at −30, +5 at −36, +4.5 … +6 at −48; Vari-mu within
+about 1 dB at −12 / −18, +1.5 dB at −24, +3 at −30, +5 at −36 and +8 … +11 dB at −48.
 
 Open: the reference's Two-way depends on frequency (100 Hz gets about 1.4 dB more gain than 1 kHz, 8 kHz 4.5 – 6.7 dB
 more reduction: probably bands); not modelled, it is most of the remaining 1.9 dB.
@@ -2351,6 +2355,8 @@ more reduction: probably bands); not modelled, it is most of the remaining 1.9 d
 
 The reference's Vocal style turns hiss-like sound down when it starts after a pause and lets it come back while it
 lasts; its other styles do not, and neither do LYNX's (bit-identical, also Vocal with ducking).
+Sentry's appended `Law` parameter versions it the same way: projects saved before load with it off and render
+bit-identically (no noise reduction).
 
 - What counts: the part above 4 kHz, when it holds most of the power (10 % → 75 % of it: none → full). White noise
   low-passed at 2 kHz, tones, music and voiced notes pass untouched.

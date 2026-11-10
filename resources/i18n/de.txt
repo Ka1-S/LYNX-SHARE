@@ -8263,3 +8263,4 @@ countries: de at ch li lu
 "Mixer groups follow the Playlist (LYNX)" = "Mixer-Gruppen folgen der Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts wie die Playlist anordnen"
 "{0} insert(s) moved to follow the Playlist" = "{0} Insert(s) verschoben, um der Playlist zu folgen"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Gemessen: das an die Referenz angepasste Modell; klassisch: das von Projekten, die davor gespeichert wurden"

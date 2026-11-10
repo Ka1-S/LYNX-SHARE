@@ -8263,3 +8263,4 @@ countries: kr
 "Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "측정: 레퍼런스에 맞춘 모델, 클래식: 그 이전에 저장된 프로젝트의 모델"

@@ -8263,3 +8263,4 @@ countries: jp
 "Mixer groups follow the Playlist (LYNX)" = "ミキサーのグループをプレイリストに合わせる（LYNX）"
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "計測: リファレンスに合わせたモデル。クラシック: それ以前に保存したプロジェクトのモデル"

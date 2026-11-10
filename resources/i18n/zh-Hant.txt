@@ -8263,3 +8263,4 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "實測：依參考擬合的模型；經典：此前儲存的專案所用的模型"

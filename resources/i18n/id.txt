@@ -8263,3 +8263,4 @@ countries: id
 "Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Terukur: model yang disesuaikan dengan referensi; klasik: model proyek yang disimpan sebelumnya"

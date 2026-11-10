@@ -239,3 +239,83 @@ TEST (p190v_sentry_vocal_turns_noise_down_after_a_pause)
         CHECK (std::abs (g) < 0.1);
     }
 }
+
+TEST (p190v_projects_saved_before_keep_the_classic_laws)
+{
+    using namespace lynx;
+    namespace c = dyn::crest;
+    namespace s = dyn::sentry;
+    using namespace dyn108;
+    // new instances run the measured laws; a state saved before the parameter existed loads with it off, a state saved
+    // with it keeps what it had (both values survive a load)
+    for (const auto kind : { EffectKind::crestCompressor, EffectKind::sentryGate })
+    {
+        const auto law = (std::size_t) (kind == EffectKind::crestCompressor ? (int) c::law : (int) s::law);
+        CHECK (effectInfo (kind).params.size() == law + 1 && std::string (effectInfo (kind).params[law].name) == "Law");
+        auto fresh = makeEffectSlot (kind);
+        CHECK (fresh.params[law] >= 0.5f);
+        auto old = makeEffectSlot (kind);
+        upgradeLoadedEffectParams (old, law); // saved by 0.1.25: one parameter short
+        CHECK (old.params[law] < 0.5f);
+        for (const float v : { 0.0f, 1.0f })
+        {
+            auto again = makeEffectSlot (kind);
+            again.params[law] = v;
+            upgradeLoadedEffectParams (again, law + 1);
+            CHECK (again.params[law] == v);
+        }
+    }
+    // the classic laws are round 108's, as 0.1.25 rendered them (1 kHz stairs at threshold −36, ratio 4, knee 0, attack
+    // 10 ms, release 200 ms: the gain at −48, −36, −24, −12, −6 and 0 dBFS, taken from the build whose classic renders
+    // hash-match 0.1.25's, /mnt/e/lynx-work/parity190v/hash/hash.md)
+    const std::vector<double> levels { -48, -36, -24, -12, -6, 0 };
+    std::size_t per = 0;
+    const auto x = stair (levels, 0.5, 1000.0, per);
+    const struct { c::Style style; double gain[6]; } classic[] {
+        { c::Style::twoWay, { -2.184, -4.312, -9.160, -16.432, -20.069, -23.704 } },
+        { c::Style::variMu, { 0.000, 0.000, -6.304, -15.916, -20.587, -25.258 } },
+    };
+    for (const auto& row : classic)
+    {
+        auto p = defaults (EffectKind::crestCompressor);
+        p[c::style] = c::styleValue (row.style);
+        p[c::threshold] = 0.4f;
+        p[c::ratio] = c::ratioValue (4.0);
+        p[c::knee] = 0.0f;
+        p[c::attack] = c::attackValue (10.0);
+        p[c::release] = c::releaseValue (200.0);
+        p[c::autoGain] = 0.0f;
+        p[c::law] = 0.0f;
+        const auto old = stairGains (x, run (EffectKind::crestCompressor, p, x), per, levels.size());
+        p[c::law] = 1.0f;
+        const auto now = stairGains (x, run (EffectKind::crestCompressor, p, x), per, levels.size());
+        std::printf ("  classic style %d: %.3f %.3f %.3f %.3f %.3f %.3f\n", (int) row.style, old[0], old[1], old[2], old[3], old[4], old[5]);
+        double apart = 0.0;
+        for (std::size_t i = 0; i < levels.size(); ++i)
+        {
+            CHECK (std::abs (old[i] - row.gain[i]) < 0.02);
+            apart = std::max (apart, std::abs (old[i] - now[i]));
+        }
+        CHECK (apart > 1.0); // and the measured law is another one
+        // another style does not hear the switch
+        p[c::style] = c::styleValue (c::Style::clean);
+        const auto a = run (EffectKind::crestCompressor, p, x);
+        p[c::law] = 0.0f;
+        CHECK (a == run (EffectKind::crestCompressor, p, x));
+    }
+    // Sentry: with the law off the Vocal style has no noise reduction (noise after a pause comes through at 0 dB)
+    auto n = p190v::noise (-20.0, 3.0, 190u);
+    std::fill (n.begin(), n.begin() + (std::ptrdiff_t) (0.5 * sr), 0.0f);
+    auto q = defaults (EffectKind::sentryGate);
+    q[s::threshold] = 0.0f;
+    q[s::lookaheadOn] = 0.0f;
+    q[s::style] = s::styleValue (s::Style::vocal);
+    q[s::law] = 0.0f;
+    const auto y = run (EffectKind::sentryGate, q, n);
+    const auto a = (std::size_t) (0.6 * sr), b = (std::size_t) (0.7 * sr);
+    CHECK (std::abs (rmsDb (y, a, b) - rmsDb (n, a, b)) < 0.1);
+    q[s::style] = s::styleValue (s::Style::classic);
+    const auto off = run (EffectKind::sentryGate, q, n);
+    q[s::law] = 1.0f;
+    CHECK (off == run (EffectKind::sentryGate, q, n));
+}

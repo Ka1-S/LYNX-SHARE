@@ -36,6 +36,7 @@ const std::map<std::string, const char*>& shared()
         { "phase", TR_NOOP ("Inverts the polarity") },
         { "voicing", TR_NOOP ("Which model the engine follows: LYNX SHARE's own or the one matched to a reference") },
         { "matched", TR_NOOP ("Uses the model matched to the reference instead of LYNX SHARE's own") },
+        { "law", TR_NOOP ("Measured: the model fitted to the reference; classic: the one of projects saved before it") },
         { "oversampling", TR_NOOP ("Processes at a higher rate: less aliasing, more CPU") },
         { "auto gain", TR_NOOP ("Keeps the loudness about the same while the effect is changed") },
         { "listen", TR_NOOP ("Plays only what the effect removes or reacts to") },

@@ -258,7 +258,7 @@ namespace
 {
 // The style families (fitted to MEASURE_fabfilter §2, see REA_rodada108 §3): time-constant scales of the level
 // detector (τ = scale × knob), the knee every curve gets on top of the knob, and the curve family.
-enum class Curve { downward, upward, twoWay, vocal, variMu };
+enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic };
 struct StyleDef
 {
     double attackScale;  // detector attack τ = scale × knob
@@ -304,6 +304,23 @@ constexpr StyleDef styleDefs[allStyles] {
     { 0.570, 0.223, 0.990, 13.98, 0.488, Curve::downward, 0.0, 0.00, 1.000, 4.61, 1.000, 1.00, 0.0, 0.0 }, // op-el (voicing)
     { 0.023, 3.667, 0.190, 1.69, 0.808, Curve::downward, 0.0, -0.77, 1.000, 0.00, 3.165, 0.83, 0.00, 0.000 }, // mastering (voicing)
 };
+
+// round 190v: the two-way and vari-mu laws of projects saved before that round (round 108's fits; the `law` parameter
+// off). They render exactly as they did.
+constexpr StyleDef classicDefs[2] {
+    { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWayClassic, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 },
+    { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMuClassic, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 },
+};
+// the definition a style runs with: its own, or the classic one of two-way / vari-mu when the measured law is off
+const StyleDef& defOf (Style st, bool measured) noexcept
+{
+    if (! measured && st == Style::twoWay)
+        return classicDefs[0];
+    if (! measured && st == Style::variMu)
+        return classicDefs[1];
+    return styleDefs[(int) st];
+}
+const StyleDef& defOf (const EffectParams& p) noexcept { return defOf (styleOf (p), on (p[law])); }
 
 double releaseTau (const StyleDef& d, double knobMs) noexcept
 {
@@ -462,14 +479,51 @@ double variMuGain (const VariMuLaw& w, double x) noexcept
     return -w.slope * w.width * softplus ((x - w.corner) / w.width);
 }
 
+// (the classic vari-mu law, projects saved before round 190v)
+// vari-mu: the share of the full ratio reached at an overshoot o (dB), by slope s = 1 − 1/R — measured (§2.1 data,
+// slopes 1/3 … 0.99, overshoots 0 … 18 dB) and divided by our detector's own shortfall (0.96)
+double variMuShare (double s, double o) noexcept
+{
+    static constexpr double slopes[6] { 0.3333, 0.5, 0.75, 0.875, 0.95, 0.99 };
+    static constexpr double table[6][10] {
+        { 0, 0.071, 0.118, 0.189, 0.28, 0.383, 0.491, 0.599, 0.701, 0.797 },
+        { 0, 0.102, 0.2, 0.311, 0.422, 0.524, 0.615, 0.695, 0.764, 0.824 },
+        { 0, 0.263, 0.442, 0.561, 0.645, 0.708, 0.758, 0.797, 0.829, 0.856 },
+        { 0, 0.478, 0.637, 0.723, 0.776, 0.813, 0.841, 0.863, 0.881, 0.896 },
+        { 0, 0.545, 0.677, 0.742, 0.783, 0.812, 0.833, 0.85, 0.863, 0.875 },
+        { 0, 0.665, 0.767, 0.811, 0.839, 0.857, 0.871, 0.882, 0.892, 0.9 } };
+    if (o <= 0.0)
+        return 0.0;
+    const auto row = [&] (int k) {
+        if (o >= 18.0)
+            return 1.0 - (1.0 - table[k][9]) * 18.0 / o;
+        const auto x = o / 2.0;
+        const int i = std::min (8, (int) x);
+        return table[k][i] + (table[k][i + 1] - table[k][i]) * (x - i);
+    };
+    double f;
+    if (s <= slopes[0])
+        f = row (0) * s / slopes[0];
+    else if (s >= slopes[5])
+        f = row (5);
+    else
+    {
+        int k = 0;
+        while (s > slopes[k + 1])
+            ++k;
+        const auto t = (s - slopes[k]) / (slopes[k + 1] - slopes[k]);
+        f = row (k) + (row (k + 1) - row (k)) * t;
+    }
+    return std::min (1.0, f / 0.96);
+}
+
 // the most an upward curve lifts (dB), whatever the range (round tp172b3, measured)
 constexpr double upwardCapDb = 30.0;
 
 // target gain change (dB; negative = reduction) for a detector level `x` (dB); `attMs`: the attack knob (two-way's
 // fixed gain follows it)
-double curveGain (Style st, double x, double thr, double r, double knee, double range, double attMs = 10.0) noexcept
+double curveGain (const StyleDef& d, double x, double thr, double r, double knee, double range, double attMs = 10.0) noexcept
 {
-    const auto& d = styleDefs[(int) st];
     const auto s = 1.0 - 1.0 / r;
     switch (d.curve)
     {
@@ -499,6 +553,23 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
         }
         case Curve::variMu:
             return std::max (-range, variMuGain (variMuLaw (thr, r, knee), x));
+        case Curve::twoWayClassic:
+        {
+            // two-way: a fixed offset, upward compression below (threshold − 6 dB), downward above (threshold + 4 dB)
+            const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
+            // round tp172b3: the upward part only over the 30 dB under its corner and not on silence (under −90 dBFS:
+            // the original's first hit after digital silence comes out turned down, never lifted)
+            const auto up = x < -90.0 ? 0.0 : d.upSlope * s * std::clamp (thr - 6.0 - x, 0.0, upwardCapDb);
+            const auto g = d.baseDb * s + up - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
+            return std::clamp (g, -range, std::min (range, upwardCapDb));
+        }
+        case Curve::variMuClassic:
+        {
+            // the ratio grows with the reduction (variable-mu tube behaviour), as measured
+            const auto o = std::max (0.0, x - thr);
+            const auto soft = knee > 0.0 ? kneeCurve (x - thr, 1.0, knee) : o;
+            return -std::min (range, s * soft * variMuShare (s, o + knee * 0.25));
+        }
         case Curve::downward:
         default:
             return -std::min (range, kneeCurve (x - thr - d.offsetDb, s * d.slopeScale, d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s));
@@ -518,17 +589,16 @@ void scEqParams (const EffectParams& p, EffectParams& out) noexcept
 
 double staticGainDb (const EffectParams& p, double inputDb)
 {
-    const auto st = styleOf (p);
+    const auto& def = defOf (p);
     const auto att = attackMs (p[attack]);
-    if (styleDefs[(int) st].curve == Curve::twoWay)
+    if (def.curve == Curve::twoWay)
     {
         // round 190v: two-way's detector (a linear attack / release follower) settles under a steady sine's peak by up
         // to 3.9 dB as the attack nears the release (0.5 dB at 10 / 200 ms, 2 dB at 100 / 200 ms, measured)
-        const auto& sd = styleDefs[(int) st];
-        const auto rho = att * sd.attackScale / std::max (0.5, releaseMs (p[release]) * sd.releaseScale);
+        const auto rho = att * def.attackScale / std::max (0.5, releaseMs (p[release]) * def.releaseScale);
         inputDb -= std::min (3.9, 4.0 * std::pow (rho, 0.55));
     }
-    return curveGain (st, inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
+    return curveGain (def, inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
                       std::max (0.01, rangeDb (p[range])), att);
 }
 
@@ -667,6 +737,7 @@ private:
         bool autoRel;
         // round 190v: two-way / vari-mu run their measured laws, set up once per chunk
         Curve curve = Curve::downward;
+        const StyleDef* def = &styleDefs[0];
         TwoWayLaw twoWay {};
         VariMuLaw variMu {};
         double aRl = 0.0; // two-way: the linear follower's release
@@ -677,7 +748,7 @@ private:
             return std::clamp (twoWayGain (x.twoWay, level), -x.rng, std::min (x.rng, upwardCapDb));
         if (x.curve == Curve::variMu)
             return std::max (-x.rng, variMuGain (x.variMu, level));
-        return curveGain (x.st, level, x.thr, x.rat, x.kn, x.rng);
+        return curveGain (*x.def, level, x.thr, x.rat, x.kn, x.rng);
     }
 
     // latency = the chosen maximum look-ahead (+ the oversampler when on), as the reference does (§2: 960 samples
@@ -726,7 +797,8 @@ private:
     {
         Ctx c;
         c.st = styleOf (p);
-        const auto& sd = styleDefs[(int) c.st];
+        const auto& sd = defOf (p);
+        c.def = &sd;
         c.thr = on (p[autoThreshold]) ? autoThresholdDb (thresholdDb (p[threshold]), programDb) : thresholdDb (p[threshold]);
         c.rat = ratioOf (p[ratio]);
         c.kn = kneeDb (p[knee]);
@@ -758,7 +830,7 @@ private:
             c.variMu = variMuLaw (c.thr, c.rat, c.kn);
         }
         c.aP = coef (c.relMs, rate);
-        c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
+        c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay && sd.curve != Curve::twoWayClassic;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
@@ -900,7 +972,7 @@ private:
         const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
         const auto st = styleOf (p);
         float makeup = 1.0f;
-        if (on (p[autoGain]) && styleDefs[(int) st].curve != Curve::upward)
+        if (on (p[autoGain]) && defOf (p).curve != Curve::upward)
         {
             const auto rng = std::max (0.01, rangeDb (p[range]));
             // round tp172b [EXEC] (1 kHz stairs through the reference, 32 settings): its auto gain makes up ~0.36 of the
@@ -916,7 +988,7 @@ private:
             // (never more than 3 dB over the other styles' make-up: one capture does not carry a deep setting, and the
             // make-up also lifts the pauses)
             const auto common = 0.36 * slowAttack * plain;
-            const auto made = styleDefs[(int) st].curve == Curve::twoWay ? std::min (1.19 * slowAttack * plain, common + 3.0) : common;
+            const auto made = defOf (p).curve == Curve::twoWay ? std::min (1.19 * slowAttack * plain, common + 3.0) : common;
             makeup = (float) dbToGain (std::min (rng, made));
         }
         const auto mode = linkModeOf (p[linkMode]);
@@ -2719,7 +2791,7 @@ private:
         double maxGr = 0.0;
         const bool over = osFactor > 1;
         // round 190v: the Vocal style's noise reduction (vocalNr above); nothing of it runs in the other styles
-        const bool nr = st == Style::vocal && ! duck;
+        const bool nr = st == Style::vocal && ! duck && on (p[law]);
         double nrDepthScale = 0.0, nrRange = 0.0, nrArmMs = 0.0, nrMsCoef = 0.0, nrPeakCoef = 0.0, nrSmooth = 0.0;
         if (nr)
         {
@@ -2951,7 +3023,10 @@ const EffectInfo& crestInfo()
                                      // round 137: the side-chain trigger (off), 1/4 note, rate 100 %, length 10 %, no channel
                                      { "Trigger", 0.0f }, { "Trigger sync", 0.5f }, { "Trigger rate", 0.5f }, { "Trigger length", 0.1f },
                                      { "Trigger channel", 0.0f },
-                                     { "Voicing", 0.0f } } }; // round tp172b2
+                                     { "Voicing", 0.0f }, // round tp172b2
+                                     // round 190v: two-way and vari-mu on the reference grid (new instances; projects saved before keep
+                                     // round 108's laws: upgradeLoadedEffectParams)
+                                     { "Law", 1.0f } } };
     return info;
 }
 
@@ -3058,7 +3133,9 @@ const EffectInfo& sentryInfo()
                                      { "Channel mode", 0.0f }, { "SC gain L", 0.5f }, { "SC mix L", 0.5f }, { "SC gain R", 0.5f },
                                      { "SC mix R", 0.5f }, { "Wet pan", 0.5f }, { "Dry pan", 0.5f }, { "Ducking", 0.0f },
                                      { "Input", 0.5f },
-                                     { "Oversampling", 0.0f } } }; // round 135
+                                     { "Oversampling", 0.0f }, // round 135
+                                     // round 190v: the Vocal style's noise reduction (new instances; projects saved before have none)
+                                     { "Law", 1.0f } } };
     return info;
 }
 
@@ -3156,6 +3233,7 @@ std::string paramText (EffectKind kind, int param, float v)
                 static const char* names[voicings] { "None", "Smooth", "Op-El", "Mastering" };
                 return names[pick (v, voicings)];
             }
+            case law: return on (v) ? "measured" : "classic";
             default: return on (v) ? "on" : "off";
         }
     }
@@ -3252,6 +3330,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case dry: return fmt ("%.0f%%", v * 100.0);
             case output: case input: return db (lin (v, -24.0, 24.0));
             case oversampling: return crest::oversamplingOf (v) == 1 ? "off" : std::to_string (crest::oversamplingOf (v)) + "x";
+            case law: return on (v) ? "measured" : "classic";
             case channelMode: return on (v) ? "Mid/Side" : "Left/Right";
             case scGainL: case scGainR: return db (scGainDb (v));
             case scMixL: case scMixR: return fmt ("%+.2f", mixOf (v));
