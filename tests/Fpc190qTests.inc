@@ -92,8 +92,11 @@ inline lynx::Song kitSong (const lynx::fpc::Kit& kit)
     using namespace lynx;
     Song s;
     s.bpm = 128.0;
+    s.mixer = Song::defaultMixer (5); // Master + 5 inserts, no effects
     while (s.mixer.size() < 6)
         s.mixer.emplace_back();
+    for (auto& t : s.mixer)
+        t.effects.clear();
     ChannelDef c;
     c.name = "FPC";
     c.instrument = InstrumentKind::fpc;
