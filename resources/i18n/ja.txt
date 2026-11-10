@@ -1563,6 +1563,8 @@ countries: jp
 "Controller type" = "コントローラータイプ"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "汎用コントローラー: コントロールの右クリックメニュー > MIDIコントローラーにリンク でノブやフェーダーをリンクします。"
 "Pickup (takeover mode)" = "ピックアップ (テイクオーバーモード)"
+"Foot pedal controls note off" = "フットペダルでノートオフを制御"
+"Disable to send sustain to plugins" = "オフにするとサステインをプラグインに送ります"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "コントローラーが現在の値に達してから初めてパラメーターを動かすため、値が飛びません。"
 "Links in this project" = "このプロジェクトのリンク"
 "ch. {0}" = "Ch {0}"

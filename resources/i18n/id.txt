@@ -1563,6 +1563,8 @@ countries: id
 "Controller type" = "Jenis kontroler"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Kontroler generik: tautkan knob atau fader lewat menu klik kanan kontrol > Tautkan ke kontroler MIDI."
 "Pickup (takeover mode)" = "Pickup (mode takeover)"
+"Foot pedal controls note off" = "Pedal kaki mengatur akhir nada"
+"Disable to send sustain to plugins" = "Nonaktifkan untuk mengirim sustain ke plugin"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Kontroler baru menggerakkan parameter setelah mencapai nilainya saat ini, jadi tidak ada yang melompat."
 "Links in this project" = "Tautan di proyek ini"
 "ch. {0}" = "ch. {0}"

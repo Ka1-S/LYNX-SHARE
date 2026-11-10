@@ -11314,6 +11314,9 @@ private:
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),
                                                      ui.getMixerForSnapshot().getStripsForSnapshot().buildMenu (1) };
                 saveMenus (juce::StringArray { "Piano roll tools", "Playlist track", "Mixer track" }, menus, prefix + "-menus143.png");
+                // round 190j (discussion #10): the Piano roll menu's Chord stamp list
+                saveMenus (juce::StringArray { "Chord stamp" }, std::vector<juce::PopupMenu> { ui.getPianoRollForSnapshot().getStampMenuForSnapshot() },
+                           prefix + "-stamp-menu.png");
                 // round 167l: the channel menu ("Lock active/mute state")
                 if (! offline.getSong().channels.empty())
                     saveMenus (juce::StringArray { "Channel" }, std::vector<juce::PopupMenu> { ui.getRackForSnapshot().getChannelMenuForSnapshot (0) }, prefix + "-channel-menu.png");
