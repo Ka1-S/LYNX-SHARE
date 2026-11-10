@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <map>
 #include <memory>
@@ -8,6 +9,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/MeterBallistics.h"
 #include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
@@ -75,6 +77,11 @@ public:
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
     static inline int editPatternsIn = 0;
+    // FL 2026's Playlist menu › View › Track headers (round 190w; FL's defaults): the record / input buttons on audio
+    // tracks, and a stereo level meter beside the header of audio tracks (their mixer track) and instrument tracks
+    // (their channel's mixer track). Kept with the UI settings.
+    static inline bool showAudioTrackControls = true, showAudioTrackLevels = true, showInstrumentTrackLevels = false;
+    void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
     void paint (juce::Graphics& g) override;
@@ -495,6 +502,13 @@ private:
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
     ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
+    // round 190w: the track headers' level meters (FL's "Show levels on audio / instrument tracks")
+    int meteredInsertOf (int track) const;
+    bool updateMeterColumn();        // true when the column appeared or went away
+    bool stepHeaderMeters (double nowMs);
+    int meterColumn = 0;             // px at the right of the headers for the meters (0 = no track shows one)
+    std::map<int, std::array<meters::PeakHold, 2>> headerLevels; // per mixer track shown
+    double headerMeterMs = -1.0;
 
     void zoomAroundCentre (double factor);
     void zoomToBars (int bars);

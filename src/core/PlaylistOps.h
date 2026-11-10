@@ -134,6 +134,20 @@ std::string describe (const Song& song, int track);
 // source", "Recording / Monitoring" and "Arm/disarm recording" buttons that act on its linked mixer track; unassigned and
 // instrument tracks have none). -1 when `track` is not an audio track linked to an existing insert.
 int armableInsert (const Song& song, int track);
+// FL 2026's Playlist menu › View › Track headers (round 190w; [DFM] EEShowAudioTrackControlsAction Checked=true,
+// EEShowAudioTrackMetersAction Checked=true, EEShowInstrumentTrackMetersAction unchecked; [SHOT] FL 2026 flgap190w):
+// "Show controls on audio tracks", "Show levels on audio tracks", "Show levels on instrument tracks". User options, not
+// saved in the project (FL keeps them with its settings).
+struct HeaderOptions
+{
+    bool audioControls = true;
+    bool audioLevels = true;
+    bool instrumentLevels = false;
+};
+// The mixer track whose level a track header shows (FL draws a stereo peak meter beside the header): an audio track's
+// linked mixer track while audioLevels is on; an instrument track's channel's mixer track (0 = the Master) while
+// instrumentLevels is on. -1 = no meter on this track.
+int meteredInsert (const Song& song, int track, const HeaderOptions& options);
 // Audio clips placed on an audio track play through its mixer track (issue #15, FL 2026 [DECOMP FLEngine FUN_00e66ba0 /
 // FUN_00e66580]): only the clips an edit placed (`touched`: moved, painted, pasted, duplicated, dropped — indices into
 // song.playlist) are routed, never the others, so a channel routed by hand stays where the user put it until its clip

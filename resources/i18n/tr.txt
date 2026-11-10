@@ -8263,3 +8263,7 @@ countries: tr
 "Mixer groups follow the Playlist (LYNX)" = "Mikser grupları Playlist'i izler (LYNX)"
 "Arrange inserts like the Playlist" = "Insert'leri Playlist gibi sırala"
 "{0} insert(s) moved to follow the Playlist" = "Playlist'i izlemek için {0} insert taşındı"
+"Track headers" = "Parça başlıkları"
+"Show controls on audio tracks" = "Ses parçalarında denetimleri göster"
+"Show levels on audio tracks" = "Ses parçalarında seviyeleri göster"
+"Show levels on instrument tracks" = "Enstrüman parçalarında seviyeleri göster"

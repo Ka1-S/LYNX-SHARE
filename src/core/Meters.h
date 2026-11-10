@@ -22,6 +22,8 @@ public:
 
         raise (peaks[(std::size_t) track * 2], left);
         raise (peaks[(std::size_t) track * 2 + 1], right);
+        raise (viewPeaks[(std::size_t) track * 2], left);
+        raise (viewPeaks[(std::size_t) track * 2 + 1], right);
     }
 
     // UI: peak since the last read. channel 0 = left, 1 = right.
@@ -31,6 +33,16 @@ public:
             return 0.0f;
 
         return peaks[(std::size_t) track * 2 + (std::size_t) channel].exchange (0.0f, std::memory_order_relaxed);
+    }
+
+    // The same peaks for a second reader (round 190w: the Playlist track headers' levels, FL's "Show levels on audio
+    // tracks"), so the Mixer's meters and the headers never take each other's peaks.
+    float takeViewPeak (int track, int channel) noexcept
+    {
+        if (track < 0 || track >= maxMixerTracks)
+            return 0.0f;
+
+        return viewPeaks[(std::size_t) track * 2 + (std::size_t) channel].exchange (0.0f, std::memory_order_relaxed);
     }
 
     // the audio editor's recording tap (round 86): input, Master (0) or a mixer insert
@@ -54,5 +66,6 @@ private:
     }
 
     std::array<std::atomic<float>, maxMixerTracks * 2> peaks {};
+    std::array<std::atomic<float>, maxMixerTracks * 2> viewPeaks {};
 };
 } // namespace lynx

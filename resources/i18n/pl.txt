@@ -8263,3 +8263,7 @@ countries: pl
 "Mixer groups follow the Playlist (LYNX)" = "Grupy miksera podążają za Playlistą (LYNX)"
 "Arrange inserts like the Playlist" = "Ułóż inserty jak w Playliście"
 "{0} insert(s) moved to follow the Playlist" = "Przeniesiono inserty, by podążały za Playlistą: {0}"
+"Track headers" = "Nagłówki ścieżek"
+"Show controls on audio tracks" = "Pokazuj kontrolki na ścieżkach audio"
+"Show levels on audio tracks" = "Pokazuj poziomy na ścieżkach audio"
+"Show levels on instrument tracks" = "Pokazuj poziomy na ścieżkach instrumentów"

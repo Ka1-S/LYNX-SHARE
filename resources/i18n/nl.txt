@@ -8263,3 +8263,7 @@ countries: nl be
 "Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
+"Track headers" = "Trackkoppen"
+"Show controls on audio tracks" = "Bediening op audiotracks tonen"
+"Show levels on audio tracks" = "Niveaus op audiotracks tonen"
+"Show levels on instrument tracks" = "Niveaus op instrumenttracks tonen"

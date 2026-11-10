@@ -2063,6 +2063,12 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
+            PlaylistComponent::showAudioTrackControls = on;
+        else if (key == "audioTrackLevels")
+            PlaylistComponent::showAudioTrackLevels = on;
+        else if (key == "instrumentTrackLevels")
+            PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "alternateUndo")
@@ -2293,6 +2299,9 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
+                                      + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
+                                      + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
@@ -3048,6 +3057,21 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
             action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
+            {
+                // FL 2026's Playlist menu › View › Track headers (round 190w; [DFM] EEViewMenu, FL's defaults)
+                juce::PopupMenu view;
+                view.addSectionHeader (tr ("Track headers"));
+                auto option = [this, &view] (const juce::String& text, bool& setting) {
+                    view.addItem (text, true, setting, [this, &setting] {
+                        setting = ! setting;
+                        playlist.headerOptionsChanged();
+                    });
+                };
+                option (tr ("Show controls on audio tracks"), PlaylistComponent::showAudioTrackControls);
+                option (tr ("Show levels on audio tracks"), PlaylistComponent::showAudioTrackLevels);
+                option (tr ("Show levels on instrument tracks"), PlaylistComponent::showInstrumentTrackLevels);
+                menu.addSubMenu (tr ("View"), view);
+            }
             {
                 juce::PopupMenu trackTools;
                 action (trackTools, "playlist.cloneTracks", tr ("Clone selected playlist track(s)"));

@@ -8263,3 +8263,7 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+"Track headers" = "軌道標題"
+"Show controls on audio tracks" = "在音訊軌道上顯示控制項"
+"Show levels on audio tracks" = "在音訊軌道上顯示電平"
+"Show levels on instrument tracks" = "在樂器軌道上顯示電平"

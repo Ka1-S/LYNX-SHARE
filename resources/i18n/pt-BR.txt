@@ -8346,3 +8346,7 @@ countries: br
 "Mixer groups follow the Playlist (LYNX)" = "Grupos do Mixer seguem a Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Organizar inserts como a Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) movido(s) para seguir a Playlist"
+"Track headers" = "Cabeçalhos das trilhas"
+"Show controls on audio tracks" = "Mostrar controles nas trilhas de áudio"
+"Show levels on audio tracks" = "Mostrar níveis nas trilhas de áudio"
+"Show levels on instrument tracks" = "Mostrar níveis nas trilhas de instrumento"

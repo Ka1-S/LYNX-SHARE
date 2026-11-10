@@ -8263,3 +8263,7 @@ countries: kr
 "Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
+"Track headers" = "트랙 헤더"
+"Show controls on audio tracks" = "오디오 트랙에 컨트롤 표시"
+"Show levels on audio tracks" = "오디오 트랙에 레벨 표시"
+"Show levels on instrument tracks" = "악기 트랙에 레벨 표시"
