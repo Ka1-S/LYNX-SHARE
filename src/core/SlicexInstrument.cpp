@@ -19,6 +19,14 @@ const std::string& deckBPath (const ChannelDef& channel) noexcept
     return channel.zones.empty() ? none : channel.zones.front().path;
 }
 
+double sampleBeats (const SampleData& sample) noexcept
+{
+    if (sample.frames() == 0)
+        return 0.0;
+    const auto seconds = (double) sample.frames() / (sample.sampleRate > 0.0 ? sample.sampleRate : 44100.0);
+    return sample.acidBeats > 0.0f ? (double) sample.acidBeats : guessBeats (seconds);
+}
+
 void setDeckBPath (ChannelDef& channel, const std::string& path)
 {
     channel.zones.clear();
@@ -72,6 +80,7 @@ slicex::DeckAudio deckAudio (const std::shared_ptr<const SampleData>& sample, co
     a.right = sample->isStereo() ? sample->rightData() : nullptr;
     a.frames = (std::int64_t) sample->frames();
     a.sampleRate = sample->sampleRate > 0.0 ? sample->sampleRate : 44100.0;
+    a.beats = slicex::sampleBeats (*sample);
     std::int64_t frames = 0;
     if (! deck.wav.empty())
         a.regions = slicex::wavRegions (deck.wav, frames);

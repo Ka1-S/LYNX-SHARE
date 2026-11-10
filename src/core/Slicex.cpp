@@ -226,6 +226,26 @@ double Deck::beats() const noexcept
     return std::isfinite (shown) && shown > 0.0 ? shown : 0.0;
 }
 
+double Deck::selectionStart() const noexcept
+{
+    double v;
+    std::memcpy (&v, params.data(), 8);
+    return v;
+}
+
+double Deck::selectionEnd() const noexcept
+{
+    double v;
+    std::memcpy (&v, params.data() + 8, 8);
+    return v;
+}
+
+bool Deck::hasSelection() const noexcept
+{
+    const auto a = selectionStart(), b = selectionEnd();
+    return std::isfinite (a) && std::isfinite (b) && a >= 0.0 && b > a;
+}
+
 std::int32_t State::optionInt (int offset) const noexcept
 {
     std::int32_t v = 0;
@@ -468,6 +488,40 @@ void setDeckBeats (State& state, int deck, double start, double end)
     auto& d = state.decks[(std::size_t) deck];
     std::memcpy (d.params.data() + 0x10, &start, 8);
     std::memcpy (d.params.data() + 0x18, &end, 8);
+}
+
+double deckBeats (const Deck& deck, double fileBeats) noexcept
+{
+    if (const auto own = wavBeats (deck.wav); own > 0.0)
+        return own;
+    if (deck.wav.empty() && std::isfinite (fileBeats) && fileBeats > 0.0)
+        return fileBeats;
+    return deck.beats();
+}
+
+void setDeckSelection (State& state, int deck, double from, double to)
+{
+    if (deck < 0 || deck > 1)
+        return;
+    if (from > to)
+        std::swap (from, to);
+    if (! (to > from) || from < 0.0)
+        from = to = -1.0;
+    auto& d = state.decks[(std::size_t) deck];
+    std::memcpy (d.params.data(), &from, 8);
+    std::memcpy (d.params.data() + 8, &to, 8);
+}
+
+FrameRange framesOf (double fromBeats, double toBeats, double framesPerBeat, std::int64_t frames) noexcept
+{
+    FrameRange r;
+    if (! (framesPerBeat > 0.0) || frames <= 0 || ! std::isfinite (fromBeats) || ! std::isfinite (toBeats))
+        return r;
+    if (fromBeats > toBeats)
+        std::swap (fromBeats, toBeats);
+    r.first = std::clamp<std::int64_t> (std::llround (fromBeats * framesPerBeat), 0, frames);
+    r.end = std::clamp<std::int64_t> (std::llround (toBeats * framesPerBeat), r.first, frames);
+    return r;
 }
 
 double wavBeats (const std::vector<std::uint8_t>& w) noexcept
@@ -838,6 +892,96 @@ std::vector<std::uint8_t> withRegions (const std::vector<std::uint8_t>& w, const
     const auto riff = (std::uint32_t) (out.size() - 8);
     for (int i = 0; i < 4; ++i)
         out[4 + (std::size_t) i] = (std::uint8_t) (riff >> (8 * i));
+    return out;
+}
+
+namespace
+{
+// offsets in a sampler chunk's body: the loop count, then the first loop's start and end
+constexpr std::size_t smplLoops = 28, smplLoopStart = 44, smplLoopEnd = 48, smplOneLoop = 60;
+bool isWav (const std::vector<std::uint8_t>& w) noexcept
+{
+    return w.size() >= 12 && std::memcmp (w.data(), "RIFF", 4) == 0 && std::memcmp (w.data() + 8, "WAVE", 4) == 0;
+}
+void store32 (std::uint8_t* p, std::uint32_t v) noexcept
+{
+    for (int i = 0; i < 4; ++i)
+        p[i] = (std::uint8_t) (v >> (8 * i));
+}
+} // namespace
+
+bool wavLoop (const std::vector<std::uint8_t>& w, std::int64_t& first, std::int64_t& last)
+{
+    if (! isWav (w))
+        return false;
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        const std::size_t size = le32 (w.data() + p + 4);
+        const std::size_t have = std::min (size, w.size() - (p + 8));
+        if (std::memcmp (w.data() + p, "smpl", 4) == 0 && have >= smplOneLoop && le32 (w.data() + p + 8 + smplLoops) >= 1)
+        {
+            first = (std::int64_t) le32 (w.data() + p + 8 + smplLoopStart);
+            last = (std::int64_t) le32 (w.data() + p + 8 + smplLoopEnd);
+            return true;
+        }
+        p += 8 + size + (size & 1);
+    }
+    return false;
+}
+
+std::vector<std::uint8_t> withLoop (const std::vector<std::uint8_t>& w, std::int64_t first, std::int64_t last)
+{
+    if (! isWav (w) || first < 0 || last < first)
+        return {};
+    // a sampler chunk that has a loop: its points are replaced where they are (what FL's own save shows)
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        const std::size_t size = le32 (w.data() + p + 4);
+        const std::size_t have = std::min (size, w.size() - (p + 8));
+        if (std::memcmp (w.data() + p, "smpl", 4) == 0 && have >= smplOneLoop && le32 (w.data() + p + 8 + smplLoops) >= 1)
+        {
+            auto out = w;
+            store32 (out.data() + p + 8 + smplLoopStart, (std::uint32_t) first);
+            store32 (out.data() + p + 8 + smplLoopEnd, (std::uint32_t) last);
+            return out;
+        }
+        p += 8 + size + (size & 1);
+    }
+    // none: one is written after the audio (FL's chunk order: fmt, data, smpl…), a loop-less one is dropped
+    std::uint32_t rate = 44100;
+    std::vector<std::uint8_t> out (w.begin(), w.begin() + 12);
+    bool placed = false;
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        const std::size_t size = le32 (w.data() + p + 4);
+        const std::size_t have = std::min (size, w.size() - (p + 8));
+        const std::size_t next = std::min (w.size(), p + 8 + size + (size & 1));
+        if (std::memcmp (w.data() + p, "fmt ", 4) == 0 && have >= 8)
+            rate = le32 (w.data() + p + 12);
+        if (std::memcmp (w.data() + p, "smpl", 4) != 0)
+            out.insert (out.end(), w.begin() + (std::ptrdiff_t) p, w.begin() + (std::ptrdiff_t) next);
+        if (std::memcmp (w.data() + p, "data", 4) == 0 && ! placed)
+        {
+            placed = true;
+            if (out.size() & 1)
+                out.push_back (0);
+            const auto at = out.size();
+            out.resize (at + 8 + smplOneLoop, 0);
+            std::memcpy (out.data() + at, "smpl", 4);
+            store32 (out.data() + at + 4, (std::uint32_t) smplOneLoop);
+            auto* body = out.data() + at + 8;
+            store32 (body + 8, rate > 0 ? (std::uint32_t) std::llround (1.0e9 / (double) rate) : 0u); // the sample period, ns
+            store32 (body + 12, 60);                 // the unity note
+            store32 (body + smplLoops, 1);
+            store32 (body + 36, 0x20000u);           // the loop's id as FL writes it
+            store32 (body + smplLoopStart, (std::uint32_t) first);
+            store32 (body + smplLoopEnd, (std::uint32_t) last);
+        }
+        p = next;
+    }
+    if (! placed)
+        return {};
+    store32 (out.data() + 4, (std::uint32_t) (out.size() - 8));
     return out;
 }
 

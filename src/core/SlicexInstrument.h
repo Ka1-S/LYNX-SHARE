@@ -25,6 +25,12 @@ namespace slicex
 const std::string& deckBPath (const ChannelDef& channel) noexcept;
 void setDeckBPath (ChannelDef& channel, const std::string& path);
 
+// The beat count of a sample that is a deck by reference (its WAV is not in the state): the file's own (ACID chunk),
+// else FL's guess from its length (guessBeats). What the editor writes as the deck's range when it loads the file,
+// and what the engine and the editor take the deck's tempo from once the saved range holds the editor's zoom
+// (round 190aj)
+double sampleBeats (const SampleData& sample) noexcept;
+
 // Fills an imported channel (FlpImport): the state and the decks' samples (the files it names, resolved with
 // `existing`, or the WAVs it holds, stored with `saveEmbedded`). False: not a state LYNX reads, or no deck's audio is
 // on this machine.
