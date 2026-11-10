@@ -486,6 +486,22 @@ TEST (flm190ab_three_osc_envelope_steps_as_flm)
         CHECK (c != nullptr && c->modelParams.size() == 3 && c->modelParams[0] == 96.0f);
         if (c == nullptr)
             return;
+        // the pitch envelope's amount is in cents × 2 (±2400 cents), the Mod X / Mod Y ones in 1/128 (A/B setting P1)
+        {
+            auto q = flm190u::threeOscDefaults();
+            q[65] = 1.0f, q[109] = 0.56f, q[107] = 0.85f, q[108] = 0.25f;
+            FlpImportReport report;
+            const auto amounts = importFlm (flm190u::engineProject (flm::module::threeOsc, 149, q), flm182c::options (&report));
+            const auto* ca = amounts ? flm182c::channelNamed (*amounts, "Bass") : nullptr;
+            const auto amount = [ca] (int record) {
+                std::int32_t x = 0;
+                std::memcpy (&x, ca->pluginState.data() + 0x60 + 0x44 * record + 4 * 8, 4);
+                return x;
+            };
+            CHECK (ca != nullptr && ca->pluginState.size() >= 460);
+            if (ca != nullptr && ca->pluginState.size() >= 460)
+                CHECK (amount (4) == 288 && amount (2) == 90 && amount (3) == -64 && amount (1) == 0);
+        }
         // the level per 128 samples of a held key 84 (523 Hz in FLM's octave, 84 samples a cycle)
         const auto levels = [] (const ChannelDef& channel) {
             auto inst = makeThreeOscInstrument();

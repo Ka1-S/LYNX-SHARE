@@ -453,7 +453,9 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
             r[5] = time (86 + e);
             r[6] = rnd (128.0 * v (94 + e));
             r[7] = time (98 + e);
-            r[8] = e == 0 ? 0 : rnd (256.0 * (v (106 + e) - 0.5));
+            // the amount in the record's unit, as the LFO's: Mod X / Mod Y 256, the pitch 4800 = ±2400 cents (A/B inside
+            // FL, round 190ab, setting P1: 0.56 starts 288 cents up)
+            r[8] = e == 0 ? 0 : rnd ((j == 4 ? 4800.0 : 256.0) * (v (106 + e) - 0.5));
             r[14] = rnd (256.0 * (v (78 + e) - 0.5));
             r[15] = rnd (256.0 * (v (90 + e) - 0.5));
             r[16] = rnd (256.0 * (v (102 + e) - 0.5));

@@ -797,7 +797,7 @@ installation.
 | 22 / 23 mix, 26 phase randomness | state | round(128v); round(64v) |
 | 27–61 LFOs (global, tempo, shape, predelay, attack, amount, speed) | snapshot records 0…4 | flags; round(2v); times round(65536v); amount in the record's unit (pan 128, volume / Mod X / Mod Y 256, pitch 4800, all × (v−½)) |
 | 62–105 envelopes (on, tempo, predelay, attack, hold, decay, sustain, release, tensions) | snapshot records 1…4 | flags; times round(65536v) (attack raw 100 where FLM's time is 0); sustain round(128v); tensions round(256(v−½)) |
-| 107–109 envelope amounts | records 2…4 | round(256(v−½)) |
+| 107–109 envelope amounts | records 2…4 | Mod X, Mod Y: round(256(v−½)); pitch: round(4800(v−½)) = ±2400 cents (A/B, round 190ab, setting P1) |
 | 110 filter type, 111 cutoff, 112 resonance, 115 / 116 offsets | snapshot | round(7v); round(256(v + offset)) clamped to 0…256 |
 | 106 volume envelope amount, 114 volume multiplier | channel gain (modelParams[2]) | 2v · clamp(2(v106−½), 0, 1): plain factors, as in FLM |
 | 113 pan | channel pan | 2v − 1 |
