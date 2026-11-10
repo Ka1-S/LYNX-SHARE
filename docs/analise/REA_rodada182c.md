@@ -753,6 +753,13 @@ pulse width: up to 2.7 dB on single notes of S3). (2) FLM's FL plugin hands the 
 Tools: /mnt/e/lynx-work/flm190u/ab (mkgen_tb.py, render.sh, score_tb.py, null2.py), tools/tbr.cpp; spec
 /mnt/e/lynx-work/flm190n/rea/spec-transistorbass.md.
 
+**End to end (follow-up, round 190u).** The A/B above drove the module through the reference renderer. Through the
+.flm import and the song renderer (tools/flmr.cpp) the first note nulled FL (−37 dB) but every later note came out
+3 dB down and rising: the instrument wrote the desktop's note pan gains (√ law, 0.707 at the centre) over the
+module's smoothed balance at each note-on. Fixed (FLM channels get only the module's balance); the song render now
+equals the reference render to −141 dB on every note of phrases A and B, and a test compares the instrument with
+the reference render over three notes.
+
 Quality gate: the desktop path writes the same bytes as before on 36 renders (FL's three presets, each also as stream
 version 5 with engines 0 / 1 / 2 and with the oversampling field 1 and 2; 44.1 and 48 kHz; old against new object),
 same CPU time. Not modelled: FLM's un-clamped pitch below key 12, last-bit summation orders, Drive through √ and

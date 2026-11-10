@@ -2992,8 +2992,11 @@ public:
                 plugin->setCutExpression (0.0f);
                 plugin->setResExpression (0.0f);
                 plugin->setPitchExpression (noteCents[(std::size_t) k]);
-                plugin->setPanExpression ((float) std::clamp ((double) notePan[(std::size_t) k] + pan, -1.0, 1.0));
-                plugin->setFlmNotePan (notePan[(std::size_t) k]);
+                // (FLM's module has its own smoothed balance: the desktop's pan gains would be written over it)
+                if (plugin->isFlm())
+                    plugin->setFlmNotePan (notePan[(std::size_t) k]);
+                else
+                    plugin->setPanExpression ((float) std::clamp ((double) notePan[(std::size_t) k] + pan, -1.0, 1.0));
                 sent[(std::size_t) k] = true;
             }
         if (plugin->isFlm()) // FLM's module: the channel's pan and volume as plain gains (no MIDI volume)

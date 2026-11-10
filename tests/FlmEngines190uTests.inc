@@ -181,6 +181,50 @@ TEST (flm190u_transistor_bass_plays_flms_build)
     auto desktop = *bass;
     desktop.modelParams.clear();
     CHECK (! transistorBassIsFlm (desktop) && rendered (desktop).first == 0.0f);
+
+    // end to end: the imported channel through the instrument is the module's own reference render, note after note
+    // (the desktop's note pan gains were written over the module's balance: every note after the first came out 3 dB
+    // down, rising)
+    {
+        auto inst = makeTransistorBassInstrument();
+        inst->prepare (44100.0);
+        inst->configure (*bass, 120.0);
+        constexpr int length = 90112, block = 512;
+        const int starts[] = { 0, 30208, 60416 }, keys[] = { 60, 48, 67 };
+        const float velocities[] = { 0.5f, 0.9f, 0.5f };
+        std::vector<float> l ((std::size_t) length, 0.0f), r ((std::size_t) length, 0.0f);
+        std::vector<tbass::RefNote> notes;
+        for (int k = 0; k < 3; ++k)
+        {
+            tbass::RefNote n;
+            n.start = starts[k], n.key = keys[k], n.initVol = velocities[k], n.release = starts[k] + 8192;
+            notes.push_back (n);
+        }
+        for (int pos = 0; pos < length; pos += block)
+        {
+            for (int k = 0; k < 3; ++k)
+            {
+                if (pos == starts[k])
+                    inst->noteOn (keys[k], velocities[k]);
+                if (pos == starts[k] + 8192)
+                    inst->noteOff (keys[k]);
+            }
+            inst->render (l.data() + pos, r.data() + pos, block, 1.0f, 1.0f);
+        }
+        tbass::RefOptions o;
+        o.flm = true;
+        const auto ref = tbass::renderReference (bass->pluginState, "", notes, 44100.0, length, o);
+        CHECK ((int) ref.size() == 2 * length);
+        double worst = 0.0, energy = 0.0;
+        if ((int) ref.size() == 2 * length)
+            for (int i = 0; i < length; ++i)
+            {
+                worst = std::max ({ worst, std::abs ((double) l[(std::size_t) i] - ref[2 * (std::size_t) i]), std::abs ((double) r[(std::size_t) i] - ref[2 * (std::size_t) i + 1]) });
+                if (i >= starts[1])
+                    energy += (double) ref[2 * (std::size_t) i] * ref[2 * (std::size_t) i];
+            }
+        CHECK (energy > 1.0e-6 && worst < 1.0e-6);
+    }
 }
 
 // The desktop plugin plays at 4× whatever the state's oversampling field says (A/B inside FL, round 190u: FL's render
