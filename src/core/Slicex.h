@@ -117,14 +117,20 @@ struct Deck
     bool longPath = false;              // the path was saved in the long form (kept for a byte-exact rewrite)
     std::string path;                   // FL's path variables kept (%FLStudioFactoryData%…)
     std::vector<std::uint8_t> wav;      // the embedded WAV (FL's own writer output: cue points, labels, keys)
-    std::array<std::uint8_t, 76> params {}; // the editor's view settings and beat grid, as saved
+    std::array<std::uint8_t, 76> params {}; // the editor's view settings (selection, shown range in beats…), as saved
     std::array<Curve, 4> curves;        // the editor's curves (kind 6)
     std::vector<RegionRecord> regions;  // one per region of the sample, in sample order (an empty deck keeps one)
 
     bool empty() const noexcept { return wav.empty() && path.empty(); }
     // the beat grid of the deck's sample (beats): start and end; the tempo FL shows is beats · 60 / duration
+    // the part of the sample the editor shows (beats), as saved: start and end. A deck saved zoomed out has the
+    // sample's whole beat count here; one saved zoomed in has less (round 190ac: FL showed 60BPM for 8 beats and saved
+    // 0..6.845 with the view zoomed), so the tempo is NOT taken from here when the sample says its own (beats())
     double beatStart() const noexcept;
     double beatEnd() const noexcept;
+    // the sample's beat count: the embedded WAV's own (FL writes it there, ACID chunk; also for a sample that came
+    // without one), else the saved view range (a deck by reference, as LYNX writes one: its whole length)
+    double beats() const noexcept;
     bool operator== (const Deck&) const = default;
 };
 
@@ -179,13 +185,15 @@ std::vector<std::uint8_t> write (const State& state);
 State fresh();
 // Puts a sample file on a deck (by reference; its regions come from the file's cue points): one default record per region
 void setDeckFile (State& state, int deck, const std::string& path, int regions);
-// the deck's beat grid (Deck::beatStart / beatEnd): the tempo FL shows is beats · 60 / duration
+// the deck's shown range in beats (Deck::beatStart / beatEnd); for a deck without an embedded WAV also its beat count
 void setDeckBeats (State& state, int deck, double start, double end);
 
 // The beat count FL gives a loaded sample that carries no tempo (no ACID beat count): the power of two that puts its
 // tempo in 80 < BPM ≤ 160 (round 190ac, nine files loaded in FL: 3.000 s → 8 beats = 160 BPM, 2.981 s → 4 = 80.5,
 // 1.370 s → 2 = 87.6; the project's tempo, 120, plays no part)
 double guessBeats (double seconds) noexcept;
+// The beat count a WAV carries (ACID chunk), 0 without one. The tempo FL shows is beats · 60 / duration
+double wavBeats (const std::vector<std::uint8_t>& wav) noexcept;
 
 // ---- the laws (FL's single-precision arithmetic)
 float masterVolume (std::int32_t raw) noexcept;      // 0…16000, 12800 = 1: (11^x − 1)/10

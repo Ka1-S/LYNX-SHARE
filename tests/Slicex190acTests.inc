@@ -80,3 +80,30 @@ TEST (slicex190ac_untagged_sample_tempo_is_fls_guess)
     CHECK (slicex::guessBeats (0.0) == 0.0);
     CHECK (slicex::guessBeats (0.1) == 0.25); // (shorter than a beat at 160: halved [not seen in FL])
 }
+
+// The tempo of a deck is its sample's own beat count; the saved view range (which FL writes zoomed: 0..6.845 beats of
+// an 8-beat loop that still showed 60BPM) only stands in for a deck without an embedded WAV
+TEST (slicex190ac_deck_tempo_survives_a_zoomed_view)
+{
+    using namespace lynx;
+    auto wav = slicex190h::wavWith (1000, { { 1, 0, 0, "Kick", -1 } });
+    CHECK (slicex::wavBeats (wav) == 0.0);
+    // an ACID chunk: flags, root note, 0x80, 0.0, beats, meter, tempo
+    const std::uint8_t acid[] = { 'a', 'c', 'i', 'd', 24, 0, 0, 0, 0, 0, 0, 0, 0x3c, 0, 0x80, 0, 0, 0, 0, 0, 8, 0, 0, 0, 4, 0, 4, 0, 0, 0, 0x70, 0x42 };
+    wav.insert (wav.end(), std::begin (acid), std::end (acid));
+    const auto size = (std::uint32_t) (wav.size() - 8);
+    std::memcpy (wav.data() + 4, &size, 4);
+    CHECK (slicex::wavBeats (wav) == 8.0);
+    std::int64_t frames = 0;
+    CHECK (slicex::wavBeats (slicex::withRegions (wav, slicex::wavRegions (wav, frames))) == 8.0);
+
+    auto s = slicex::fresh();
+    slicex::setDeckBeats (s, 0, 0.0, 6.84476021);
+    CHECK (s.decks[0].beats() == 6.84476021); // by reference: the range is all there is
+    s.decks[0].wav = wav;
+    CHECK (s.decks[0].beats() == 8.0);
+    s.decks[1].wav = slicex190h::wavWith (1000, { { 1, 0, 0, "Kick", -1 } });
+    slicex::setDeckBeats (s, 1, 0.0, 4.0);
+    CHECK (s.decks[1].beats() == 4.0);
+    CHECK (slicex::wavBeats ({}) == 0.0);
+}

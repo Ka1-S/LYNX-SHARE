@@ -1488,7 +1488,7 @@ private:
         const auto deck = (std::size_t) currentDeck();
         const auto& sample = samples[deck];
         rateLabel.setText (sample != nullptr ? juce::String ((int) std::lround (sample->sampleRate)) + "Hz" : juce::String(), juce::dontSendNotification);
-        const auto beats = state.decks[deck].beatEnd() - state.decks[deck].beatStart();
+        const auto beats = state.decks[deck].beats();
         tempoLabel.setText (sample != nullptr && sample->frames() > 0 && std::isfinite (beats) && beats > 0.0
                                 ? juce::String ((int) std::lround (beats * 60.0 * sample->sampleRate / (double) sample->frames())) + "BPM"
                                 : juce::String(),

@@ -218,6 +218,14 @@ double Deck::beatEnd() const noexcept
     return v;
 }
 
+double Deck::beats() const noexcept
+{
+    if (const auto own = wavBeats (wav); own > 0.0)
+        return own;
+    const auto shown = beatEnd() - beatStart();
+    return std::isfinite (shown) && shown > 0.0 ? shown : 0.0;
+}
+
 std::int32_t State::optionInt (int offset) const noexcept
 {
     std::int32_t v = 0;
@@ -460,6 +468,30 @@ void setDeckBeats (State& state, int deck, double start, double end)
     auto& d = state.decks[(std::size_t) deck];
     std::memcpy (d.params.data() + 0x10, &start, 8);
     std::memcpy (d.params.data() + 0x18, &end, 8);
+}
+
+double wavBeats (const std::vector<std::uint8_t>& w) noexcept
+{
+    if (w.size() < 12 || (std::memcmp (w.data(), "RIFF", 4) != 0 && std::memcmp (w.data(), "RF64", 4) != 0))
+        return 0.0;
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        std::uint32_t len = 0;
+        std::memcpy (&len, w.data() + p + 4, 4);
+        const auto body = p + 8;
+        if (std::memcmp (w.data() + p, "data", 4) == 0 && (len == 0xffffffffu || body + len > w.size()))
+            break; // (a 64-bit or cut file: nothing after the samples to read)
+        if (body + len > w.size())
+            break;
+        if (std::memcmp (w.data() + p, "acid", 4) == 0 && len >= 16)
+        {
+            std::uint32_t beats = 0;
+            std::memcpy (&beats, w.data() + body + 12, 4);
+            return beats > 0 && beats < 65536 ? (double) beats : 0.0;
+        }
+        p = body + len + (len & 1);
+    }
+    return 0.0;
 }
 
 double guessBeats (double seconds) noexcept

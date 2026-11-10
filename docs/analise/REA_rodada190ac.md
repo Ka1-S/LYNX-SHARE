@@ -34,8 +34,17 @@ on, the last with "Snap to zero-crossing". FL's saved chunks (`p/riff.py`):
   The Snap menu is for selections and envelope points.
 - `slicex::withRegions` writes the list this way; run on FL's own two files with the regions it reads from them, it
   gives the files back byte for byte (`p/rt`). `wavRegions` now also keeps each region's purpose and info text.
-- Seen but not explained: the same save holds a beat-grid end of 6.845 instead of 8 (one of the drags or wheel turns
-  changed the deck's grid). Not reproduced, not built.
+- The two doubles at 0x10 / 0x18 of a deck's parameters are the range the editor SHOWS, in beats, not the sample's
+  beat grid (rounds 190l/190r read them as the grid): this save holds 0..6.845 although FL showed 60BPM and a length
+  of 003:01:000 (8 beats) at the moment of saving, with the deck zoomed in so that it ended about 6.85 beats in
+  (fl/shots/sv1.png). A deck saved zoomed out has the whole beat count there, which is why it passed for the grid.
+  The beat count itself is in the deck's embedded WAV: FL writes an `acid` chunk there (beats at +12, tempo at +20),
+  also for a sample that came without one (u9.wav has none; the deck's copy in ac_untag.flp has 4 beats, 81.5).
+  Built: `slicex::wavBeats`, `Deck::beats()` (the WAV's count, else the saved range for a deck by reference); the
+  engine's deck tempo and the editor's TEMPO / LENGTH texts use it, and the editor opens a deck at the saved range.
+  Before: ac_edit1.flp showed 518BPM in LYNX and tempo-synced parts of such a deck ran at that tempo. [EXEC: FL save
+  + shot; the visible range matched by eye only, about 104 px a beat]
+  Not built: LYNX does not write its own zoom back into the state (FL does).
 
 ## 3. Zoom / scroll bar and the wave [EXEC + DOC]
 
