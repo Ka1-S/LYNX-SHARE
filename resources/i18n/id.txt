@@ -8266,3 +8266,6 @@ countries: id
 "Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
+"Keyboard style" = "Gaya keyboard"
+"Flat keys (FL Studio style)" = "Tuts datar (gaya FL Studio)"
+"Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"

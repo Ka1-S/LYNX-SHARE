@@ -8266,3 +8266,6 @@ countries: es mx ar co cl pe ve
 "Mixer groups follow the Playlist (LYNX)" = "Los grupos del Mixer siguen la Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Ordenar inserts como la Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) movido(s) para seguir la Playlist"
+"Keyboard style" = "Estilo del teclado"
+"Flat keys (FL Studio style)" = "Teclas planas (estilo FL Studio)"
+"Piano keys (lines between the white keys)" = "Teclas de piano (líneas entre las teclas blancas)"

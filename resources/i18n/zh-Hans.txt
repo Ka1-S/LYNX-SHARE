@@ -8266,3 +8266,6 @@ countries: cn sg
 "Mixer groups follow the Playlist (LYNX)" = "混音器分组跟随 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "按 Playlist 排列插入轨"
 "{0} insert(s) moved to follow the Playlist" = "已移动 {0} 个插入轨以跟随 Playlist"
+"Keyboard style" = "键盘样式"
+"Flat keys (FL Studio style)" = "平面琴键（FL Studio 样式）"
+"Piano keys (lines between the white keys)" = "钢琴琴键（白键之间有分隔线）"
