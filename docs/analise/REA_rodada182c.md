@@ -758,7 +758,12 @@ Tools: /mnt/e/lynx-work/flm190u/ab (mkgen_tb.py, render.sh, score_tb.py, null2.p
 3 dB down and rising: the instrument wrote the desktop's note pan gains (√ law, 0.707 at the centre) over the
 module's smoothed balance at each note-on. Fixed (FLM channels get only the module's balance); the song render now
 equals the reference render to −141 dB on every note of phrases A and B, and a test compares the instrument with
-the reference render over three notes.
+the reference render over three notes. Against FL itself the song render is checked on a phrase whose notes
+stay clear of the 0.25 s tail (phrase E: seven notes 0.125 s apart, keys 36…72, plain / accented): every note nulls
+at −28…−37 dB (lags −3…0 samples), level within 0.02 dB. On phrases A and B (each note exactly 0.25 s after the
+last) only the first note nulls sample for sample, the levels agree within 0.03 dB: there FL's block-counted tail has
+stopped the engine about 230 samples early, which shifts the phase of the next note (the harness with FL's tail
+length nulls them, table above).
 
 Quality gate: the desktop path writes the same bytes as before on 36 renders (FL's three presets, each also as stream
 version 5 with engines 0 / 1 / 2 and with the oversampling field 1 and 2; 44.1 and 48 kHz; old against new object),
