@@ -11458,6 +11458,7 @@ private:
                 if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fruityslicer)
                 {
                     saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fruityslicer.png");
+                    saveWindow (lynx::makeChannelFrame (offline, c, 1), "-fruityslicer-envelope.png"); // round 190f: its Envelope / instrument page
                     break;
                 }
 
