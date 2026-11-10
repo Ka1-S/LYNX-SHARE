@@ -17380,6 +17380,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleChooser184aTests.inc"
 #include "LayoutStyle184aTests.inc"
 #include "Rack116Tests.inc"
+#include "Issue116DetachedTests.inc"
 #include "Trial187bTests.inc"
 #include "ProjectKey184aTests.inc"
 #include "Render186bTests.inc"
