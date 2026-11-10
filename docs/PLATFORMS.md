@@ -50,6 +50,14 @@ Other per-OS code, kept small and guarded in place:
 - `ui/WindowOwner.cpp` — dark native title bar and owned tool windows (Windows); JUCE defaults elsewhere.
 - `ui/Theme.cpp` — Segoe UI on Windows; the system sans-serif elsewhere. On Linux (JUCE's software renderer) knobs and
   rounded plates are drawn from cached pre-rendered sprites, which are much cheaper there than path filling.
+  Linux fonts (issue #142): JUCE 8.0.4 lists the installed fonts from the `<dir>` entries of `/etc/fonts/fonts.conf`
+  only, without its `<include>`s, so on NixOS (each font package in its own `/nix/store` folder, added by an included
+  file) it found DejaVu Sans alone and no monospaced font; a font whose family is not installed has no typeface on
+  Linux, and drawing text with one crashed (0.1.25). LYNX now hands JUCE fontconfig's own folder list (through JUCE's
+  `JUCE_FONT_PATH`; a value the user set is kept), gives every font without a typeface the bundled Open Sans
+  (`LookAndFeel::getTypefaceForFont`), and JUCE fix 19 (`cmake/LynxPatchJuce.cmake`) makes a font without a typeface
+  draw nothing instead of crashing. `FONTS=none scripts/check-appimage-start.sh <AppImage>` starts the AppImage with
+  no font on the system; `--selftest` reports `fonts=`.
 - `ui/Toolbar.cpp` — process memory (Windows API, `/proc/self/statm` on Linux).
 
 ## Floating point

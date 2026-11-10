@@ -148,6 +148,8 @@ TEST (slicer180c_prepare_reverses_declicks_and_fades)
 {
     using namespace lynx;
     auto s = slicer180c::threeSlices();
+    s.declick = 0; // (a new Slicer has DECLICK on and DEC at 4 ms, as in FL: each step is switched on below)
+    s.fadeOutMs = 0;
     const auto sample = slicer180c::ramp (13230, 44100.0, true);
 
     // nothing to do: the sample comes back as it was

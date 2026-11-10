@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/NoteTools.h"
+#include "core/PianoKeys.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
@@ -108,6 +109,10 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
+    // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
+    static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
+    void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
     // the keys of the selection, on every change (the toolbar's chord panel)
     static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
@@ -216,6 +221,7 @@ private:
     double xToTick (int x) const;
     int keyToY (int key) const;
     int yToKey (int y) const;
+    int keyboardKeyAt (int x, int y) const; // the key a point of the keyboard plays (the keyboard style decides)
     int rowFor (int key) const noexcept;  // the key's row from the top (a folded-away key: the row above it)
     void updateKeyRows();                 // after the scale or the fold changed
     notetools::KeyRows rows = notetools::keyRows (0, 0, false);

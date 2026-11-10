@@ -557,3 +557,71 @@ silent Analyzer and Tuner.
 crush hold, bias, the limiters' attack and recovery, the gate's floor and delay, the delays' echo times and levels,
 the tape's interpolated echo, MultiFX's delay / filter / panner / reverb), the Post Gain utility and the imports.
 No per-effect FLM render exists yet; an A/B in FL's FL Studio Mobile plugin (GUI + FL locks) is the next check.
+
+### F5 effects, round 188i: A/B against FL Studio Mobile inside FL (branch `feature/flm188i`, 0.1.26)
+
+**Method.** FL Studio 2026 ships "FL Studio Mobile Rack FX" (an FL effect that hosts an FLM effect rack) and IL's own
+presets for it. Its state is the `SSLF/10LF → RACK → RMOd{HEAD DESC PRST ADD1 PRMS SMPR CSTM}` tree of §8 of
+FLM_FORMAT.md; a module's type, PRMS and SMPR can be rewritten in place (the preset re-encodes byte for byte). Each
+test project is FL's own "Sampler" render test with one note playing a 28 s stimulus (1 kHz stair −36…0 dB, drums,
+noise bursts, sweep, music) into insert 1, where the Rack FX holds one module; FL renders it with `/R` (no input,
+minimized). The LYNX side runs the same module values through `tools/fxrender` on FL's own dry render, so both sides
+get identical input. Tools: `/mnt/e/lynx-work/flm188i/ab/tools` (mkflp.py, jobs1.py, lx.py).
+
+Host facts measured on the way (not engine behaviour, the LYNX side reproduces them for the comparison):
+- the rack wrapper with a disabled module is bit-transparent (−215 dB against the dry render);
+- FL runs the module for one 512-sample block before song position 0 (the BitCrush hold phase proves it:
+  a unique pre-roll of 512 samples fits every hold boundary of a 62.47-sample hold);
+- FL's 16-bit render clips at full scale; latency (Limiter 88, Gate 256 samples) is compensated by FL.
+
+**Scores** (round-170i scale, ESR in dB; 16-bit renders put the floor near −75 dB):
+
+| Effect | Settings (score) |
+|---|---|
+| Distortion | preset 10; Drive 0.7 8 (−54.5); BitCrush 0.3 / 0.5 / 0.7 9 / 9 / 9; Tube + Bias 0.7 9; Clip + Stereo 0.9 10; wrapper Mix 50 % + Post Gain 0.65 9 (−59.4) |
+| Limiter (legacy) | preset 10 (bit-identical); threshold 0.5 / 0.3 / 0.7 10 / 10 / 10 |
+| Limiter | preset 10 (bit-identical); In +12 dB 10; threshold −12 dB 10; release 0.8 10 |
+| Leveller | preset 10; gain 0.4 + pan 0.2 9; gain 1.0 + pan 0.9 10 |
+| Gate | preset 10; thresholds −20 / −10.5 dB 10 / (6: the output is at the 16-bit floor, residual ≈ −100 dB); Mix 0.25 10; curves 10 |
+| Trance Delay | preset (Ping-Pong) 10; Stereo + filter 10; Mirror 10; Ping-Pong + input pan + dry pan 10; 1/4 beat + feedback 0.9 10 |
+| Tape Delay | preset 10; three more settings 10 / 10 / 10 |
+| MultiFX | preset 10; the seven other kinds 8 (Reverb, −35), 10, 10, 10, 10, 10, 9 (Vox); **with the LFO 6 / 7 / 4** |
+
+**Fixed:** BitCrush's hold length. FLM computes v⁴ as (v²)²; the last-bit difference from ((v·v)·v)·v moved
+fractional holds (BitCrush 0.3 and 0.7 went from −19.5 / −23.0 to −68.9 / −68.8 dB). Regression test in
+tests/FlmImport188hTests.inc.
+
+**Open:** MultiFX with the LFO on. The LFO is song-locked and in phase (`fxrender --songpos`), its square edges land
+in the same 10 ms windows, but inside a window FLM switches earlier and its swept filters differ; no block size or
+position offset reproduces it. Needs one REA pass on how FLM applies the LFO within a block (per-sample update or a
+coefficient ramp).
+
+### F5 effects, round 189h: MultiFX's LFO inside FL (branch `feature/flm189h`, 0.1.26)
+
+The LFO settings were not an engine difference but how FL drives the module, found by fitting the square-LFO edges of
+`mfx_L3` (HP Filter, 1 kHz stair) and confirmed on all three settings:
+- **FL runs a hosted FLM rack in chunks of one song tick (1/96 beat)** cut on the song's grid (chunk k starts at sample
+  round(k · tick)), and each chunk gets its tick's exact position. FLM reads its per-block LFO once per chunk. The
+  falling edges of a square LFO land on the beat, the rising ones one tick (229.7 samples at 120 BPM) after the half
+  beat: the chunk at the half beat starts on ph = 0.5 exactly, and FLM's square switches on ph > 0.5. A 512-sample host
+  block (fxrender's default) put both edges up to 511 samples late, which was the 188i mismatch. The 48 and 192 grids
+  and floor/ceil rounding all fit worse (fxrender `--ticks <ppq> <mode>`).
+- **The "input is active" flag is always true inside FL.** With LYNX computing it from the block (FLM's own tracks
+  derive it from playing voices, spec-multifx §2), the Flanger skipped the silent gaps of the burst segment and its
+  tape speed did not glide on: bursts −3.5 dB. Always active: −52.7 dB. The flag only gates skipping and tails; no
+  static setting changes.
+
+LYNX's Pocket MultiFX now cuts every host block on the same grid, carries a chunk that a block boundary cuts with the
+LFO value it started with, gives grid chunks their exact tick position and never skips silent input. Its output is
+the same to the bit for host blocks of 64, 100, 256, 512, 1000, 2048 and 4096 samples (before, it changed with the
+block). The Reverb kind has no LFO and runs once per block (identical output). Test: `flm189h_pocket_multifx_tick_chunks`.
+
+| Setting | 188i | 189h |
+|---|---|---|
+| mfx_L1 LP Filter, sine 3/8 beat, amount 0.36 | 6 (−9.5) | 9 (−59.5) |
+| mfx_L2 Flanger, saw 1 beat, amount 0.64 | 7 (−11.8) | 10 (−72.4) |
+| mfx_L3 HP Filter, square 1 beat, amount 0.25 | 4 (−6.3) | 9 (−68.2) |
+| mfx_D, K1–K7 (no LFO) | 10, 8, 10, 10, 10, 10, 10, 9 | 10, 8, 10, 10, 10, 10 (−70.2 → −80.9), 10, 10 (−65.3 → −72.0) |
+
+Not reproduced (INFERRED from the fit, not REA): whether FL or the rack wrapper makes the tick chunks. FLM's own app
+calls with its device buffer and voice-derived activity; LYNX follows the measurable host (FL).
