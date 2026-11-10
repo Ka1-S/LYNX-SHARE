@@ -99,15 +99,17 @@ cached() {
     name="$(basename "$obj" .o)-$key"
     mkdir -p "$OBJ_CACHE"
     # a hit replays the compiler's warnings and refreshes the entry's date (entries unused for 10 days are pruned)
-    if [[ -f "$OBJ_CACHE/$name.o" ]] && cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; then
+    # (-s, not -f: an empty object left by a crash or a full disk is not a hit; it is compiled again and replaced)
+    if [[ -s "$OBJ_CACHE/$name.o" ]] && cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; then
         touch "$OBJ_CACHE/$name.o"; cat "$OBJ_CACHE/$name.err" 2>/dev/null >&2 || true; return 0
     fi
     (
         flock 9
-        if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj" && { cat "$OBJ_CACHE/$name.err" 2>/dev/null >&2 || true; }; exit; fi
+        if [[ -s "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj" && { cat "$OBJ_CACHE/$name.err" 2>/dev/null >&2 || true; }; exit; fi
         "$@" 2> "$obj.err$$"; rc=$?
         cat "$obj.err$$" >&2
         [[ $rc == 0 ]] || { rm -f "$obj.err$$"; exit $rc; }
+        [[ -s "$obj" ]] || { rm -f "$obj.err$$"; echo "error: $obj is empty after a successful compile (disk full?)" >&2; exit 1; }
         mv "$obj.err$$" "$OBJ_CACHE/$name.err"
         cp "$obj" "$OBJ_CACHE/.$name.$$" && mv "$OBJ_CACHE/.$name.$$" "$OBJ_CACHE/$name.o"
     ) 9> "$OBJ_CACHE/$name.lock"
