@@ -1138,6 +1138,18 @@ public:
             return;
         }
 
+        if (args.contains ("--pluginoptionstest"))
+        {
+            // LYNX --pluginoptionstest plugin report.txt [shots folder]: round 190ao. Hosts the plugin inside LYNX (a
+            // channel for an instrument, insert 1 for an effect) in an offline engine, opens its window and checks
+            // LYNX's own plugin-window options: Pin on top (set, kept above another window, saved with the plugin,
+            // back when the window opens again). With a shots folder: PNGs of each state. The window is on screen.
+            const auto i = args.indexOf ("--pluginoptionstest");
+            runPluginOptionsTest (args[i + 1].unquoted(), args[i + 2].unquoted(),
+                                  i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String());
+            return;
+        }
+
         if (args.contains ("--plugwintest"))
         {
             // LYNX --plugwintest plugin report.txt ["name"] [seconds]: round 162d. Puts the plugin in a channel (an
@@ -2445,12 +2457,14 @@ private:
             const auto off = lynx::ProjectFile::toJson (song);
             song.channels[channel].plugin.allowHostKeys = true;
             song.channels[channel].plugin.hostKeysFirst = true;
+            song.channels[channel].plugin.pinned = true; // (round 190ao: Pin on top)
             const auto on = lynx::ProjectFile::toJson (song);
             const auto offBack = lynx::ProjectFile::fromJson (off, error);
             const auto onBack = lynx::ProjectFile::fromJson (on, error);
             hostKeysOk = ! off.contains ("allowHostKeys") && on.contains ("allowHostKeys") && offBack && onBack
                          && ! offBack->channels[channel].plugin.allowHostKeys && onBack->channels[channel].plugin.allowHostKeys
-                         && ! off.contains ("hostKeysFirst") && ! offBack->channels[channel].plugin.hostKeysFirst && onBack->channels[channel].plugin.hostKeysFirst;
+                         && ! off.contains ("hostKeysFirst") && ! offBack->channels[channel].plugin.hostKeysFirst && onBack->channels[channel].plugin.hostKeysFirst
+                         && ! off.contains ("pinnedOnTop") && ! offBack->channels[channel].plugin.pinned && onBack->channels[channel].plugin.pinned;
         }
 
         // hardware output targets (REA round 156): saved only when set; old projects (no field) keep the defaults
@@ -3889,6 +3903,232 @@ private:
             }
         }
         test->start();
+    }
+
+    void runPluginOptionsTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& shotsPath)
+    {
+        struct Test final : juce::Timer
+        {
+            juce::String reportPath, report;
+            juce::File shots;
+            std::unique_ptr<lynx::AudioEngine> engine;
+            std::unique_ptr<juce::DocumentWindow> mainWindow, other; // LYNX's main window stand-in; another secondary window
+            bool instrument = false, ok = true;
+            int channelIndex = -1, phase = 0;
+            juce::uint32 phaseStart = 0;
+            juce::AudioPluginInstance* instance = nullptr;
+            std::function<void (bool)> done;
+
+            void step (const juce::String& line)
+            {
+                report << line << "\n";
+                juce::File (reportPath).replaceWithText (report);
+            }
+            void expect (const juce::String& name, bool value)
+            {
+                step (name + "=" + juce::String ((int) value));
+                ok = ok && value;
+            }
+            void next (int to)
+            {
+                phase = to;
+                phaseStart = juce::Time::getMillisecondCounter();
+            }
+            int elapsed() const { return (int) (juce::Time::getMillisecondCounter() - phaseStart); }
+
+            lynx::PluginRef* ref (lynx::Song& song) const
+            {
+                if (instrument)
+                    return channelIndex < 0 || channelIndex >= (int) song.channels.size() ? nullptr : &song.channels[(size_t) channelIndex].plugin;
+                return song.mixer.size() < 2 || song.mixer[1].effects.empty() ? nullptr : &song.mixer[1].effects[0].plugin;
+            }
+            const lynx::PluginRef& refNow() const { return *ref (const_cast<lynx::Song&> (engine->getSong())); }
+
+            juce::AudioPluginInstance* find()
+            {
+                if (instrument)
+                {
+                    if (auto* p = dynamic_cast<lynx::PluginInstrument*> (engine->getChannelInstrument (channelIndex).get()))
+                        return &p->getInstance();
+                }
+                else if (auto* p = dynamic_cast<lynx::PluginEffect*> (engine->getEffect (1, 0).get()))
+                    return &p->getInstance();
+                return nullptr;
+            }
+
+            void openWindow()
+            {
+                std::shared_ptr<void> owner = instrument ? std::shared_ptr<void> (engine->getChannelInstrument (channelIndex))
+                                                         : std::shared_ptr<void> (engine->getEffect (1, 0));
+                lynx::PluginWindows::open (owner, *instance, instance->getName(),
+                                           { engine.get(), [this] (lynx::Song& song) { return ref (song); }, instrument, instrument ? -1 : 1,
+                                             instrument ? -1 : 0, {}, {} });
+            }
+
+            void shot (const char* name, bool settingsPage = false)
+            {
+                if (shots != juce::File() && instance != nullptr)
+                    step (juce::String ("shot_") + name + "=" + juce::String ((int) lynx::PluginWindows::saveWindowShot (*instance, shots.getChildFile (juce::String (name) + ".png"), settingsPage)));
+            }
+
+            // the plugin window is in front of the other secondary window
+            bool pluginInFront()
+            {
+                auto* plug = lynx::PluginWindows::hostWindowHandle (*instance);
+               #if JUCE_WINDOWS
+                return plug != nullptr && lynx::nativechild::isAbove (plug, other->getWindowHandle());
+               #else
+                auto& desktop = juce::Desktop::getInstance();
+                for (int i = 0; i < desktop.getNumComponents(); ++i)
+                    if (auto* c = desktop.getComponent (i); c->getWindowHandle() == plug)
+                        return c->isAlwaysOnTop() || desktop.getComponent (desktop.getNumComponents() - 1) == c;
+                return false;
+               #endif
+            }
+
+            void timerCallback() override
+            {
+                if (phase == 0) // waiting for the engine to host the plugin
+                {
+                    instance = find();
+                    if (instance == nullptr)
+                    {
+                        if (elapsed() > 20000)
+                            finish ("not hosted");
+                        return;
+                    }
+                    step ("hosted=" + instance->getName() + " format=" + instance->getPluginDescription().pluginFormatName);
+                    openWindow();
+                    next (1);
+                    return;
+                }
+                if (phase == 1 && elapsed() >= 800) // Pin on top: off for a new plugin
+                {
+                    expect ("pin_off_by_default", ! lynx::PluginWindows::isPinnedOnTop (*instance) && ! refNow().pinned);
+                    shot ("pin-off");
+                    const auto history = engine->getHistoryPosition();
+                    lynx::PluginWindows::setPinnedOnTop (*instance, true);
+                    expect ("pin_set", lynx::PluginWindows::isPinnedOnTop (*instance) && refNow().pinned);
+                    expect ("pin_no_undo_step_project_modified", engine->getHistoryPosition() == history && engine->isModified());
+                    // another secondary window brought in front of it
+                    other = std::make_unique<juce::DocumentWindow> ("Another LYNX window", juce::Colours::darkslategrey, juce::DocumentWindow::closeButton);
+                    other->setUsingNativeTitleBar (true);
+                    other->setBounds (mainWindow->getX() + 60, mainWindow->getY() + 60, 420, 300);
+                    other->setVisible (true);
+                    lynx::keepAboveMainWindow (*other);
+                    lynx::forceForegroundForTest (*other);
+                    other->toFront (true);
+                    next (2);
+                    return;
+                }
+                if (phase == 2 && elapsed() >= 1200)
+                {
+                    expect ("pinned_stays_in_front_of_a_clicked_window", pluginInFront());
+                    shot ("pin-on");
+                    // closed and opened again: the pin comes back from the project
+                    lynx::PluginWindows::close (*instance);
+                    openWindow();
+                    next (3);
+                    return;
+                }
+                if (phase == 3 && elapsed() >= 600)
+                {
+                    expect ("pin_remembered_when_reopened", lynx::PluginWindows::isPinnedOnTop (*instance));
+                    lynx::PluginWindows::setPinnedOnTop (*instance, false);
+                    expect ("pin_cleared", ! lynx::PluginWindows::isPinnedOnTop (*instance) && ! refNow().pinned);
+                    other->toFront (true);
+                    next (4);
+                    return;
+                }
+                if (phase == 4 && elapsed() >= 1000)
+                {
+                   #if JUCE_WINDOWS
+                    expect ("unpinned_goes_behind_a_clicked_window", ! pluginInFront());
+                   #endif
+                    other = nullptr;
+                    finish ({});
+                }
+            }
+
+            void finish (const juce::String& failure)
+            {
+                stopTimer();
+                if (failure.isNotEmpty())
+                    step ("failed=" + failure);
+                ok = ok && failure.isEmpty();
+                step (ok ? "result=OK" : "result=FAILED");
+                lynx::PluginWindows::closeAll();
+                done (ok);
+            }
+        };
+
+        auto* test = new Test();
+        test->reportPath = reportPath;
+        if (shotsPath.isNotEmpty())
+        {
+            test->shots = juce::File (shotsPath);
+            test->shots.createDirectory();
+        }
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        test->done = [this, test] (bool ok) {
+            setApplicationReturnValue (ok ? 0 : 1);
+            juce::MessageManager::callAsync ([this, test] {
+                lynx::setMainWindowForOwnership (nullptr);
+                test->other = nullptr;
+                test->mainWindow = nullptr;
+                test->engine = nullptr;
+                delete test;
+                quit();
+            });
+        };
+        test->engine = std::make_unique<lynx::AudioEngine> (false);
+        test->mainWindow = std::make_unique<juce::DocumentWindow> ("LYNX test main window", juce::Colours::darkgrey, 0);
+        test->mainWindow->setBounds (20, 20, 300, 200);
+        test->mainWindow->setVisible (true);
+        lynx::setMainWindowForOwnership (test->mainWindow.get());
+        auto& host = test->engine->getPluginHost();
+        test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
+        std::optional<juce::PluginDescription> chosen;
+        for (const auto& type : host.getKnownPlugins().getTypes())
+            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            {
+                chosen = type;
+                break;
+            }
+        if (! chosen)
+        {
+            test->step ("result=FAILED (no plugin)");
+            test->done (false);
+            return;
+        }
+        test->instrument = chosen->isInstrument;
+        lynx::PluginRef ref;
+        ref.id = chosen->createIdentifierString().toStdString();
+        ref.name = chosen->name.toStdString();
+        test->engine->editSong ([&] (lynx::Song& song) {
+            if (test->instrument)
+            {
+                lynx::ChannelDef c;
+                c.name = ref.name;
+                c.instrument = lynx::InstrumentKind::plugin;
+                c.plugin = ref;
+                test->channelIndex = (int) song.channels.size();
+                song.channels.push_back (c);
+            }
+            else
+            {
+                while (song.mixer.size() < 2)
+                    song.mixer.emplace_back();
+                lynx::EffectSlot slot;
+                slot.kind = lynx::EffectKind::plugin;
+                slot.plugin = ref;
+                song.mixer[1].effects.push_back (slot);
+            }
+        });
+        test->engine->markSaved();
+        test->step ("plugin=" + chosen->name + " instrument=" + juce::String ((int) test->instrument));
+        test->next (0);
+        test->startTimerHz (20);
     }
 
     void runReloadTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& shotsPath, bool waitKill)

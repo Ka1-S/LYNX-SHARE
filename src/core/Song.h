@@ -232,6 +232,9 @@ struct PluginRef
     // FL's plugin menu › "Detached" (issue #116): the editor opens in a window of its own above the main window instead
     // of docked in the workspace. LYNX's own field until the .flp bit is found (docking is behind a developer switch)
     bool detached = false;
+    // LYNX's own "Pin on top" of the plugin window (round 190ao, pain point 11; FL has none): the detached window stays
+    // above LYNX's other windows. Off for a new plugin and for projects saved before
+    bool pinned = false;
 
     bool operator== (const PluginRef& o) const
     {
@@ -243,7 +246,7 @@ struct PluginRef
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
-               && detached == o.detached;
+               && detached == o.detached && pinned == o.pinned;
     }
 };
 

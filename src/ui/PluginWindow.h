@@ -42,6 +42,13 @@ void setDetached (juce::AudioPluginInstance& plugin, bool detached);
 // --plugwintest (issue #116): whether the open editor is docked, and the native window that holds it.
 bool isDocked (const juce::AudioPluginInstance& plugin);
 void* hostWindowHandle (const juce::AudioPluginInstance& plugin);
+// Round 190ao, LYNX's "Pin on top" (pain point 11; FL has no pin): a detached plugin window that stays above LYNX's
+// other secondary windows (not above other programs: like them it is owned by the main window; on Linux, where there
+// are no owner windows, the window manager's "always on top"). The header's pin and the plugin menu's item set it; it
+// is saved with the plugin in the project (PluginRef::pinned). Not for a docked window or a plugin in a separate
+// process (its editor is a window of that process).
+bool isPinnedOnTop (const juce::AudioPluginInstance& plugin);
+void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned);
 void closeAll();
 // Closes now the windows whose plugin is no longer in the song (removed, replaced, its channel deleted); a timer
 // also does it on its own while a window is open.

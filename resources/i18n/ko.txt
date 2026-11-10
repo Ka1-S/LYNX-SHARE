@@ -8364,3 +8364,6 @@ countries: kr
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE와 프로젝트는 계속 실행되었습니다(이펙트는 바이패스되고 악기는 소리가 나지 않습니다). 프로젝트를 저장하세요."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "해당 프로세스만 영향을 받았습니다. LYNX SHARE와 프로젝트는 계속 실행되었고 플러그인은 음소거되었습니다. 프로젝트를 저장하세요."
 "Reload crashed plugin" = "충돌한 플러그인 새로 고침"
+"Pin on top" = "위에 고정"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "위에 고정: 이 창을 LYNX SHARE의 다른 창보다 위에 유지합니다"
+"Pin on top is not available for a plugin in a separate process" = "별도 프로세스의 플러그인에는 위에 고정을 사용할 수 없습니다"

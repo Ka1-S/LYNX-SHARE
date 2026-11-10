@@ -8364,3 +8364,6 @@ countries: tw hk mo
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE 和你的專案繼續執行（效果器被旁通，樂器保持靜音）。請儲存專案。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已被靜音。請儲存專案。"
 "Reload crashed plugin" = "重新載入已崩潰的外掛"
+"Pin on top" = "固定在最前"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "固定在最前：讓此視窗保持在 LYNX SHARE 其他視窗之上"
+"Pin on top is not available for a plugin in a separate process" = "獨立處理程序中的外掛無法使用「固定在最前」"

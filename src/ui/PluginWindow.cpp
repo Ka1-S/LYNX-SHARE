@@ -12,6 +12,7 @@
 #endif
 
 #include "core/CrashReport.h"
+#include "core/PinOnTop.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
@@ -441,6 +442,37 @@ public:
     }
 };
 
+// Round 190ao (pain point 11, LYNX's own; FL has no pin): "Pin on top" at the right end of the wrapper header of a
+// detached plugin window. A pushpin: upright and in the accent colour while the window is pinned, tilted and dim when not.
+class PinButton final : public juce::Button
+{
+public:
+    PinButton() : juce::Button ("Pin on top") { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.5f);
+        if (over || down)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.drawRoundedRectangle (r, 4.0f, 1.2f);
+        }
+        const auto on = getToggleState() && isEnabled();
+        juce::Path pin; // in a 16 x 16 box: cap, body, flange, needle
+        pin.addRoundedRectangle (5.0f, 1.5f, 6.0f, 2.0f, 1.0f);
+        pin.addRectangle (6.0f, 3.5f, 4.0f, 5.0f);
+        pin.addRoundedRectangle (3.5f, 8.5f, 9.0f, 2.0f, 1.0f);
+        pin.addRectangle (7.4f, 10.5f, 1.2f, 4.5f);
+        const auto side = juce::jmin (r.getWidth(), r.getHeight()) * 0.78f;
+        auto place = juce::AffineTransform::translation (-8.0f, -8.0f);
+        if (! on)
+            place = place.rotated (juce::MathConstants<float>::pi * 0.25f);
+        place = place.scaled (side / 16.0f).translated (r.getCentreX(), r.getCentreY());
+        g.setColour (! isEnabled() ? theme::colour::textDisabled : on ? theme::colour::accent : theme::colour::textSecondary);
+        g.fillPath (pin, place);
+    }
+};
+
 // Round 190ao: what a plugin window shows in place of the editor when its plugin went down (Bitwig turns the plugin's
 // panel into a notice with "Reload plug-in"). Nothing reloads by itself: a plugin that crashes again shows this again.
 class CrashNotice final : public juce::Component
@@ -517,6 +549,12 @@ public:
             refreshKeyboardPriority();
         };
         refreshKeyboardPriority();
+        // round 190ao: "Pin on top" (the host turns it on when it is a detached window: setPin)
+        addChildComponent (pin);
+        pin.onClick = [this] {
+            if (onPin)
+                onPin (! pin.getToggleState());
+        };
         for (auto* b : { &pluginTab, &settingsTab })
         {
             b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
@@ -542,6 +580,19 @@ public:
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
     void showPage (bool showSettings) { show (showSettings); }
+
+    // round 190ao: the pin of a detached window. `available` false: shown greyed (a plugin in a separate process: its
+    // editor is a window of that process)
+    void setPin (std::function<void (bool)> set, bool available)
+    {
+        onPin = std::move (set);
+        pin.setVisible (onPin != nullptr);
+        pin.setEnabled (available);
+        pin.setTooltip (available ? tr ("Pin on top: keep this window above LYNX SHARE's other windows")
+                                  : tr ("Pin on top is not available for a plugin in a separate process"));
+        resized();
+    }
+    void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
 
     // round 190ao: the plugin went down (the window's timer): the notice with "Reload" takes the editor's place
     void setDown (bool isDown, std::function<void()> reload)
@@ -592,6 +643,11 @@ public:
         header.removeFromLeft (4);
         settingsTab.setBounds (header.removeFromLeft (130));
         header.removeFromLeft (8);
+        if (pin.isVisible())
+        {
+            pin.setBounds (header.removeFromRight (26));
+            header.removeFromRight (4);
+        }
         if (sidechain.isVisible())
         {
             sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
@@ -624,6 +680,8 @@ private:
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
     KeyboardPriorityButton keyboardPriority;
+    PinButton pin;
+    std::function<void (bool)> onPin;
 
     void fitEditor()
     {
@@ -735,8 +793,12 @@ public:
         if (c.engine != nullptr && c.find) // FL's wrapper header and settings page (round 146a)
         {
             auto* wrapped = new WrappedEditor (editor, *c.engine, c.find, plugin, c.channel, c.track, c.slot);
-            if (canDock (plugin)) // FL's plugin menu ends with "Detached" (issue #116)
-                wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) { addDetachedItem (menu); });
+            // FL's plugin menu ends with "Detached" (issue #116); a detached window then has LYNX's "Pin on top"
+            wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) {
+                if (canDock (this->plugin))
+                    addDetachedItem (menu);
+                addPinItem (menu);
+            });
             content.reset (wrapped);
         }
         else
@@ -749,6 +811,10 @@ public:
     virtual bool hostActive() = 0;
     virtual void bringToFront() = 0;
     virtual bool hostMinimised() { return false; }
+    // round 190ao: "Pin on top" (a detached window only)
+    virtual bool pinnedOnTop() const { return false; }
+    virtual void setPinnedOnTop (bool) {}
+    virtual void addPinItem (juce::PopupMenu&) {}
     void* nativeHandle() { return hostComponent().getWindowHandle(); }
 
     juce::AudioPluginInstance* key() const noexcept { return &plugin; }
@@ -857,6 +923,7 @@ private:
 };
 
 void closeHostOf (const juce::AudioPluginInstance* plugin);
+void pinnedWindowsChanged();
 
 // FL's "Detached": the editor in a top-level window of its own, kept above the main window (LYNX's only kind so far).
 class PluginWindow final : public juce::DocumentWindow, public EditorHost
@@ -877,6 +944,50 @@ public:
         setVisible (true);
         keepAboveMainWindow (*this);
         startHost();
+        // round 190ao: LYNX's "Pin on top", remembered with the plugin in the project
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+        {
+            wrapped->setPin ([this] (bool on) { setPinned (on, true); }, pinnable());
+            const auto& c = getContext();
+            const auto* ref = c.engine != nullptr && c.find ? c.find (const_cast<Song&> (c.engine->getSong())) : nullptr;
+            if (ref != nullptr && ref->pinned && pinnable())
+                setPinned (true, false);
+        }
+    }
+
+    // A plugin in a separate process shows its editor in a window of that process: LYNX can't keep that one in front.
+    bool pinnable() const { return ! isSandboxedPlugin (*key()); }
+    bool pinnedOnTop() const override { return pinned; }
+    void setPinnedOnTop (bool on) override { setPinned (on, true); }
+
+    void setPinned (bool on, bool save)
+    {
+        pinned = on && pinnable();
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+            wrapped->showPinned (pinned);
+        if (const auto& c = getContext(); save && c.engine != nullptr && c.find)
+        {
+            c.engine->editSong ([find = c.find, on = pinned] (Song& song) {
+                if (auto* ref = find (song))
+                    ref->pinned = on;
+            }, false);
+            c.engine->markModified();
+        }
+       #if JUCE_LINUX || JUCE_BSD
+        // X11 has no owner windows and JUCE can only raise a window there by activating it, which would take the
+        // keyboard from the window being used: the window manager's "always on top" instead
+        setAlwaysOnTop (pinned);
+       #else
+        pinnedWindowsChanged();
+       #endif
+    }
+
+    void addPinItem (juce::PopupMenu& menu) override
+    {
+        menu.addItem (tr ("Pin on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
+            if (safe != nullptr)
+                safe->setPinned (! safe->pinned, true);
+        });
     }
 
     // round 157a: the window that holds a third-party editor draws LYNX's few pixels with GDI, not Direct2D (JUCE 8's
@@ -924,6 +1035,9 @@ public:
         if (isActiveWindow())
             lastUsed() = key();
     }
+
+private:
+    bool pinned = false;
 };
 
 // FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
@@ -1180,6 +1294,59 @@ void closeHostOf (const juce::AudioPluginInstance* plugin)
 {
     // close after leaving this callback (the window deletes itself)
     juce::MessageManager::callAsync ([plugin] { windows().erase (const_cast<juce::AudioPluginInstance*> (plugin)); });
+}
+
+// Round 190ao, "Pin on top": pinned plugin windows stay above LYNX's other secondary windows. Like them they are owned by
+// the main window (WindowOwner: above LYNX, not above other programs); when another of those windows is brought in
+// front of a pinned one, the pinned one is put back in front without being activated, so the keyboard stays where it
+// is. Checked a few times a second while a window is pinned. Not while a dialog is open (it must stay reachable) or
+// while LYNX is in the background.
+void raisePinnedWindows()
+{
+    if (juce::Component::getNumCurrentlyModalComponents() > 0 || ! juce::Process::isForegroundProcess())
+        return;
+    auto& desktop = juce::Desktop::getInstance();
+    std::vector<juce::Component*> order; // back to front
+    std::vector<bool> pinned;
+    for (int i = 0; i < desktop.getNumComponents(); ++i)
+    {
+        auto* c = desktop.getComponent (i);
+        if (dynamic_cast<juce::TopLevelWindow*> (c) == nullptr || ! c->isVisible() || c->isAlwaysOnTop() || ! isOwnedByMainWindow (*c))
+            continue;
+        if (auto* window = dynamic_cast<juce::ResizableWindow*> (c); window != nullptr && window->isMinimised())
+            continue;
+        auto isPinned = false;
+        for (const auto& [plugin, host] : windows())
+            isPinned = isPinned || (&host->hostComponent() == c && host->pinnedOnTop());
+        order.push_back (c);
+        pinned.push_back (isPinned);
+    }
+    for (const auto i : pinontop::toRaise (pinned))
+        order[(std::size_t) i]->toFront (false);
+}
+
+class PinKeeper final : public juce::Timer
+{
+public:
+    void timerCallback() override
+    {
+        auto any = false;
+        for (const auto& [plugin, host] : windows())
+            any = any || host->pinnedOnTop();
+        if (! any)
+        {
+            stopTimer();
+            return;
+        }
+        raisePinnedWindows();
+    }
+};
+
+void pinnedWindowsChanged()
+{
+    static auto* keeper = new PinKeeper(); // (never destroyed: a static Timer must not outlive the message manager)
+    if (! keeper->isTimerRunning())
+        keeper->startTimerHz (8);
 }
 
 std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title,
@@ -1466,6 +1633,18 @@ void* hostWindowHandle (const juce::AudioPluginInstance& plugin)
 {
     const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
     return it != windows().end() ? it->second->nativeHandle() : nullptr;
+}
+
+bool isPinnedOnTop (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    return it != windows().end() && it->second->pinnedOnTop();
+}
+
+void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned)
+{
+    if (const auto it = windows().find (&plugin); it != windows().end())
+        it->second->setPinnedOnTop (pinned);
 }
 
 void closeAll()

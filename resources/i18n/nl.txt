@@ -8364,3 +8364,6 @@ countries: nl be
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE en je project bleven draaien (een effect wordt overgeslagen, een instrument blijft stil). Sla je project op."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "Alleen het eigen proces werd geraakt: LYNX SHARE en je project bleven draaien, en de plugin is gedempt. Sla je project op."
 "Reload crashed plugin" = "Gecrashte plugin herladen"
+"Pin on top" = "Bovenop vastzetten"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Bovenop vastzetten: houdt dit venster boven de andere vensters van LYNX SHARE"
+"Pin on top is not available for a plugin in a separate process" = "Bovenop vastzetten is niet beschikbaar voor een plugin in een apart proces"

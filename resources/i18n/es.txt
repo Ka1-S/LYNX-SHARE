@@ -8364,3 +8364,6 @@ countries: es mx ar co cl pe ve
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE y tu proyecto siguieron funcionando (un efecto queda en bypass, un instrumento queda en silencio). Guarda tu proyecto."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "Solo se vio afectado su proceso: LYNX SHARE y tu proyecto siguieron funcionando, y el plugin se silenció. Guarda tu proyecto."
 "Reload crashed plugin" = "Recargar el plugin que falló"
+"Pin on top" = "Fijar encima"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Fijar encima: mantiene esta ventana por encima de las demás ventanas de LYNX SHARE"
+"Pin on top is not available for a plugin in a separate process" = "Fijar encima no está disponible para un plugin en un proceso separado"

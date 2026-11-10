@@ -129,6 +129,7 @@
 #include "core/DelphiMath.h"
 #include "core/LiveEventQueue.h"
 #include "core/RackRenderer.h"
+#include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
 #include "core/Patcherize.h"
@@ -17402,3 +17403,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bugs190cTests.inc"
 #include "Surge190xTests.inc"
 #include "Reload190aoTests.inc"
+#include "Pin190aoTests.inc"

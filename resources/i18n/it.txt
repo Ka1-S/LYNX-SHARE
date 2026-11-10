@@ -8364,3 +8364,6 @@ countries: it ch sm
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE e il tuo progetto hanno continuato a funzionare (un effetto viene bypassato, uno strumento resta muto). Salva il progetto."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "È stato coinvolto solo il suo processo: LYNX SHARE e il tuo progetto hanno continuato a funzionare e il plugin è stato silenziato. Salva il progetto."
 "Reload crashed plugin" = "Ricarica il plugin bloccato"
+"Pin on top" = "Fissa in primo piano"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Fissa in primo piano: mantiene questa finestra sopra le altre finestre di LYNX SHARE"
+"Pin on top is not available for a plugin in a separate process" = "Fissa in primo piano non è disponibile per un plugin in un processo separato"

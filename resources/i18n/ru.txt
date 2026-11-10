@@ -8364,3 +8364,6 @@ countries: ru by kz
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE и ваш проект продолжили работать (эффект обходится, инструмент молчит). Сохраните проект."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "Затронут только его процесс: LYNX SHARE и ваш проект продолжили работать, а плагин был заглушён. Сохраните проект."
 "Reload crashed plugin" = "Обновить сбойный плагин"
+"Pin on top" = "Закрепить поверх окон"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Закрепить поверх окон: это окно остаётся поверх остальных окон LYNX SHARE"
+"Pin on top is not available for a plugin in a separate process" = "Закрепление поверх окон недоступно для плагина в отдельном процессе"

@@ -8364,3 +8364,6 @@ countries: jp
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE とプロジェクトは動作を続けています（エフェクトはバイパスされ、インストゥルメントは無音になります）。プロジェクトを保存してください。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。"
 "Reload crashed plugin" = "クラッシュしたプラグインを再読み込み"
+"Pin on top" = "手前に固定"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "手前に固定：このウィンドウを LYNX SHARE のほかのウィンドウより手前に保ちます"
+"Pin on top is not available for a plugin in a separate process" = "別プロセスのプラグインでは「手前に固定」は使えません"

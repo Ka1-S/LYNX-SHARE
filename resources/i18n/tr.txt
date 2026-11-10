@@ -8364,3 +8364,6 @@ countries: tr
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE ve projen çalışmaya devam etti (efekt atlanır, enstrüman sessiz kalır). Projeni kaydet."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "Yalnızca kendi işlemi etkilendi: LYNX SHARE ve projen çalışmaya devam etti, plugin susturuldu. Projeni kaydet."
 "Reload crashed plugin" = "Çöken plugin'i yeniden yükle"
+"Pin on top" = "Üste sabitle"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Üste sabitle: bu pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar"
+"Pin on top is not available for a plugin in a separate process" = "Üste sabitleme, ayrı bir işlemdeki plugin için kullanılamaz"

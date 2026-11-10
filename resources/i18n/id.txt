@@ -8364,3 +8364,6 @@ countries: id
 "LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project." = "LYNX SHARE dan proyek Anda tetap berjalan (efek di-bypass, instrumen tetap senyap). Simpan proyek Anda."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda."
 "Reload crashed plugin" = "Muat ulang plugin yang mogok"
+"Pin on top" = "Sematkan di atas"
+"Pin on top: keep this window above LYNX SHARE's other windows" = "Sematkan di atas: jendela ini tetap di atas jendela LYNX SHARE lainnya"
+"Pin on top is not available for a plugin in a separate process" = "Sematkan di atas tidak tersedia untuk plugin dalam proses terpisah"
