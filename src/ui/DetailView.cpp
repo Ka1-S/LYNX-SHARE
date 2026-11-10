@@ -1464,7 +1464,7 @@ private:
         scaleName.setEnabled (key.has_value());
         tools.setVisible (pattern && ! toolsFolded);
         foldTools.setVisible (pattern);
-        foldTools.setButtonText (juce::String::fromUTF8 (toolsFolded ? "\xe2\x96\xb8" : "\xe2\x96\xbe"));
+        foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
         foldTools.toFront (false);
         fitScale.setEnabled (key && projectkey::lynxScale (*key) > 0);
     }
