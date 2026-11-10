@@ -61,7 +61,7 @@ there.
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
 | Shell Channel (drum channel strip) | SSL Native Drumstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge's gate): gate (open / close, range, attack, hold, release) with its meter, transient shaper (gain, speed, amount, invert, listen; two measured followers), low and high frequency enhancers (frequency, drive, amount), listen-mic compressor (comp, narrow band, make-up, mix), output mix, and the 120 process orders (drag the chevrons); latency 4.1 ms like the original. State translated 1:1. fxparity 4.4 → 6.1 (bank 4.3 → 6.0) |
 | Strike Shaper (transient designer) | SPL Transient Designer (2-knob; Plus) | 8 | 7 | 3 | 7 | trans189d | trans189d (issue #94): its own plugin, from the public description of the differential-envelope method (no trial on this PC, so no audio comparison yet: sound stays ≤ 3 by the scale above): attack ±15 dB and sustain ±24 dB follow the ratio of two envelopes, so there is no threshold and the gains are the same at any level (drum hits 0 … −60 dBFS: onset / tail within 0.2 dB; Airwindows Point, MIT, measured on the same hits as an open reference of the ratio method: also level independent, but unbounded, +41 dB at its top); output −20 … +6 dB on the printed scale, parallel mix, Guard (soft clip, 0 dBFS ceiling), link, detector high-pass; no latency; neutral = bit-exact. Editor: the 2-knob panel's layout (SIG / OVL, Attack, Sustain, On / Link, Output gain) in brushed silver round black capsules, LYNX's own plate and mark; CPU ≈ 0.3–0.6 % of real time per stereo instance |
-| Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
+| Halo | ValhallaShimmer | 8 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.00 → 3.25, verb 6.52 → 7.17; bank 2.66 → 2.93 / 5.89 → 6.80): the Mono mode's partly correlated tail and quieter onset |
 | Horizon | ValhallaFutureVerb | 8 | 9 | 4 | 8 | 135 | 183b: sound 2 → 4 (fxparity 3.00 → 3.25, verb 7.84 → 8.35 on the matched settings; 45-setting bank 2.25 → 2.81 / 6.79 → 7.54; music level error 4.2 → 1.2 dB): echo as pre-delay, EQ / colour / mode laws measured |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
@@ -72,7 +72,7 @@ there.
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
-| Echoform | ValhallaDelay | 9 | 8 | 4 | 6 | 137 |  |
+| Echoform | ValhallaDelay | 9 | 8 | 5 | 6 | 137 | 183b: sound 4 → 5 (fxparity 3.75 → 4.06, verb 5.12 → 7.39; bank 2.88 → 3.44 / 5.18 → 6.77): tape repeats without −1.9 dB per pass, one tape transport in the Single style |
 | Atrium | ValhallaRoom | 9 | 8 | 5 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work); 183b: sound 4 → 5 (fxparity 3.17 → 3.50, verb 8.08 → 8.54; bank 3.14 → 3.59 / 8.14 → 8.52): level laws of Early/Late, Decay and Late size |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
@@ -2272,6 +2272,18 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
 | Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
 | .flp import of the mapping | stored in the wrapper data | not yet | open |
+
+## Round a2m189b: Convert to MIDI (Ableton Live's Convert Melody / Harmony / Drums, LYNX extra)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Where | Edison › Tools › "Convert to score and dump to piano roll" (monophonic, into the selected channel's notes) | audio clip menu › "Convert Melody / Harmony / Drums to New MIDI Track" | Playlist audio clip menu › "Convert to MIDI" › Melody / Harmony / Drums "to new pattern", and the same submenu in the audio editor's Tools › Analysis (the selection, or the whole audio). FL's own item stays as it was |
+| Result | the notes replace the channel's notes in the current pattern | a new MIDI track under the clip with an instrument (Melody / Harmony: "… to MIDI" instrument racks; Drums: a 606 Drum Rack, kick C1, snare D1, hi-hat F#1) | a new pattern on new channels (melody / harmony: one Synth channel; drums: Kick, Snare and Hat channels, one step note per hit), on a new track right under the clip, aligned with it and as long; one undo step; the pattern is selected |
+| Analysis | FL's pitch detector | Live's own (not public) | melody and harmony: Spotify Basic Pitch (Apache-2.0, 230 KB model compiled in, run by the ONNX Runtime LYNX already ships), with settings chosen on round a2m189b's clips; drums: LYNX's own semi-adaptive NMF (kick / snare / hat templates); on a worker thread with a progress window and Cancel, nothing on the audio thread |
+
+Measured against ground truth (note F1, onset within 50 ms) on round a2m189b's clips (`/mnt/e/lynx-work/a2m189b/report.md`):
+LYNX matches or beats Live 12 on bass, synthetic voice, guitar, piano, drums; Live is better on a real sung vocal
+(F1 0.48 vs 0.43).
 
 # FL Studio Mobile roles: the Pocket effects (round 188h)
 

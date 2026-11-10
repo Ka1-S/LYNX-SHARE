@@ -123,6 +123,7 @@ private:
     struct PeerWatch;
     std::unique_ptr<PeerWatch> peerWatch;
     std::vector<juce::Component::SafePointer<juce::Component>> dockedFrames;
+    void nativeToFront (Panel panel);
     void rehostNativeFrames(); // the main window's native window was (re)created or the desktop moved in it
     void applyLayout (bool fadePanels = false); // fadePanels: a panel the user opened or closed fades (round 179a)
     void setFocusedPanel (Panel panel);

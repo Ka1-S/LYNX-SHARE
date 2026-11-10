@@ -17,6 +17,7 @@
 #include "ui/VideoTracks.h"
 #include "core/PatternBlocks.h"
 #include "ui/StemExtract.h"
+#include "ui/AudioToMidi.h"
 
 #include "core/KeyMap.h"
 #include "core/MarkerPlan.h"
@@ -5699,6 +5700,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 
         menu.addItem (tr ("Extract stems from sample"), sample != nullptr, false,
                       [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
+
+        // Live's Convert Melody / Harmony / Drums to New MIDI Track, the FL way: a new pattern on new channels (round a2m189b)
+        {
+            juce::PopupMenu convert;
+            const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
+                                                                { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
+                                                                { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
+            for (const auto& [label, mode] : modes)
+                convert.addItem (tr (label), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
+            menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
+        }
 
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });

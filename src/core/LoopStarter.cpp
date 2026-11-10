@@ -1151,6 +1151,39 @@ int apply (Song& song, const Plan& plan)
     return patternIndex;
 }
 
+std::vector<ChannelDef> kitChannels (const Plan& plan)
+{
+    std::vector<ChannelDef> out;
+    for (const auto& c : plan.channels)
+    {
+        ChannelDef def;
+        def.name = displayName (c.category);
+        if (! c.samplePath.empty())
+        {
+            def.instrument = InstrumentKind::sampler;
+            def.samplePath = c.samplePath;
+        }
+        else
+            def.instrument = builtinDrumFor (c.category);
+        out.push_back (std::move (def));
+    }
+    return out;
+}
+
+Pattern kitPattern (const Plan& plan)
+{
+    Pattern p;
+    p.lengthTicks = (std::int64_t) std::max (1, plan.bars) * 16 * ticksPerStep;
+    for (int row = 0; row < (int) plan.channels.size(); ++row)
+        for (auto n : plan.channels[(std::size_t) row].notes)
+        {
+            n.channel = row;
+            p.notes.push_back (n);
+        }
+    p.sortNotes();
+    return p;
+}
+
 std::vector<int> channelsOf (const Song& song, int pattern)
 {
     std::vector<int> out;

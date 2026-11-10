@@ -103,11 +103,13 @@ public:
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
+    SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
+    Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
