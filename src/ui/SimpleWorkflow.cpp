@@ -10,7 +10,6 @@
 #include "ui/FinishDock.h"
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
-#include "ui/MixerComponent.h"
 #include "ui/QuickPick.h"
 #include "ui/Theme.h"
 
@@ -631,14 +630,7 @@ void SimpleWorkflow::addAudio (Kind kind)
     q.name = trackNameFor (kind);
     q.input = 0; // the device's first input, mono (a microphone or an instrument cable)
     q.inputStereo = false;
-    if (! add (std::move (q)) || kind == Kind::audio)
-        return;
-    // Nothing to record from (round 190t): arming the first track opens the device's input and reports a missing one;
-    // a later track with the input still missing says so too. One message, with a button to Settings > Audio.
-    auto notice = engine.takeRecordingNotice();
-    if (notice.issue == AudioEngine::InputIssue::none && ! engine.hasAudioInput())
-        notice = engine.openAudioInput();
-    mixerinput::explain (notice);
+    add (std::move (q));
 }
 
 void SimpleWorkflow::addDefaultInstrument()
