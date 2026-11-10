@@ -10,6 +10,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/LayoutStyle.h"
 #include "core/Performance.h"
 #include "ui/UiTrace.h"
 #include "core/ToolbarLayout.h"
@@ -21,8 +22,10 @@
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/MixerComponent.h"
+#include "ui/DetailView.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
+#include "ui/SimpleWorkflow.h"
 #include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
@@ -35,6 +38,13 @@
 
 namespace lynx
 {
+class GamepadInput;
+namespace gamepad
+{
+struct Changes;
+struct State;
+} // namespace gamepad
+
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
                             public ui::HintSource,
@@ -55,6 +65,7 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
     void dragOperationStarted (const juce::DragAndDropTarget::SourceDetails&) override; // (issue #12: drops on windows)
     bool keyFromSecondaryWindow (const juce::KeyPress& key); // a key a tool / plugin window left unused
+    bool keyFromPluginView (const juce::KeyPress& key, bool optionOn); // a plain key over a focused plugin (issue #96)
     bool keyStateChanged (bool isKeyDown) override;
     ui::Hint hintAt (juce::Point<int> position) override; // the toolbar's background: how to edit it
 
@@ -85,9 +96,16 @@ public:
     void showDesktopForSnapshot (bool extraPanels);
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
-    void setClipLaunchWorkflow (bool on, bool swapLayout = true);
+    void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
-    bool isClipLaunchWorkflow() const noexcept { return clipLaunchWorkflow; }
+    bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
+    // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
+    void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
+    layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
+    SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
+    // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
+    DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -280,6 +298,13 @@ private:
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
+    // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer
+    // otherwise); the hints overlay while Back is held
+    std::unique_ptr<GamepadInput> gamepadInput;
+    std::unique_ptr<juce::Component> gamepadHints;
+    void updateGamepad();
+    void gamepadChanges (const gamepad::Changes& changes, const gamepad::State& state, double seconds);
+    int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)
@@ -576,10 +601,32 @@ private:
     PlaylistComponent playlist;
     PatternPicker picker { engine, playlist };
     PlaylistArea playlistArea { picker, playlist };
-    bool clipLaunchWorkflow = false, startInClipLaunchWorkflow = false;
+    layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
+    layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
+    std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
+    void makeDetailView();
+    // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)
+    bool pianoRollDocked = false;
+    juce::Component* dockPianoRoll (int pattern);
+    void undockPianoRoll();
+    bool pianoRollKeysHere() const; // the docked Piano roll was clicked last: the keys are its own
+    struct DockClickWatcher final : juce::MouseListener
+    {
+        std::function<void (const juce::MouseEvent&)> down;
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (down != nullptr)
+                down (e);
+        }
+    };
+    DockClickWatcher dockClickWatcher; // a global listener only while the Piano roll is docked
+    bool pianoRollDockActive = false;
+    bool runDetailAction (const std::string& id);
+    void openGridClip (int track, int scene);
     MixerComponent mixer;
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first

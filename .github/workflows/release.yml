@@ -15,6 +15,10 @@
 #   macos    (macos)    CMake universal (arm64 + x86_64) build, self-test, ad-hoc signature (no Apple Developer ID,
 #                       not notarized), .dmg (scripts/package-macos.sh)
 #   publish  (ubuntu)   SHA256SUMS.txt over every file; on a tag push attaches everything to the (draft) GitHub release
+#   plugins             the optional plugin download (plugins.yml: LYNX's effects as CLAP + a short VST3 list for Windows,
+#                       Linux and macOS, each checked with plugexporttest, pluginval and clap-validator); never in the
+#                       app's installer, and the app's release doesn't wait for it
+#   plugins-publish     on a tag push attaches LYNX-Plugins-<label>-* (with their own SHA256SUMS file) to the same release
 #   store    (windows)  on a tag (push, or a manual store_build resubmission run on the tag): the .msix as a new Microsoft
 #                       Store submission (msstore CLI); skipped with a notice until the MSSTORE_* secrets exist
 #                       (docs/STORE.md › Automatic Store submission)
@@ -492,6 +496,38 @@ jobs:
               --notes "Built from \`$GITHUB_SHA\` by [this workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
           fi
           gh release upload "$tag" dist/* --clobber
+
+  # LYNX's plugins for other hosts (round 188b, docs/PLUGIN_EXPORT.md): a separate, optional download with its own
+  # LYNX-Plugins-<label>-SHA256SUMS.txt. Its file names never end like the app's (the updater picks the app's by suffix).
+  plugins:
+    name: Plugins
+    needs: version
+    uses: ./.github/workflows/plugins.yml
+    with:
+      label: ${{ needs.version.outputs.label }}
+
+  plugins-publish:
+    name: Plugins on the release
+    needs: [version, publish, plugins]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && needs.plugins.result == 'success' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # attach the files to the (draft) release that publish made
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: LYNX-Plugins-${{ env.LABEL }}-all
+          path: dist
+
+      - name: Attach to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la dist
+          gh release upload "$GITHUB_REF_NAME" dist/LYNX-Plugins-* --clobber
 
   # Microsoft Store (round 168y): the release's LYNX-<label>-store.msix as a new submission of product 9NQRFBFDCX6N. The
   # msstore CLI clones the last published submission (listings, pricing, "What's new" untouched), replaces its package
