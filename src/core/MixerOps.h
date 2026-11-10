@@ -40,7 +40,14 @@ enum class LinkedPlaylistTracks
     unlink,
     deleteToo
 };
-int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked = LinkedPlaylistTracks::unlink);
+// `keepLostLinks` (LYNX's option, pain point 1; off = FL): every send into a deleted insert also stays as a
+// MixerTrack::lostSends entry, drawn greyed, until reconnectLostSend or removeLostSends.
+int deleteTracks (Song& song, std::vector<int> tracks, LinkedPlaylistTracks linked = LinkedPlaylistTracks::unlink, bool keepLostLinks = false);
+// Turns lost send `index` of `track` into a send to insert `to` at its level. False when that route isn't possible
+// (out of range, itself, or a cycle).
+bool reconnectLostSend (Song& song, int track, int index, int to);
+// Removes lost send `index` of `track` (all of them for −1).
+void removeLostSends (Song& song, int track, int index = -1);
 
 // The Playlist audio / instrument tracks linked to one of `tracks` (FL asks "Delete tracks and channels" or
 // "Unlink tracks and channels" when there is one; FUN_012a5b00): an audio track by its mixer track, an instrument
@@ -194,6 +201,28 @@ bool toggleFold (Song& song, int track);
 bool isFolded (const Song& song, int track);
 // Folds (or unfolds) every group that can fold. Returns how many changed.
 int foldAll (Song& song, bool fold);
+
+// --- Mixer groups that follow the Playlist (round 186c, pain point 4; LYNX's addition, FL has no link) -------------------
+// The inserts of each Playlist track group (a header and its grouped tracks), in Playlist order: an audio track's mixer
+// track, an instrument track's channel's mixer track (each insert once, in the first group that names it).
+struct PlaylistGroupInserts
+{
+    std::vector<int> inserts;
+    bool collapsed = false; // the header is collapsed
+};
+std::vector<PlaylistGroupInserts> playlistGroupInserts (const Song& song);
+// The inserts linked to any Playlist track, in Playlist order (each once).
+std::vector<int> playlistOrderInserts (const Song& song);
+// "Mixer groups follow the Playlist": the separators and folds of the inserts linked to Playlist tracks mirror the
+// Playlist's groups (a group of 2+ inserts that sit next to each other in one dock becomes a mixer group, folded when its
+// header is collapsed); a closing separator may land on the insert after a group. Separators of the other inserts stay.
+// Returns true when something changed.
+bool followPlaylistGroups (Song& song);
+bool followsPlaylistGroups (const Song& song); // nothing for followPlaylistGroups to change
+// "Arrange inserts like the Playlist": the inserts linked to Playlist tracks move to the front (insert 1 on) in Playlist
+// order, the others keep their order after them (everything that refers to an insert follows it), then
+// followPlaylistGroups. Returns how many inserts changed place.
+int arrangeLikePlaylist (Song& song);
 
 // --- VCA faders (round 177a slice 3, LYNX's addition; REA_rodada177a §3) ---------------------------------------------
 // The VCAs that act on `track`: those it is a member of and their parents, each once (indices into Song::vcas).

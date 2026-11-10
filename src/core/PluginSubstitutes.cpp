@@ -672,6 +672,14 @@ vendor = Harrison
 lynx = Hush De-esser
 names = Harrison De-Esser; Harrison DeEsser
 
+# round trans189d (issue #94): the two-knob transient designer role -> Strike Shaper (level-independent attack / sustain,
+# output, parallel mix, limiter, side-chain filter); its states are not read (no trial on this PC): Strike at its defaults
+[spl-transient-designer]
+product = Transient Designer
+vendor = SPL
+lynx = Strike Shaper
+names = SPL Transient Designer; SPL Transient Designer Plus; Transient Designer Plus; SPL TD Plus; UAD SPL Transient Designer; SPL Transient Designer (UAD)
+
 [slate-fresh-air]
 product = Fresh Air
 vendor = Slate Digital

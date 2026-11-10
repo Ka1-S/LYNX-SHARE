@@ -15,6 +15,8 @@
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+
+#include <array>
 #include "engine/MidiFileIo.h"
 #include "engine/Mp3Format.h"
 #include "core/PianoRollTools.h"
@@ -323,9 +325,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
         addAndMakeVisible (box);
     }
 
-    laneBox.addItem (tr ("Velocity"), 1);
-    laneBox.addItem (tr ("Pan"), 2);
-    laneBox.addItem (tr ("Fine pitch"), 3);
+    addNoteLanes();
     laneBox.setTooltip (tr ("What the bottom lane edits"));
     laneBox.setSelectedId (1, juce::dontSendNotification);
     laneBox.setWantsKeyboardFocus (false);
@@ -949,6 +949,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.fillEllipse (r.getRight() - 6.0f, r.getY() + 1.5f, 3.5f, 3.5f);
             }
 
+            // a Chance below 100 % (round 187c): a small triangle in the top-left corner, as Live 12 marks it ("A small
+            // triangle is displayed in the upper-left corner of notes with probability values less than 100%")
+            if ((n.chance < 1.0f || n.chanceGroup != 0) && r.getWidth() > 6.0f && r.getHeight() > 5.0f)
+            {
+                juce::Path corner;
+                const auto size = juce::jmin (6.0f, r.getHeight() - 2.0f);
+                corner.addTriangle (r.getX() + 1.0f, r.getY() + 1.0f, r.getX() + 1.0f + size, r.getY() + 1.0f, r.getX() + 1.0f, r.getY() + 1.0f + size);
+                g.setColour (bg0.withAlpha (0.75f));
+                g.fillPath (corner);
+            }
+
             if (n.porta) // porta: slanted stroke at the start, like the glide
             {
                 g.setColour (bg0.withAlpha (0.65f));
@@ -1109,6 +1120,28 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (n.muted)
                 colour = noteMuted;
             const auto hovered = i == hover.note && drag == Drag::none;
+            // the velocity lane shows a note's Velocity Range (round 187c) as a shaded box over the note's length, from
+            // its velocity to where the range reaches, as Live 12 draws it [LIVE 12.4 shot, live-02]
+            if (laneBox.getSelectedId() == laneVelocity && n.velocityRange != 0.0f)
+            {
+                const auto reach = juce::jlimit (1.0f / 127.0f, 1.0f, n.velocity + n.velocityRange);
+                const auto y2 = (float) lane.getBottom() - 2.0f - usable * reach;
+                const auto w = juce::jmax (3.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+                g.setColour (colour.withAlpha (0.22f));
+                g.fillRect (juce::Rectangle<float> (x, juce::jmin (top, y2), w, std::abs (y2 - top)));
+                g.setColour (colour.withAlpha (0.5f));
+                g.drawHorizontalLine ((int) y2, x, x + w);
+            }
+            // a probability group (round 187c): its members' Chance markers joined by a line (the group has one Chance)
+            if (laneIsChance() && n.chanceGroup != 0)
+                for (int j = i + 1; j < (int) pattern.notes.size(); ++j)
+                    if (const auto& m = pattern.notes[(std::size_t) j]; m.chanceGroup == n.chanceGroup && edits (m) && rows.shown (m.key))
+                    {
+                        g.setColour (colour.withAlpha (0.5f));
+                        const auto dash = std::array<float, 2> { 3.0f, 3.0f };
+                        g.drawDashedLine (juce::Line<float> (x, top, (float) tickToX ((double) m.start), top), dash.data(), 2, n.chanceOne ? 1.0f : 2.0f);
+                        break;
+                    }
             g.setColour (hovered ? colour.brighter (0.3f) : colour.withAlpha (0.8f));
             g.fillRect (juce::Rectangle<float> (x, juce::jmin (top, base), hovered ? 3.0f : 2.0f, std::abs (base - top)));
             g.fillEllipse (x - 3.0f, top - 3.0f, 7.0f, 7.0f);
@@ -1358,12 +1391,32 @@ void PianoRollComponent::visibilityChanged()
     }
 }
 
+// The note properties the bottom lane edits: FL's (velocity, pan, fine pitch, release, Mod X / Y: its "Control" list,
+// FLEngine strings "Note release", "Note modulation X / Y"), then Live 12's Chance and Velocity Range (round 187c, LYNX
+// additions marked "(LYNX)")
+void PianoRollComponent::addNoteLanes()
+{
+    laneBox.addItem (tr ("Velocity"), laneVelocity);
+    laneBox.addItem (tr ("Pan"), lanePan);
+    laneBox.addItem (tr ("Fine pitch"), laneFinePitch);
+    laneBox.addItem (tr ("Release"), laneRelease);
+    laneBox.addItem (tr ("Mod X"), laneModX);
+    laneBox.addItem (tr ("Mod Y"), laneModY);
+    laneBox.addItem (tr ("Chance (LYNX)"), laneChance);
+    laneBox.addItem (tr ("Velocity range (LYNX)"), laneVelocityRange);
+}
+
 float PianoRollComponent::laneValue (const Note& n) const
 {
     switch (laneBox.getSelectedId())
     {
-        case 2: return (n.pan + 1.0f) * 0.5f;
-        case 3: return (n.finePitch + 120.0f) / 240.0f;
+        case lanePan: return (n.pan + 1.0f) * 0.5f;
+        case laneFinePitch: return (n.finePitch + 120.0f) / 240.0f;
+        case laneRelease: return n.release;
+        case laneModX: return n.modX;
+        case laneModY: return n.modY;
+        case laneChance: return n.chance;
+        case laneVelocityRange: return (n.velocityRange + 1.0f) * 0.5f;
         default: return n.velocity;
     }
 }
@@ -1374,16 +1427,26 @@ void PianoRollComponent::setLaneValue (Note& n, float v) const
 
     switch (laneBox.getSelectedId())
     {
-        case 2: n.pan = std::abs (v - 0.5f) < 0.02f ? 0.0f : v * 2.0f - 1.0f; break;   // snaps to center
-        case 3: n.finePitch = std::round (v * 240.0f - 120.0f); break;
+        case lanePan: n.pan = std::abs (v - 0.5f) < 0.02f ? 0.0f : v * 2.0f - 1.0f; break;   // snaps to center
+        case laneFinePitch: n.finePitch = std::round (v * 240.0f - 120.0f); break;
+        case laneRelease: n.release = v; break;
+        case laneModX: n.modX = v; break;
+        case laneModY: n.modY = v; break;
+        case laneChance: n.chance = std::round (v * 100.0f) / 100.0f; break; // whole percents, as Live shows them
+        case laneVelocityRange: // whole Live velocity steps (1/127); snaps to none
+            n.velocityRange = std::abs (v - 0.5f) < 0.02f ? 0.0f : std::round ((v * 2.0f - 1.0f) * 127.0f) / 127.0f;
+            break;
         default: n.velocity = v; break;
     }
 }
 
 bool PianoRollComponent::laneIsBipolar() const
 {
-    return laneBox.getSelectedId() != 1;
+    const auto id = laneBox.getSelectedId();
+    return id == lanePan || id == laneFinePitch || id == laneVelocityRange || id >= eventLaneIdBase;
 }
+
+bool PianoRollComponent::laneIsChance() const { return laneBox.getSelectedId() == laneChance; }
 
 void PianoRollComponent::applyVelocity (int fromX, int toX, int y)
 {
@@ -1409,6 +1472,8 @@ void PianoRollComponent::applyLaneValue (int toX, float value, int fromX)
         editNotes ([this, &hits, value] (Pattern& p) {
             for (auto i : hits)
                 setLaneValue (p.notes[(std::size_t) i], value);
+            if (laneIsChance())
+                notetools::spreadGroupChance (p, hits); // a probability group has one Chance
         });
 }
 
@@ -1606,7 +1671,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         if (e.mods.isAltDown() && e.mods.isLeftButtonDown()) // Alt+click resets the notes under the mouse
         {
             drag = Drag::velocity;
-            applyLaneValue (e.x, laneBox.getSelectedId() == 1 ? Note().velocity : 0.5f, e.x);
+            applyLaneValue (e.x, laneValue (Note()), e.x); // (each property's default)
             drag = Drag::none;
             return;
         }
@@ -2010,6 +2075,8 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
                     if (x >= lo && x <= hi)
                         setLaneValue (n, (float) gesture::lineValue (x0, laneSetValue, x1, value, x));
                 }
+                if (laneIsChance())
+                    notetools::spreadGroupChance (p, targets);
             });
             repaint();
             return;
@@ -3081,6 +3148,40 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
         }
         menu.addSubMenu (tr ("Select by velocity"), velocity);
     }
+    {
+        // Live 12's note Chance (round 187c, LYNX additions): probability groups, a reset and a new draw for the project
+        juce::PopupMenu chance;
+        const auto several = selection.size() > 1;
+        chance.addItem (tr ("Group the selected notes: play all"), several, false, [this] {
+            runOperation ([] (Pattern& p, const std::vector<int>& t) { notetools::groupChance (p, t, false); return t; });
+        });
+        chance.addItem (tr ("Group the selected notes: play one"), several, false, [this] {
+            runOperation ([] (Pattern& p, const std::vector<int>& t) { notetools::groupChance (p, t, true); return t; });
+        });
+        chance.addItem (tr ("Ungroup the chance of the selected notes"), [this] {
+            runOperation ([] (Pattern& p, const std::vector<int>& t) { notetools::ungroupChance (p, t); return t; });
+        });
+        chance.addSeparator();
+        chance.addItem (tr ("Reset chance and velocity range"), [this] {
+            runOperation ([] (Pattern& p, const std::vector<int>& t) {
+                notetools::ungroupChance (p, t);
+                for (auto i : t)
+                    if (i >= 0 && i < (int) p.notes.size())
+                        p.notes[(std::size_t) i].chance = 1.0f, p.notes[(std::size_t) i].velocityRange = 0.0f;
+                return t;
+            });
+        });
+        chance.addItem (tr ("New chance seed (draws again for the whole project)"), [this] {
+            const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt64();
+            engine.editSong ([seed] (Song& s) { s.chanceSeed = seed == 0 ? 1u : seed; });
+            repaint();
+        });
+        chance.addSeparator();
+        chance.addItem (tr ("Show the chance lane"), true, laneIsChance(), [this] {
+            laneBox.setSelectedId (laneChance);
+        });
+        menu.addSubMenu (tr ("Chance (LYNX)"), chance);
+    }
     menu.addSeparator();
     menu.addItem (tr ("Edit events..."), [this] {
         openEventEditor (engine, { AutomationTargetKind::channelVolume, engine.getSelectedChannel() });
@@ -3562,6 +3663,8 @@ void PianoRollComponent::wheelNoteProperty (int note, float deltaY, bool fine, j
             auto& n = p.notes[(std::size_t) i];
             setLaneValue (n, (float) gesture::wheelStepValue (laneValue (n), deltaY, fine));
         }
+        if (laneIsChance())
+            notetools::spreadGroupChance (p, targets);
     }, newBurst);
 
     // hear it (FL previews the single note; the selection's nearest note too is LYNX's own, issue #16) and a single
@@ -4156,14 +4259,12 @@ void PianoRollComponent::rebuildLaneBox (std::optional<AutomationTarget> shown, 
     eventTargets = targets;
     const auto previous = laneBox.getSelectedId();
     laneBox.clear (juce::dontSendNotification);
-    laneBox.addItem (tr ("Velocity"), 1);
-    laneBox.addItem (tr ("Pan"), 2);
-    laneBox.addItem (tr ("Fine pitch"), 3);
+    addNoteLanes();
     if (! eventTargets.empty())
         laneBox.addSectionHeading (tr ("Pattern events"));
     for (int k = 0; k < (int) eventTargets.size(); ++k)
         laneBox.addItem (describeAutomationTarget (engine, eventTargets[(std::size_t) k]), eventLaneIdBase + k);
-    auto id = previous >= 1 && previous <= 3 ? previous : 1;
+    auto id = previous >= 1 && previous <= laneLast ? previous : 1;
     if (shown)
         id = eventLaneIdBase + (int) (std::find (eventTargets.begin(), eventTargets.end(), *shown) - eventTargets.begin());
     laneBox.setSelectedId (id, juce::dontSendNotification);

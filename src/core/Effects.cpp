@@ -18,6 +18,7 @@
 #include "core/EmphasisFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
+#include "core/PocketFx.h"
 #include "core/FreqShifterFl.h"
 #include "core/LowLifterFl.h"
 #include "core/Vocodex.h"
@@ -204,7 +205,18 @@ private:
 class Compressor final : public Effect
 {
 public:
-    void prepare (double sr) noexcept override { sampleRate = sr; vintage.prepare (sr); reset(); }
+    // `initial` (may be null): the slot's parameters, so the voicing's latency is known after prepare(), before the
+    // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
+    explicit Compressor (const EffectParams* initial = nullptr) : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f) {}
+
+    void prepare (double sr) noexcept override
+    {
+        sampleRate = sr;
+        vintage.prepare (sr);
+        reset();
+        if (vintageAtStart)
+            latency.store (vintage.latency(), std::memory_order_relaxed);
+    }
     void reset() noexcept override
     {
         envelopeDb = 0.0f;
@@ -361,6 +373,7 @@ private:
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
+    bool vintageAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -1965,7 +1978,13 @@ double noteA (float v) { return 55.0 * std::pow (2.0, (2.0 * v - 1.0) / 12.0); }
 class PitchCorrect final : public Effect
 {
 public:
-    PitchCorrect() { dsp.reserve (maxSampleRate); }
+    // `initial` (may be null): the slot's parameters, so the formant path's latency is known before the first block
+    explicit PitchCorrect (const EffectParams* initial = nullptr)
+    {
+        dsp.reserve (maxSampleRate);
+        if (initial != nullptr)
+            latency.store ((*initial)[29] > 0.5f ? 257 : 9, std::memory_order_relaxed); // (pitcher::Pitcher::latency())
+    }
 
     void prepare (double sr) noexcept override { dsp.prepare (sr); }
     void reset() noexcept override
@@ -2987,6 +3006,57 @@ const EffectInfo& effectInfo (EffectKind kind)
         case EffectKind::kilnChannel: return mixsuite::kilnInfo();
         case EffectKind::fretChannel: return mixsuite::fretInfo();
         case EffectKind::shellChannel: return mixsuite::shellInfo();
+        case EffectKind::pocketDistortion:
+        {
+            // FL Studio Mobile's own values and defaults (round 188h)
+            static const EffectInfo info { "Pocket Distortion", { { "Drive", 0.25f }, { "BitCrush", 0.0f }, { "Gain", 1.0f },
+                                                                  { "Stereo", 0.5f }, { "Kind", 0.0f }, { "Bias", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketLimiterClassic:
+        {
+            static const EffectInfo info { "Pocket Limiter Classic", { { "Threshold", 1.0f }, { "Release", 0.7f },
+                                                                       { "Output gain", 2.0f / 3.0f } } };
+            return info;
+        }
+        case EffectKind::pocketLimiter:
+        {
+            static const EffectInfo info { "Pocket Limiter", { { "In gain", 0.5f }, { "Out gain", 0.5f }, { "Release", 0.2f },
+                                                               { "Threshold", 1.0f } } };
+            return info;
+        }
+        case EffectKind::pocketLeveller:
+        {
+            static const EffectInfo info { "Pocket Leveller", { { "Gain", 0.7379573f }, { "Pan", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketGate:
+        {
+            static const EffectInfo info { "Pocket Gate", { { "Threshold", 0.0f }, { "Asymmetry", 0.0f }, { "Attack", 0.01f },
+                                                            { "Attack curve", 0.0f }, { "Release", 0.25f }, { "Release curve", 1.0f },
+                                                            { "Mix", 1.0f }, { "Hold", 0.25f } } };
+            return info;
+        }
+        case EffectKind::pocketTranceDelay:
+        {
+            static const EffectInfo info { "Pocket Trance Delay", { { "Time", 0.775f }, { "Feedback", 0.4f }, { "Mix", 1.0f },
+                                                                    { "Filter", 0.5f }, { "Mode", 0.0f }, { "Input pan", 0.5f },
+                                                                    { "Dry pan", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketTapeDelay:
+        {
+            static const EffectInfo info { "Pocket Tape Delay", { { "Time", 0.6f }, { "Feedback", 0.6f }, { "Async", 0.5f },
+                                                                  { "Mix", 0.4f } } };
+            return info;
+        }
+        case EffectKind::pocketMultiFx:
+        {
+            static const EffectInfo info { "Pocket MultiFX", { { "FX kind", 0.0f }, { "X", 0.5f }, { "Y", 0.5f }, { "LFO rate", 0.61f },
+                                                               { "LFO amount", 0.0f }, { "LFO shape", 0.0f } } };
+            return info;
+        }
+        case EffectKind::strikeShaper: return mixsuite::strikeInfo();
         case EffectKind::rackMixer:
         {
             static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
@@ -3750,6 +3820,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
         case EffectKind::shellChannel:
+        case EffectKind::strikeShaper:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -3794,6 +3865,22 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return fllegacy::eq7ParamText (param, v);
         case EffectKind::flDelay1:
             return fllegacy::delay1ParamText (param, v);
+        case EffectKind::pocketDistortion:
+            return pocket::distortionParamText (param, v);
+        case EffectKind::pocketLimiterClassic:
+            return pocket::limiterClassicParamText (param, v);
+        case EffectKind::pocketLimiter:
+            return pocket::limiterParamText (param, v);
+        case EffectKind::pocketLeveller:
+            return pocket::levellerParamText (param, v);
+        case EffectKind::pocketGate:
+            return pocket::gateParamText (param, v);
+        case EffectKind::pocketTranceDelay:
+            return pocket::tranceDelayParamText (param, v);
+        case EffectKind::pocketTapeDelay:
+            return pocket::tapeDelayParamText (param, v);
+        case EffectKind::pocketMultiFx:
+            return pocket::multiFxParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -3974,7 +4061,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::maximus)
         return maximusfx::make (slot.state);
     if (slot.kind == EffectKind::multibandDelay)
-        return mbdelay::make (slot.state);
+        return mbdelay::make (slot.state, &slot.params); // (#113: the mode's latency known at once)
     if (slot.kind == EffectKind::vocoder)
         return std::make_unique<Vocoder> (slot.state);
     if (slot.kind == EffectKind::equo)
@@ -4005,6 +4092,24 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return dyn::make (slot.kind, &slot.params);
     if (slot.kind == EffectKind::apexLimiter) // round 135: the oversampling latency known before the first block
         return apex::make (&slot.params);
+    if (slot.kind == EffectKind::ridgeStrip) // issue #113: its Vocal voicing / DRIVE latency known before the first block
+        return mixsuite::makeRidge (&slot.params);
+    if (slot.kind == EffectKind::aether) // issue #113: its model (the exciter's oversampling latency) known before the first block
+        return mixsuite::makeAether (&slot.params);
+    if (slot.kind == EffectKind::lynxTune) // issue #113: its range / low-latency path known before the first block
+        return lynxtune::make (&slot.params);
+    if (slot.kind == EffectKind::transmitter) // issue #113: its look-ahead (latency) known before the first block
+        return transmitter::make (&slot.params);
+    if (slot.kind == EffectKind::flPitchShifter) // issue #113: its engine (latency) known before the first block
+        return psfl::make (&slot.params);
+    if (slot.kind == EffectKind::compressor) // issue #113: its voicing's latency known before the first block
+        return std::make_unique<Compressor> (&slot.params);
+    if (slot.kind == EffectKind::pitchCorrect) // issue #113: its formant path's latency known before the first block
+        return std::make_unique<PitchCorrect> (&slot.params);
+    if (slot.kind == EffectKind::fruityLimiter) // issue #113: its look-ahead (latency) known before the first block
+        return fldyn::makeLimiter (&slot.params);
+    if (slot.kind == EffectKind::fruityCompressor) // its reported look-ahead known before the first block
+        return fldyn::makeCompressor (&slot.params);
     if (slot.kind == EffectKind::hyperChorus)
         return hyperchorusfx::make (hyperchorusfx::instanceOf (slot.state));
     if (slot.kind == EffectKind::vintageChorus)
@@ -4018,7 +4123,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::fruityDelayBank)
         return fldbank::make (slot.state);
     if (slot.kind == EffectKind::fruityMultiband)
-        return slot.state.empty() ? flmb::make() : flmb::make (slot.state);
+        return slot.state.empty() ? flmb::make (&slot.params) : flmb::make (slot.state, &slot.params); // (#113: latency known at once)
     return makeEffect (slot.kind);
 }
 
@@ -4101,7 +4206,8 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::ember:
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
-        case EffectKind::shellChannel: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::shellChannel:
+        case EffectKind::strikeShaper: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
@@ -4131,6 +4237,14 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::flBassBoost: return fllegacy::makeBassBoost();
         case EffectKind::fl7BandEq: return fllegacy::makeEq7();
         case EffectKind::flDelay1: return fllegacy::makeDelay1();
+        case EffectKind::pocketDistortion: return pocket::makeDistortion(); // round 188h (FL Studio Mobile)
+        case EffectKind::pocketLimiterClassic: return pocket::makeLimiterClassic();
+        case EffectKind::pocketLimiter: return pocket::makeLimiter();
+        case EffectKind::pocketLeveller: return pocket::makeLeveller();
+        case EffectKind::pocketGate: return pocket::makeGate();
+        case EffectKind::pocketTranceDelay: return pocket::makeTranceDelay();
+        case EffectKind::pocketTapeDelay: return pocket::makeTapeDelay();
+        case EffectKind::pocketMultiFx: return pocket::makeMultiFx();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

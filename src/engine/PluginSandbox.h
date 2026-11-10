@@ -34,6 +34,9 @@ bool isModule32Bit (const juce::String& fileOrIdentifier); // a 32-bit x86 VST2 
 bool isPlugin32Bit (const juce::PluginDescription& description);
 // A sandbox proxy running in the 32-bit bridge.
 bool isBridged32 (const juce::AudioPluginInstance& plugin);
+// Any sandbox proxy (Options' separate process, "Make bridged" or the 32-bit bridge): its editor is a window of another
+// process, so it can't be docked inside the main window (issue #116).
+bool isSandboxedPlugin (const juce::AudioPluginInstance& plugin);
 
 // Opens the plugin in a child process, already prepared (rate, block, base64 state). nullptr + `error` on
 // failure (child didn't start, plugin didn't load, timeout).
