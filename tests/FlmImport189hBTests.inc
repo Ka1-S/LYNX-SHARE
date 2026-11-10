@@ -229,3 +229,69 @@ TEST (flm189h_maps_pocket_modules_b)
     const auto t = flmfx::map (flm188f::moduleOf (46, { 1.0f, 0.2f, 0.0f, 1.0f, 0.3f }));
     CHECK (t.slots.size() == 1 && t.slots[0].kind == EffectKind::pocketTremolo && t.slots[0].params[3] == 0.3f && t.slots[0].params[7] == 0.5f);
 }
+
+// Round 190g: the two controls the effect audit cannot see move the sound where FLM's laws say they do.
+namespace flm190g
+{
+inline std::vector<std::array<float, 2>> render (lynx::EffectSlot slot, int moveParam = -1, float moveTo = 0.0f)
+{
+    using namespace lynx;
+    auto fx = makeEffect (slot);
+    fx->prepare (44100.0);
+    std::vector<float> l (88200), r (88200);
+    for (int i = 0; i < 88200; ++i)
+    {
+        l[(std::size_t) i] = 0.4f * std::sin ((float) i * 0.031f);
+        r[(std::size_t) i] = 0.4f * std::sin ((float) i * 0.047f);
+    }
+    for (int done = 0; done < 88200; done += 441)
+    {
+        if (moveParam >= 0 && done == 4410)
+            slot.params[(std::size_t) moveParam] = moveTo; // a knob moved while playing
+        fx->process (l.data() + done, r.data() + done, 441, slot.params, 120.0);
+    }
+    std::vector<std::array<float, 2>> out (88200);
+    for (std::size_t i = 0; i < out.size(); ++i)
+        out[i] = { l[i], r[i] };
+    return out;
+}
+inline double difference (const std::vector<std::array<float, 2>>& a, const std::vector<std::array<float, 2>>& b, int channel)
+{
+    double e = 0.0;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        e += (double) (a[i][(std::size_t) channel] - b[i][(std::size_t) channel]) * (double) (a[i][(std::size_t) channel] - b[i][(std::size_t) channel]);
+    return e;
+}
+} // namespace flm190g
+
+TEST (flm190g_tremolo_stereo_offset_moves_the_right_channel_only)
+{
+    using namespace lynx;
+    const auto base = flm190g::render (makeEffectSlot (EffectKind::pocketTremolo));
+    for (const float v : { 0.25f, 0.5f })
+    {
+        auto slot = makeEffectSlot (EffectKind::pocketTremolo);
+        slot.params[5] = v; // Stereo offset: 90°, 180° (added to the right LFO's phase)
+        const auto out = flm190g::render (slot);
+        CHECK (flm190g::difference (base, out, 0) == 0.0);
+        CHECK (flm190g::difference (base, out, 1) > 1.0);
+    }
+    auto whole = makeEffectSlot (EffectKind::pocketTremolo);
+    whole.params[5] = 1.0f; // 360°: a whole cycle, the same phase (what the effect audit tries)
+    CHECK (flm190g::difference (base, flm190g::render (whole), 1) == 0.0);
+}
+
+TEST (flm190g_wow_random_rate_acts_when_moved_not_when_loaded)
+{
+    using namespace lynx;
+    // FLM writes the sync length (parameter 8) after the free rate (7): a loaded state takes its random interval from
+    // the sync length (4 beats = 2 s at 120 bpm), whatever the free rate is
+    const auto base = flm190g::render (makeEffectSlot (EffectKind::pocketWowFlutter));
+    auto loaded = makeEffectSlot (EffectKind::pocketWowFlutter);
+    loaded.params[7] = 1.0f;
+    const auto same = flm190g::render (loaded);
+    CHECK (flm190g::difference (base, same, 0) == 0.0 && flm190g::difference (base, same, 1) == 0.0);
+    // moved while playing, the free rate (10 Hz) sets the interval: the wow rate is re-picked every 0.1 s
+    const auto moved = flm190g::render (makeEffectSlot (EffectKind::pocketWowFlutter), 7, 1.0f);
+    CHECK (flm190g::difference (base, moved, 0) > 1e-6);
+}
