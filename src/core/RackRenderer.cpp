@@ -365,6 +365,20 @@ std::shared_ptr<Effect> buildEffect (const EffectSlot& slot, double sampleRate, 
     return effect;
 }
 
+// Issue #134: hosted plugins are prepared when they are made, for the rate they are made at. A Patcher built again
+// for another sample rate (the audio device changed) keeps the running nodes of its old graph, and LYNX's own units
+// follow the new rate, but a hosted plugin kept that way went on running at the old one (out of tune, its delays and
+// envelopes off). A Patcher that holds one, nested ones included, is built from nothing at a new rate.
+bool hostsPlugins (const PatcherDoc& doc) noexcept
+{
+    for (const auto& n : doc.nodes)
+        if (n.generator ? n.channel.instrument == InstrumentKind::plugin
+                              || (n.channel.instrument == InstrumentKind::patcher && hostsPlugins (n.channel.patcher))
+                        : n.effect.kind == EffectKind::plugin || (n.effect.kind == EffectKind::patcher && hostsPlugins (n.effect.patcher)))
+            return true;
+    return false;
+}
+
 // What a Patcher builds its nodes with: the same builders as the rack's channels and slots
 patcher::Factories patcherFactories (double sampleRate, double bpm, const RackState::Factories& factories)
 {
@@ -564,7 +578,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 state->instruments.back()->configure (channel, song.bpm);
                 continue;
             }
-            state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), old));
+            const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher) ? nullptr : old;
+            state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept));
             state->instruments.back()->configure (channel, song.bpm);
             continue;
         }
@@ -672,7 +687,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     state->effects[t].push_back (previous->effects[pt][pi]);
                     continue;
                 }
-                std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), old);
+                const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher) ? nullptr : old;
+                std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept);
                 effect->prepare (sampleRate);
                 state->effects[t].push_back (std::move (effect));
                 continue;
