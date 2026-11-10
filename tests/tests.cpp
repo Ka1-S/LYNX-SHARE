@@ -150,6 +150,7 @@
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
+#include "core/UndoKeys.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
 #include "core/PlaylistTrackOps.h"
@@ -17387,3 +17388,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
 #include "Notes188gTests.inc"
+#include "Undo190bTests.inc"
