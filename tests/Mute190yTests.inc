@@ -112,3 +112,50 @@ TEST (mute190y_muted_insert_keeps_its_meter_not_its_sound)
     }, true);
     CHECK (controller.insert1 == 0.0f);
 }
+
+// Round 190y, FL 2026 renders (E:/lynx-work/mute190y/rt, insert 1 = a kick, Master peak): insert 1 muted with a mixer send
+// to insert 8 -> 0.0000 (FL cuts the send); unmuted with only the send -> 0.6578; muted with a Fruity Send (dry 100 %) to
+// insert 8 instead -> 0.8222, the same as insert 1 alone (FL keeps running a muted insert's effects: the Fruity Send is
+// heard). Song::muteRunsEffects (.flp imports, new projects) follows that; older LYNX projects keep their old sound.
+TEST (mute190y_muted_insert_runs_its_effects_like_fl)
+{
+    using namespace lynx;
+    const auto fsend = [] (bool fl, bool muted) {
+        return [fl, muted] (Song& s) {
+            s.muteRunsEffects = fl;
+            s.mixer[1].muted = muted;
+            s.mixer[1].sends.clear();
+            s.mixer[1].effects.push_back (send105::sendSlot (0, 256, 256, 2));
+        };
+    };
+    const auto peak = [] (const mute190y::Result& r) {
+        float p = 0.0f;
+        for (std::size_t i = 0; i < r.l.size(); ++i)
+            p = std::max ({ p, std::abs (r.l[i]), std::abs (r.r[i]) });
+        return p;
+    };
+    // insert 3's own channel off, so the Master hears insert 1's paths only
+    const auto quiet = [] (const std::function<void (Song&)>& f) { return [f] (Song& s) { f (s); s.channels[1].muted = true; }; };
+
+    // FL: a muted insert's mixer send is cut (both ways)
+    for (const auto fl : { false, true })
+    {
+        const auto r = mute190y::render (quiet ([fl] (Song& s) { s.muteRunsEffects = fl; s.mixer[1].muted = true; }), false);
+        CHECK (peak (r) == 0.0f);
+    }
+    // FL: its Fruity Send is heard, as loud as from the unmuted insert routed nowhere else
+    const auto unmuted = mute190y::render (quiet ([fsend] (Song& s) { fsend (true, false) (s); s.mixer[1].toMaster = false; }), false);
+    const auto flMuted = mute190y::render (quiet (fsend (true, true)), false);
+    CHECK (peak (unmuted) > 0.1f);
+    CHECK (std::abs (peak (flMuted) - peak (unmuted)) < 1.0e-4f);
+    // the same live, with the meters on; and its meter moves
+    const auto flMetered = mute190y::render (quiet (fsend (true, true)), true);
+    CHECK (flMetered.l == flMuted.l && flMetered.insert1 > 0.1f && flMetered.insert2 > 0.1f);
+    // a project from before keeps its sound: nothing from the muted insert
+    const auto old = mute190y::render (quiet (fsend (false, true)), false);
+    CHECK (peak (old) == 0.0f);
+
+    // saved with the project; a project without the key (older) loads with it off; .flp imports and new projects: on
+    Song s;
+    CHECK (! s.muteRunsEffects);
+}

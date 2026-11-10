@@ -930,6 +930,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
     // REA round 168j: PDC "Automatic" 0x1D / "Compensate automations" 0x27, Time settings 0x23, the Piano Roll's scale

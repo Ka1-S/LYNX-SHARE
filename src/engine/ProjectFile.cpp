@@ -2158,6 +2158,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("compCrossfadeMs", (double) song.compCrossfadeMs);
     if (song.playTruncatedNotes)
         root->setProperty ("playTruncatedNotes", true);
+    if (song.muteRunsEffects)
+        root->setProperty ("muteRunsEffects", true);
     if (song.fastDeclick)
         root->setProperty ("fastDeclick", true);
     if (song.panTriangular)
@@ -2767,6 +2769,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
     song.compCrossfadeMs = juce::jlimit (0.0f, 100.0f, (float) (double) root.getProperty ("compCrossfadeMs", (double) Song::defaultCompCrossfadeMs));
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
+    song.muteRunsEffects = (bool) root.getProperty ("muteRunsEffects", false); // (round 190y; older projects: off)
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
     song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";
     song.autoPdc = (bool) root.getProperty ("autoPdc", true);
