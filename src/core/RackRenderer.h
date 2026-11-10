@@ -427,6 +427,14 @@ public:
         clickRight = right != nullptr ? right : left;
         clickTrack = track;
     }
+    // Round 188b (the plugins' side-chain bus): this audio goes into `track`'s input, as the metronome input does into its
+    // own track. nullptr = none. Same thread as process(); the pointers cover the block.
+    void setSideInput (const float* left, const float* right, int track) noexcept
+    {
+        sideLeft = left;
+        sideRight = right != nullptr ? right : left;
+        sideTrack = track;
+    }
 
     // Allocates the mixer buffers: call off the audio thread.
     // Blocks larger than maxBlockSize are processed in pieces.
@@ -607,10 +615,14 @@ private:
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;
+    const float* sideLeft = nullptr;
+    const float* sideRight = nullptr;
+    int sideTrack = -1;
     const EffectParams* overrideParams = nullptr;
     int overrideTrack = -1, overrideSlot = -1;
     int metronomeTarget (const RackState& state) const noexcept;
     void mixMetronome (const RackState& state, int track, int n) noexcept;
+    void mixSideInput (const RackState& state, int track, int n) noexcept;
     void mixLiveInput (const RackState& state, bool playing, int n) noexcept;
     void mixLiveInputTrack (const RackState& state, int track, bool recording, bool playing, int n) noexcept;
     // the task graph run (RackState::graphOk): per chunk, each task's unfinished predecessors and the ready queue

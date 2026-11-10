@@ -9,8 +9,13 @@
 //    sample paths: "@L@" = the .flm's folder (an FLM share-zip keeps the library tree), "@R@" = FL Studio's copy of
 //    the app's resources; missing files are reported;
 //  - slice F3: FLM's DW Sampler with a single sample → a LYNX sampler channel (its key range, the module's sample);
-//  - the rest is listed in the report: the other generators play LYNX's built-in synth for now (F4), effects are not
-//    imported yet (F5), automation lanes neither (F6).
+//  - slice F2 (182c, 187d): the rack's level, pan, mute and solo on the channel's insert, its held pitch bend on a
+//    sampler's pitch, the SEND routes;
+//  - slice F6 (182c, 187d): the rack's Level, Pan and send-level automation lanes as automation clips;
+//  - slice F5 (188f): Equalizer, Graphic EQ, Filter, Autoduck (legacy), Reverb (legacy) and Reverb 2 on the insert
+//    as LYNX effects (core/FlmEffects.h), with their parameters' automation lanes;
+//  - the rest is listed in the report: the other generators play LYNX's built-in synth for now (F4), the other effects
+//    (MultiFX and the rest of FLM_FORMAT §7) are listed.
 
 #include <cstdint>
 #include <optional>

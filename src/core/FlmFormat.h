@@ -110,13 +110,14 @@ struct Module
     std::string presetFile; // PRST: the preset or sample file (absolute, as saved)
     std::string presetName; // PRST: its display / relative name
     std::vector<float> params;    // PRMS
+    std::vector<float> reserved;  // SMPR: Post Gain, Mix, Wet Pan (FLM's parameter ids 0x7FC0…0x7FC2, also −3, −2)
     std::vector<std::uint8_t> custom; // CSTM body (the engine's own state)
 };
 
 struct Rack
 {
     std::uint32_t kind = kindNormal;
-    std::vector<float> params; // RPRM: [0] volume 0…1, [1] pan 0…1 (0.5 = centre), …
+    std::vector<float> params; // RPRM: the rack's own parameters, see rackparam (FLM_FORMAT §3)
     std::vector<std::uint8_t> pads; // RSMP's PADS
     std::vector<SampleRef> kit;     // RSMP's samples (drum lanes play kit[key])
     std::vector<Module> modules;    // in slot order
@@ -147,6 +148,15 @@ enum class ModuleCategory : int { unknown = 0, generator = 1, delayReverb = 2, d
 const char* moduleName (std::uint32_t type) noexcept; // nullptr for an unregistered id
 ModuleCategory moduleCategory (std::uint32_t type) noexcept;
 inline bool isGenerator (std::uint32_t type) noexcept { return moduleCategory (type) == ModuleCategory::generator; }
+
+// The rack's own parameters (module instance 0): RPRM holds the first six; automation lanes on module 0 use the same
+// indices, plus MIDI CCs and the per-destination send switches/levels (FLM_FORMAT §3, PROVEN-REA 0x18059eb20)
+namespace rackparam
+{
+constexpr int level = 0, pan = 1, mute = 2, solo = 3, pitchBend = 4, aftertouch = 5;
+constexpr int firstMidiCc = 7, lastMidiCc = 7 + 126;
+constexpr int sendEnableBase = 0x1000, sendLevelBase = 0x2000; // + the destination's channel id
+} // namespace rackparam
 
 // Module type ids the importer refers to by name
 namespace module

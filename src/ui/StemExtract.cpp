@@ -8,13 +8,13 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include <onnxruntime_c_api.h>
 
 #include "core/AudioEdit.h"
 #include "core/StemSplit.h"
 #include "core/UpdateCheck.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
+#include "ui/OnnxRuntime.h"
 
 namespace lynx
 {
@@ -47,19 +47,6 @@ juce::File modelFile() { return modelFolder().getChildFile ("htdemucs_fp16weight
 // (a truncated or damaged copy counts as missing: it is downloaded again, after the same question)
 bool modelInstalled() { return modelFile().getSize() == modelBytes; }
 
-// ONNX Runtime, shipped next to LYNX and loaded by its full path (never a copy from the system's search path).
-juce::File runtimeFile()
-{
-   #if JUCE_MAC
-    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory().getSiblingFile ("Frameworks").getChildFile ("libonnxruntime.1.23.2.dylib");
-   #elif JUCE_WINDOWS
-    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory().getChildFile ("onnxruntime.dll");
-   #else
-    // /proc/self/exe: started by name from PATH, argv[0] (currentExecutableFile) would point at the current folder
-    return juce::File::getSpecialLocation (juce::File::hostApplicationPath).getParentDirectory().getChildFile ("libonnxruntime.so.1.23.2");
-   #endif
-}
-
 juce::String runtimeLoadError()
 {
    #if JUCE_MAC
@@ -71,31 +58,14 @@ juce::String runtimeLoadError()
    #endif
 }
 
-// ONNX Runtime's C API, from the library at run time (the Windows build is cross-compiled with MinGW and can't link
-// Microsoft's import library). Only loaded while "Extract stems" runs: nothing of it is in memory at start-up.
-struct Runtime
+// ONNX Runtime (ui/OnnxRuntime), with this feature's messages.
+struct Runtime : onnx::Runtime
 {
     bool load (juce::String& error)
     {
-        const auto path = runtimeFile();
-        if (! path.existsAsFile())
-        {
-            error = tr ("Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip.", { path.getFileName() });
-            return false;
-        }
-        const auto getBase = library.open (path.getFullPathName()) ? (const OrtApiBase* (ORT_API_CALL*) (void) noexcept) library.getFunction ("OrtGetApiBase") : nullptr;
-        api = getBase != nullptr ? getBase()->GetApi (ORT_API_VERSION) : nullptr;
-        if (api == nullptr)
-        {
-            error = runtimeLoadError();
-            library.close();
-            return false;
-        }
-        return true;
+        return onnx::Runtime::load (error, tr ("Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip."),
+                                    runtimeLoadError());
     }
-
-    juce::DynamicLibrary library;
-    const OrtApi* api = nullptr;
 };
 
 // One loaded model.

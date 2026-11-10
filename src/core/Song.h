@@ -178,6 +178,17 @@ struct ForeignPlugin
     bool operator== (const ForeignPlugin&) const = default;
 };
 
+// FL's Settings › General › "Disable typing keyboard priority by default" (DisablePlugFocusDefaultBox, off; round
+// 187a): on, a plugin added from now on starts with its window's Typing keyboard priority off (LYNX first)
+namespace pluginkeys
+{
+inline std::atomic<bool>& newPluginsHostFirst() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+} // namespace pluginkeys
+
 struct PluginRef
 {
     std::string id;    // unique plugin identifier (JUCE's format-name-hash)
@@ -212,10 +223,21 @@ struct PluginRef
     bool modXAftertouch = false;    // "Send MOD X as polyphonic aftertouch": each note's Mod X follows its note on
     bool allNotesOffOnStop = true;  // "Send All Notes Off when playback stops" (off: only the held notes are released)
     bool resetOnFlush = true;       // Troubleshooting › "Reset plugin when FL Studio resets": before an export, on panic
+    // FL's Troubleshooting box "Allow FL Studio to process keyboard presses when the keyboard focus option is on"
+    // (wrapper flags2 bit 0x800, off for a new plugin): kept from and written back to FL projects (round 181c/187a);
+    // what it changes in LYNX comes with the Typing keyboard priority button (issue #96 slice 2)
+    bool allowHostKeys = false;
+    // FL's plugin-window "Typing keyboard priority" button turned off: LYNX takes the keys it uses (typing piano,
+    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96).
+    // .flp: wrapper flags bit 0x01000000 set [DATA round 187a: one project saved with the button on and off]
+    bool hostKeysFirst = pluginkeys::newPluginsHostFirst().load (std::memory_order_relaxed);
     bool sendLoopPosition = true;   // "Send loop position": the play head reports the loop's start and end
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64
     int bitSize = 0;
+    // FL's plugin menu › "Detached" (issue #116): the editor opens in a window of its own above the main window instead
+    // of docked in the workspace. LYNX's own field until the .flp bit is found (docking is behind a developer switch)
+    bool detached = false;
 
     bool operator== (const PluginRef& o) const
     {
@@ -225,7 +247,9 @@ struct PluginRef
                && midiInPort == o.midiInPort && midiOutPort == o.midiOutPort && notifyRender == o.notifyRender
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
-               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize;
+               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
+               && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
+               && detached == o.detached;
     }
 };
 
@@ -908,10 +932,19 @@ enum class EffectKind : std::uint8_t
     flTransporter,   // FL's Transporter, exact (REA_rodada167f-transporter, core/TransporterFl.h): FL's 22 controls (raw − min) / range + source, stereo, send
     kilnChannel,     // LYNX's console channel (round tp172c7, core/MixSuite.h kiln): six measured console models, drive, noise, group bypass
     fretChannel,     // LYNX's guitar / bass channel strip (round tp172c8, core/MixSuite.h fret): phase correction, EQ, compressor, amp
-    shellChannel     // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    shellChannel,    // LYNX's drum channel strip (round tp172c8, core/MixSuite.h shell): gate, transient shaper, enhancers, listen-mic compressor
+    pocketDistortion,     // Pocket Distortion, FL Studio Mobile's Distortion, exact (round 188h, core/PocketFx.h): FLM's 6 values
+    pocketLimiterClassic, // Pocket Limiter Classic, FL Studio Mobile's Limiter (legacy), exact (round 188h, core/PocketFx.h): FLM's 3 values
+    pocketLimiter,         // Pocket Limiter, FL Studio Mobile's Limiter, exact (round 188h, core/PocketFx.h)
+    pocketLeveller,        // Pocket Leveller, FL Studio Mobile's Leveller, exact (round 188h, core/PocketFx.h)
+    pocketGate,            // Pocket Gate, FL Studio Mobile's Gate, exact (round 188h, core/PocketFx.h)
+    pocketTranceDelay,     // Pocket Trance Delay, FL Studio Mobile's Trance Delay, exact (round 188h, core/PocketFx.h)
+    pocketTapeDelay,       // Pocket Tape Delay, FL Studio Mobile's Tape Delay, exact (round 188h, core/PocketFx.h)
+    pocketMultiFx,         // Pocket MultiFX, FL Studio Mobile's MultiFX, exact (round 188h, core/PocketMultiFx.cpp): an X/Y pad over 8 effects
+    strikeShaper     // LYNX's level-independent transient designer (round trans189d, issue #94, core/StrikeShaper.h): attack / sustain ±15 / ±24 dB
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::shellChannel;
+constexpr EffectKind lastEffectKind = EffectKind::strikeShaper;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).
@@ -1024,6 +1057,17 @@ struct MixerSend
     bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level; }
 };
 
+// LYNX's "Keep links to deleted inserts" (round 186c, pain point 1, off by default; FL drops them): a send whose insert
+// was deleted, kept by the deleted insert's name and the send's level. It carries no sound; the mixer draws it greyed
+// until it is reconnected to an insert or removed.
+struct LostSend
+{
+    std::string to;      // the deleted insert's name
+    float level = 1.0f;  // the send's level (0 = a side-chain link)
+
+    bool operator== (const LostSend&) const = default;
+};
+
 // Built-in EQ of each mixer track (FL's 3 bands: low shelf, peak, high shelf),
 // after the effect slots and before the fader (REA_rodada6 §1).
 struct TrackEq
@@ -1112,6 +1156,7 @@ struct MixerTrack
     bool invertPhase = false;
     bool swapChannels = false;
     std::vector<MixerSend> sends;    // to other inserts
+    std::vector<LostSend> lostSends; // sends to deleted inserts, kept greyed (round 186c, an option; saved)
     TrackEq eq;
     // external audio input (FL's "Audio input source"): the device's input channel `inputChannel` (0-based;
     // -1 = none) and, when `inputStereo`, the next one too
