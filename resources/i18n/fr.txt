@@ -8360,3 +8360,6 @@ countries: fr be ch ca lu
 "Pre-fader send (not moved by this track's fader)" = "Send pré-fader (le fader de cette piste ne le modifie pas)"
 "PRE" = "PRE"
 "Send level (pre-fader)" = "Niveau du send (pré-fader)"
+"LOW LAT" = "FAIBLE LAT"
+"Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "Contourné par « Faible latence à l'enregistrement » : cet effet ajoute {0} ms de latence et un insert armé ou monitoré passe par lui. Il revient quand cet insert est désarmé"
+"Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Faible latence à l'enregistrement (contourne les effets qui ajoutent de la latence sur les inserts armés ou monitorés)"

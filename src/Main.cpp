@@ -2682,6 +2682,37 @@ private:
                 preSendOk = false;
         }
 
+        // LYNX's "Low latency while recording" (round 190aq): a latency-adding effect on a monitored insert's path is
+        // bypassed in the engine only — PDC drops, the slot is marked, the song and the saved project stay as they are —
+        // and it is back when the option goes off
+        bool lowLatencyOk = false;
+        {
+            lynx::AudioEngine live (false);
+            live.editSong ([] (lynx::Song& s) {
+                s.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::limiter)); // 1.5 ms look-ahead
+                s.mixer[1].inputChannel = 0;
+                s.mixer[1].monitor = lynx::InputMonitor::on;
+            });
+            const auto before = live.getLatencySamples();
+            const auto saved = lynx::ProjectFile::toJson (live.getSong());
+            const auto idle = live.lowLatencyBypassedCount() == 0; // the option is off: nothing is bypassed
+            auto o = live.getRecordOptions();
+            o.lowLatencyRecording = true;
+            live.setRecordOptions (o);
+            const auto during = live.getLatencySamples();
+            const auto marked = live.isSlotLowLatencyBypassed (1, 0) && live.lowLatencyBypassedLatency (1, 0) > 0 && live.lowLatencyBypassedCount() >= 1;
+            const auto untouched = live.getSong().mixer[1].effects[0].enabled && lynx::ProjectFile::toJson (live.getSong()) == saved;
+            // monitoring leaves "On" (nothing armed): the effect returns
+            live.editSong ([] (lynx::Song& s) { s.mixer[1].monitor = lynx::InputMonitor::whenArmed; });
+            const auto released = live.getLatencySamples() == before && ! live.isSlotLowLatencyBypassed (1, 0);
+            live.editSong ([] (lynx::Song& s) { s.mixer[1].monitor = lynx::InputMonitor::on; });
+            const auto again = live.getLatencySamples() == during && live.isSlotLowLatencyBypassed (1, 0);
+            o.lowLatencyRecording = false;
+            live.setRecordOptions (o);
+            lowLatencyOk = before > 0 && idle && during < before && marked && untouched && released && again
+                           && live.getLatencySamples() == before && live.lowLatencyBypassedCount() == 0;
+        }
+
         // LYNX substitutes (round 98): a missing plugin's slot plays a built-in equivalent and the project keeps the
         // original reference byte for byte (.flp record and LYNX plugin state)
         bool substituteOk = false;
@@ -3429,7 +3460,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3449,6 +3480,7 @@ private:
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "pre_fader_sends=" << (preSendOk ? "OK" : "ERROR") << "\n"
+               << "low_latency_recording=" << (lowLatencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"

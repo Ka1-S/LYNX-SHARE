@@ -731,6 +731,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     state->buildAutomationTables();
     {
         const loadtrace::Scope timing ("pdc");
+        state->lowLatencyTracks = factories.lowLatencyTracks; // (round 190aq; empty in exports)
         state->buildPdc (previous);
     }
     state->buildMixerGraph();
@@ -1033,6 +1034,11 @@ std::vector<int> RackState::currentLatencies() const
     for (std::size_t t = 0; t < effects.size(); ++t)
         for (std::size_t s = 0; s < effects[t].size(); ++s)
         {
+            if (lowlatency::bypassed (lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
+            {
+                out.push_back (0);
+                continue;
+            }
             const auto reported = effects[t][s]->latencySamples();
             const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
             out.push_back (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported);
@@ -1043,6 +1049,39 @@ std::vector<int> RackState::currentLatencies() const
 
 void RackState::buildPdc (const RackState* previous)
 {
+    // "Low latency while recording" (round 190aq): on the engine's live inserts, the active slots with a latency are
+    // bypassed; the plan below is made without them
+    lowLatencySlots.clear();
+    lowLatencySaved.clear();
+    if (! lowLatencyTracks.empty())
+    {
+        const auto all = currentLatencies(); // (no slot bypassed yet: the real latencies)
+        std::vector<lowlatency::SlotMask> masks (effects.size(), 0);
+        std::vector<std::vector<int>> saved (effects.size());
+        auto next = all.begin() + (std::ptrdiff_t) instruments.size();
+        auto any = false;
+        for (std::size_t t = 0; t < effects.size(); ++t)
+        {
+            saved[t].assign (effects[t].size(), 0);
+            for (std::size_t s = 0; s < effects[t].size(); ++s)
+            {
+                const auto latency = *next++;
+                if (t < lowLatencyTracks.size() && lowLatencyTracks[t] != 0 && s < 16 && latency > 0 && t < song.mixer.size()
+                    && s < song.mixer[t].effects.size() && song.slotActive (song.mixer[t].effects[s]))
+                {
+                    masks[t] = (lowlatency::SlotMask) (masks[t] | (1u << s));
+                    saved[t][s] = latency;
+                    any = true;
+                }
+            }
+        }
+        if (any)
+        {
+            lowLatencySlots = std::move (masks);
+            lowLatencySaved = std::move (saved);
+        }
+    }
+
     latencies = currentLatencies();
 
     std::vector<int> channelLatency (latencies.begin(), latencies.begin() + (std::ptrdiff_t) instruments.size());
@@ -1841,6 +1880,7 @@ void RackRenderer::resetUnitTimes() noexcept
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     lastPreGain.fill (std::numeric_limits<float>::quiet_NaN());
+    lowLatencySkipped.assign ((std::size_t) maxMixerTracks * maxEffectSlots, 0);
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
@@ -2618,6 +2658,24 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             if (hasLiveMeters (slots[i].kind))
                 clearMeters();
             continue;
+        }
+
+        // "Low latency while recording" (round 190aq): a latency-adding slot on a live insert's path is skipped; when
+        // it comes back it starts from a reset state
+        if (const auto at = (std::size_t) track * maxEffectSlots + i; at < lowLatencySkipped.size())
+        {
+            if (lowlatency::bypassed (state.lowLatencySlots, track, (int) i))
+            {
+                lowLatencySkipped[at] = 1;
+                if (hasLiveMeters (slots[i].kind))
+                    clearMeters();
+                continue;
+            }
+            if (lowLatencySkipped[at] != 0)
+            {
+                lowLatencySkipped[at] = 0;
+                effects[i]->reset();
+            }
         }
 
         // smart disable (like FL): an effect with silent input and output is skipped (plugins

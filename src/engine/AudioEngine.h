@@ -179,6 +179,11 @@ public:
         // armed inserts are disarmed when a take stops. FL has no such option (round 166e measured: neither its
         // "Disarm on stop" nor the mixer's "Auto-unarm" disarms the inserts after a live take).
         bool disarmOnStop = false;
+        // LYNX's "Low latency while recording" (round 190aq, core/LowLatency.h; FL has no such switch): while an insert
+        // with an audio input is armed or monitored "On", the latency-adding effects on its path to the Master are
+        // bypassed and the PDC plan is made without them; they return when it is disarmed. What is recorded and the
+        // saved project never change. Off by default.
+        bool lowLatencyRecording = false;
         // FL's record menu "Disarm on stop" (RecDisableOnStopMenu, round 166e measured): the record switch turns off when
         // playback stops after recording
         bool recordOffOnStop = false;
@@ -794,6 +799,11 @@ public:
     int getLatencySamples() const noexcept { return lastPublishedShape.pdc.total; }
     // The last published PDC plan (per-track latencies: outLat, inAlign). Message thread.
     const PdcPlan& getPdcPlan() const noexcept { return lastPublishedShape.pdc; }
+    // "Low latency while recording" (round 190aq): whether slot `slot` of insert `track` is bypassed for it now, the
+    // latency it would add (samples, 0 = not bypassed), and how many slots are bypassed in all. Message thread.
+    bool isSlotLowLatencyBypassed (int track, int slot) const noexcept { return lowlatency::bypassed (lastPublishedShape.lowLatencySlots, track, slot); }
+    int lowLatencyBypassedLatency (int track, int slot) const noexcept;
+    int lowLatencyBypassedCount() const noexcept;
 
 private:
     void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
@@ -932,6 +942,10 @@ private:
     std::atomic<bool> waitingForInput { false };
     void startOnInput() noexcept; // MIDI or UI thread: the first note while waiting starts playback
     std::vector<int> armedInserts;
+    // round 190aq: the inserts "Low latency while recording" bypasses latency-adding slots on, as last published
+    std::vector<char> publishedLowLatency;
+    std::vector<char> lowLatencyTracksNow() const; // what it should be for the song, the armed inserts and the option
+    void refreshLowLatency();                      // republishes when that changed (an insert armed or disarmed, the option)
     juce::String releasedInputDevice; // the input device releaseAudioInputIfUnused closed (reopened by name)
     double lastPlayingTick = 0.0;
     RecordOffOnStop recordSwitch; // FL's "Disarm on stop"

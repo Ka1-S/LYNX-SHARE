@@ -8360,3 +8360,6 @@ countries: tw hk mo
 "Pre-fader send (not moved by this track's fader)" = "推桿前傳送（不受此軌道推桿影響）"
 "PRE" = "PRE"
 "Send level (pre-fader)" = "傳送電平（推桿前）"
+"LOW LAT" = "低延遲"
+"Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "已被「錄音時低延遲」旁通：此效果器會增加 {0} 毫秒延遲，且有已預備錄音或正在監聽的插入軌經過它。取消該插入軌的錄音預備後它會恢復"
+"Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "錄音時低延遲（在已預備錄音或正在監聽的插入軌上旁通會增加延遲的效果器）"

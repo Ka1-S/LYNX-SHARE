@@ -728,6 +728,34 @@ void AudioEngine::stop() noexcept
     transport.playing.store (false);
 }
 
+std::vector<char> AudioEngine::lowLatencyTracksNow() const
+{
+    return recordOptions.lowLatencyRecording ? lowlatency::bypassTracks (song, armedInserts) : std::vector<char> {};
+}
+
+void AudioEngine::refreshLowLatency()
+{
+    if (lowLatencyTracksNow() != publishedLowLatency)
+        publishSong();
+}
+
+int AudioEngine::lowLatencyBypassedLatency (int track, int slot) const noexcept
+{
+    const auto& saved = lastPublishedShape.lowLatencySaved;
+    return isSlotLowLatencyBypassed (track, slot) && (std::size_t) track < saved.size() && (std::size_t) slot < saved[(std::size_t) track].size()
+               ? saved[(std::size_t) track][(std::size_t) slot]
+               : 0;
+}
+
+int AudioEngine::lowLatencyBypassedCount() const noexcept
+{
+    int count = 0;
+    for (const auto mask : lastPublishedShape.lowLatencySlots)
+        for (auto m = (unsigned) mask; m != 0; m &= m - 1)
+            ++count;
+    return count;
+}
+
 void AudioEngine::setRecordOptions (const RecordOptions& options)
 {
     recordOptions = options;
@@ -737,6 +765,7 @@ void AudioEngine::setRecordOptions (const RecordOptions& options)
     recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);
     compensatePlayed.store (options.compensateOutput);
     updateLinearSong();
+    refreshLowLatency(); // (round 190aq: the option switched while an insert is live)
     sendChangeMessage();
 }
 
@@ -839,6 +868,7 @@ void AudioEngine::setInsertArmed (int track, bool armed)
     else if (! armed && armedInserts.empty() && audioArmed)
         setAudioRecordingArmed (false);
 
+    refreshLowLatency(); // (round 190aq: "Low latency while recording" follows the arm switches)
     sendChangeMessage();
 }
 
@@ -3537,6 +3567,9 @@ void AudioEngine::publishSong()
             clipLauncher = std::make_unique<launcher::Runtime>();
         factories.clipLauncher = clipLauncher.get();
     }
+    // "Low latency while recording" (round 190aq): the live inserts' paths, for this snapshot only (not the song)
+    publishedLowLatency = lowLatencyTracksNow();
+    factories.lowLatencyTracks = publishedLowLatency;
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -3555,6 +3588,8 @@ void AudioEngine::publishSong()
     lastPublishedShape.effects = state->effects;
     lastPublishedShape.sampleRate = state->sampleRate;
     lastPublishedShape.latencies = state->latencies;
+    lastPublishedShape.lowLatencySlots = state->lowLatencySlots; // (currentLatencies() reads them)
+    lastPublishedShape.lowLatencySaved = state->lowLatencySaved;
     lastPublishedShape.pdc = state->pdc;
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;

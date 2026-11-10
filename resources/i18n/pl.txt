@@ -8360,3 +8360,6 @@ countries: pl
 "Pre-fader send (not moved by this track's fader)" = "Send pre-fader (fader tej ścieżki go nie zmienia)"
 "PRE" = "PRE"
 "Send level (pre-fader)" = "Poziom sendu (pre-fader)"
+"LOW LAT" = "NISKA LAT"
+"Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "Pominięty przez „Niska latencja podczas nagrywania”: ten efekt dodaje {0} ms latencji, a przechodzi przez niego uzbrojony lub odsłuchiwany insert. Wróci, gdy ten insert zostanie rozbrojony"
+"Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Niska latencja podczas nagrywania (pomija efekty dodające latencję na uzbrojonych lub odsłuchiwanych insertach)"
