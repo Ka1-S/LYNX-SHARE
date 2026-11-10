@@ -38,6 +38,13 @@
 
 namespace lynx
 {
+class GamepadInput;
+namespace gamepad
+{
+struct Changes;
+struct State;
+} // namespace gamepad
+
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
                             public ui::HintSource,
@@ -58,6 +65,7 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
     void dragOperationStarted (const juce::DragAndDropTarget::SourceDetails&) override; // (issue #12: drops on windows)
     bool keyFromSecondaryWindow (const juce::KeyPress& key); // a key a tool / plugin window left unused
+    bool keyFromPluginView (const juce::KeyPress& key, bool optionOn); // a plain key over a focused plugin (issue #96)
     bool keyStateChanged (bool isKeyDown) override;
     ui::Hint hintAt (juce::Point<int> position) override; // the toolbar's background: how to edit it
 
@@ -74,6 +82,9 @@ public:
     void confirmDiscard (std::function<void()> then);
     // The main window came up (issue #62): the detached panels restored with the layout go to their saved place, above it.
     void restoreDetachedWindows() { workspace.restoreDetachedWindows(); }
+    // Issue #123: at start-up without a file to open, FL's "Startup project" (Settings › General › Startup): the default
+    // template as a new untitled project (nothing changes while it is LYNX's default), an empty project or the last one.
+    void openStartupProject();
 
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
@@ -98,6 +109,7 @@ public:
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
+    Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
@@ -285,6 +297,13 @@ private:
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
+    // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer
+    // otherwise); the hints overlay while Back is held
+    std::unique_ptr<GamepadInput> gamepadInput;
+    std::unique_ptr<juce::Component> gamepadHints;
+    void updateGamepad();
+    void gamepadChanges (const gamepad::Changes& changes, const gamepad::State& state, double seconds);
+    int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)
