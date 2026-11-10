@@ -2439,6 +2439,22 @@ private:
                          && ! off.contains ("hostKeysFirst") && ! offBack->channels[channel].plugin.hostKeysFirst && onBack->channels[channel].plugin.hostKeysFirst;
         }
 
+        // round 190ad: a new project has FL's plugin levels and keeps them through a save; a project saved before
+        // (no "pluginLevels") reads as LYNX's own law, and stays so when it opens
+        bool pluginLevelsOk = false;
+        {
+            const auto fresh = lynx::makeNewProject();
+            const auto saved = lynx::ProjectFile::toJson (fresh);
+            const auto back = lynx::ProjectFile::fromJson (saved, error);
+            auto old = lynx::Song::makeDefault(); // (what every earlier version made)
+            const auto oldSaved = lynx::ProjectFile::toJson (old);
+            const auto oldBack = lynx::ProjectFile::fromJson (oldSaved, error);
+            const auto stripped = lynx::ProjectFile::fromJson (saved.replace ("\"pluginLevels\"", "\"pluginLevelsGone\""), error);
+            pluginLevelsOk = fresh.flPluginLevels && saved.contains ("\"pluginLevels\"") && back && back->flPluginLevels
+                             && ! old.flPluginLevels && ! oldSaved.contains ("pluginLevels") && oldBack && ! oldBack->flPluginLevels
+                             && stripped && ! stripped->flPluginLevels;
+        }
+
         // hardware output targets (REA round 156): saved only when set; old projects (no field) keep the defaults
         bool hwOutOk = false;
         {
@@ -3406,7 +3422,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3419,6 +3435,7 @@ private:
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "plugin_host_keys_option=" << (hostKeysOk ? "OK" : "ERROR") << "\n"
+               << "plugin_levels_new_project=" << (pluginLevelsOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "clip_fades_180d=" << (clipFades180dOk ? "OK" : "ERROR") << "\n"
                << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"

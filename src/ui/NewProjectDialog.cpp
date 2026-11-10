@@ -426,7 +426,10 @@ private:
             return makeNewProject (item.builtIn);
         juce::String error;
         if (auto song = ProjectFile::load (item.file, error))
+        {
+            adoptFlPluginLevels (*song); // (round 190ad: FL's plugin levels, unless it holds plugins made under LYNX's)
             return std::move (*song);
+        }
         return makeNewProject();
     }
 
@@ -592,7 +595,10 @@ std::optional<Song> makeFromTemplate (const TemplateChoice& choice)
             if (! file.existsAsFile())
                 return std::nullopt;
             if (auto song = ProjectFile::load (file, error)) // (a user's template stays as saved)
+            {
+                adoptFlPluginLevels (*song); // (round 190ad: FL's plugin levels, unless it holds plugins made under LYNX's)
                 return song;
+            }
             return std::nullopt;
         }
         case TemplateChoice::Kind::lynxDefault: break;
