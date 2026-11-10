@@ -82,7 +82,7 @@ menu clicks and Ctrl+S per run, each after `safeinput.ps1`; no new line in the i
 
 ## 5. Not built: FL's "Open detached plugins with the FL Studio window"
 General › Miscellaneous checkbox `DetachedPlugsOnMainScreenBox`, hint "Open detached plugins on the same screen as the
-FL Studio window" **[STR]**: a multi-monitor placement rule for detached plugin windows. LYNX opens a detached plugin
-window on the main window's display already (it is owned by the main window and placed from it), which is this
-option switched on. FL's default and what "off" does (the plugin's last screen?) were not driven. Needs a decision:
-recommended is to leave it out until someone with two monitors asks.
+FL Studio window" **[STR]**: a multi-monitor placement rule for detached plugin windows. FL's default, what "off"
+does (the plugin's last screen?) and where LYNX's detached windows open on a second monitor were not driven or
+checked in this round. Needs a decision: recommended is to study it in FL on the two monitors here before building
+anything, as its own small slice.
