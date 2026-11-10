@@ -1624,7 +1624,7 @@ private:
         switch (kind)
         {
             case InstrumentKind::bassdrum: case InstrumentKind::drumaxx: case InstrumentKind::drumpad: case InstrumentKind::fruitkick:
-            case InstrumentKind::drumsynth:
+            case InstrumentKind::drumsynth: case InstrumentKind::fpc:
                 return "Drum";
             case InstrumentKind::boobass: case InstrumentKind::flkeys: case InstrumentKind::soundfont:
                 return "Misc";

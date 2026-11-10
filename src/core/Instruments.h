@@ -82,6 +82,9 @@ public:
     // allocates its per-voice pitch shifters (keys transpose it without changing its length, like FL's Stretch modes).
     virtual void prepareKeyShift (double /*sampleRate*/) {}
 
+    // The channel's pan (−1..1) and linear volume behind the gains of the next render() calls. Audio thread, before
+    // every chunk. For an instrument that pans its parts around the channel's pan (FPC's pads, round 190q).
+    virtual void setChannelLevels (float /*pan*/, float /*volume*/) noexcept {}
     // Adds (does not overwrite) n samples into left/right, with the gains already applied.
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.

@@ -81,6 +81,7 @@ bool sameInstrumentSetup (const ChannelDef& a, const ChannelDef& b)
         case InstrumentKind::soundfont: return a.samplePath == b.samplePath;
         case InstrumentKind::fruityslicer: return a.samplePath == b.samplePath && a.pluginState == b.pluginState;
         case InstrumentKind::directwave: return a.zones == b.zones && a.modelParams == b.modelParams && a.pluginState == b.pluginState;
+        case InstrumentKind::fpc: return a.zones == b.zones && a.pluginState == b.pluginState;
         case InstrumentKind::dashboard: // (its outputs are structure)
             return std::equal (a.patcher.surface.begin(), a.patcher.surface.end(), b.patcher.surface.begin(), b.patcher.surface.end(),
                                [] (const SurfaceControl& x, const SurfaceControl& y) { return x.kind == y.kind; });

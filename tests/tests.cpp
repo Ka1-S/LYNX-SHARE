@@ -54,6 +54,7 @@
 #include "core/VoltageController.h"
 #include "core/FlSamplers.h"
 #include "core/Fpc.h"
+#include "core/FpcInstrument.h"
 #include "core/FlSynths.h"
 #include "core/Inflate.h"
 #include "core/WavPack.h"
@@ -1468,12 +1469,14 @@ TEST (flp_real_files)
                         CHECK (c.sampler.slices.back() < 1.0f);
                     }
                     dwExact += c.instrument == lynx::InstrumentKind::directwave ? 1 : 0;
-                    if (! c.zones.empty() && c.name.find (" - ") == std::string::npos)
+                    if (! c.zones.empty() && c.name.find (" - ") == std::string::npos && c.instrument != lynx::InstrumentKind::fpc)
                     {
                         ++dwChannels;
                         dwZones += (int) c.zones.size();
                     }
                     padChannels += c.name.find (" - ") != std::string::npos && c.instrument == lynx::InstrumentKind::sampler ? 1 : 0;
+                    if (c.instrument == lynx::InstrumentKind::fpc) // (round 190q: a kit on one channel; its pads that play)
+                        padChannels += (int) lynx::fpcChannelPads (c).size();
                 }
                 fpcKits += hasFpc;
                 // Maximus / Soundgoodizer become the exact engine (REA_rodada40); Vocodex carries SG.dat (and its
@@ -1556,7 +1559,8 @@ TEST (flp_real_files)
                     for (const auto& n : pat.notes)
                     {
                         CHECK (n.channel >= 0 && n.channel < (int) full.channels.size());
-                        padNotes += full.channels[(std::size_t) n.channel].name.find (" - ") != std::string::npos ? 1 : 0;
+                        padNotes += full.channels[(std::size_t) n.channel].name.find (" - ") != std::string::npos
+                                    || full.channels[(std::size_t) n.channel].instrument == lynx::InstrumentKind::fpc ? 1 : 0;
                     }
             }
 
@@ -17355,6 +17359,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Fpc190mTests.inc"
+#include "Fpc190qTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"

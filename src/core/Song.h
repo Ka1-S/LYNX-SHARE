@@ -142,8 +142,10 @@ enum class InstrumentKind : std::uint8_t
                 // Kepler Exo engine_x64.dll in samplePath
     wavetraveller, // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
                    // the channel's sample in samplePath
-    fruityslicer   // FL's Fruity Slicer (round 180c, core/FruitySlicer.h): FL's state (slices, fades, declick...) in pluginState,
+    fruityslicer,  // FL's Fruity Slicer (round 180c, core/FruitySlicer.h): FL's state (slices, fades, declick...) in pluginState,
                    // the sample in samplePath; the sampler's voices play the slices
+    fpc            // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
+                   // layers in `zones` (one per layer with a sample, in the state's order; only `path` is used)
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.

@@ -1,5 +1,6 @@
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/Fpc.h"
 
 #include <algorithm>
 #include <cmath>
@@ -81,6 +82,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
     { InstrumentKind::fruityslicer, "Fruity Slicer", false },
+    { InstrumentKind::fpc, "FPC", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -943,6 +945,9 @@ struct Converter
             c.pluginState = originMatches (def) && ! def.flOrigin.state.empty() ? def.flOrigin.state : def.pluginState;
             if (c.pluginState.empty() && def.instrument == InstrumentKind::threeosc)
                 c.pluginState = defaultThreeOscState();
+            if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)
+                if (const auto kit = fpc::read (c.pluginState))
+                    c.pluginState = fpc::write (*kit);
             const auto* g = generatorFor (def.instrument);
             if ((g != nullptr && g->channelSample) || samplerLike (def.instrument))
                 c.samplePath = path (def.samplePath);

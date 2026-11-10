@@ -1,6 +1,7 @@
 #include "core/FlpImport.h"
 #include "core/FlpExport.h"
 
+#include "core/Fpc.h"
 #include "core/FruitySlicer.h"
 
 #include "core/Dvs.h"
@@ -530,16 +531,8 @@ void applyFlStretchPanel (SamplerSettings& s, int mode, int pitchCents, int mul,
         s.stretchBeats = std::clamp ((float) (sampleSeconds * std::pow (2.0, mul / 10000.0) * bpm / 60.0), 0.0f, 4096.0f);
 }
 
-void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads)
+ChannelDef drumPadChannel (const ChannelDef& original, const DrumPad& pad, int channel)
 {
-    if (channel < 0 || channel >= (int) song.channels.size() || pads.empty())
-        return;
-
-    const auto original = song.channels[(std::size_t) channel];
-    const auto inserted = (int) pads.size() - 1; // the first pad takes the original channel's place
-    std::vector<ChannelDef> padChannels;
-
-    for (const auto& pad : pads)
     {
         ChannelDef def = original;
         def.name = original.name + " - " + pad.name;
@@ -563,8 +556,21 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
         def.cutGroup = pad.cutGroup > 0 ? 1000 * (channel + 1) + pad.cutGroup : 0;
         def.cutBy = pad.cutBy > 0 ? 1000 * (channel + 1) + pad.cutBy : 0;
         def.mixerTrack = std::clamp (original.mixerTrack + pad.mixerOffset, 0, maxMixerTracks - 1);
-        padChannels.push_back (std::move (def));
+        return def;
     }
+}
+
+void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || pads.empty())
+        return;
+
+    const auto original = song.channels[(std::size_t) channel];
+    const auto inserted = (int) pads.size() - 1; // the first pad takes the original channel's place
+    std::vector<ChannelDef> padChannels;
+
+    for (const auto& pad : pads)
+        padChannels.push_back (drumPadChannel (original, pad, channel));
 
     song.channels[(std::size_t) channel] = padChannels.front();
     song.channels.insert (song.channels.begin() + channel + 1, padChannels.begin() + 1, padChannels.end());
@@ -1475,7 +1481,19 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         found.push_back (std::move (pad));
                 }
 
-                if (! found.empty())
+                // One FPC channel (round 190q) when it plays what the pad channels play: every pad on the channel's own
+                // mixer insert (a pad with an output offset needs its own insert: those kits keep a channel per pad)
+                const auto oneInsert = std::all_of (found.begin(), found.end(), [] (const DrumPad& pad) { return pad.mixerOffset == 0; });
+                const auto kit = fpc::read (c.pluginState);
+                if (! found.empty() && oneInsert && kit && ! options.fpcAsPads)
+                {
+                    def.instrument = InstrumentKind::fpc;
+                    def.plugin = {};
+                    def.samplePath.clear();
+                    setFpcKit (def, *kit, existing);
+                    def.pluginState = c.pluginState; // (FL's own bytes)
+                }
+                else if (! found.empty())
                     drumKits.push_back ({ (int) song.channels.size(), std::move (found) });
             }
 
@@ -2188,7 +2206,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
                      || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
-                     || def.instrument == InstrumentKind::fruityslicer
+                     || def.instrument == InstrumentKind::fruityslicer || def.instrument == InstrumentKind::fpc
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
