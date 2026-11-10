@@ -1,6 +1,9 @@
 // --- Round 184a, slice S3: the New track chooser's core parts — when a project counts as empty (it then opens on the
 // chooser) and a starter beat (a Loop Starter plan) turned into a Drums track.
 
+#include <cmath>
+
+#include "core/ClipOps.h"
 #include "core/LoopStarter.h"
 #include "core/SimpleTracks.h"
 
@@ -119,6 +122,62 @@ TEST (simple184a_imported_audio_is_a_track_with_its_clip)
     CHECK (s.channels[(std::size_t) simpletracks::addTrack (s, q).channels[0]].name == "take");
     q.audioFile.clear();
     CHECK (simpletracks::addTrack (s, q).channels.empty());
+}
+
+TEST (simple190p_a_loop_keeps_time)
+{
+    using namespace lynx;
+    using simpletracks::loopBeats;
+    // the tempo in the name
+    bool said = false;
+    CHECK (simpletracks::tempoInName ("DL1_102_Dm_Regulators_Stack_Verse.wav", &said) == 102.0 && ! said);
+    CHECK (simpletracks::tempoInName ("Funky Guitar 98.wav") == 98.0);
+    CHECK (simpletracks::tempoInName ("Break Scatty 174 bpm.wav", &said) == 174.0 && said);
+    CHECK (simpletracks::tempoInName ("loop_128BPM") == 128.0);
+    CHECK (simpletracks::tempoInName ("808 Kick 01.wav") == 0.0);   // out of range, too short
+    CHECK (simpletracks::tempoInName ("Chord Dm7 4bars.wav") == 0.0); // numbers inside words
+    CHECK (simpletracks::tempoInName ("Lead vocal.wav") == 0.0);
+    CHECK (simpletracks::tempoInName ("120.wav") == 120.0);
+    CHECK (simpletracks::tempoInName ("Take 1200.wav") == 0.0);
+    // whole bars at the name's tempo: 4 bars at 102 BPM last 9.412 s
+    CHECK (loopBeats ("DL1_102_Dm_Regulators_Stack_Verse.wav", 16.0 * 60.0 / 102.0, 0.0f, 4) == 16.0f);
+    CHECK (loopBeats ("Funky Guitar 98.wav", 8.0 * 60.0 / 98.0 + 0.05, 0.0f, 4) == 8.0f); // a little padding
+    CHECK (loopBeats ("Waltz 90.wav", 6.0 * 60.0 / 90.0, 0.0f, 3) == 6.0f);
+    CHECK (loopBeats ("Hat 120.wav", 0.5, 0.0f, 4) == 1.0f);  // one beat
+    CHECK (loopBeats ("Hat 120.wav", 1.0, 0.0f, 4) == 2.0f);  // half a bar
+    // a number that doesn't make whole bars is not a tempo: a take, a song
+    CHECK (loopBeats ("Take 90.wav", 13.7, 0.0f, 4) == 0.0f);
+    CHECK (loopBeats ("Lead vocal.wav", 8.0, 0.0f, 4) == 0.0f);
+    CHECK (loopBeats ("My song 120.wav", 180.0, 0.0f, 4) == 0.0f);
+    // "bpm" in the name keeps a loop with a tail; the ACID beat count wins; long files are left alone
+    CHECK (std::abs (loopBeats ("Pad 100 bpm.wav", 10.5, 0.0f, 4) - 17.5f) < 1.0e-4f);
+    CHECK (loopBeats ("Pad 100 bpm.wav", 10.5, 8.0f, 4) == 8.0f);
+    CHECK (loopBeats ("anything.wav", 4.0, 8.0f, 4) == 8.0f);
+    CHECK (loopBeats ("Song 100 bpm.wav", 200.0, 0.0f, 4) == 0.0f);
+    CHECK (loopBeats ("anything.wav", 0.0, 8.0f, 4) == 0.0f);
+
+    // the track: the channel is stretched to the beats with its pitch kept, and the clip is that long
+    Song s;
+    s.mixer.resize (3);
+    simpletracks::Request q;
+    q.kind = simpletracks::Kind::audio;
+    q.audioFile = "D:/loops/DL1_102_Dm_Regulators_Stack_Verse.wav";
+    q.audioLength = 13 * ppq; // (its length at its own speed: not used for a loop)
+    q.audioBeats = 16.0f;
+    const auto r = simpletracks::addTrack (s, q);
+    CHECK (r.ok() && r.channels.size() == 1);
+    const auto& c = s.channels[(std::size_t) r.channels[0]];
+    CHECK (c.sampler.stretchBeats == 16.0f && c.sampler.keepPitch);
+    CHECK (s.playlist.size() == 1 && s.playlist[0].length == 16 * ppq);
+    // the same 16 beats at any tempo
+    CHECK (clipops::fileTicks (c, 415059.0, 44100.0, 120.0) == 16 * ppq);
+    CHECK (clipops::fileTicks (c, 415059.0, 44100.0, 85.0) == 16 * ppq);
+    // without it nothing changes
+    q.audioBeats = 0.0f;
+    const auto plain = simpletracks::addTrack (s, q);
+    CHECK (s.channels[(std::size_t) plain.channels[0]].sampler.stretchBeats == 0.0f);
+    CHECK (! s.channels[(std::size_t) plain.channels[0]].sampler.keepPitch);
+    CHECK (s.playlist.back().length == 13 * ppq);
 }
 
 TEST (simple184a_imported_midi_track_is_an_instrument_with_its_notes)

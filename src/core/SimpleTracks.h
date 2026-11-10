@@ -62,6 +62,9 @@ struct Request
     std::int64_t audioLength = 0;
     // Audio and Instrument with notes (slice S4: a file dropped on the timeline): where the clip starts, in ticks (>= 0)
     std::int64_t start = 0;
+    // Audio (round 190p: a loop keeps time): > 0 makes the file last this many beats at any tempo (its channel's
+    // stretch, pitch kept), and the clip is that long whatever `audioLength` says. 0: the file plays at its own speed.
+    float audioBeats = 0.0f;
     // Voice, Guitar, Bass: the insert's audio input (the device's input channel, 0-based; -1 none) and whether the
     // next channel is taken too. Audio (imports) has no input.
     int input = 0;
@@ -106,6 +109,20 @@ void recolour (Song& song, int track, std::uint32_t colour);
 
 // The insert a Simple track plays through, or -1 (the same rule as kindOf).
 int insertOf (const Song& song, int track);
+
+// A loop keeps time (round 190p). How many beats an imported or dropped audio file should last so that it follows the
+// project's tempo, or 0 when it is not a loop made for a tempo (a voice take, a whole song, a one-shot): it then plays
+// at its own speed, as before. `name` is the file's name without folder (the extension is ignored), `seconds` its
+// length, `acidBeats` the WAV's ACID beat count (0 = none).
+//  - an ACID beat count is taken as it is;
+//  - else the tempo written in the name: "... 98 bpm ..." (autowarp::bpmInName), or a number from 60 to 200 standing
+//    alone between separators ("DL_102_Dm_Stack", "Funky Guitar 98"). With it the file must come out as whole bars
+//    (within a quarter of a beat: 1, 2, 3 ... bars of `beatsPerBar`), or as whole beats when shorter than a bar; a name
+//    that says "bpm" also keeps a loop with a tail (its exact beats).
+//  - files longer than 70 seconds are never taken as loops.
+float loopBeats (const std::string& name, double seconds, float acidBeats, int beatsPerBar) noexcept;
+// The tempo `loopBeats` reads in a name (0 = none) and whether the name says "bpm" (`*explicitBpm`, may be null).
+double tempoInName (const std::string& name, bool* explicitBpm = nullptr);
 
 // Whether a project has nothing in it yet (the Simple workflow then opens on the New track chooser, slice S3): no clip
 // in any clip list, no note in any pattern, no Playlist track with a mode or a name. Channels without notes (a

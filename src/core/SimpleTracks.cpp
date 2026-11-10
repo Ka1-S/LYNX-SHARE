@@ -1,7 +1,11 @@
 #include "core/SimpleTracks.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
 
+#include "core/AutoWarp.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 
@@ -78,6 +82,12 @@ Result addAudio (Song& song, int track, const Request& request)
         c.instrument = InstrumentKind::audioClip;
         c.samplePath = request.audioFile;
         c.mixerTrack = insert;
+        if (request.audioBeats > 0.0f)
+        {
+            // a loop: it lasts that many beats at any tempo, at its own pitch (round 190p)
+            c.sampler.stretchBeats = request.audioBeats;
+            c.sampler.keepPitch = true;
+        }
         song.channels.push_back (std::move (c));
         r.channels = { (int) song.channels.size() - 1 };
         Clip clip;
@@ -85,7 +95,7 @@ Result addAudio (Song& song, int track, const Request& request)
         clip.channel = r.channels[0];
         clip.track = track;
         clip.start = std::max<std::int64_t> (0, request.start);
-        clip.length = request.audioLength;
+        clip.length = request.audioBeats > 0.0f ? std::max<std::int64_t> (1, std::llround ((double) request.audioBeats * ppq)) : request.audioLength;
         song.playlist.push_back (clip);
         song.mode = PlayMode::song;
     }
@@ -277,6 +287,59 @@ int nextEmptyTrack (const Song& song)
         if (! used[(std::size_t) t])
             return t;
     return -1;
+}
+
+double tempoInName (const std::string& name, bool* explicitBpm)
+{
+    auto stem = name;
+    if (const auto dot = stem.find_last_of ('.'); dot != std::string::npos && dot > 0)
+        stem.resize (dot);
+    if (explicitBpm != nullptr)
+        *explicitBpm = false;
+    if (const auto bpm = autowarp::bpmInName (stem); bpm > 0.0)
+    {
+        if (explicitBpm != nullptr)
+            *explicitBpm = true;
+        return bpm;
+    }
+    // a whole number from 60 to 200 between separators (not part of a word: "Dm7", "808s", "4bars" don't count)
+    const auto alnum = [] (char c) { return std::isalnum ((unsigned char) c) != 0; };
+    for (std::size_t i = 0; i < stem.size();)
+    {
+        if (! alnum (stem[i]))
+        {
+            ++i;
+            continue;
+        }
+        auto end = i;
+        bool digits = true;
+        while (end < stem.size() && alnum (stem[end]))
+            digits = std::isdigit ((unsigned char) stem[end++]) != 0 && digits;
+        if (digits && end - i >= 2 && end - i <= 3)
+            if (const auto bpm = std::atoi (stem.substr (i, end - i).c_str()); bpm >= 60 && bpm <= 200)
+                return (double) bpm;
+        i = end;
+    }
+    return 0.0;
+}
+
+float loopBeats (const std::string& name, double seconds, float acidBeats, int beatsPerBar) noexcept
+{
+    if (! (seconds > 0.0) || seconds > 70.0)
+        return 0.0f;
+    if (acidBeats > 0.0f)
+        return acidBeats;
+    bool explicitBpm = false;
+    const auto bpm = tempoInName (name, &explicitBpm);
+    if (! (bpm > 0.0))
+        return 0.0f;
+    const auto beats = seconds * bpm / 60.0;
+    const auto bar = (double) std::max (1, beatsPerBar);
+    if (const auto bars = std::round (beats / bar); bars >= 1.0 && std::abs (beats - bars * bar) <= 0.25)
+        return (float) (bars * bar);
+    if (const auto whole = std::round (beats); whole >= 1.0 && whole < bar && std::abs (beats - whole) <= 0.08)
+        return (float) whole;
+    return explicitBpm && beats >= 1.0 ? (float) beats : 0.0f;
 }
 
 Result addTrack (Song& song, const Request& request)

@@ -641,6 +641,9 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         q.name = file.getFileNameWithoutExtension().toStdString();
         q.audioFile = file.getFullPathName().toStdString();
         q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        // a loop made for a tempo (ACID beats, or a tempo in its name that makes whole bars) keeps time: it lasts its
+        // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
+        q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar);
         q.start = start;
         add (std::move (q));
     }
