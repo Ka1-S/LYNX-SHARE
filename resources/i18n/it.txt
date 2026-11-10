@@ -8292,3 +8292,4 @@ countries: it ch sm
 "Spread velocity range across layers" = "Distribuisci l'intervallo di velocity tra i layer"
 "Trigger overlapping layers randomly" = "Attiva casualmente i layer sovrapposti"
 "Volume envelope" = "Inviluppo del volume"
+"{0} (stored, not played yet)" = "{0} (salvato, non ancora riprodotto)"

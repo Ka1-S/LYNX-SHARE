@@ -8292,3 +8292,4 @@ countries: ru by kz
 "Spread velocity range across layers" = "Распределить диапазон velocity по layer"
 "Trigger overlapping layers randomly" = "Запускать перекрывающиеся layer случайно"
 "Volume envelope" = "Огибающая громкости"
+"{0} (stored, not played yet)" = "{0} (сохранено, пока не воспроизводится)"

@@ -8292,3 +8292,4 @@ countries: cn sg
 "Spread velocity range across layers" = "将力度范围分配到各 Layer"
 "Trigger overlapping layers randomly" = "随机触发重叠的 Layer"
 "Volume envelope" = "音量包络"
+"{0} (stored, not played yet)" = "{0}（已保存，尚未播放）"

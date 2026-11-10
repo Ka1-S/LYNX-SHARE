@@ -8292,3 +8292,4 @@ countries: id
 "Spread velocity range across layers" = "Sebarkan rentang velocity ke seluruh layer"
 "Trigger overlapping layers randomly" = "Picu layer yang tumpang tindih secara acak"
 "Volume envelope" = "Envelope volume"
+"{0} (stored, not played yet)" = "{0} (tersimpan, belum dimainkan)"

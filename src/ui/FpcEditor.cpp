@@ -117,7 +117,7 @@ public:
         g.setColour (theme::colour::bg0);
         g.fillRoundedRectangle (getLocalBounds().toFloat(), 2.0f);
         g.setColour (theme::colour::textPrimary);
-        g.setFont (theme::font (theme::type::caption));
+        g.setFont (theme::font (theme::type::small));
         g.drawText (textOf ? textOf (value) : juce::String (value), getLocalBounds(), juce::Justification::centred, false);
     }
 
@@ -283,7 +283,9 @@ public:
         tune.setDoubleClickReturnValue (true, 0.0);
         tune.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 9.375)) + " " + tr ("cents"); };
         ui::setHint (volume, tr ("Layer volume"));
-        ui::setHint (pan, tr ("Layer pan"));
+        ui::setHint (pan, tr ("{0} (stored, not played yet)", { tr ("Layer pan") }));
+        pan.setEnabled (false); // the engine does not play a layer's pan yet: shown, not editable
+        pan.setAlpha (0.35f);
         ui::setHint (tune, tr ("Layer tune"));
         range.setSliderStyle (juce::Slider::TwoValueHorizontal);
         range.setRange (0.0, 127.0, 1.0);
@@ -403,7 +405,7 @@ public:
         ui::setHint (sampleName, tr ("Sample name"));
         for (auto* lab : { &currentPad, &padName, &padNote, &sampleName })
         {
-            lab->setFont (theme::font (theme::type::small));
+            lab->setFont (theme::font (theme::type::body));
             lab->setColour (juce::Label::backgroundColourId, theme::colour::bg0);
             addAndMakeVisible (*lab);
         }
@@ -441,6 +443,16 @@ public:
         led (scaleVolume, tr ("Scale volume with velocity"), 4);
         led (randomTrigger, tr ("Trigger overlapping layers randomly"), 8);
         randomTrigger.onMenu = [this] { triggerMenu(); };
+        // stored in the kit, not played by the engine yet (it always takes turns through the layers that cover the
+        // velocity, and plays no pad envelope): shown as they are in the state, not editable until the engine plays them
+        ui::setHint (scaleVolume, tr ("{0} (stored, not played yet)", { tr ("Scale volume with velocity") }));
+        ui::setHint (randomTrigger, tr ("{0} (stored, not played yet)", { tr ("Trigger overlapping layers randomly") }));
+        ui::setHint (envelope, tr ("{0} (stored, not played yet)", { tr ("Volume envelope") }));
+        for (auto* c : std::initializer_list<juce::Component*> { &scaleVolume, &randomTrigger, &envelope })
+        {
+            c->setEnabled (false);
+            c->setAlpha (0.35f);
+        }
 
         auto digi = [this] (DigiWheel& w, const juce::String& hint, int lo, int hi, int reset, std::function<void (fpc::Pad&, int)> set) {
             w.low = lo;
@@ -507,9 +519,11 @@ public:
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::caption));
         // FL writes the names beside the controls: M, S, Scale Vol, then one dark strip with Midi Note, Cut, Cut By, Output
+        g.setFont (theme::font (theme::type::body));
         g.drawText ("M", fl (435, 40, 11, 18), juce::Justification::centred, false);
         g.drawText ("S", fl (467, 40, 11, 18), juce::Justification::centred, false);
-        g.drawText ("Scale Vol", fl (501, 40, 60, 18), juce::Justification::centredLeft, false);
+        g.setColour (theme::colour::textDisabled);
+        g.drawText ("Scale Vol", fl (500, 40, 38, 18), juce::Justification::centredLeft, false);
         g.setColour (theme::colour::bg0);
         g.fillRect (fl (538, 40, 246, 18));
         g.setColour (theme::colour::textPrimary);
@@ -519,6 +533,7 @@ public:
         g.drawText ("Output", fl (708, 40, 44, 18), juce::Justification::centredRight, false);
         // the bank bar
         g.setColour (theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::caption));
         g.drawText ("BANK A", fl (36, 334, 60, 19), juce::Justification::centredLeft, false);
         g.drawText ("BANK B", fl (193, 334, 60, 19), juce::Justification::centredRight, false);
     }

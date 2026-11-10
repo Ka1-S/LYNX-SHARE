@@ -8292,3 +8292,4 @@ countries: nl be
 "Spread velocity range across layers" = "Velocity-bereik over de layers verdelen"
 "Trigger overlapping layers randomly" = "Overlappende layers willekeurig activeren"
 "Volume envelope" = "Volume-envelope"
+"{0} (stored, not played yet)" = "{0} (opgeslagen, wordt nog niet afgespeeld)"

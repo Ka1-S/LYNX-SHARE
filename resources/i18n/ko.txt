@@ -8292,3 +8292,4 @@ countries: kr
 "Spread velocity range across layers" = "벨로시티 범위를 레이어에 분산"
 "Trigger overlapping layers randomly" = "겹치는 레이어를 무작위로 트리거"
 "Volume envelope" = "볼륨 엔벨로프"
+"{0} (stored, not played yet)" = "{0} (저장됨, 아직 재생되지 않음)"

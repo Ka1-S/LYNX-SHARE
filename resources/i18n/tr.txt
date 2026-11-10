@@ -8292,3 +8292,4 @@ countries: tr
 "Spread velocity range across layers" = "Velocity aralığını layer'lara yay"
 "Trigger overlapping layers randomly" = "Çakışan layer'ları rastgele tetikle"
 "Volume envelope" = "Ses envelope"
+"{0} (stored, not played yet)" = "{0} (kayıtlı, henüz çalınmıyor)"

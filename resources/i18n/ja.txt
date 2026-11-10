@@ -8292,3 +8292,4 @@ countries: jp
 "Spread velocity range across layers" = "ベロシティ範囲をLayerに分散"
 "Trigger overlapping layers randomly" = "重なったLayerをランダムに鳴らす"
 "Volume envelope" = "ボリュームのエンベロープ"
+"{0} (stored, not played yet)" = "{0}（保存済み、まだ再生されません）"

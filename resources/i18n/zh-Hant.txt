@@ -8292,3 +8292,4 @@ countries: tw hk mo
 "Spread velocity range across layers" = "將力度範圍分配到各 Layer"
 "Trigger overlapping layers randomly" = "隨機觸發重疊的 Layer"
 "Volume envelope" = "音量波封"
+"{0} (stored, not played yet)" = "{0}（已儲存，尚未播放）"

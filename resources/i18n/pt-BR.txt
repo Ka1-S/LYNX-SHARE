@@ -8375,3 +8375,4 @@ countries: br
 "Spread velocity range across layers" = "Distribuir a faixa de velocity entre as camadas"
 "Trigger overlapping layers randomly" = "Disparar camadas sobrepostas aleatoriamente"
 "Volume envelope" = "Envelope de volume"
+"{0} (stored, not played yet)" = "{0} (guardado, ainda não é tocado)"

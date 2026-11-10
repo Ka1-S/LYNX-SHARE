@@ -8292,3 +8292,4 @@ countries: pl
 "Spread velocity range across layers" = "Rozłóż zakres velocity na layery"
 "Trigger overlapping layers randomly" = "Losowo uruchamiaj nakładające się layery"
 "Volume envelope" = "Obwiednia głośności"
+"{0} (stored, not played yet)" = "{0} (zapisane, jeszcze nie odtwarzane)"
