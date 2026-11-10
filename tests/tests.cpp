@@ -17360,6 +17360,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicer180cTests.inc"
 #include "Fpc190mTests.inc"
 #include "Fpc190qTests.inc"
+#include "Fpc190zTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
