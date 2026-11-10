@@ -8158,7 +8158,6 @@ countries: cn sg
 "Chain Volume" = "链音量"
 "Click a macro's Map button to assign a parameter" = "点击宏的 Map 按钮来分配参数"
 "Drop an instrument or effect here" = "将乐器或效果拖放到这里"
-"Drop effects here" = "将效果拖放到这里"
 "Exclude Macro from Randomization" = "从随机化中排除此宏"
 "Exclude Macro from Variations" = "从变体中排除此宏"
 "Instrument Rack" = "乐器机架"

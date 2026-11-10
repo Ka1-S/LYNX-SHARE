@@ -8158,7 +8158,6 @@ countries: nl be
 "Chain Volume" = "Ketenvolume"
 "Click a macro's Map button to assign a parameter" = "Klik op de Map-knop van een macro om een parameter toe te wijzen"
 "Drop an instrument or effect here" = "Zet hier een instrument of effect neer"
-"Drop effects here" = "Zet hier effecten neer"
 "Exclude Macro from Randomization" = "Macro uitsluiten van willekeur"
 "Exclude Macro from Variations" = "Macro uitsluiten van variaties"
 "Instrument Rack" = "Instrumentrack"

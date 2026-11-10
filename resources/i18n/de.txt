@@ -8162,7 +8162,6 @@ countries: de at ch li lu
 "Exclude Macro from Variations" = "Makro von den Variationen ausnehmen"
 "Instrument Rack" = "Instrument-Rack"
 "Invert Range" = "Bereich umkehren"
-"Launch" = "Starten"
 "MIDI Effect Rack" = "MIDI-Effekt-Rack"
 "MIDI effect" = "MIDI-Effekt"
 "MIDI effects" = "MIDI-Effekte"

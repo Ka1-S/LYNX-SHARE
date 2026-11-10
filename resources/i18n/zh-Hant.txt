@@ -8158,7 +8158,6 @@ countries: tw hk mo
 "Chain Volume" = "鏈音量"
 "Click a macro's Map button to assign a parameter" = "點選巨集的 Map 按鈕來指派參數"
 "Drop an instrument or effect here" = "將樂器或效果拖放到這裡"
-"Drop effects here" = "將效果拖放到這裡"
 "Exclude Macro from Randomization" = "從隨機化中排除此巨集"
 "Exclude Macro from Variations" = "從變體中排除此巨集"
 "Instrument Rack" = "樂器機架"

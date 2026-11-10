@@ -8162,7 +8162,6 @@ countries: tr
 "Exclude Macro from Variations" = "Makroyu varyasyonlardan çıkar"
 "Instrument Rack" = "Enstrüman rafı"
 "Invert Range" = "Aralığı ters çevir"
-"Launch" = "Başlat"
 "MIDI Effect Rack" = "MIDI efekt rafı"
 "MIDI effect" = "MIDI efekti"
 "MIDI effects" = "MIDI efektleri"

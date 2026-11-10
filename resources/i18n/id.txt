@@ -8162,7 +8162,6 @@ countries: id
 "Exclude Macro from Variations" = "Kecualikan makro dari variasi"
 "Instrument Rack" = "Rak instrumen"
 "Invert Range" = "Balik rentang"
-"Launch" = "Jalankan"
 "MIDI Effect Rack" = "Rak efek MIDI"
 "MIDI effect" = "Efek MIDI"
 "MIDI effects" = "Efek MIDI"
