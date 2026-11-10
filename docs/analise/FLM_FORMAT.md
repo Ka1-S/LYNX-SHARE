@@ -213,13 +213,16 @@ Clip children (PROVEN-REA writer 0x18075c150):
 | 0 | u32 | start tick inside the clip (128/beat) | point tick |
 | 4 | f64 | **length in beats** (0.25 = 1/16; drum steps 0.1249) | 0 |
 | 12 | i16 | **key**: MIDI note (0…127), or kit sample index on drum lanes | negative: point shape/tension code (−2, −4, −5, −10, …). INFERRED |
-| 14 | u8 | INFERRED: **velocity** 0…255 (178/200/204/255 common) | 0xB2 constant |
-| 15 | u8 | INFERRED: pan, 127 = centre (always 127 in the samples) | 0x7F |
-| 16 | u16 | INFERRED: fine pitch, 0x7FFF = centre (always 0x7FFF in the samples) | **value 0…65535** (normalized) |
-| 18 | u8, u8 | INFERRED: per-step note repeat / flags (0 in the samples) | 0 |
+| 14 | u8 | **velocity**: the module's note-on value w = byte / 255 (PROVEN-REA, round 190u; the piano roll draws 204 = 0.8, the drum grid 255, the bare template 178; 200 = MIDI 100) | 0xB2 constant |
+| 15 | u8 | pan = byte / 255 at playback (PROVEN-REA; 127 = 0.498; always 127 in the samples) | 0x7F |
+| 16 | u16 | fine pitch = u16 / 65534, 0x7FFF = centre (PROVEN-REA; not handed to the module's note-on on note lanes) | **value 0…65535** (normalized) |
+| 18 | u8, u8 | 18 = note repeat count, 19 = slide flag (such a note is a glide event, not a note-on) (PROVEN-REA; 0 in the samples) | 0 |
 
-The record layout is PROVEN-REA. The meanings of bytes 14–19 are INFERRED; the graph editor's velocity, pan, pitch
-and repeat fields fit them (section 9).
+The record layout is PROVEN-REA, and since round 190u so are bytes 14–19 (the song scheduler 0x180770330 multiplies
+the velocity byte by 1/255 and hands it on unchanged, through the event queue and the channel's note entry, to the
+module's note-on: no curve, no lane or clip multiplier; the editors write trunc(clamp(255·v, 1, 255)). Over the 12 709
+notes of FLM's 20 shipped songs and templates byte 14 peaks at 178, 204, 200 and 255. Drum pads are linear in w with a
+balance pan; evidence /mnt/e/lynx-work/flm190u/rea/spec-velocity.md). Not imported yet: byte 15 pan, 18 repeat, 19 slide.
 
 On audio lanes `EVN2` holds the clip's envelope points (volume/pan/pitch of the wave editor). INFERRED.
 
@@ -402,8 +405,8 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
 
 ## 9. Open points (each is INFERRED today; the plan says which slice closes it)
 
-1. EVN2 bytes 14–19 meanings (velocity scale, pan, fine pitch, repeat). Close it with one REA pass on the note loader,
-   or by round-tripping a note edited in the plugin UI (GUI turn).
+1. (closed, round 190u) EVN2 bytes 14–19: velocity = byte / 255, pan = byte / 255, fine pitch, repeat count, slide flag.
+   Open: importing pan, repeat and slide notes; the DW sampler's velocity → level law.
 2. CHHD colour and its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
    applies them on load is not traced.)
 3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).

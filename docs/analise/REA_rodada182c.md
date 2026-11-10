@@ -763,8 +763,9 @@ the reference render over three notes.
 Quality gate: the desktop path writes the same bytes as before on 36 renders (FL's three presets, each also as stream
 version 5 with engines 0 / 1 / 2 and with the oversampling field 1 and 2; 44.1 and 48 kHz; old against new object),
 same CPU time. Not modelled: FLM's un-clamped pitch below key 12, last-bit summation orders, Drive through √ and
-squaring (≤ 1 ulp). Parameter automation lanes of a .flm on the module are still listed, not imported. OPEN: the
-scale of the velocity byte of a .flm note (byte / 255 puts the accent at 199).
+squaring (≤ 1 ulp). Parameter automation lanes of a .flm on the module are still listed, not imported. The velocity
+byte of a .flm note is w = byte / 255 (PROVEN-REA, FLM_FORMAT §EVN2), so the accent starts at byte 199: FLM's own
+piano-roll default (204) is an accent, as FL's default velocity is in FLM-in-FL.
 
 **Best way?** FL: FLM-in-FL is the reference, matched sample for sample. Ableton: no FLM import. Users: 303-style
 slides and accents are the instrument; keeping FLM's own rules (slide back, accent at 99) keeps the user's bass line
