@@ -14,6 +14,7 @@
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
 #include "core/PlaylistOps.h"
+#include "core/ProjectKey.h"
 #include "core/NativeEngines.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
@@ -1160,8 +1161,8 @@ private:
 // ---------------------------------------------------------------------------------------------------------------------
 // Slice 2b: the Clip page's left column, the reference's Clip / Launch / Notes panels [SHOT d08, m3-live-clipview2] over
 // LYNX's existing model: the grid clip's offset and length, its slot's loop and launch settings, and the pattern's
-// notes through the Piano roll's own note tools. No new model: Signature is the project's, Scale waits for the project
-// key (round 184a's core/ProjectKey.h), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
+// notes through the Piano roll's own note tools. No new model: Signature is the project's, Scale is the project key
+// (core/ProjectKey.h; round 190o), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
 class ClipColumn final : public juce::Component, private juce::ChangeListener
 {
 public:
@@ -1179,7 +1180,7 @@ public:
         const std::pair<juce::Label*, const char*> labels[] = { { &nameLabel, TR_NOOP ("Name") }, { &startLabel, TR_NOOP ("Start") },
                                                                  { &endLabel, TR_NOOP ("End") }, { &lengthLabel, TR_NOOP ("Length") },
                                                                  { &signatureLabel, TR_NOOP ("Signature") }, { &modeLabel, TR_NOOP ("Launch mode") },
-                                                                 { &quantLabel, TR_NOOP ("Launch quantisation") } };
+                                                                 { &quantLabel, TR_NOOP ("Launch quantisation") }, { &scaleLabel, TR_NOOP ("Scale") } };
         for (const auto& [l, text] : labels)
         {
             l->setText (tr (text), juce::dontSendNotification);
@@ -1251,6 +1252,58 @@ public:
                 notetools::randomise (p, all, o);
             });
         };
+        // Live's Stretch ×2 and /2 and Fit to Scale [LIVE 12.4 Clip View, Pitch & Time] (round 190o)
+        timesTwo.setButtonText (juce::String::fromUTF8 ("\xc3\x97" "2"));
+        divideTwo.setButtonText (juce::String::fromUTF8 ("\xc3\xb7" "2"));
+        fitScale.setButtonText (tr ("Fit to scale"));
+        timesTwo.setTooltip (tr ("Twice as slow: doubles every note's start and length"));
+        divideTwo.setTooltip (tr ("Twice as fast: halves every note's start and length"));
+        fitScale.setTooltip (tr ("Moves every note of the clip onto the project's key"));
+        for (auto* b : { &timesTwo, &divideTwo, &fitScale })
+        {
+            b->setConnectedEdges (0);
+            addAndMakeVisible (*b);
+        }
+        const auto stretch = [this] (bool twice) {
+            notes ([twice] (Pattern& p, const std::vector<int>& all, const Song&) {
+                for (auto i : all)
+                {
+                    auto& n = p.notes[(std::size_t) i];
+                    n.start = twice ? n.start * 2 : n.start / 2;
+                    n.length = std::max<std::int64_t> (1, twice ? n.length * 2 : n.length / 2);
+                }
+                if (p.lengthTicks > 0)
+                    p.lengthTicks = std::max<std::int64_t> (1, twice ? p.lengthTicks * 2 : p.lengthTicks / 2);
+            });
+        };
+        timesTwo.onClick = [stretch] { stretch (true); };
+        divideTwo.onClick = [stretch] { stretch (false); };
+        fitScale.onClick = [this] {
+            notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) {
+                if (const auto key = projectkey::get (song); key && projectkey::lynxScale (*key) > 0)
+                    notetools::snapNotesToScale (p, all, key->root, projectkey::lynxScale (*key));
+            });
+        };
+
+        // the Clip panel's Scale row: the project key (Live keeps a scale per clip; LYNX SHARE has one per project)
+        scaleRoot.addItem (tr ("None"), 1);
+        for (int root = 0; root < 12; ++root)
+            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 2);
+        for (auto index : projectkey::commonFirst())
+            scaleName.addItem (tr (notetools::flReferenceScales()[(std::size_t) index].name), index + 1);
+        for (auto* c : { &scaleRoot, &scaleName })
+        {
+            c->setTooltip (tr ("The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)"));
+            addAndMakeVisible (*c);
+            c->onChange = [this] {
+                std::optional<projectkey::Key> key;
+                if (scaleRoot.getSelectedId() >= 2)
+                    key = projectkey::Key { scaleRoot.getSelectedId() - 2, std::max (0, scaleName.getSelectedId() - 1) };
+                if (key && scaleName.getSelectedId() == 0) // first key of a project: Major
+                    key->flScale = projectkey::commonFirst().front();
+                engine.editSong ([key] (Song& song) { projectkey::set (song, key); });
+            };
+        }
         engine.addChangeListener (this);
     }
     ~ClipColumn() override { engine.removeChangeListener (this); }
@@ -1297,6 +1350,8 @@ public:
         loop.setBounds (take (c, 20));
         halves (take (c, 14), lengthLabel, signatureLabel);
         halves (take (c, 20), length, signature);
+        scaleLabel.setBounds (take (c, 14));
+        halves (take (c, 20), scaleRoot, scaleName);
 
         // Launch: mode, quantisation, legato
         auto l = r.removeFromLeft (launchPanel);
@@ -1311,10 +1366,12 @@ public:
         // Notes: the note tools, two columns
         auto n = r.removeFromLeft (notesPanel);
         notesTitle.setBounds (take (n, 14));
-        const juce::TextButton* order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize };
+        juce::TextButton* const order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &timesTwo, &divideTwo, &fitScale, &randomize };
         const auto w = (n.getWidth() - 4) / 2;
-        for (int i = 0; i < 7; ++i)
-            const_cast<juce::TextButton*> (order[i])->setBounds (n.getX() + (i % 2) * (w + 4), n.getY() + (i / 2) * 24, i == 6 ? n.getWidth() : w, 21);
+        for (int i = 0; i < 8; ++i)
+            order[i]->setBounds (n.getX() + (i % 2) * (w + 4), n.getY() + (i / 2) * 24, w, 21);
+        for (int i = 8; i < 10; ++i) // Fit to scale, Randomize velocity: a row each
+            order[i]->setBounds (n.getX(), n.getY() + (i - 4) * 24, n.getWidth(), 21);
     }
 
 private:
@@ -1359,8 +1416,13 @@ private:
                 parent->resized();
         for (auto* b : { &notesTitle })
             b->setVisible (pattern);
-        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize })
+        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale })
             b->setVisible (pattern);
+        const auto key = projectkey::get (song);
+        scaleRoot.setSelectedId (key ? key->root + 2 : 1, n);
+        scaleName.setSelectedId (key ? key->flScale + 1 : 0, n);
+        scaleName.setEnabled (key.has_value());
+        fitScale.setEnabled (key && projectkey::lynxScale (*key) > 0);
     }
 
     // the clip's own fields (one undo step)
@@ -1429,7 +1491,9 @@ private:
     juce::TextEditor name, start, end, length;
     juce::ToggleButton loop, legato;
     juce::ComboBox mode, quant;
-    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize;
+    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
+    juce::Label scaleLabel;
+    juce::ComboBox scaleRoot, scaleName; // the project key (round 190o; Live: the clip's Scale)
 };
 
 // ---------------------------------------------------------------------------------------------------------------------

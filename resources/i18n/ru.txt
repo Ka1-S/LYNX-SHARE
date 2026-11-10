@@ -8263,3 +8263,8 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+"Fit to scale" = "Подогнать под лад"
+"Twice as slow: doubles every note's start and length" = "Вдвое медленнее: удваивает начало и длину каждой ноты"
+"Twice as fast: halves every note's start and length" = "Вдвое быстрее: делит пополам начало и длину каждой ноты"
+"Moves every note of the clip onto the project's key" = "Переносит каждую ноту клипа в тональность проекта"
+"The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "Тональность проекта: Piano roll подсвечивает её, а «Подогнать под лад» использует её (в LYNX SHARE одна тональность на проект)"

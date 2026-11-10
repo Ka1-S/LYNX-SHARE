@@ -8263,3 +8263,8 @@ countries: tr
 "Mixer groups follow the Playlist (LYNX)" = "Mikser grupları Playlist'i izler (LYNX)"
 "Arrange inserts like the Playlist" = "Insert'leri Playlist gibi sırala"
 "{0} insert(s) moved to follow the Playlist" = "Playlist'i izlemek için {0} insert taşındı"
+"Fit to scale" = "Gama uydur"
+"Twice as slow: doubles every note's start and length" = "İki kat yavaş: her notanın başlangıcını ve uzunluğunu ikiye katlar"
+"Twice as fast: halves every note's start and length" = "İki kat hızlı: her notanın başlangıcını ve uzunluğunu yarıya indirir"
+"Moves every note of the clip onto the project's key" = "Klibin her notasını projenin tonuna taşır"
+"The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "Projenin tonu: Piano roll onu vurgular ve Gama uydur onu kullanır (LYNX SHARE'de proje başına bir ton vardır)"

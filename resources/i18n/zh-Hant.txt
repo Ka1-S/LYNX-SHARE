@@ -8263,3 +8263,8 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+"Fit to scale" = "適配音階"
+"Twice as slow: doubles every note's start and length" = "慢一倍：每個音符的起點和長度加倍"
+"Twice as fast: halves every note's start and length" = "快一倍：每個音符的起點和長度減半"
+"Moves every note of the clip onto the project's key" = "把片段的每個音符移到專案的調上"
+"The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "專案的調：鋼琴捲簾會醒目顯示它，「適配音階」會使用它（LYNX SHARE 每個專案只有一個調）"

@@ -8263,3 +8263,8 @@ countries: fr be ch ca lu
 "Mixer groups follow the Playlist (LYNX)" = "Les groupes du Mixer suivent la Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Ranger les inserts comme la Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) déplacé(s) pour suivre la Playlist"
+"Fit to scale" = "Ajuster à la gamme"
+"Twice as slow: doubles every note's start and length" = "Deux fois plus lent : double le début et la durée de chaque note"
+"Twice as fast: halves every note's start and length" = "Deux fois plus rapide : divise par deux le début et la durée de chaque note"
+"Moves every note of the clip onto the project's key" = "Déplace chaque note du clip dans la tonalité du projet"
+"The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "La tonalité du projet : le Piano roll la met en évidence et Ajuster à la gamme l'utilise (LYNX SHARE a une tonalité par projet)"
