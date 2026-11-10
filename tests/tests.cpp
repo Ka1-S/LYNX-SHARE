@@ -17389,3 +17389,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Notes188gTests.inc"
 #include "Slicex190hTests.inc"
 #include "Slicex190lTests.inc"
+#include "Slicex190rTests.inc"

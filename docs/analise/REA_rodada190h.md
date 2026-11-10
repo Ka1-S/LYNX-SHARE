@@ -191,7 +191,7 @@ sample's filename is set to the path. Deck B in all demos is empty: ref_only = 1
 216/188-byte WAV with 0 frames.
 
 The embedded WAV is FL's own writer output. A u32 size placeholder is written first and back-patched, so wav_len
-equals the RIFF size + 8. Chunks: [JUNK] fmt [fact] data smpl inst acid strc cue LIST/adtl [LIST/tlst] LIST/INFO
+equals the RIFF size + 8. Chunks: [JUNK] fmt [fact] data smpl inst acid strc cue LIST/adtl [tlst] LIST/INFO
 (ISFT "Slicex"). It is a normal RIFF/WAVE and is parsed by the same routine as files on disk.
 
 ### 3.1 Edison region list (sample+0x100, entries of 0x38 bytes)
@@ -211,7 +211,7 @@ equals the RIFF size + 8. Chunks: [JUNK] fmt [fact] data smpl inst acid strc cue
 - LIST `adtl`: `labl` (id, name) when the name is non-empty; `note` (id, text) when +0x18 is non-empty; `ltxt`
   (id, length, purpose) for every region except type-2 markers. length = min(end, last) − start + 1 for real regions
   and 0 for markers.
-- LIST **`tlst`** (written only if some region has key ≥ 0): i32 count, then 24-byte entries
+- **`tlst`**, a chunk of its own, not a LIST (corrected in round 190r from a file FL saved; written only if some region has key ≥ 0): i32 count, then 24-byte entries
   {'cue ', cueID−1, 1, u8 0xFF, u8 **key**, u8 0x90, u8 0, i32 0, i32 0}. This is where the **per-region key** lives:
   it is an Acid-style trigger list holding a note-on of `key`.
 - None of the demo WAVs has `ltxt` or `tlst`. Every demo region is a marker with key −1, so every demo map is automatic.

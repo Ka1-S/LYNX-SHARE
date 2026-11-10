@@ -197,6 +197,9 @@ struct WavRegion
 };
 // `frames` receives the audio length (0 when the data chunk is missing)
 std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& wav, std::int64_t& frames);
+// The WAV with its regions' keys set (FL's trigger list chunk, rewritten): keys[i] is region i's key in the order
+// wavRegions() returns them (−1 = automatic). An empty result: `wav` is not a WAV with cue points.
+std::vector<std::uint8_t> withRegionKeys (const std::vector<std::uint8_t>& wav, const std::vector<int>& keys);
 // FL's name for a region without one: "Marker #n" / "Region #n"
 std::string regionName (const WavRegion& r, int index);
 
