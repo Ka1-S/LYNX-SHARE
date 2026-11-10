@@ -10,6 +10,7 @@
 
 #include "core/DirectWave.h"
 #include "core/FlmEffects.h"
+#include "core/GmsMobile.h"
 #include "core/MiniSynth.h"
 #include "core/TransistorBass.h"
 #include "core/ThreeOsc.h"
@@ -458,6 +459,54 @@ bool transistorBassState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// FLM's GMSynth → the "GMSynth (FLM)" engine (F4, round 190ab; core/GmsMobile.h): the module's 75 parameters as they
+// are plus its CSTM chunk (the two waves, bend range, mod wheel). The engine reads FLM's own data files at run time —
+// the waves' spectra and the filter table, in FL's copy of FLM's resources — so without them the channel stays on
+// the built-in synth and is listed as not converted. Effect kinds the engine doesn't render yet are listed too.
+bool gmSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    namespace gm = gmsmobile;
+    const auto& o = ctx.options.common;
+    if (m.params.size() < (std::size_t) gm::paramCount || ! o.fileExists || ctx.options.resourceRoot.empty())
+        return false;
+    gm::Patch patch;
+    for (int i = 0; i < gm::paramCount; ++i)
+        patch.P[(std::size_t) i] = std::isfinite (m.params[(std::size_t) i]) ? m.params[(std::size_t) i] : 0.0f;
+    if (m.custom.size() >= 20)
+    {
+        std::int32_t a, b;
+        std::memcpy (&a, m.custom.data(), 4);
+        std::memcpy (&b, m.custom.data() + 4, 4);
+        std::memcpy (&patch.bendRange, m.custom.data() + 8, 4);
+        std::memcpy (&patch.mwAmount, m.custom.data() + 12, 4);
+        std::memcpy (&patch.mwDest, m.custom.data() + 16, 4);
+        patch.waveA = a;
+        patch.waveB = b;
+    }
+    const auto& root = ctx.options.resourceRoot;
+    const auto waveA = gm::waveFileName (patch.waveA), waveB = gm::waveFileName (patch.waveB);
+    if (waveA.empty() || waveB.empty() || ! o.fileExists (joinPath (root, "FilterTable_Ctf_Res.data"))
+        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveA + ".spectra"))
+        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveB + ".spectra")))
+        return false;
+    auto state = gm::writeState (patch);
+    if (! gm::readState (state))
+        return false;
+    c.instrument = InstrumentKind::gms;
+    c.modelParams = { 1.0f }; // FL Studio Mobile's module, not the desktop GMS (core/GmsMobile.h)
+    c.pluginState = std::move (state);
+    c.samplePath = root;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: GMSynth");
+    for (int slot = 0; slot < 3; ++slot)
+    {
+        const auto base = (std::size_t) (gm::param::fxBase + gm::param::fxStride * slot);
+        const auto kind = gm::fxKindOf (patch.P[base + gm::param::fxKind]);
+        if (patch.P[base + gm::param::fxEnable] != 0.0f && ! gm::fx::implemented (kind))
+            ctx.note (&FlpImportReport::partialEffects, std::string ("FL Studio Mobile: GMSynth effect ") + gm::fx::name (kind) + " (not rendered)");
+    }
+    return true;
+}
+
 // FLM's 3x Osc → LYNX's 3x Osc engine and FL's channel settings (F4, round 190u). FLM's module is the desktop
 // plugin plus the channel's voice processor, echo delay, arpeggiator, polyphony and tracking as 148 parameters 0…1,
 // and it carries its own converter from the desktop's raw values (REA spec of round 190n), so every parameter goes
@@ -642,6 +691,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
     if (gen->type == flm::module::transistorBass && transistorBassState (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::threeOsc && threeOscState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::gmSynth && gmSynthState (ctx, *gen, c))
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;
