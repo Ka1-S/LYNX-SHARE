@@ -314,7 +314,7 @@ TEST (flm190u_three_osc_maps_the_parameters)
         CHECK (snap (*c, 1, 0) == 4 && snap (*c, 1, 1) == 0 && snap (*c, 1, 6) == 128 && snap (*c, 1, 16) == -101 && snap (*c, 1, 8) == 0);
         CHECK (snap (*c, 1, 10) == 19988 && snap (*c, 1, 12) == 32768 && snap (*c, 4, 11) == 0 && snap (*c, 0, 1) == 0);
         CHECK (word (*c, 0x15c) == 256 && word (*c, 0x160) == 0 && word (*c, 0x168) == 0);
-        CHECK (c->modelParams.size() == 3 && c->modelParams[0] == 128.0f && c->pan == 0.0f && c->maxPolyphony == 0);
+        CHECK (c->modelParams.size() == 3 && c->modelParams[0] == 96.0f && c->pan == 0.0f && c->maxPolyphony == 0);
         // FLM sounds an octave below the desktop plugin (A/B inside FL): the channel's pitch, in semitones
         CHECK (c->sampler.pitch == -12.0f && c->modelParams[1] == 1.0f && c->modelParams[2] == 1.0f);
         CHECK (! c->misc.mono && ! c->misc.porta && c->misc.gateBeats == 0.0f && ! c->misc.echo.enabled() && ! c->arp.enabled());
@@ -401,5 +401,123 @@ TEST (flm190u_three_osc_maps_the_parameters)
         auto louder = *c;
         louder.modelParams[2] *= 1.5f;
         CHECK (std::abs (peak (louder, 0.5f) / half - 1.5f) < 0.01f);
+    }
+}
+
+// FLM's envelope clock and stepping (round 190ab; the volume envelope of A/B setting E1 inside FL): the module's
+// ticks are 384 / (the song's steps per beat) per beat, 96 for TDIV 4/4, in whole samples; the hold and the predelay
+// last one tick more than the desktop's and the attack's position is not clamped, so an attack of 57 ticks (58 float
+// steps of 1/58 stop just below 1) takes a 59th step to 1.0077, holds there for 13 ticks and the decay starts above 1
+TEST (flm190ab_three_osc_envelope_steps_as_flm)
+{
+    using namespace lynx;
+    // the articulator alone: E1's volume record at PPQ 96 and 120 BPM
+    {
+        const std::int32_t r[17] = { 4, 1, 0, 16384, 6554, 26214, 64, 22938, 0, 100, 20000, 0, 32950, 0, 51, -51, 26 };
+        const auto run = [&r] (bool mobile, int& top, float& topValue, int& peak, float& peakValue, int& below) {
+            flvp::Rec rec;
+            rec.build (r, 96, 120.0);
+            rec.mobile = mobile;
+            CHECK (rec.hold == 12 && std::abs (1.0f / rec.att - 58.0f) < 1e-3f && std::abs (-1.0f / rec.dec - 184.0f) < 1e-2f);
+            flvp::Art art;
+            art.init (rec);
+            top = peak = below = 0, peakValue = topValue = 0.0f;
+            for (int step = 1; step <= 200; ++step)
+            {
+                art.step (rec);
+                if (top == 0 && art.val >= 1.0f)
+                    top = step, topValue = art.val;
+                if (art.val > peakValue)
+                    peak = step, peakValue = art.val;
+                if (top != 0 && below == 0 && art.val < 1.0f)
+                    below = step;
+            }
+            CHECK (art.state == 4 && art.val == 0.5f);
+        };
+        int top = 0, peak = 0, below = 0;
+        float topValue = 0.0f, peakValue = 0.0f;
+        run (true, top, topValue, peak, peakValue, below);
+        CHECK (top == 59 && std::abs (topValue - 1.0076666f) < 2e-5f && peak == 73 && std::abs (peakValue - 1.0223727f) < 2e-5f && below == 76);
+        run (false, top, topValue, peak, peakValue, below); // the desktop: clamped, the hold one tick shorter
+        CHECK (top == 59 && topValue == 1.0f && peakValue == 1.0f && below == 72);
+
+        // the predelay: one tick more
+        std::int32_t d[17];
+        std::copy (std::begin (r), std::end (r), d);
+        d[2] = 6554;
+        for (const auto mobile : { false, true })
+        {
+            flvp::Rec rec;
+            rec.build (d, 96, 120.0);
+            rec.mobile = mobile;
+            flvp::Art art;
+            art.init (rec);
+            int first = 0;
+            for (int step = 1; step <= 40 && first == 0; ++step)
+            {
+                art.step (rec);
+                if (art.val > 0.0f)
+                    first = step;
+            }
+            CHECK (rec.delay == 12 && first == (mobile ? 14 : 13));
+        }
+    }
+
+    // the import: the tick rate from TDIV's second byte, and the instrument's whole-sample ticks
+    {
+        auto p = flm190u::threeOscDefaults();
+        p[22] = 0.0f, p[23] = 0.0f;                                // oscillator 1 alone (a sine)
+        p[62] = 1.0f, p[74] = 0.25f, p[78] = 0.7f, p[82] = 0.1f;   // E1: attack 25 %, tension +40 %, hold 10 %
+        p[86] = 0.4f, p[90] = 0.3f, p[94] = 0.5f, p[98] = 0.35f, p[102] = 0.6f;
+        const auto import = [&p] (int steps) {
+            auto bytes = flm190u::engineProject (flm::module::threeOsc, 149, p);
+            for (std::size_t i = 0; i + 10 <= bytes.size(); ++i)
+                if (std::memcmp (bytes.data() + i, "TDIV", 4) == 0)
+                    bytes[i + 9] = (std::uint8_t) steps;
+            FlpImportReport report;
+            std::string error;
+            return importFlm (bytes, flm182c::options (&report), &error);
+        };
+        const auto three = import (3);
+        const auto* c3 = three ? flm182c::channelNamed (*three, "Bass") : nullptr;
+        CHECK (c3 != nullptr && c3->modelParams.size() == 3 && c3->modelParams[0] == 128.0f);
+        const auto song = import (4);
+        const auto* c = song ? flm182c::channelNamed (*song, "Bass") : nullptr;
+        CHECK (c != nullptr && c->modelParams.size() == 3 && c->modelParams[0] == 96.0f);
+        if (c == nullptr)
+            return;
+        // the level per 128 samples of a held key 84 (523 Hz in FLM's octave, 84 samples a cycle)
+        const auto levels = [] (const ChannelDef& channel) {
+            auto inst = makeThreeOscInstrument();
+            inst->prepare (44100.0);
+            inst->configure (channel, 120.0);
+            inst->noteOn (84, 1.0f);
+            const int n = 24000;
+            std::vector<float> l ((std::size_t) n, 0.0f), r ((std::size_t) n, 0.0f), out;
+            inst->render (l.data(), r.data(), n, 1.0f, 1.0f);
+            for (int a = 0; a + 128 <= n; a += 128)
+                out.push_back (*std::max_element (l.begin() + a, l.begin() + a + 128, [] (float x, float y) { return std::fabs (x) < std::fabs (y); }));
+            for (auto& v : out)
+                v = std::fabs (v);
+            return out;
+        };
+        const auto stats = [] (const std::vector<float>& e, float& hold, float& bump, int& falls) {
+            hold = *std::max_element (e.begin() + 112, e.begin() + 124);   // samples 14 336 … 15 872: the hold
+            bump = *std::max_element (e.begin() + 126, e.begin() + 140);   // 16 128 … 17 920: the decay's start
+            falls = 0;
+            for (int k = 112; k < (int) e.size() && falls == 0; ++k)
+                if (e[(std::size_t) k] < 0.95f * hold)
+                    falls = 128 * k;
+        };
+        float hold = 0.0f, bump = 0.0f;
+        int falls = 0;
+        stats (levels (*c), hold, bump, falls);
+        // FLM: 59 ticks of 230 samples to the top, 13 of hold, the decay from 1.0224 / 1.0077 of the hold's level
+        CHECK (hold > 0.05f && std::abs (bump / hold - 1.0223727f / 1.0076666f) < 0.004f);
+        const auto flmFalls = falls;
+        auto desktop = *c;
+        desktop.modelParams = { 96.0f };
+        stats (levels (desktop), hold, bump, falls);
+        CHECK (std::abs (bump / hold - 1.0f) < 0.003f && flmFalls - falls >= 600 && flmFalls - falls <= 1300); // 4 ticks of 230, in steps of 128
     }
 }

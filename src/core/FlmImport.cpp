@@ -68,6 +68,7 @@ struct Ctx
     Song song;
     std::map<std::string, int> audioChannels; // resolved path | pitch | insert → audioClip channel
     std::set<std::string> missingSeen;
+    int stepsPerBeat = 4; // TDIV's second byte (the song's +0xa9): the grid's steps per beat, and 384 / it = the modules' tick rate
 
     explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -418,7 +419,10 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 
     // the channel snapshot: five records (pan, volume, Mod X = cutoff, Mod Y = resonance, pitch) of 17 values. FLM's
     // times are T(v) = round((e^(6.908755·v) − 1)·B) ticks, the desktop's law on raw / 65536; a raw below 101 is 0.
-    const auto ppq = 128; // FLM's 128 ticks per beat (INFERRED: the host byte of the spec's O2)
+    // The module's ticks: 384 / X per beat, X = the song's steps per beat (TDIV's second byte, 4 in every file seen):
+    // 96 per beat (PROVEN-REA: the byte the module reads is the one the song loader fills from TDIV; A/B inside FL,
+    // round 190ab: the volume envelope of setting E1 fits 230-sample ticks = PPQ 96 at 120 BPM, not PPQ 128)
+    const auto ppq = (int) std::lround (384.0 / (double) std::clamp (ctx.stepsPerBeat, 1, 32));
     const auto time = [&] (std::size_t k) { return std::clamp (rnd (65536.0 * v (k)), 0, 65536); };
     for (std::size_t j = 0; j < 5; ++j)
     {
@@ -443,7 +447,7 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
             r[2] = time (70 + e);
             r[3] = time (74 + e);
             // an attack of no tick starts the envelope at its top: the desktop's attack raw 100
-            if (std::lround ((std::exp (6.908755 * v (74 + e)) - 1.0) * 0.128 * ppq * (tempo ? 1.0 : ctx.song.bpm / 120.0)) == 0)
+            if (std::lround ((std::exp (6.908755 * v (74 + e)) - 1.0) * 49.152 / (double) std::clamp (ctx.stepsPerBeat, 1, 32) * (tempo ? 1.0 : ctx.song.bpm / 120.0)) == 0)
                 r[3] = 100;
             r[4] = time (82 + e);
             r[5] = time (86 + e);
@@ -782,17 +786,10 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     song.arrangements = { Arrangement { "Arrangement", {}, 0, 0, {} } };
     song.info.title = project.title;
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
-    if (project.denominator == 4)
-        song.beatsPerBar = std::clamp (project.numerator, 1, 32);
-    else
-    {
-        Marker m;
-        m.tick = 0;
-        m.numerator = project.numerator;
-        m.denominator = project.denominator;
-        m.action = Marker::timeSignature;
-        song.addMarker (m);
-    }
+    // TDIV: beats per bar and the grid's steps per beat (FLM_FORMAT §TDIV, round 190ab: the second byte is not a note
+    // value; LYNX's own grid stays at four steps per beat)
+    ctx.stepsPerBeat = project.denominator;
+    song.beatsPerBar = std::clamp (project.numerator, 1, 32);
 
     // channels in FLM's display order (the master first), each with its rack
     std::vector<std::size_t> order (project.channels.size());

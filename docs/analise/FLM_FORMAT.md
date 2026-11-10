@@ -79,7 +79,10 @@ PROVEN-REA 0x18076b9e0. Offsets:
 
 ### TDIV
 
-2 bytes: time-signature numerator and denominator (4, 4). PROVEN-REA (two single bytes read after META), PROVEN-FILE.
+2 bytes (4, 4): **beats per bar** and **steps per beat**. PROVEN-REA (two single bytes read after META into the
+song's +0xa8 / +0xa9; the note grid's snap values are 1/X, 1/2X, 1/3X, 1/4X, 1/6X of a beat with X = the second byte
+and "bar" = the first; round 190ab), PROVEN-FILE. The second byte is also the modules' tick rate: 3x Osc steps its
+envelopes and LFOs 384 / X times per beat (96), each tick round(fs·60 / (tempo·384 / X)) samples.
 
 ## 3. RACK: a channel's instrument and effect chain
 

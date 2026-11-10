@@ -935,6 +935,7 @@ struct Setup
     std::shared_ptr<const HqSet> hq;
     int ppq = 96;
     double tempo = 140.0;
+    bool mobile = false; // a channel from a .flm: FLM's envelope stepping and whole-sample ticks (core/ThreeOsc.h)
 };
 
 class ThreeOscInstrument final : public Instrument
@@ -960,6 +961,7 @@ public:
         take();
         engine.custom = current.custom, engine.hqCustomSet = current.hq;
         engine.hostHq = hostHq != nullptr && hostHq();
+        engine.S.setMobile (current.mobile);
         engine.init (current.P, sr, current.snap.data(), current.ppq, current.tempo);
         engine.reset();
         tickPhase = 0.0;
@@ -976,7 +978,8 @@ public:
         // a channel from a .flm (core/ThreeOsc.h): the note's velocity is the voice's level as it is, times a gain
         flmLevel.store (threeOscIsFlm (channel) ? (channel.modelParams.size() > 2 ? std::clamp (channel.modelParams[2], 0.0f, 4.0f) : 1.0f) : -1.0f);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath)
+        const auto mobile = threeOscIsFlm (channel);
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath && mobile == lastMobile)
             return;
         Params p;
         if (! parseNormalised (channel.pluginState, p))
@@ -984,7 +987,7 @@ public:
         auto s = std::make_unique<Setup>();
         s->P = p;
         std::memcpy (s->snap.data(), channel.pluginState.data() + 0x60, snapshotSize);
-        s->ppq = ppq, s->tempo = tempo;
+        s->ppq = ppq, s->tempo = tempo, s->mobile = mobile;
         if (channel.samplePath == wavePath)
             s->custom = uiCustom;
         else if (auto w = channel.samplePath.empty() ? std::vector<float> {} : threeOscCustomWave (channel.samplePath); ! w.empty())
@@ -994,7 +997,7 @@ public:
             hqFixed (1); // (builds the band-limited tables here, not on the audio thread)
         if (p.hq && s->custom != nullptr)
             s->hq = hqCustom (*s->custom); // (the custom wave's band-limited tables: only for HQ states)
-        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, wavePath = channel.samplePath;
+        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, wavePath = channel.samplePath, lastMobile = mobile;
         delete incoming.exchange (s.release());
     }
 
@@ -1070,7 +1073,7 @@ public:
     {
         const auto playing = lastTicks >= 0.0 && ticks != lastTicks;
         lastTicks = ticks;
-        if (playing)
+        if (playing && ! current.mobile) // (FLM's module clock runs free, in whole samples)
             tickPhase = ticks / (double) ppq * (double) current.ppq;
     }
 
@@ -1096,7 +1099,9 @@ public:
             }
         }
         // FL's sequencer ticks (PPQ per beat): a tick boundary starts a new host block, NewTick first
-        const auto perSample = current.tempo * (double) current.ppq / (60.0 * rate);
+        // (FLM's module counts its ticks in whole samples: round(fs·60 / (tempo·PPQ)), 230 at 120 BPM and 44.1 kHz)
+        const auto perSample = current.mobile ? 1.0 / std::max (1.0, std::round (60.0 * rate / (current.tempo * (double) current.ppq)))
+                                              : current.tempo * (double) current.ppq / (60.0 * rate);
         for (int done = 0; done < n;)
         {
             if (std::fabs (tickPhase - std::round (tickPhase)) < 1e-9)
@@ -1141,6 +1146,7 @@ private:
             engine.custom = current.custom, engine.hqCustomSet = current.hq;
             engine.hostHq = hostHq != nullptr && hostHq();
             std::memcpy (engine.snap.data(), current.snap.data(), snapshotSize);
+            engine.S.setMobile (current.mobile);
             engine.timing (current.ppq, current.tempo); // (FL: parameters and tempo reach the plugin while voices play)
             engine.update();
             retired.store (s);
@@ -1160,6 +1166,7 @@ private:
     std::shared_ptr<const std::vector<float>> uiCustom;
     int lastPpq = -1;
     double lastTempo = -1.0;
+    bool lastMobile = false;
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, tickPhase = 0.0, lastTicks = -1.0;

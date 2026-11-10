@@ -806,7 +806,7 @@ installation.
 | 129 gate, 130–138 echo delay | channel misc | FL's time knob law on int(997v + 450); echoes round(9v + 1), feedback 2v, time 2v beats, pan 4v − 2, pitch 2400(v−½) cents, ping-pong, fat |
 | 139–145 arpeggiator | channel arp | direction {0,1,2,3,5,4}[round(5v)], time knob law, gate v, range round(6v) (1…4), repeat round(5v + 1), slide, chord k = round(90v) − 2 of FL's chord list (88 chords: the parameter's default 1/90 is "one above auto") |
 
-**FLM's module around the engine** (`ChannelDef::modelParams = { PPQ 128, 1, gain }`, `threeOscIsFlm`; the desktop
+**FLM's module around the engine** (`ChannelDef::modelParams = { PPQ 96, 1, gain }`, `threeOscIsFlm`; the desktop
 path is unchanged): the note's velocity is the voice's level as it is (FLM's level is linear in the velocity; the
 desktop's Init.Vol curve (11^(1.28v) − 1)/10 is not applied), times the gain above; the channel's pitch carries
 **−12 semitones**: FLM plays key 60 with coarse 0 at 261.6 Hz, the desktop plugin at 523.3 Hz (measured, below).
@@ -828,13 +828,36 @@ Fourteen more settings (oscillators, envelopes, filters, LFOs, pan / tracking, m
 tempo-synced times, volume multiplier) are rendered and scored by /mnt/e/lynx-work/flm190u/ab/score_osc.py; their
 numbers are in the round's HANDOFF.
 
+**The module's clock and envelope stepping (round 190ab, setting E1: volume envelope with attack 25 %, tension
++40 %, hold 10 %, decay 40 %, tension −40 %, sustain 50 %, release 35 %).** With PPQ 128 and the desktop's stepping
+LYNX was +0.32 dB against FLM and the decay started about 6 ticks early. Three things, all read in the module and
+measured on the render:
+- **Tick rate = 384 / X per beat, X = the song's steps per beat = TDIV's second byte** (PROVEN-REA: the byte the
+  module reads, song +0xa9, is filled by the song loader from the TDIV chunk and reset from the new-song defaults; the
+  note grid snaps to 1/X, 1/2X … of a beat with it and takes the bar length from the byte before). X = 4 in every
+  file, so **PPQ 96**, not 128. One tick is **round(fs·60 / (tempo·PPQ)) whole samples** (230 at 120 BPM, 44.1 kHz), on
+  a clock of the module's own; inside FL every note starts on the next boundary of that clock (all seven notes of the
+  render: start + lag ≡ 178 mod 230).
+- **The hold and the predelay last one tick more** than the desktop's (the counter must pass the tick count,
+  0x1807d9640), and
+- **the attack's position is not clamped to 1.** 58 float steps of 1/58 stop just below 1, so the attack takes a 59th
+  step to 1.0077 (through the tension curve), the hold stays there, and the decay starts from above 1: the level peaks
+  at 1.0224 fourteen ticks later and only then falls. (At PPQ 128 the same knob gives 77 steps that land on 1.)
+LYNX: `flvp::Rec::mobile` (the two counters and the clamp), the instrument's whole-sample ticks running free of the
+song position, and the importer's PPQ from TDIV. Against the FLM render (first note, low-passed at 1.2 kHz because the
+saw's edges never null, below): whole note −28.8 → **−34.6 dB**, hold and decay −27.0 → −35.3 dB, release −21.8 →
+−35.3 dB; level over the file +0.32 → **0.00 dB**, level per 125 ms 0.52 / 3.89 → 0.14 / 0.95 dB (mean / max).
+Not copied: the note start on the module's tick boundary (up to one tick, 5 ms, late), and FLM's float phase (its
+oscillators drift about 0.09 sample against LYNX's 32-bit phase, which is why shapes with edges stop at −12…−22 dB
+while the sines null at −50 dB).
+
 Quality gate: the desktop path writes the same bytes as before (the instrument built from the branch base against
-this round's, 15 states, notes at velocities 0.05…1: 15 / 15 byte-identical, same CPU time).
+this round's, 15 states, notes at velocities 0.05…1: 15 / 15 byte-identical, same CPU time; again after round
+190ab's change: 15 / 15, 1487 → 1268 ms).
 
 Not converted (listed in the import report): a custom shape's file, Free Run (146–148), the arpeggiator's "Hold" time
 and ranges 0 / 5 / 6. Differences LYNX keeps from the desktop engine (spec §5): table lookup without FLM's linear
-interpolation, the 10 ms fade of an envelope-less release, FL's velocity tracking curve, PPQ 128 for tempo-synced
-times (INFERRED). Parameter automation lanes of a .flm on the module are still listed, not imported.
+interpolation, the 10 ms fade of an envelope-less release, FL's velocity tracking curve. Parameter automation lanes of a .flm on the module are still listed, not imported.
 
 **Best way?** FL: FLM's own preset importer proves the two are one instrument, so playing LYNX's FL-exact 3x Osc
 keeps the patch editable on the page the user knows. Ableton: no FLM import. Verdict: desktop engine + FLM's level and
