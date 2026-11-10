@@ -1366,12 +1366,17 @@ public:
         // Notes: the note tools, two columns
         auto n = r.removeFromLeft (notesPanel);
         notesTitle.setBounds (take (n, 14));
-        juce::TextButton* const order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &timesTwo, &divideTwo, &fitScale, &randomize };
+        // rows of two; the fourth holds ×2 and ÷2 in its left half and Fit to scale in its right; Randomize velocity
+        // has the fifth to itself (five rows fit the dock's default height)
+        juce::TextButton* const order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize };
         const auto w = (n.getWidth() - 4) / 2;
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < 6; ++i)
             order[i]->setBounds (n.getX() + (i % 2) * (w + 4), n.getY() + (i / 2) * 24, w, 21);
-        for (int i = 8; i < 10; ++i) // Fit to scale, Randomize velocity: a row each
-            order[i]->setBounds (n.getX(), n.getY() + (i - 4) * 24, n.getWidth(), 21);
+        const auto small = (w - 4) / 2;
+        timesTwo.setBounds (n.getX(), n.getY() + 3 * 24, small, 21);
+        divideTwo.setBounds (n.getX() + small + 4, n.getY() + 3 * 24, w - small - 4, 21);
+        fitScale.setBounds (n.getX() + w + 4, n.getY() + 3 * 24, w, 21);
+        randomize.setBounds (n.getX(), n.getY() + 4 * 24, n.getWidth(), 21);
     }
 
 private:
