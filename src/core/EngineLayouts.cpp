@@ -1,6 +1,7 @@
 #include "core/EngineLayouts.h"
 
 #include <string>
+#include <vector>
 
 // Positions: FL's editor forms at 100 % (the SynthPanel of each plugin's TSynthEditorForm, docs/analise/REA_rodada168q.md
 // §1), one design unit = one pixel. Section frames and captions are LYNX's (FL paints its own in the background art).
@@ -654,6 +655,19 @@ Layout transistorBassLayout()
     v.push_back (dial (589, 372, 46, "Reverb early", TR_NOOP ("ER")));
     v.push_back (dial (645, 372, 46, "Reverb wet", TR_NOOP ("Wet")));
     v.push_back (toggle (88, 94, 34, 28, "303 pulse", "303", boxed));
+    return l;
+}
+
+// A channel imported from a .flm plays FL Studio Mobile's build of the engine (core/TransistorBass.h): no sequencer,
+// programs, delay, reverb or recorded 303 cycles. The same page without the parts that do nothing there.
+Layout transistorBassMobileLayout()
+{
+    auto l = transistorBassLayout();
+    l.height = 266;
+    std::erase_if (l.items, [] (const LayoutItem& i) {
+        return i.y >= 262.0f || (i.display != nullptr && std::string (i.display) == "tbprogram")
+               || (i.param != nullptr && std::string (i.param) == "303 pulse");
+    });
     return l;
 }
 

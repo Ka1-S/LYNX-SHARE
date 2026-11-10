@@ -448,6 +448,7 @@ countries: nl be
 "Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)" = "Ogun — de engine van FL met zijn effecten (Seed 2 Random is een vaste trekking per kanaal)"
 "Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)" = "Autogun — de engine van FL met zijn effecten en Magic Dust (SG.dat gelezen uit je FL-installatie)"
 "Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)" = "Transistor Bass — de engine van FL met zijn sequencer en effecten (oscillatorcycli gelezen uit je FL-installatie)"
+"Transistor Bass — FL Studio Mobile's build of the engine" = "Transistor Bass — de engine in de versie van FL Studio Mobile"
 "MiniSynth — FL's engine with its effects (wave tables read from your FL installation)" = "MiniSynth — de engine van FL met zijn effecten (wavetables gelezen uit je FL-installatie)"
 "SimSynth — FL's engine (new settings restart the voices)" = "SimSynth — de engine van FL (nieuwe instellingen herstarten de voices)"
 "Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL" = "Wasp — FL Studio 2026 heeft geen 64-bit Wasp: het kanaal behoudt zijn instellingen en blijft stil, zoals in FL"

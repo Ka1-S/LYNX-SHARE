@@ -504,6 +504,7 @@ public:
         morphine = def.instrument == InstrumentKind::morphine;
         autogun = def.instrument == InstrumentKind::autogun;
         transistorBass = def.instrument == InstrumentKind::transistorbass;
+        transistorBassMobile = transistorBass && transistorBassIsFlm (def);
         ogun = def.instrument == InstrumentKind::ogun || autogun; // Autogun: Ogun's parameter layout (REA_rodada57)
         miniSynth = def.instrument == InstrumentKind::minisynth;
         dx10 = def.instrument == InstrumentKind::dx10;
@@ -1130,7 +1131,8 @@ public:
 
         // FL's arrangement of the plugin's page (core/PluginLayout.cpp): the knobs at FL's places, faders and
         // switches drawn by the panel
-        layout = plugui::instrumentLayout (def.instrument);
+        // (a Transistor Bass from a .flm: FL Studio Mobile's build has no sequencer, delay or reverb)
+        layout = transistorBassMobile ? plugui::transistorBassFlmLayout() : plugui::instrumentLayout (def.instrument);
         if (layout != nullptr && plugui::hostedElsewhere) // (round 180b: the plate prints the plugin's name)
         {
             hostedName = def.name;
@@ -2149,6 +2151,7 @@ public:
                : harmor ? tr ("Harmor — FL's additive engine with its effects rack")
                : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
                : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
+               : transistorBass && transistorBassMobile ? tr ("Transistor Bass — FL Studio Mobile's build of the engine")
                : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
                : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
                : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
@@ -2644,7 +2647,7 @@ private:
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
     skin::Art pageArt = skin::Art::none;           // its own art (round 170j: Themed)
     std::unique_ptr<skin::ArtLayer> artLayer;      // the art's moving part (petals, a glowing trefoil...)
-    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
+    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, transistorBassMobile = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
          engineFilesMissing = false;

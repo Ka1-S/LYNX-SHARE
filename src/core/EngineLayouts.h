@@ -13,6 +13,7 @@ namespace lynx::plugui
 Layout keplerLayout();
 Layout keplerExoLayout();
 Layout transistorBassLayout();
+Layout transistorBassMobileLayout(); // (a channel imported from a .flm)
 Layout sawerLayout();
 Layout beepMapLayout();
 Layout granulizerLayout();
