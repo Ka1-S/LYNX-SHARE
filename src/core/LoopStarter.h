@@ -174,6 +174,11 @@ struct Sources
 };
 
 double pickTempo (const Genre& genre, FlRand& rng); // update_pattern_tempo (randomise)
+// The tempo a genre suggests, as a whole number: what a starter button shows ("Lo-fi  84 BPM") and what the project
+// gets when the starter is added with "Use the suggested tempo" — the same number, not pickTempo's random one from the
+// genre's range (round 190t). The second form looks the genre up like generate() does (unknown: LYNX's own default).
+int suggestedTempo (const Genre& genre);
+int suggestedTempo (const Sources& sources, const std::string& genreId);
 // picks a sample of the category (or of its fallbacks), avoiding `recent`; "" = none in the library
 std::string pickSample (const Library& library, const std::string& category, FlRand& rng,
                         const std::vector<std::string>& recent = {}, std::string* pickedCategory = nullptr);

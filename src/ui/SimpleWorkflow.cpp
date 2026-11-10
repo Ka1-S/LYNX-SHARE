@@ -272,7 +272,7 @@ public:
                 {
                     genreIds.push_back (genre->id);
                     genreButtons.push_back (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (genre->label.c_str()) + "  "
-                                                                                + tr ("{0} BPM", { juce::String (juce::roundToInt (genre->defaultTempo)) })));
+                                                                                + tr ("{0} BPM", { juce::String (loopstarter::suggestedTempo (*genre)) })));
                 }
             // one click on a starter adds it (round 190t): nothing to pick first, nothing to confirm
             for (std::size_t i = 0; i < genreButtons.size(); ++i)
@@ -794,7 +794,8 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
     if (q.kit.empty())
         return;
     if (useTempo && steps)
-        q.bpm = plan.bpm; // (in the same undo step as the track)
+        q.bpm = loopstarter::suggestedTempo (sources, id); // the number on the starter's button, not the plan's random
+                                                           // one: the beat is in steps, so it follows (same undo step)
     add (std::move (q));
 }
 } // namespace lynx
