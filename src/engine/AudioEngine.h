@@ -780,6 +780,12 @@ public:
     // --selftest "driver_panel": showDriverPanel with a fake device whose panel changes its buffer (and one whose panel
     // changes nothing). "OK" or what went wrong.
     static juce::String driverPanelSelfTest();
+    // --selftest "device_change" / --devicechangetest (issue #134, engine/DeviceChangeTest.cpp): a playing project while
+    // the output device, its sample rate and its buffer size change, on stand-in devices with real callback threads.
+    // "OK (...)" or "ERROR ...". `everyUnit`: every instrument and effect LYNX can make here (else a handful);
+    // `pluginFiles`: hosted plugins to add; `log` receives a line per change.
+    static juce::String deviceChangeSelfTest (int switches, bool everyUnit, const juce::StringArray& pluginFiles = {},
+                                              const std::function<void (const juce::String&)>& log = {});
     // %APPDATA%\LYNX\audio-glitches.log: a line each time callbacks run over their deadline (at most every 2 s).
     static juce::File glitchLogFile();
 
@@ -1108,6 +1114,13 @@ private:
     juce::ChangeBroadcaster levelsChanged;
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
+    // Issue #134: a publish asked for while one is still building its rack (a plugin being created ran the message
+    // loop: the engine's timer, an edit) waits until that one is done; see publishSong
+    bool publishing = false, publishAgain = false;
+    int nestedPublishes = 0; // (diagnostics / tests)
+    // tests: called for every hosted instrument / effect the rack asks for, in place of a plugin that runs the
+    // message loop while it is created (DeviceChangeTest)
+    std::function<void()> duringPluginCreation;
     void saveUndoStep();
     ProcessTimes* externalTimes = nullptr;
     std::function<std::shared_ptr<Effect>()> externalEffect;
