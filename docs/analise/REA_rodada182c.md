@@ -776,3 +776,66 @@ piano-roll default (204) is an accent, as FL's default velocity is in FLM-in-FL.
 slides and accents are the instrument; keeping FLM's own rules (slide back, accent at 99) keeps the user's bass line
 as written. Verdict: FLM-exact; the page shows the desktop Transistor Bass controls (its sequencer has no effect on a
 channel from a .flm).
+
+### F4 3x Osc (round 190u, branch `feature/flm190u-3xosc`, 0.1.26)
+
+FLM's "3x Osc" module (type 39, 149 parameters) is the desktop 3x Osc and FL's channel settings behind it (envelopes,
+LFOs, filter, polyphony, tracking, echo delay, arpeggiator) rebuilt in float. FLM carries its own importer of desktop
+3x Osc presets, with one converter "FL raw value → FLM 0…1" per parameter (PROVEN-REA, round 190n,
+/mnt/e/lynx-work/flm190n/rea/spec-3xosc.md), so every FLM parameter has an exact FL raw value. The .flm import runs
+that converter backwards and writes what a .flp would carry: a version 14 plugin state (21 parameters, invert × 3,
+AM, HQ and the 364-byte channel snapshot: five 17-int records pan / volume / Mod X / Mod Y / pitch, Mod X, Mod Y,
+filter type) plus the channel's own fields. LYNX's exact 3x Osc engine then plays it; nothing is read from an FL
+installation.
+
+**Mapping** (`threeOscState` in core/FlmImport.cpp; v = the saved value 0…1):
+
+| FLM | To | Law |
+|---|---|---|
+| 1–3 shape, 4–6 invert, 24 AM, 25 HQ | state | round(6v); v > 0.5 |
+| 7–9 phase, 10–12 detune, 13–15 coarse, 16–18 fine, 19–21 pan | state | round(128(v−½)), round(100(v−½)), round(48(v−½)), round(200(v−½)), round(128(v−½)) |
+| 22 / 23 mix, 26 phase randomness | state | round(128v); round(64v) |
+| 27–61 LFOs (global, tempo, shape, predelay, attack, amount, speed) | snapshot records 0…4 | flags; round(2v); times round(65536v); amount in the record's unit (pan 128, volume / Mod X / Mod Y 256, pitch 4800, all × (v−½)) |
+| 62–105 envelopes (on, tempo, predelay, attack, hold, decay, sustain, release, tensions) | snapshot records 1…4 | flags; times round(65536v) (attack raw 100 where FLM's time is 0); sustain round(128v); tensions round(256(v−½)) |
+| 107–109 envelope amounts | records 2…4 | round(256(v−½)) |
+| 110 filter type, 111 cutoff, 112 resonance, 115 / 116 offsets | snapshot | round(7v); round(256(v + offset)) clamped to 0…256 |
+| 106 volume envelope amount, 114 volume multiplier | channel gain (modelParams[2]) | 2v · clamp(2(v106−½), 0, 1): plain factors, as in FLM |
+| 113 pan | channel pan | 2v − 1 |
+| 117 polyphony, 118 slide, 119 porta, 120 mono | channel | round(99v); FL's time knob law on int(1660v) |
+| 121–128 key / velocity tracking | channel misc | middle key 120 − 120v (key) / 120v (velocity) as LYNX stores them, pan 8(v−½), Mod X / Y 2(v−½) |
+| 129 gate, 130–138 echo delay | channel misc | FL's time knob law on int(997v + 450); echoes round(9v + 1), feedback 2v, time 2v beats, pan 4v − 2, pitch 2400(v−½) cents, ping-pong, fat |
+| 139–145 arpeggiator | channel arp | direction {0,1,2,3,5,4}[round(5v)], time knob law, gate v, range round(6v) (1…4), repeat round(5v + 1), slide, chord k = round(90v) − 2 of FL's chord list (88 chords: the parameter's default 1/90 is "one above auto") |
+
+**FLM's module around the engine** (`ChannelDef::modelParams = { PPQ 128, 1, gain }`, `threeOscIsFlm`; the desktop
+path is unchanged): the note's velocity is the voice's level as it is (FLM's level is linear in the velocity; the
+desktop's Init.Vol curve (11^(1.28v) − 1)/10 is not applied), times the gain above; the channel's pitch carries
+**−12 semitones**: FLM plays key 60 with coarse 0 at 261.6 Hz, the desktop plugin at 523.3 Hz (measured, below).
+
+**A/B inside FL (round 190u).** Projects as for Transistor Bass (FL Studio Mobile Rack holding one 3x Osc module with
+the 149 PRMS values, seven notes), against LYNX's own .flm import and song render of the same values and notes
+(tools/flmr.cpp: a .flm written with the test builders, `importFlm`, the export renderer; LYNX at the fixed
+−5.08 dB FL's channel gives the rack). 3x Osc has no random source with phase randomness off, so the notes are compared
+sample for sample: FLM inside FL starts every note up to one 512 block late, so each note's first 150 ms is nulled at
+its own lag.
+
+| Setting | level FLM − LYNX | third-octave difference mean / max | worst note ESR |
+|---|---|---|---|
+| D default (sine / sine −12 / sine −24, no envelope, no filter) | −0.02 dB | 0.16 / 1.12 dB | −50 dB |
+
+The default patch settles the three open points of the spec: the octave (O1: one below the desktop), the level
+(the same structure, factor 1.00) and the linear velocity law (velocities 80 and 120 both land within 0.02 dB).
+Fourteen more settings (oscillators, envelopes, filters, LFOs, pan / tracking, mono / porta, echo, gate, arpeggiator,
+tempo-synced times, volume multiplier) are rendered and scored by /mnt/e/lynx-work/flm190u/ab/score_osc.py; their
+numbers are in the round's HANDOFF.
+
+Quality gate: the desktop path writes the same bytes as before (the instrument built from the branch base against
+this round's, 15 states, notes at velocities 0.05…1: 15 / 15 byte-identical, same CPU time).
+
+Not converted (listed in the import report): a custom shape's file, Free Run (146–148), the arpeggiator's "Hold" time
+and ranges 0 / 5 / 6. Differences LYNX keeps from the desktop engine (spec §5): table lookup without FLM's linear
+interpolation, the 10 ms fade of an envelope-less release, FL's velocity tracking curve, PPQ 128 for tempo-synced
+times (INFERRED). Parameter automation lanes of a .flm on the module are still listed, not imported.
+
+**Best way?** FL: FLM's own preset importer proves the two are one instrument, so playing LYNX's FL-exact 3x Osc
+keeps the patch editable on the page the user knows. Ableton: no FLM import. Verdict: desktop engine + FLM's level and
+octave rules; the channel shows PITCH −12 semitones, which is what FLM plays.

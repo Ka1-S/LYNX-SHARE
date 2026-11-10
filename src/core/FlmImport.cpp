@@ -12,6 +12,7 @@
 #include "core/FlmEffects.h"
 #include "core/MiniSynth.h"
 #include "core/TransistorBass.h"
+#include "core/ThreeOsc.h"
 #include "core/MissingFiles.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
@@ -198,6 +199,12 @@ float flmGain (float v) noexcept
     return (float) std::pow (10.0, 3.3 * std::pow ((double) v, 0.6) - 3.0);
 }
 
+// FLM's 3x Osc against LYNX's 3x Osc at the same velocity (A/B inside FL, round 190u): the level is the same
+// (0.00 dB on the default patch) and FLM sounds one octave below the desktop plugin (key 60 with coarse 0 = 261.6 Hz,
+// the desktop's 523.3 Hz), so the channel's pitch carries −12 semitones
+constexpr double threeOscFlmLevel = 1.0;
+constexpr float threeOscFlmPitch = -12.0f;
+
 float velocityOf (const flm::Event& e) noexcept { return std::clamp ((float) e.velocity / 255.0f, 0.0f, 1.0f); }
 
 // The pattern holding one content of a note or drum lane: `channelFor(key)` is the channel and key a note plays on
@@ -378,6 +385,146 @@ bool transistorBassState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// FLM's 3x Osc → LYNX's 3x Osc engine and FL's channel settings (F4, round 190u). FLM's module is the desktop
+// plugin plus the channel's voice processor, echo delay, arpeggiator, polyphony and tracking as 148 parameters 0…1,
+// and it carries its own converter from the desktop's raw values (REA spec of round 190n), so every parameter goes
+// back to the raw value FL keeps and from there to the field the .flp import fills. The state is version 14
+// (core/ThreeOsc.h: 21 parameters, invert × 3, AM, HQ, the 364-byte channel snapshot).
+bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    if (m.params.size() < 146) // (146…148, Free Run, have no desktop twin)
+        return false;
+    const auto v = [&m] (std::size_t k) { return k < m.params.size() && std::isfinite (m.params[k]) ? std::clamp ((double) m.params[k], 0.0, 1.0) : 0.0; };
+    const auto rnd = [] (double x) { return (std::int32_t) std::lround (x); };
+    std::vector<std::uint8_t> state (460, 0);
+    const auto put = [&state] (std::size_t at, std::int32_t x) { std::memcpy (state.data() + at, &x, 4); };
+    put (0, 14);
+    for (std::size_t k = 0; k < 3; ++k)
+    {
+        const auto at = 4 + 4 * 7 * k;
+        put (at, rnd (128.0 * (v (19 + k) - 0.5)));      // pan
+        put (at + 4, rnd (6.0 * v (1 + k)));             // shape
+        put (at + 8, rnd (48.0 * (v (13 + k) - 0.5)));   // coarse
+        put (at + 12, rnd (200.0 * (v (16 + k) - 0.5))); // fine
+        put (at + 16, rnd (128.0 * (v (7 + k) - 0.5)));  // stereo phase
+        put (at + 20, rnd (100.0 * (v (10 + k) - 0.5))); // stereo detune
+        state[0x58 + k] = v (4 + k) > 0.5 ? 1 : 0;       // invert
+    }
+    put (4 + 4 * 6, rnd (128.0 * v (22)));  // mix 2
+    put (4 + 4 * 13, rnd (128.0 * v (23))); // mix 3
+    put (4 + 4 * 20, rnd (64.0 * v (26)));  // phase randomness
+    state[0x5b] = v (24) > 0.5 ? 1 : 0;     // osc 3 AM
+    state[0x5c] = v (25) > 0.5 ? 1 : 0;     // HQ
+
+    // the channel snapshot: five records (pan, volume, Mod X = cutoff, Mod Y = resonance, pitch) of 17 values. FLM's
+    // times are T(v) = round((e^(6.908755·v) − 1)·B) ticks, the desktop's law on raw / 65536; a raw below 101 is 0.
+    const auto ppq = 128; // FLM's 128 ticks per beat (INFERRED: the host byte of the spec's O2)
+    const auto time = [&] (std::size_t k) { return std::clamp (rnd (65536.0 * v (k)), 0, 65536); };
+    for (std::size_t j = 0; j < 5; ++j)
+    {
+        std::int32_t r[17] = { j == 1 ? 4 : 0, 0, 100, 20000, 20000, 30000, 50, 20000, 0, 100, 20000, 0, 32950, 0, 0, 0, j == 1 ? -101 : 0 };
+        // the LFO
+        if (v (27 + j) > 0.5)
+            r[0] |= 0x20; // global phase
+        if (v (32 + j) > 0.5)
+            r[0] |= 2;    // tempo
+        r[13] = rnd (2.0 * v (37 + j));
+        r[9] = time (42 + j);
+        r[10] = time (47 + j);
+        r[11] = rnd ((j == 0 ? 128.0 : j == 4 ? 4800.0 : 256.0) * (v (52 + j) - 0.5));
+        r[12] = time (57 + j);
+        if (j >= 1) // the envelope (FLM has none on the pan)
+        {
+            const auto e = j - 1;
+            const auto tempo = v (66 + e) > 0.5;
+            r[1] = v (62 + e) > 0.5 ? 1 : 0;
+            if (tempo)
+                r[0] |= 1;
+            r[2] = time (70 + e);
+            r[3] = time (74 + e);
+            // an attack of no tick starts the envelope at its top: the desktop's attack raw 100
+            if (std::lround ((std::exp (6.908755 * v (74 + e)) - 1.0) * 0.128 * ppq * (tempo ? 1.0 : ctx.song.bpm / 120.0)) == 0)
+                r[3] = 100;
+            r[4] = time (82 + e);
+            r[5] = time (86 + e);
+            r[6] = rnd (128.0 * v (94 + e));
+            r[7] = time (98 + e);
+            r[8] = e == 0 ? 0 : rnd (256.0 * (v (106 + e) - 0.5));
+            r[14] = rnd (256.0 * (v (78 + e) - 0.5));
+            r[15] = rnd (256.0 * (v (90 + e) - 0.5));
+            r[16] = rnd (256.0 * (v (102 + e) - 0.5));
+        }
+        std::memcpy (state.data() + 0x60 + 0x44 * j, r, sizeof (r));
+    }
+    // the filter: cutoff and resonance with FLM's offsets (2v − 1) folded in
+    put (0x60 + 0x15c, std::clamp (rnd (256.0 * (v (111) + 2.0 * v (115) - 1.0)), 0, 256));
+    put (0x60 + 0x160, std::clamp (rnd (256.0 * (v (112) + 2.0 * v (116) - 1.0)), 0, 256));
+    put (0x60 + 0x168, std::clamp (rnd (7.0 * v (110)), 0, 7));
+    if (! threeOscStateUsable (state))
+        return false;
+
+    c.instrument = InstrumentKind::threeosc;
+    c.pluginState = std::move (state);
+    c.samplePath.clear();
+    // the level: linear in the velocity, FLM's Volume multiplier (×2v) and volume-envelope amount (×2(v − ½))
+    const auto gain = 2.0 * v (114) * std::clamp (2.0 * (v (106) - 0.5), 0.0, 1.0);
+    c.modelParams = { (float) ppq, 1.0f, (float) (threeOscFlmLevel * gain) };
+    c.sampler.pitch = threeOscFlmPitch;
+    c.pan = (float) std::clamp (2.0 * v (113) - 1.0, -1.0, 1.0);
+    c.maxPolyphony = std::clamp (rnd (99.0 * v (117)), 0, 99);
+
+    // FL's time knobs: n = round((27^(r / 1024) − 1)·48/26) steps of 1/192 beat
+    const auto knobBeats = [] (int r) { return std::max (1.0, std::round ((std::pow (27.0, r / 1024.0) - 1.0) * 48.0 / 26.0)) / 192.0; };
+    auto& misc = c.misc;
+    misc.mono = v (120) > 0.5;
+    misc.porta = c.synth.porta = c.sampler.porta = v (119) > 0.5;
+    misc.portaBeats = c.synth.portaBeats = c.sampler.portaBeats = (float) knobBeats ((int) (1660.0 * v (118)));
+    misc.gateBeats = v (129) >= 1.0 ? 0.0f : (float) knobBeats ((int) (997.0 * v (129) + 450.0));
+    misc.key.mid = std::clamp (rnd (120.0 - 120.0 * v (121)), 0, 131);
+    misc.key.pan = (float) std::clamp (8.0 * (v (122) - 0.5), -1.0, 1.0);
+    misc.key.modX = (float) (2.0 * (v (123) - 0.5));
+    misc.key.modY = (float) (2.0 * (v (124) - 0.5));
+    misc.velocity.mid = std::clamp (rnd (120.0 * v (125)), 0, 128);
+    misc.velocity.pan = (float) std::clamp (8.0 * (v (126) - 0.5), -1.0, 1.0);
+    misc.velocity.modX = (float) (2.0 * (v (127) - 0.5));
+    misc.velocity.modY = (float) (2.0 * (v (128) - 0.5));
+    misc.echo.echoes = std::clamp (rnd (9.0 * v (130) + 1.0), 1, 10);
+    misc.echo.feedback = (float) (2.0 * v (131));
+    misc.echo.timeBeats = (float) std::clamp (2.0 * v (132), 1.0 / 192.0, 16.0);
+    misc.echo.pan = (float) std::clamp (4.0 * v (133) - 2.0, -1.0, 1.0);
+    misc.echo.pitch = (float) (2400.0 * (v (134) - 0.5));
+    misc.echo.modX = (float) (2.0 * v (135) - 1.0);
+    misc.echo.modY = (float) (2.0 * v (136) - 1.0);
+    misc.echo.pingPong = v (137) != 0.0;
+    misc.echo.fat = v (138) != 0.0;
+
+    static constexpr int directions[] = { 0, 1, 2, 3, 5, 4 }; // FL's 4 = sticky, 5 = random
+    bool partial = false;
+    if (const auto direction = std::clamp (rnd (5.0 * v (139)), 0, 5); direction > 0)
+    {
+        auto& a = c.arp;
+        a.direction = directions[direction];
+        a.range = std::clamp (rnd (6.0 * v (142)), 1, 4);
+        a.stepBeats = (float) std::clamp (knobBeats ((int) (997.0 * v (140) + 450.0)), 1.0 / 192.0, 4.0);
+        a.gate = (float) std::clamp (v (141), 0.05, 1.0);
+        a.octaveRepeat = std::clamp (rnd (5.0 * v (143) + 1.0), 1, 6);
+        a.slide = v (144) > 0.5;
+        // FLM's chord list: "Auto", "Auto (sustain)", "(none)", then 88 chords (the default 1 / 90 is "Auto (sustain)")
+        const auto chord = rnd (90.0 * v (145) - 2.0);
+        a.chordSustain = chord != -2;
+        if (chord == 0)
+            a.chord = { 0 };
+        partial = chord > 0 || v (140) >= 1.0 || rnd (6.0 * v (142)) == 0 || rnd (6.0 * v (142)) > 4; // a named chord, Hold, ranges LYNX lacks
+    }
+    for (std::size_t k = 0; k < 3; ++k)
+        partial = partial || rnd (6.0 * v (1 + k)) == 6 || v (146 + k) > 0.5; // a custom shape (its file is not read), Free Run
+    partial = partial || 2.0 * v (114) * threeOscFlmLevel > 4.0;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: 3x Osc");
+    if (partial)
+        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: 3x Osc (custom shape, Free Run, arpeggiator chord, Hold or range not converted)");
+    return true;
+}
+
 // The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
 // generator → the built-in synth, listed in the report until its engine is mapped, F4).
 ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
@@ -417,6 +564,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
     if (gen->type == flm::module::miniSynth && miniSynthState (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::transistorBass && transistorBassState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::threeOsc && threeOscState (ctx, *gen, c))
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;

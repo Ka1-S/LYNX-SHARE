@@ -34,6 +34,13 @@
 
 namespace lynx
 {
+// FL Studio Mobile's 3x Osc module is the same machine in float (REA spec of round 190n) and carries, per parameter,
+// the FL raw value it converts from; a channel imported from a .flm is a desktop state plus
+// ChannelDef::modelParams = { PPQ, 1, gain }: [1] ≥ 0.5 makes the note's velocity the voice's level as it is (FLM's
+// level is linear in the velocity; the desktop's Init.Vol curve is not applied), times [2] (FLM's Volume multiplier
+// and volume-envelope amount; 1 when absent). Saved with the project.
+bool threeOscIsFlm (const ChannelDef& channel) noexcept;
+
 // true when the exact engine can read this 3x Osc state (any version the plugin loads)
 bool threeOscStateUsable (const std::vector<std::uint8_t>& state);
 

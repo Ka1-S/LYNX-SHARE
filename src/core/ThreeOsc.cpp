@@ -836,6 +836,11 @@ std::vector<float> readWaveMono (const std::vector<std::uint8_t>& b)
 
 // ------------------------------------------------------------------------------------------------------- public
 
+bool threeOscIsFlm (const ChannelDef& channel) noexcept
+{
+    return channel.instrument == InstrumentKind::threeosc && channel.modelParams.size() > 1 && channel.modelParams[1] >= 0.5f;
+}
+
 bool threeOscStateUsable (const std::vector<std::uint8_t>& state)
 {
     Params p;
@@ -968,6 +973,8 @@ public:
         pitchCents.store (channel.sampler.pitch * 100.0f);
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
+        // a channel from a .flm (core/ThreeOsc.h): the note's velocity is the voice's level as it is, times a gain
+        flmLevel.store (threeOscIsFlm (channel) ? (channel.modelParams.size() > 2 ? std::clamp (channel.modelParams[2], 0.0f, 4.0f) : 1.0f) : -1.0f);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
         if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath)
             return;
@@ -1021,7 +1028,8 @@ public:
     {
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
-        const auto initVol = (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+        const auto mobile = flmLevel.load();
+        const auto initVol = mobile >= 0.0f ? (float) (vel * (double) mobile) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
         const auto k = std::clamp (key, 0, 127);
         const auto knob = pitchCents.load();
         const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);
@@ -1144,6 +1152,7 @@ private:
     Setup current;
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::atomic<float> pitchCents { 0.0f };
+    std::atomic<float> flmLevel { -1.0f }; // ≥ 0: a channel from a .flm, the gain on its notes' velocities
     LiveChannelPitch live; // (audio thread)
     std::atomic<int> maxPoly { 0 };
     std::vector<std::uint8_t> state;
