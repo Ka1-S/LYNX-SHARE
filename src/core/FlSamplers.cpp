@@ -1,5 +1,7 @@
 #include "core/FlSamplers.h"
 
+#include "core/Fpc.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -64,34 +66,6 @@ std::string ascii (const Chunk& c)
     return s;
 }
 
-std::string utf16 (const Chunk& c)
-{
-    std::string out;
-
-    for (std::size_t i = 0; i + 1 < c.size; i += 2)
-    {
-        const auto ch = (std::uint32_t) c.data[i] | ((std::uint32_t) c.data[i + 1] << 8);
-
-        if (ch == 0)
-            break;
-        if (ch < 0x80)
-            out += (char) ch;
-        else if (ch < 0x800)
-        {
-            out += (char) (0xC0 | (ch >> 6));
-            out += (char) (0x80 | (ch & 0x3F));
-        }
-        else
-        {
-            out += (char) (0xE0 | (ch >> 12));
-            out += (char) (0x80 | ((ch >> 6) & 0x3F));
-            out += (char) (0x80 | (ch & 0x3F));
-        }
-    }
-
-    return out;
-}
-
 double l11 (double x) // (11^x − 1)/10: FL's volume curves
 {
     return (std::pow (11.0, std::clamp (x, 0.0, 2.0)) - 1.0) / 10.0;
@@ -109,73 +83,56 @@ float fpcVolume (int v)
 
 std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
 {
-    if (d.size() < 16)
+    const auto kit = fpc::read (d);
+
+    if (! kit)
         return std::nullopt;
 
-    std::uint32_t version = 0;
-    std::memcpy (&version, d.data(), 4);
-
-    if (version < 0xF424B || version > 0x1E84E403) // old formats without chunks: not handled
-        return std::nullopt;
+    // as the importer always read FPC's strings: up to a NUL
+    const auto text = [] (std::u16string s) {
+        s.erase (std::find (s.begin(), s.end(), u'\0'), s.end());
+        return fpc::toUtf8 (s);
+    };
 
     std::vector<DrumPad> pads;
 
-    forEachChunk (d.data() + 4, d.size() - 4, [&] (const Chunk& top) {
-        if (top.id != 2) // pad
-            return;
-
+    for (const auto& source : kit->pads)
+    {
         DrumPad pad;
-        bool muted = false;
+        // FPC's own law, and the constant 1/(2·√2) its output carries (measured against FL's renders of
+        // pad / layer volume and pan variants of FL's render test, REA_rodada170i §7)
+        pad.gain = fpcVolume (std::clamp (source.volume, 0, 128)) * 0.35355339059327373f;
+        pad.pan = std::clamp (source.pan, -128, 128) / 128.0f;
+        pad.key = std::clamp (source.note, 0, 127);
+        pad.mixerOffset = std::clamp (source.output, -99, 103);
+        pad.cutGroup = source.cut >= 0 ? source.cut + 1 : 0; // −1 = none; 0 becomes group 1
+        pad.cutBy = source.cutBy >= 0 ? source.cutBy + 1 : 0;
+        pad.tune = std::clamp (source.tune, -128, 128) * 9.375f / 100.0f;
+        pad.name = text (source.name);
 
-        forEachChunk (top.data, top.size, [&] (const Chunk& c) {
-            if (c.id == 0x64) // 16 × i32 parameters
-            {
-                // FPC's own law, and the constant 1/(2·√2) its output carries (measured against FL's renders of
-                // pad / layer volume and pan variants of FL's render test, REA_rodada170i §7)
-                pad.gain = fpcVolume (std::clamp (i32 (c, 0), 0, 128)) * 0.35355339059327373f;
-                pad.pan = std::clamp (i32 (c, 1), -128, 128) / 128.0f;
-                muted = (i32 (c, 2) & 1) != 0;
-                pad.key = std::clamp (i32 (c, 3), 0, 127);
-                pad.mixerOffset = std::clamp (i32 (c, 4), -99, 103);
-                pad.cutGroup = i32 (c, 5) >= 0 ? i32 (c, 5) + 1 : 0; // −1 = none; 0 becomes group 1
-                pad.cutBy = i32 (c, 6) >= 0 ? i32 (c, 6) + 1 : 0;
-                pad.tune = std::clamp (i32 (c, 7), -128, 128) * 9.375f / 100.0f;
-            }
-            else if (c.id == 0x65)
-                pad.name = utf16 (c);
-            else if (c.id == 0x69) // layer
-            {
-                SampleZone layer;
-                bool hasPath = false;
+        for (const auto& from : source.layers)
+        {
+            SampleZone layer;
+            layer.path = text (from.path);
 
-                forEachChunk (c.data, c.size, [&] (const Chunk& l) {
-                    if (l.id == 0x12C)
-                    {
-                        layer.path = utf16 (l);
-                        hasPath = ! layer.path.empty();
-                    }
-                    else if (l.id == 0x12D)
-                    {
-                        layer.gain = fpcVolume (std::clamp (i32 (l, 0), 0, 127));
-                        layer.lowVelocity = std::clamp (i32 (l, 2), 0, 127);
-                        const auto high = std::clamp (i32 (l, 3), 0, 127); // exclusive, except 127
-                        layer.highVelocity = high >= 127 ? 127 : std::max (layer.lowVelocity, high - 1);
-                        layer.tune = std::clamp (i32 (l, 5), -128, 128) * 9.375f / 100.0f;
-                    }
-                });
+            if (layer.path.empty())
+                continue;
 
-                if (hasPath)
-                    pad.layers.push_back (std::move (layer));
-            }
-        });
+            layer.gain = fpcVolume (std::clamp (from.volume, 0, 127));
+            layer.lowVelocity = std::clamp (from.velocityLow, 0, 127);
+            const auto high = std::clamp (from.velocityHigh, 0, 127); // exclusive, except 127
+            layer.highVelocity = high >= 127 ? 127 : std::max (layer.lowVelocity, high - 1);
+            layer.tune = std::clamp (from.tune, -128, 128) * 9.375f / 100.0f;
+            pad.layers.push_back (std::move (layer));
+        }
 
-        if (! pad.layers.empty() && ! muted)
+        if (! pad.layers.empty() && ! source.muted())
         {
             if (pad.name.empty())
                 pad.name = "Pad " + std::to_string (pads.size() + 1);
             pads.push_back (std::move (pad));
         }
-    });
+    }
 
     if (pads.empty())
         return std::nullopt;
