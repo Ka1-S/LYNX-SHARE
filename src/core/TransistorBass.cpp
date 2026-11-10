@@ -1163,6 +1163,8 @@ public:
     virtual void noteOff() noexcept = 0;
     virtual float tick() noexcept = 0;
     virtual bool silent() const noexcept = 0;
+    // the state's oversampling field (1, 2 or 4 times the host rate); engines without the setting ignore it
+    virtual void setOversampling (int) noexcept {}
     float transpose = 0.0f, pitchExpr = 0.0f, cutExpr = 0.0f, resExpr = 0.0f;
     double bend = 0.0;
 };
@@ -1227,7 +1229,8 @@ public:
                 vcaReleaseCoef = 1.0 - powD (0.1, 1.0 / (vcaRelease * fsOs));
                 return;
             }
-            case 0x29: pulseMode = (int) ((double) (2 - 1) * (double) v + 0.5); return;
+            // (the recorded cycles are the installation's: without them the mode stays off, FL Studio Mobile's build)
+            case 0x29: pulseMode = recTab != nullptr ? (int) ((double) (2 - 1) * (double) v + 0.5) : 0; return;
             default:
                 if (i >= 0 && i < 256)
                     p[(std::size_t) i] = v;
@@ -1235,6 +1238,16 @@ public:
         }
     }
     float getParam (int i) const noexcept override { return i >= 0 && i < 256 ? raw[(std::size_t) i] : 0.0f; }
+
+    // the engine's 1×, 2× and 4× paths (the per-sample loop count, the decimators and every rate-dependent
+    // coefficient). Desktop states carry 4; FL Studio Mobile's build of this engine runs at 1 (round 190u)
+    void setOversampling (int n) noexcept override
+    {
+        if ((n != 1 && n != 2 && n != 4) || n == oversampling)
+            return;
+        oversampling = n;
+        setRate (fsBase);
+    }
 
     void setRate (double fs) noexcept override
     {
@@ -2221,12 +2234,17 @@ State parseState (const std::vector<std::uint8_t>& s)
 class Plugin
 {
 public:
-    Plugin (const State& s, std::shared_ptr<const DllData> d, double fs) : st (s), dll (std::move (d))
+    Plugin (const State& s, std::shared_ptr<const DllData> d, double fs, bool mobile = false) : st (s), dll (std::move (d)), flm (mobile)
     {
-        if (st.engine == 0)
+        if (st.engine == 0 || flm)
             engine = std::make_unique<Engine1> (dll);
         else
             engine = std::make_unique<Engine2> (dll, st.engine == 1);
+        // FL Studio Mobile's build runs the engine at the host rate (its 1× path). The desktop plugin plays at 4×
+        // whatever the state's oversampling field says: FL's render of a state saved with 1 equals this engine at 4×,
+        // note for note, and not at 1× (A/B inside FL, round 190u)
+        if (flm)
+            engine->setOversampling (1);
         reverb.reset();
         program = st.program;
         editProgram = st.editProgram;
@@ -2291,6 +2309,62 @@ public:
         playing = false;
     }
 
+    // ---- FL Studio Mobile's module around the engine (spec of round 190n, §3): monophonic, last-note priority, a
+    // stack of up to 16 held keys. A note while another is held slides to it (no retrigger); releasing the top key
+    // slides back to the key below it; velocity ≥ 99/127 is an accent and nothing else (no level effect).
+    void flmNoteOn (int key, float velocity) noexcept
+    {
+        if (flmHeld >= (int) flmKeys.size() || std::find (flmKeys.begin(), flmKeys.begin() + flmHeld, key) != flmKeys.begin() + flmHeld)
+            return;
+        const auto slide = flmHeld > 0;
+        flmKeys[(std::size_t) flmHeld++] = key;
+        flmAccent = velocity >= 0.77952754f;
+        engine->noteOn (std::min (key, 91), slide, flmAccent); // (its note table ends 36 keys early)
+        flmTail = -1;
+        if (flmFrozen)
+            flmFrozen = false;
+    }
+    void flmNoteOff (int key) noexcept
+    {
+        const auto end = flmKeys.begin() + flmHeld;
+        const auto it = std::find (flmKeys.begin(), end, key);
+        if (it == end)
+            return;
+        const auto top = it + 1 == end;
+        std::copy (it + 1, end, it);
+        --flmHeld;
+        if (flmHeld == 0)
+        {
+            engine->noteOff();
+            // the engine runs on for a quarter second, then stands still (FLM counts it down in host blocks, so its
+            // engine stops up to a block earlier: one FL tick inside FL)
+            flmTail = flmTailLength >= 0 ? std::max (1, flmTailLength) : (int) (0.25 * rate);
+        }
+        else if (top)
+            engine->noteOn (std::min (flmKeys[(std::size_t) (flmHeld - 1)], 91), true, flmAccent);
+    }
+    // The module's note pan, a balance (−1…1: the far side falls linearly, the near side stays 1). Its gains move 1 %
+    // of the way per process call of FLM (taken as 512 samples; one tick inside FL), jump on the first block and go
+    // back to the centre while no key is held (A/B inside FL, round 190u).
+    void setFlmNotePan (float pan) noexcept { flmNotePan = std::clamp (pan, -1.0f, 1.0f); }
+    // the channel's own volume and pan (LYNX's; FLM's rack level and pan sit on the mixer insert): a plain balance
+    void setFlmChannel (float pan, float volume) noexcept
+    {
+        const auto p = std::clamp (pan, -1.0f, 1.0f);
+        flmChannelL = volume * (p > 0.0f ? 1.0f - p : 1.0f);
+        flmChannelR = volume * (p < 0.0f ? 1.0f + p : 1.0f);
+    }
+    void setFlmPanBlock (int samples) noexcept { flmPanCoef = (float) (1.0 - std::pow (0.99, 1.0 / (double) std::max (1, samples))); }
+    bool isFlm() const noexcept { return flm; }
+    // (verification) the engine running `samples` before the first note; the tail length in samples
+    void setFlmTail (int samples) noexcept { flmTailLength = samples; }
+    void flmPreroll (int samples) noexcept
+    {
+        flmFrozen = false;
+        for (int i = 0; i < samples; ++i)
+            engine->tick();
+    }
+
     void setPanExpression (float pan) noexcept
     {
         auto p = (pan + 1.0f) * 0.5f;
@@ -2307,6 +2381,29 @@ public:
     void render (float* left, float* right, int n) noexcept
     {
         RenderMode mode;
+        if (flm)
+        {
+            const auto p = flmHeld > 0 ? flmNotePan : 0.0f;
+            const auto targetL = p > 0.0f ? 1.0f - p : 1.0f, targetR = p < 0.0f ? 1.0f + p : 1.0f;
+            for (int i = 0; i < n; ++i)
+            {
+                if (flmSnap)
+                    gainL = targetL, gainR = targetR, flmSnap = false;
+                if (flmFrozen)
+                {
+                    left[i] = right[i] = 0.0f;
+                    continue;
+                }
+                const auto s = engine->tick();
+                left[i] = s * gainL * flmChannelL;
+                right[i] = s * gainR * flmChannelR;
+                gainL += (targetL - gainL) * flmPanCoef;
+                gainR += (targetR - gainR) * flmPanCoef;
+                if (flmTail > 0 && --flmTail == 0)
+                    flmFrozen = true;
+            }
+            return;
+        }
         for (int i = 0; i < n; ++i)
         {
             const auto& q = st.sequences[(std::size_t) st.programs[(std::size_t) program].sequence];
@@ -2384,7 +2481,7 @@ public:
         }
     }
 
-    bool silent() const noexcept { return engine->silent(); }
+    bool silent() const noexcept { return flm ? flmFrozen : engine->silent(); }
 
     // the program the editor edits: the saved one, or the last note's key while the sequencer is on and follows
     int editedProgram() const noexcept { return editProgram; }
@@ -2631,6 +2728,12 @@ private:
     State st;
     std::shared_ptr<const DllData> dll;
     std::unique_ptr<Engine> engine;
+    // FL Studio Mobile's module (round 190u)
+    bool flm = false, flmAccent = false, flmFrozen = true, flmSnap = true;
+    std::array<int, 16> flmKeys {};
+    int flmHeld = 0, flmTail = -1, flmTailLength = -1;
+    float flmNotePan = 0.0f, flmChannelL = 1.0f, flmChannelR = 1.0f;
+    float flmPanCoef = 1.9629e-05f; // 1 − 0.99^(1/512)
     std::array<float, 0x2A> params {};
     Delay delay;
     Reverb reverb;
@@ -2792,10 +2895,11 @@ public:
         delete retired.exchange (nullptr);
         tempo.store (bpm > 0.0 ? bpm : 140.0);
         channelCents.store (channel.sampler.pitch * 100.0f);
-        if (channel.pluginState == state && channel.samplePath == dllPath)
+        const auto variant = transistorBassIsFlm (channel);
+        if (channel.pluginState == state && channel.samplePath == dllPath && variant == flmVariant)
             return;
         // only the current patch's values changed (a knob of the editor, round 168q): the playing engine takes them
-        if (channel.samplePath == dllPath && plugin != nullptr && liveChange (state, channel.pluginState))
+        if (channel.samplePath == dllPath && variant == flmVariant && plugin != nullptr && liveChange (state, channel.pluginState))
         {
             state = channel.pluginState;
             parsed = parseState (state);
@@ -2803,6 +2907,7 @@ public:
         }
         state = channel.pluginState;
         dllPath = channel.samplePath;
+        flmVariant = variant;
         parsed = parseState (state);
         data = loadDll (dllPath);
         delete incoming.exchange (build().release());
@@ -2823,14 +2928,18 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto v7 = velocityFromInitVol (initVol);
+        const auto mobile = plugin->isFlm();
         if (sounding[(std::size_t) k])
-            plugin->noteOff (0, k);
+            mobile ? plugin->flmNoteOff (k) : plugin->noteOff (0, k);
         sounding[(std::size_t) k] = true;
         notePan[(std::size_t) k] = nextPan;
         noteCents[(std::size_t) k] = (float) channelCents.load() + nextCents;
         slide = {};
         slideKey = k;
-        plugin->noteOn (0, k, v7);
+        if (mobile) // FLM's module takes the note's velocity as it is
+            plugin->flmNoteOn (k, (float) vel);
+        else
+            plugin->noteOn (0, k, v7);
         selected.store (plugin->editedProgram());
         sent[(std::size_t) k] = false;
         nextPan = 0.0f, nextCents = 0.0f;
@@ -2844,7 +2953,7 @@ public:
         if (plugin == nullptr || ! sounding[(std::size_t) k])
             return;
         sounding[(std::size_t) k] = false;
-        plugin->noteOff (0, k);
+        plugin->isFlm() ? plugin->flmNoteOff (k) : plugin->noteOff (0, k);
     }
 
     // a piano-roll slide note (issue #14): FL's host glides the sounding note's Final.Pitch (the bass is monophonic:
@@ -2884,8 +2993,11 @@ public:
                 plugin->setResExpression (0.0f);
                 plugin->setPitchExpression (noteCents[(std::size_t) k]);
                 plugin->setPanExpression ((float) std::clamp ((double) notePan[(std::size_t) k] + pan, -1.0, 1.0));
+                plugin->setFlmNotePan (notePan[(std::size_t) k]);
                 sent[(std::size_t) k] = true;
             }
+        if (plugin->isFlm()) // FLM's module: the channel's pan and volume as plain gains (no MIDI volume)
+            plugin->setFlmChannel ((float) pan, (float) vol);
         plugin->setTempo (tempo.load());
         // FL's channel volume reaches the plugin only as MIDI CC 7 (Final.Vol is not read, §2.10): raw volume
         // (0…12800)·128/12800 truncated, at most 127, as Kepler's host (REA_rodada165g-flbeta165k §3); LYNX's gains are
@@ -2926,9 +3038,10 @@ public:
 private:
     std::unique_ptr<Plugin> build() const
     {
-        if (! parsed.usable || data == nullptr)
+        // (FL Studio Mobile's build needs none of the installation's data)
+        if (! parsed.usable || (data == nullptr && ! flmVariant))
             return nullptr;
-        return std::make_unique<Plugin> (parsed, data, rate.load());
+        return std::make_unique<Plugin> (parsed, data, rate.load(), flmVariant);
     }
 
     void take() noexcept
@@ -3020,6 +3133,7 @@ private:
     std::atomic<float> channelCents { 0.0f };
     std::atomic<int> selected { -1 }; // the plugin's program (selectedProgram)
     int sentVolume = -1;              // the MIDI volume sent to the plugin
+    bool flmVariant = false;          // FL Studio Mobile's module around the engine (transistorBassIsFlm)
     std::vector<std::uint8_t> state;
     std::string dllPath;
     int quiet = 0;
@@ -3037,6 +3151,61 @@ bool transistorBassStateUsable (const std::vector<std::uint8_t>& state) { return
 bool transistorBassDllUsable (const std::string& path) { return loadDll (path) != nullptr; }
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument() { return std::make_unique<TransistorBassInstrument>(); }
+
+bool transistorBassIsFlm (const ChannelDef& channel) noexcept
+{
+    return channel.instrument == InstrumentKind::transistorbass && ! channel.modelParams.empty() && channel.modelParams[0] >= 0.5f;
+}
+
+int transistorBassOversampling (const std::vector<std::uint8_t>& state)
+{
+    const auto st = parseState (state);
+    return st.usable ? st.oversampling : 0;
+}
+
+// The layout of REA_rodada57 §2.2, the values of FL's own "Sequencer off" preset around the patch: wrapper version 2,
+// engine stream version 5, program 60, 128 programs (program k = patch k + sequence k), sequences of 16 gated C5 steps.
+std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling, int engine)
+{
+    std::vector<std::uint8_t> e;
+    const auto put = [&e] (const auto v) {
+        const auto* p = (const std::uint8_t*) &v;
+        e.insert (e.end(), p, p + sizeof (v));
+    };
+    const auto name = [&put] { put ((std::int32_t) 1), put ((std::uint8_t) 0); }; // an empty, terminated string
+    put ((std::int16_t) 5);
+    put ((std::int32_t) 60), put ((std::int32_t) 60), put ((std::uint8_t) 0);
+    for (std::int32_t k = 0; k < 128; ++k)
+        put ((std::int16_t) 0), name(), put (k), put (k), put ((std::int32_t) 0);
+    for (int k = 0; k < 128; ++k)
+        for (int c = 0; c < 2; ++c)
+        {
+            name();
+            for (std::size_t i = 0; i < 100; ++i)
+                put (i < patch.size() ? patch[i] : 0.0f);
+        }
+    for (int k = 0; k < 128; ++k)
+    {
+        put ((std::int16_t) 0), name(), put ((std::int16_t) 0), put ((std::int32_t) 16);
+        for (int s = 0; s < 32; ++s)
+            put ((std::int16_t) 1), put ((std::int8_t) 0), put ((std::int32_t) 60), put ((std::int8_t) 1), put (0.5), put (0.5f), put ((std::int8_t) 0);
+        put (125.0), put ((std::int8_t) 0), put (0.0);
+    }
+    put ((std::int32_t) 0);                                                       // sequencer off
+    put ((std::int32_t) 0), put ((std::int32_t) 0), put (0.0f), put (1.0f);      // sequence transpose, …, MIDI volume
+    put ((std::int32_t) oversampling);
+    put ((std::int32_t) engine);
+    std::vector<std::uint8_t> out;
+    const auto top = [&out] (const auto v) {
+        const auto* p = (const std::uint8_t*) &v;
+        out.insert (out.end(), p, p + sizeof (v));
+    };
+    top ((std::uint32_t) 2);
+    top ((std::uint32_t) 1), top ((std::uint64_t) 8), top ((std::uint32_t) 2), top ((std::uint32_t) 2); // the editor's 8 bytes
+    top ((std::uint32_t) 2), top ((std::uint64_t) (e.size() + 12)), top ((std::uint32_t) 0), top ((std::uint64_t) e.size());
+    out.insert (out.end(), e.begin(), e.end());
+    return out;
+}
 
 int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index)
 {
@@ -3157,6 +3326,24 @@ bool tbSetValue (ChannelDef& c, const EngineParam& p, float raw)
 Table transistorBassModelTable() { return { &transistorBassParams(), &tbValue, &tbSetValue }; }
 } // namespace modelparams
 
+// FLM's 14 values (0 Enable, 1 Waveform, 2 Cutoff, 3 Reso, 4 Env Mod, 5 Decay, 6 Accent, 7 distortion on, 8 Drive HP,
+// 9 Drive, 10 Drive Vol., 11 PW, 12 LFO Speed, 13 LFO->PW) on the desktop patch that makes the same engine values
+// (spec of round 190n §1, §4; A/B inside FL, round 190u): the same knob laws except Drive, which the desktop squares;
+// FLM's fixed controls (volume 0.25 = 0.75·⅓, high-pass 205 Hz, minimum decay 0.2775 s, no key follow, tone fully
+// open, VCA 5 ms) and tuning 1, which puts a key on FLM's pitch (key 60 = 130.8 Hz).
+std::vector<std::uint8_t> transistorBassFlmState (const std::vector<float>& flm)
+{
+    if (flm.size() < 14)
+        return {};
+    const auto v = [&flm] (std::size_t k) { return std::isfinite (flm[k]) ? std::clamp (flm[k], 0.0f, 1.0f) : 0.0f; };
+    // (the reverb and delay values of FL's empty patch: both are off, the page shows FL's defaults)
+    std::array<float, 42> j { 1.0f, v (1), v (2), 0.0f, v (3), v (4), v (5), v (6), 1.0f / 3.0f, 0.5f, 0.5f, v (11), v (12), v (13),
+                              0.0f, 0.1997f, 1.0f, 0.25f, 0.0f, 0.4966f, 1.0f, 0.3025f, 0.0103f, 0.4959f, 0.8344f, 0.4959f, 0.695f,
+                              v (7), v (8), std::sqrt (v (9)), 1.0f, v (10),
+                              0.0f, 1.0f, 0.4444f, 0.605f, 0.045f, 0.2534f, 0.7625f, 0.5003f, 0.0f, 0.0f };
+    return transistorBassWriteState (j, 1, 0);
+}
+
 bool transistorBassClearSequence (std::vector<std::uint8_t>& state)
 {
     const auto st = parseState (state);
@@ -3199,9 +3386,15 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
 {
     const auto st = parseState (state);
     auto data = loadDll (dll);
-    if (! st.usable || data == nullptr || length <= 0)
+    if (! st.usable || (data == nullptr && ! options.flm) || length <= 0)
         return {};
-    auto plugin = std::make_unique<Plugin> (st, data, sampleRate);
+    auto plugin = std::make_unique<Plugin> (st, data, sampleRate, options.flm);
+    if (options.flm && options.flmPreroll > 0)
+        plugin->flmPreroll (options.flmPreroll);
+    if (options.flm && options.flmTail >= 0)
+        plugin->setFlmTail (options.flmTail);
+    if (options.flm && options.flmPanBlock > 0)
+        plugin->setFlmPanBlock (options.flmPanBlock);
     plugin->setTempo (options.tempo > 0.0 ? options.tempo : 125.0);
     std::vector<float> out (2 * (std::size_t) length);
     std::vector<float> l ((std::size_t) std::max (1, options.block)), r ((std::size_t) std::max (1, options.block));
@@ -3222,15 +3415,21 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
             if (nt.release == n0 && sounding[(std::size_t) (nt.key & 127)])
             {
                 sounding[(std::size_t) (nt.key & 127)] = false;
-                plugin->noteOff (nt.channel, nt.key);
+                options.flm ? plugin->flmNoteOff (nt.key) : plugin->noteOff (nt.channel, nt.key);
             }
         for (const auto& nt : notes)
             if (nt.start == n0)
             {
                 const auto v = velocityFromInitVol (nt.initVol);
                 if (sounding[(std::size_t) (nt.key & 127)])
-                    plugin->noteOff (nt.channel, nt.key);
+                    options.flm ? plugin->flmNoteOff (nt.key) : plugin->noteOff (nt.channel, nt.key);
                 sounding[(std::size_t) (nt.key & 127)] = true;
+                if (options.flm)
+                {
+                    plugin->flmNoteOn (nt.key, (float) nt.initVol);
+                    plugin->setFlmNotePan ((float) nt.finalPan);
+                    continue;
+                }
                 plugin->noteOn (nt.channel, nt.key, v);
                 pending.push_back ({ nt.key, (float) nt.finalPan, (float) nt.pitchCents, (float) nt.fcut, (float) nt.fres });
             }

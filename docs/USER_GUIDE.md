@@ -11,7 +11,7 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 |---|---|---|
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
 | `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
-| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, MiniSynth; other instruments play a built-in synth for now |
+| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, MiniSynth, Transistor Bass; other instruments play a built-in synth for now |
 | `.mid` | any app | opened as a project |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and

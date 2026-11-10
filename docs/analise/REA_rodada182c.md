@@ -689,3 +689,77 @@ listed, not imported (LYNX's MiniSynth takes no automation clips on its knobs fr
 
 **Best way?** FL: FLM-in-FL is the reference, matched. Ableton: no FLM import. Users: FLM users ask for desktop
 continuity of their MiniSynth patches (FL's own answer is the FLM plugin). Verdict: FLM-exact, no alternative proposed.
+
+### F4 Transistor Bass (round 190u, branch `feature/flm190u-tbass`, 0.1.26)
+
+FLM's "Transistor Bass" module (type 19) is a compiled-in copy of the desktop plugin's **"V1 legacy" engine**
+(REA_rodada57 §2.5; PROVEN-REA in round 190n: the same per-sample routine, diode ladder, saw tables, distortion and
+decimators, constant for constant) at **1× oversampling**, inside its own note layer, with 13 knobs and none of the
+desktop's sequencer, programs, delay, reverb, V2 engines or recorded "303 Pulse" cycles. It reads no data file, so a
+channel imported from a .flm plays without an FL installation.
+
+**Mapping** (FLM parameter k → desktop patch parameter j; `transistorBassFlmState`): 1 Waveform → 1, 2 Cutoff → 2,
+3 Reso → 4, 4 Env Mod → 5, 5 Decay → 6, 6 Accent → 7, 7 distortion on → 27, 8 Drive HP → 28, 9 Drive → 29 as **√v**
+(the desktop squares its knob, FLM doesn't), 10 Drive Vol. → 31, 11 PW → 11, 12 LFO Speed → 12, 13 LFO->PW → 13; the
+same knob laws otherwise. FLM's fixed controls: tuning 1 (key 60 = 130.8 Hz), key follow 0, volume ⅓ (0.25 in the
+engine), high-pass 0.5 (205 Hz), minimum decay 0.5 (0.2775 s), tone 1, VCA smooth 0, reverb / delay / 303 Pulse off.
+FLM's 0 is the module's Enable. The state is written as the desktop plugin saves one (stream version 5, sequencer
+off, every program the patch, oversampling field 1, engine 0; `transistorBassWriteState`).
+
+**FLM's module around the engine** (`ChannelDef::modelParams = { 1 }`, `transistorBassIsFlm`; the desktop path is
+unchanged):
+
+| | Desktop Transistor Bass | FLM's module | LYNX |
+|---|---|---|---|
+| oversampling | 4× (the state's field is ignored, see below) | 1× | engine switch |
+| accent | MIDI velocity ≥ 110 | velocity ≥ 99 / 127 | engine switch |
+| velocity → level | none | none | same |
+| overlapping notes | slide; the last release ends the note | stack of 16 keys: slide to the new key, **slide back** to the key below when the top key is released | engine switch |
+| pan | √ law per note | balance (far side falls linearly), moving 1 % per process call, back to the centre between notes | engine switch (512 samples per call) |
+| channel volume | MIDI CC 7 | none in the module (the rack's level) | plain gain |
+| tail | until silent | the engine runs 0.25 s after the last key, then stands still (exact silence) | engine switch |
+| data | recorded cycles from engine_x64.dll | none | no file needed |
+
+**The desktop plugin ignores the state's oversampling field** (measured, round 190u): FL's render of FL's own
+"Sequencer off" preset with the field set to 1 has, note for note, the level pattern of LYNX's engine at 4× (constant
+offset 2.08 dB = the project's channel volume through CC 7) and not at 1× (−0.9 / +2.0 dB alternating between plain and
+accented notes). So LYNX applies 1× only to FLM's build; a desktop state plays at 4× as before, whatever the field says.
+
+**A/B inside FL (round 190u).** Projects made like 190n's (FL's render test `MiniSynth.flp`; only the channel's
+plugin events and the 7 notes changed): FL Studio Mobile Rack holding one Transistor Bass module (the rack preset's
+module made type 19 with 14 PRMS values) against LYNX's engine in FLM's build, 5 settings × 2 phrases (A: accent at
+velocity 80 / 100 / 120, an overlap with slide and slide back, a pair released bottom first; B: seven separate notes,
+keys 36…72, alternating plain / accented) and a pan phrase. Transistor Bass has no random source, so the renders are
+compared sample for sample: ESR per note segment (gain fixed at −5.08 dB for all, the level FL's channel gives the
+rack, the same as on MiniSynth in 190n; lag −1 sample).
+
+| Setting | phrase A: worst segment ESR | phrase B: worst segment ESR | level difference (max) |
+|---|---|---|---|
+| D default | −25 dB | −28 dB | 0.01 dB |
+| S1 saw, cutoff 0.5, reso 0.8, env mod 0.6, decay 0.4, accent 0.7 | −36 dB (one segment at −95 dBFS: −6 dB, FL gates it to exact silence) | −34 dB | 0.02 dB |
+| S2 distortion (Drive HP 0.3, Drive 0.6, Vol 0.4) | −33 dB | −31 dB | 0.01 dB |
+| S3 pulse width 0.6, LFO 0.5 → PW 0.8 | −38 dB | −35 dB | 0.02 dB |
+| S4 reso 1, env mod 1, accent 1, Drive 0.9 | −25 dB | −18 dB | 0.01 dB |
+| D, pan phrase | −37 dB (most segments −46…−53 dB) | | 0.02 dB |
+
+Reading: the octave (key 60 = 130.8 Hz, the same as the desktop plugin with tuning 1), the 13 knob laws, the accent
+threshold (FL's default note velocity 100 arrives as 99 and is an accent), the slide and the slide back, and the level
+all hold. Two host-dependent details were set in the harness to what happens inside FL, and are not what LYNX ships:
+(1) FLM counts its 0.25 s tail in host blocks, so inside FL (one block per tick) the engine stands still about 230
+samples before a note that follows exactly 0.25 s later; that only shifts the oscillator and LFO phase of the next
+note (with LYNX's sample-exact 0.25 s the levels still agree within 0.1 dB, except where the LFO phase decides the
+pulse width: up to 2.7 dB on single notes of S3). (2) FLM's FL plugin hands the module only pans right of centre
+(left pans arrive as "no pan"), and one process call is one tick; LYNX uses the module's own two-sided balance.
+Tools: /mnt/e/lynx-work/flm190u/ab (mkgen_tb.py, render.sh, score_tb.py, null2.py), tools/tbr.cpp; spec
+/mnt/e/lynx-work/flm190n/rea/spec-transistorbass.md.
+
+Quality gate: the desktop path writes the same bytes as before on 36 renders (FL's three presets, each also as stream
+version 5 with engines 0 / 1 / 2 and with the oversampling field 1 and 2; 44.1 and 48 kHz; old against new object),
+same CPU time. Not modelled: FLM's un-clamped pitch below key 12, last-bit summation orders, Drive through √ and
+squaring (≤ 1 ulp). Parameter automation lanes of a .flm on the module are still listed, not imported. OPEN: the
+scale of the velocity byte of a .flm note (byte / 255 puts the accent at 199).
+
+**Best way?** FL: FLM-in-FL is the reference, matched sample for sample. Ableton: no FLM import. Users: 303-style
+slides and accents are the instrument; keeping FLM's own rules (slide back, accent at 99) keeps the user's bass line
+as written. Verdict: FLM-exact; the page shows the desktop Transistor Bass controls (its sequencer has no effect on a
+channel from a .flm).

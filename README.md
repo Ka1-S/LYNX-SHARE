@@ -293,9 +293,9 @@ Live 11 and Live 12 sets open and save ([format notes](docs/analise/ALS_FORMAT.m
 ### FL Studio Mobile (`.flm`)
 
 Import only, and partial ([format notes](docs/analise/FLM_FORMAT.md)): tempo, time signature, the arrangement (note,
-drum and audio lanes as patterns, clips and audio clips), samples, drum kits, DirectWave single-sample programs, and
-the mixer's levels, panning and routing. Other instruments play LYNX's built-in synth for now, and anything not
-converted is listed in the import report.
+drum and audio lanes as patterns, clips and audio clips), samples, drum kits, DirectWave single-sample programs, the
+MiniSynth and Transistor Bass instruments, and the mixer's levels, panning and routing. Other instruments play LYNX's
+built-in synth for now, and anything not converted is listed in the import report.
 
 > [!NOTE]
 > Every conversion rule comes from **behavioural** reverse engineering (decompilation studied, official manual and project data), recorded in [`docs/analise/`](docs/analise). Anything not confirmed is flagged as an approximation in [`docs/STATUS.md`](docs/STATUS.md).
