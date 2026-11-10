@@ -1485,6 +1485,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             applyFlWrapperOptions (def.plugin.foreign, def.plugin);
             def.plugin.midiInPort = def.plugin.foreign.midiInPort; // the MIDI Out channels on that port play it
             def.plugin.midiOutPort = def.plugin.foreign.midiOutPort; // its notes play the plugins on that port
+            // the plugin window's "Detached" (0xD4 flag 0x4, issue #116 [EXEC + DATA: REA_rodada190i.md])
+            def.plugin.detached = flDetached (c.wrapperFlags);
         }
 
         // MIDI Out (REA_rodada16 §1): a silent channel whose notes the renderer sends to the plugins on its port
@@ -2962,6 +2964,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     made->plugin.name = foreign.name;
                     applyFlWrapperOptions (foreign, made->plugin);
                     made->plugin.foreign = std::move (foreign);
+                    made->plugin.detached = flDetached (slot.wrapperFlags); // (0xD4 flag 0x4, issue #116)
                 }
                 else
                 {

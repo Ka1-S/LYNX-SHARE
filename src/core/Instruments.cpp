@@ -2269,8 +2269,12 @@ public:
                 if (modulation.fl.recs[1].enabled != 0)
                     for (int k = 1; k < 5; ++k)
                         v.flProc.arts[(std::size_t) k].release (modulation.fl.recs[(std::size_t) k]);
-                else if (v.loopEnd > v.loopStart && v.offFade < 0)
-                    v.offFade = 0; // a looping sample without volume envelope fades out in 10 ms (EXEC, §8)
+                else if ((v.loopEnd > v.loopStart || v.cutAtEnd) && v.offFade < 0)
+                    // a looping sample without volume envelope fades out in 10 ms (EXEC, §8). So does a Fruity Slicer
+                    // voice: the plugins' voice processor starts its end fade at a note-off when the volume envelope
+                    // is off (Fruity Slicer FUN_007579d0 → FUN_00757a50, as 3x Osc's REA_rodada47 §3.1) — the channel
+                    // sampler above plays on instead (issue #129, round 190f)
+                    v.offFade = 0;
                 v.stage = 3;
             }
 
