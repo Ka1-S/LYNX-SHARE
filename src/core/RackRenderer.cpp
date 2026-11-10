@@ -1659,10 +1659,11 @@ void panGains (float pan, float gain, float& left, float& right) noexcept
 // A hosted plugin channel in a project with FL's levels (Song::flPluginLevels, REA_rodada190ad.md): Fruity Wrapper's
 // output gains are the host's ComputeLRVol of (the channel's pan, 2 × its volume curve) — FL's pan kernel (circular
 // cos/sin, or the project's triangular law: the louder side keeps v/√2, the other falls linearly), so the centre is
-// √2 × the curve and the side panned to 2 ×.
+// √2 × the curve and the side panned to 2 ×. The wrapper gets the pan as an integer, −64…64 (FL's renders: a channel
+// pan of 1.5 / 64 and 2.5 / 64 play as 1 / 64 and 2 / 64, 0.4 / 64 as the centre), so the pan moves in steps of 1 / 64.
 void flWrapperGains (float pan, float gain, bool triangular, float& left, float& right) noexcept
 {
-    const auto p = std::clamp (pan, -1.0f, 1.0f);
+    const auto p = std::trunc (std::clamp (pan, -1.0f, 1.0f) * 64.0f) / 64.0f;
     const auto vol = gain * 2.0f;
     if (triangular)
     {

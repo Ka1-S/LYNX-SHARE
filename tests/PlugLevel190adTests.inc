@@ -100,7 +100,21 @@ TEST (plug190ad_fl_projects_play_hosted_plugins_at_the_wrapper_level)
         CHECK (plug190ad::close (l, 2.0f * g * std::cos (3.14159265f / 8.0f)));
         CHECK (plug190ad::close (r, 2.0f * g * std::sin (3.14159265f / 8.0f)));
     }
+    // the wrapper's pan is an integer −64…64 (FL's renders: R / L = 1.0249 at 1.5 / 64, 1.0503 at 2.5 / 64, 1 at 0.4 / 64)
+    {
+        CHECK (plug190ad::gains (true, 0.78f, 1.5f / 64.0f) == plug190ad::gains (true, 0.78f, 1.0f / 64.0f));
+        CHECK (plug190ad::gains (true, 0.78f, 2.5f / 64.0f) == plug190ad::gains (true, 0.78f, 2.0f / 64.0f));
+        CHECK (plug190ad::gains (true, 0.78f, 0.4f / 64.0f) == plug190ad::gains (true, 0.78f, 0.0f));
+        CHECK (plug190ad::gains (true, 0.78f, -1.5f / 64.0f) == plug190ad::gains (true, 0.78f, -1.0f / 64.0f));
+        const auto [l, r] = plug190ad::gains (true, 0.78f, 1.5f / 64.0f);
+        CHECK (std::abs (r / l - 1.0249f) < 0.0002f);
+        const auto [l2, r2] = plug190ad::gains (true, 0.78f, 2.5f / 64.0f);
+        CHECK (std::abs (r2 / l2 - 1.0503f) < 0.0002f);
+        const auto [l3, r3] = plug190ad::gains (true, 0.78f, -0.5f);
+        CHECK (std::abs (r3 / l3 - 0.4142f) < 0.0002f); // (FL: 0.4142 at half left)
+    }
     // the project's triangular law: the louder side keeps the centre level, the other falls linearly
+    // (FL's render at half left: L at the centre's level, R / L = 0.5000)
     {
         const auto [l, r] = plug190ad::gains (true, 0.78f, -0.5f, true);
         CHECK (plug190ad::close (l, g * sqrt2));
