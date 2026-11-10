@@ -173,6 +173,30 @@ int eraseAnyRow (Song& song, std::int64_t fromTick, std::int64_t toTick)
     return eraseSpan (song, -1, fromTick, toTick);
 }
 
+bool anyInRange (const Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick) noexcept
+{
+    if (pattern < 0)
+        return false;
+    if (toTick < fromTick)
+        std::swap (fromTick, toTick);
+    const auto [first, last] = rowRange (song.blocks, pattern);
+    for (auto i = first; i < last; ++i)
+        if (song.blocks[i].start <= toTick && fromTick < playedEnd (song, song.blocks, i))
+            return true;
+    return false;
+}
+
+std::int64_t grabOffset (const Song& song, int pattern, std::int64_t tick)
+{
+    const auto index = blockAt (song, pattern, tick);
+    return index < 0 ? 0 : std::max<std::int64_t> (0, snapToBar (song, tick) - song.blocks[(std::size_t) index].start);
+}
+
+std::int64_t dragTarget (const Song& song, std::int64_t tick, std::int64_t grabOffset)
+{
+    return snapToBar (song, std::max<std::int64_t> (0, snapToBar (song, tick) - std::max<std::int64_t> (0, grabOffset)));
+}
+
 std::vector<Clip> asClips (const Song& song)
 {
     std::vector<Clip> out;

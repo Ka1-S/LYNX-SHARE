@@ -14,9 +14,10 @@ class PlaylistComponent;
 // it shares the Playlist's time zoom, scroll and playhead.
 //  - divider (top edge): drag to resize the section, double-click: fit every row
 //  - left click on a row: pencil places one block on the bar and drags it along its row, brush drags to paint
-//    whole blocks (press a block and drag to move it); eraser click / drag: erases blocks in any row;
-//    right click / right drag always erases whatever the tool; other tools keep the old paint/erase behavior.
-//    Blocks can't be moved to another row, resized or slipped.
+//    whole blocks (press a block and drag to move it; the block keeps the bar it was grabbed by under the mouse);
+//    eraser click / drag: erases the blocks under the mouse, in whichever row the drag crosses;
+//    right click / right drag always erases the same way whatever the tool; other tools keep the old paint/erase
+//    behavior. Blocks can't be moved to another row, resized or slipped.
 //  - header: click = current pattern, double click = open it, right click = Rename and color
 //  - wheel: scrolls the rows; Shift / Ctrl / Alt+wheel go to the Playlist (time scroll, zoom)
 class PatternBlocksView final : public juce::Component,
@@ -43,6 +44,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
 
     void refresh(); // the song changed: scroll range, repaint
+    // For snapshots and the gesture check: the middle of row `row` at `tick`, in this component's coordinates.
+    juce::Point<int> pointForSnapshot (int row, std::int64_t tick) const;
 
 private:
     void scrollBarMoved (juce::ScrollBar*, double) override;
@@ -51,6 +54,7 @@ private:
     int rowTop (int row) const;
     std::int64_t tickAt (int x) const;
     bool inGrid (juce::Point<int> p) const;
+    void eraseUnder (int row, std::int64_t fromTick, std::int64_t toTick); // only that row (the one under the mouse)
 
     AudioEngine& engine;
     PlaylistComponent& playlist;
@@ -62,6 +66,7 @@ private:
     int dragRow = -1;
     std::int64_t lastTick = 0;
     std::int64_t moveStart = 0;
+    std::int64_t grabOffset = 0; // move: the bar under the press minus the block's start
     int dividerStartHeight = 0;
     int hoverRow = -1;
     bool hoverHeader = false, hoverDivider = false;

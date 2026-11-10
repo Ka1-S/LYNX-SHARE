@@ -433,3 +433,58 @@ TEST (pb170f_move_erase_labels)
     CHECK (patternblocks::eraseAnyRow (s, 2 * bar, 3 * bar) == 2);
     CHECK (std::string (describeChange (moved, s).text) == "Erase pattern blocks");
 }
+
+// Our follow-up to PR #132 (issue #127): what the view's gestures use.
+TEST (pb170f_erase_takes_only_the_row_under_the_mouse)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 0, 2 * bar)); // P1 and P3 on bar 3, P2 over bars 3-4
+    CHECK (patternblocks::place (s, 1, 2 * bar));
+    CHECK (patternblocks::place (s, 2, 2 * bar));
+
+    // a right-click on P1's block: the view erases row 0 only, the other rows keep their blocks on that bar
+    CHECK (patternblocks::anyInRange (s, 0, 2 * bar + 5, 2 * bar + 5));
+    CHECK (patternblocks::eraseRange (s, 0, 2 * bar + 5, 2 * bar + 5) == 1);
+    CHECK (s.blocks.size() == 2 && s.blocks[0].pattern == 1 && s.blocks[1].pattern == 2);
+    // the drag goes down a row: now P2's block goes, P3's stays
+    CHECK (patternblocks::anyInRange (s, 1, 2 * bar + 5, 2 * bar + 9));
+    CHECK (patternblocks::eraseRange (s, 1, 2 * bar + 5, 2 * bar + 9) == 1);
+    CHECK (s.blocks.size() == 1 && s.blocks[0].pattern == 2);
+
+    // nothing to erase: an empty row, a span beside the block, either order, no row
+    CHECK (! patternblocks::anyInRange (s, 0, 0, 8 * bar));
+    CHECK (! patternblocks::anyInRange (s, 2, 0, 2 * bar - 1));
+    CHECK (patternblocks::anyInRange (s, 2, 3 * bar - 1, 0));
+    CHECK (! patternblocks::anyInRange (s, 2, 3 * bar, 4 * bar)); // its played end belongs to the next bar
+    CHECK (! patternblocks::anyInRange (s, -1, 0, 8 * bar));
+    CHECK (! patternblocks::anyInRange (s, 9, 0, 8 * bar));
+}
+
+TEST (pb170f_move_keeps_the_grabbed_bar_under_the_mouse)
+{
+    using namespace lynx;
+    using pb170f::bar;
+    auto s = pb170f::blockSong();
+    CHECK (patternblocks::place (s, 1, 2 * bar)); // the 2-bar P2 over bars 3-4
+
+    // grabbed on its first bar: no offset; on its second bar: one bar; beside it: none
+    CHECK (patternblocks::grabOffset (s, 1, 2 * bar + 10) == 0);
+    CHECK (patternblocks::grabOffset (s, 1, 3 * bar + 10) == bar);
+    CHECK (patternblocks::grabOffset (s, 1, 4 * bar) == 0);
+    CHECK (patternblocks::grabOffset (s, 0, 3 * bar + 10) == 0);
+
+    // pressed on the second bar: a move inside that bar leaves the block where it is (it used to jump a bar)
+    const auto offset = patternblocks::grabOffset (s, 1, 3 * bar + 10);
+    CHECK (patternblocks::dragTarget (s, 3 * bar + 700, offset) == 2 * bar);
+    // one bar to the right, the block follows by one bar; to the left the same; never before bar 1
+    CHECK (patternblocks::dragTarget (s, 4 * bar + 1, offset) == 3 * bar);
+    CHECK (patternblocks::move (s, 1, 2 * bar, patternblocks::dragTarget (s, 4 * bar + 1, offset)) == 3 * bar);
+    CHECK (s.blocks.size() == 1 && s.blocks[0].start == 3 * bar);
+    CHECK (patternblocks::dragTarget (s, 2 * bar + 1, offset) == bar);
+    CHECK (patternblocks::dragTarget (s, 5, offset) == 0);
+    CHECK (patternblocks::dragTarget (s, -900, offset) == 0);
+    // with no offset the target is the bar under the mouse, as for a block placed by the pencil
+    CHECK (patternblocks::dragTarget (s, 6 * bar + 3, 0) == 6 * bar);
+}

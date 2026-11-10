@@ -59,6 +59,16 @@ int eraseRange (Song& song, int pattern, std::int64_t fromTick, std::int64_t toT
 // Removes every block of any row whose played span meets [fromTick, toTick]. Returns how many.
 int eraseAnyRow (Song& song, std::int64_t fromTick, std::int64_t toTick);
 
+// Whether a block of row `pattern` plays over [fromTick, toTick] (either order): what eraseRange would remove.
+bool anyInRange (const Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick) noexcept;
+
+// A move drag keeps the point where the block was grabbed (issue #127): a 2-bar block pressed on its second bar stays
+// under the mouse by that bar instead of jumping to start under it.
+// grabOffset: the bar under `tick` minus the start of the block of row `pattern` there; 0 when there is none.
+// dragTarget: the bar the block starts on while the mouse is at `tick` (never before bar 1).
+std::int64_t grabOffset (const Song& song, int pattern, std::int64_t tick);
+std::int64_t dragTarget (const Song& song, std::int64_t tick, std::int64_t grabOffset);
+
 // The blocks of the current arrangement as pattern clips on blockTrack (each its played span), in block order.
 std::vector<Clip> asClips (const Song& song);
 
