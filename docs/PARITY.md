@@ -2289,3 +2289,9 @@ for now (FL Studio Mobile reference shots and the matching layouts are the next 
 Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
 Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
 FL Studio Mobile plugin is the open sound check.
+
+## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
+FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
+`docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
+export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
+have no Detached state: their imported flags are kept as they were.
