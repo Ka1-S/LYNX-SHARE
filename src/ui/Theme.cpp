@@ -609,6 +609,8 @@ juce::String fontSelfTest()
     }
    #endif
     // the font folders handed to JUCE: fontconfig's, without the missing ones and the ones inside another
+    // (POSIX paths: on Windows "/usr/..." is not an absolute path, and fontconfig is not used there)
+   #if ! JUCE_WINDOWS
     {
         const auto all = [] (const juce::String&) { return true; };
         const auto notOpt = [] (const juce::String& folder) { return ! folder.startsWith ("/opt"); };
@@ -620,6 +622,7 @@ juce::String fontSelfTest()
             || ! fontFoldersToScan ({}, all).isEmpty())
             return "ERROR font folders";
     }
+   #endif
     return "OK";
 }
 
