@@ -3078,6 +3078,8 @@ const EffectInfo& effectInfo (EffectKind kind)
         {
             static const EffectInfo info { "Pocket Stereoizer", { { "Strength", 0.7f }, { "Timbre", 0.52f }, { "Focus", 0.75f },
                                                                   { "L/R delay", 0.5f }, { "Pan", 0.5f } } };
+            return info;
+        }
         case EffectKind::pocketWowFlutter:
         {
             // FL Studio Mobile's own values and defaults (round 189h); FLM names each rate knob and its sync menu alike
@@ -3106,6 +3108,8 @@ const EffectInfo& effectInfo (EffectKind kind)
             static const EffectInfo info { "Pocket Tremolo", { { "Rate", 0.045467f }, { "Rate sync", 0.0f }, { "Amount max", 1.0f },
                                                                { "Amount min", 0.0f }, { "Phase offset", 0.0f }, { "Stereo offset", 0.0f },
                                                                { "Sync", 0.0f }, { "Shape", 0.5f }, { "Smooth", 1.0f }, { "Skew", 0.5f }, { "Width", 0.5f } } };
+            return info;
+        }
         case EffectKind::pocketWaveshaper:
         {
             // FL Studio Mobile's own values and defaults (round 189h)
