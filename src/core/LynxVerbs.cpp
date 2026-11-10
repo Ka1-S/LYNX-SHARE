@@ -223,8 +223,8 @@ struct Engine::Impl
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
     float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
-    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, band[maxBandSections];
-    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, bandOn = false;
+    Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, toneLow, band[maxBandSections];
+    bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, toneLowOn = false, bandOn = false;
     int bandSections = 0;
 
     // tap patterns (unit times and gains), drawn once
@@ -320,6 +320,7 @@ struct Engine::Impl
         for (auto& b : band)
             b.reset();
         toneHigh.reset();
+        toneLow.reset();
         toneMid.reset();
         shiftState = 0.0f;
         first = true;
@@ -435,6 +436,9 @@ struct Engine::Impl
             for (int k = 0; k < bandSections; ++k)
                 band[k].filter (sr, 0, s.bandLimit, 1.0 / (2.0 * std::cos ((2 * k + 1) * pi / (4.0 * bandSections))));
         }
+        toneLowOn = std::abs (s.toneLowDb) > 0.01;
+        if (toneLowOn)
+            toneLow.shelf (sr, s.toneLowHz, s.toneLowDb, false, 0.7);
         toneHighOn = std::abs (s.toneHighDb) > 0.01;
         if (toneHighOn)
             toneHigh.shelf (sr, std::min (s.toneHighHz, 0.45 * sr), s.toneHighDb, true, 0.7);
@@ -671,6 +675,8 @@ struct Engine::Impl
                 band[k].processBlock (L, R, n);
         if (toneHighOn)
             toneHigh.processBlock (L, R, n);
+        if (toneLowOn)
+            toneLow.processBlock (L, R, n);
         if (toneMidOn)
             toneMid.processBlock (L, R, n);
         if (shelfLowOn)
@@ -978,6 +984,13 @@ protected:
         s.buildSec = m.buildMs / 1000.0 * (0.25 + 1.5 * p[4]);
         s.gateSec = m.gate > 0.0 ? m.gate * decay + 0.05 : 0.0;
         s.gain = m.gain;
+        // round 183b (the reference's impulse at −20 dB, 17 settings; it is linear): its first 80 ms hold more of the
+        // energy at longer decays (−3.8 dB of the total at its default 4 s, ours −7.2; at 2 s round 100's −3.1 dB in the
+        // first 100 ms still holds), its modes sit denser low down (lines × 0.85: the −20 dB impulses and music both
+        // closer), and it is 0.7 dB lower
+        s.lineScale *= 0.85;
+        s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
+        s.gain *= 0.92;
     }
 };
 
@@ -1024,10 +1037,15 @@ protected:
         s.outHighCut = 100.0 + 14900.0 * p[3];
         s.bandLimit = t.cut;
         const auto earlyLate = (double) p[4]; // 0 = early only, 1 = late only
-        // round 172d: a linear crossfade like the reference's (its impulse energy per window at 0 / ¼ / ½ / ¾ / 1: the late
-        // tank grows in proportion and sits ≈ 6 dB above the old law at 50 %, the early part −3.7 dB at 0 %)
-        s.earlyLevel = t.early * 0.92 * (1.0 - earlyLate);
-        s.lateLevel = t.lateGain * 3.8 * earlyLate;
+        // round 183b: an equal-power crossfade (the reference's total level moves only 2.6 dB from early only to late
+        // only: −28.7 / −27.2 / −26.1 dB at 0 / 50 / 100 %, impulse at −20 dB; the old linear one moved 10.7 dB). The
+        // late level holds over Decay (the reference: −27.2 / −26.8 dB at RT 2.1 / 8.6 s, ours rose with the RT) and
+        // over Late size (0 % ran +3 dB, 100 % −1.2 dB)
+        const auto fade = 0.5 * pi * earlyLate;
+        s.earlyLevel = t.early * 0.92 * 1.46 * std::cos (fade);
+        const auto lateSizeDb = p[5] <= 0.5f ? -3.1 * (1.0 - 2.0 * p[5]) : 2.4 * (p[5] - 0.5);
+        s.lateLevel = t.lateGain * 3.8 * 0.575 * std::sin (fade) * std::sqrt (2.1 / std::max (0.1, atriumDecaySec (p[2]) * t.rtScale))
+                    * std::pow (10.0, lateSizeDb / 20.0);
         s.shape = t.shape;
         s.lineScale = t.scale * (0.35 + 0.9 * p[5]);
         s.crossFeed = 0.35 + 0.65 * p[6];
@@ -1049,11 +1067,11 @@ protected:
         s.loopDiffusion = 0.3 + 0.6 * p[18];
         const auto space = (double) p[20];
         s.buildSec = 0.02 + 0.06 * space;
-        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults)
+        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25 * 1.18; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults); 183b: +1.4 dB with the equal-power fade and the lower shelf
         // round 172d: the reference's late field holds far more below 100 Hz (impulse and music, octave bands: 31 / 63 Hz
         // +8 … +15 dB at the defaults) than this tank's few low modes give
         s.lowShelfHz = 90.0;
-        s.lowShelfDb = 10.0;
+        s.lowShelfDb = 5.0; // round 183b: +10 dB was 4 … 7 dB too much below 80 Hz with the louder early part (impulse at −20 dB, music)
         s.toneMidHz = 140.0; // (the tank's own hump around 125 … 160 Hz taken back)
         s.toneMidDb = -5.0;
         s.toneMidQ = 1.4;
@@ -1158,15 +1176,33 @@ protected:
         s.width = p[4] <= 0.5f ? 2.0 * p[4] : 1.0 + 0.48 * (p[4] - 0.5);
         s.modRateHz = skewLaw (p[5], 0.05, 5.0, 2.381);
         s.modDepthMs = 1.0 * p[6] / std::sqrt (std::max (0.3, s.modRateHz));
-        s.lowShelfHz = 20.0 + 1980.0 * p[7];
-        s.lowShelfDb = 0.75 * (-12.0 + 24.0 * p[8]);
-        s.highShelfHz = 200.0 + 19800.0 * p[9];
-        s.highShelfDb = -12.0 + 24.0 * p[10];
+        // round 183b: the reference's Low / High EQ (Mix 100 %, the impulse at −20 dB, gain at 0 / 100 %): the low shelf
+        // spans ±12 dB with its half-gain point at ~0.47 × the frequency law (−6 dB near 330 Hz at the default 711 Hz),
+        // the high one +12 dB with its half-gain point at ~0.5 × (5 kHz at the default) but only −4.5 dB down
+        s.lowShelfHz = 0.47 * (20.0 + 1980.0 * p[7]);
+        s.lowShelfDb = -12.0 + 24.0 * p[8];
+        s.highShelfHz = 0.5 * (200.0 + 19800.0 * p[9]);
+        s.highShelfDb = p[10] >= 0.5f ? 24.0 * (p[10] - 0.5) : -9.0 * (0.5 - p[10]);
         // the plate speaks at once after its own delay: a short, smeared early burst
         s.earlyLevel = t.early;
         s.earlySec = 0.015;
         s.earlyDiffusion = 0.8;
         s.gain = t.gain * 1.3; // round 172d: +2.3 dB (the reference plate at its defaults: music / drums RMS −3.6 / −4.2 dB)
+        // round 183b (the ValhallaPlate role, voicing off; the reference's impulse at −20 dB and music): Width keeps the
+        // level (the reference: −27.4 / −27.5 / −27.2 dB at 0 / 50 / 100 %, ours moved 4 dB), its tail is fuller below
+        // 80 Hz (+5 dB at 28 … 71 Hz) and less forward at 2.8 … 7 kHz (−3.5 dB), and it sits ~1 dB lower; shorter decays
+        // are no louder than the default
+        if (p[14] < 0.5f)
+        {
+            s.gain *= 0.9 * std::sqrt (2.0 / (1.0 + s.width * s.width));
+            // and shorter decays a little quieter (Decay 20 / 25 %: this tank ran +1.4 … +2.7 dB on music, +3 dB on the impulse)
+            s.gain *= std::pow (10.0, -2.5 * std::max (0.0, 0.5 - (double) p[2]) / 0.3 / 20.0);
+            s.toneLowHz = 60.0;
+            s.toneLowDb = 5.0;
+            s.toneMidHz = 4500.0;
+            s.toneMidDb = -3.5;
+            s.toneMidQ = 0.8;
+        }
         // round 135: a low cut on the plate's output, 20 Hz … 1 kHz (0 = off; 12 dB/oct)
         s.outLowCut = foil::lowCutHz (p[13]);
         s.outLowOrder = 2;
@@ -1417,6 +1453,15 @@ protected:
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
+        // round 183b: the reference's Mono mode (mono in) gives a partly correlated tail: L/R correlation 0.25 / 0.31 /
+        // 0.43 at Size 30 / 50 / 80 % (its stereo modes: ~0, as this tank's)
+        if (m.stereo == 1)
+        {
+            const auto c = 0.13 + 0.375 * size;
+            s.width = std::sqrt ((1.0 - c) / (1.0 + c));
+            s.gain *= std::sqrt (2.0 / (1.0 + s.width * s.width)); // (the same energy as the full width)
+            s.earlyLevel *= 0.4; // its first 80 ms hold 3.4 dB less of the energy than ours did (impulse at −20 dB)
+        }
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)

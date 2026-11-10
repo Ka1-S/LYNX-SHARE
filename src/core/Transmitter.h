@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "core/Song.h"
+
 namespace lynx
 {
 class Effect;
@@ -108,5 +110,6 @@ struct EnvelopeView
 };
 const EnvelopeView* envelopeOf (const Effect* effect); // nullptr: not a running Transmitter
 
-std::unique_ptr<Effect> make();
+// `params` (may be null): the slot's parameters, so the look-ahead latency is known before the first block (#113)
+std::unique_ptr<Effect> make (const EffectParams* params = nullptr);
 } // namespace lynx::transmitter

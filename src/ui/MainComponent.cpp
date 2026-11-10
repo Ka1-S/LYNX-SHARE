@@ -2,6 +2,7 @@
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
+#include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/PlaylistOps.h"
@@ -66,6 +67,7 @@
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
+#include "core/ClipLauncher.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
 #include "ui/EventEditor.h"
@@ -74,6 +76,7 @@
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
@@ -163,6 +166,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
         engine.setSong (makeNewProject());
         skin::onStyleSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // an editor's own style was picked
+            if (safe != nullptr) safe->saveUiSettings();
+        };
+        messages::onChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // "Remember my choice" / Manage messages
             if (safe != nullptr) safe->saveUiSettings();
         };
         loadKeyMap();
@@ -740,8 +746,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
-    if (startInClipLaunchWorkflow)
-        setClipLaunchWorkflow (true, false); // (the saved workspace layout is already this style's)
+    if (startStyle.style != layoutstyle::Style::pattern)
+        setLayoutStyle (startStyle.style, false); // (the saved workspace layout is already this style's)
+    updateGamepad(); // (round 184a, S16: only when the option is on)
     juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
             safe->startLiveFromCommandLine();
@@ -751,14 +758,28 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
+    // keys over a focused plugin (rounds 181c/187a, issue #96): what it passes back plays, and with its "Typing keyboard priority" off LYNX goes first
+    setPluginViewPlainKeyHandler ([] (juce::Component& window) { return PluginWindows::letsHostProcessKeys (window); },
+                                  [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
+                                      return safe != nullptr && safe->keyFromPluginView (key, true);
+                                  },
+                                  [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
+                                      return safe != nullptr && safe->keyFromPluginView (key, false);
+                                  });
 }
 
 MainComponent::~MainComponent()
 {
+    gamepadInput.reset();
+    if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
+        detailView->releaseEditor();
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
+    setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
     setSecondaryWindowKeyHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
@@ -1509,6 +1530,8 @@ juce::Rectangle<int> MainComponent::getToolStripAreaForSnapshot (bool playlistSt
 
 keys::Context MainComponent::focusContext() const
 {
+    if (pianoRollKeysHere()) // (round 183a: docked in the Clip-launch workflow's detail view)
+        return keys::Context::pianoRoll;
     switch (workspace.getFocused())
     {
         case Panel::playlist: return keys::Context::playlist;
@@ -1565,10 +1588,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     const auto focused = workspace.getFocused();
     const auto panelShown = workspace.isPanelVisible (focused);
 
-    if (panelShown && focused == Panel::pianoRoll && pianoRoll.handleKey (key))
+    if (((panelShown && focused == Panel::pianoRoll) || pianoRollKeysHere()) && pianoRoll.handleKey (key))
         return true;
 
-    if (panelShown && focused == Panel::playlist && playlist.handleKey (key))
+    if (panelShown && focused == Panel::playlist && ! pianoRollKeysHere() && playlist.handleKey (key))
         return true;
 
     // 4. the key map
@@ -1612,9 +1635,21 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     return ! action.empty() && runAction (action);
 }
 
+bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
+{
+    // the typing piano as over the main window (its release is polled, MainComponent::keyStateChanged). With the
+    // plugin's "Typing keyboard priority" off (LYNX first) the shortcuts run too; keys that do nothing here stay the plugin's.
+    if (typingKey (chordFromKeyPress (key)).taken)
+        return keyPressed (key);
+    return optionOn && keyFromSecondaryWindow (key);
+}
+
 bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
+
+    if (id.rfind ("view.detail", 0) == 0) // round 183a: Clip-launch workflow only (false: the chord falls through as before)
+        return runDetailAction (id);
 
     if (id == "rack.follow")
     {
@@ -2106,10 +2141,22 @@ void MainComponent::loadUiSettings()
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
             autoclipplace::setAtPlayback (on);
-        else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready)
-            startInClipLaunchWorkflow = on;
+        else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready; "layoutStyle" wins)
+            startStyle.legacyFlag (on);
+        else if (key == "layoutStyle") // (round 184a)
+            startStyle.styleId (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "lanesBeforeClipLaunch")
             lanesBeforeClipLaunch = on;
+        else if (key == "detailHeight") // round 183a: the Clip-launch workflow's detail view
+            DetailView::preferredHeight = juce::jlimit (DetailView::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "detailShown")
+            DetailView::shownSetting = on;
+        else if (key == "detailDevices")
+            DetailView::devicesPage = on;
+        else if (key == "detailExtraWindowKey")
+            DetailView::extraWindowKey = on;
+        else if (key == "detailExtraSelectInMixer")
+            DetailView::extraSelectInMixer = on;
         else if (key == "alsSessionOnPlaylist")
             AudioEngine::alsSessionOnPlaylist = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -2138,6 +2185,8 @@ void MainComponent::loadUiSettings()
             autosaveMinutes = prefs::clampAutosaveMinutes (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askUnusedRecordings")
             askUnusedRecordings = on;
+        else if (key == "messagesHidden") // FL's "Manage messages" (round 186c)
+            messages::setHiddenList (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "backupWaitsForQuiet")
             backupWaitsForQuiet = on;
         else if (key == "backupLongestWait")
@@ -2224,6 +2273,10 @@ void MainComponent::loadUiSettings()
             newProjectDefaults().readKey (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "mixerUsedOnly")
             MixerStrips::showUsedOnly = on;
+        else if (key == "mixerKeepLostLinks")
+            MixerStrips::keepLostLinks = on;
+        else if (key == "mixerFollowPlaylist")
+            MixerStrips::followPlaylist = on;
         else if (key == "mixerLayout") // FL's FXViewMode numbering (issue #52)
         {
             MixerStrips::layout = mixerlayout::parse (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
@@ -2280,8 +2333,14 @@ void MainComponent::saveUiSettings()
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
-                                      + "\nclipLaunchWorkflow=" + juce::String (clipLaunchWorkflow ? 1 : 0)
+                                      + "\nclipLaunchWorkflow=" + juce::String (layoutstyle::legacyClipLaunchFlag (layoutStyle) ? 1 : 0)
+                                      + "\nlayoutStyle=" + layoutstyle::id (layoutStyle)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
+                                      + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
+                                      + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
+                                      + "\ndetailDevices=" + juce::String (DetailView::devicesPage ? 1 : 0)
+                                      + "\ndetailExtraWindowKey=" + juce::String (DetailView::extraWindowKey ? 1 : 0)
+                                      + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
@@ -2296,6 +2355,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntoolbarVisible=" + juce::String (toolbarLayout.visible ? 1 : 0)
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
+                                      + "\nmessagesHidden=" + messages::hiddenList()
                                       + "\nbackupWaitsForQuiet=" + juce::String (backupWaitsForQuiet ? 1 : 0)
                                       + "\nbackupLongestWait=" + juce::String (backupLongestWaitMinutes)
                                       + "\nhoverValues=" + juce::String (hoverValues ? 1 : 0)
@@ -2330,7 +2390,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
-                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
+                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
 }
@@ -2575,29 +2635,57 @@ private:
 };
 } // namespace
 
-void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
+void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
 {
-    if (on == clipLaunchWorkflow && (! on || clipGridView != nullptr))
+    using layoutstyle::Style;
+    const auto from = layoutStyle;
+    const auto partsReady = [this] (Style s) {
+        return s == Style::pattern || (s == Style::clipLaunch && clipGridView != nullptr) || (s == Style::simple && simpleWorkflow != nullptr);
+    };
+    if (style == from && partsReady (style))
         return;
-    if (on && clipGridView == nullptr)
+    // each style's own parts are made the first time it is chosen (nothing of them exists in Pattern workflow)
+    if (style == Style::clipLaunch && clipGridView == nullptr)
     {
         clipGridView = makeClipGrid (engine);
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
+        makeDetailView();
     }
-    if (clipGridView == nullptr)
-        return;
+    if (style == Style::simple && simpleWorkflow == nullptr)
+    {
+        SimpleWorkflow::Host host;
+        host.setOverlay = [this] (juce::Component* c) { playlistArea.setOverlay (c); };
+        host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
+        host.showLoops = [this] {
+            if (findToolWindow ("sampleBrowser") == nullptr)
+                toggleSampleBrowser();
+        };
+        host.trackAdded = [this] (int) { playlist.repaint(); };
+        simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+    }
+    if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->left();
 
     // the workspace layout is kept per style, so going back restores the Pattern layout exactly
-    const auto layoutFile = [] (bool clipLaunch) { return platform::settingsFile (clipLaunch ? "workspace-cliplaunch.txt" : "workspace-pattern.txt"); };
-    if (persistent && swapLayout && on != clipLaunchWorkflow)
+    const auto layoutFile = [] (Style s) { return platform::settingsFile (layoutstyle::workspaceFile (s)); };
+    if (persistent && swapLayout && style != from)
     {
-        layoutFile (clipLaunchWorkflow).replaceWithText (workspace.getLayoutText());
-        if (const auto saved = layoutFile (on); saved.existsAsFile())
+        layoutFile (from).replaceWithText (workspace.getLayoutText());
+        if (const auto saved = layoutFile (style); saved.existsAsFile())
             workspace.applyLayoutText (saved.loadFileAsString());
-        else if (on)
+        else if (style == Style::clipLaunch)
         {
             workspace.hide (Panel::channelRack); // one click away, on the toolbar
             workspace.show (Panel::playlist);
+        }
+        else if (style == Style::simple)
+        {
+            // one window: the tracks and the timeline fill it; the other panels stay one click away (View, F5…F9)
+            for (auto panel : { Panel::channelRack, Panel::pianoRoll, Panel::mixer, Panel::browser })
+                workspace.hide (panel);
+            workspace.show (Panel::playlist);
+            if (! workspace.isMaximised (Panel::playlist))
+                workspace.toggleMaximised (Panel::playlist);
         }
         refreshPanelButtons();
         if (isShowing())
@@ -2605,27 +2693,186 @@ void MainComponent::setClipLaunchWorkflow (bool on, bool swapLayout)
     }
 
     // Clip-launch workflow shows the automation lanes; going back restores the user's setting
-    if (on != clipLaunchWorkflow)
+    const auto clipLaunch = style == Style::clipLaunch;
+    if (clipLaunch != (from == Style::clipLaunch))
     {
-        if (on && swapLayout) // (at startup, the saved value holds)
+        if (clipLaunch && swapLayout) // (at startup, the saved value holds)
             lanesBeforeClipLaunch = autolanes::shown();
-        autolanes::setShown (on || lanesBeforeClipLaunch);
+        autolanes::setShown (clipLaunch || lanesBeforeClipLaunch);
         playlist.repaint();
     }
 
-    clipLaunchWorkflow = on;
-    playlistArea.setClipGrid (on ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
-    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
-        flip->show (PlaylistArea::GridView::beside);
-    workspace.setTitleAccessory (Panel::playlist, on ? clipGridSwitch.get() : nullptr, on ? ClipGridSwitch::width : 0);
+    if (! clipLaunch && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
+        detailView->releaseEditor();
+    layoutStyle = style;
+    if (clipGridView != nullptr || clipLaunch)
+    {
+        playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+        // the detail view docks under the grid and the Playlist (round 183a); other workflows: nothing docked
+        if (detailView != nullptr)
+            detailView->setVisible (clipLaunch && DetailView::shownSetting);
+        playlistArea.setDetailView (clipLaunch ? detailView.get() : nullptr,
+                                    [this] (int available) { return detailView != nullptr ? detailView->heightFor (available) : 0; });
+        if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+            flip->show (PlaylistArea::GridView::beside);
+        workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
+    }
+    if (style == Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
 }
 
 void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
 {
+    using layoutstyle::Style;
     juce::PopupMenu styles;
-    styles.addItem (tr ("Pattern workflow (default)"), true, ! clipLaunchWorkflow, [this] { setClipLaunchWorkflow (false); saveUiSettings(); });
-    styles.addItem (tr ("Clip-launch workflow"), true, clipLaunchWorkflow, [this] { setClipLaunchWorkflow (true); saveUiSettings(); });
+    const auto item = [this, &styles] (const juce::String& text, Style style) {
+        styles.addItem (text, true, layoutStyle == style, [this, style] {
+            setLayoutStyle (style);
+            saveUiSettings();
+        });
+    };
+    item (tr ("Pattern workflow (default)"), Style::pattern);
+    item (tr ("Clip-launch workflow"), Style::clipLaunch);
+    item (tr ("Simple workflow"), Style::simple);
     menu.addSubMenu (tr ("Layout style"), styles);
+    // round 183a: the detail view's items, only in Clip-launch workflow (the reference DAW's View menu [SHOT] d05)
+    if (isClipLaunchWorkflow() && detailView != nullptr)
+    {
+        menu.addItem (tr ("Detail view") + shortcutText ("view.detailToggle"), true, DetailView::shownSetting, [this] { runAction ("view.detailToggle"); });
+        menu.addItem (tr ("Clip view") + shortcutText ("view.detailClip"), true, DetailView::shownSetting && ! DetailView::devicesPage,
+                      [this] { runAction ("view.detailClip"); });
+        menu.addItem (tr ("Device view") + shortcutText ("view.detailDevices"), true, DetailView::shownSetting && DetailView::devicesPage,
+                      [this] { runAction ("view.detailDevices"); });
+        menu.addItem (tr ("Switch between clip view and device view") + shortcutText ("view.detailSwitch"), [this] { runAction ("view.detailSwitch"); });
+    }
+}
+
+void MainComponent::makeDetailView()
+{
+    DetailView::Hooks h;
+    // the out meter: the Mixer's own level while its strips are on screen (they take the peaks), else the peaks
+    h.levelOf = [this] (int insert, int side) {
+        return mixer.metersShowing() ? mixer.shownLevel (insert, side) : engine.getMeters().takePeak (insert, side);
+    };
+    h.toggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); };
+    h.selectInMixer = [this] (int insert) { mixer.selectTrack (insert); };
+    h.instrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); }; // (as on the Mixer)
+    h.openClip = [this] (int track, int scene) { openGridClip (track, scene); };
+    h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
+    h.undockPianoRoll = [this] { undockPianoRoll(); };
+    h.selectPattern = [this] (int pattern) { selectPattern (pattern); };
+    // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
+    workspace.onWillShow = [this] (Panel panel) {
+        if (panel == Panel::pianoRoll && pianoRollDocked)
+        {
+            undockPianoRoll();
+            if (detailView != nullptr)
+                detailView->editorTakenBack();
+        }
+    };
+    h.layoutChanged = [this] {
+        if (detailView != nullptr)
+            detailView->setVisible (isClipLaunchWorkflow() && DetailView::shownSetting);
+        playlistArea.resized();
+        saveUiSettings();
+    };
+    detailView = std::make_unique<DetailView> (engine, std::move (h));
+    setClipGridPickListener (*clipGridView, [this] (int track, int scene, GridPick pick) {
+        if (detailView == nullptr)
+            return;
+        detailView->showSelection (track, scene);
+        if (pick == GridPick::openClip)
+            detailView->setPage (DetailView::Page::clip);
+        else if (pick == GridPick::openTrack)
+            detailView->setPage (DetailView::Page::devices);
+    });
+    const auto selected = clipGridSelection (*clipGridView);
+    detailView->showSelection (selected.first, selected.second);
+}
+
+juce::Component* MainComponent::dockPianoRoll (int pattern)
+{
+    if (pattern >= 0 && pattern < (int) engine.getSong().patterns.size() && pattern != engine.getSong().currentPattern)
+        selectPattern (pattern);
+    if (! pianoRollDocked)
+    {
+        if (workspace.isPanelVisible (Panel::pianoRoll))
+        {
+            workspace.hide (Panel::pianoRoll);
+            refreshPanelButtons();
+        }
+        workspace.releaseContent (Panel::pianoRoll);
+        pianoRollDocked = true;
+        pianoRollDockActive = false;
+        pianoRoll.setDocked (true); // (a short velocity lane and the keys fitted to the notes in the short dock)
+        dockClickWatcher.down = [this] (const juce::MouseEvent& e) {
+            pianoRollDockActive = e.eventComponent != nullptr && (e.eventComponent == &pianoRoll || pianoRoll.isParentOf (e.eventComponent));
+        };
+        juce::Desktop::getInstance().addGlobalMouseListener (&dockClickWatcher);
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<PianoRollComponent> (&pianoRoll)] {
+            if (safe != nullptr)
+                safe->scrollToNotes();
+        });
+    }
+    return &pianoRoll;
+}
+
+void MainComponent::undockPianoRoll()
+{
+    if (! pianoRollDocked)
+        return;
+    pianoRollDocked = false;
+    pianoRollDockActive = false;
+    pianoRoll.setDocked (false);
+    juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
+}
+
+bool MainComponent::pianoRollKeysHere() const
+{
+    return pianoRollDocked && pianoRollDockActive && pianoRoll.isShowing();
+}
+
+bool MainComponent::runDetailAction (const std::string& id)
+{
+    if (! isClipLaunchWorkflow() || detailView == nullptr) // (Pattern workflow: the keys keep their old meaning)
+        return false;
+    if (id == "view.detailToggle")
+    {
+        DetailView::shownSetting = ! DetailView::shownSetting;
+        detailView->setVisible (DetailView::shownSetting);
+        playlistArea.resized();
+        saveUiSettings();
+    }
+    else if (id == "view.detailClip")
+        detailView->setPage (DetailView::Page::clip);
+    else if (id == "view.detailDevices")
+        detailView->setPage (DetailView::Page::devices);
+    else if (id == "view.detailSwitch")
+        detailView->togglePage();
+    else
+        return false;
+    return true;
+}
+
+void MainComponent::openGridClip (int track, int scene)
+{
+    const auto& song = engine.getSong();
+    if (! song.clipGrid)
+        return;
+    const auto* clip = launcher::clipAt (*song.clipGrid, track, scene);
+    if (clip == nullptr)
+        return;
+    if (clip->kind == ClipKind::audio)
+    {
+        if (clip->channel >= 0 && clip->channel < (int) song.channels.size())
+            openAudioEditorForChannel (engine, clip->channel);
+    }
+    else if (clip->kind == ClipKind::pattern && clip->pattern >= 0 && clip->pattern < (int) song.patterns.size())
+    {
+        selectPattern (clip->pattern);
+        openPianoRoll();
+    }
 }
 
 void MainComponent::setClipGridView (PlaylistArea::GridView view)
@@ -3877,6 +4124,8 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
+        simpleWorkflow->songChanged(); // (an empty project opens on the New track chooser)
     // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
     if (song.currentPattern != lastCurrentPattern)
     {
@@ -4114,7 +4363,7 @@ void MainComponent::setControlHints()
     };
 
     ui::setHint (newButton, with (tr ("New project"), "file.new"));
-    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, MIDI)"), "file.open"));
+    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, Ableton Live .als, FL Studio Mobile .flm, MIDI)"), "file.open"));
     ui::setHint (saveButton, with (tr ("Save the project"), "file.save") + "  " + tr ("save as:") + " " + keyMarkup ("file.saveAs"));
     ui::setHint (exportButton, with (tr ("Export audio: WAV, FLAC or OGG"), "file.export"));
     ui::setHint (undoButton, with (tr ("Undo the last edit"), "edit.undo") + "  " + tr ("[RMB] undo history"), true);
@@ -5733,7 +5982,7 @@ void MainComponent::openSettings (int page)
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
         o.autoClipsAtPlayback = autoclipplace::atPlayback();
-        o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
+        o.layoutStyle = (int) safe->layoutStyle;
         o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -5819,7 +6068,7 @@ void MainComponent::openSettings (int page)
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
-        self.setClipLaunchWorkflow (o.clipLaunchWorkflow);
+        self.setLayoutStyle ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, o.layoutStyle));
         AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())
         {
@@ -5854,6 +6103,10 @@ void MainComponent::openSettings (int page)
     hooks.managePlugins = [safe] {
         if (safe != nullptr)
             safe->showPluginManager();
+    };
+    hooks.midiChanged = [safe] {
+        if (safe != nullptr)
+            safe->updateGamepad();
     };
     showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::theme, page), std::move (hooks)); // (Theme was clamped to MIDI)
 }
@@ -6455,6 +6708,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSubMenu (tr ("Next to last tweaked"), makeLastTweakedMenu (1), engine.getLastTweaked (1).has_value());
         menu.addSectionHeader (tr ("Macros"));
         menu.addItem (tr ("Stop sound") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
+        // FL's next item, MacroCancelRecordingAction (round 187a; REA 169k §2.3): greyed while not recording
+        menu.addItem (tr ("Cancel recording"), engine.isRecording(), false, [this] { engine.cancelRecording(); });
         menu.addSeparator();
         // FL's Macros order (round 181b; [DFM] mainmenu, round 168f)
         menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
@@ -6575,6 +6830,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                      currentFile != juce::File() ? currentFile.getParentDirectory()
                                                                  : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                      projectStem (projectName));
+            });
+            // Export for other apps (round 184a, S9): stems, MIDI, a Live set, an FL Studio project, the mixdown and a README
+            exports.addItem (tr ("For other apps..."), [this] {
+                engine.capturePluginStates();
+                showOtherAppsExportDialog (engine,
+                                           currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                           projectStem (projectName));
             });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
@@ -6796,13 +7059,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     {
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
-        menu.addItem (tr ("Last FL Studio import report"), [this] {
+        menu.addItem (tr ("Last project import report"), [this] {
             const auto& r = engine.getImportReport();
             if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
-                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("FL Studio import"),
-                                                        tr ("Nothing to report (no .flp imported in this session, or everything was converted)."));
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),
+                                                        tr ("Nothing to report (no .flp, .als or .flm project imported in this session, or everything was converted)."));
             else
                 showImportReport();
         });
@@ -6836,8 +7099,8 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
     {
         About()
             : juce::AlertWindow ("LYNX SHARE " JUCE_APPLICATION_VERSION_STRING,
-                                 tr ("Lightweight C++/JUCE DAW with the FL Studio workflow.\n"
-                                     "Independent implementation: no Image-Line code was copied."),
+                                 tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
+                                     "Independent implementation: no Image-Line or Ableton code was copied."),
                                  juce::MessageBoxIconType::NoIcon)
         {
             addCustomComponent (&logo);
@@ -7159,7 +7422,7 @@ void MainComponent::showImportReport()
                     { juce::String (r.relocatedSamples) }) << "\n";
 
     if (text.isNotEmpty())
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("FL Studio import"), text.trimEnd());
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"), text.trimEnd());
 }
 
 void MainComponent::showAudioSettings()
@@ -7215,4 +7478,120 @@ void MainComponent::prepareForPerformance()
     keepAboveMainWindow (*window);
 }
 
+} // namespace lynx
+
+// --- the game controller (round 184a, S16) ---------------------------------------------------------------------------
+
+namespace lynx
+{
+void MainComponent::updateGamepad()
+{
+    const auto on = engine.getMidiPrefs().gamepad;
+    if (on == (gamepadInput != nullptr))
+        return;
+    if (! on)
+    {
+        gamepadInput.reset();
+        if (gamepadHints != nullptr)
+            removeChildComponent (gamepadHints.get());
+        gamepadHints.reset();
+        return;
+    }
+    gamepadInput = std::make_unique<GamepadInput> ([safe = juce::Component::SafePointer<MainComponent> (this)] (const gamepad::Changes& c,
+                                                                                                             const gamepad::State& s, double dt) {
+        if (safe != nullptr)
+            safe->gamepadChanges (c, s, dt);
+    });
+    if (! gamepadInput->available())
+        ui::postHint ({ tr ("Game controllers are not supported on this system yet."), {} }, 5000);
+}
+
+int MainComponent::gamepadInsert() const
+{
+    const auto& song = engine.getSong();
+    const auto track = playlist.getCurrentTrack();
+    if (track >= 0 && track < (int) song.playlistTracks.size())
+        if (const auto insert = song.playlistTracks[(std::size_t) track].mixerTrack; insert >= 0 && insert < (int) song.mixer.size())
+            return insert;
+    const auto channel = engine.getSelectedChannel();
+    if (channel >= 0 && channel < (int) song.channels.size())
+        if (const auto insert = song.channels[(std::size_t) channel].mixerTrack; insert >= 0 && insert < (int) song.mixer.size())
+            return insert;
+    return -1;
+}
+
+void MainComponent::gamepadChanges (const gamepad::Changes& c, const gamepad::State& s, double seconds)
+{
+    using namespace gamepad;
+    // every change is also a MIDI controller on channel 16, so Link to controller can learn it
+    for (int i = 0; i < c.controllerCount; ++i)
+        engine.injectMidiInput (juce::MidiMessage::controllerEvent (midiChannel, c.controller[(std::size_t) i], c.value[(std::size_t) i]));
+    if (c.connectedChanged)
+        ui::postHint ({ s.connected ? tr ("Game controller connected") : tr ("Game controller disconnected"), {} }, 3000);
+
+    const auto& map = defaultMap();
+    for (int i = 0; i < c.pressedCount; ++i)
+    {
+        const auto action = map[(std::size_t) c.pressed[(std::size_t) i]];
+        switch (action)
+        {
+            case Action::playStop: runAction ("transport.playStop"); break;
+            case Action::record: runAction ("transport.record"); break;
+            case Action::undo: runAction ("edit.undo"); break;
+            case Action::metronome: runAction ("transport.metronome"); break;
+            case Action::previousPattern: runAction ("pattern.previous"); break;
+            case Action::nextPattern: runAction ("pattern.next"); break;
+            case Action::finish: runAction ("file.export"); break;
+            case Action::previousTrack:
+            case Action::nextTrack:
+            {
+                const auto t = playlist.getCurrentTrack();
+                playlist.selectTrack (t < 0 ? 0 : t + (action == Action::nextTrack ? 1 : -1));
+                const auto& song = engine.getSong();
+                const auto now = playlist.getCurrentTrack();
+                if (now >= 0 && now < (int) song.playlistTracks.size())
+                    if (const auto ch = song.playlistTracks[(std::size_t) now].channel; ch >= 0 && ch < (int) song.channels.size())
+                        engine.setSelectedChannel (ch); // an instrument track: its channel plays the keys
+                break;
+            }
+            case Action::barBack:
+            case Action::barForward:
+            {
+                // to the previous / next bar line (from inside a bar, back goes to its start)
+                const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+                const auto at = engine.getTransport().positionTicks.load() / bar;
+                const auto target = action == Action::barForward ? std::floor (at + 1e-6) + 1.0 : std::ceil (at - 1e-6) - 1.0;
+                engine.seek (juce::jmax (0.0, target) * bar);
+                break;
+            }
+            case Action::hints:
+                if (gamepadHints == nullptr)
+                {
+                    gamepadHints = makeGamepadHints();
+                    addChildComponent (*gamepadHints);
+                }
+                gamepadHints->setCentrePosition (getLocalBounds().getCentre());
+                gamepadHints->setVisible (true);
+                gamepadHints->toFront (false);
+                break;
+            case Action::none:
+                break;
+        }
+    }
+    for (int i = 0; i < c.releasedCount; ++i)
+        if (map[(std::size_t) c.released[(std::size_t) i]] == Action::hints && gamepadHints != nullptr)
+            gamepadHints->setVisible (false);
+
+    // the triggers: the selected track's volume; the left stick's X: its pan (only while pushed)
+    const auto insert = gamepadInsert();
+    if (insert < 0)
+        return;
+    if (const auto db = volumeStepDb (s, seconds); db != 0.0)
+        engine.editLevels ([insert, db] (Song& song) {
+            auto& v = song.mixer[(std::size_t) insert].volume;
+            v = juce::jlimit (0.0f, 1.0f, faderPosition (faderGain (v) * juce::Decibels::decibelsToGain ((float) db)));
+        });
+    if (const auto pan = axis (s, Axis::leftX); pan != 0.0f)
+        engine.editLevels ([insert, pan] (Song& song) { song.mixer[(std::size_t) insert].pan = juce::jlimit (-1.0f, 1.0f, pan); });
+}
 } // namespace lynx
