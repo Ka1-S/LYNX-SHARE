@@ -10180,6 +10180,12 @@ private:
                 }
                 simple->dropFiles (files, 0);
                 offline.dispatchPendingMessages();
+                // the clips' waveforms are analysed in the background and drawn once ready (a live window repaints by
+                // itself; one off-screen paint came too early and showed empty clips)
+                for (const auto& path : files)
+                    lynx::ui::WaveformCache::getInstance()->find (path, [&offline, path] { return offline.getSampleLibrary().load (path); });
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (30000);
+                offline.dispatchPendingMessages();
                 write ("simple-loop");
                 const auto& song = offline.getSong();
                 juce::String report;
