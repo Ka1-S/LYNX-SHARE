@@ -516,7 +516,7 @@ public:
         g.drawText ("Midi Note", fl (538, 40, 57, 18), juce::Justification::centredRight, false);
         g.drawText ("Cut", fl (626, 40, 22, 18), juce::Justification::centredRight, false);
         g.drawText ("Cut By", fl (664, 40, 38, 18), juce::Justification::centredRight, false);
-        g.drawText ("Output", fl (712, 40, 43, 18), juce::Justification::centredRight, false);
+        g.drawText ("Output", fl (708, 40, 44, 18), juce::Justification::centredRight, false);
         // the bank bar
         g.setColour (theme::colour::textSecondary);
         g.drawText ("BANK A", fl (36, 334, 60, 19), juce::Justification::centredLeft, false);
