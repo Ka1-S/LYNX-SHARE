@@ -17388,6 +17388,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Playlist189iTests.inc"
 #include "Playlist189lTests.inc"
 #include "Playlist189nTests.inc"
+#include "PlaylistKeys190agTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
 #include "Strike189dTests.inc"

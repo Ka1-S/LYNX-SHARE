@@ -8324,3 +8324,5 @@ countries: jp
 "Mixer groups follow the Playlist (LYNX)" = "ミキサーのグループをプレイリストに合わせる（LYNX）"
 "Arrange inserts like the Playlist" = "インサートをプレイリストの順に並べる"
 "{0} insert(s) moved to follow the Playlist" = "プレイリストに合わせて {0} 個のインサートを移動しました"
+"Nudge the selected clips left (fine step, no snap)" = "選択したクリップを左へ微調整（細かいステップ、スナップなし）"
+"Nudge the selected clips right (fine step, no snap)" = "選択したクリップを右へ微調整（細かいステップ、スナップなし）"

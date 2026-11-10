@@ -8324,3 +8324,5 @@ countries: tr
 "Mixer groups follow the Playlist (LYNX)" = "Mikser grupları Playlist'i izler (LYNX)"
 "Arrange inserts like the Playlist" = "Insert'leri Playlist gibi sırala"
 "{0} insert(s) moved to follow the Playlist" = "Playlist'i izlemek için {0} insert taşındı"
+"Nudge the selected clips left (fine step, no snap)" = "Seçili klipleri sola ince kaydır (ince adım, yakalama yok)"
+"Nudge the selected clips right (fine step, no snap)" = "Seçili klipleri sağa ince kaydır (ince adım, yakalama yok)"

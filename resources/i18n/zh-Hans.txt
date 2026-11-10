@@ -8324,3 +8324,5 @@ countries: cn sg
 "Mixer groups follow the Playlist (LYNX)" = "混音器分组跟随 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "按 Playlist 排列插入轨"
 "{0} insert(s) moved to follow the Playlist" = "已移动 {0} 个插入轨以跟随 Playlist"
+"Nudge the selected clips left (fine step, no snap)" = "将所选剪辑向左微移（细微步长，不吸附）"
+"Nudge the selected clips right (fine step, no snap)" = "将所选剪辑向右微移（细微步长，不吸附）"

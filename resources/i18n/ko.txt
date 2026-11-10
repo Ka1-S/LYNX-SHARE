@@ -8324,3 +8324,5 @@ countries: kr
 "Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
+"Nudge the selected clips left (fine step, no snap)" = "선택한 클립을 왼쪽으로 미세 이동 (미세 단계, 스냅 없음)"
+"Nudge the selected clips right (fine step, no snap)" = "선택한 클립을 오른쪽으로 미세 이동 (미세 단계, 스냅 없음)"

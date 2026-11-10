@@ -579,8 +579,9 @@ inline void reverseAudio (Song& song, int clip, std::int64_t wholeFileTicks)
         }
 }
 // Playlist › Edit › Shift left / right (Shift+Left / Shift+Right; EEShiftL/RAction Tag -1 / 1 → FUN_00eb32a0 →
-// FUN_00e51730 (editor, Tag, 0), round 189e): the selected clips move by `delta` ticks (one snap step), held so that none
-// starts before the song start. Returns the move applied.
+// FUN_00e51730 (editor, Tag, 0), round 189e): the selected clips move by `delta` ticks (one snap step; with Alt held
+// one pixelStepTicks, round 190ag), held so that none starts before the song start: the whole selection stops together
+// and keeps its spacing. Clips that land on other clips simply overlap them, as after a drag. Returns the move applied.
 inline std::int64_t shiftClipsInTime (std::vector<Clip>& playlist, const std::vector<int>& selection, std::int64_t delta)
 {
     for (auto i : selection)
@@ -590,6 +591,29 @@ inline std::int64_t shiftClipsInTime (std::vector<Clip>& playlist, const std::ve
         if (i >= 0 && i < (int) playlist.size())
             playlist[(std::size_t) i].start += delta;
     return delta;
+}
+
+// FL's fine step (round 190ag, issue #147; FUN_00e51730 with Alt held, and the Shift+wheel nudge): one pixel's worth of
+// ticks at the current zoom (the editor's ticks-per-pixel, rounded), never less than one tick.
+inline std::int64_t pixelStepTicks (double pixelsPerTick)
+{
+    return pixelsPerTick > 0.0 ? std::max<std::int64_t> (1, (std::int64_t) std::llround (1.0 / pixelsPerTick)) : 1;
+}
+
+// After a keyboard shift FL keeps the edge that leads the move in view (FUN_00e51730 -> FUN_00e7e290 with 1/32 of the
+// view as the margin, round 190ag): `edge` is the earliest start (moving earlier) or the latest end (moving later) of
+// the moved clips. When it is closer than one margin to the side of the view it moves towards (or past it), the view
+// scrolls so that the edge sits three margins inside that side. Returns the new scroll position in ticks.
+inline double scrollToShowEdge (double scrollTicks, double viewPixels, double pixelsPerTick, std::int64_t edge, bool movingLater)
+{
+    if (viewPixels <= 0.0 || pixelsPerTick <= 0.0)
+        return scrollTicks;
+    const auto margin = std::max (1.0, std::round (viewPixels / 32.0));
+    const auto ticksPerPixel = 1.0 / pixelsPerTick;
+    if (movingLater)
+        return (double) edge > scrollTicks + (viewPixels - margin) * ticksPerPixel
+                   ? std::max (0.0, (double) edge - (viewPixels - 3.0 * margin) * ticksPerPixel) : scrollTicks;
+    return (double) edge < scrollTicks + margin * ticksPerPixel ? std::max (0.0, (double) edge - 3.0 * margin * ticksPerPixel) : scrollTicks;
 }
 
 // Playlist › Edit › "Nudge clips with mouse wheel" (Shift+wheel, FUN_00e82270, round 189g; checked in FL 2026: the clips

@@ -8324,3 +8324,5 @@ countries: id
 "Mixer groups follow the Playlist (LYNX)" = "Grup Mixer mengikuti Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Atur insert seperti Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert dipindahkan agar mengikuti Playlist"
+"Nudge the selected clips left (fine step, no snap)" = "Geser halus klip terpilih ke kiri (langkah halus, tanpa snap)"
+"Nudge the selected clips right (fine step, no snap)" = "Geser halus klip terpilih ke kanan (langkah halus, tanpa snap)"

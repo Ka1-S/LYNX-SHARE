@@ -8324,3 +8324,5 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+"Nudge the selected clips left (fine step, no snap)" = "Слегка сдвинуть выделенные клипы влево (мелкий шаг, без привязки)"
+"Nudge the selected clips right (fine step, no snap)" = "Слегка сдвинуть выделенные клипы вправо (мелкий шаг, без привязки)"

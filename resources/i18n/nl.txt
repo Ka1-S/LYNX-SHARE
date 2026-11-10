@@ -8324,3 +8324,5 @@ countries: nl be
 "Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
+"Nudge the selected clips left (fine step, no snap)" = "Geselecteerde clips fijn naar links schuiven (fijne stap, zonder snap)"
+"Nudge the selected clips right (fine step, no snap)" = "Geselecteerde clips fijn naar rechts schuiven (fijne stap, zonder snap)"

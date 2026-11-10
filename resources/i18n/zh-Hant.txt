@@ -8324,3 +8324,5 @@ countries: tw hk mo
 "Mixer groups follow the Playlist (LYNX)" = "混音器分組跟隨 Playlist（LYNX）"
 "Arrange inserts like the Playlist" = "依 Playlist 排列插入軌"
 "{0} insert(s) moved to follow the Playlist" = "已移動 {0} 個插入軌以跟隨 Playlist"
+"Nudge the selected clips left (fine step, no snap)" = "將所選片段向左微移（細微步長，不吸附）"
+"Nudge the selected clips right (fine step, no snap)" = "將所選片段向右微移（細微步長，不吸附）"

@@ -8324,3 +8324,5 @@ countries: pl
 "Mixer groups follow the Playlist (LYNX)" = "Grupy miksera podążają za Playlistą (LYNX)"
 "Arrange inserts like the Playlist" = "Ułóż inserty jak w Playliście"
 "{0} insert(s) moved to follow the Playlist" = "Przeniesiono inserty, by podążały za Playlistą: {0}"
+"Nudge the selected clips left (fine step, no snap)" = "Lekko przesuń zaznaczone klipy w lewo (drobny krok, bez przyciągania)"
+"Nudge the selected clips right (fine step, no snap)" = "Lekko przesuń zaznaczone klipy w prawo (drobny krok, bez przyciągania)"
