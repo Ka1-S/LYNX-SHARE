@@ -8320,3 +8320,5 @@ countries: tw hk mo
 "Velocity-mapped" = "力度對應"
 "X / Y modulation" = "X / Y 調變"
 "to" = "至"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

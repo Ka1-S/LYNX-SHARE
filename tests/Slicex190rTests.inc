@@ -98,3 +98,31 @@ TEST (slicex190r_lfo_cycle_is_one_bipolar_period)
     CHECK (hi > 0.9f && lo < -0.9f);
 }
 
+// A packed WAV (FL's packs: Ogg Vorbis in a WAV, format tag 0x674f) says its length in the fact chunk; the data chunk
+// holds the packed stream. The deck's beat grid is the two doubles FL shows the tempo from.
+TEST (slicex190r_packed_wav_length_comes_from_fact_and_beats_are_set)
+{
+    using namespace lynx;
+    std::vector<std::uint8_t> w;
+    const auto put32 = [&w] (std::uint32_t v) { for (int i = 0; i < 4; ++i) w.push_back ((std::uint8_t) (v >> (8 * i))); };
+    const auto tag = [&w] (const char* t) { w.insert (w.end(), t, t + 4); };
+    tag ("RIFF"); put32 (0); tag ("WAVE");
+    tag ("fmt "); put32 (16); w.push_back (0x4f); w.push_back (0x67); w.push_back (2); w.push_back (0); put32 (44100); put32 (20000);
+    w.push_back (1); w.push_back (0); w.push_back (16); w.push_back (0);
+    tag ("fact"); put32 (4); put32 (1000);
+    tag ("data"); put32 (10); for (int i = 0; i < 10; ++i) w.push_back (0);
+    tag ("cue "); put32 (4 + 2 * 24); put32 (2);
+    for (std::uint32_t k = 0; k < 2; ++k) { put32 (k + 1); put32 (0); tag ("data"); put32 (0); put32 (0); put32 (k * 500); }
+    std::int64_t frames = 0;
+    const auto regions = slicex::wavRegions (w, frames);
+    CHECK (frames == 1000);
+    CHECK (regions.size() == 2);
+    if (regions.size() == 2)
+        CHECK (regions[1].start == 500 && regions[1].end == 999);
+
+    auto s = slicex::fresh();
+    slicex::setDeckBeats (s, 1, 0.0, 8.0);
+    CHECK (s.decks[1].beatStart() == 0.0 && s.decks[1].beatEnd() == 8.0);
+    const auto back = slicex::parse (slicex::write (s));
+    CHECK (back.has_value() && back->decks[1].beatEnd() == 8.0);
+}

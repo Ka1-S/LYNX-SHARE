@@ -8320,3 +8320,5 @@ countries: cn sg
 "Velocity-mapped" = "力度映射"
 "X / Y modulation" = "X / Y 调制"
 "to" = "至"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

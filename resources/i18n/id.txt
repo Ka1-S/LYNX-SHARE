@@ -8320,3 +8320,5 @@ countries: id
 "Velocity-mapped" = "Terpetakan ke velocity"
 "X / Y modulation" = "Modulasi X / Y"
 "to" = "hingga"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

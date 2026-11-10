@@ -8320,3 +8320,5 @@ countries: kr
 "Velocity-mapped" = "벨로시티에 매핑"
 "X / Y modulation" = "X / Y 모듈레이션"
 "to" = "~"
+"Deck A" = "덱 A"
+"Deck B" = "덱 B"

@@ -8320,3 +8320,5 @@ countries: nl be
 "Velocity-mapped" = "Velocity-gemapt"
 "X / Y modulation" = "X / Y-modulatie"
 "to" = "tot"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

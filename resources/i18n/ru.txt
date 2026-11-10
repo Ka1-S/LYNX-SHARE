@@ -8320,3 +8320,5 @@ countries: ru by kz
 "Velocity-mapped" = "Привязка к velocity"
 "X / Y modulation" = "Модуляция X / Y"
 "to" = "до"
+"Deck A" = "Дек A"
+"Deck B" = "Дек B"

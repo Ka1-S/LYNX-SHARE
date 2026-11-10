@@ -875,7 +875,7 @@ public:
         // ---- region settings
         header (regionHeader, "REGION SETTINGS");
         ui::setHint (regionMenuButton, tr ("More region settings"), true);
-        regionMenuButton.onClick = [this] { regionMenu(); };
+        regionMenuButton.onClick = [this] { regionMenu (true); };
         addAndMakeVisible (regionMenuButton);
         ui::setHint (regionSel, tr ("Current region"));
         regionSel.onChange = [this] {
@@ -1046,7 +1046,7 @@ public:
             v.menu = [this, d] (int i) {
                 if (i >= 0)
                     selectRegion (d, i, false);
-                regionMenu();
+                regionMenu (false);
             };
             addAndMakeVisible (v);
         }
@@ -1409,8 +1409,12 @@ private:
             std::int64_t frames = 0;
             if (! state.decks[i].wav.empty())
                 regions[i] = slicex::wavRegions (state.decks[i].wav, frames);
-            if (regions[i].empty() || frames != (std::int64_t) samples[i]->frames())
-                regions[i] = slicex::regionsFromMarkers (samples[i]->markerStarts, (std::int64_t) samples[i]->frames());
+            else if (fileName (paths[i]).endsWithIgnoreCase (".wav"))
+                regions[i] = slicex::wavRegions (deckWav (k), frames); // a referenced WAV: its own region names and keys
+            const auto fromMarkers = slicex::regionsFromMarkers (samples[i]->markerStarts, (std::int64_t) samples[i]->frames());
+            // (what the instrument plays; a file's own list is only taken when it is the same cut)
+            if (regions[i].empty() || frames != (std::int64_t) samples[i]->frames() || (state.decks[i].wav.empty() && regions[i].size() != fromMarkers.size()))
+                regions[i] = fromMarkers;
         }
         refresh();
     }
@@ -1431,10 +1435,15 @@ private:
         crossfade.value = std::clamp ((int) state.optionInt (slicex::oCrossfade), 0, 4);
 
         regionSel.clear (juce::dontSendNotification);
+        // the names as FL shows them ("Kick"); a heading per deck only when both decks have regions
+        const auto bothDecks = ! regions[0].empty() && ! regions[1].empty();
         for (int d = 0; d < 2; ++d)
+        {
+            if (bothDecks)
+                regionSel.addSectionHeading (d == 0 ? tr ("Deck A") : tr ("Deck B"));
             for (std::size_t i = 0; i < regions[(std::size_t) d].size(); ++i)
-                regionSel.addItem ((d == 0 ? "A: " : "B: ") + juce::String::fromUTF8 (slicex::regionName (regions[(std::size_t) d][i], (int) i).c_str()),
-                                   ((d << 16) | (int) i) + 1);
+                regionSel.addItem (juce::String::fromUTF8 (slicex::regionName (regions[(std::size_t) d][i], (int) i).c_str()), ((d << 16) | (int) i) + 1);
+        }
         const auto* rec = record();
         const auto has = rec != nullptr && regionIndex() < (int) regions[(std::size_t) regionDeck()].size();
         regionSel.setSelectedId (has ? ((regionDeck() << 16) | regionIndex()) + 1 : 0, juce::dontSendNotification);
@@ -1605,6 +1614,10 @@ private:
         const auto count = (int) slicex::regionsFromMarkers (sample->markerStarts, (std::int64_t) sample->frames()).size();
         auto s = state;
         slicex::setDeckFile (s, deck, p, std::max (1, count));
+        // the beat grid: the file's own beat count (its ACID chunk: "DL Breaker" has 8 beats in 8 s and FL shows 60BPM);
+        // a file without one is taken at the project's tempo
+        const auto seconds = (double) sample->frames() / (sample->sampleRate > 0.0 ? sample->sampleRate : 44100.0);
+        slicex::setDeckBeats (s, deck, 0.0, sample->acidBeats > 0.0f ? (double) sample->acidBeats : seconds * std::max (1.0, engine.getSong().bpm) / 60.0);
         s.ui[0] = deck;
         s.ui[1] = deck << 16;
         const auto bytes = slicex::write (s);
@@ -1661,7 +1674,8 @@ private:
     }
 
     // FL's "More region settings" (RgnMenuBtn; the same menu on a region of the wave). Stage 1: its "Trigger note" entry
-    void regionMenu()
+    // `fromButton`: under the region settings' menu button; else at the mouse (a right click on the region in the wave)
+    void regionMenu (bool fromButton)
     {
         const auto deck = regionDeck(), index = regionIndex();
         if (index >= (int) regions[(std::size_t) deck].size())
@@ -1675,7 +1689,7 @@ private:
         m.addSectionHeader (juce::String::fromUTF8 (slicex::regionName (regions[(std::size_t) deck][(std::size_t) index], index).c_str()));
         m.addSubMenu (tr ("Trigger note"), keys, canSetKeys (deck));
         juce::Component::SafePointer<SlicexEditor> self (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&regionMenuButton), [self, deck, index] (int r) {
+        m.showMenuAsync (fromButton ? juce::PopupMenu::Options().withTargetComponent (&regionMenuButton) : juce::PopupMenu::Options(), [self, deck, index] (int r) {
             if (self != nullptr && r != 0)
                 self->setRegionKey (deck, index, r == 1 ? -1 : r - 1000);
         });
@@ -1756,7 +1770,7 @@ private:
         m.addItem (1, tr ("Assign current region to this key"), key >= 0 && key < 128 && record() != nullptr && canSetKeys (regionDeck()));
         m.addItem (2, tr ("Select region assigned to this key"), on);
         juce::Component::SafePointer<SlicexEditor> self (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyboard), [self, key] (int r) {
+        m.showMenuAsync (juce::PopupMenu::Options(), [self, key] (int r) {
             if (self != nullptr && r == 1)
                 self->setRegionKey (self->regionDeck(), self->regionIndex(), key);
             if (self == nullptr || r != 2)

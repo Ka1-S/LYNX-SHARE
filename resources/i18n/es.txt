@@ -8320,3 +8320,5 @@ countries: es mx ar co cl pe ve
 "Velocity-mapped" = "Asignado por velocity"
 "X / Y modulation" = "Modulación X / Y"
 "to" = "a"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

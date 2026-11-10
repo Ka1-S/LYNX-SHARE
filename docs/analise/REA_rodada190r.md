@@ -82,6 +82,22 @@ button (the window keeps the full layout), the Options menu's macros, region ren
 region starts in the wave, the time scroller, the envelope's time zoom and options menu, "Lock audio data" and "Leave
 unedited audio data on disk".
 
+### 3.1 Live pass (Windows build, real window)
+
+Add channel → Slicex, File → Load sample ("DL Breaker.wav" of FL's packs), click regions, switch ENV / LFO, drag an
+envelope node, open the layering combo, the region menu and the key menu, assign region 8 to a key. What it showed
+and what was fixed:
+
+- FL's packs are packed WAVs (Ogg Vorbis in a WAV, format tag 0x674f): the data chunk is the packed stream and the
+  length is in `fact`. `slicex::wavRegions` took the data size for the length, so a key could not be assigned on such
+  a file. Fixed (length from `fact` when the format is not PCM / float).
+- A referenced WAV now shows its own region names ("Kick", "Snare", as FL does) instead of "Marker #n".
+- A loaded sample gets its beat grid from the file's ACID beat count ("DL Breaker": 8 beats in 8 s; FL shows 60BPM,
+  LYNX now too). A file without one is taken at the project's tempo [HYP: FL's own guess for untagged files was not
+  measured].
+- The region and key menus of a right click open at the mouse.
+- The region combo shows the plain name ("Kick"), with a heading per deck only when both decks have regions.
+
 ## 4. A new Slicex ("add channel")
 
 `natives::instrumentEngines()` lists Slicex; a new channel is `slicex::fresh()` (FL's Default preset values, both decks

@@ -8320,3 +8320,5 @@ countries: jp
 "Velocity-mapped" = "ベロシティにマッピング"
 "X / Y modulation" = "X / Y モジュレーション"
 "to" = "から"
+"Deck A" = "デッキ A"
+"Deck B" = "デッキ B"

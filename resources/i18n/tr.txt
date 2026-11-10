@@ -8320,3 +8320,5 @@ countries: tr
 "Velocity-mapped" = "Velocity'ye eşlenmiş"
 "X / Y modulation" = "X / Y modülasyonu"
 "to" = "-"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

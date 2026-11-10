@@ -8403,3 +8403,5 @@ countries: br
 "Velocity-mapped" = "Mapeado por velocity"
 "X / Y modulation" = "Modulação X / Y"
 "to" = "até"
+"Deck A" = "Deck A"
+"Deck B" = "Deck B"

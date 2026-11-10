@@ -453,6 +453,15 @@ void setDeckFile (State& state, int deck, const std::string& path, int regions)
     d.regions.assign ((std::size_t) std::max (1, regions), defaultRegion());
 }
 
+void setDeckBeats (State& state, int deck, double start, double end)
+{
+    if (deck < 0 || deck > 1)
+        return;
+    auto& d = state.decks[(std::size_t) deck];
+    std::memcpy (d.params.data() + 0x10, &start, 8);
+    std::memcpy (d.params.data() + 0x18, &end, 8);
+}
+
 float masterVolume (std::int32_t raw) noexcept { return law11 ((float) std::clamp (raw, 0, 16000) * 7.8125e-05f); }
 
 float masterBipolar (std::int32_t raw, int unit) noexcept
@@ -492,6 +501,8 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
     };
     std::vector<Extra> extras;
     std::size_t blockAlign = 1;
+    bool packed = false;
+    std::int64_t dataFrames = 0, factFrames = -1;
 
     for (std::size_t p = 12; p + 8 <= w.size();)
     {
@@ -499,9 +510,15 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
         const auto* body = w.data() + p + 8;
         const std::size_t have = std::min (size, w.size() - (p + 8));
         if (std::memcmp (w.data() + p, "fmt ", 4) == 0 && have >= 14)
+        {
             blockAlign = std::max<std::size_t> (1, (std::size_t) body[12] | ((std::size_t) body[13] << 8));
+            const auto tag = (unsigned) body[0] | ((unsigned) body[1] << 8);
+            packed = tag != 1 && tag != 3 && tag != 0xfffe; // not PCM / float (FL's own packs are Ogg Vorbis in a WAV, tag 0x674f)
+        }
+        else if (std::memcmp (w.data() + p, "fact", 4) == 0 && have >= 4)
+            factFrames = (std::int64_t) le32 (body);
         else if (std::memcmp (w.data() + p, "data", 4) == 0)
-            frames = (std::int64_t) (have / blockAlign);
+            dataFrames = (std::int64_t) (have / blockAlign);
         else if (std::memcmp (w.data() + p, "cue ", 4) == 0 && have >= 4)
         {
             const std::size_t n = std::min<std::size_t> (le32 (body), (have - 4) / 24);
@@ -550,6 +567,8 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
         }
         p += 8 + size + (size & 1);
     }
+    // a packed WAV's length is in its fact chunk (the data chunk holds the packed stream)
+    frames = packed ? std::max<std::int64_t> (0, factFrames) : dataFrames;
 
     for (const auto& e : extras)
         for (auto& c : cues)
