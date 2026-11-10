@@ -2307,6 +2307,12 @@ FL Studio Mobile plugin is the open sound check.
 | Clip colour / activator square, pitch range (drag to transpose), Add interval | clip menu; transpose keys | Clip View title bar, Pitch & Time | ✅ Clip View column (Clip-launch workflow) |
 | Set Length + grid, Humanize amount, Scale / Highlight Scale buttons in the editor header | — | Pitch & Time, editor header | ❌ open (GAPMAP-0126 D5, D13) |
 
+## Round 190aa: the MIDI Transformations measured in Live (Ableton-style, LYNX extras)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Arpeggiate (18 styles, overlapping notes), Connect (chords, Tie), Recombine on Grid, Span Offset, Strum (High + Tension), Quantize (incl. 1/8 + 1/8T) | its own Piano roll tools (unchanged) | Clip View › Transform | ✅ note for note against Live 12.4.16 (60-clip set, `docs/analise/REA_rodada190aa.md`); random settings checked by range |
+
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on

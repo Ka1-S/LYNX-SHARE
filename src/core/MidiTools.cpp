@@ -85,8 +85,8 @@ Notes span (Notes notes, const SpanOptions& o, std::int64_t grid)
             n.length = smallest / 2;
 
         n.length += gridShare (std::clamp (o.offset, -1.0f, 1.0f), grid);
-        if (o.variation != 0.0f)
-            n.length = (std::int64_t) std::llround ((double) n.length * (1.0 - std::clamp ((double) o.variation, -1.0, 1.0) * rng.unit()));
+        if (o.variation != 0.0f) // [LIVE round 190aa] up to |variation| half grid steps either way
+            n.length += gridShare (std::abs (std::clamp ((double) o.variation, -1.0, 1.0)) * 0.5 * (2.0 * rng.unit() - 1.0), grid);
         n.length = std::max<std::int64_t> (1, n.length);
     }
     return notes;
@@ -127,9 +127,9 @@ Notes strum (Notes notes, const StrumOptions& o, std::int64_t grid)
             auto n = chord[(std::size_t) i];
             if (count > 1)
             {
-                // position 0 = the chord's highest note … 1 = its lowest
+                // position 0 = the chord's highest note … 1 = its lowest; each side's curve starts at the note that stays
                 const auto position = (double) (count - 1 - i) / (double) (count - 1);
-                const auto share = high + (low - high) * strumCurve (position, o.tension);
+                const auto share = low * strumCurve (position, o.tension) + high * strumCurve (1.0 - position, o.tension);
                 n.start = std::max<std::int64_t> (0, n.start + gridShare (share, grid));
             }
             out.push_back (n);
@@ -283,8 +283,16 @@ std::vector<int> stylePass (int style, int count, const std::vector<int>& playOr
         if (hi != lo)
             converge.push_back (hi);
     }
-    auto diverge = converge;
-    std::reverse (diverge.begin(), diverge.end());
+    // [LIVE round 190aa] Diverge: the middle first, then outwards, the lower note of each pair first (60 64 67 → 64 60 67)
+    std::vector<int> diverge;
+    for (int lo = (count - 1) / 2, hi = count / 2; lo >= 0; --lo, ++hi)
+    {
+        diverge.push_back (lo);
+        if (hi != lo)
+            diverge.push_back (hi);
+    }
+    auto convergeBack = converge; // Con & Diverge's way back [LIVE: 60 67 64 67]
+    std::reverse (convergeBack.begin(), convergeBack.end());
     const auto alternate = [count] (bool pinky) { // every note but the pinky / thumb, each followed by it
         std::vector<int> v;
         for (int i = pinky ? 0 : 1; i < (pinky ? count - 1 : count); ++i)
@@ -318,7 +326,7 @@ std::vector<int> stylePass (int style, int count, const std::vector<int>& playOr
         case A::downAndUp:     return join (down, up);
         case A::converge:      return converge;
         case A::diverge:       return diverge;
-        case A::conAndDiverge: return join (converge, inner (diverge));
+        case A::conAndDiverge: return join (converge, inner (convergeBack));
         case A::pinkyUp:       return alternate (true);
         case A::pinkyUpDown:   return thereAndBack (alternate (true));
         case A::thumbUp:       return alternate (false);
@@ -358,9 +366,8 @@ Notes arpeggiate (Notes notes, const ArpeggiateOptions& o)
             time = notes[next].start; // nothing sounding: the clock restarts at the next note
             continue;
         }
-        // [LIVE] the pattern starts again when none of the notes of the step before is still held (a note that follows
-        // another with no gap starts a new run)
-        if (std::none_of (held.begin(), held.end(), [&before] (int i) { return std::find (before.begin(), before.end(), i) != before.end(); }))
+        // [LIVE round 190aa] the pattern starts again whenever the held notes change (a key added or released)
+        if (held != before)
         {
             step = 0;
             randomOrder.clear();
@@ -390,8 +397,11 @@ Notes arpeggiate (Notes notes, const ArpeggiateOptions& o)
             for (int i = 0; i < count; ++i)
                 emit (i, step % passes);
         }
-        else if (o.style == ArpeggiateOptions::random)
-            emit (rng.below (count), (step / std::max (1, count)) % passes);
+        else if (o.style == ArpeggiateOptions::random) // [LIVE round 190aa] any note of any pass
+        {
+            const auto pick = rng.below (count * passes);
+            emit (pick % count, pick / count);
+        }
         else if (o.style == ArpeggiateOptions::randomOther || o.style == ArpeggiateOptions::randomOnce)
         {
             const auto position = step % count;
@@ -435,30 +445,47 @@ Notes connect (Notes notes, const ConnectOptions& o, std::int64_t grid)
         }
         if (c + 1 >= groups.size())
             break;
-        const auto& from = groups[c].front();
-        const auto& to = groups[c + 1].front();
-        if (sounding >= to.start)
+        const auto& from = groups[c];
+        const auto& to = groups[c + 1];
+        const auto end = to.front().start;
+        if (sounding >= end)
             continue;
 
-        const auto slots = (int) ((to.start - sounding + rate - 1) / rate);
+        const auto slots = (int) ((end - sounding + rate - 1) / rate);
+        const auto at = [&] (const Note& a, const Note& b, int k, int key) { // step k's note on the line a → b
+            const auto share = (double) (k + 1) / (double) (slots + 1);
+            auto n = a;
+            n.start = sounding + k * rate;
+            n.length = std::min (rate, end - n.start);
+            n.key = key;
+            n.velocity = std::clamp (a.velocity + (b.velocity - a.velocity) * (float) share, 1.0f / 127.0f, 1.0f);
+            n.slide = n.porta = false;
+            return n;
+        };
+        const auto pitch = [&] (const Note& a, const Note& b, int k) {
+            const auto share = (double) (k + 1) / (double) (slots + 1);
+            return (int) std::floor ((double) a.key + (double) (b.key - a.key) * share + 0.5); // [LIVE] 70.5 → 71
+        };
         for (int k = 0; k < slots; ++k)
         {
             if (o.density < 1.0f && rng.unit() >= (double) std::max (0.0f, o.density))
                 continue;
-            const auto share = (double) (k + 1) / (double) (slots + 1);
-            auto n = from;
-            n.start = sounding + k * rate;
-            n.length = std::min (rate, to.start - n.start);
-            n.key = (int) std::floor ((double) from.key + (double) (to.key - from.key) * share + 0.5); // [LIVE] 70.5 → 71
-            if (o.spread > 0)
-                n.key += rng.below (2 * o.spread + 1) - o.spread;
-            n.key = std::clamp (n.key, 0, 127);
-            n.velocity = std::clamp (from.velocity + (to.velocity - from.velocity) * (float) share, 1.0f / 127.0f, 1.0f);
-            n.slide = n.porta = false;
+            const auto offset = o.spread > 0 ? rng.below (2 * o.spread + 1) - o.spread : 0;
             const auto tied = o.tie > 0.0f && rng.unit() < (double) o.tie;
-            if (tied)
-                n.length = to.start - n.start;
-            out.push_back (n);
+            const auto last = tied ? slots - 1 : k;
+            std::vector<int> keys;
+            for (std::size_t v = 0; v < from.size(); ++v)
+            {
+                const auto& target = to[std::min (v, to.size() - 1)];
+                const auto key = std::clamp (pitch (from[v], target, last) + offset, 0, 127);
+                if (std::find (keys.begin(), keys.end(), key) != keys.end())
+                    continue; // [LIVE] one note per pitch and time
+                keys.push_back (key);
+                auto n = at (from[v], target, k, key);
+                if (tied) // [LIVE round 190aa] until the next chord, the pitch of the last step it covers
+                    n.length = end - n.start;
+                out.push_back (n);
+            }
             if (tied)
                 break;
         }
@@ -511,14 +538,17 @@ Notes notesAt (const Pattern& pattern, const std::vector<int>& indices)
 
 Notes quantize (Notes notes, const QuantizeOptions& o, std::int64_t grid)
 {
-    auto step = o.step > 0 ? o.step : grid;
-    if (o.triplets)
-        step = step * 2 / 3;
+    const auto straight = o.step > 0 ? o.step : grid;
+    const auto step = o.triplets ? straight * 2 / 3 : straight;
     if (step <= 0)
         return notes;
     const auto amount = std::clamp ((double) o.amount, 0.0, 1.0);
-    const auto towards = [step, amount] (std::int64_t t) {
-        const auto line = (t + step / 2) / step * step; // (times are never negative here)
+    const auto nearest = [] (std::int64_t t, std::int64_t s) { return (t + s / 2) / s * s; }; // (times are never negative)
+    const auto towards = [&] (std::int64_t t) {
+        auto line = nearest (t, step);
+        if (o.triplets && o.straightToo) // [LIVE round 190aa] "1/8 + 1/8T": the nearer of both kinds of line
+            if (const auto other = nearest (t, straight); std::llabs (other - t) < std::llabs (line - t))
+                line = other;
         return t + (std::int64_t) std::llround ((double) (line - t) * amount);
     };
     for (auto& n : notes)
