@@ -892,7 +892,7 @@ public:
         if (isActiveWindow())
         {
             lastUsed() = key();
-            editorlimit::touch (&plugin); // (round 189o: the limit closes the least recently used editors)
+            editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
             focusLinked();
         }
     }
@@ -987,7 +987,7 @@ public:
             setMinimisedFrame (false);
         toFront (true);
         lastUsed() = key();
-        editorlimit::touch (&plugin); // (round 189o: the limit closes the least recently used editors)
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
     }
 
@@ -995,7 +995,7 @@ public:
     {
         toFront (false);
         lastUsed() = key();
-        editorlimit::touch (&plugin); // (round 189o: the limit closes the least recently used editors)
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
         if (e.eventComponent != this)
             return;
