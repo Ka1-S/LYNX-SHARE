@@ -66,6 +66,7 @@
 #include "core/MidiSync.h"
 #include "core/History.h"
 #include "core/Gms.h"
+#include "core/GmsMobile.h"
 #include "core/PoiZone.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
