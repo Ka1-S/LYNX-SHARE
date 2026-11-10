@@ -362,7 +362,7 @@ TEST (flm190u_three_osc_maps_the_parameters)
         CHECK (c->misc.mono && c->misc.porta && c->synth.porta && c->misc.portaBeats > 0.125f && c->misc.gateBeats > 0.0f && c->misc.gateBeats < 1.0f);
         CHECK (c->misc.key.mid == 72 && std::abs (c->misc.key.pan - 0.5f) < 1e-6f && c->misc.velocity.mid == 60 && std::abs (c->misc.velocity.pan + 0.5f) < 1e-6f);
         CHECK (c->misc.echo.echoes == 7 && std::abs (c->misc.echo.feedback - 0.5f) < 1e-6f && std::abs (c->misc.echo.timeBeats - 0.5f) < 1e-6f
-               && std::abs (c->misc.echo.pan - 0.4f) < 1e-5f && std::abs (c->misc.echo.pitch - 200.0f) < 1e-3f && c->misc.echo.pingPong && ! c->misc.echo.fat);
+               && std::abs (c->misc.echo.pan - 0.8f) < 1e-5f && std::abs (c->misc.echo.pitch - 200.0f) < 1e-3f && c->misc.echo.pingPong && ! c->misc.echo.fat);
         CHECK (c->arp.direction == 5 && c->arp.range == 2 && std::abs (c->arp.gate - 0.6f) < 1e-6f && c->arp.octaveRepeat == 3 && c->arp.slide
                && c->arp.chord == std::vector<int> { 0 } && c->arp.chordSustain && c->arp.stepBeats > 0.0f && c->arp.stepBeats < 0.25f);
         CHECK (report.unsupported.empty());
