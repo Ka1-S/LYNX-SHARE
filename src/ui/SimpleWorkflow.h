@@ -31,6 +31,8 @@ public:
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
         // round 190t
         std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
+        std::function<void (int format)> exportAudio;      // the Export window on one format (0 WAV, 1 MP3): the Finish dock
+        std::function<void()> exportOtherApps;             // File › Export › For other apps
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
     };
 

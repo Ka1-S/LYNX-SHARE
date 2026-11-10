@@ -8320,3 +8320,12 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Сохранить песню в файл"
+"Best quality, larger file" = "Лучшее качество, файл больше"
+"Small, for sharing" = "Небольшой, чтобы делиться"
+"All changes saved" = "Все изменения сохранены"
+"Not saved yet" = "Ещё не сохранено"
+"Backed up just now" = "Резервная копия только что"
+"Backed up {0} min ago" = "Резервная копия {0} мин назад"

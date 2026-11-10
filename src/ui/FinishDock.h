@@ -23,7 +23,15 @@ class FinishDock final : public juce::Component,
 public:
     static constexpr int width = 300;
 
-    FinishDock (AudioEngine& engine, std::function<void()> onClose);
+    // What "Save the song as a file" opens (round 190t): the Export window on one format (0 WAV, 1 MP3) and
+    // File › Export › For other apps. Without them the block is not shown.
+    struct Saving
+    {
+        std::function<void (int format)> exportAudio;
+        std::function<void()> exportOtherApps;
+    };
+
+    FinishDock (AudioEngine& engine, std::function<void()> onClose, Saving saving = {});
     ~FinishDock() override;
 
     // the song changed (undo, a Mixer edit, another project): the dock shows what the Master has now
@@ -34,6 +42,8 @@ public:
 
 private:
     class LookTile;
+    class SaveRow;
+    void save (int format); // the look is switched back on first: the file is what "Hear without" is not
     void choose (int id);
     void changed (bool structural); // the intensity / tone moved: the chain follows (one undo step per drag)
     void autoLevel();
@@ -42,9 +52,11 @@ private:
     AudioEngine& engine;
     std::function<void()> onClose;
     MasterLookSettings shown;
+    Saving saving;
     std::unique_ptr<LookTile> tiles[8];
-    juce::Label title, status, intensityLabel, toneLabel, levelInfo, peakHint;
-    juce::TextButton closeButton, hearWithout, autoButton, removeButton;
+    std::unique_ptr<SaveRow> saveRows[2]; // WAV, MP3
+    juce::Label title, status, intensityLabel, toneLabel, levelInfo, peakHint, saveLabel;
+    juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps;
     juce::Slider intensity, tone[3];
     juce::Label toneNames[3], marks[3];
     std::shared_ptr<std::atomic<int>> measuring; // Auto level's render: 0 idle, 1 running (shared with its thread)

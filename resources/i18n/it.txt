@@ -8320,3 +8320,12 @@ countries: it ch sm
 "Mixer groups follow the Playlist (LYNX)" = "I gruppi del Mixer seguono la Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Disponi gli insert come la Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert spostati per seguire la Playlist"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Salva il brano come file"
+"Best quality, larger file" = "Qualità migliore, file più grande"
+"Small, for sharing" = "Piccolo, per condividere"
+"All changes saved" = "Tutte le modifiche salvate"
+"Not saved yet" = "Non ancora salvato"
+"Backed up just now" = "Backup eseguito adesso"
+"Backed up {0} min ago" = "Backup {0} min fa"

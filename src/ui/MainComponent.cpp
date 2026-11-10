@@ -2670,6 +2670,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         host.setSideDock = [this] (juce::Component* c, int width) { playlistArea.setSideDock (c, width); };
         host.sampleFolder = [this] { return browser.firstSampleFolder(); };
+        host.exportAudio = [this] (int format) { exportAudio (format); };
+        host.exportOtherApps = [this] { exportForOtherApps(); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
         // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
         playlist.onTrackEffects = [this] (int insert) {
@@ -6462,6 +6464,15 @@ void MainComponent::exportAudio (int format)
     showExportDialog (engine, currentFile.getParentDirectory(), projectName, format);
 }
 
+void MainComponent::exportForOtherApps()
+{
+    engine.capturePluginStates();
+    showOtherAppsExportDialog (engine,
+                               currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                           : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                               projectStem (projectName));
+}
+
 void MainComponent::importMidiFile()
 {
     const auto folder = currentFile.existsAsFile() ? currentFile.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
@@ -6937,13 +6948,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                      projectStem (projectName));
             });
             // Export for other apps (round 184a, S9): stems, MIDI, a Live set, an FL Studio project, the mixdown and a README
-            exports.addItem (tr ("For other apps..."), [this] {
-                engine.capturePluginStates();
-                showOtherAppsExportDialog (engine,
-                                           currentFile != juce::File() ? currentFile.getParentDirectory()
-                                                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
-                                           projectStem (projectName));
-            });
+            exports.addItem (tr ("For other apps..."), [this] { exportForOtherApps(); });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });

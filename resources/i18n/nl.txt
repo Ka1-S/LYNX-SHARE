@@ -8320,3 +8320,12 @@ countries: nl be
 "Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Het nummer als bestand opslaan"
+"Best quality, larger file" = "Beste kwaliteit, groter bestand"
+"Small, for sharing" = "Klein, om te delen"
+"All changes saved" = "Alle wijzigingen opgeslagen"
+"Not saved yet" = "Nog niet opgeslagen"
+"Backed up just now" = "Zojuist geback-upt"
+"Backed up {0} min ago" = "{0} min geleden geback-upt"

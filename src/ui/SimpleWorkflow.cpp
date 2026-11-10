@@ -461,7 +461,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
 void SimpleWorkflow::showFinish()
 {
     if (finishDock == nullptr)
-        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); });
+        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps });
     static_cast<FinishDock&> (*finishDock).refresh();
     if (host.setSideDock)
         host.setSideDock (finishDock.get(), FinishDock::width);

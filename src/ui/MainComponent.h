@@ -324,6 +324,7 @@ private:
     // cancelled dialog or a failed save).
     void save (bool askForFile, std::function<void()> afterSaved = {});
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
+    void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
