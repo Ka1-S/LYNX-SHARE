@@ -13,6 +13,7 @@
 
 #include "core/CrashReport.h"
 #include "core/PinOnTop.h"
+#include "core/Preferences.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
@@ -72,7 +73,7 @@ public:
     }
 
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
-        : engine (e), find (std::move (f)), plugin (p)
+        : engine (e), find (std::move (f)), plugin (p), instrumentChannel (channel)
     {
         const char* tabNames[] = { TR_NOOP ("Settings"), TR_NOOP ("Processing"), TR_NOOP ("Troubleshooting") };
         for (int t = 0; t < 3; ++t)
@@ -121,6 +122,32 @@ public:
             });
         };
         addChildComponent (bendRange);
+        // round 190ao (pain point 12; LYNX's own, FL's wrapper has no velocity setting): how notes played into this
+        // instrument from MIDI devices reach it. The first item follows Settings › MIDI › Velocity (the default)
+        velocityMode.addItem (tr ("Follow the MIDI settings"), 1);
+        velocityMode.addItem (tr ("As played"), 2);
+        velocityMode.addItem (tr ("Soft (light playing sounds louder)"), 3);
+        velocityMode.addItem (tr ("Hard (needs harder playing)"), 4);
+        velocityMode.addItem (tr ("Fixed"), 5);
+        velocityMode.setTooltip (tr ("Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, "
+                                     "or this plugin's own curve or fixed velocity"));
+        velocityMode.onChange = [this] {
+            engine.editSong ([fn = find, mode = velocityMode.getSelectedId() - 1] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && mode >= 0)
+                    ref->velocityMode = prefs::clampPluginVelocityMode (mode);
+            });
+        };
+        addChildComponent (velocityMode);
+        for (int v = 1; v <= 127; ++v)
+            fixedVelocity.addItem (juce::String (v), v);
+        fixedVelocity.setTooltip (tr ("The velocity every played note gets (1 to 127)"));
+        fixedVelocity.onChange = [this] {
+            engine.editSong ([fn = find, v = fixedVelocity.getSelectedId()] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && v > 0)
+                    ref->fixedVelocity = prefs::clampFixedVelocity (v);
+            });
+        };
+        addChildComponent (fixedVelocity);
         inPort.setTooltip (tr ("MIDI input port number"));
         inPort.onChange = [this] { setPort (inPort.getSelectedId() - 2, false); };
         // FL's Output port: the notes the plugin sends out play the plugins on that input port (instruments in the
@@ -166,7 +193,8 @@ public:
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
-    int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
+    // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
+    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + (instrumentChannel ? rowHeight : 0); }
 
     void paint (juce::Graphics& g) override
     {
@@ -242,7 +270,7 @@ public:
             int midiRows = 0;
             for (const auto& o : wrapperOptions())
                 midiRows += juce::String (o.section) == "MIDI" ? 1 : 0;
-            auto midi = group (area, headerHeight + (1 + midiRows) * rowHeight + 8, tr ("MIDI"));
+            auto midi = group (area, headerHeight + (1 + midiRows + (instrumentChannel ? 1 : 0)) * rowHeight + 8, tr ("MIDI"));
             auto line = midi.removeFromTop (rowHeight);
             label (line.removeFromLeft (80), tr ("Input port"));
             show (inPort, line.removeFromLeft (70).reduced (0, 2));
@@ -259,6 +287,14 @@ public:
                         show (bendRange, row.removeFromRight (70).reduced (0, 2));
                     show (*toggles[(int) i], row);
                 }
+            if (instrumentChannel) // LYNX's own per-plugin velocity, under FL's MIDI options (round 190ao)
+            {
+                auto row = midi.removeFromTop (rowHeight);
+                label (row.removeFromLeft (80), tr ("Velocity"));
+                show (velocityMode, row.removeFromLeft (250).reduced (0, 2));
+                row.removeFromLeft (8);
+                show (fixedVelocity, row.removeFromLeft (70).reduced (0, 2));
+            }
             if (bridge32Supported())
             {
                 auto options = group (area, headerHeight + rowHeight + 8, tr ("Options"));
@@ -386,6 +422,9 @@ private:
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
         outPort.setSelectedId (ref->midiOutPort + 2, juce::dontSendNotification);
+        velocityMode.setSelectedId (prefs::clampPluginVelocityMode (ref->velocityMode) + 1, juce::dontSendNotification);
+        fixedVelocity.setSelectedId (prefs::clampFixedVelocity (ref->fixedVelocity), juce::dontSendNotification);
+        fixedVelocity.setEnabled (ref->velocityMode == prefs::pluginVelocityFixed);
         const auto reported = plugin.getLatencySamples();
         const auto text = ref->latencyOverrideMs >= 0.0f
                               ? tr ("{0} ms (set by hand)", { juce::String (ref->latencyOverrideMs, 2) })
@@ -406,8 +445,9 @@ private:
     juce::AudioPluginInstance& plugin;
     juce::OwnedArray<juce::TextButton> tabs;
     juce::OwnedArray<juce::ToggleButton> toggles;
-    juce::ComboBox inPort, outPort, bendRange, bitSize;
+    juce::ComboBox inPort, outPort, bendRange, bitSize, velocityMode, fixedVelocity;
     juce::TextButton latency, locate;
+    const bool instrumentChannel; // a Channel rack instrument: the MIDI group has LYNX's Velocity row
     int tab = 0;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groups;
     std::vector<Label> labels;

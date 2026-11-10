@@ -8367,3 +8367,6 @@ countries: tr
 "Pin on top" = "Üste sabitle"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "Üste sabitle: bu pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar"
 "Pin on top is not available for a plugin in a separate process" = "Üste sabitleme, ayrı bir işlemdeki plugin için kullanılamaz"
+"Follow the MIDI settings" = "MIDI ayarlarını izle"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "MIDI cihazlarından bu plugin'e çalınan notaların velocity'si: MIDI ayarlarındaki eğri ya da bu plugin'in kendi eğrisi veya sabit velocity'si"
+"The velocity every played note gets (1 to 127)" = "Çalınan her notanın aldığı velocity (1 ile 127 arası)"

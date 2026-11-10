@@ -2239,6 +2239,16 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     for (int i = 0; i < staleCount; ++i)
         push (stale[i], false, 0.0f);
 
+    // round 190ao: a hosted instrument with its own velocity setting answers with it instead of the MIDI settings' curve
+    std::uint16_t ownVelocity[InputHeldNotes::maxTargets] {};
+    if (on)
+    {
+        const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
+        for (int i = 0; i < count; ++i)
+            if (targets[i].channel >= 0 && targets[i].channel < (int) channelVelocity.size())
+                ownVelocity[i] = channelVelocity[(std::size_t) targets[i].channel];
+    }
+
     for (int i = 0; i < count; ++i)
     {
         // the foot pedal (round 187a): a held note struck again is released first; a note-off it holds waits for it
@@ -2246,7 +2256,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
             push (targets[i], false, 0.0f);
         if (! on && pedalHold.noteOff (targets[i].channel, targets[i].key))
             continue;
-        push (targets[i], on, on ? prefs::mapVelocity (m.getFloatVelocity(), velocityCurve) : 0.0f);
+        push (targets[i], on, on ? prefs::mapPluginVelocity (m.getFloatVelocity(), ownVelocity[i] & 0xff, ownVelocity[i] >> 8, velocityCurve) : 0.0f);
     }
 }
 
@@ -3459,8 +3469,18 @@ void AudioEngine::publishSong()
         for (std::size_t c = 0; c < song.channels.size(); ++c)
             if (! song.channels[c].receiveFrom.empty())
                 locks.push_back ({ song.channels[c].receiveFrom, song.channels[c].receiveMidiChannel, (int) c });
+        // round 190ao: the hosted instruments with their own velocity setting
+        std::vector<std::uint16_t> velocities;
+        for (std::size_t c = 0; c < song.channels.size(); ++c)
+            if (song.channels[c].instrument == InstrumentKind::plugin && song.channels[c].plugin.velocityMode != prefs::pluginVelocityFollow)
+            {
+                velocities.resize (c + 1, 0);
+                velocities[c] = (std::uint16_t) (prefs::clampPluginVelocityMode (song.channels[c].plugin.velocityMode)
+                                                 | (prefs::clampFixedVelocity (song.channels[c].plugin.fixedVelocity) << 8));
+            }
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         noteLocks.swap (locks);
+        channelVelocity.swap (velocities);
     }
     transport.bpm.store (song.bpm);
     transport.beatsPerBar.store (song.beatsPerBar);

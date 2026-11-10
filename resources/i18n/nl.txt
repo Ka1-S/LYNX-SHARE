@@ -8367,3 +8367,6 @@ countries: nl be
 "Pin on top" = "Bovenop vastzetten"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "Bovenop vastzetten: houdt dit venster boven de andere vensters van LYNX SHARE"
 "Pin on top is not available for a plugin in a separate process" = "Bovenop vastzetten is niet beschikbaar voor een plugin in een apart proces"
+"Follow the MIDI settings" = "MIDI-instellingen volgen"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity van de noten die vanaf MIDI-apparaten in deze plugin worden gespeeld: de curve van de MIDI-instellingen, of een eigen curve of vaste velocity van deze plugin"
+"The velocity every played note gets (1 to 127)" = "De velocity die elke gespeelde noot krijgt (1 tot 127)"

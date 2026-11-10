@@ -8367,3 +8367,6 @@ countries: kr
 "Pin on top" = "위에 고정"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "위에 고정: 이 창을 LYNX SHARE의 다른 창보다 위에 유지합니다"
 "Pin on top is not available for a plugin in a separate process" = "별도 프로세스의 플러그인에는 위에 고정을 사용할 수 없습니다"
+"Follow the MIDI settings" = "MIDI 설정 따르기"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "MIDI 장치에서 이 플러그인으로 연주한 노트의 벨로시티: MIDI 설정의 커브, 또는 이 플러그인만의 커브나 고정 벨로시티"
+"The velocity every played note gets (1 to 127)" = "연주한 모든 노트에 적용되는 벨로시티(1~127)"

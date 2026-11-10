@@ -2458,13 +2458,18 @@ private:
             song.channels[channel].plugin.allowHostKeys = true;
             song.channels[channel].plugin.hostKeysFirst = true;
             song.channels[channel].plugin.pinned = true; // (round 190ao: Pin on top)
+            song.channels[channel].plugin.velocityMode = lynx::prefs::pluginVelocityFixed; // (round 190ao: the plugin's own velocity)
+            song.channels[channel].plugin.fixedVelocity = 64;
             const auto on = lynx::ProjectFile::toJson (song);
             const auto offBack = lynx::ProjectFile::fromJson (off, error);
             const auto onBack = lynx::ProjectFile::fromJson (on, error);
             hostKeysOk = ! off.contains ("allowHostKeys") && on.contains ("allowHostKeys") && offBack && onBack
                          && ! offBack->channels[channel].plugin.allowHostKeys && onBack->channels[channel].plugin.allowHostKeys
                          && ! off.contains ("hostKeysFirst") && ! offBack->channels[channel].plugin.hostKeysFirst && onBack->channels[channel].plugin.hostKeysFirst
-                         && ! off.contains ("pinnedOnTop") && ! offBack->channels[channel].plugin.pinned && onBack->channels[channel].plugin.pinned;
+                         && ! off.contains ("pinnedOnTop") && ! offBack->channels[channel].plugin.pinned && onBack->channels[channel].plugin.pinned
+                         && ! off.contains ("velocityMode") && ! off.contains ("fixedVelocity") && offBack->channels[channel].plugin.velocityMode == 0
+                         && offBack->channels[channel].plugin.fixedVelocity == lynx::prefs::defaultFixedVelocity
+                         && onBack->channels[channel].plugin.velocityMode == lynx::prefs::pluginVelocityFixed && onBack->channels[channel].plugin.fixedVelocity == 64;
         }
 
         // hardware output targets (REA round 156): saved only when set; old projects (no field) keep the defaults
@@ -4046,6 +4051,26 @@ private:
                     expect ("unpinned_goes_behind_a_clicked_window", ! pluginInFront());
                    #endif
                     other = nullptr;
+                    // the wrapper settings page: LYNX's Velocity row in the MIDI group (instruments), default = follow
+                    expect ("velocity_follows_midi_settings_by_default", refNow().velocityMode == lynx::prefs::pluginVelocityFollow
+                                                                              && refNow().fixedVelocity == lynx::prefs::defaultFixedVelocity);
+                    shot ("wrapper-velocity-default", true);
+                    engine->editSong ([this] (lynx::Song& song) {
+                        if (auto* r = ref (song))
+                        {
+                            r->velocityMode = lynx::prefs::pluginVelocityFixed;
+                            r->fixedVelocity = 96;
+                        }
+                    });
+                    next (5);
+                    return;
+                }
+                if (phase == 5 && elapsed() >= 400)
+                {
+                    expect ("velocity_change_keeps_the_running_plugin", find() == instance);
+                    shot ("wrapper-velocity-fixed", true);
+                    engine->undo();
+                    expect ("velocity_undo", refNow().velocityMode == lynx::prefs::pluginVelocityFollow && find() == instance);
                     finish ({});
                 }
             }

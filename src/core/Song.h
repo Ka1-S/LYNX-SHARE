@@ -235,6 +235,11 @@ struct PluginRef
     // LYNX's own "Pin on top" of the plugin window (round 190ao, pain point 11; FL has none): the detached window stays
     // above LYNX's other windows. Off for a new plugin and for projects saved before
     bool pinned = false;
+    // LYNX's own per-plugin velocity (round 190ao, pain point 12; FL's wrapper has none): how notes played into this
+    // instrument from MIDI devices reach it. 0 = follow the MIDI settings' curve (the default, and projects saved
+    // before), 1 as played, 2 soft, 3 hard, 4 fixed at `fixedVelocity` (1…127). core/Preferences.h mapPluginVelocity
+    int velocityMode = 0;
+    int fixedVelocity = 100;
 
     bool operator== (const PluginRef& o) const
     {
@@ -246,7 +251,7 @@ struct PluginRef
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
-               && detached == o.detached && pinned == o.pinned;
+               && detached == o.detached && pinned == o.pinned && velocityMode == o.velocityMode && fixedVelocity == o.fixedVelocity;
     }
 };
 

@@ -8367,3 +8367,6 @@ countries: id
 "Pin on top" = "Sematkan di atas"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "Sematkan di atas: jendela ini tetap di atas jendela LYNX SHARE lainnya"
 "Pin on top is not available for a plugin in a separate process" = "Sematkan di atas tidak tersedia untuk plugin dalam proses terpisah"
+"Follow the MIDI settings" = "Ikuti pengaturan MIDI"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity not yang dimainkan ke plugin ini dari perangkat MIDI: kurva pengaturan MIDI, atau kurva atau velocity tetap milik plugin ini"
+"The velocity every played note gets (1 to 127)" = "Velocity yang diberikan pada setiap not yang dimainkan (1 sampai 127)"

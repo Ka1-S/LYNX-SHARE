@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/Preferences.h"
 
 #include "core/ClipLauncher.h"
 #include "core/PatternBlocks.h"
@@ -353,6 +354,11 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("detached", true);
     if (p.pinned) // round 190ao (saved only when on)
         o->setProperty ("pinnedOnTop", true);
+    if (p.velocityMode != 0) // round 190ao (saved only when the plugin has its own velocity setting)
+    {
+        o->setProperty ("velocityMode", p.velocityMode);
+        o->setProperty ("fixedVelocity", p.fixedVelocity);
+    }
     return juce::var (o.release());
 }
 
@@ -368,6 +374,8 @@ PluginRef pluginFromVar (const juce::var& v)
     p.separateProcess = (bool) v.getProperty ("separateProcess", false);
     p.detached = (bool) v.getProperty ("detached", false);
     p.pinned = (bool) v.getProperty ("pinnedOnTop", false);
+    p.velocityMode = prefs::clampPluginVelocityMode ((int) v.getProperty ("velocityMode", 0));
+    p.fixedVelocity = prefs::clampFixedVelocity ((int) v.getProperty ("fixedVelocity", prefs::defaultFixedVelocity));
     p.threaded = (bool) v.getProperty ("threaded", true);
     p.maxSizeBuffers = (bool) v.getProperty ("maxSizeBuffers", false);
     p.allowSmartDisable = (bool) v.getProperty ("allowSmartDisable", true);

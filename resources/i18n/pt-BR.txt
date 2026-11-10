@@ -8450,3 +8450,6 @@ countries: br
 "Pin on top" = "Fixar no topo"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "Fixar no topo: mantém esta janela acima das outras janelas do LYNX SHARE"
 "Pin on top is not available for a plugin in a separate process" = "Fixar no topo não está disponível para um plugin em processo separado"
+"Follow the MIDI settings" = "Seguir as configurações MIDI"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity das notas tocadas neste plugin a partir de dispositivos MIDI: a curva das configurações MIDI, ou uma curva ou velocity fixa só deste plugin"
+"The velocity every played note gets (1 to 127)" = "A velocity que toda nota tocada recebe (1 a 127)"

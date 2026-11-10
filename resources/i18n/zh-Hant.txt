@@ -8367,3 +8367,6 @@ countries: tw hk mo
 "Pin on top" = "固定在最前"
 "Pin on top: keep this window above LYNX SHARE's other windows" = "固定在最前：讓此視窗保持在 LYNX SHARE 其他視窗之上"
 "Pin on top is not available for a plugin in a separate process" = "獨立處理程序中的外掛無法使用「固定在最前」"
+"Follow the MIDI settings" = "跟隨 MIDI 設定"
+"Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "從 MIDI 裝置彈入此外掛的音符力度：使用 MIDI 設定中的曲線，或此外掛自己的曲線或固定力度"
+"The velocity every played note gets (1 to 127)" = "每個彈奏音符得到的力度（1 到 127）"

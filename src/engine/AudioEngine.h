@@ -989,6 +989,10 @@ private:
         int channel = 0;
     };
     std::vector<NoteLock> noteLocks;
+    // Round 190ao: each channel's own velocity setting for played notes (a hosted instrument's PluginRef::velocityMode,
+    // low byte, and fixedVelocity, high byte; 0 = follow the MIDI settings), rebuilt on every publish; guarded by
+    // midiPrefsLock too
+    std::vector<std::uint16_t> channelVelocity;
     void logPlayedNote (int channel, int key, float velocity, bool on, double tick = -1.0, bool recorded = false);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;
