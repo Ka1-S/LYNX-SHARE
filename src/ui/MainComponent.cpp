@@ -2669,9 +2669,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         };
         host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         host.setSideDock = [this] (juce::Component* c, int width) { playlistArea.setSideDock (c, width); };
+        // round 190t: the Sampler tile's start folder, the Finish dock's "Save the song as a file", the backup status
         host.sampleFolder = [this] { return browser.firstSampleFolder(); };
         host.exportAudio = [this] (int format) { exportAudio (format); };
         host.exportOtherApps = [this] { exportForOtherApps(); };
+        host.saveStatus = [this] { return simpleSaveStatus(); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
         // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
         playlist.onTrackEffects = [this] (int insert) {
@@ -5281,9 +5283,31 @@ void MainComponent::autosave()
             if (! ok)
                 ui::postHint ({ tr ("Autosave failed: {0}", { error }), {}, false, false }, 6000);
             else
+            {
                 safe->rotateBackups (stem);
+                safe->lastBackupMs = juce::Time::currentTimeMillis(); // (the Simple workflow's "Backed up ... ago")
+                safe->lastBackupProject = safe->engine.getSong().projectId;
+            }
         });
     });
+}
+
+// The Simple workflow's line beside "+ Add track" (round 190t): what a beginner needs to know about their work — LYNX
+// backs it up by itself. Empty when there is nothing to say (a new project with nothing in it yet).
+juce::String MainComponent::simpleSaveStatus() const
+{
+    return simpleSaveStatusText (engine.isModified(), currentFile.existsAsFile(),
+                                 lastBackupProject == engine.getSong().projectId ? lastBackupMs : 0, juce::Time::currentTimeMillis());
+}
+
+juce::String MainComponent::simpleSaveStatusText (bool modified, bool hasFile, juce::int64 backupMs, juce::int64 nowMs)
+{
+    if (! modified)
+        return hasFile ? tr ("All changes saved") : juce::String();
+    if (backupMs <= 0)
+        return tr ("Not saved yet");
+    const auto minutes = (int) ((nowMs - backupMs) / 60000);
+    return minutes < 1 ? tr ("Backed up just now") : tr ("Backed up {0} min ago", { juce::String (minutes) });
 }
 
 void MainComponent::rotateBackups (const juce::String& stem)

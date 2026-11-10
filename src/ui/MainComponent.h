@@ -363,6 +363,13 @@ private:
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written
     int autosaveMinutes = 2, autosaveKeep = 10; // Settings › General › Backup
+    juce::int64 lastBackupMs = 0;  // when the last timed backup was written, and for which project (Song::projectId)
+    std::string lastBackupProject;
+    juce::String simpleSaveStatus() const;
+public:
+    // --simpleshot: the status texts as drawn (saved, not saved yet, backed up now / minutes ago)
+    static juce::String simpleSaveStatusText (bool modified, bool hasFile, juce::int64 backupMs, juce::int64 nowMs);
+private:
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
     bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse

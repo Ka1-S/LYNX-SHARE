@@ -10268,6 +10268,26 @@ private:
             offline.dispatchPendingMessages();
             ui.getPlaylistForSnapshot().selectTrack (1);
             write ("simple-tracks");
+            // round 190t, slice E: the backup status beside the title tools, in each of its states
+            {
+                const auto now = juce::Time::currentTimeMillis();
+                juce::String states;
+                int n = 0;
+                for (const auto& text : { lynx::MainComponent::simpleSaveStatusText (true, false, 0, now), lynx::MainComponent::simpleSaveStatusText (true, false, now - 5000, now),
+                                          lynx::MainComponent::simpleSaveStatusText (true, true, now - 125000, now), lynx::MainComponent::simpleSaveStatusText (false, true, 0, now),
+                                          lynx::MainComponent::simpleSaveStatusText (false, false, 0, now) })
+                {
+                    simple->setStatusForSnapshot (text);
+                    offline.dispatchPendingMessages();
+                    states << n << ": " << text << "\n";
+                    writeImage (ui.createComponentSnapshot (ui.getLocalBounds().withTop (juce::jmin (ui.getHeight() - 1, 70)).withHeight (juce::jmin (ui.getHeight(), 44)), true, 1.0f),
+                                ("status-" + juce::String (n++)).toRawUTF8());
+                }
+                juce::File (prefix + "-status.txt").replaceWithText (states);
+                simple->setStatusForSnapshot (lynx::MainComponent::simpleSaveStatusText (true, true, now - 125000, now));
+                offline.dispatchPendingMessages();
+                write ("simple-status");
+            }
             // slice S8: the Finish dock, empty, then with a look on the Master (Balanced, Normal, a little Tone)
             simple->showFinish();
             offline.dispatchPendingMessages();

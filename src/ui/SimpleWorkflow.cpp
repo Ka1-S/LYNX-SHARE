@@ -417,26 +417,55 @@ public:
 } // namespace
 
 // the Playlist title bar's tools: "+ Add track" and "Finish" side by side
-class SimpleTitleTools final : public juce::Component
+class SimpleTitleTools final : public juce::Component,
+                               private juce::Timer
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& b) : add (a), finish (b)
+    SimpleTitleTools (juce::Component& a, juce::Component& b, std::function<juce::String()> statusText) : add (a), finish (b), text (std::move (statusText))
     {
         addAndMakeVisible (add);
         addAndMakeVisible (finish);
+        // round 190t: LYNX backs the work up by itself; a beginner should see it ("Backed up 2 min ago")
+        status.setFont (theme::font (theme::type::small));
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        status.setJustificationType (juce::Justification::centredLeft);
+        status.setMinimumHorizontalScale (0.8f);
+        status.setInterceptsMouseClicks (false, false);
+        addAndMakeVisible (status);
+        refresh();
+        startTimer (2000);
     }
-    static constexpr int width = 110 + 6 + 80;
+    static constexpr int statusWidth = 150;
+    static constexpr int width = 110 + 6 + 80 + 10 + statusWidth;
     void resized() override
     {
         auto r = getLocalBounds();
         add.setBounds (r.removeFromLeft (110));
         r.removeFromLeft (6);
-        finish.setBounds (r);
+        finish.setBounds (r.removeFromLeft (80));
+        r.removeFromLeft (10);
+        status.setBounds (r);
+    }
+    void showForSnapshot (const juce::String& fixed)
+    {
+        stopTimer();
+        text = [fixed] { return fixed; };
+        refresh();
+    }
+    void refresh()
+    {
+        const auto now = text ? text() : juce::String();
+        if (now != status.getText())
+            status.setText (now, juce::dontSendNotification);
     }
 
 private:
+    void timerCallback() override { refresh(); }
+
     juce::Component& add;
     juce::Component& finish;
+    std::function<juce::String()> text;
+    juce::Label status;
 };
 
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
@@ -455,7 +484,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             showFinish();
     };
     finishButton = std::move (finish);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, host.saveStatus);
 }
 
 void SimpleWorkflow::showFinish()
@@ -508,6 +537,7 @@ void SimpleWorkflow::songChanged()
         return;
     if (isFinishShowing())
         static_cast<FinishDock&> (*finishDock).refresh();
+    static_cast<SimpleTitleTools&> (*titleTools).refresh();
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {
@@ -561,6 +591,11 @@ void SimpleWorkflow::clickStarterForSnapshot (int index)
     showStarterPageForSnapshot();
     if (index >= 0 && index < (int) chooser->genreButtons.size() && chooser->genreButtons[(std::size_t) index]->onClick)
         chooser->genreButtons[(std::size_t) index]->onClick();
+}
+
+void SimpleWorkflow::setStatusForSnapshot (const juce::String& text)
+{
+    static_cast<SimpleTitleTools&> (*titleTools).showForSnapshot (text);
 }
 
 bool SimpleWorkflow::add (simpletracks::Request request)
