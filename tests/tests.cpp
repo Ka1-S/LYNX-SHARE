@@ -2933,7 +2933,7 @@ TEST (fl_fpc_cycle_layers_and_slicex_master_volume)
     state.push_back (5);
     for (char ch : std::string ("x.wav"))
         state.push_back ((std::uint8_t) ch);
-    const auto sliced = lynx::slicex (state);
+    const auto sliced = lynx::slicexSample (state);
     CHECK (sliced.has_value() && sliced->path == "x.wav");
     CHECK (sliced && std::abs (sliced->gain - (float) ((std::pow (11.0, 1.25) - 1.0) / 10.0)) < 1e-5f);
 }
