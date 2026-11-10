@@ -932,6 +932,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
+    song.flPluginLevels = true; // hosted plugins at Fruity Wrapper's level and velocity law (REA_rodada190ad.md)
     // REA round 168j: PDC "Automatic" 0x1D / "Compensate automations" 0x27, Time settings 0x23, the Piano Roll's scale
     // highlighting 0xF3, the data folder 0xCA
     song.autoPdc = project.autoPdc;

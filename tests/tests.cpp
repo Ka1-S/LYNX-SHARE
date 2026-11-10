@@ -17393,4 +17393,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "NoteChance187cTests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
+#include "PlugLevel190adTests.inc"
 #include "Undo190bTests.inc"

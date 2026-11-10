@@ -816,6 +816,13 @@ struct Converter
             if (g > 1.0f)
                 report.notes.push_back (channelLabel (def, index) + ": the Sampler's Gain is above FL's channel volume range (capped at 100%)");
         }
+        // a hosted plugin (round 190ad, REA_rodada190ad.md): FL's wrapper plays it √2 over LYNX's own channel law. A
+        // project with FL's levels writes the knob as it is; one with LYNX's own gets the volume that sounds the same
+        if (def.instrument == InstrumentKind::plugin && ! song.flPluginLevels)
+        {
+            const auto g = channelGain (volume) * 0.70710678f;
+            volume = (float) std::clamp (std::log (10.0 * g + 1.0) / std::log (11.0), 0.0, 1.0);
+        }
         // warp markers that bend the tempo inside the file (round 175a, M1): FL's channel stretch has one tempo
         if (def.sampler.keepPitch && def.sampler.stretchBeats > 0.0f
             && ! warpStretchMap (def.sampler.warp, 1.0e9, 1000.0, 1.0e9).empty()) // (any file length: do the markers bend)

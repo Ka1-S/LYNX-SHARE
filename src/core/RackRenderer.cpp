@@ -582,6 +582,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             instrument->setFastDeclick (song.fastDeclick);
             instrument->setPanTriangular (song.panTriangular);
+            instrument->setFlWrapperVelocity (song.flPluginLevels);
         }
     prepareKeyShifts (keyShiftLater, sampleRate);
 
@@ -1655,6 +1656,26 @@ void panGains (float pan, float gain, float& left, float& right) noexcept
     right = gain * std::sin (angle) * 1.41421356f;
 }
 
+// A hosted plugin channel in a project with FL's levels (Song::flPluginLevels, REA_rodada190ad.md): Fruity Wrapper's
+// output gains are the host's ComputeLRVol of (the channel's pan, 2 × its volume curve) — FL's pan kernel (circular
+// cos/sin, or the project's triangular law: the louder side keeps v/√2, the other falls linearly), so the centre is
+// √2 × the curve and the side panned to 2 ×.
+void flWrapperGains (float pan, float gain, bool triangular, float& left, float& right) noexcept
+{
+    const auto p = std::clamp (pan, -1.0f, 1.0f);
+    const auto vol = gain * 2.0f;
+    if (triangular)
+    {
+        const auto v = vol * 0.70710677f;
+        if (std::signbit (p))
+            left = v, right = (p + 1.0f) * v;
+        else
+            right = v, left = (1.0f - p) * v;
+    }
+    else
+        flvp::panLaw (p, vol, left, right);
+}
+
 float peakOf (const float* data, int n) noexcept
 {
     float peak = 0.0f;
@@ -2223,7 +2244,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     const auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], knobVolume) : knobVolume);
     const auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (knobPan + 1.0f) * 0.5f) * 2.0f - 1.0f : knobPan;
     float gl = 0.0f, gr = 0.0f;
-    panGains (pan, volume, gl, gr);
+    if (c.instrument == InstrumentKind::plugin && state.song.flPluginLevels)
+        flWrapperGains (pan, volume, state.song.panTriangular, gl, gr);
+    else
+        panGains (pan, volume, gl, gr);
 
     auto* l = channelBuffer (i, 0);
     auto* r = channelBuffer (i, 1);

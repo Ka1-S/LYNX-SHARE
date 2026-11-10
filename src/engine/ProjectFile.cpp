@@ -2162,6 +2162,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("fastDeclick", true);
     if (song.panTriangular)
         root->setProperty ("panLaw", "triangular");
+    if (song.flPluginLevels) // (round 190ad: absent = LYNX's own law, as every project saved before)
+        root->setProperty ("pluginLevels", "fl");
     // FL's mixer › Plugin delay compensation, Time settings, Piano Roll scale highlighting, data folder (round 168j)
     if (! song.autoPdc)
         root->setProperty ("autoPdc", false);
@@ -2769,6 +2771,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
     song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";
+    song.flPluginLevels = root.getProperty ("pluginLevels", "lynx").toString() == "fl";
     song.autoPdc = (bool) root.getProperty ("autoPdc", true);
     song.compensateAutomations = (bool) root.getProperty ("compensateAutomations", true);
     song.timeSignatureMode = root.getProperty ("timeSettings", "division").toString() == "signature";

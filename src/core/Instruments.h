@@ -46,6 +46,8 @@ public:
     virtual void setFastDeclick (bool /*fast*/) noexcept {}
     // the project's panning law (Song::panTriangular, FL's Options › Project › Panning law; REA round 167j §1)
     virtual void setPanTriangular (bool /*triangular*/) noexcept {}
+    // Song::flPluginLevels (round 190ad): a hosted plugin sends its notes' velocities as FL's wrapper does
+    virtual void setFlWrapperVelocity (bool /*on*/) noexcept {}
     // A note on a given MIDI channel (0…15), from a MIDI Out channel routed to this one's MIDI input port. Only
     // hosted plugins see the channel; the others play it as a plain note.
     virtual void noteOnMidi (int key, float velocity, int /*midiChannel*/) noexcept { noteOn (key, velocity); }

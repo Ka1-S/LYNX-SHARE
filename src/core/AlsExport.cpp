@@ -816,7 +816,8 @@ struct Exporter
             t.colour = ch.colour;
             t.channel = (int) i;
             t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
-            t.gain = channelGain (ch.volume);
+            // (a hosted plugin in a project with FL's levels plays √2 over the curve, round 190ad)
+            t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f);
             t.pan = ch.pan;
             tracks.push_back (t);
             if (! plugin && ch.instrument != InstrumentKind::plugin)
