@@ -8284,7 +8284,7 @@ countries: cn sg
 "Pad pan" = "打击垫声像"
 "Pad tune" = "打击垫调音"
 "Pad volume" = "打击垫音量"
-"Pad {0}/16" = "打击垫 {0}/16"
+"Pad {0}/32" = "打击垫 {0}/32"
 "Pan envelope" = "声像包络"
 "Previous pad" = "上一个打击垫"
 "Random (avoid previous)" = "随机(避开上一个)"

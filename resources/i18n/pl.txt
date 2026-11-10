@@ -8284,7 +8284,7 @@ countries: pl
 "Pad pan" = "Panorama padu"
 "Pad tune" = "Strój padu"
 "Pad volume" = "Głośność padu"
-"Pad {0}/16" = "Pad {0}/16"
+"Pad {0}/32" = "Pad {0}/32"
 "Pan envelope" = "Obwiednia panoramy"
 "Previous pad" = "Poprzedni pad"
 "Random (avoid previous)" = "Losowo (unikaj poprzedniego)"

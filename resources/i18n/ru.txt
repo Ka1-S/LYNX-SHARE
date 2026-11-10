@@ -8284,7 +8284,7 @@ countries: ru by kz
 "Pad pan" = "Панорама пэда"
 "Pad tune" = "Строй пэда"
 "Pad volume" = "Громкость пэда"
-"Pad {0}/16" = "Пэд {0}/16"
+"Pad {0}/32" = "Пэд {0}/32"
 "Pan envelope" = "Огибающая панорамы"
 "Previous pad" = "Предыдущий пэд"
 "Random (avoid previous)" = "Случайно (избегать предыдущего)"

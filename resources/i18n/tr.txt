@@ -8284,7 +8284,7 @@ countries: tr
 "Pad pan" = "Pad pan"
 "Pad tune" = "Pad akordu"
 "Pad volume" = "Pad sesi"
-"Pad {0}/16" = "Pad {0}/16"
+"Pad {0}/32" = "Pad {0}/32"
 "Pan envelope" = "Pan envelope"
 "Previous pad" = "Önceki pad"
 "Random (avoid previous)" = "Rastgele (öncekini atla)"

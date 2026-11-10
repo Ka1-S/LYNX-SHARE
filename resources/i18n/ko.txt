@@ -8284,7 +8284,7 @@ countries: kr
 "Pad pan" = "패드 팬"
 "Pad tune" = "패드 튠"
 "Pad volume" = "패드 볼륨"
-"Pad {0}/16" = "패드 {0}/16"
+"Pad {0}/32" = "패드 {0}/32"
 "Pan envelope" = "팬 엔벨로프"
 "Previous pad" = "이전 패드"
 "Random (avoid previous)" = "랜덤 (이전 것 제외)"

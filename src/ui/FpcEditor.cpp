@@ -212,7 +212,7 @@ public:
             g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, on ? 2.0f : 1.0f);
             g.setColour (muted && muted (pad) ? theme::colour::textDisabled : has ? theme::colour::textPrimary : theme::colour::textSecondary);
             g.setFont (theme::font (theme::type::caption));
-            g.drawFittedText (name ? name (pad) : juce::String(), cell (pad).reduced (4), juce::Justification::centred, 3);
+            g.drawFittedText (name ? name (pad) : juce::String(), cell (pad).reduced (4), juce::Justification::centredBottom, 2);
         }
     }
 
@@ -381,16 +381,12 @@ public:
         button (loadButton, juce::String::fromUTF8 ("\xe2\x96\xbe"), tr ("Load sample"), [this] { chooseSample(); });
         button (volumeTab, "VOL", tr ("Volume envelope"), [this] { envelopeTab = 0; refresh(); });
         button (panTab, "PAN", tr ("Pan envelope"), [this] { envelopeTab = 1; refresh(); });
-        for (auto* b : { &bankA, &bankB })
-        {
-            b->setClickingTogglesState (false);
-            b->setWantsKeyboardFocus (false);
-            addAndMakeVisible (*b);
-        }
-        bankA.setButtonText (tr ("Bank A"));
-        bankB.setButtonText (tr ("Bank B"));
-        bankA.onClick = [this] { selectPad (selectedPad % 16, false); };
-        bankB.onClick = [this] { selectPad (16 + selectedPad % 16, false); };
+        ui::setHint (bankA, tr ("Bank A"));
+        ui::setHint (bankB, tr ("Bank B"));
+        bankA.onChange = [this] (bool) { selectPad (selectedPad % 16, false); };
+        bankB.onChange = [this] (bool) { selectPad (16 + selectedPad % 16, false); };
+        addAndMakeVisible (bankA);
+        addAndMakeVisible (bankB);
 
         currentPad.setJustificationType (juce::Justification::centred);
         padName.setJustificationType (juce::Justification::centred);
@@ -457,7 +453,8 @@ public:
         digi (cutGroup, tr ("Cut which group?"), -1, 99, -1, [] (fpc::Pad& p, int v) { p.cut = v; });
         digi (cutBy, tr ("Cut by which group?"), -1, 99, -1, [] (fpc::Pad& p, int v) { p.cutBy = v; });
         digi (output, tr ("Pad output offset"), -99, 103, 0, [] (fpc::Pad& p, int v) { p.output = v; });
-        cutGroup.textOf = cutBy.textOf = [] (int v) { return v < 0 ? juce::String ("--") : juce::String (v); };
+        cutGroup.textOf = cutBy.textOf = [] (int v) { return v < 0 ? juce::String ("---") : juce::String (v); };
+        output.textOf = [] (int v) { return v == 0 ? juce::String ("---") : juce::String (v); };
 
         grid.name = [this] (int pad) {
             const auto& p = kit.pads[(std::size_t) (bank() * 16 + pad)];
@@ -509,17 +506,21 @@ public:
         g.drawText ("FPC", fl (10, 1, 110, 32), juce::Justification::centredLeft, false);
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::caption));
-        auto caption = [&g] (const char* s, int x, int y, int w) { g.drawText (s, fl (x, y, w, 9), juce::Justification::centred, false); };
-        caption ("VOL", 295, 59, 36);
-        caption ("PAN", 329, 59, 36);
-        caption ("TUNE", 369, 59, 36);
-        caption ("MUTE", 407, 59, 35);
-        caption ("SOLO", 439, 59, 35);
-        caption ("SCALE", 471, 59, 35);
-        caption ("NOTE", 594, 33, 42);
-        caption ("CUT", 640, 33, 35);
-        caption ("CUT BY", 692, 33, 39);
-        caption ("OUT", 749, 33, 36);
+        // FL writes the names beside the controls: M, S, Scale Vol, then one dark strip with Midi Note, Cut, Cut By, Output
+        g.drawText ("M", fl (435, 40, 11, 18), juce::Justification::centred, false);
+        g.drawText ("S", fl (467, 40, 11, 18), juce::Justification::centred, false);
+        g.drawText ("Scale Vol", fl (501, 40, 60, 18), juce::Justification::centredLeft, false);
+        g.setColour (theme::colour::bg0);
+        g.fillRect (fl (548, 40, 236, 18));
+        g.setColour (theme::colour::textPrimary);
+        g.drawText ("Midi Note", fl (550, 40, 46, 18), juce::Justification::centredRight, false);
+        g.drawText ("Cut", fl (626, 40, 22, 18), juce::Justification::centredRight, false);
+        g.drawText ("Cut By", fl (668, 40, 34, 18), juce::Justification::centredRight, false);
+        g.drawText ("Output", fl (722, 40, 34, 18), juce::Justification::centredRight, false);
+        // the bank bar
+        g.setColour (theme::colour::textSecondary);
+        g.drawText ("BANK A", fl (36, 334, 60, 19), juce::Justification::centredLeft, false);
+        g.drawText ("BANK B", fl (193, 334, 60, 19), juce::Justification::centredRight, false);
     }
 
     void resized() override
@@ -539,8 +540,8 @@ public:
         cutBy.setBounds (fl (702, 42, 19, 14));
         output.setBounds (fl (754, 42, 26, 14));
         grid.setBounds (fl (14, 79, 261, 251));
-        bankA.setBounds (fl (14, 334, 130, 19));
-        bankB.setBounds (fl (145, 334, 130, 19));
+        bankA.setBounds (fl (16, 335, 17, 17));
+        bankB.setBounds (fl (256, 335, 17, 17));
         createLayer.setBounds (fl (299, 73, 54, 19));
         deleteLayer.setBounds (fl (357, 73, 54, 19));
         layerUp.setBounds (fl (417, 73, 13, 10));
@@ -720,17 +721,27 @@ private:
         });
     }
 
-    // the pad's note, by octave (FL's own popup also has Last hit / Learn / Map notes for entire bank: not built yet)
+    // FL's note popup: one column per octave, the General MIDI drum names beside the notes that have one (its first
+    // column — Last hit, Learn, Map notes for entire bank, Show GM note names — is not built yet)
     void noteMenu()
     {
+        static const char* const gm[] = { "High Q", "Slap", "Scratch Push", "Scratch Pull", "Sticks", "Square Click", "Metronome Click", "Metronome Bell",
+            "Acoustic Bass Drum", "Bass Drum 1", "Side Stick", "Acoustic Snare", "Hand Clap", "Electric Snare",
+            "Low Floor Tom", "Closed Hi-Hat", "High Floor Tom", "Pedal Hi-Hat", "Low Tom", "Open Hi-Hat", "Low-Mid Tom", "Hi Mid Tom",
+            "Crash Cymbal 1", "High Tom", "Ride Cymbal 1", "Chinese Cymbal", "Ride Bell", "Tambourine", "Splash Cymbal", "Cowbell",
+            "Crash Cymbal 2", "Vibra-slap", "Ride Cymbal 2", "Hi Bongo", "Low Bongo", "Mute Hi Conga", "Open Hi Conga", "Low Conga",
+            "High Timbale", "Low Timbale", "High Agogo", "Low Agogo", "Cabasa", "Maracas", "Short Whistle", "Long Whistle", "Short Guiro",
+            "Long Guiro", "Claves", "Hi Wood Block", "Low Wood Block", "Mute Cuica", "Open Cuica", "Mute Triangle", "Open Triangle" };
         juce::PopupMenu m;
         const auto now = kit.pads[(std::size_t) selectedPad].note;
-        for (int octave = 0; octave <= 10; ++octave)
+        for (int key = 0; key < 128; ++key)
         {
-            juce::PopupMenu sub;
-            for (int key = octave * 12; key < std::min (128, octave * 12 + 12); ++key)
-                sub.addItem (key + 1, keyName (key), true, key == now);
-            m.addSubMenu (juce::String (octave), sub, true, nullptr, now / 12 == octave);
+            if (key > 0 && key % 12 == 0)
+                m.addColumnBreak();
+            auto name = keyName (key);
+            if (key >= 27 && key <= 81) // as FL lists them (D#2 High Q … A6 Open Triangle)
+                name << " (" << gm[key - 27] << ")";
+            m.addItem (key + 1, name, true, key == now);
         }
         juce::Component::SafePointer<FpcEditor> self (this);
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&padNote), [self] (int r) {
@@ -768,7 +779,7 @@ private:
         loading = true;
         const auto& pad = kit.pads[(std::size_t) selectedPad];
         selectedLayer = std::clamp (selectedLayer, 0, std::max (0, (int) pad.layers.size() - 1));
-        currentPad.setText (tr ("Pad {0}/16", { juce::String (selectedPad % 16 + 1) }), juce::dontSendNotification);
+        currentPad.setText (tr ("Pad {0}/32", { juce::String (selectedPad + 1) }), juce::dontSendNotification);
         const auto name = text (pad.name);
         padName.setText (name.isNotEmpty() ? name : tr ("Pad {0}", { juce::String (selectedPad % 16 + 1) }), juce::dontSendNotification);
         padVolume.setValue (std::clamp (pad.volume, 0, 127), juce::dontSendNotification);
@@ -782,8 +793,8 @@ private:
         cutGroup.set (pad.cut);
         cutBy.set (pad.cutBy);
         output.set (pad.output);
-        bankA.setToggleState (bank() == 0, juce::dontSendNotification);
-        bankB.setToggleState (bank() == 1, juce::dontSendNotification);
+        bankA.set (bank() == 0);
+        bankB.set (bank() == 1);
         volumeTab.setToggleState (envelopeTab == 0, juce::dontSendNotification);
         panTab.setToggleState (envelopeTab == 1, juce::dontSendNotification);
 
@@ -857,10 +868,10 @@ private:
     int selectedPad = 0, selectedLayer = 0, envelopeTab = 0;
     bool loading = false;
 
-    juce::TextButton previousPad, nextPad, createLayer, deleteLayer, layerUp, layerDown, spreadEven, loadButton, volumeTab, panTab, bankA, bankB;
+    juce::TextButton previousPad, nextPad, createLayer, deleteLayer, layerUp, layerDown, spreadEven, loadButton, volumeTab, panTab;
     juce::Label currentPad, padName, padNote, sampleName;
     juce::Slider padVolume, padPan, padTune;
-    Led mute, solo, scaleVolume, randomTrigger;
+    Led mute, solo, scaleVolume, randomTrigger, bankA, bankB;
     DigiWheel cutGroup, cutBy, output;
     PadGrid grid;
     juce::Viewport layerView;
