@@ -12,6 +12,8 @@
 //   Drive     0 … 10: a tube stage on the shifted voice           Mix      dry / wet (linear, measured)
 //
 // Latency: two periods of the lowest detected pitch (70 Hz), reported to PDC; the dry signal is delayed to match.
+// Round trial187b: each channel has its own detector and shifter (as the reference, measured black-box); once shifted
+// the right channel runs 1.25 ms behind the left; Transpose at Pitch 0 / Formant 0 passes the input itself.
 // Meters (controlOutput): 0 = sung note / 127 (0 = unvoiced), 1 = the note sent out / 127, 2 = the held MIDI note / 127
 // (0 = none; round 137).
 
@@ -42,6 +44,9 @@ double driveAmount (float v) noexcept;      // 0 … 10
 constexpr double robotNote = 60.0;          // C4 (261.6 Hz) at Pitch 0 [EXEC trial: 262 Hz]
 constexpr double minHz = 70.0, maxHz = 1000.0;
 int latencyFor (double sampleRate) noexcept;
+// round trial187b: the level (dB) the reference's voice gains when the pitch moves this many semitones against
+// the formants (pitch − formant shift; negative = quieter)
+double tiltDb (double semitones) noexcept;
 // the drive stage's static curve (no state): input → output at a drive amount 0 … 10
 float driveCurve (float x, double amount) noexcept;
 int midiChannelIndex (float v) noexcept;    // −1 = off, else 0 … 127 (LYNX Tune's law)

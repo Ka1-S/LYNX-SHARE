@@ -61,9 +61,9 @@ General › Hints and warnings › Manage messages). Matches every row above. Di
 
 FL drops a send into a deleted insert. Users ask to see the broken link instead (research-web-2 §3.1). Mixer menu ›
 "Keep links to deleted inserts, greyed (LYNX)": each send into a deleted insert stays as `MixerTrack::lostSends`
-(the deleted insert's name and the send level, saved in the project, never in the .flp). The routing lane under the
-strips draws it greyed and dashed, ending in a cross; the insert menu's "Disconnected links" reconnects it to another
-insert at its level, or removes it. The sound is the same as with the option off.
+(the deleted insert's name and the send level, saved in the project, never in the .flp). The selected insert shows
+them as a greyed dashed chip ("× name", or "× N") in its own route-switch place; the insert menu's Routing section ›
+"Disconnected links" reconnects one to another insert at its level, or removes it. The sound is the same as with the option off.
 
 **Best way?** FL: drops it. Live: a send to a deleted return goes too. Users: want "routing by reference" and a visible
 broken link. Verdict: an option, off by default (FL-exact default).
