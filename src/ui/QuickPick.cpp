@@ -225,6 +225,18 @@ void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function
                        std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner)
 {
     const auto entries = generatorEntries (engine, true);
+    // issue #130: the plugin list first (the user's own instruments are the ones they reach for most), then FL's
+    // generator categories below
+    juce::PopupMenu plugins;
+    addPluginItems (plugins, engine, true, [pick] (PluginRef ref) {
+        ChannelDef c;
+        c.name = ref.name;
+        c.instrument = InstrumentKind::plugin;
+        c.plugin = ref;
+        pick (std::move (c));
+    }, owner, pick);
+    menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
+    menu.addSeparator();
     // FL's Add menu (round 170b): the generators under their categories, A-Z (FL's Plugin database folders, LYNX's own
     // first); the channel's own generator is ticked (only kinds with one entry: the VFX and FL engines share kinds / names)
     categorizedItems<GeneratorEntry> (menu, engine, entries, true, [&] (juce::PopupMenu& m, int i) {
@@ -240,15 +252,6 @@ void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function
     });
     if (chooseSample)
         menu.addItem (tr ("Sampler (choose file)..."), chooseSample);
-    juce::PopupMenu plugins;
-    addPluginItems (plugins, engine, true, [pick] (PluginRef ref) {
-        ChannelDef c;
-        c.name = ref.name;
-        c.instrument = InstrumentKind::plugin;
-        c.plugin = ref;
-        pick (std::move (c));
-    }, owner, pick);
-    menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
 }
 
 juce::String shownName (AudioEngine& engine, const std::string& key, const juce::String& original)
