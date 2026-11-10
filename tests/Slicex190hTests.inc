@@ -291,3 +291,230 @@ TEST (slicex190h_fl_projects_states_rewrite_byte_for_byte)
     }
     CHECK (seen == same);
 }
+
+// ---- slice 2: the voice engine (core/SlicexEngine.h)
+#include "core/SlicexEngine.h"
+
+namespace slicex190h
+{
+struct Rig
+{
+    std::shared_ptr<std::vector<float>> audio = std::make_shared<std::vector<float>>();
+    lynx::slicex::State state = lynx::slicex::fresh();
+    lynx::slicex::Engine engine;
+    std::vector<float> left, right;
+
+    // a 1 s mono sample at 44.1 kHz: four regions of 11025 frames, each a constant level (0.1 · (index + 1)) with a
+    // fast sine on top in the second half of the sample
+    lynx::slicex::DeckAudio deck (std::vector<int> keys = {}) const
+    {
+        lynx::slicex::DeckAudio a;
+        a.owner = audio;
+        a.left = audio->data();
+        a.frames = (std::int64_t) audio->size();
+        a.regions = lynx::slicex::regionsFromMarkers ({ 0, 11025, 22050, 33075 }, a.frames);
+        for (std::size_t i = 0; i < keys.size() && i < a.regions.size(); ++i)
+            a.regions[i].key = keys[i];
+        return a;
+    }
+
+    Rig()
+    {
+        for (int i = 0; i < 44100; ++i)
+            audio->push_back (0.1f * (float) (i / 11025 + 1) + (i >= 22050 ? 0.05f * (float) std::sin (i * 1.5) : 0.0f));
+        state.decks[0].regions.assign (4, lynx::slicex::defaultRegion());
+        engine.setRate (44100, false);
+        engine.setTempo (120.0f);
+    }
+
+    void load (std::vector<int> keys = {}) { engine.setProgram (lynx::slicex::makeProgram (state, deck (std::move (keys)), {})); }
+
+    int play (int key, int colour = 0, float cents = 0.0f)
+    {
+        lynx::slicex::Note n;
+        n.key = key;
+        n.colour = colour;
+        n.pitchCents = (float) (100 * (key - 60)) + cents;
+        return engine.trigger (n);
+    }
+
+    void run (int frames)
+    {
+        const auto at = left.size();
+        left.resize (at + (std::size_t) frames, 0.0f);
+        right.resize (at + (std::size_t) frames, 0.0f);
+        for (int done = 0; done < frames; done += 256)
+            engine.render (left.data() + at + done, right.data() + at + done, std::min (256, frames - done));
+    }
+};
+} // namespace slicex190h
+
+TEST (slicex190h_engine_plays_each_region_on_its_key_at_the_samples_own_pitch)
+{
+    using namespace lynx;
+    slicex190h::Rig rig;
+    rig.load();
+    CHECK (rig.play (59) == -1 && rig.play (64) == -1 && rig.engine.idle());
+    const int id = rig.play (61);
+    CHECK (id >= 0 && rig.engine.voiceCount() == 1);
+    rig.run (12000);
+    // the region's own frames, unity gain on both sides, then nothing: the slice ends on its last frame
+    bool exact = true;
+    for (int i = 0; i < 11025; ++i)
+        exact = exact && rig.left[(std::size_t) i] == (*rig.audio)[(std::size_t) (11025 + i)] && rig.right[(std::size_t) i] == rig.left[(std::size_t) i];
+    CHECK (exact);
+    bool silent = true;
+    for (int i = 11025; i < 12000; ++i)
+        silent = silent && std::abs (rig.left[(std::size_t) i]) < 1e-6f;
+    CHECK (silent);
+    CHECK (rig.engine.idle() && ! rig.engine.noteActive (id));
+}
+
+TEST (slicex190h_engine_note_off_cuts_the_slice_with_fls_20_ms_declick)
+{
+    using namespace lynx;
+    slicex190h::Rig rig;
+    rig.load();
+    const int id = rig.play (60);
+    rig.run (2000);
+    rig.engine.release (id);
+    rig.run (3000);
+    CHECK (std::abs (rig.left[1999] - 0.1f) < 1e-6f);
+    // the release starts on the next 48-frame sub-block and closes within 20 ms (882 frames)
+    CHECK (std::abs (rig.left[2015] - 0.1f) < 1e-6f);
+    CHECK (std::abs (rig.left[2016 + 882 + 48]) < 1e-5f);
+    float peak = 0.0f;
+    for (int i = 2016; i < 5000; ++i)
+        peak = std::max (peak, std::abs (rig.left[(std::size_t) i]));
+    CHECK (peak <= 0.1f + 1e-6f);
+    CHECK (rig.engine.idle());
+    // the "Sustaining" way: a volume envelope with a sustain point keeps the voice after the note off
+    rig.left.clear();
+    rig.right.clear();
+    auto& env = rig.state.groups[0].art[slicex::volume].envelope;
+    env.enabled = -1;
+    env.points[1].dt = 6.0;
+    env.points[1].y = 1.0;
+    env.sustain = 0;
+    rig.load();
+    const int held = rig.play (60);
+    rig.run (2000);
+    rig.engine.release (held);
+    rig.run (3000);
+    CHECK (std::abs (rig.left[4000] - 0.1f) < 1e-4f);
+    CHECK (! rig.engine.idle());
+}
+
+TEST (slicex190h_engine_region_settings_pitch_pan_volume_delay_reverse)
+{
+    using namespace lynx;
+    slicex190h::Rig rig;
+    auto& rec = rig.state.decks[0].regions;
+    rec[0][slicex::rVolume] = 16000;   // ×4
+    rec[1][slicex::rPan] = 6400;       // hard right
+    rec[2][slicex::rDelay] = 6400;     // half a beat = 11025 frames at 120 bpm
+    rig.state.masters[slicex::mVolume] = 0;
+    rig.load();
+    rig.play (60);
+    rig.run (64);
+    CHECK (rig.left[40] == 0.0f); // master volume 0
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.state.masters[slicex::mVolume] = 12800;
+    rig.load();
+    rig.play (60);
+    rig.run (1000);
+    CHECK (std::abs (rig.left[500] - 0.4f) < 1e-5f && std::abs (rig.right[500] - 0.4f) < 1e-5f);
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (61);
+    rig.run (1000);
+    CHECK (std::abs (rig.left[500]) < 1e-6f && std::abs (rig.right[500] - 0.2f * 1.4142135f) < 1e-5f);
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (62);
+    rig.run (12000);
+    CHECK (rig.left[11024] == 0.0f && std::abs (rig.left[11025] - (*rig.audio)[22050]) < 1e-6f);
+    // an octave up reads the region twice as fast: it ends after half its length
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (60, 0, 1200.0f);
+    rig.run (7000);
+    CHECK (std::abs (rig.left[3000] - 0.4f) < 1e-3f && std::abs (rig.left[5400] - 0.4f) < 1e-3f && std::abs (rig.left[6000]) < 1e-5f);
+    // colours 14 and 15 play the region backwards (its last frame first); odd colours play deck B (empty here)
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    CHECK (rig.play (63, 15) == -1);
+    CHECK (rig.play (63, 14) >= 0);
+    rig.run (400);
+    CHECK (std::abs (rig.left[300] - (*rig.audio)[44099 - 300]) < 2e-3f); // (past the 4 ms start declick)
+}
+
+TEST (slicex190h_engine_layering_cut_groups_filter_and_envelope)
+{
+    using namespace lynx;
+    slicex190h::Rig rig;
+    // regions 0 and 1 share key 72: "cycle" layering plays them in turn, "all" plays both
+    rig.state.setOptionInt (slicex::oLayering, 6);
+    rig.state.setOptionInt (slicex::oCrossfade, 0);
+    rig.load ({ 72, 72 });
+    auto level = [&rig] {
+        rig.left.clear(), rig.right.clear();
+        rig.engine.killAll();
+        rig.play (72);
+        rig.run (600);
+        return rig.left[500];
+    };
+    const float first = level(), second = level(), third = level();
+    CHECK (std::abs (first - 0.1f) < 1e-5f && std::abs (second - 0.2f) < 1e-5f && std::abs (third - 0.1f) < 1e-5f);
+    rig.state.setOptionInt (slicex::oLayering, 0);
+    rig.load ({ 72, 72 });
+    CHECK (std::abs (level() - 0.3f) < 1e-5f);
+    rig.state.setOptionInt (slicex::oLayering, 1); // gain-compensated: each at 1/2
+    rig.load ({ 72, 72 });
+    CHECK (std::abs (level() - 0.15f) < 1e-5f);
+
+    // a cut group: the next note of the group closes the sounding one
+    for (auto& r : rig.state.decks[0].regions)
+        r[slicex::rCutGroup] = 3;
+    rig.load();
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (60);
+    rig.run (500);
+    rig.play (61);
+    CHECK (rig.engine.voiceCount() == 2);
+    rig.run (2000);
+    CHECK (rig.engine.voiceCount() == 1);
+    CHECK (std::abs (rig.left[2400] - 0.2f) < 1e-4f);
+
+    // the group's low-pass (order 1, cutoff wheel low) takes the fast sine off region 3 and keeps its level
+    for (auto& r : rig.state.decks[0].regions)
+        r[slicex::rCutGroup] = 0;
+    rig.state.groups[0].header = { 128, 0, 128, 0, 1 };
+    rig.load();
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (62);
+    rig.run (8000);
+    float lo = 1.0f, hi = 0.0f;
+    for (int i = 6000; i < 8000; ++i)
+        lo = std::min (lo, rig.left[(std::size_t) i]), hi = std::max (hi, rig.left[(std::size_t) i]);
+    CHECK (hi - lo < 0.01f && std::abs ((hi + lo) * 0.5f - 0.3f) < 0.01f);
+
+    // a volume envelope: 1 → 0 over 0.5 units (0.25 s) with no sustain point; the voice ends with it
+    rig.state.groups[0].header = { 128, 128, 128, 0, 0 };
+    auto& env = rig.state.groups[0].art[slicex::volume].envelope;
+    env.enabled = -1;
+    env.points[1].dt = 0.5;
+    env.points[1].tension = 0.0f;
+    env.sustain = -1;
+    rig.load();
+    rig.left.clear(), rig.right.clear();
+    rig.engine.killAll();
+    rig.play (60);
+    rig.run (11025);
+    CHECK (std::abs (rig.left[10] - 0.1f) < 1e-3f);
+    CHECK (std::abs (rig.left[5512] - 0.05f) < 2e-3f); // half way down (a straight line)
+    CHECK (std::abs (rig.left[11000]) < 1e-3f); // (the gains ramp over each 48-frame sub-block: one sub-block behind)
+}

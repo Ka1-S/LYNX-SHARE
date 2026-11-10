@@ -17,9 +17,35 @@ record and all 8 articulator groups (`tests/Slicex190hTests.inc`).
 - Runtime master fields (Part 3 §9): +0x1088 is the randomness level and +0x108c the master LFO.
 - The region volume law's K is ln 3 (Part 3 §1 read the constant; Part 1 had it as a hypothesis).
 
-**Open [HYP] items that need an FL render before the voice engine relies on them:** the sub-block length during an
-export (Part 3 "Uncertain" 1), note-off with every articulator envelope off (Part 3 §8), the pan kernel variant
-(Part 3 "Uncertain" 2), how FL fills a deck's beat grid for a newly loaded sample (Part 1 §3.2).
+**The voice engine (190h slice 2, `core/SlicexEngine.{h,cpp}`)** follows Parts 2 and 3: key map and layering at the
+trigger, one voice per layered region (FL's resampler on the region, start offset, delay, reverse for note colours 14
+and 15), the six articulators stepped per sub-block (the curve library is the one LYNX already had bit-exact for Fruity
+Love Philter, now shared as `core/FlCurves.inc`; Slicex's ATT/DEC/SUS/REL knob factors, decay point and release are
+added in the engine), the group filter, the two declicks, the pan matrix and the gain ramps.
+
+**Checked against FL [EXEC: FL 2026 `/R` render, round 170i2's `Slicex_vel64.flp` — 10 notes on the 22 regions of
+"DL Breaker", velocity 64, no envelopes or filter]:** the engine's output times one constant (the host's channel
+volume, outside the plugin) equals FL's 16-bit file within 1 LSB on every sample (residual −72 dB = the file's
+quantisation; `p/flcmp` in /mnt/e/lynx-work/slicex190h). That settles three of the open points:
+- **Sub-block in an export: 48·sr/44100, not 4.** With 4 the residual is −54 dB, all of it at the note ends (Part 3
+  "Uncertain" 1: the rendering flag does not shorten the sub-block in an FL `/R` render). "HQ envelopes" still gives 4.
+- **Note off with every envelope off** (Part 3 §8): the voice goes to state 9 on the next sub-block and closes with the
+  20 ms declick, i.e. a note cuts its slice. A sustain point in an enabled envelope ("Sustaining" preset) keeps it.
+- **Velocity** reaches the level through the host's Init.Vol, and the slice ends hard on its last frame (as 170i saw).
+
+**Still open [HYP] (need FL renders of edited states; none of FL's demos has them):** filter coefficient laws and the
+pan kernel variant against a render; envelope knobs (ATT/DEC/SUS/REL) and the sustain shift; the LFO's global phase
+(the engine starts every LFO at its start phase); taps before a region's start (the engine repeats the first frame,
+zeros past the end); layering mode 7 (song time; the engine plays every layer); the output track offset; deck B needs
+a second sample on the channel; how FL fills a deck's beat grid for a newly loaded sample (Part 1 §3.2).
+
+**Best way?** (for the engine; the editor's own block comes with the UI slice)
+- **FL:** one plugin holds the slicing, per-region settings and 8 articulator groups (Parts 1–3, checked by the render above).
+- **Ableton:** Simpler's slicing mode and "Slice to MIDI / Drum Rack" cover the same task with one shared envelope and
+  filter per Simpler, or one chain per slice in a rack (/mnt/e/lynx-work/ableton/STUDY.md rows "Simpler (slicing)" and
+  gap #6; research-web.md §3 with Ableton's manual links).
+- **Users:** not researched in this round — to do with the editor slice (web search with sources).
+- **Verdict:** FL-exact engine and state, so FL projects sound the same; no alternative proposed at engine level.
 
 ---
 
