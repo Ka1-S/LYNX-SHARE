@@ -17386,4 +17386,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ExportBundle184aTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
+#include "MidiTools190oTests.inc"
 #include "Notes188gTests.inc"
