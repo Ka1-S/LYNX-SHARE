@@ -927,10 +927,14 @@ enum class EffectKind : std::uint8_t
     pocketAutoduck,        // Pocket Autoduck, FL Studio Mobile's Autoduck, exact (round 189h, core/PocketFx.h)
     pocketChorus,          // Pocket Chorus, FL Studio Mobile's Chorus, exact (round 189h, core/PocketFx.h)
     pocketSpacer,          // Pocket Spacer, FL Studio Mobile's Spacer, exact (round 189h, core/PocketFx.h)
-    pocketStereoizer       // Pocket Stereoizer, FL Studio Mobile's Stereoizer, exact (round 189h, core/PocketFx.h)
+    pocketStereoizer,       // Pocket Stereoizer, FL Studio Mobile's Stereoizer, exact (round 189h, core/PocketFx.h)
+    pocketWowFlutter,      // Pocket Wow & Flutter, FL Studio Mobile's Wow & Flutter (round 189h, core/PocketFxB.cpp)
+    pocketPhaser,          // Pocket Phaser, FL Studio Mobile's Phaser (round 189h, core/PocketFxB.cpp)
+    pocketFlanger,         // Pocket Flanger, FL Studio Mobile's Flanger (round 189h, core/PocketFxB.cpp)
+    pocketTremolo          // Pocket Tremolo, FL Studio Mobile's Tremolo (round 189h, core/PocketFxB.cpp)
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::pocketStereoizer;
+constexpr EffectKind lastEffectKind = EffectKind::pocketTremolo;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

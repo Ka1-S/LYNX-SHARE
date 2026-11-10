@@ -39,6 +39,19 @@
 //     [6] Stereo Mode (0: Standard, Output M/S, Input M/S).
 //   Pocket Stereoizer (EffectKind::pocketStereoizer, FLM module 15): [0] Strength (0.7), [1] Timbre (0.52; Haas delay
 //     0.5…50 ms), [2] Focus (0.75; low-pass below ½, high-pass above), [3] L/R Delay (0.5; ±25 ms), [4] Pan (0.5).
+//   Pocket Wow & Flutter (EffectKind::pocketWowFlutter, FLM module 43): [0] Wow rate (0.184564; 0.1…5 Hz), [1] Wow sync
+//     (0.2: 1/8 … 16 beats), [2] Wow amount (0.25; exponential), [3] Flutter rate (0.066818; 5…20 Hz), [4] Flutter sync
+//     (0.1), [5] Flutter amount (0.25), [6] Sync (0), [7] Random rate (0.08952; 0.1…10 Hz), [8] Random sync (0.8),
+//     [9] Random amount (0.25). A 100 % wet modulated delay (core/PocketFxB.cpp; random picks timed in samples).
+//   Pocket Phaser (EffectKind::pocketPhaser, FLM module 14): [0] LFO rate (0.112222: 1/4 beat … "16 bars"), [1] LFO
+//     amount (0.25), [2] Feedback (0.1), [3] Frequency (0.25; 50 + 15950v² Hz), [4] Mix (1), [5] Sync (1), [6] LFO speed
+//     (0; 0.1…10 Hz), [7] LFO shape (0), [8] Stereo (1). Six first-order all-passes, the wet added to the dry.
+//   Pocket Flanger (EffectKind::pocketFlanger, FLM module 13): [0] LFO rate (0.4), [1] Sync (0), [2] LFO speed (0.55),
+//     [3] LFO shape (0), [4] LFO amount (1), [5] Delay (0.25; 2.5v² ms), [6] Feedback (0.75), [7] Invert feedback (1),
+//     [8] Stereo (0), [9] Mix (1), [10] Invert mix (1). FLM's tape (core/PocketTape.h) as a 5 ms loop.
+//   Pocket Tremolo (EffectKind::pocketTremolo, FLM module 46): [0] Rate (0.045467; 0.1…20 Hz), [1] Rate sync (0),
+//     [2] Amount max (1), [3] Amount min (0), [4] Phase offset (0), [5] Stereo offset (0), [6] Sync (0), [7] Shape (0.5),
+//     [8] Smooth (1), [9] Skew (0.5), [10] Width (0.5).
 
 #include <memory>
 #include <string>
@@ -49,6 +62,7 @@ namespace lynx::pocket
 {
 constexpr int distortionParams = 6, limiterClassicParams = 3, limiterParams = 4, levellerParams = 2, gateParams = 8, tranceDelayParams = 7, tapeDelayParams = 4, multiFxParams = 6;
 constexpr int autoduckParams = 7, chorusParams = 4, spacerParams = 7, stereoizerParams = 5;
+constexpr int wowFlutterParams = 10, phaserParams = 9, flangerParams = 11, tremoloParams = 11;
 
 // Distortion's curves: soft knee x/(k|x| + 1), tanh, exponential, hard clip
 const char* distortionKindName (int kind) noexcept;
@@ -66,6 +80,10 @@ std::unique_ptr<Effect> makeAutoduck();   // core/PocketFxA.cpp
 std::unique_ptr<Effect> makeChorus();     // core/PocketFxA.cpp
 std::unique_ptr<Effect> makeSpacer();     // core/PocketFxA.cpp
 std::unique_ptr<Effect> makeStereoizer(); // core/PocketFxA.cpp
+std::unique_ptr<Effect> makeWowFlutter(); // core/PocketFxB.cpp
+std::unique_ptr<Effect> makePhaser();
+std::unique_ptr<Effect> makeFlanger();
+std::unique_ptr<Effect> makeTremolo();
 
 std::string distortionParamText (int param, float v);
 std::string limiterClassicParamText (int param, float v);
@@ -75,6 +93,10 @@ std::string gateParamText (int param, float v);
 std::string tranceDelayParamText (int param, float v);
 std::string tapeDelayParamText (int param, float v);
 std::string multiFxParamText (int param, float v);
+std::string wowFlutterParamText (int param, float v);
+std::string phaserParamText (int param, float v);
+std::string flangerParamText (int param, float v);
+std::string tremoloParamText (int param, float v);
 const char* multiFxKindName (int kind) noexcept;            // "Delay", "Reverb", … "Vox"
 int multiFxKind (float v) noexcept;                          // ⌊7v⌋
 const char* multiFxAxisName (int kind, bool yAxis) noexcept; // the pad's axis labels per kind
