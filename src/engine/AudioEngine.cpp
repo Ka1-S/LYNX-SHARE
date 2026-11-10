@@ -1739,7 +1739,7 @@ void AudioEngine::finishAudioTake()
     for (int k = 0, count = takeWrapCount.exchange (0); k < count; ++k)
         wraps.push_back ((double) takeWraps[(std::size_t) k].load() * takeTicksPerSample);
 
-    if (frames <= 0 || startTick < 0.0)
+    if (frames <= 0 || startTick < 0.0 || discardAudioTakes) // (Cancel recording drops the takes, round 187a)
     {
         for (auto& take : done)
         {
@@ -2126,6 +2126,37 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     {
         const auto cc = m.getControllerNumber();
         controllerQueue.push ({ cc, m.getChannel() - 1, m.getControllerValue() });
+        // FL's "Foot pedal controls note off" (round 187a [DECOMP FUN_00fdb260]): with it on, CC 64 / CC 66 hold the
+        // played channels' notes and don't reach the plugins
+        if (const auto mode = PedalHold::modeFor (cc, m.getControllerValue()); mode >= 0 && footPedalNoteOff.load (std::memory_order_relaxed))
+        {
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto stamped = m.getTimeStamp() * 1000.0;
+            const auto tick = recordTickFor (std::abs (stamped - now) < 1000.0 ? stamped : now);
+            const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+            auto pedal = [&] (int channel) {
+                pedalHold.setMode (channel, mode, [&] (int key) {
+                    NoteEvent e;
+                    e.type = NoteEvent::Type::off;
+                    e.channel = channel;
+                    e.key = key;
+                    midiEvents.push (e);
+                    logPlayedNote (channel, key, 0.0f, false, transport.playing.load() ? tick : -1.0, taking);
+                    if (taking) // (the recorded note lasts until the pedal comes up, as in FL)
+                        midiRecordQueue.push ({ tick, channel, key, 0.0f, false });
+                });
+            };
+            if (device.target >= 0)
+                pedal (device.target);
+            else
+            {
+                const auto extra = juce::jlimit (0, maxLiveChannels, extraLiveCount.load());
+                for (int i = -1; i < extra; ++i)
+                    if (const auto channel = i < 0 ? liveChannel.load() : extraLiveChannels[(std::size_t) i].load(); channel >= 0)
+                        pedal (channel);
+            }
+            return;
+        }
         // (120…127 are channel mode messages: All Sound / Notes Off, reset…)
         if (cc >= 0 && cc < 120 && (linkedCcs[(std::size_t) (cc >> 6)].load (std::memory_order_relaxed) >> (cc & 63) & 1u) == 0)
             playControl (cc, (float) m.getControllerValue() / 127.0f);
@@ -2208,7 +2239,14 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         push (stale[i], false, 0.0f);
 
     for (int i = 0; i < count; ++i)
+    {
+        // the foot pedal (round 187a): a held note struck again is released first; a note-off it holds waits for it
+        if (on && pedalHold.noteOn (targets[i].channel, targets[i].key))
+            push (targets[i], false, 0.0f);
+        if (! on && pedalHold.noteOff (targets[i].channel, targets[i].key))
+            continue;
         push (targets[i], on, on ? prefs::mapVelocity (m.getFloatVelocity(), velocityCurve) : 0.0f);
+    }
 }
 
 void AudioEngine::enableAllMidiInputs()
@@ -2255,6 +2293,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         midiPrefsShared = p;
     }
     performanceMidiChannel.store (p.performanceChannel);
+    footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
         pickups.clear();
     if (prefetcher != nullptr) // (only with an audio device: the real app)
@@ -2317,6 +2356,38 @@ void AudioEngine::setRecording (bool shouldRecord)
     sendChangeMessage();
 }
 
+bool AudioEngine::cancelRecording()
+{
+    if (! transport.recording.load())
+        return false;
+    // FL [DECOMP 0xf1d7e0]: the recorded-event buffers are emptied, every disk-recording take is dropped and its track
+    // re-armed, the record button is released; playback is not stopped. LYNX writes a take into the song as it goes, so
+    // the pass's edits are undone instead (one undo step per take; a step the user made while recording goes too).
+    updateRecording(); // (what was played up to now, and the start of this pass if the timer hasn't seen it yet)
+    const auto armed = armedInserts;
+    const auto inPass = recordPassActive && recordPassMarked; // (record on but stopped: the last pass is already kept)
+    discardAudioTakes = true;
+    setRecording (false); // (the takes close here: the notes still held are committed, the audio files deleted)
+    discardAudioTakes = false;
+    for (const auto t : armed)
+        if (std::find (armedInserts.begin(), armedInserts.end(), t) == armedInserts.end())
+            setInsertArmed (t, true);
+    if (inPass && ! sessionHistory)
+    {
+        const auto made = undoStack.size() + recordPassTrimmed;
+        const auto steps = made > recordPassUndoBase ? made - recordPassUndoBase : 0;
+        for (std::size_t i = 0; i < steps && ! undoStack.empty(); ++i)
+        {
+            undo();
+            if (! redoStack.empty())
+                redoStack.pop_back(); // (nothing to redo: the pass is gone)
+        }
+    }
+    recordPassMarked = false;
+    sendChangeMessage();
+    return true;
+}
+
 void AudioEngine::updateRecording()
 {
     const auto playing = transport.playing.load();
@@ -2331,6 +2402,14 @@ void AudioEngine::updateRecording()
     // (round 170d: a take starts with its count-in, so the notes played during it are kept)
     const auto counting = isCountingIn();
     const auto active = transport.recording.load() && (playing || counting);
+    // a recording pass starts: what Cancel recording goes back to (round 187a)
+    if (active && ! recordPassActive)
+    {
+        recordPassMarked = true;
+        recordPassUndoBase = undoStack.size();
+        recordPassTrimmed = 0;
+    }
+    recordPassActive = active;
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
@@ -2530,7 +2609,11 @@ void AudioEngine::saveUndoStep()
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
+        {
             undoStack.pop_front();
+            if (recordPassMarked)
+                ++recordPassTrimmed;
+        }
         if (sessionHistory)
         {
             closeSessionStep();

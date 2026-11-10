@@ -6,6 +6,7 @@
 #include "ui/EditorTools.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/NativeChild.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
@@ -321,15 +322,16 @@ public:
 
         dragEdges = e.eventComponent == this ? edgesAt (e.getPosition()) : 0;
         dragging = dragEdges != 0 || (onTitle && ! owner.isDetached (panel) && ! owner.isMaximised (panel));
-        startBounds = getBounds();
+        startBounds = owner.frameBounds (*this); // (the desktop's coordinates: the frame may be a native child, issue #116)
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
-        if (! dragging || getParentComponent() == nullptr)
+        if (! dragging || (getParentComponent() == nullptr && ! nativechild::isAttached (*this)))
             return;
 
-        const auto delta = e.getEventRelativeTo (getParentComponent()).getOffsetFromDragStart();
+        // in JUCE's screen coordinates, which are the desktop's too (a native child frame has no parent component)
+        const auto delta = e.getScreenPosition() - e.getMouseDownScreenPosition();
         auto r = startBounds;
 
         if (dragEdges == 0)
@@ -347,7 +349,7 @@ public:
         }
 
         // keep the title strip reachable
-        const auto parent = getParentComponent()->getLocalBounds();
+        const auto parent = owner.getLocalBounds();
         r.setY (juce::jlimit (0, juce::jmax (0, parent.getHeight() - Workspace::titleHeight), r.getY()));
 
         if (! e.mods.isAltDown()) // Alt: no snapping
@@ -358,13 +360,13 @@ public:
             r = toJuce (workspace::snap (toRect (r), others, parent.getWidth(), parent.getHeight(), 8, dragEdges));
         }
 
-        setBounds (r);
+        owner.placeFrame (*this, r);
     }
 
     void mouseUp (const juce::MouseEvent&) override
     {
         if (dragging)
-            owner.frameMoved (panel, getBounds());
+            owner.frameMoved (panel, owner.frameBounds (*this));
 
         dragging = false;
     }
@@ -614,6 +616,24 @@ private:
 
 // --- the desktop -------------------------------------------------------------------------------
 
+// Issue #116: native child frames follow the main window's native window (made again) and the desktop's place in it
+struct Workspace::PeerWatch final : juce::ComponentMovementWatcher
+{
+    explicit PeerWatch (Workspace& w) : juce::ComponentMovementWatcher (&w), owner (w) {}
+    void componentMovedOrResized (bool wasMoved, bool) override
+    {
+        if (wasMoved)
+            owner.rehostNativeFrames();
+    }
+    void componentPeerChanged() override
+    {
+        owner.rehostNativeFrames();
+        owner.applyLayout(); // (a panel left plain while there was no native window yet)
+    }
+    void componentVisibilityChanged() override { owner.applyLayout(); }
+    Workspace& owner;
+};
+
 Workspace::Workspace()
 {
     for (int i = 0; i < workspace::panelCount; ++i)
@@ -624,11 +644,20 @@ Workspace::Workspace()
 
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
+    if (nativechild::dockingEnabled())
+        peerWatch = std::make_unique<PeerWatch> (*this);
 }
 
 Workspace::~Workspace()
 {
     saveState();
+    peerWatch.reset();
+    // the native child frames go before the main window's native window does
+    for (auto& f : frames)
+        nativechild::detach (*f);
+    for (auto& f : dockedFrames)
+        if (f != nullptr)
+            nativechild::detach (*f);
 
     for (auto& w : windows)
         if (w != nullptr)
@@ -674,6 +703,8 @@ bool Workspace::toggle (Panel panel)
 {
     const auto visible = layout.toggle (panel);
     applyLayout (true);
+    if (visible)
+        nativeToFront (panel);
     return visible;
 }
 
@@ -681,6 +712,15 @@ void Workspace::show (Panel panel)
 {
     layout.show (panel);
     applyLayout (true);
+    nativeToFront (panel);
+}
+
+void Workspace::nativeToFront (Panel panel)
+{
+    // issue #116: a panel called by its key (F5..F9) or maximised comes in front of the docked plugin windows too, as a
+    // click on it does (applyLayout keeps them where they were among the panels)
+    if (auto& frame = *frames[(std::size_t) panel]; isNativePanel (panel) && nativechild::isAttached (frame) && frame.isVisible())
+        frame.toFront (false);
 }
 
 void Workspace::hide (Panel panel)
@@ -693,6 +733,7 @@ void Workspace::toggleMaximised (Panel panel)
 {
     layout.toggleMaximised (panel);
     applyLayout();
+    nativeToFront (panel);
 }
 
 void Workspace::setDetached (Panel panel, bool detached)
@@ -707,7 +748,7 @@ void Workspace::setDetached (Panel panel, bool detached)
 
         if (layout[panel].windowBounds.w <= 0 && isShowing()) // first time: where the panel is, on screen
         {
-            const auto screen = localAreaToGlobal (frames[(std::size_t) panel]->getBounds());
+            const auto screen = localAreaToGlobal (frameBounds (*frames[(std::size_t) panel]));
             layout[panel].windowBounds = toRect (screen);
         }
     }
@@ -719,7 +760,8 @@ void Workspace::setDetached (Panel panel, bool detached)
 
 void Workspace::activate (Panel panel)
 {
-    if (layout.focused == panel && (layout[panel].detached || layout.isFrontmost (panel)))
+    // (a native panel comes in front of the docked plugin windows on every click, as FL's: they are not in `layout`)
+    if (layout.focused == panel && (layout[panel].detached || layout.isFrontmost (panel)) && ! isNativePanel (panel))
         return;
 
     layout.bringToFront (panel);
@@ -808,9 +850,69 @@ std::vector<juce::Rectangle<int>> Workspace::otherPanelBounds (Panel panel) cons
 
     for (int i = 0; i < workspace::panelCount; ++i)
         if ((Panel) i != panel && layout[(Panel) i].visible && ! layout[(Panel) i].detached && ! layout[(Panel) i].maximised)
-            out.push_back (frames[(std::size_t) i]->getBounds());
+            out.push_back (frameBounds (*frames[(std::size_t) i]));
 
     return out;
+}
+
+bool Workspace::isNativePanel (Panel panel) const
+{
+    // every floating panel (the Playlist, Channel rack, Piano roll and Mixer, slice 2); the Browser is a background
+    // panel, always below them and the docked plugin windows, so it stays a plain component (REA_rodada181c)
+    return nativechild::dockingEnabled() && ! isBackgroundPanel (panel) && ! layout[panel].detached;
+}
+
+juce::Component& Workspace::getFrame (Panel panel) const
+{
+    return *frames[(std::size_t) panel];
+}
+
+void Workspace::placeFrame (juce::Component& frame, juce::Rectangle<int> bounds)
+{
+    nativechild::place (frame, *this, bounds);
+}
+
+juce::Rectangle<int> Workspace::frameBounds (const juce::Component& frame) const
+{
+    return nativechild::boundsIn (frame, *this);
+}
+
+void Workspace::rehostNativeFrames()
+{
+    for (auto& f : frames)
+        nativechild::refresh (*f, *this);
+    for (auto& f : dockedFrames)
+        if (f != nullptr)
+            nativechild::refresh (*f, *this);
+}
+
+void Workspace::addDockedFrame (juce::Component& frame)
+{
+    removeDockedFrame (frame);
+    dockedFrames.emplace_back (&frame);
+    if (peerWatch == nullptr)
+        peerWatch = std::make_unique<PeerWatch> (*this);
+}
+
+void Workspace::removeDockedFrame (juce::Component& frame)
+{
+    dockedFrames.erase (std::remove_if (dockedFrames.begin(), dockedFrames.end(),
+                                        [&frame] (const auto& f) { return f == nullptr || f.getComponent() == &frame; }),
+                        dockedFrames.end());
+}
+
+juce::Rectangle<int> Workspace::placeForDockedFrame (int width, int height) const
+{
+    // FL opens a plugin window near the top-left of the workspace, the next one a step down and right
+    int open = 0;
+    for (const auto& f : dockedFrames)
+        if (f != nullptr && f->isVisible())
+            ++open;
+    const auto step = 24 * (open % 8);
+    auto r = juce::Rectangle<int> (60 + step, 40 + step, width, height);
+    r.setX (juce::jlimit (0, juce::jmax (0, getWidth() - width), r.getX()));
+    r.setY (juce::jlimit (0, juce::jmax (0, getHeight() - height), r.getY()));
+    return r;
 }
 
 void Workspace::restoreDetachedWindows()
@@ -844,6 +946,7 @@ void Workspace::applyLayout (bool fadePanels)
         bool in;
     };
     std::vector<Fade> fades;
+    std::array<bool, workspace::panelCount> nativeShown {}; // (native panels that were hidden and show now)
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -859,6 +962,7 @@ void Workspace::applyLayout (bool fadePanels)
         {
             if (window == nullptr)
             {
+                nativechild::detach (frame);
                 removeChildComponent (&frame);
                 frame.setVisible (true);
                 frame.setSize (state.bounds.w, state.bounds.h);
@@ -880,10 +984,31 @@ void Workspace::applyLayout (bool fadePanels)
                 addChildComponent (frame);
             }
 
-            frame.setBounds (state.maximised ? getLocalBounds() : toJuce (state.bounds));
+            // issue #116: a native child window of the main window (developer switch), or a plain child component
+            if (isNativePanel (panel) && ! nativechild::isAttached (frame))
+            {
+                removeChildComponent (&frame);
+                if (nativechild::attach (frame, *this))
+                    nativechild::forwardUnusedKeys (frame);
+                else
+                    addChildComponent (frame); // (no native window yet: PeerWatch tries again when it comes)
+            }
+            else if (! isNativePanel (panel) && nativechild::isAttached (frame))
+            {
+                nativechild::detach (frame);
+                addChildComponent (frame);
+            }
+
+            placeFrame (frame, state.maximised ? getLocalBounds() : toJuce (state.bounds));
+            if (nativechild::isAttached (frame))
+            {
+                const auto show = state.visible && isVisible();
+                nativeShown[(std::size_t) i] = show && ! frame.isVisible();
+                frame.setVisible (show); // (no fade: a child window has no transparency)
+            }
             // a panel the user opens or closes fades in or out (Settings › General › Animations, round 179a), after
             // the stacking order below is set
-            if (fadePanels && ui::motion::enabled() && isShowing() && frame.isVisible() != state.visible)
+            else if (fadePanels && ui::motion::enabled() && isShowing() && frame.isVisible() != state.visible)
                 fades.push_back ({ &frame, state.visible });
             else
             {
@@ -896,9 +1021,25 @@ void Workspace::applyLayout (bool fadePanels)
         frame.refreshButtons();
     }
 
-    // stacking order (back to front): the background panels first, then the floating ones
+    // stacking order (back to front): the background panels first, then the floating ones. Issue #116: native panels
+    // are only moved when they are out of order, and then just above the panel before them, so a docked plugin window
+    // keeps its place among them (a layout change elsewhere doesn't hide it); a panel that shows now comes in front of
+    // everything (F7, F9: as a click on it, FL brings it in front of the docked plugin windows).
+    juce::Component* nativeBelow = nullptr;
     for (auto panel : layout.stacking())
-        frames[(std::size_t) panel]->toFront (false);
+    {
+        auto& frame = *frames[(std::size_t) panel];
+        if (! nativechild::isAttached (frame))
+        {
+            frame.toFront (false);
+            continue;
+        }
+        if (nativeShown[(std::size_t) panel])
+            frame.toFront (false);
+        else
+            nativechild::keepAbove (frame, nativeBelow);
+        nativeBelow = &frame;
+    }
 
     // The animator's timer runs only during a fade. Closing fades a picture of the panel placed right behind it (so
     // after the stacking above), and the panel itself is hidden at once. Opening: the frame is opaque (it hides what is
