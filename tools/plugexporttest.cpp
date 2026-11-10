@@ -64,6 +64,14 @@ struct Audio
         for (auto v : r) p = std::max (p, (double) std::abs (v));
         return p;
     }
+    // the first sample where the two differ by more than `tolerance` (-1 = none)
+    long firstDifference (const Audio& o, double tolerance = 1.0e-5) const
+    {
+        for (std::size_t i = 0; i < std::min (l.size(), o.l.size()); ++i)
+            if (std::abs (l[i] - o.l[i]) > tolerance || std::abs (r[i] - o.r[i]) > tolerance)
+                return (long) i;
+        return -1;
+    }
     double difference (const Audio& o) const
     {
         double p = l.size() == o.l.size() ? 0.0 : 1e9;
@@ -120,9 +128,44 @@ Audio render (juce::AudioProcessor& p, bool instrument, double* seconds = nullpt
     return out;
 }
 
+// Round 188b: an effect with its side-chain bus switched on (stereo), the side fed with `side` × a square wave; the main
+// input as in render(). Empty: the host couldn't switch the bus on.
+Audio renderWithSide (juce::AudioProcessor& p, float side)
+{
+    Audio out;
+    auto layout = p.getBusesLayout();
+    if (layout.inputBuses.size() < 2)
+        return out;
+    layout.inputBuses.getReference (1) = juce::AudioChannelSet::stereo();
+    if (! p.setBusesLayout (layout))
+        return out;
+    p.setRateAndBufferSizeDetails (rate, block);
+    p.prepareToPlay (rate, block);
+    const auto channels = juce::jmax (p.getTotalNumInputChannels(), p.getTotalNumOutputChannels());
+    juce::AudioBuffer<float> buffer (channels, block);
+    for (int b = 0; b < blocks; ++b)
+    {
+        buffer.clear();
+        fillInput (buffer.getWritePointer (0), buffer.getWritePointer (1), block, b * block);
+        for (int c = 2; c < juce::jmin (4, channels); ++c)
+            for (int i = 0; i < block; ++i)
+                buffer.setSample (c, i, side * (i % 64 < 32 ? 1.0f : -1.0f));
+        juce::MidiBuffer midi;
+        p.processBlock (buffer, midi);
+        out.l.insert (out.l.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + block);
+        out.r.insert (out.r.end(), buffer.getReadPointer (1), buffer.getReadPointer (1) + block);
+    }
+    p.releaseResources();
+    // (back to the main buses only, as render() expects)
+    layout.inputBuses.getReference (1) = juce::AudioChannelSet::disabled();
+    p.setBusesLayout (layout);
+    return out;
+}
+
 // The same engine with no plugin between: the effect itself / a rack with the channel
 Audio directEffect (EffectKind kind, const EffectParams& params)
 {
+    const juce::ScopedNoDenormals noDenormals; // (as the plugin's processBlock: denormals flushed)
     Audio out;
     auto effect = makeEffect (kind);
     effect->prepare (rate);
@@ -213,7 +256,11 @@ void writeEditorPicture (const Entry& entry, const juce::String& prefix)
 }
 
 } // namespace
+#if JUCE_MAC
+ #include <CoreFoundation/CoreFoundation.h>
+#else
 namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // (juce_events' native code)
+#endif
 namespace
 {
 // Lets the message loop (and a CLAP plugin's timer) run for a while
@@ -222,8 +269,12 @@ void pump (int ms, const std::function<void()>& tick = {})
     const auto end = juce::Time::getMillisecondCounter() + (juce::uint32) ms;
     while (juce::Time::getMillisecondCounter() < end)
     {
+       #if JUCE_MAC
+        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.005, false); // (JUCE's messages come through the main run loop)
+       #else
         while (juce::detail::dispatchNextMessageOnSystemQueue (true)) {}
         juce::Thread::sleep (5);
+       #endif
         if (tick)
             tick();
     }
@@ -310,7 +361,11 @@ void clapStateLoadIsSilent (const juce::File& file, const Entry& entry)
     source->getStateInformation (saved);
 
     juce::DynamicLibrary library;
-    if (! library.open (file.getFullPathName()))
+    auto binary = file; // (macOS: the executable inside the .clap bundle; clap_entry.init still gets the bundle)
+    if (file.isDirectory())
+        if (const auto inside = file.getChildFile ("Contents/MacOS").getChildFile (file.getFileNameWithoutExtension()); inside.existsAsFile())
+            binary = inside;
+    if (! library.open (binary.getFullPathName()))
         return check (false, "CLAP opens in a plain host");
     const auto* clapEntry = static_cast<const clap_plugin_entry_t*> (library.getFunction ("clap_entry"));
     if (clapEntry == nullptr || ! clapEntry->init (file.getFullPathName().toRawUTF8()))
@@ -407,6 +462,30 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     const auto nulled = sound.difference (direct);
     check (nulled < 1.0e-5, "null test at the defaults: peak difference " + juce::String (nulled, 8));
 
+    // round 188b: the side-chain bus. Switched on and silent, nothing changes (at the defaults no effect listens to it)
+    if (! entry->instrument)
+    {
+        const auto withSide = renderWithSide (*instance, 0.0f);
+        if (withSide.l.empty())
+            report << "  side-chain bus: this host can't switch it on\n";
+        else
+            check (withSide.difference (sound) < 1.0e-5, "side-chain bus on and silent: peak difference " + juce::String (withSide.difference (sound), 8));
+        if (entry->effect == EffectKind::crestCompressor && ! withSide.l.empty())
+        {
+            // its external side chain on: a loud side signal compresses the main input
+            const auto& names = effectInfo (entry->effect).params;
+            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
+                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    instance->getParameters()[i]->setValue (1.0f);
+            const auto quiet = renderWithSide (*instance, 0.0f), loud = renderWithSide (*instance, 0.9f);
+            const auto energy = [] (const Audio& a) { double e = 0.0; for (auto v : a.l) e += (double) v * v; return e; };
+            check (energy (loud) < 0.7 * energy (quiet), "external side chain through the bus compresses: " + juce::String (energy (loud) / juce::jmax (1.0e-12, energy (quiet)), 3));
+            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
+                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    instance->getParameters()[i]->setValue (0.0f);
+        }
+    }
+
     auto& parameters = instance->getParameters();
     if (! entry->instrument)
     {
@@ -422,7 +501,8 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         }
         const auto wet = render (*instance, false);
         const auto d = wet.difference (direct = directEffect (entry->effect, params));
-        check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8));
+        check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8)
+                               + (d < 1.0e-5 ? juce::String() : ", first at sample " + juce::String (wet.firstDifference (direct))));
         check (wet.difference (sound) > 1.0e-3, "those settings change the sound, difference " + juce::String (wet.difference (sound), 5));
     }
     else
@@ -445,7 +525,8 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         second->setStateInformation (state.getData(), (int) state.getSize());
         const auto first = render (*instance, entry->instrument), restored = render (*second, entry->instrument);
         const auto d = restored.difference (first);
-        check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8));
+        check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8)
+                               + (d < 1.0e-3 ? juce::String() : ", first at sample " + juce::String (restored.firstDifference (first, 1.0e-3))));
     }
     stateLoadIsSilent (format, description, state);
 

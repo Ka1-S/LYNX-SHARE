@@ -1739,7 +1739,7 @@ void AudioEngine::finishAudioTake()
     for (int k = 0, count = takeWrapCount.exchange (0); k < count; ++k)
         wraps.push_back ((double) takeWraps[(std::size_t) k].load() * takeTicksPerSample);
 
-    if (frames <= 0 || startTick < 0.0)
+    if (frames <= 0 || startTick < 0.0 || discardAudioTakes) // (Cancel recording drops the takes, round 187a)
     {
         for (auto& take : done)
         {
@@ -2317,6 +2317,38 @@ void AudioEngine::setRecording (bool shouldRecord)
     sendChangeMessage();
 }
 
+bool AudioEngine::cancelRecording()
+{
+    if (! transport.recording.load())
+        return false;
+    // FL [DECOMP 0xf1d7e0]: the recorded-event buffers are emptied, every disk-recording take is dropped and its track
+    // re-armed, the record button is released; playback is not stopped. LYNX writes a take into the song as it goes, so
+    // the pass's edits are undone instead (one undo step per take; a step the user made while recording goes too).
+    updateRecording(); // (what was played up to now, and the start of this pass if the timer hasn't seen it yet)
+    const auto armed = armedInserts;
+    const auto inPass = recordPassActive && recordPassMarked; // (record on but stopped: the last pass is already kept)
+    discardAudioTakes = true;
+    setRecording (false); // (the takes close here: the notes still held are committed, the audio files deleted)
+    discardAudioTakes = false;
+    for (const auto t : armed)
+        if (std::find (armedInserts.begin(), armedInserts.end(), t) == armedInserts.end())
+            setInsertArmed (t, true);
+    if (inPass && ! sessionHistory)
+    {
+        const auto made = undoStack.size() + recordPassTrimmed;
+        const auto steps = made > recordPassUndoBase ? made - recordPassUndoBase : 0;
+        for (std::size_t i = 0; i < steps && ! undoStack.empty(); ++i)
+        {
+            undo();
+            if (! redoStack.empty())
+                redoStack.pop_back(); // (nothing to redo: the pass is gone)
+        }
+    }
+    recordPassMarked = false;
+    sendChangeMessage();
+    return true;
+}
+
 void AudioEngine::updateRecording()
 {
     const auto playing = transport.playing.load();
@@ -2331,6 +2363,14 @@ void AudioEngine::updateRecording()
     // (round 170d: a take starts with its count-in, so the notes played during it are kept)
     const auto counting = isCountingIn();
     const auto active = transport.recording.load() && (playing || counting);
+    // a recording pass starts: what Cancel recording goes back to (round 187a)
+    if (active && ! recordPassActive)
+    {
+        recordPassMarked = true;
+        recordPassUndoBase = undoStack.size();
+        recordPassTrimmed = 0;
+    }
+    recordPassActive = active;
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
@@ -2530,7 +2570,11 @@ void AudioEngine::saveUndoStep()
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
+        {
             undoStack.pop_front();
+            if (recordPassMarked)
+                ++recordPassTrimmed;
+        }
         if (sessionHistory)
         {
             closeSessionStep();
