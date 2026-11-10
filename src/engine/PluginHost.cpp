@@ -1934,10 +1934,99 @@ std::optional<juce::PluginDescription> PluginHost::findForeign (const ForeignPlu
 
 bool PluginHost::isInstalled (const PluginRef& ref)
 {
-    if (ref.id.empty())
+    if (ref.id.empty() || playedElsewhere (ref)) // (another participant of the live session plays it: P5-A1)
         return false;
     const auto d = find (juce::String::fromUTF8 (ref.id.c_str()));
     return d != nullptr && fileStillThere (d->fileOrIdentifier);
+}
+
+// --- Online Sessions P5-A1: plugins the host shares (core/RemotePlugins.h) ------------------------------------------
+
+namespace
+{
+bool sharedParameter (const juce::AudioProcessorParameter& p)
+{
+    // (a JUCE-built plugin lists 16 x 128 "MIDI CC" parameters: not something to show a guest)
+    return p.isAutomatable() && ! p.getName (32).startsWith ("MIDI CC ");
+}
+} // namespace
+
+std::optional<remoteplug::Shared> PluginHost::describeForSharing (const std::string& id, juce::String* error)
+{
+    const auto description = find (juce::String::fromUTF8 (id.c_str()));
+    if (description == nullptr || ! fileStillThere (description->fileOrIdentifier))
+    {
+        if (error != nullptr)
+            *error = "plugin not installed or not scanned";
+        return std::nullopt;
+    }
+    PluginRef ref;
+    ref.id = id;
+    ref.name = description->name.toStdString();
+    juce::String why;
+    auto instance = createInstance (ref, 44100.0, &why);
+    if (instance == nullptr)
+    {
+        if (error != nullptr)
+            *error = why;
+        return std::nullopt;
+    }
+    remoteplug::Shared shared;
+    shared.id = id;
+    shared.name = description->name.toStdString();
+    shared.vendor = description->manufacturerName.toStdString();
+    shared.format = description->pluginFormatName.toStdString();
+    shared.instrument = description->isInstrument;
+    const auto& params = instance->getParameters();
+    for (int i = 0; i < params.size() && shared.params.size() < remoteplug::maxParams; ++i)
+    {
+        auto* p = params.getUnchecked (i);
+        if (p == nullptr || ! sharedParameter (*p))
+            continue;
+        remoteplug::Param out;
+        out.index = i;
+        out.name = p->getName (48).toStdString();
+        out.unit = p->getLabel().substring (0, 12).toStdString();
+        out.def = juce::jlimit (0.0f, 1.0f, p->getDefaultValue());
+        out.low = p->getText (0.0f, 24).toStdString();
+        out.high = p->getText (1.0f, 24).toStdString();
+        const auto steps = p->getNumSteps();
+        if (p->isDiscrete() && steps >= 2 && steps <= 1 << 16)
+        {
+            out.steps = steps;
+            if (steps <= remoteplug::maxSteps)
+                for (int k = 0; k < steps; ++k)
+                    out.stepNames.push_back (p->getText ((float) k / (float) (steps - 1), 24).toStdString());
+        }
+        shared.params.push_back (std::move (out));
+    }
+    instance->releaseResources();
+    instance.reset();
+    remoteplug::clean (shared);
+    return shared;
+}
+
+void PluginHost::applyValues (juce::AudioPluginInstance& plugin, const std::vector<std::pair<int, float>>& values)
+{
+    const auto& params = plugin.getParameters();
+    for (const auto& [index, value] : values)
+        if (index >= 0 && index < params.size())
+            if (auto* p = params.getUnchecked (index); p != nullptr && sharedParameter (*p))
+                p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, value));
+}
+
+std::vector<std::pair<int, float>> PluginHost::readValues (juce::AudioPluginInstance& plugin)
+{
+    std::vector<std::pair<int, float>> out;
+    const auto& params = plugin.getParameters();
+    for (int i = 0; i < params.size() && out.size() < remoteplug::maxParams; ++i)
+        if (auto* p = params.getUnchecked (i); p != nullptr && sharedParameter (*p))
+        {
+            const auto v = juce::jlimit (0.0f, 1.0f, p->getValue());
+            if (std::abs (v - juce::jlimit (0.0f, 1.0f, p->getDefaultValue())) > 1.0e-4f)
+                out.push_back ({ i, v });
+        }
+    return out;
 }
 
 std::optional<PluginHost::Identity> PluginHost::portableIdentity (const PluginRef& ref) const
@@ -2359,6 +2448,21 @@ int PluginHost::preloadedCount() const
 
 std::unique_ptr<juce::AudioPluginInstance> PluginHost::instantiate (const PluginRef& ref, double sampleRate, juce::String* error)
 {
+    if (playedElsewhere (ref)) // Online Sessions P5-A1: the session's host plays it; here its stand-ins play
+    {
+        if (error != nullptr)
+            *error = juce::String::fromUTF8 (ref.name.c_str()) + ": played by another computer in the live session";
+        return nullptr;
+    }
+    auto instance = instantiateOnce (ref, sampleRate, error);
+    // a hosted plugin's sound is its (default) state plus the parameter values the session keeps for it
+    if (instance != nullptr && ! ref.values.empty())
+        applyValues (*instance, ref.values);
+    return instance;
+}
+
+std::unique_ptr<juce::AudioPluginInstance> PluginHost::instantiateOnce (const PluginRef& ref, double sampleRate, juce::String* error)
+{
     {
         const std::scoped_lock lock (preloadLock);
         if (auto it = preloaded.find (preloadKey (ref, sampleRate)); it != preloaded.end() && ! it->second.empty())
@@ -2609,6 +2713,8 @@ void PluginHost::clearLoadFailures()
 
 std::shared_ptr<Instrument> PluginHost::makeInstrument (const PluginRef& ref, double sampleRate, juce::String* error)
 {
+    if (playedElsewhere (ref)) // (P5-A1: not a load failure — the host of the live session plays it)
+        return nullptr;
     juce::String why;
     if (auto instance = instantiate (ref, sampleRate, &why))
         return std::make_shared<PluginInstrument> (std::move (instance), maxBlockSize, ref.fixedBuffers ? fixedPluginBlock (ref.maxSizeBuffers) : 0,
@@ -2625,6 +2731,8 @@ std::shared_ptr<Instrument> PluginHost::makeInstrument (const PluginRef& ref, do
 
 std::shared_ptr<Effect> PluginHost::makeEffect (const PluginRef& ref, double sampleRate, juce::String* error)
 {
+    if (playedElsewhere (ref)) // (P5-A1: not a load failure — the host of the live session plays it)
+        return nullptr;
     juce::String why;
     if (auto instance = instantiate (ref, sampleRate, &why))
         return std::make_shared<PluginEffect> (std::move (instance), maxBlockSize, ref.fixedBuffers ? fixedPluginBlock (ref.maxSizeBuffers) : 0,

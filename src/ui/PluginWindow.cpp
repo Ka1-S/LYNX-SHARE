@@ -21,6 +21,7 @@
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/NativeChild.h"
+#include "ui/LiveRemoteUi.h"
 #include "ui/PluginHeader.h"
 #include "ui/Workspace.h"
 #include "platform/Paths.h"
@@ -1528,6 +1529,9 @@ void addPluginItems (juce::PopupMenu& menu, AudioEngine& engine, bool instrument
     // FL's way (round 151): the favourites right here, every other plugin in the picker ("More plugins...", FL's
     // list of every generator / effect with its categories, search and favourite stars). The old menu listed all
     // of them: hundreds of items in four columns on a PC with many plugins.
+    // Online Sessions P5-A1 (round 190ai): a guest of a live session gets the plugins the host shares first, under
+    // "On {host}'s computer", each marked "played by {host}"
+    liveui::addSharedPluginItems (menu, instruments, onChosen);
     auto types = engine.getPluginHost().getKnownPlugins().getTypes();
     std::sort (types.begin(), types.end(), [] (const auto& a, const auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });
     const auto& favourites = engine.getPluginHost().favourites();

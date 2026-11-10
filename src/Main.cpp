@@ -50,6 +50,7 @@
 #include "platform/Package.h"
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/LiveRemoteUi.h"
 #include "ui/GamepadInput.h"
 #include "ui/SettingsPages.h"
 #include "ui/OtherAppsExport.h"
@@ -1581,6 +1582,17 @@ public:
             // its end, and the time a full repaint takes)
             const auto i = args.indexOf ("--feat166shot");
             runFeat166Shot (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--remoteshot"))
+        {
+            // LYNX.exe --remoteshot prefix: Online Sessions P5-A1 (round 190ai) — the host's "Share plugins with guests"
+            // list and a guest's parameter editor of a plugin the host plays, off-screen with sample data
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::liveui::saveRemoteShots (args[args.indexOf ("--remoteshot") + 1].unquoted());
+            juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
             quit();
             return;
         }

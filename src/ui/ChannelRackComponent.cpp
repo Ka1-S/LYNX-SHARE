@@ -34,6 +34,7 @@
 #include "ui/Dialogs.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/LiveRemoteUi.h"
 #include "ui/BrowserComponent.h"
 
 #include "ui/PluginWindow.h"
@@ -2747,6 +2748,10 @@ void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
 
 void ChannelRackComponent::openPluginWindow (int channel)
 {
+    // Online Sessions P5-A1: a plugin the session's host plays for this channel opens its parameter editor
+    if (channel >= 0 && channel < (int) engine.getSong().channels.size()
+        && liveui::showHostedEditor ({ { live::Kind::channel, engine.getSong().channels[(std::size_t) channel].uid, 0 }, -1 }))
+        return;
     auto instrument = engine.getChannelInstrument (channel);
 
     if (auto* plugin = dynamic_cast<PluginInstrument*> (instrument.get()))

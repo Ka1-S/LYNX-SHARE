@@ -14,6 +14,7 @@
 #include "core/FruityBasicFx.h"
 #include "core/PluginSubstitutes.h"
 #include "core/ProjectSafety.h"
+#include "core/RemotePlugins.h"
 #include "engine/Text.h"
 
 namespace lynx::ProjectFile
@@ -351,6 +352,19 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("bitSize", p.bitSize);
     if (p.detached) // issue #116 (saved only when not the default)
         o->setProperty ("detached", true);
+    // Online Sessions P5-A1 (round 190ai): a plugin the session's host plays for everyone, and its parameter values
+    if (p.playedBy != 0)
+        o->setProperty ("playedBy", (juce::int64) p.playedBy);
+    if (! p.values.empty())
+    {
+        juce::Array<juce::var> values; // [index, value, index, value, ...]
+        for (const auto& [index, value] : p.values)
+        {
+            values.add (index);
+            values.add ((double) value);
+        }
+        o->setProperty ("values", values);
+    }
     return juce::var (o.release());
 }
 
@@ -385,6 +399,13 @@ PluginRef pluginFromVar (const juce::var& v)
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;
+    p.playedBy = (std::uint32_t) juce::jlimit<juce::int64> (0, 0xffffffffLL, (juce::int64) v.getProperty ("playedBy", 0));
+    if (const auto* values = v["values"].getArray())
+    {
+        for (int i = 0; i + 1 < values->size() && p.values.size() < remoteplug::maxParams; i += 2)
+            p.values.push_back ({ (int) (*values)[i], (float) (double) (*values)[i + 1] });
+        remoteplug::cleanValues (p);
+    }
     return p;
 }
 

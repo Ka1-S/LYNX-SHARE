@@ -62,6 +62,7 @@
 #include "ui/SessionDialogs.h"
 #include "engine/LiveSessions.h"
 #include "ui/LiveChat.h"
+#include "ui/LiveRemoteUi.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -712,6 +713,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // Online Sessions P2 (round 169b): live sessions
     live = std::make_unique<LiveSessionManager> (engine);
     liveui::attach (*live);
+    liveui::setRemoteSession (live.get(), &engine); // (P5-A1: the shared plugins in the menus, the guest's editor)
     live->onChange = [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
         {
@@ -777,6 +779,7 @@ MainComponent::~MainComponent()
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
+    liveui::setRemoteSession (nullptr, nullptr);
     live.reset(); // (a session still on ends: the others are told)
     setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
     setSecondaryWindowKeyHandler (nullptr);

@@ -6,6 +6,8 @@
 #include "engine/LiveSessions.h"
 #include "platform/Paths.h"
 #include "ui/LiveChat.h"
+#include "ui/LiveRemoteUi.h"
+#include "ui/PluginWindow.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -70,7 +72,13 @@ void addMenuItems (juce::PopupMenu& menu, Context c)
     if (! c.live.isHost())
         menu.addItem (tr ("Follow the host's transport"), active, c.live.isFollowingTransport(), [c] { c.live.setFollowTransport (! c.live.isFollowingTransport()); });
     else
+    {
         menu.addItem (tr ("People and permissions..."), active, false, [c] { showPermissions (c.live); });
+        // P5-A1 (round 190ai): which of the host's plugins guests may use
+        const auto sharing = (int) c.live.sharedPlugins().size();
+        menu.addItem (tr ("Share plugins with guests...") + (active && sharing > 0 ? " (" + juce::String (sharing) + ")" : juce::String()), active, false,
+                      [c] { showSharePlugins (c.live, c.engine); });
+    }
     menu.addItem (c.live.isHost() || ! active ? tr ("End live session") : tr ("Leave live session"), active, false, [c] { leave (c); });
 }
 
@@ -212,6 +220,8 @@ void offerResume (Context c)
 
 void attach (LiveSessionManager& live)
 {
+    // P5-A1: what the host changes in a shared plugin's own window becomes parameter values when that window closes
+    live.hostedEditorOpen = [] (juce::AudioPluginInstance& plugin) { return PluginWindows::isOpen (plugin); };
     live.onHint = [] (const juce::String& text) { ui::postHint ({ text, {} }, 4000); };
     live.onChat = [] (const LiveSessionManager::ChatLine& line) {
         if (! line.mine && ! chatVisible())
