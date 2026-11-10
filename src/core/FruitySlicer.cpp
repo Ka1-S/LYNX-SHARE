@@ -514,12 +514,36 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
     def.sampler.pitch = std::clamp (def.sampler.pitch + (float) state.pitchCents / 100.0f, -24.0f, 24.0f);
 }
 
+flvoice::Settings voiceSettings (const State& state)
+{
+    return flvoice::read (state.voiceBlock);
+}
+
+void setVoiceSettings (State& state, const flvoice::Settings& settings)
+{
+    flvoice::write (state.voiceBlock, settings); // (write() saves version 16, which carries the block)
+}
+
 State fresh (const std::string& path, int sampleRate)
 {
     State s;
     s.path = path;
     s.sampleRate = sampleRate;
     s.slices.push_back ({});
+    // What a Fruity Slicer added in FL 2026 saves (round 190m, /mnt/e/lynx-work/fpc190m/fl/fresh.flp): ANIMATE and
+    // DECLICK on, DEC at 4 ms, and the volume envelope on with no delay / attack / hold / decay, full sustain and a
+    // short release — the rest of the voice block is the plugin's defaults. FL's stretch method there is 4 (the
+    // licensed engine); LYNX keeps Fill gaps, the method its TS wheel can run.
+    s.animate = 1;
+    s.declick = 1;
+    s.fadeOutMs = 4;
+    auto voice = flvoice::read ({});
+    auto& volume = voice.articulators[flvoice::volume];
+    volume.envelope = true;
+    volume.delay = volume.attack = volume.hold = volume.decay = 100;
+    volume.sustain = 128;
+    volume.release = 6500;
+    setVoiceSettings (s, voice);
     return s;
 }
 int firstNote (const State& state)

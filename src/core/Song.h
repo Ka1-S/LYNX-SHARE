@@ -172,6 +172,17 @@ struct ForeignPlugin
     bool operator== (const ForeignPlugin&) const = default;
 };
 
+// FL's Settings › General › "Disable typing keyboard priority by default" (DisablePlugFocusDefaultBox, off; round
+// 187a): on, a plugin added from now on starts with its window's Typing keyboard priority off (LYNX first)
+namespace pluginkeys
+{
+inline std::atomic<bool>& newPluginsHostFirst() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+} // namespace pluginkeys
+
 struct PluginRef
 {
     std::string id;    // unique plugin identifier (JUCE's format-name-hash)
@@ -211,8 +222,9 @@ struct PluginRef
     // what it changes in LYNX comes with the Typing keyboard priority button (issue #96 slice 2)
     bool allowHostKeys = false;
     // FL's plugin-window "Typing keyboard priority" button turned off: LYNX takes the keys it uses (typing piano,
-    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96)
-    bool hostKeysFirst = false;
+    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96).
+    // .flp: wrapper flags bit 0x01000000 set [DATA round 187a: one project saved with the button on and off]
+    bool hostKeysFirst = pluginkeys::newPluginsHostFirst().load (std::memory_order_relaxed);
     bool sendLoopPosition = true;   // "Send loop position": the play head reports the loop's start and end
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64

@@ -392,6 +392,10 @@ jobs:
       - name: AppImage starts offline and shows its window
         run: REQUIRE_OFFLINE=1 ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-x86_64.AppImage"
 
+      # issue #142 (NixOS): a system where JUCE finds no font at all; LYNX draws with the font it brings.
+      - name: AppImage starts on a system without fonts
+        run: FONTS=none ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-x86_64.AppImage"
+
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:

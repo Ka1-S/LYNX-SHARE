@@ -2297,3 +2297,9 @@ FL Studio Mobile plugin is the open sound check.
 | Span, Strum (grid % + tension curve), Ornament (flam, grace notes), Recombine, Arpeggiate (18 styles), Connect, Chop | its own Piano roll tools (Strum, Arpeggiate, Chop, Articulate, Flam…) | Clip View › Transform panel | ⚠️ core only (`core/MidiTools.h`), note for note against a Live 12.4 save; the panel is the next slice. FL's tools unchanged |
 | Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
 | Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
+
+## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
+FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
+`docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
+export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
+have no Detached state: their imported flags are kept as they were.

@@ -180,6 +180,10 @@ bool pluginKeysTestTick (juce::AudioProcessorEditor& editor, const std::function
             if (const auto shot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_SHOT", {}); shot.isNotEmpty())
                 step ("keys_settings_shot=" + juce::String ((int) PluginWindows::saveSettingsPageShot (*editor.getTopLevelComponent(), juce::File (shot))));
             setOption (false);
+            // (round 187a: the header again with the Typing keyboard priority button on, FL's default; taken after the
+            // key checks, since showing the page moves the focus)
+            if (const auto shot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_SHOT", {}); shot.isNotEmpty())
+                PluginWindows::saveSettingsPageShot (*editor.getTopLevelComponent(), juce::File (shot.upToLastOccurrenceOf (".", false, false) + "-plugin-first.png"));
             setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
             setSecondaryWindowKeyHandler (nullptr);
             step (state.ok ? "keys_result=OK" : "keys_result=FAILED");
