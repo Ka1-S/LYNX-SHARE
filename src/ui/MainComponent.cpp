@@ -4812,11 +4812,22 @@ void MainComponent::timerCallback()
                        + juce::String::toHexString ((juce::int64) c.code));
         }
         PluginHost::settingsFolder().getChildFile ("plugin-crashes.log").appendText (lines[lines.size() - 1] + "\n");
-        juce::AlertWindow::showMessageBoxAsync (
-            juce::MessageBoxIconType::WarningIcon, tr ("Plugin crashed"),
-            tr ("The plugin \"{0}\" crashed and was switched off, so LYNX SHARE and your project kept running (the effect is bypassed, an "
-                "instrument stays silent). Save your project; the plugin loads again the next time you open it.",
-                { names[names.size() - 1] }));
+        // round 190ao: "Reload" starts it again without reopening the project (only on request: a plugin that crashes
+        // again shows this again)
+        const auto crashedName = names[names.size() - 1];
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::WarningIcon)
+                                          .withTitle (tr ("Plugin crashed"))
+                                          .withMessage (tr ("{0} crashed and was switched off.", { crashedName }) + "\n\n"
+                                                        + tr ("LYNX SHARE and your project kept running (an effect is bypassed, an instrument "
+                                                              "stays silent). Save your project.")
+                                                        + " " + tr ("Reload starts it again with the settings from the last save or backup."))
+                                          .withButton (tr ("Reload"))
+                                          .withButton (tr ("Close")),
+                                      [safe = juce::Component::SafePointer<MainComponent> (this), crashedName] (int result) {
+                                          if (safe != nullptr && result == 1)
+                                              safe->reloadCrashedPlugins (crashedName);
+                                      });
     }
 
     // round 176a: a plugin in a separate process (Make bridged, or a 32-bit plugin in the 32-bit bridge) crashed or hung:
@@ -5720,6 +5731,17 @@ void MainComponent::announceEditorCrash (const juce::String& plugin)
     });
 }
 
+// Round 190ao: "Reload" of a crash prompt: the plugins of that name that are down (the prompt only knows the name the
+// plugin reports; when the project knows it under another name, every plugin that is down)
+void MainComponent::reloadCrashedPlugins (const juce::String& plugin)
+{
+    auto which = engine.downHostedPlugins (plugin.toStdString());
+    if (which.empty())
+        which = engine.downHostedPlugins();
+    if (! which.empty())
+        PluginWindows::reload (engine, which);
+}
+
 // Round 176a: round 174a's "Plugin crashed" prompt for a plugin whose separate process died. LYNX itself is unharmed
 // (the plugin ran in its own process), so it offers the save and says how to get the plugin back.
 void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32)
@@ -5731,11 +5753,17 @@ void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bo
                        .withTitle (tr ("Plugin crashed"))
                        .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + "\n\n"
                                      + tr ("Only its process was affected: LYNX SHARE and your project kept running, and the plugin "
-                                           "was muted. Save your project; the plugin loads again the next time you open it."))
+                                           "was muted. Save your project.")
+                                     + " " + tr ("Reload starts it again with the settings from the last save or backup."))
+                       .withButton (tr ("Reload")) // (round 190ao: without reopening the project; only on request)
                        .withButton (tr ("Save as..."))
                        .withButton (tr ("Close"));
-    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this)] (int result) {
-        if (safe != nullptr && result == 1)
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), plugin] (int result) {
+        if (safe == nullptr)
+            return;
+        if (result == 1)
+            safe->reloadCrashedPlugins (plugin);
+        else if (result == 2)
             safe->save (true);
     });
 }

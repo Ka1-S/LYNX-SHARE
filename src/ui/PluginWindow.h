@@ -26,6 +26,12 @@ struct WrapperContext
     // round 177b: a mixer slot's plugin (insert, slot): a plugin with a sidechain input gets the header's
     // "Sidechain from" picker; -1 = not a mixer slot
     int track = -1, slot = -1;
+    // round 190ao (reload a crashed plugin): `reload` starts the plugin again and opens its window again (the caller
+    // knows the channel / slot); with it, a window whose plugin went down (crashed inside a call, or its separate
+    // process died) shows a notice with "Reload" in place of the editor. `down`: the adapter's own crash flag (a dead
+    // separate process is seen by the window itself). Nothing reloads unless the user asks.
+    std::function<void()> reload;
+    std::function<bool()> down;
 };
 // `owner` is the adapter (PluginInstrument/PluginEffect) that holds the plugin.
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context = {});
@@ -54,6 +60,13 @@ struct EditorCrash
 };
 int editorCrashCount();
 std::vector<EditorCrash> editorCrashes();
+// Round 190ao (Bitwig's "Reload plug-in"): closes the windows of those hosted plugins and starts them again from their
+// last captured state (AudioEngine::reloadHostedPlugins: no undo step, the project is not reopened). Says so when one
+// could not be started. Returns how many run again.
+int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& which);
+// The user asked for the window of a plugin that is down: "<name> crashed and was switched off" with Reload (and, for a
+// plugin that ran inside LYNX, "Reload in a separate process"). `reopen` runs after a reload that worked.
+void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen);
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;
@@ -61,6 +74,9 @@ extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGestu
 bool letsHostProcessKeys (juce::Component& window);
 // (round 187a's check) a PNG of a plugin window's Wrapper settings page
 bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
+// Tests / shots (round 190ao): runs the open window's periodic check now (the crash notice follows the plugin) and
+// writes a PNG of its content: the editor page (or the crash notice in its place), or the Wrapper settings page.
+bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage);
 } // namespace PluginWindows
 
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.

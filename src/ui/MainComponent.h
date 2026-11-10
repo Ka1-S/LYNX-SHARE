@@ -182,6 +182,7 @@ private:
     int sandboxDeathsSeen = 0; // separate-process plugins that died (engine/PluginSandbox.h, round 176a) already announced
     void announceEditorCrash (const juce::String& plugin);
     void announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32);
+    void reloadCrashedPlugins (const juce::String& plugin); // round 190ao: a crash prompt's "Reload"
     void showHelp();
     void closeUnfocusedWindows();
     void closeHelp();

@@ -122,6 +122,22 @@ public:
 
     // Copies the plugins' current state into the Song (before saving).
     void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
+    // Round 190ao (Bitwig's "Reload plug-in"): a hosted plugin of a channel (track < 0) or a mixer slot that is down:
+    // it crashed inside a call and was switched off, or its separate process died or stopped responding.
+    struct HostedSlot
+    {
+        int channel = -1, track = -1, slot = -1;
+        bool operator== (const HostedSlot& o) const noexcept { return channel == o.channel && track == o.track && slot == o.slot; }
+    };
+    bool hostedPluginDown (HostedSlot where) const;
+    // The plugins that are down (channels first); `named`: only the ones with that PluginRef name.
+    std::vector<HostedSlot> downHostedPlugins (const std::string& named = {}) const;
+    // Starts those plugins again, each from its last captured state (a running plugin's is captured now; one that is
+    // down keeps what the last save, backup or capture took), without reopening the project. Only ever on request:
+    // a plugin that goes down again stays down until this is called again. The song and the undo history are not
+    // changed (close the plugins' windows first: a window keeps the old instance alive). Returns how many run again.
+    // Plugins inside a Patcher are not covered.
+    int reloadHostedPlugins (const std::vector<HostedSlot>& which);
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
     void stampWorkTime();

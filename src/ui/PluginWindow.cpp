@@ -441,6 +441,52 @@ public:
     }
 };
 
+// Round 190ao: what a plugin window shows in place of the editor when its plugin went down (Bitwig turns the plugin's
+// panel into a notice with "Reload plug-in"). Nothing reloads by itself: a plugin that crashes again shows this again.
+class CrashNotice final : public juce::Component
+{
+public:
+    CrashNotice()
+    {
+        reload.setButtonText (tr ("Reload"));
+        reload.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        reload.onClick = [this] {
+            if (onReload)
+                onReload();
+        };
+        addAndMakeVisible (reload);
+    }
+
+    void setPluginName (const juce::String& name)
+    {
+        title = tr ("{0} crashed and was switched off.", { name });
+        repaint();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg1);
+        auto r = getLocalBounds().reduced (16, 12);
+        r.removeFromBottom (40);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        g.drawFittedText (title, r.removeFromTop (r.getHeight() / 2), juce::Justification::centredBottom, 2);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::body));
+        g.drawFittedText (tr ("Reload starts it again with the settings from the last save or backup."), r.withTrimmedTop (4),
+                          juce::Justification::centredTop, 3);
+    }
+
+    void resized() override { reload.setBounds (getLocalBounds().reduced (16, 12).removeFromBottom (28).withSizeKeepingCentre (140, 28)); }
+
+    std::function<void()> onReload;
+
+private:
+    juce::String title;
+    juce::TextButton reload;
+};
+
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
 class WrappedEditor final : public juce::Component
 {
@@ -482,6 +528,8 @@ public:
         settingsTab.onClick = [this] { show (true); };
         addAndMakeVisible (editor.get());
         addChildComponent (page);
+        addChildComponent (notice);
+        notice.setPluginName (plugin.getName());
         pluginTab.setToggleState (true, juce::dontSendNotification);
         fitEditor();
     }
@@ -494,6 +542,17 @@ public:
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
     void showPage (bool showSettings) { show (showSettings); }
+
+    // round 190ao: the plugin went down (the window's timer): the notice with "Reload" takes the editor's place
+    void setDown (bool isDown, std::function<void()> reload)
+    {
+        if (isDown == down)
+            return;
+        down = isDown;
+        notice.onReload = std::move (reload);
+        show (settings);
+    }
+    bool isDown() const noexcept { return down; }
     void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
 
     void refreshKeyboardPriority()
@@ -542,7 +601,8 @@ public:
         header.removeFromLeft (4);
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
-        if (editor != nullptr && ! settings)
+        notice.setBounds (area);
+        if (editor != nullptr && ! settings && ! down)
         {
             const juce::ScopedValueSetter<bool> guard (laying, true);
             if (editor->isResizable())
@@ -554,7 +614,7 @@ public:
 
     void childBoundsChanged (juce::Component* child) override
     {
-        if (child == editor.get() && ! laying && ! settings)
+        if (child == editor.get() && ! laying && ! settings && ! down)
             fitEditor();
     }
 
@@ -567,7 +627,9 @@ private:
 
     void fitEditor()
     {
-        if (editor != nullptr)
+        if (down) // (the notice: at least a readable size, the editor's when that is larger)
+            setSize (juce::jmax (minWidth, getWidth()), juce::jmax (150 + headerHeight, getHeight()));
+        else if (editor != nullptr)
             setSize (juce::jmax (minWidth, editor->getWidth()), editor->getHeight() + headerHeight);
     }
 
@@ -577,14 +639,15 @@ private:
         pluginTab.setToggleState (! settings, juce::dontSendNotification);
         settingsTab.setToggleState (settings, juce::dontSendNotification);
         page.setVisible (settings);
+        notice.setVisible (down && ! settings);
         if (editor != nullptr)
         {
-            editor->setVisible (! settings);
+            editor->setVisible (! settings && ! down);
             // A plugin editor embedded as a native child window (VST3 / LV2 through JUCE's XEmbedComponent and CLAP /
             // VST2 through NativeEmbed on Linux) is not unmapped when its component is hidden: it stayed over the
             // Wrapper settings page and made it unreachable (issue #8). Moving it outside the window clips it away on
             // every platform; resized() puts it back.
-            if (settings)
+            if (settings || down)
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
@@ -610,9 +673,10 @@ private:
 
     std::unique_ptr<juce::AudioProcessorEditor> editor;
     WrapperSettingsPage page;
+    CrashNotice notice;
     pluginpresetui::PresetBar presets;
     juce::TextButton pluginTab { tr ("Plugin") }, settingsTab { juce::String::fromUTF8 ("\xe2\x9a\x99 ") + tr ("Wrapper settings") };
-    bool settings = false, laying = false;
+    bool settings = false, laying = false, down = false;
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -704,6 +768,10 @@ public:
     const juce::String& hostTitle() const noexcept { return title; }
     const PluginWindows::WrapperContext& getContext() const noexcept { return context; }
 
+    // tests / shots: the periodic check now (the crash notice follows the plugin), and the window's content
+    void pollNow() { timerCallback(); }
+    juce::Component* contentForShot() const noexcept { return shownContent; }
+
     void addDetachedItem (juce::PopupMenu& menu)
     {
         auto* p = &plugin;
@@ -755,6 +823,9 @@ private:
         {
             wrapped->refreshSidechain();
             wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
+            // round 190ao: the plugin went down while its window is open: the notice with "Reload" (only on request)
+            if (context.reload && ! wrapped->isDown() && (isSandboxedPluginDead (plugin) || (context.down && context.down())))
+                wrapped->setDown (true, [reload = context.reload] { juce::MessageManager::callAsync (reload); });
         }
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
@@ -1341,6 +1412,24 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
     return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
 }
 
+bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    if (it == windows().end() || it->second->contentForShot() == nullptr)
+        return false;
+    it->second->pollNow();
+    auto* content = it->second->contentForShot();
+    auto* wrapped = dynamic_cast<WrappedEditor*> (content);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (true);
+    const auto image = content->createComponentSnapshot (content->getLocalBounds(), true, 1.0f);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
@@ -1410,6 +1499,90 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 void close (const juce::AudioPluginInstance& plugin)
 {
     windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+}
+
+namespace
+{
+juce::AudioPluginInstance* instanceAt (AudioEngine& engine, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+    {
+        auto* p = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (where.channel).get());
+        return p != nullptr ? &p->getInstance() : nullptr;
+    }
+    auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (where.track, where.slot).get());
+    return p != nullptr ? &p->getInstance() : nullptr;
+}
+
+const PluginRef* refAt (const Song& song, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+        return where.channel >= 0 && where.channel < (int) song.channels.size() ? &song.channels[(std::size_t) where.channel].plugin : nullptr;
+    if (where.track >= (int) song.mixer.size() || where.slot < 0 || where.slot >= (int) song.mixer[(std::size_t) where.track].effects.size())
+        return nullptr;
+    return &song.mixer[(std::size_t) where.track].effects[(std::size_t) where.slot].plugin;
+}
+} // namespace
+
+int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& which)
+{
+    juce::StringArray names;
+    for (const auto& w : which)
+    {
+        if (auto* instance = instanceAt (engine, w)) // (a window keeps the old instance alive)
+            close (*instance);
+        if (const auto* ref = refAt (engine.getSong(), w))
+            names.add (juce::String::fromUTF8 (ref->name.c_str()));
+    }
+    const auto running = engine.reloadHostedPlugins (which);
+    if (running < (int) which.size())
+    {
+        juce::StringArray failed;
+        for (std::size_t i = 0; i < which.size(); ++i)
+            if (instanceAt (engine, which[i]) == nullptr || engine.hostedPluginDown (which[i]))
+                failed.addIfNotAlreadyThere (names[(int) i]);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
+                                                tr ("{0} could not be started again.", { failed.joinIntoString (", ") }));
+    }
+    return running;
+}
+
+void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen)
+{
+    const auto* ref = refAt (engine.getSong(), where);
+    auto* instance = instanceAt (engine, where);
+    if (ref == nullptr || instance == nullptr)
+        return;
+    const auto name = juce::String::fromUTF8 (ref->name.c_str());
+    // a plugin that ran inside LYNX can come back in a process of its own, where its next crash can't reach LYNX
+    const auto offerSeparate = ! isSandboxedPlugin (*instance) && ! pluginSandboxEnabled() && ! ref->separateProcess && ! pluginAlwaysSeparate (name);
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage (tr ("{0} crashed and was switched off.", { name }) + "\n\n"
+                                     + tr ("Reload starts it again with the settings from the last save or backup."))
+                       .withButton (tr ("Reload"));
+    if (offerSeparate)
+        options = options.withButton (tr ("Reload in a separate process"));
+    options = options.withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [&engine, where, offerSeparate, reopen = std::move (reopen)] (int result) {
+        // (JUCE: the first button is 1, the last one 0)
+        if (result == 2 && offerSeparate)
+        {
+            // FL's "Make bridged" for this plugin: the changed option makes it again, from the state captured last
+            if (auto* p = instanceAt (engine, where))
+                close (*p);
+            engine.capturePluginStates();
+            engine.editSong ([where] (Song& song) {
+                if (auto* r = const_cast<PluginRef*> (refAt (song, where)))
+                    r->separateProcess = true;
+            });
+            if (reopen && instanceAt (engine, where) != nullptr && ! engine.hostedPluginDown (where))
+                reopen();
+        }
+        else if (result == 1 && reload (engine, { where }) == 1 && reopen)
+            reopen();
+    });
 }
 
 int editorCrashCount()

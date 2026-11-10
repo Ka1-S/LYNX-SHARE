@@ -43,6 +43,7 @@
 #include "core/VfxScript.h"
 #include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
+#include "engine/PluginSandbox.h"
 #include "flp/Flp.h"
 
 #if JUCE_WINDOWS
@@ -4647,6 +4648,63 @@ void AudioEngine::capturePluginStates()
 
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+}
+
+namespace
+{
+bool pluginIsDown (Instrument* instrument)
+{
+    auto* p = dynamic_cast<PluginInstrument*> (instrument);
+    return p != nullptr && (p->hasCrashed() || isSandboxedPluginDead (p->getInstance()));
+}
+
+bool pluginIsDown (Effect* effect)
+{
+    auto* p = dynamic_cast<PluginEffect*> (effect);
+    return p != nullptr && (p->hasCrashed() || isSandboxedPluginDead (p->getInstance()));
+}
+} // namespace
+
+bool AudioEngine::hostedPluginDown (HostedSlot where) const
+{
+    return where.track < 0 ? pluginIsDown (getChannelInstrument (where.channel).get()) : pluginIsDown (getEffect (where.track, where.slot).get());
+}
+
+std::vector<AudioEngine::HostedSlot> AudioEngine::downHostedPlugins (const std::string& named) const
+{
+    std::vector<HostedSlot> out;
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+        if (song.channels[i].instrument == InstrumentKind::plugin && (named.empty() || song.channels[i].plugin.name == named)
+            && hostedPluginDown ({ (int) i, -1, -1 }))
+            out.push_back ({ (int) i, -1, -1 });
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
+            if (const auto& fx = song.mixer[t].effects[s];
+                fx.kind == EffectKind::plugin && (named.empty() || fx.plugin.name == named) && hostedPluginDown ({ -1, (int) t, (int) s }))
+                out.push_back ({ -1, (int) t, (int) s });
+    return out;
+}
+
+int AudioEngine::reloadHostedPlugins (const std::vector<HostedSlot>& which)
+{
+    // the running plugins' current settings (a reloaded one that still runs starts from them); this also brings the
+    // last published shape in line with the song
+    capturePluginStates();
+    std::vector<HostedSlot> asked;
+    for (const auto& w : which)
+        if (w.track < 0 ? forgetHostedPlugin (lastPublishedShape, w.channel) : forgetHostedPlugin (lastPublishedShape, w.track, w.slot))
+            asked.push_back (w);
+    if (asked.empty())
+        return 0;
+    publishSong();
+    auto running = 0;
+    for (const auto& w : asked)
+    {
+        const auto loaded = w.track < 0 ? dynamic_cast<PluginInstrument*> (getChannelInstrument (w.channel).get()) != nullptr
+                                        : dynamic_cast<PluginEffect*> (getEffect (w.track, w.slot).get()) != nullptr;
+        running += loaded && ! hostedPluginDown (w) ? 1 : 0;
+    }
+    return running;
 }
 
 void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
