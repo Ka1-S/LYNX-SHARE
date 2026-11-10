@@ -2598,7 +2598,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
 
     const auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
-    const auto pluginsBefore = detachNewPluginsOn ? pluginIdCounts (song) : std::map<std::string, int>();
+    const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
     edit (song);
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);

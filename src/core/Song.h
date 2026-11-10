@@ -2113,10 +2113,12 @@ std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track);
 // (Issue #4: a pattern set to 2 bars still looped 1 bar in Song mode.)
 std::vector<std::int64_t> patternLengths (const Song& song);
 
-// FL's General › "Detach all new plugins" (issue #116): how many hosted plugins (Channel rack instruments and mixer
-// effects) of each id the song has, and, after an edit, marking the ones the edit added (an id the song has more of
-// than before, and no saved state yet: a plugin just added, not one loaded or cloned) as Detached. Returns how many.
-std::map<std::string, int> pluginIdCounts (const Song& song);
+// FL's General › "Detach all new plugins" (issue #116): how many fresh hosted plugins (Channel rack instruments and
+// mixer effects with no saved state yet that are still docked: just added, not loaded or cloned) of each id the song
+// has, and, after an edit, marking the ones the edit added (an id the song has more fresh ones of than before; the
+// newest of them) as Detached. Returns how many. A clone or a loaded plugin is never counted, so adding one leaves
+// the fresh plugins that were already there (docked again by the user) alone.
+std::map<std::string, int> freshPluginCounts (const Song& song);
 int detachNewPlugins (const std::map<std::string, int>& before, Song& song);
 void followPatternLengths (const std::vector<std::int64_t>& before, Song& song);
 
