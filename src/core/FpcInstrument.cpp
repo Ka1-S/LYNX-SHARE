@@ -219,10 +219,11 @@ public:
             pads.push_back (std::move (pad));
         }
 
-        // (the shapers read their pad's envelopes: made once the pads stay where they are)
+        // (the shapers read their pad's envelopes: made once the pads stay where they are). A layer without envelope,
+        // layer pan or a group that can cut it needs none: its gains stay 1 (the sampler's own path, nothing per sample)
         for (auto& p : pads)
             for (auto& l : p.layers)
-                if (l.sampler != nullptr)
+                if (l.sampler != nullptr && (p.volume.enabled() || p.pan.enabled() || l.pan != 0 || p.source.cutBy > 0))
                 {
                     l.shaper = std::make_unique<LayerShaper> (p.volume, p.pan, l.pan);
                     l.sampler->setVoiceShaper (l.shaper.get());
@@ -244,7 +245,8 @@ public:
                 if (l.sampler != nullptr)
                 {
                     l.sampler->prepare (sampleRate);
-                    l.shaper->prepare (sampleRate);
+                    if (l.shaper != nullptr)
+                        l.shaper->prepare (sampleRate);
                 }
     }
 
@@ -474,7 +476,7 @@ public:
 
             for (auto& l : p.layers)
             {
-                if (l.sampler == nullptr)
+                if (l.sampler == nullptr || l.sampler->idle()) // (an idle layer has nothing to add: 8-layer kits stay cheap)
                     continue;
                 if (p.output < 0)
                     l.sampler->render (left, right, n, gl, gr);
