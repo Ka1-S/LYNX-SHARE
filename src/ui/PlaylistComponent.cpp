@@ -5076,7 +5076,8 @@ void PlaylistComponent::moveClips (std::vector<int> chosen, std::int64_t delta, 
             if (i >= 0 && i < (int) s.playlist.size())
                 edge = delta < 0 ? std::min (edge, s.playlist[(std::size_t) i].start) : std::max (edge, s.playlist[(std::size_t) i].end());
     }, newUndoStep);
-    sortClips (std::move (chosen));
+    // (only a change of track can put an audio clip on another audio track: a move in time asks nothing)
+    sortClips (tracks != 0 ? std::move (chosen) : std::vector<int> {});
 
     if (keepInView && delta != 0) // FL scrolls to keep the leading edge of the moved clips in view (FUN_00e7e290)
         if (const auto to = clipops::scrollToShowEdge (scrollTicks, (double) gridArea().getWidth(), pixelsPerTick, edge, delta > 0);
