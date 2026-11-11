@@ -254,8 +254,12 @@ void MixerStrips::layoutStrips()
     // insert shows; selecting another strip doesn't move the strips under the mouse)
     hidden.assign ((std::size_t) tracks + 1, false);
     if (showUsedOnly)
-        for (int t = 1; t < tracks; ++t)
-            hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    {
+        // round 190am: the selected inserts stay, and stay after the selection moves on (no strip jumps under the mouse)
+        revealed.insert (selected);
+        revealed.insert (selection.begin(), selection.end());
+        hidden = mixerops::hiddenUnusedInserts (song, revealed);
+    }
     // folded groups (round 177a): nothing is computed unless a group is folded
     foldShow.clear();
     tabOf.clear();
@@ -2254,6 +2258,7 @@ void MixerStrips::setSelection (std::vector<int> tracks, int primary)
     selection = tracks;
     const auto changed = primary != selected;
     selected = primary;
+    keepSelectionShown();
     repaint();
 
     if (changed && onSelectionChanged)
@@ -2601,10 +2606,21 @@ void MixerStrips::mouseDoubleClick (const juce::MouseEvent& e)
     }
 }
 
+void MixerStrips::keepSelectionShown()
+{
+    if (! showUsedOnly)
+        return;
+    const auto wasHidden = std::any_of (selection.begin(), selection.end(), [this] (int t) { return revealed.count (t) == 0 && isHidden (t); })
+                           || (revealed.count (selected) == 0 && isHidden (selected));
+    if (wasHidden) // (selected from the Channel Rack, a menu or the keyboard: its strip comes back)
+        updateSize();
+}
+
 void MixerStrips::selectTrack (int track)
 {
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), track);
     selection = { selected };
+    keepSelectionShown();
     repaint();
 
     if (onSelectionChanged)
@@ -3962,11 +3978,16 @@ bool MixerStrips::liveFrame (double nowMs)
     // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
+    int woken = -1;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
         const auto before = m;
-        m.advance (meters.takePeak ((int) (i / 2), (int) (i % 2)), elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
+        m.advance (peak, elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
+        if (showUsedOnly && peak > 1.0e-4f && i >= 2 && revealed.count ((int) (i / 2)) == 0 && isHidden ((int) (i / 2)))
+            woken = (int) (i / 2);
         if (m.level != before.level || m.peak != before.peak)
             moving = true;
         if (! showing)
@@ -4039,6 +4060,12 @@ bool MixerStrips::liveFrame (double nowMs)
         meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
         repaint (dirty);
         meterRepaintOnly = false;
+    }
+    if (woken > 0) // (one per frame is enough: the next frame brings the next)
+    {
+        revealed.insert (woken);
+        updateSize();
+        repaint();
     }
     return moving;
 }

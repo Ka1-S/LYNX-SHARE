@@ -11152,6 +11152,47 @@ private:
                 offline.dispatchPendingMessages();
             }
             saveSnapshot (ui, prefix + "-mixer.png");
+            // round 190am: LYNX's two mixer extras, before and after (the demo project leaves most inserts unused). The
+            // loudness panel shows a real measurement of 12 s of a test tone (a 1 kHz sine at -14 dBFS after a quieter
+            // stretch, pushed through the Master's tap as the audio thread does)
+            {
+                auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+                saveSnapshot (ui, prefix + "-mixer190am-before.png");
+                strips.setShowUsedOnly (true);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-mixer190am-usedonly.png");
+                strips.setShowUsedOnly (false);
+                strips.setShowLoudness (true);
+                {
+                    const double sr = 48000.0;
+                    std::vector<float> tone (480);
+                    auto& tap = offline.getMeters().loudness;
+                    for (int block = 0; block < 1200; ++block)
+                    {
+                        const auto gain = std::pow (10.0, (block < 400 ? -20.0 : -14.0) / 20.0);
+                        for (int i = 0; i < 480; ++i)
+                            tone[(std::size_t) i] = (float) (gain * std::sin (2.0 * juce::MathConstants<double>::pi * 1000.0 * (block * 480 + i) / sr));
+                        tap.push (tone.data(), tone.data(), 480, sr);
+                    }
+                }
+                strips.refreshLoudnessForSnapshot();
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-mixer190am-loudness.png");
+                for (const auto l : { lynx::mixerlayout::Layout::compact, lynx::mixerlayout::Layout::extraLarge })
+                {
+                    const auto was = lynx::MixerStrips::layout;
+                    strips.setLayout (l);
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-mixer190am-loudness-" + juce::String ((int) l) + ".png");
+                    strips.setLayout (was);
+                }
+                strips.setShowUsedOnly (true);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-mixer190am-both.png");
+                strips.setShowUsedOnly (false);
+                strips.setShowLoudness (false);
+                offline.dispatchPendingMessages();
+            }
             // round 168h (issue #52): FL's 8 Mixer layouts
             {
                 const auto before = lynx::MixerStrips::layout;

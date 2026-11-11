@@ -173,6 +173,7 @@ public:
 
     // Mixer menu › "Show only used inserts" (round 163; ui-options.txt "mixerUsedOnly"): inserts nothing uses
     // (Song::insertInUse) take no room; "+" brings back the first unused insert before adding one.
+    // Round 190am: the selected inserts and any insert whose meter moves always show (mixerops::hiddenUnusedInserts).
     static inline bool showUsedOnly = false;
     // Mixer menu › "Loudness meter beside the Master (LYNX)" (round 190am; ui-options.txt "mixerLoudness"; off = FL's
     // mixer, and nothing is measured): a narrow panel right of the Master with the short-term and integrated loudness
@@ -220,7 +221,8 @@ private:
     std::vector<int> stripXs;                                    // layout x (before pinning)
     std::vector<bool> hidden;                                    // per track: not shown (unused, "Show only used inserts")
     static constexpr int hiddenX = -100000;
-    std::set<int> revealed;                                      // unused inserts shown anyway (added with "+")
+    std::set<int> revealed;                                      // unused inserts shown anyway (added with "+", selected, or receiving audio)
+    void keepSelectionShown();                                   // "Show only used inserts": the selection never hides
     // the loudness panel (round 190am): its layout x (hiddenX while off), what it shows now and its hover state
     static constexpr int loudnessWidth = 58;
     int loudnessX = hiddenX;
