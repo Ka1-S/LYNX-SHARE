@@ -8866,3 +8866,5 @@ countries: cn sg
 "Scripts" = "脚本"
 "Run last script again" = "再次运行上一个脚本"
 "Open script folder..." = "打开脚本文件夹..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "静音的插入轨不处理（LYNX，节省 CPU；此项目）"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "静音的插入轨会跳过其效果：其中的 Fruity Send 或控制器会静默，电平表停止，取消静音时效果从头开始（FL 会让它们继续运行）"

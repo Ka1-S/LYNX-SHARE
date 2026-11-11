@@ -4711,6 +4711,13 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         if (on && withEq > 0) // nothing is lost: switching it off brings the EQ back as it was
             ui::postHint ({ tr ("Clean mixer: the EQ of {0} insert(s) is bypassed and hidden (kept in the project)", { juce::String ((int) withEq) }), {}, false, false }, 5000);
     });
+    // LYNX option (round 190y): the old cheap mute; FL keeps a muted insert's effects running (and showing its level)
+    menu.addItem (tr ("Muted inserts don't process (LYNX, saves CPU; this project)"), true, song.mutedInsertsSkip, [&engine] {
+        const auto on = ! engine.getSong().mutedInsertsSkip;
+        engine.editSong ([on] (Song& s) { s.mutedInsertsSkip = on; });
+        if (on)
+            ui::postHint ({ tr ("Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)"), {}, false, false }, 6000);
+    });
     menu.addItem (tr ("Show only used inserts"), true, MixerStrips::showUsedOnly, [] {
         const auto on = ! MixerStrips::showUsedOnly;
         if (setShowUsedOnly)

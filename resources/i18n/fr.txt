@@ -8833,3 +8833,5 @@ countries: fr be ch ca lu
 "Scripts" = "Scripts"
 "Run last script again" = "Relancer le dernier script"
 "Open script folder..." = "Ouvrir le dossier des scripts..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Les inserts coupés ne traitent rien (LYNX, économise le CPU ; ce projet)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Les inserts coupés sautent leurs effets : un Fruity Send ou un contrôleur dedans se tait, son vumètre s'arrête et ses effets repartent de zéro à la réactivation (FL les laisse tourner)"

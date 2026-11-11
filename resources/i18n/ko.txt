@@ -8866,3 +8866,5 @@ countries: kr
 "Scripts" = "스크립트"
 "Run last script again" = "마지막 스크립트 다시 실행"
 "Open script folder..." = "스크립트 폴더 열기..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "음소거된 인서트는 처리하지 않음 (LYNX, CPU 절약, 이 프로젝트)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "음소거된 인서트는 효과를 건너뜁니다: 그 안의 Fruity Send나 컨트롤러는 조용해지고, 미터가 멈추며, 음소거를 해제하면 효과가 처음부터 다시 시작됩니다 (FL은 계속 실행합니다)"

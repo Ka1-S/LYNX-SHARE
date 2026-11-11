@@ -2193,6 +2193,10 @@ struct Song
     // behaviour before (the insert skipped its effects); projects saved before keep it off, .flp imports and new
     // projects turn it on. Saved with the project.
     bool muteRunsEffects = false;
+    // LYNX option (round 190y, off): "Muted inserts don't process" — a muted insert skips its effects, EQ and meter, as
+    // LYNX did before (saves CPU; unlike FL, a Fruity Send or controller in it goes quiet and its effects start fresh at
+    // unmute). Saved with the project only when on; an .flp export keeps FL's behaviour.
+    bool mutedInsertsSkip = false;
     // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3, .flp 0x28): a voice cut by a cut group or
     // by "cut itself" fades out in 2 ms instead of its channel's declicking time. Saved with the project.
     bool fastDeclick = false;

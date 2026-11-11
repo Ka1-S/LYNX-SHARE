@@ -8866,3 +8866,5 @@ countries: tr
 "Scripts" = "Betikler"
 "Run last script again" = "Son betiği yeniden çalıştır"
 "Open script folder..." = "Betik klasörünü aç..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Sessize alınan insert'ler işlenmez (LYNX, CPU tasarrufu; bu proje)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Sessize alınan insert'ler efektlerini atlar: içlerindeki Fruity Send veya kontrolcü susar, ölçer durur ve sessizden çıkarınca efektler baştan başlar (FL onları çalıştırmaya devam eder)"

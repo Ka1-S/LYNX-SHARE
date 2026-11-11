@@ -8833,3 +8833,5 @@ countries: it ch sm
 "Scripts" = "Script"
 "Run last script again" = "Esegui di nuovo l'ultimo script"
 "Open script folder..." = "Apri la cartella degli script..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Gli insert silenziati non elaborano (LYNX, risparmia CPU; questo progetto)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Gli insert silenziati saltano i loro effetti: un Fruity Send o un controller al loro interno tace, il meter si ferma e gli effetti ripartono da zero alla riattivazione (FL li mantiene attivi)"

@@ -8866,3 +8866,5 @@ countries: pl
 "Scripts" = "Skrypty"
 "Run last script again" = "Uruchom ponownie ostatni skrypt"
 "Open script folder..." = "Otwórz folder skryptów..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Wyciszone inserty nie przetwarzają (LYNX, oszczędza CPU; ten projekt)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Wyciszone inserty pomijają swoje efekty: Fruity Send lub kontroler w nich milknie, miernik się zatrzymuje, a efekty startują od nowa po odciszeniu (FL działa je dalej)"

@@ -4075,7 +4075,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
         const auto level = mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
         target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : level;
-        if (master.muted && meters != nullptr)
+        if (master.muted && meters != nullptr && ! song.mutedInsertsSkip)
             mutedLevel = level;
     }
 
@@ -4476,9 +4476,11 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
     // issue #144: a silenced insert keeps its meter (FL): metered without being heard, while the meters are on
-    const auto meterSilenced = silent && meters != nullptr && canMeterSilenced (track);
+    // (the LYNX option "Muted inserts don't process": the old cheap way, no effects, no meter)
+    const auto skip = silent && state.song.mutedInsertsSkip;
+    const auto meterSilenced = ! skip && silent && meters != nullptr && canMeterSilenced (track);
     // FL (round 190y renders): a muted insert keeps running its effects, live and in exports; only its routes are cut
-    const auto runSilenced = silent && state.song.muteRunsEffects;
+    const auto runSilenced = ! skip && silent && state.song.muteRunsEffects;
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };

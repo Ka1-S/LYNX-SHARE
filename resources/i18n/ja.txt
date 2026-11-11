@@ -8866,3 +8866,5 @@ countries: jp
 "Scripts" = "スクリプト"
 "Run last script again" = "最後のスクリプトをもう一度実行"
 "Open script folder..." = "スクリプトフォルダーを開く..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "ミュートしたインサートは処理しない（LYNX、CPU節約、このプロジェクト）"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "ミュートしたインサートはエフェクトを処理しません：中の Fruity Send やコントローラーは無音になり、メーターは止まり、ミュート解除時にエフェクトは初期状態から再開します（FL では動作し続けます）"
