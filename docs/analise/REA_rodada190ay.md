@@ -88,8 +88,26 @@ in clips of the clip grid, instruments whose knobs a controller link moves live.
   timeline once (a selection, one pattern, a repeated range) every frozen channel does, because the frozen audio is
   the whole song from its start and those renders cut and move the timeline (read from the code, not measured:
   before this such an export would have played the stem from its start). The project itself stays frozen. Cost: the export loads those instruments.
-- **Hosted plugin** (`tools/testplugin/lynx_test_heavy_vst3.cpp`, `LYNX_FREEZETEST_PLUGIN`): see the table in the
-  HANDOFF / report.
+- **Hosted plugin** — `tools/testplugin/lynx_test_heavy_vst3.cpp` ("LYNX Test Heavy": 512 MB touched per instance,
+  1000 sines of work per frame, 512 frames of reported latency, a tuning as its state that a new instance starts
+  different, a create / destroy log) on the demo song's Lead, `LYNX.exe --freezetest` with `LYNX_FREEZETEST_PLUGIN`
+  (Windows build of 4c9df3a23, fresh profile, 47 ok / 0 failures):
+
+  | | live | frozen | unfrozen |
+  |---|---|---|---|
+  | private bytes of the process | 589.3 MB | 62.0 MB | 590.6 MB |
+  | working set | 592.5 MB | 86.3 MB | 610.1 MB |
+  | render of 33.3 s (4 channels) | 11.03 s (33.1 %) | 0.17 s (0.5 %) | 11.06 s (33.2 %) |
+  | plugin instances alive (its own log) | 1 | 0 | 1 |
+  | mix vs live | — | -128.6 dB | -200 dB |
+
+  The stem is latency-compensated (engine latency 578 frames with the plugin; the frozen mix nulls against the live
+  one with three other channels in it). State: the 230-character state saved before the freeze equals the state read
+  back from the new instance after Unfreeze, and that instance starts with another tuning, so the -200 dB null also
+  proves it was applied. Freezing took 40.4 s (the song twice through the plugin: whole song + pattern loops).
+  The first run of this test failed "no instance alive": the command-line mode has no message loop, where the engine
+  frees the racks an edit replaced; `AudioEngine::freeRetiredRacks` does that for the test. In the app the 30 Hz
+  timer and the message loop do it (not measured in a running app).
 
 ## 7. Known limits
 - **Harmless does not null** (Thief's "Synth Bass": frozen vs live +1 dB from the first note after a 41 s rest). Not
