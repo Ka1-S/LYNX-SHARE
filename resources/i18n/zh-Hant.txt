@@ -8366,3 +8366,5 @@ countries: tw hk mo
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Scripts" = "指令碼"
+"Run last script again" = "再次執行上一個指令碼"

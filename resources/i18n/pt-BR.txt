@@ -8449,3 +8449,5 @@ countries: br
 "Octaver" = "Oitavador"
 "Rectify" = "Retificar"
 "CrossFold" = "CrossFold"
+"Scripts" = "Scripts"
+"Run last script again" = "Executar o último script de novo"

@@ -189,6 +189,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.articulate", TR_NOOP ("Articulate..."), Context::pianoRoll, { chord ('L', alt) } },
         { "pianoRoll.riffMachine", TR_NOOP ("Riff machine..."), Context::pianoRoll, { chord ('E', alt) } },
         { "pianoRoll.chordProgression", TR_NOOP ("Generate chord progression..."), Context::pianoRoll, { chord ('P', alt) } },
+        // FL's "Run last script again" (Piano roll scripts, round 190as)
+        { "pianoRoll.runLastScript", TR_NOOP ("Run last script again"), Context::pianoRoll, { chord ('Y', ctrl | alt) } },
         // note colours and the Select menu (REA round 153: FL's keys from its piano roll manual)
         { "pianoRoll.colourSelected", TR_NOOP ("Colour the selected notes with the note colour"), Context::pianoRoll, { chord ('C', alt) } },
         { "pianoRoll.selectByColour", TR_NOOP ("Select the notes of the same colour"), Context::pianoRoll, { chord ('C', shift) } },

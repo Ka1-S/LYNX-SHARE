@@ -8366,3 +8366,5 @@ countries: it ch sm
 "Octaver" = "Ottavatore"
 "Rectify" = "Rettifica"
 "CrossFold" = "CrossFold"
+"Scripts" = "Script"
+"Run last script again" = "Esegui di nuovo l'ultimo script"

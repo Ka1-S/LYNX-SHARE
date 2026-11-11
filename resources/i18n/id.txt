@@ -8366,3 +8366,5 @@ countries: id
 "Octaver" = "Oktaver"
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
+"Scripts" = "Skrip"
+"Run last script again" = "Jalankan lagi skrip terakhir"

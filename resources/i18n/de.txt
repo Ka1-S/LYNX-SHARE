@@ -8366,3 +8366,5 @@ countries: de at ch li lu
 "Octaver" = "Oktavierer"
 "Rectify" = "Gleichrichter"
 "CrossFold" = "CrossFold"
+"Scripts" = "Skripte"
+"Run last script again" = "Letztes Skript erneut ausführen"

@@ -8366,3 +8366,5 @@ countries: jp
 "Octaver" = "オクターバー"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Scripts" = "スクリプト"
+"Run last script again" = "最後のスクリプトをもう一度実行"

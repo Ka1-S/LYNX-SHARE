@@ -3100,7 +3100,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             juce::PopupMenu tools;
             for (const auto* id : { "pianoRoll.riffMachine", "pianoRoll.chordProgression", "pianoRoll.articulate", "pianoRoll.quantize",
                                     "pianoRoll.chop", "pianoRoll.arpeggiate", "pianoRoll.strum", "pianoRoll.flam", "pianoRoll.claw",
-                                    "pianoRoll.limit", "pianoRoll.flip", "pianoRoll.randomise", "pianoRoll.scaleLevels", "pianoRoll.lfo" })
+                                    "pianoRoll.limit", "pianoRoll.flip", "pianoRoll.randomise", "pianoRoll.scaleLevels", "pianoRoll.lfo",
+                                    "pianoRoll.runLastScript" })
                 if (const auto* a = keys::findAction (id))
                     action (tools, a->id, tr (a->description));
             menu.addSubMenu (tr ("Tools"), tools);

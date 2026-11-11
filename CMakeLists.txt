@@ -508,6 +508,7 @@ if(LYNX_BUILD_APP)
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
+        src/ui/PianoRollScripts.cpp
         src/ui/MidiClipboard.cpp
         src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp

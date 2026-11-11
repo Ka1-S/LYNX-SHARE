@@ -3255,6 +3255,11 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
         openEventEditor (engine, { AutomationTargetKind::channelVolume, engine.getSelectedChannel() });
     });
 
+    // FL's second column: "Scripts", the Piano roll's Python scripts (round 190as)
+    menu.addColumnBreak();
+    menu.addSectionHeader (tr ("Scripts"));
+    addScriptItems (menu);
+
     return menu;
 }
 
@@ -3572,6 +3577,7 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.articulate")) openNoteTool (NoteTool::articulate);
     else if (is ("pianoRoll.riffMachine")) openNoteTool (NoteTool::riffMachine);
     else if (is ("pianoRoll.chordProgression")) openNoteTool (NoteTool::chordProgression);
+    else if (is ("pianoRoll.runLastScript")) runLastScript();
     else if (is ("pianoRoll.zoomIn")) zoomAroundCentre (1.25);
     else if (is ("pianoRoll.zoomOut")) zoomAroundCentre (1.0 / 1.25);
     else if (is ("pianoRoll.zoom1")) zoomToBars (1);

@@ -8366,3 +8366,5 @@ countries: cn sg
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Scripts" = "脚本"
+"Run last script again" = "再次运行上一个脚本"

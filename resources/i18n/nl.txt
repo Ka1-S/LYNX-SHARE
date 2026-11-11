@@ -8366,3 +8366,5 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+"Scripts" = "Scripts"
+"Run last script again" = "Laatste script opnieuw uitvoeren"

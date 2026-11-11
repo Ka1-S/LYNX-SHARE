@@ -8366,3 +8366,5 @@ countries: tr
 "Octaver" = "Oktavlayıcı"
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
+"Scripts" = "Betikler"
+"Run last script again" = "Son betiği yeniden çalıştır"

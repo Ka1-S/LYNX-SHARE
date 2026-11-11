@@ -8366,3 +8366,5 @@ countries: ru by kz
 "Octaver" = "Октавер"
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
+"Scripts" = "Скрипты"
+"Run last script again" = "Запустить последний скрипт ещё раз"

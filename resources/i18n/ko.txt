@@ -8366,3 +8366,5 @@ countries: kr
 "Octaver" = "옥타버"
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
+"Scripts" = "스크립트"
+"Run last script again" = "마지막 스크립트 다시 실행"

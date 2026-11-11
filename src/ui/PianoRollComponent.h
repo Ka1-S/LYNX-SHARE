@@ -13,6 +13,7 @@
 #include "ui/ValueControl.h"
 #include "core/NoteEdit.h"
 #include "core/MidiImport.h"
+#include "core/ScriptDialog.h"
 
 namespace lynx
 {
@@ -156,6 +157,9 @@ public:
     std::vector<int> noteIndicesForSnapshot() const { return selectionOrAll(); }
     std::int64_t gridForSnapshot() const { return gridTicks(); }
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
+    juce::PopupMenu getScriptsMenuForSnapshot() { return scriptsMenu(); }
+    // runs a Piano roll script by its menu name (LYNX's own, or a file of the script folders)
+    void runScriptForSnapshot (const juce::String& name);
     juce::PopupMenu getStampMenuForSnapshot() { return stampMenu(); }
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
@@ -333,6 +337,30 @@ private:
     void zoomAll();
     void centreOnPlayhead();
     juce::PopupMenu toolsMenu();
+
+    // --- scripts (Tools › Scripts: FL's Piano roll scripts, round 190as; ui/PianoRollScripts.cpp) ---------------------
+    struct ScriptRef
+    {
+        juce::String name;  // menu name
+        juce::String key;   // the form memory's key (the script's path, or "lynx:<name>")
+        std::string source; // a built-in script's text (a file is read when it runs)
+        juce::File file;
+    };
+    struct ScriptJob;
+    struct ScriptResult;
+    juce::PopupMenu scriptsMenu();
+    void addScriptItems (juce::PopupMenu& menu);
+    void runScript (const ScriptRef& ref);
+    void runLastScript();
+    void scriptStep (std::shared_ptr<ScriptJob> job, std::vector<scriptform::Form> answers, bool preview);
+    void scriptFinished (std::shared_ptr<ScriptJob> job, ScriptResult& result, bool preview, std::uint64_t ticket);
+    bool scriptTargetStill (const ScriptJob& job) const;
+    void showScriptPattern (const Pattern& pattern, const std::vector<int>& select, bool undoable);
+    void commitScript (const ScriptJob& job, const Pattern& result, const std::vector<int>& select, std::int64_t from, std::int64_t to, bool takeTimeSelection);
+    void showScriptText (const juce::String& title, const juce::String& text);
+    ScriptRef lastScript;
+    bool scriptBusy = false;
+    std::uint64_t scriptTicket = 0;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::PopupMenu midiMenu();
 

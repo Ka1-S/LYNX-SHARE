@@ -49,6 +49,8 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 #include "core/AlsImport.h"
+#include "core/PianoRollScript.h"
+#include "ui/ScriptPanel.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/GamepadInput.h"
 #include "ui/SettingsPages.h"
@@ -11481,6 +11483,21 @@ private:
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),
                                                      ui.getMixerForSnapshot().getStripsForSnapshot().buildMenu (1) };
                 saveMenus (juce::StringArray { "Piano roll tools", "Playlist track", "Mixer track" }, menus, prefix + "-menus143.png");
+                // round 190as: the Piano roll's scripts (FL's Tools › Scripts column) and a script's form
+                saveMenus (juce::StringArray { "Piano roll scripts" }, std::vector<juce::PopupMenu> { ui.getPianoRollForSnapshot().getScriptsMenuForSnapshot() },
+                           prefix + "-prscripts-menu.png");
+                {
+                    lynx::prscript::Score score;
+                    const auto out = lynx::prscript::run (lynx::prscript::builtins().front().source, score, {});
+                    if (out.status == lynx::prscript::Outcome::Status::needsForm)
+                    {
+                        lynx::ScriptPanel::Options options;
+                        options.acceptText = lynx::tr ("Accept");
+                        saveWindow (std::make_unique<lynx::ScriptPanel> (out.form, [] (const lynx::scriptform::Form&) {}, [] (const lynx::scriptform::Form&) {},
+                                                                         nullptr, options),
+                                    "-prscript-form.png");
+                    }
+                }
                 // round 190j (discussion #10): the Piano roll menu's Chord stamp list
                 saveMenus (juce::StringArray { "Chord stamp" }, std::vector<juce::PopupMenu> { ui.getPianoRollForSnapshot().getStampMenuForSnapshot() },
                            prefix + "-stamp-menu.png");
