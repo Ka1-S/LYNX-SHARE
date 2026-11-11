@@ -68,7 +68,26 @@ TEST (slicer190f_voice_settings_round_trip)
 
     // an edit lands in FL's record and survives the state's own round trip
     auto state = slicer180c::threeSlices();
-    CHECK (state.voiceBlock.empty() && fslicer::voiceSettings (state) == defaults);
+    {
+        // a new Slicer is FL's (a Fruity Slicer added in FL 2026 and saved, round 190m): ANIMATE and DECLICK on, DEC
+        // 4 ms, the volume envelope on — no delay / attack / hold / decay, full sustain, release 6500 — and the rest
+        // of the block the plugin's defaults
+        CHECK (state.animate == 1 && state.declick == 1 && state.fadeOutMs == 4 && state.fadeInMs == 0 && state.autoDump == 1 && state.autoFit == 1);
+        CHECK (state.voiceBlock.size() == 364);
+        auto expected = defaults;
+        auto& v = expected.articulators[flvoice::volume];
+        v.envelope = true;
+        v.delay = v.attack = v.hold = v.decay = 100;
+        v.sustain = 128;
+        v.release = 6500;
+        CHECK (fslicer::voiceSettings (state) == expected);
+        std::int32_t on = 0;
+        std::memcpy (&on, state.voiceBlock.data() + 0x48, 4);
+        CHECK (on == -1); // as FL writes it
+        // a state without the block still reads as the plugin's defaults
+        state.voiceBlock.clear();
+        CHECK (fslicer::voiceSettings (state) == defaults);
+    }
     auto voice = defaults;
     auto& pitch = voice.articulators[flvoice::pitch];
     pitch.lfoAmount = 50;

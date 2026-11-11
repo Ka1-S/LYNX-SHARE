@@ -81,4 +81,15 @@ struct WrapperOption
     bool needsFixed;
 };
 const std::vector<WrapperOption>& wrapperOptions();
+
+// Processing › Connections of a generator (round 188d, issue #114; FL 2026 [EXEC] + Fruity Wrapper FUN_0078aea0 /
+// FUN_00790380 [DECOMP]), on `count` outputs (the routes are first padded to it with FL's defaults):
+// "Auto map outputs": from the first output's offset, one more for each next output (inactive ones included);
+// "Reset": every offset back to 0 ("---"), the LEDs as they are. Trailing default entries are dropped, as saved.
+void autoMapOutputs (std::vector<PluginOutputRoute>& routes, int count);
+void resetOutputOffsets (std::vector<PluginOutputRoute>& routes, int count);
+void trimOutputRoutes (std::vector<PluginOutputRoute>& routes);
+// The insert an output plays on: the channel's insert + its offset; −1 when inactive (`pluginDefault`: whether the
+// plugin declares the output active)
+int outputTargetTrack (int channelTrack, const PluginOutputRoute& route, bool pluginDefault = true) noexcept;
 } // namespace lynx
