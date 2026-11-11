@@ -10,7 +10,7 @@
 namespace prscript190
 {
 // a pattern with a C major arpeggio on channel 0 (4 notes, one per beat) and two notes of channel 1
-lynx::Pattern pattern()
+inline lynx::Pattern pattern()
 {
     lynx::Pattern p;
     const int keys[] = { 60, 64, 67, 72 };
@@ -38,7 +38,7 @@ lynx::Pattern pattern()
     return p;
 }
 
-std::vector<int> channelIndices (const lynx::Pattern& p, int channel)
+inline std::vector<int> channelIndices (const lynx::Pattern& p, int channel)
 {
     std::vector<int> out;
     for (std::size_t i = 0; i < p.notes.size(); ++i)
@@ -55,7 +55,7 @@ struct Result
 };
 
 // runs a script to its end on channel 0 of `p`, answering every form with its defaults changed by `set`
-Result runAll (const std::string& src, lynx::Pattern& p, const std::vector<int>& selection = {}, const std::map<std::string, double>& set = {},
+inline Result runAll (const std::string& src, lynx::Pattern& p, const std::vector<int>& selection = {}, const std::map<std::string, double>& set = {},
                double limitMs = 20000.0, std::int64_t timeFrom = 0, std::int64_t timeTo = 0)
 {
     using namespace lynx::prscript;
@@ -81,14 +81,14 @@ Result runAll (const std::string& src, lynx::Pattern& p, const std::vector<int>&
     return r;
 }
 
-bool done (const Result& r)
+inline bool done (const Result& r)
 {
     if (r.outcome.status != lynx::prscript::Outcome::Status::done)
         std::printf ("  script: %s\n", r.outcome.error.c_str());
     return r.outcome.status == lynx::prscript::Outcome::Status::done;
 }
 
-bool failedWith (const Result& r, const char* text)
+inline bool failedWith (const Result& r, const char* text)
 {
     const bool ok = r.outcome.status == lynx::prscript::Outcome::Status::failed && r.outcome.error.find (text) != std::string::npos;
     if (! ok)
