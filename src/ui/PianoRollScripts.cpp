@@ -90,7 +90,16 @@ void PianoRollComponent::addScriptItems (juce::PopupMenu& menu)
 {
     const bool free = ! scriptBusy;
     auto keyText = [] (const std::string& id) { return shortcutText ? shortcutText (id) : juce::String(); };
+    // FL's order (live capture, shots/pyscript-fl-tools-menu.png): Run last script again, Open script folder..., the scripts
     menu.addItem (tr ("Run last script again") + keyText ("pianoRoll.runLastScript"), free && lastScript.key.isNotEmpty(), false, [this] { runLastScript(); });
+    menu.addItem (tr ("Open script folder..."), true, false, [] {
+        const auto dir = myScriptsFolder();
+        dir.createDirectory();
+        if (platform::testMode())
+            platform::testModeLog ("open folder " + dir.getFullPathName());
+        else
+            dir.startAsProcess();
+    });
     menu.addSeparator();
     menu.addSectionHeader ("LYNX SHARE");
     for (const auto& b : prscript::builtins())
@@ -133,15 +142,6 @@ void PianoRollComponent::addScriptItems (juce::PopupMenu& menu)
         if (! dir.isDirectory() || ! addFolder (dir, menu, addFolder, 0))
             menu.addItem (tr ("(no scripts)"), false, false, nullptr);
     }
-    menu.addSeparator();
-    menu.addItem (tr ("Open my scripts folder"), true, false, [] {
-        const auto dir = myScriptsFolder();
-        dir.createDirectory();
-        if (platform::testMode())
-            platform::testModeLog ("open folder " + dir.getFullPathName());
-        else
-            dir.startAsProcess();
-    });
 }
 
 void PianoRollComponent::runLastScript()
@@ -335,7 +335,8 @@ void PianoRollComponent::scriptFinished (std::shared_ptr<ScriptJob> job, ScriptR
                 self->scriptStep (job, std::move (answers), true);
             },
             nullptr, options);
-        openToolWindow (std::move (panel), tr ("Configure script") + " - " + job->ref.name, scriptWindowKey);
+        // (FL's window carries the form's title)
+        openToolWindow (std::move (panel), form.title.empty() ? job->ref.name : juce::String::fromUTF8 (form.title.c_str()), scriptWindowKey);
         return;
     }
 

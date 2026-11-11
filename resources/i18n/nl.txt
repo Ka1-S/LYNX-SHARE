@@ -8368,3 +8368,4 @@ countries: nl be
 "CrossFold" = "CrossFold"
 "Scripts" = "Scripts"
 "Run last script again" = "Laatste script opnieuw uitvoeren"
+"Open script folder..." = "Scriptmap openen..."

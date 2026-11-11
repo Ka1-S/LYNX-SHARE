@@ -8368,3 +8368,4 @@ countries: jp
 "CrossFold" = "CrossFold"
 "Scripts" = "スクリプト"
 "Run last script again" = "最後のスクリプトをもう一度実行"
+"Open script folder..." = "スクリプトフォルダーを開く..."

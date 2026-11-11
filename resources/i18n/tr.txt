@@ -8368,3 +8368,4 @@ countries: tr
 "CrossFold" = "CrossFold"
 "Scripts" = "Betikler"
 "Run last script again" = "Son betiği yeniden çalıştır"
+"Open script folder..." = "Betik klasörünü aç..."

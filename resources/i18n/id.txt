@@ -8368,3 +8368,4 @@ countries: id
 "CrossFold" = "CrossFold"
 "Scripts" = "Skrip"
 "Run last script again" = "Jalankan lagi skrip terakhir"
+"Open script folder..." = "Buka folder skrip..."

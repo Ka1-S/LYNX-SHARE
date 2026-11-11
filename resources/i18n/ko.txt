@@ -8368,3 +8368,4 @@ countries: kr
 "CrossFold" = "CrossFold"
 "Scripts" = "스크립트"
 "Run last script again" = "마지막 스크립트 다시 실행"
+"Open script folder..." = "스크립트 폴더 열기..."

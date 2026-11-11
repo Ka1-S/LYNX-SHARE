@@ -8368,3 +8368,4 @@ countries: cn sg
 "CrossFold" = "CrossFold"
 "Scripts" = "脚本"
 "Run last script again" = "再次运行上一个脚本"
+"Open script folder..." = "打开脚本文件夹..."

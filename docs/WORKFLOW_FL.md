@@ -261,6 +261,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | R27 | Time markers in the roll (Alt+T named, Ctrl+T auto); per-pattern time signature (Shift+Alt+T) | [DOC][sc-pr] [DOC][pr] |
 | R28 | MIDI file import/export from the roll (Ctrl+M / Shift+Ctrl+M) | [DOC][sc-pr] |
 | R29 | Play button in the roll: right-click returns to the last start / roll start | [DOC][pr] |
+| R30 | Piano roll scripts: Tools › Scripts lists Python `.pyscript` files (factory, user, downloaded); a script edits the notes and markers through `flpianoroll`, with an automatic form and live preview; Run last script again Ctrl+Alt+Y | [DOC] Piano roll script reference, manual pianoroll_scripting_api; REA_rodada190as-pyscript.md |
 
 ### 2.5 Playlist (P)
 
@@ -467,6 +468,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | R27 | No | Markers exist only on the Playlist ruler |
 | R28 | Yes | MIDI menu import/export (`:1163-1209`) |
 | R29 | No | — |
+| R30 | Yes | Round 190as: `core/PianoRollScript.h` (LYNX's own `flpianoroll` on the embedded Python), Tools › Scripts with LYNX's scripts, My scripts and FL's folders; FL's shipped scripts run unmodified. Sandbox and time limit are LYNX additions |
 
 **Playlist**
 

@@ -8368,3 +8368,4 @@ countries: ru by kz
 "CrossFold" = "CrossFold"
 "Scripts" = "Скрипты"
 "Run last script again" = "Запустить последний скрипт ещё раз"
+"Open script folder..." = "Открыть папку скриптов..."

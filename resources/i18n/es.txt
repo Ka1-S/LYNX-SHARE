@@ -8368,3 +8368,4 @@ countries: es mx ar co cl pe ve
 "CrossFold" = "CrossFold"
 "Scripts" = "Scripts"
 "Run last script again" = "Ejecutar de nuevo el último script"
+"Open script folder..." = "Abrir la carpeta de scripts..."

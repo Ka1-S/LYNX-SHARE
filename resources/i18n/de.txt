@@ -8368,3 +8368,4 @@ countries: de at ch li lu
 "CrossFold" = "CrossFold"
 "Scripts" = "Skripte"
 "Run last script again" = "Letztes Skript erneut ausführen"
+"Open script folder..." = "Skriptordner öffnen..."

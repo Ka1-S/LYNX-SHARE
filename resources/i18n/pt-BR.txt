@@ -8451,3 +8451,4 @@ countries: br
 "CrossFold" = "CrossFold"
 "Scripts" = "Scripts"
 "Run last script again" = "Executar o último script de novo"
+"Open script folder..." = "Abrir a pasta de scripts..."

@@ -2316,6 +2316,18 @@ FL Studio Mobile plugin is the open sound check.
 | Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
 | Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
 
+## Round 190as: Piano roll scripts (FL's `.pyscript`, `flpianoroll`)
+
+Details and proof: `docs/analise/REA_rodada190as-pyscript.md`.
+
+| FL | LYNX | | Notes |
+|---|---|---|---|
+| Piano roll › Tools, second column "Scripts": Run last script again (Ctrl+Alt+Y), Open script folder..., the scripts | same column, order and key; LYNX's own scripts, My scripts (`Documents/LYNX/Piano roll scripts`), and FL's factory / user / downloaded script folders when FL is installed | ✅ | FL's five shipped scripts run unmodified (read in place, never copied) |
+| `flpianoroll`: score, Note, Marker, ScriptDialog, Utils | LYNX's own module on the embedded Python, same names and behaviour (what a script sees, live notes, typed members, defaults, storage rounding) | ✅ | `score.loadScoreFromFile` (undocumented) is refused: scripts cannot read files |
+| Note `repeats`, Marker `scale_root` / `scale_helper` | kept for the script, not stored | ⚠️ | LYNX has no note repeats; scale markers carry no scale data yet |
+| Script form: Preview (on), Reset, Regenerate, Accept; two columns of knobs | LYNX's Configure script panel with Preview on and Accept; one column of sliders; the preview shows in the Piano roll, Accept is one undo step | ⚠️ | layout differs (review pending) |
+| No limits on a script | no files / programs / network; stopped after 20 s (5 s for a preview) | ➕ | LYNX's sandbox |
+
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on

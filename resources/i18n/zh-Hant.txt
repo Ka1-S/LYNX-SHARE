@@ -8368,3 +8368,4 @@ countries: tw hk mo
 "CrossFold" = "CrossFold"
 "Scripts" = "指令碼"
 "Run last script again" = "再次執行上一個指令碼"
+"Open script folder..." = "開啟指令碼資料夾..."
