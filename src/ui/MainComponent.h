@@ -116,6 +116,8 @@ public:
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
+    // --no-plugins project.lynx (round 190ap): the next .lynx project opens with its third-party plugins off
+    void openNextWithoutPlugins (bool on) { nextOpenWithoutPlugins = on; }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
     juce::PopupMenu getPanelMenuForSnapshot (workspace::Panel panel)
@@ -173,7 +175,11 @@ private:
     void showImportReport();
     void importFlp (const juce::File& file);
     void flpImported (const juce::File& file); // after the import: title, recent files, missing files
-    void openLynxProject (const juce::File& file);
+    void openLynxProject (const juce::File& file, bool withoutPlugins = false);
+    // round 190ap: "Open without third-party plugins" (File menu; --no-plugins on the command line): the project opens
+    // with every hosted plugin switched off, its settings kept; the panel switches them back on
+    void chooseFileToOpenWithoutPlugins();
+    void showPluginsOff();
     // The "Missing files" window (ui/MissingFilesDialog.h) for the current project; `afterOpening`: shown by opening a
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
@@ -257,6 +263,8 @@ private:
     void loadUiSettings();
     void saveUiSettings();
     bool persistent = true;
+    bool nextOpenWithoutPlugins = false; // --no-plugins (round 190ap)
+    bool shownPluginsOff = false;        // what the title says now
     StartupOptions startup; // splash screen and start-up sound (read by Main.cpp before this window exists)
 
     // menu bar
@@ -345,6 +353,9 @@ private:
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
     void revertToLastBackup();
+    // round 190ap: the Versions panel (saved versions and backups of this project) and its "Open as a copy"
+    void showVersions();
+    void openProjectAsCopy (const juce::File& file, const juce::String& name);
     void exportPackage();
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     liveui::Context liveContext();       // the live session's (round 169b)

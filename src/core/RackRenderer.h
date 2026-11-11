@@ -292,6 +292,10 @@ struct RackState
         StretchedSpanProvider stretchedSpans;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        // Round 190ap ("Open without third-party plugins"): true for a plugin whose slots must be created anew in this
+        // build although the slot did not change (a plugin switched back on: its slot holds the silent placeholder of
+        // when it was off). A Patcher that holds such a plugin is built anew as a whole. Unset: nothing is forced.
+        std::function<bool (const PluginRef&)> rebuildPlugin;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
     };
 

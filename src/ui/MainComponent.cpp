@@ -33,6 +33,8 @@
 #include "core/EditorPolish.h"
 
 #include "ui/HistoryPanel.h"
+#include "ui/VersionsPanel.h"
+#include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/PluginManager.h"
@@ -950,7 +952,9 @@ void MainComponent::paint (juce::Graphics& g)
         g.setFont (font (type::small, true));
         g.setColour (colour::textSecondary);
         if (const auto rest = titleArea.withTrimmedLeft (people > 0 ? people + 10 : 0); rest.getWidth() >= 50)
-            g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, rest, juce::Justification::centredRight, 1, 0.8f);
+            g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name
+                                  + (engine.pluginsOff() ? " " + tr ("(third-party plugins off)") : juce::String()), // round 190ap
+                              rest, juce::Justification::centredRight, 1, 0.8f);
     }
 
     // captions that name the snap and pattern selectors, after their icons (the magnet is a button)
@@ -4270,6 +4274,12 @@ void MainComponent::refreshModeButton()
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    // round 190ap: the title says while third-party plugins are off; the last one switched on takes the note away
+    if (const auto off = engine.pluginsOff(); off != shownPluginsOff)
+    {
+        shownPluginsOff = off;
+        updateTitle();
+    }
     if (const auto notice = engine.takeRecordingNotice(); notice.issue != AudioEngine::InputIssue::none && persistent)
         mixerinput::explain (notice);
     // round 165c: hardware inserts measured for another device setup (the device or its buffer size changed, or the project
@@ -5241,8 +5251,10 @@ void MainComponent::updateTitle()
             const auto st = live->getState();
             liveState = " [" + (st == S::live ? tr ("LIVE") : st == S::reconnecting ? tr ("Reconnecting...") : st == S::waitingHost ? tr ("Waiting for the host...") : tr ("Connecting...")) + "]";
         }
+        // round 190ap: opened without third-party plugins, while some are still off
+        const auto pluginsOff = engine.pluginsOff() ? " " + tr ("(third-party plugins off)") : juce::String();
         window->setName ((engine.isModified() ? "* " : "")
-                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix + liveState);
+                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix + pluginsOff + liveState);
     }
 }
 
@@ -5470,7 +5482,10 @@ juce::String MainComponent::simpleSaveStatusText (bool modified, bool hasFile, j
 void MainComponent::rotateBackups (const juce::String& stem)
 {
     const auto folder = autosaveFolder();
-    for (const auto& old : safety::backupsToRemove (backupFiles (folder), stem.toStdString(), autosaveKeep))
+    // (round 190ap: a backup the user labelled in the Versions panel is one to find again: it is left alone and does
+    // not count toward the number kept; without labels the rotation is exactly as before)
+    const auto files = safety::versions::withoutLabelled (backupFiles (folder), backupLabels (folder, stem));
+    for (const auto& old : safety::backupsToRemove (files, stem.toStdString(), autosaveKeep))
     {
         const auto f = folder.getChildFile (juce::String::fromUTF8 (old.c_str()) + ProjectFile::extension);
         f.setReadOnly (false); // (FL clears the read-only flag before deleting an old backup too)
@@ -5518,6 +5533,64 @@ void MainComponent::saveNewVersion()
     importedSuffix = {};
     updateTitle();
     ui::postHint ({ tr ("Saved as a new version: {0}", { file.getFileName() }), {}, false, false }, 5000);
+}
+
+void MainComponent::showVersions()
+{
+    if (auto* open = findToolWindow ("versions"))
+    {
+        open->toFront (true);
+        return;
+    }
+    VersionsActions actions;
+    const juce::Component::SafePointer<MainComponent> safe (this);
+    actions.context = [safe] {
+        VersionsContext c;
+        if (safe == nullptr)
+            return c;
+        c.projectFile = safe->currentFile;
+        c.projectStem = projectStem (safe->projectName);
+        c.backupFolder = autosaveFolder();
+        c.extension = ProjectFile::extension;
+        return c;
+    };
+    actions.openAsCopy = [safe] (const juce::File& file, const juce::String& name) {
+        if (safe != nullptr)
+            safe->confirmDiscard ([safe, file, name] {
+                if (safe != nullptr)
+                    safe->openProjectAsCopy (file, name);
+            });
+    };
+    actions.saveNewVersion = [safe] {
+        if (safe != nullptr)
+            safe->saveNewVersion();
+    };
+    if (auto* window = openToolWindow (makeVersionsPanel (std::move (actions)), tr ("Versions"), "versions"))
+        window->setResizable (true, false);
+}
+
+void MainComponent::openProjectAsCopy (const juce::File& file, const juce::String& name)
+{
+    // A version or a backup opened to look at or to carry on from: it becomes an unsaved project under `name`, so
+    // neither that file nor the project that was open is written over (Save asks where to put it).
+    juce::String error;
+    auto song = ProjectFile::load (file, error);
+    if (! song)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not open"), error);
+        return;
+    }
+    engine.getPluginHost().applySubstitutes (*song);
+    engine.stop();
+    engine.rewind();
+    engine.setSong (std::move (*song));
+    currentFile = juce::File();
+    importedFlpFile = juce::File();
+    projectName = name;
+    importedSuffix = {};
+    updateTitle();
+    playlist.showSongAfterOpen();
+    ui::postHint ({ tr ("Opened as a copy: {0}", { file.getFileName() }), tr ("Save asks where to keep it; the original file is untouched") }, 7000);
 }
 
 void MainComponent::revertToLastBackup()
@@ -6263,7 +6336,33 @@ void MainComponent::flpImported (const juce::File& file)
     }
 }
 
-void MainComponent::openLynxProject (const juce::File& file)
+void MainComponent::chooseFileToOpenWithoutPlugins()
+{
+    confirmDiscard ([this] {
+        fileChooser = lynx::ui::makeFileChooser (tr ("Open without third-party plugins"), currentFile.getParentDirectory(), juce::String ("*") + ProjectFile::extension);
+        lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                  [this] (const juce::FileChooser& chooser) {
+                                      if (chooser.getResult().existsAsFile())
+                                      {
+                                          crashguard::note (("opening project without plugins " + chooser.getResult().getFileName()).toStdString());
+                                          openLynxProject (chooser.getResult(), true);
+                                      }
+                                  });
+    });
+}
+
+void MainComponent::showPluginsOff()
+{
+    if (auto* open = findToolWindow ("pluginsOff"))
+    {
+        open->toFront (true);
+        return;
+    }
+    if (auto* window = openToolWindow (makePluginsOffPanel (engine), tr ("Third-party plugins"), "pluginsOff"))
+        window->setResizable (true, false);
+}
+
+void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins)
 {
     juce::String error, savedBy;
     auto song = ProjectFile::load (file, error, &savedBy);
@@ -6273,13 +6372,22 @@ void MainComponent::openLynxProject (const juce::File& file)
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not open"), error);
         return;
     }
-
-    // missing plugins get their LYNX substitute; substitutes whose original is installed now go back to it
-    engine.getPluginHost().applySubstitutes (*song);
+    withoutPlugins = withoutPlugins || std::exchange (nextOpenWithoutPlugins, false);
 
     engine.stop();
     engine.rewind();
-    engine.setSong (std::move (*song));
+    if (withoutPlugins)
+    {
+        // round 190ap: no hosted plugin is created and no slot is changed (no substitutes either): each keeps the
+        // settings the file has, which is also what a save made now writes
+        engine.setSongWithPluginsOff (std::move (*song));
+    }
+    else
+    {
+        // missing plugins get their LYNX substitute; substitutes whose original is installed now go back to it
+        engine.getPluginHost().applySubstitutes (*song);
+        engine.setSong (std::move (*song));
+    }
     currentFile = file;
     importedFlpFile = juce::File();
     projectName = file.getFileNameWithoutExtension();
@@ -6298,6 +6406,14 @@ void MainComponent::openLynxProject (const juce::File& file)
                                                     tr ("This project was saved by LYNX SHARE {0}, and this is {1}. What the newer version added may be "
                                                         "lost if you save it here: use File › Save as... to keep the original.",
                                                         { savedBy, JUCE_APPLICATION_VERSION_STRING }));
+    }
+
+    if (engine.pluginsOff())
+    {
+        platform::testModeLog ("project opened without third-party plugins");
+        ui::postHint ({ tr ("Opened without third-party plugins: their settings are kept"), {}, false, false }, 8000);
+        if (persistent && ! engine.hostedPluginUses().empty())
+            showPluginsOff();
     }
 
     if (persistent)
@@ -7176,6 +7292,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         templates.addItem (tr ("Change default template..."), [this] { openSettings (3); });
         menu.addSubMenu (tr ("New from template"), templates);
         menu.addItem (tr ("Open...") + shortcutText ("file.open"), [this] { chooseFileToOpen(); });
+        // round 190ap: a project that will not open, or crashes while it loads: its plugins stay off until switched on
+        menu.addItem (tr ("Open without third-party plugins..."), [this] { chooseFileToOpenWithoutPlugins(); });
+        if (engine.pluginsOff())
+            menu.addItem (tr ("Switch plugins back on..."), [this] { showPluginsOff(); });
         menu.addSeparator();
 
         // FL's order (REA round 139): saving, then Export, then the recent projects listed in the menu itself
@@ -7270,6 +7390,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         if (recent.getNumFiles() == 0)
             menu.addItem (tr ("(none)"), false, false, [] {});
         menu.addSeparator();
+        menu.addItem (tr ("Versions..."), [this] { showVersions(); }); // round 190ap: the saved versions and the backups in one list
         menu.addItem (tr ("Revert to last backup..."), [this] { revertToLastBackup(); });
         menu.addItem (tr ("Open autosave folder"), [] {
             autosaveFolder().createDirectory();

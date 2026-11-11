@@ -1,7 +1,7 @@
 language: Español
 countries: es mx ar co cl pe ve
 
-# LYNX SHARE interface in Español (JUCE LocalisedStrings format).
+# LYNX interface in Español (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/es-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4559,6 +4559,7 @@ countries: es mx ar co cl pe ve
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "No se pudo enviar el informe ({0}); LYNX SHARE lo reintentará en el próximo inicio"
 "Report a problem" = "Informar de un problema"
 "Report a problem..." = "Informar de un problema..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Buscar actualizaciones..."
 "Check for updates automatically" = "Buscar actualizaciones automáticamente"
@@ -5282,6 +5283,27 @@ countries: es mx ar co cl pe ve
 "RPN..." = "RPN..."
 "Send MIDI" = "Enviar MIDI"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "El Dashboard envía sus notas, el programa y los controles configurados en “Enviar MIDI” a los plugins cuyo puerto de entrada MIDI es este puerto (ventana del plugin > Configuración > MIDI > Puerto de entrada)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "Bucle de marcador"
+"Marker skip" = "Salto de marcador"
+"Marker pause" = "Pausa de marcador"
+"Pattern length" = "Duración del patrón"
+"Bar override" = "Cambio de compás"
+"Key/Scale" = "Tonalidad/escala"
+"Loop length" = "Duración del bucle"
+"Add one every" = "Añadir uno cada"
+"8 bars" = "8 compases"
+"Bars" = "Compases"
+"Add jump to next bar" = "Añadir salto al siguiente compás"
+"Change to marker loop" = "Convertir en bucle de marcador"
+"Time markers" = "Marcadores de tiempo"
+"Quantize song jumps" = "Cuantizar saltos de la canción"
+"Place loop (from this marker to the next)" = "Crear bucle (de este marcador al siguiente)"
+"Song marker jump" = "Salto a marcador de la canción"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Las notas de este canal llevan la canción a un marcador en lugar de sonar: la nota 0 va al primer marcador, la siguiente al segundo... (Playlist › Cuantizar saltos de la canción se aplica durante la reproducción)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "Saltar al siguiente marcador de la canción (Cuantizar saltos de la canción durante la reproducción)"
+"Jump to the previous song marker" = "Saltar al marcador anterior de la canción"
 "MUTE" = "MUTE"
 "CHANNEL" = "CANAL"
 "Bar:Beat:Tick" = "Compás:Tiempo:Tick"
@@ -5694,6 +5716,62 @@ countries: es mx ar co cl pe ve
 "Black notes" = "Teclas negras"
 "Sharps (#)" = "Sostenidos (#)"
 "Flats (b)" = "Bemoles (b)"
+"Advanced looping" = "Bucle avanzado"
+"Burn" = "Grabar"
+"Burn MIDI to" = "Grabar MIDI en"
+"Burn all looping channels" = "Grabar todos los canales en bucle"
+"Burn selected channels" = "Grabar los canales seleccionados"
+"Burn to pattern" = "Grabar en el patrón"
+"Channel looping" = "Bucle de canales"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Bucle de canales: los canales más cortos que el patrón se repiten hasta su final (polirritmos)  [LMB] activa / desactiva  [RMB] tipo de bucle (canales de pasos, todos los canales, avanzado) y Grabar en el patrón"
+"Channel looping: {0}" = "Bucle de canales: {0}"
+"Don't loop" = "Sin bucle"
+"Echo delay" = "Eco (echo delay)"
+"Every {0} steps" = "Cada {0} pasos"
+"Loop all channels" = "Bucle en todos los canales"
+"Loop point" = "Punto de bucle"
+"Loop point ({0} steps)" = "Punto de bucle ({0} pasos)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Punto de bucle: [LMB] arrastrar o [Wheel] lo fija en pasos  [2xLMB] siguiente compás  [RMB] Sin bucle / Paso / Tiempo / Compás, Grabar en el patrón"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Repetición del bucle (tras el punto de bucle): [LMB] edita el paso que repite"
+"Loop step channels" = "Bucle en los canales de pasos"
+"Loop type" = "Tipo de bucle"
+"Looping on" = "Bucle activado"
+"Nothing to burn" = "Nada que grabar"
+"Reset after burning to MIDI" = "Restablecer tras grabar en MIDI"
+"Select what you want to reset:" = "Elige qué quieres restablecer:"
+"Set to next bar" = "Fijar en el siguiente compás"
+"Set to next beat" = "Fijar en el siguiente tiempo"
+"The selected channel doesn't contain any notes to burn." = "El canal seleccionado no tiene notas que grabar."
+"Time (shift and gate)" = "Tiempo (desplazamiento y gate)"
+"loop at the next bar" = "bucle en el siguiente compás"
+"loop at the next beat" = "bucle en el siguiente tiempo"
+"loop at the next step" = "bucle en el siguiente paso"
+"Receive notes from" = "Recibir notas de"
+"Unlock" = "Desbloquear"
+"not connected" = "sin conexión"
+"No MIDI input device" = "Ningún dispositivo de entrada MIDI"
+"(locked: receives the notes of {0})" = "(bloqueado: recibe las notas de {0})"
+"Create sampled instrument..." = "Crear instrumento sampleado..."
+"Create sampled instrument" = "Crear instrumento sampleado"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "Toca {0} tecla por tecla y crea un canal Sampler con las grabaciones."
+"Sampling the instrument..." = "Sampleando el instrumento..."
+"Writing the samples..." = "Escribiendo los samples..."
+"Could not sample the instrument" = "No se pudo samplear el instrumento"
+"Low note" = "Nota más grave"
+"High note" = "Nota más aguda"
+"Keys per zone" = "Teclas por zona"
+"Root offset" = "Desplazamiento de la raíz"
+"Velocity layers" = "Capas de velocidad"
+"Max velocity" = "Velocidad máxima"
+"Release after (seconds)" = "Soltar tras (segundos)"
+"Max length after release (seconds)" = "Duración máx. tras soltar (segundos)"
+"Stop on" = "Detener en"
+"Max length" = "Duración máx."
+"16-bit integer" = "Entero de 16 bits"
+"Mono (merged)" = "Mono (sumado)"
+"Enable insert effects" = "Activar efectos del insert"
+"Enable master effects" = "Activar efectos del Master"
+"could not read {0}" = "no se pudo leer {0}"
 "Key to" = "Teclas para"
 "Percent" = "Porcentaje"
 "Use regions" = "Usar regiones"
@@ -5708,7 +5786,6 @@ countries: es mx ar co cl pe ve
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Inserta columnas vacías antes de la canción para los clips que se van a lanzar, un marcador en cada una y un marcador Start donde empieza la canción; se activa el modo performance."
 "Marker count" = "Número de marcadores"
 "2 steps" = "2 pasos"
-"8 bars" = "8 compases"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Pista: [LMB] seleccionar  [Ctrl][LMB] añadir / quitar  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5834,7 +5911,6 @@ countries: es mx ar co cl pe ve
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "Duración del patrón en compases: [LMB] arrastra o [Wheel] para cambiarla  [2xLMB] automática (según las notas)  [RMB] menú"
 "Pattern length: {0} (automatic, from the notes)" = "Duración del patrón: {0} (automática, según las notas)"
 "Pattern length (bars, 0 = automatic)" = "Duración del patrón (compases, 0 = automática)"
-"Pattern length" = "Duración del patrón"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "Seguir: un patrón más largo que el Channel Rack pasa de página con el paso que suena; desactivado, se queda donde te desplazaste"
 "Follow the playhead (page along with the playing step) on/off" = "Activar/desactivar seguir el cursor de reproducción (pasar de página con el paso que suena)"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "Seguir: la vista pasa de página con la posición de reproducción; desactivado, se queda donde te desplazaste"
@@ -5901,9 +5977,6 @@ countries: es mx ar co cl pe ve
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Estéreo invertido"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Modo corte (C): haz clic en una nota para cortarla ahí; Ctrl+clic en una nota para pegarla a la anterior"
 "Score" = "Partitura"
@@ -5946,7 +6019,6 @@ countries: es mx ar co cl pe ve
 "Set image wallpaper..." = "Establecer imagen de fondo..."
 "Remove image wallpaper" = "Quitar imagen de fondo"
 "Set background color..." = "Establecer color de fondo..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Pista del metrónomo"
 "Metronome target mixer track" = "Pista del mezclador de destino del metrónomo"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "La pista del mezclador por la que suena el metrónomo (--- es el Master). El clic nunca entra en una exportación."
@@ -5982,8 +6054,6 @@ countries: es mx ar co cl pe ve
 "Ghost channels" = "Canales fantasma"
 "Add multiple..." = "Añadir varios..."
 "You can add a maximum of {0} inserts." = "Puedes añadir como máximo {0} inserts."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Ganancia del clip: [LMB] arrastrar arriba / abajo (los clips seleccionados juntos)  [RMB] menú"
 "Automatic crossfades (current project) on/off" = "Fundidos cruzados automáticos (proyecto actual) sí/no"
 "Automatic crossfades (current project)" = "Fundidos cruzados automáticos (proyecto actual)"
@@ -5998,14 +6068,11 @@ countries: es mx ar co cl pe ve
 "Yes" = "Sí"
 "Make clip unique?" = "¿Hacer único el clip?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "El clip \"{0}\" también se usa en otra pista de audio.\n\n¿Quieres hacer única esta instancia y luego enrutarla a esta pista de audio?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "GARGANTA"
 "Scale steps" = "Grados de escala"
 "In scale" = "En escala"
 "AMPLITUDE" = "AMPLITUD"
 "VARIATION" = "VARIACIÓN"
-
-# round 167f: FL Emphasis
 "Delta" = "Delta"
 "Envelope order" = "Orden de envolvente"
 "Linking" = "Vinculación"
@@ -6160,6 +6227,7 @@ countries: es mx ar co cl pe ve
 "Load preset..." = "Cargar preset..."
 "Save preset as..." = "Guardar preset como..."
 "Page {0}" = "Página {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Suave (coseno)"
 "Bezier" = "Bézier"
@@ -6249,7 +6317,6 @@ countries: es mx ar co cl pe ve
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Instrumento SFZ: [LMB] preescuchar  [2xLMB] canal LYNX Soundfont nuevo (o en el seleccionado)  arrastrar al Channel Rack"
 "Open a .sf2 / .sf3 / .sfz file" = "Abrir un archivo .sf2 / .sf3 / .sfz"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: reproduce bancos SoundFont 2 / 3 e instrumentos SFZ. Busca presets en todos tus SoundFonts, haz clic para preescuchar, doble clic para cargar."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "NIVELES"
 "Loop A" = "Loop A"
 "Loop B" = "Loop B"
@@ -6306,6 +6373,22 @@ countries: es mx ar co cl pe ve
 "Expand all grouped tracks" = "Expandir todas las pistas agrupadas"
 "Purge unused audio clips" = "Purgar clips de audio no usados"
 "Create variants when stretching audio clips" = "Crear variantes al estirar clips de audio"
+"Extract stems from sample" = "Extraer stems del sample"
+"Extracting stems..." = "Extrayendo stems..."
+"Downloading the stem model..." = "Descargando el modelo de stems..."
+"Checking the stem model..." = "Comprobando el modelo de stems..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "No se pudo cargar ONNX Runtime. La extracción de stems necesita macOS 13.4 o posterior."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "No se pudo cargar ONNX Runtime. Instala Microsoft Visual C++ Redistributable (x64) desde https://aka.ms/vs/17/release/vc_redist.x64.exe y vuelve a intentarlo."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "No se pudo cargar ONNX Runtime. La extracción de stems necesita la libstdc++ del sistema."
+"The model returned an unexpected result." = "El modelo devolvió un resultado inesperado."
+"The sample is empty." = "El sample está vacío."
+"The downloaded model failed its checksum, so it was not used." = "El modelo descargado no pasó la comprobación de checksum, así que no se usó."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "La extracción de stems necesita el modelo HT-Demucs. No forma parte de LYNX SHARE: se descarga una vez ({0} MB) y se guarda en {1}."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Origen: {0} (exportación ONNX de Demucs v4 de Meta AI Research)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Licencia: el código de Demucs es MIT. La licencia de los pesos entrenados no está clara, como dicen sus autores: los datos de entrenamiento incluyen MUSDB18-HQ, en parte solo para investigación. Decide tú si eso encaja con tu uso, sobre todo el comercial."
+"Download" = "Descargar"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "La extracción de stems necesita ONNX Runtime ({0}), que viene con el instalador y el zip de LYNX SHARE, pero falta junto al programa. Instala LYNX SHARE con el instalador o descomprime el zip completo."
+"Stems are still being extracted. Try again when that has finished." = "Los stems todavía se están extrayendo. Vuelve a intentarlo cuando termine."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Consolidar la selección de la Playlist (desde el inicio de la selección)"
@@ -6354,6 +6437,7 @@ countries: es mx ar co cl pe ve
 "The project has no mixer states, effects or notes to export." = "El proyecto no tiene estados de mezclador, efectos ni notas para exportar."
 "Some files could not be written:" = "Algunos archivos no se pudieron escribir:"
 "Project bones..." = "Huesos del proyecto..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "Masculino"
 "Female" = "Femenino"
@@ -6447,8 +6531,6 @@ countries: es mx ar co cl pe ve
 "Pattern time markers: Add time signature change..." = "Marcadores de tiempo del patrón: Añadir cambio de compás..."
 "Delete all markers" = "Eliminar todos los marcadores"
 "Colour group" = "Grupo de color"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "Siempre|Sostenido"
 "Arpeggio" = "Arpegio"
 "Auto|Man" = "Auto|Man."
@@ -6521,22 +6603,6 @@ countries: es mx ar co cl pe ve
 "Set as time signature" = "Definir como compás"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "División de tiempo: el sistema original de FL Studio (pulsos por compás, pasos por pulso). Compás: compases tradicionales (numerador / denominador)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "Denominador: {0} (la cuadrícula de pasos del Channel Rack tiene {1} pasos por pulso)."
-"Extract stems from sample" = "Extraer stems del sample"
-"Extracting stems..." = "Extrayendo stems..."
-"Downloading the stem model..." = "Descargando el modelo de stems..."
-"Checking the stem model..." = "Comprobando el modelo de stems..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "No se pudo cargar ONNX Runtime. La extracción de stems necesita macOS 13.4 o posterior."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "No se pudo cargar ONNX Runtime. Instala Microsoft Visual C++ Redistributable (x64) desde https://aka.ms/vs/17/release/vc_redist.x64.exe y vuelve a intentarlo."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "No se pudo cargar ONNX Runtime. La extracción de stems necesita la libstdc++ del sistema."
-"The model returned an unexpected result." = "El modelo devolvió un resultado inesperado."
-"The sample is empty." = "El sample está vacío."
-"The downloaded model failed its checksum, so it was not used." = "El modelo descargado no pasó la comprobación de checksum, así que no se usó."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "La extracción de stems necesita el modelo HT-Demucs. No forma parte de LYNX SHARE: se descarga una vez ({0} MB) y se guarda en {1}."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Origen: {0} (exportación ONNX de Demucs v4 de Meta AI Research)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Licencia: el código de Demucs es MIT. La licencia de los pesos entrenados no está clara, como dicen sus autores: los datos de entrenamiento incluyen MUSDB18-HQ, en parte solo para investigación. Decide tú si eso encaja con tu uso, sobre todo el comercial."
-"Download" = "Descargar"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "La extracción de stems necesita ONNX Runtime ({0}), que viene con el instalador y el zip de LYNX SHARE, pero falta junto al programa. Instala LYNX SHARE con el instalador o descomprime el zip completo."
-"Stems are still being extracted. Try again when that has finished." = "Los stems todavía se están extrayendo. Vuelve a intentarlo cuando termine."
 "Configuration" = "Configuración"
 "Transp." = "Transp."
 "Master envelope" = "Envolvente maestra"
@@ -6572,8 +6638,6 @@ countries: es mx ar co cl pe ve
 "sequencer on" = "secuenciador activo"
 "sequencer off" = "secuenciador inactivo"
 "transpose {0}" = "transposición {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} tiempos atrás"
 "Beat {0}" = "Tiempo {0}"
 "The first point of the envelope can't be removed." = "El primer punto de la envolvente no se puede eliminar."
@@ -6610,6 +6674,7 @@ countries: es mx ar co cl pe ve
 "now" = "ahora"
 "1 bar back" = "1 compás atrás"
 "2 bars back" = "2 compases atrás"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Reemplazar sample"
 "Generate steps" = "Generar pasos"
@@ -6685,7 +6750,6 @@ countries: es mx ar co cl pe ve
 "Morph to" = "Transformar a"
 "Harm" = "Arm."
 "Lvl" = "Niv."
-"Hi-cut" = "Corte agudos"
 "Lo-cut" = "Corte graves"
 "String 1" = "Cuerda 1"
 "String 2" = "Cuerda 2"
@@ -6768,7 +6832,6 @@ countries: es mx ar co cl pe ve
 "MODULE 2" = "MÓDULO 2"
 "MODULE 3" = "MÓDULO 3"
 "MODULE 4" = "MÓDULO 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Regla: [LMB] posición de la canción  [RMB] o [Ctrl][LMB] o [2xLMB] arrastrar: selección de tiempo (bucle)  [Shift][LMB] arrastrar: moverla  [Ctrl][RMB] arrastrar: zoom  [RMB] clic: menú  [Alt] sin ajuste"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Regla: [LMB] posición  [Alt] sin ajuste  [Ctrl][LMB], [RMB] o [2xLMB] arrastrar selecciona las notas de un rango de tiempo  [Ctrl][Wheel] zoom  [Shift][Wheel] desplazar"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "Marcador: [LMB] saltar a él (reproduciendo: en el siguiente paso de Cuantizar saltos)  [Ctrl][LMB] seleccionar hasta el siguiente marcador  [RMB] acción, renombrar, eliminar"
@@ -6791,8 +6854,6 @@ countries: es mx ar co cl pe ve
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Armar grabación: Rec + Play graba este insert en un clip de la Playlist  [RMB] grabar en un archivo"
 "Recording: {0}" = "Grabando: {0}"
 "dry input" = "entrada seca"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "Adapt"
 "Alt" = "Alt"
 "Amplifier" = "Amplificador"
@@ -6819,6 +6880,7 @@ countries: es mx ar co cl pe ve
 "HC" = "HC"
 "HD" = "HD"
 "Harmonic mask" = "Máscara armónica"
+"Hi-cut" = "Corte agudos"
 "Kb" = "Tecl"
 "Kbd" = "Tecl"
 "LC" = "LC"
@@ -6850,8 +6912,6 @@ countries: es mx ar co cl pe ve
 "Vel sens" = "Sens vel"
 "Vib" = "Vib"
 "Voice mode" = "Modo de voz"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Sustituto: su plugin no está instalado en este PC, suena un render de esta parte (se conservan los ajustes del plugin)"
 "Send project..." = "Enviar proyecto..."
 "Send my part back..." = "Devolver mi parte..."
@@ -6945,8 +7005,8 @@ countries: es mx ar co cl pe ve
 "Lock" = "Candado"
 "Mute the selected clips (all when none is selected)" = "Silenciar los clips seleccionados (todos si no hay ninguno seleccionado)"
 "Unmute the selected clips (all when none is selected)" = "Quitar el silencio de los clips seleccionados (todos si no hay ninguno seleccionado)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "Silenciar los pasos quitados"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Reproducir / pausar el patrón  [RMB] detener y volver a donde empezó la reproducción (otra vez: al inicio del patrón)"
 "Live sessions need a newer libcurl on this computer ({0})" = "Las sesiones en vivo necesitan una libcurl más reciente en este equipo ({0})"
 "Opening the session..." = "Abriendo la sesión..."
 "Too many sessions were opened from this connection. Try again in a while." = "Se abrieron demasiadas sesiones desde esta conexión. Vuelve a intentarlo dentro de un rato."
@@ -7036,8 +7096,6 @@ countries: es mx ar co cl pe ve
 "{0} files arriving" = "Recibiendo {0} archivos"
 "Live session with {0}" = "Sesión en vivo con {0}"
 "Undo left alone what someone else changed since: {0}" = "Deshacer no tocó lo que otra persona cambió desde entonces: {0}"
-"Mute removed steps" = "Silenciar los pasos quitados"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Reproducir / pausar el patrón  [RMB] detener y volver a donde empezó la reproducción (otra vez: al inicio del patrón)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "No se pudo reanudar la sesión en vivo: la conexión no volvió."
@@ -7121,8 +7179,6 @@ countries: es mx ar co cl pe ve
 "click to step, drag or mouse wheel to change" = "clic para avanzar, arrastra o usa la rueda del ratón para cambiar"
 "no effect with the current mode (another engine is in use)" = "sin efecto en el modo actual (otro motor está en uso)"
 "arrows step, click for the list, drag or mouse wheel to change" = "las flechas avanzan un paso, clic para la lista, arrastra o usa la rueda del ratón para cambiar"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "Último parámetro ajustado: el control que moviste por última vez y su valor. Clic para su menú (clip de automatización, vincular a controlador, eventos, valor)"
 "LAST TWEAKED" = "ÚLTIMO AJUSTADO"
@@ -7139,8 +7195,6 @@ countries: es mx ar co cl pe ve
 "Playlist snap" = "Ajuste de la Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Regla: [LMB] posición  [Alt] sin ajuste  [Ctrl][LMB], [RMB] o [2xLMB] arrastrar selecciona las notas de un rango de tiempo  [Ctrl][Wheel] / pellizco zoom  [Shift][Wheel] desplazar"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Regla: [LMB] posición de la canción  [RMB] o [Ctrl][LMB] o [2xLMB] arrastrar: selección de tiempo (bucle)  [Shift][LMB] arrastrar: moverla  [Ctrl][RMB] arrastrar, [Ctrl][Wheel] / pellizco: zoom  [RMB] clic: menú  [Alt] sin ajuste"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "Desactivado (mantener su tiempo real)"
 "1/32 note" = "Nota de 1/32"
 "1/16 note" = "Nota de 1/16"
@@ -7155,8 +7209,6 @@ countries: es mx ar co cl pe ve
 "Number of steps" = "Número de pasos"
 "Dual" = "Doble"
 "Align all channel editors" = "Alinear todos los editores de canal"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Selector de plugins: cada plugin como imagen; arrastra uno al Channel Rack o al Mezclador (clic derecho: paleta de añadido rápido)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "doble clic, clic derecho o Enter: un canal nuevo; arrástralo al Channel Rack (sobre un canal: reemplaza su instrumento)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "doble clic, clic derecho o Enter: en el insert del mezclador seleccionado; arrástralo a un insert del mezclador o a uno de sus slots"
@@ -7168,14 +7220,11 @@ countries: es mx ar co cl pe ve
 "Last tweaked ({0})" = "Último ajustado ({0})"
 "Deactivate" = "Desactivar"
 "Automate Patcher parameter" = "Automatizar parámetro del Patcher"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Mezclar notas grabadas: sí (las notas nuevas se suman a las del patrón)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mezclar notas grabadas: no (se reemplazan las notas anteriores de un canal grabado)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mezclar notas grabadas: activado, una toma suma sus notas al patrón (overdub); desactivado, se reemplazan las notas anteriores de un canal grabado"
 "Tempo tapper: tap the beat to set the tempo" = "Tempo por pulsación: toca el pulso para fijar el tempo"
 "Blend recorded notes" = "Mezclar notas grabadas"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "Mezclar notas grabadas sí/no (no: reemplazar)"
 "Loop record on/off" = "Grabación en bucle sí/no"
 "Step edit on/off" = "Edición por pasos sí/no"
@@ -7192,9 +7241,8 @@ countries: es mx ar co cl pe ve
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Edición por pasos: con el transporte detenido, las notas que tocas entran en el patrón actual en la posición, con un paso del ajuste de duración; suelta las teclas y la posición avanza un paso (acordes: mantenlas juntas)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: la grabación de audio guarda solo la región de bucle (la reproducción pasa por ella; pre-roll y post-roll en las opciones de grabación)"
 "Punch in/out" = "Punch in/out"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Apunta a cualquier cosa para ver ayuda  [F1] atajos  [F5]-[F9] ventanas  [Space] reproducir/parar"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Cortar los pasos de los canales seleccionados"
 "Copy the selected channels' steps" = "Copiar los pasos de los canales seleccionados"
@@ -7203,16 +7251,12 @@ countries: es mx ar co cl pe ve
 "Note names on every Piano roll key" = "Nombres de nota en todas las teclas del Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] arrastrar arriba / abajo: recorrer los patterns"
 "Playhead column in the Channel Rack" = "Columna del cabezal en el Channel Rack"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Grabación en bucle: activada (la grabación se repite: la región de bucle en modo Song, una toma por pasada; el patrón en modo Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Grabación en bucle: desactivada (la grabación sigue de largo: por la región de bucle, o más allá del final del patrón, que crece)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Grabación en bucle: activada, la grabación se repite (modo Song: la región de bucle, una toma por pasada; modo Pattern: el patrón); desactivada, sigue de largo, por la región de bucle o más allá del final del patrón, y deja todo donde se tocó (el patrón crece)"
 "Echo time" = "Tiempo de eco"
 "Prime numbers" = "Números primos"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "El panel Classic: saturador de hardware en una pantalla (Drive, Punish, cinco estilos)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} guardado."
 "Everything went over as FL Studio's own data." = "Todo pasó como datos propios de FL Studio."
 "Export to FL Studio" = "Exportar a FL Studio"
@@ -7235,11 +7279,9 @@ countries: es mx ar co cl pe ve
 "Worth knowing" = "Conviene saber"
 "Samples not on this PC" = "Samples que no están en este PC"
 "Steps use channel colour" = "Pasos con el color del canal"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "Principal|Ajuste fino"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Consola moderna"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Saturar|Consola E|Consola G|Consola A|Consola N|Consola Y|Válvula|Ampli guitarra|Ampli bajo"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "Activa la sección de drive: saturación al final del canal, antes de la salida"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "El tipo de saturación: un clipper suave, cinco canales de consola, una etapa de válvula o un amplificador de guitarra / bajo"
@@ -7247,8 +7289,6 @@ countries: es mx ar co cl pe ve
 "Level into the drive: more distortion without changing the drive" = "Nivel hacia el drive: más distorsión sin cambiar el drive"
 "Level after the drive" = "Nivel después del drive"
 "Blends the clean signal back in" = "Vuelve a mezclar la señal limpia"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Espacio"
 "Modern|Vintage|Plate" = "Moderno|Vintage|Placa"
 "Distance" = "Distancia"
@@ -7257,80 +7297,7 @@ countries: es mx ar co cl pe ve
 "Low decay" = "Caída grave"
 "High decay" = "Caída aguda"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "Bucle de marcador"
-"Marker skip" = "Salto de marcador"
-"Marker pause" = "Pausa de marcador"
-"Bar override" = "Cambio de compás"
-"Key/Scale" = "Tonalidad/escala"
-"Loop length" = "Duración del bucle"
-"Add one every" = "Añadir uno cada"
-"Bars" = "Compases"
-"Add jump to next bar" = "Añadir salto al siguiente compás"
-"Change to marker loop" = "Convertir en bucle de marcador"
-"Time markers" = "Marcadores de tiempo"
-"Quantize song jumps" = "Cuantizar saltos de la canción"
-"Place loop (from this marker to the next)" = "Crear bucle (de este marcador al siguiente)"
-"Song marker jump" = "Salto a marcador de la canción"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Las notas de este canal llevan la canción a un marcador en lugar de sonar: la nota 0 va al primer marcador, la siguiente al segundo... (Playlist › Cuantizar saltos de la canción se aplica durante la reproducción)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "Saltar al siguiente marcador de la canción (Cuantizar saltos de la canción durante la reproducción)"
-"Jump to the previous song marker" = "Saltar al marcador anterior de la canción"
-"Advanced looping" = "Bucle avanzado"
-"Burn" = "Grabar"
-"Burn MIDI to" = "Grabar MIDI en"
-"Burn all looping channels" = "Grabar todos los canales en bucle"
-"Burn selected channels" = "Grabar los canales seleccionados"
-"Burn to pattern" = "Grabar en el patrón"
-"Channel looping" = "Bucle de canales"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Bucle de canales: los canales más cortos que el patrón se repiten hasta su final (polirritmos)  [LMB] activa / desactiva  [RMB] tipo de bucle (canales de pasos, todos los canales, avanzado) y Grabar en el patrón"
-"Channel looping: {0}" = "Bucle de canales: {0}"
-"Don't loop" = "Sin bucle"
-"Echo delay" = "Eco (echo delay)"
-"Every {0} steps" = "Cada {0} pasos"
-"Loop all channels" = "Bucle en todos los canales"
-"Loop point" = "Punto de bucle"
-"Loop point ({0} steps)" = "Punto de bucle ({0} pasos)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Punto de bucle: [LMB] arrastrar o [Wheel] lo fija en pasos  [2xLMB] siguiente compás  [RMB] Sin bucle / Paso / Tiempo / Compás, Grabar en el patrón"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Repetición del bucle (tras el punto de bucle): [LMB] edita el paso que repite"
-"Loop step channels" = "Bucle en los canales de pasos"
-"Loop type" = "Tipo de bucle"
-"Looping on" = "Bucle activado"
-"Nothing to burn" = "Nada que grabar"
-"Reset after burning to MIDI" = "Restablecer tras grabar en MIDI"
-"Select what you want to reset:" = "Elige qué quieres restablecer:"
-"Set to next bar" = "Fijar en el siguiente compás"
-"Set to next beat" = "Fijar en el siguiente tiempo"
-"The selected channel doesn't contain any notes to burn." = "El canal seleccionado no tiene notas que grabar."
-"Time (shift and gate)" = "Tiempo (desplazamiento y gate)"
-"loop at the next bar" = "bucle en el siguiente compás"
-"loop at the next beat" = "bucle en el siguiente tiempo"
-"loop at the next step" = "bucle en el siguiente paso"
-"Receive notes from" = "Recibir notas de"
-"Unlock" = "Desbloquear"
-"not connected" = "sin conexión"
-"No MIDI input device" = "Ningún dispositivo de entrada MIDI"
-"(locked: receives the notes of {0})" = "(bloqueado: recibe las notas de {0})"
-"Create sampled instrument..." = "Crear instrumento sampleado..."
-"Create sampled instrument" = "Crear instrumento sampleado"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "Toca {0} tecla por tecla y crea un canal Sampler con las grabaciones."
-"Sampling the instrument..." = "Sampleando el instrumento..."
-"Writing the samples..." = "Escribiendo los samples..."
-"Could not sample the instrument" = "No se pudo samplear el instrumento"
-"Low note" = "Nota más grave"
-"High note" = "Nota más aguda"
-"Keys per zone" = "Teclas por zona"
-"Root offset" = "Desplazamiento de la raíz"
-"Velocity layers" = "Capas de velocidad"
-"Max velocity" = "Velocidad máxima"
-"Release after (seconds)" = "Soltar tras (segundos)"
-"Max length after release (seconds)" = "Duración máx. tras soltar (segundos)"
-"Stop on" = "Detener en"
-"Max length" = "Duración máx."
-"16-bit integer" = "Entero de 16 bits"
-"Mono (merged)" = "Mono (sumado)"
-"Enable insert effects" = "Activar efectos del insert"
-"Enable master effects" = "Activar efectos del Master"
-"could not read {0}" = "no se pudo leer {0}"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "Patrón {0}"
 "a pattern" = "un patrón"
 "a channel" = "un canal"
@@ -7342,7 +7309,6 @@ countries: es mx ar co cl pe ve
 "{0} in {1}" = "{0} en {1}"
 "Playlist clip" = "Clip de la Playlist"
 "ON" = "ACT."
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Ninguno|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tres caracteres de compresor más, en lugar del estilo: suave, optoelectrónico o masterización"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} falló. Guarda tu proyecto ahora (lo más seguro es como un archivo nuevo)."
@@ -7495,7 +7461,6 @@ countries: es mx ar co cl pe ve
 "Start time (H:M:S:Frame)" = "Tiempo de inicio (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "Tiempo final (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "Tiempo actual (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "Reducción de ruido"
 "Group bypass" = "Bypass del grupo"
@@ -7594,7 +7559,6 @@ countries: es mx ar co cl pe ve
 "HighCut" = "Corte de agudos"
 "Rushin" = "Apurado"
 "Draggin" = "Arrastrado"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Nivel de entrada al canal"
 "Level out of the strip, after the output mix" = "Nivel de salida del canal, después de la mezcla de salida"
 "Blend of the processed strip with the dry input" = "Mezcla del canal procesado con la entrada seca"
@@ -7751,8 +7715,6 @@ countries: es mx ar co cl pe ve
 "Auto listen" = "Escucha auto"
 "Auto\nlisten" = "Escucha\nauto"
 "EQ auto listen" = "Escucha auto del EQ"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "Nativo"
 "32 bit" = "32 bits"
 "64 bit" = "64 bits"
@@ -7772,12 +7734,11 @@ countries: es mx ar co cl pe ve
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animaciones: los paneles aparecen y desaparecen con un fundido, los botones se iluminan suavemente, la rueda se desliza"
 "{0} minutes" = "{0} minutos"
 "Longest wait between backups" = "Espera máxima entre copias"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "Crear comp con estas tomas"
 "After loop recording, only the last pass plays" = "Tras grabar en bucle, solo suena la última pasada"
 "Loop-recorded audio: every pass plays" = "Audio grabado en bucle: suenan todas las pasadas"
 "Loop-recorded audio: every pass is muted" = "Audio grabado en bucle: todas las pasadas quedan silenciadas"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Cuadrícula de clips"
 "Stop all clips" = "Detener todos los clips"
@@ -7880,8 +7841,6 @@ countries: es mx ar co cl pe ve
 "That track is fed by this one: the link would make a loop." = "Esa pista recibe señal de esta: el enlace crearía un bucle."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Entrada de sidechain: el insert que escucha este efecto. Al elegir uno se enruta aquí a nivel 0; conserva sus propias salidas  [LMB] elegir"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Entrada de sidechain: el insert que escucha la entrada lateral de este plugin. Al elegir uno se enruta aquí a nivel 0; conserva sus propias salidas"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "Carga un sample (menú Sample) o suelta uno aquí"
 "Open a sample to slice (or drop one here)" = "Abrir un sample para trocear (o suelta uno aquí)"
 "Slicing" = "Troceado"
@@ -7986,8 +7945,6 @@ countries: es mx ar co cl pe ve
 "Adds the file's time signature to the pattern's markers" = "Añade el compás del archivo a los marcadores del patrón"
 "Scores" = "Partituras"
 "Folders" = "Carpetas"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "Multivínculo a controladores"
 "Please tweak the controls you want to link..." = "Mueve los controles que quieres vincular..."
 "Multilink to controllers on/off" = "Multivínculo a controladores activado/desactivado"
@@ -8053,6 +8010,7 @@ countries: es mx ar co cl pe ve
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volumen de la pista: [LMB] clic o arrastrar  [Shift] fino  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Panorama de la pista: [LMB] arrastrar arriba / abajo  [Shift] fino  [2xLMB] centro"
 "Track effects: [LMB] open the effects of its mixer track" = "Efectos de la pista: [LMB] abrir los efectos de su pista del mezclador"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Añadir un efecto a este insert (o soltar uno desde el Navegador)"
 "Channel on / off (its mute)" = "Canal encendido / apagado (su silencio)"
@@ -8183,6 +8141,7 @@ countries: es mx ar co cl pe ve
 "D-pad down" = "Cruceta abajo"
 "D-pad left" = "Cruceta izquierda"
 "D-pad right" = "Cruceta derecha"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "Eliminar pistas"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "Esto va a |eliminar| {0} pista(s) del Mixer seleccionada(s). ¿Seguro?"
@@ -8397,6 +8356,7 @@ countries: es mx ar co cl pe ve
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity de liberación: se envía con el final de la nota a los instrumentos que la usan (plugins, Patcher)"
 "For a file with a true-peak ceiling: {0}" = "Para un archivo con techo de pico real: {0}"
 "(look)" = "(look)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "No se encontró la plantilla predeterminada; se abrió en su lugar el proyecto predeterminado de LYNX SHARE"
 "{0} could not be opened." = "No se pudo abrir {0}."
@@ -8449,6 +8409,7 @@ countries: es mx ar co cl pe ve
 "Send to {0} (deleted)" = "Envío a {0} (eliminado)"
 "Disconnected links" = "Enlaces desconectados"
 "Keep links to deleted inserts, greyed (LYNX)" = "Conservar enlaces a inserts eliminados, en gris (LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8525,6 +8486,7 @@ countries: es mx ar co cl pe ve
 "side" = "lateral"
 "Output M/S" = "Salida M/S"
 "Input M/S" = "Entrada M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8544,6 +8506,7 @@ countries: es mx ar co cl pe ve
 "Amount min" = "Cantidad mínima"
 "Stereo offset" = "Desfase estéreo"
 "16 bars" = "16 compases"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8799,3 +8762,69 @@ countries: es mx ar co cl pe ve
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity de las notas tocadas en este plugin desde dispositivos MIDI: la curva de los ajustes MIDI, o una curva o velocity fija propia de este plugin"
 "The velocity every played note gets (1 to 127)" = "La velocity que recibe cada nota tocada (1 a 127)"
 "Play a note when a preset loads" = "Tocar una nota al cargar un preset"
+
+# --- Versions panel, open without third-party plugins, export sections and presets (round 190ap)
+"switched off (the project was opened without third-party plugins)" = "desactivado (el proyecto se abrió sin plugins de terceros)"
+"Plugin switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)" = "Plugin desactivado: el proyecto se abrió sin plugins de terceros (se conservan sus ajustes; Archivo › Volver a activar plugins...)"
+"Exporting sections..." = "Exportando secciones..."
+"Sections exported" = "Secciones exportadas"
+"One file per marker section" = "Un archivo por sección de marcador"
+"Choose a preset..." = "Elegir un preset..."
+"No presets yet" = "Aún no hay presets"
+"Sets every choice of this window as it was when the preset was saved" = "Restablece todas las opciones de esta ventana como estaban al guardar el preset"
+"Keeps the choices of this window under a name" = "Guarda las opciones de esta ventana con un nombre"
+"Removes the chosen preset" = "Elimina el preset elegido"
+"Exports now with the choices of the last export, into the same folder, without asking for the file: {0}" = "Exporta ahora con las opciones de la última exportación, en la misma carpeta, sin pedir el archivo: {0}"
+"Exports again with the choices and the folder of the last export (nothing was exported yet)" = "Vuelve a exportar con las opciones y la carpeta de la última exportación (aún no se ha exportado nada)"
+"Save export preset" = "Guardar preset de exportación"
+"A name for these export choices (an existing name is replaced)" = "Un nombre para estas opciones de exportación (si ya existe, se reemplaza)"
+"Same as last time" = "Igual que la última vez"
+"{0} already exists. Replace it?" = "{0} ya existe. ¿Reemplazarlo?"
+"The song is cut at its Playlist markers and each section becomes a file named after its marker. This song has no markers yet" = "La canción se corta en sus marcadores de la Playlist y cada sección se convierte en un archivo con el nombre de su marcador. Esta canción aún no tiene marcadores"
+"The song is cut at its Playlist markers and each section becomes a file named after its marker; with stems, each section gets its stems. Sections: {0}" = "La canción se corta en sus marcadores de la Playlist y cada sección se convierte en un archivo con el nombre de su marcador; con stems, cada sección tiene sus stems. Secciones: {0}"
+"{0} section(s)" = "{0} sección(es)"
+"Save..." = "Guardar..."
+"(third-party plugins off)" = "(plugins de terceros desactivados)"
+"Versions" = "Versiones"
+"Opened as a copy: {0}" = "Abierto como copia: {0}"
+"Save asks where to keep it; the original file is untouched" = "Guardar pregunta dónde conservarlo; el archivo original no se modifica"
+"Open without third-party plugins" = "Abrir sin plugins de terceros"
+"Third-party plugins" = "Plugins de terceros"
+"Opened without third-party plugins: their settings are kept" = "Abierto sin plugins de terceros: se conservan sus ajustes"
+"Open without third-party plugins..." = "Abrir sin plugins de terceros..."
+"Switch plugins back on..." = "Volver a activar plugins..."
+"Versions..." = "Versiones..."
+"A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)" = "Un plugin de este insert está desactivado: el proyecto se abrió sin plugins de terceros (se conservan sus ajustes; Archivo › Volver a activar plugins...)"
+"Third-party plugins are off" = "Plugins de terceros desactivados"
+"This project was opened without its third-party plugins. Their settings are kept, also if you save now. Switch them on one at a time to find the one that fails." = "Este proyecto se abrió sin sus plugins de terceros. Sus ajustes se conservan, también si guardas ahora. Actívalos de uno en uno para encontrar el que falla."
+"Loads the chosen plugin with the settings kept in the project (every slot that uses it)" = "Carga el plugin elegido con los ajustes guardados en el proyecto (todos los slots que lo usan)"
+"Loads every plugin that is still off: the project is then as after a normal open" = "Carga todos los plugins que siguen desactivados: el proyecto queda como tras una apertura normal"
+"Third-party plugins are on" = "Plugins de terceros activados"
+"Did not load" = "No se cargó"
+"{0} slot(s)" = "{0} slot(s)"
+"Switch on" = "Activar"
+"Switch all on" = "Activar todos"
+"Before a save" = "Antes de guardar"
+"No saved versions or backups of this project yet." = "Este proyecto aún no tiene versiones guardadas ni copias de seguridad."
+"File › Save new version keeps the project as it is now; backups are written while you work." = "Archivo › Guardar nueva versión conserva el proyecto tal como está ahora; las copias de seguridad se escriben mientras trabajas."
+"Opens the chosen version or backup as a new, unsaved project: the file itself and the open project's file stay as they are" = "Abre la versión o copia de seguridad elegida como un proyecto nuevo sin guardar: el archivo en sí y el del proyecto abierto no cambian"
+"Opens the file manager on the chosen file" = "Abre el administrador de archivos en el archivo elegido"
+"A short note for the chosen version or backup (kept in a text file beside it, not inside the project). A labelled backup is never removed to make room for newer ones" = "Una nota corta para la versión o copia de seguridad elegida (se guarda en un archivo de texto junto a ella, no dentro del proyecto). Una copia de seguridad con etiqueta nunca se elimina para dejar sitio a las nuevas"
+"Saves the project under the next number (Song_2, Song_3...) and keeps working in it" = "Guarda el proyecto con el siguiente número (Song_2, Song_3...) y sigue trabajando en él"
+"{0} saved version(s), {1} backup(s)" = "{0} versión(es) guardada(s), {1} copia(s) de seguridad"
+"Last backup: {0}" = "Última copia de seguridad: {0}"
+"Not saved yet" = "Aún sin guardar"
+"Label" = "Etiqueta"
+"A short note for {0} (empty: no label)" = "Una nota corta para {0} (vacío: sin etiqueta)"
+"The label could not be written next to the file." = "No se pudo escribir la etiqueta junto al archivo."
+"open now" = "abierto ahora"
+"Open as a copy" = "Abrir como copia"
+"Label..." = "Etiqueta..."
+"just now" = "ahora mismo"
+"{0} min ago" = "hace {0} min"
+"{0} h ago" = "hace {0} h"
+"{0} d ago" = "hace {0} d"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

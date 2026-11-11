@@ -2614,6 +2614,14 @@ PluginIdentity PluginHost::identityOf (const PluginRef& ref)
 
 int PluginHost::applySubstitutes (Song& song, int* restored, int* substituted)
 {
+    if (restored != nullptr)
+        *restored = 0;
+    if (substituted != nullptr)
+        *substituted = 0;
+    // round 190ap: opened without third-party plugins, the slots stay exactly as the project has them: no substitute
+    // takes a plugin's place and no substitute goes back to its original (that converts settings through the plugin)
+    if (pluginsHeld())
+        return 0;
     int back = 0, replaced = 0;
     bool foreignBack = false;
     const auto substitute = pluginSubstitutesEnabled();
@@ -2671,7 +2679,7 @@ std::string PluginHost::preloadKey (const PluginRef& ref, double sampleRate)
 
 void PluginHost::preload (const PluginRef& ref, int wanted)
 {
-    if (ref.id.empty())
+    if (ref.id.empty() || pluginHeld (ref.id)) // (switched off: nothing to make ready, round 190ap)
         return;
     {
         const std::scoped_lock lock (preloadLock);
@@ -2707,8 +2715,69 @@ int PluginHost::preloadedCount() const
     return n;
 }
 
+namespace
+{
+std::mutex& holdLock()
+{
+    static std::mutex m;
+    return m;
+}
+pluginhold::State& holdState()
+{
+    static pluginhold::State s;
+    return s;
+}
+juce::String heldMessage (const PluginRef& ref)
+{
+    return juce::String::fromUTF8 (ref.name.c_str()) + ": " + tr ("switched off (the project was opened without third-party plugins)");
+}
+} // namespace
+
+bool pluginsHeld()
+{
+    const std::scoped_lock lock (holdLock());
+    return holdState().active;
+}
+
+bool pluginHeld (const std::string& id)
+{
+    const std::scoped_lock lock (holdLock());
+    return holdState().holds (id);
+}
+
+pluginhold::State pluginHoldState()
+{
+    const std::scoped_lock lock (holdLock());
+    return holdState();
+}
+
+void holdPlugins()
+{
+    const std::scoped_lock lock (holdLock());
+    holdState().start();
+}
+
+void releasePlugin (const std::string& id)
+{
+    const std::scoped_lock lock (holdLock());
+    holdState().release (id);
+}
+
+void endPluginHold()
+{
+    const std::scoped_lock lock (holdLock());
+    holdState().end();
+}
+
 std::unique_ptr<juce::AudioPluginInstance> PluginHost::instantiate (const PluginRef& ref, double sampleRate, juce::String* error)
 {
+    // round 190ap: a plugin that is switched off is not created, and no instance made earlier is handed out for it
+    if (pluginHeld (ref.id))
+    {
+        if (error != nullptr)
+            *error = heldMessage (ref);
+        return nullptr;
+    }
     if (playedElsewhere (ref)) // Online Sessions P5-A1: the session's host plays it; here its stand-ins play
     {
         if (error != nullptr)
@@ -2773,6 +2842,14 @@ std::unique_ptr<juce::AudioPluginInstance> createRightInstance (juce::AudioPlugi
 
 std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const PluginRef& ref, double sampleRate, juce::String* error)
 {
+    // round 190ap: switched off ("Open without third-party plugins"): before anything of the plugin is looked up,
+    // waited for or loaded (every creation of a project's plugin comes through here)
+    if (pluginHeld (ref.id))
+    {
+        if (error != nullptr)
+            *error = heldMessage (ref);
+        return nullptr;
+    }
     if (onInstantiate)
         onInstantiate (juce::String::fromUTF8 (ref.name.c_str()));
     const loadtrace::Scope timing ("plugin_instantiate");
@@ -2921,6 +2998,8 @@ void startModuleOf (const juce::PluginDescription& d)
 
 void PluginHost::startModulesFor (const std::vector<FlpPluginUse>& uses)
 {
+    if (pluginsHeld()) // (opened without third-party plugins: no module is started ahead, round 190ap)
+        return;
     for (const auto& u : uses)
         if (const auto d = findForeign (u.plugin, u.instrument))
             startModuleOf (*d);
@@ -2929,7 +3008,7 @@ void PluginHost::startModulesFor (const std::vector<FlpPluginUse>& uses)
 void PluginHost::startModulesFor (const std::vector<PluginRef>& refs)
 {
     for (const auto& ref : refs)
-        if (! ref.separateProcess && ! ref.id.empty())
+        if (! ref.separateProcess && ! ref.id.empty() && ! pluginHeld (ref.id))
             if (const auto d = buildFor (ref))
                 startModuleOf (*d);
 }
@@ -2981,6 +3060,7 @@ std::shared_ptr<Instrument> PluginHost::makeInstrument (const PluginRef& ref, do
         return std::make_shared<PluginInstrument> (std::move (instance), maxBlockSize, ref.fixedBuffers ? fixedPluginBlock (ref.maxSizeBuffers) : 0,
                                                    HostedOptions::of (ref));
 
+    if (! pluginHeld (ref.id)) // (switched off on purpose is not a load failure, round 190ap)
     {
         const std::scoped_lock lock (failuresLock);
         loadFailures.addIfNotAlreadyThere (failureLine (ref, why));
@@ -2999,6 +3079,7 @@ std::shared_ptr<Effect> PluginHost::makeEffect (const PluginRef& ref, double sam
         return std::make_shared<PluginEffect> (std::move (instance), maxBlockSize, ref.fixedBuffers ? fixedPluginBlock (ref.maxSizeBuffers) : 0,
                                                HostedOptions::of (ref));
 
+    if (! pluginHeld (ref.id)) // (switched off on purpose is not a load failure, round 190ap)
     {
         const std::scoped_lock lock (failuresLock);
         loadFailures.addIfNotAlreadyThere (failureLine (ref, why));

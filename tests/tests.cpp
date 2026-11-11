@@ -17454,3 +17454,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pin190aoTests.inc"
 #include "Velocity190aoTests.inc"
 #include "Audition190aoTests.inc"
+#include "Versions190apTests.inc"
+#include "core/PluginHold.h"
+#include "PluginsOff190apTests.inc"
+#include "ExportSections190apTests.inc"

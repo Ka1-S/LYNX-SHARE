@@ -237,6 +237,12 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
+namespace
+{
+// the engine whose project the plugin hold is for (round 190ap): the hold ends when that engine opens another project
+std::atomic<const AudioEngine*> pluginHoldOwner { nullptr };
+} // namespace
+
 AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
     : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
       plugins (userPluginList),
@@ -319,6 +325,11 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
+    {
+        pluginHoldOwner.store (nullptr);
+        endPluginHold();
+    }
     stopTimer();
     rackExchange.dispose = nullptr; // (from here the racks are freed at once)
     rackDisposer.flush();
@@ -2553,8 +2564,55 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
     clipLauncher->commands.push (command);
 }
 
+void AudioEngine::setSongWithPluginsOff (Song newSong)
+{
+    holdPlugins();
+    pluginHoldOwner.store (nullptr); // (so the setSong below does not end it)
+    setSong (std::move (newSong));
+    pluginHoldOwner.store (this);
+}
+
+bool AudioEngine::pluginsOff() const { return pluginsHeld() && pluginHoldOwner.load() == this; }
+
+std::vector<pluginhold::Use> AudioEngine::hostedPluginUses() const
+{
+    return pluginhold::uses (song, pluginsOff() ? pluginHoldState() : pluginhold::State());
+}
+
+int AudioEngine::switchPluginOn (const std::string& id)
+{
+    if (! pluginsOff())
+        return 0;
+    // the plugins already running keep what was set in them since the last save (a Patcher that holds one of them and
+    // the plugin switched on now is built again from the project)
+    capturePluginStates();
+    if (id.empty())
+        endPluginHold();
+    else
+        releasePlugin (id);
+    const auto slots = pluginhold::slotsOf (song, id);
+    if (! id.empty() && pluginhold::countOff (song, pluginHoldState()) == 0)
+        endPluginHold(); // the last one: the mode is over
+    if (! pluginsHeld())
+        pluginHoldOwner.store (nullptr);
+    plugins.clearLoadFailures();
+    // this one build creates the plugin's slots anew (they hold the silent placeholders of when it was off)
+    rebuildPluginId = id;
+    rebuildPlugins = true;
+    publishSong();
+    rebuildPlugins = false;
+    rebuildPluginId.clear();
+    return slots;
+}
+
 void AudioEngine::setSong (Song newSong)
 {
+    // round 190ap: another project in the engine that was opened without third-party plugins: the mode ends
+    if (pluginHoldOwner.load() == this)
+    {
+        pluginHoldOwner.store (nullptr);
+        endPluginHold();
+    }
     if (clipLauncher != nullptr)
         clipLauncher->commands.push ({ launcher::Command::Type::reset });
     undoStack.clear();
@@ -3556,6 +3614,8 @@ void AudioEngine::publishSong()
             duringPluginCreation();
         return plugins.makeEffect (ref, sr);
     };
+    if (rebuildPlugins) // round 190ap: a plugin switched back on (switchPluginOn)
+        factories.rebuildPlugin = [this] (const PluginRef& ref) { return rebuildPluginId.empty() || ref.id == rebuildPluginId; };
 
     const auto buildStart = juce::Time::getMillisecondCounterHiRes();
     const auto tracePhases = traceEdits && ! loadtrace::active(); // the build's phases (an open traces its own)
@@ -3569,6 +3629,12 @@ void AudioEngine::publishSong()
     if (standins::hasAny (song))
         projectedSong = standins::project (song, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
     const Song& played = projectedSong ? *projectedSong : song;
+    {
+        // round 190ap: the slots whose plugin is switched off ("Open without third-party plugins"), for their badges
+        const auto hold = pluginsOff() || pluginHoldOwner.load() == nullptr ? pluginHoldState() : pluginhold::State();
+        channelsOff = pluginhold::channelsOff (song, hold);
+        insertsOff = pluginhold::insertsOff (song, hold);
+    }
     standInChannels = std::move (projected.channels);
     standInInserts = std::move (projected.inserts);
     if (played.clipGrid)

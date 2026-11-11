@@ -12,6 +12,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/PluginOffTag.h"
 #include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
 #include "ui/QuickPick.h"
@@ -971,6 +972,13 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 g.setColour (bg1);
                 g.setFont (theme::font (10.0f, true));
                 g.drawText ("R", tag, juce::Justification::centred, false);
+            }
+            // round 190ap: opened without third-party plugins, this channel's plugin is still off (a grey power tag)
+            else if (engine.channelPluginOff (row))
+            {
+                badgeWidth = 16.0f;
+                juce::Graphics::ScopedSaveState keepFont (g);
+                ui::drawPluginOffTag (g, juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f));
             }
             // the channel's icon before its name, as FL's channel button shows it (round 168h)
             auto iconWidth = 0;
@@ -2227,6 +2235,8 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                 h.text << "  " << tr ("(locked: receives the notes of {0})", { juce::String::fromUTF8 (song.channels[(std::size_t) row].receiveFrom.c_str()) });
             if (engine.playsStandIn (row))
                 h.text = name + " - " + tr ("Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)");
+            else if (engine.channelPluginOff (row)) // round 190ap
+                h.text = name + " - " + tr ("Plugin switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
             h.hasMenu = true;
             // FL's hint bar names what the channel is ("Audio Clip", the plugin's name) on the right (REA round 143b)
             if (row >= 0 && row < (int) song.channels.size())

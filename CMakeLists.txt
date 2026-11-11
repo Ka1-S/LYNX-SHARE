@@ -533,6 +533,8 @@ if(LYNX_BUILD_APP)
         src/ui/SimpleWorkflow.cpp
         src/ui/FinishDock.cpp
         src/ui/HistoryPanel.cpp
+        src/ui/VersionsPanel.cpp
+        src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
         src/ui/SettingsPages.cpp

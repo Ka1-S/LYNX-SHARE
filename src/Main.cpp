@@ -122,6 +122,8 @@
 #include "ui/SetupWizard.h"
 #include "engine/FlStudio.h"
 #include "ui/HistoryPanel.h"
+#include "ui/VersionsPanel.h"
+#include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/PluginManager.h"
@@ -1765,6 +1767,15 @@ public:
             return;
         }
 
+        // --versionsshot <prefix> (round 190ap): the Versions panel, File's new items, a project opened without its
+        // third-party plugins (window, list, File menu) and the Export window's additions, offscreen
+        if (args.contains ("--versionsshot"))
+        {
+            runVersionsShot (args[args.indexOf ("--versionsshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--detailshot"))
         {
             // LYNX.exe --detailshot prefix: the Clip-launch workflow's detail view off-screen (round 183a): a track's chain
@@ -1947,6 +1958,14 @@ public:
         // (D#92, round 180a: it was ignored, leaving the blank project with no message). A missing file gets "Could not open".
         if (args.size() > 0 && lynx::safety::isFileArgument (args[0].unquoted().toStdString()))
             fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[0].unquoted());
+        // LYNX --no-plugins project.lynx (round 190ap): File › "Open without third-party plugins..." from the command
+        // line, for a project a plugin keeps from opening — no hosted plugin is created, each keeps its settings
+        if (const auto i = args.indexOf ("--no-plugins"); i >= 0)
+        {
+            if (i + 1 < args.size() && lynx::safety::isFileArgument (args[i + 1].unquoted().toStdString()))
+                fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[i + 1].unquoted());
+            startWithoutPlugins = fileToOpen.hasFileExtension ("lynx");
+        }
         // LYNX_TEST_MODE=1 LYNX --open-event-test <ms> <file>: the file arrives the way macOS's Finder delivers it (a Linux
         // or Windows run can exercise that path): 0 ms = at once, before the window exists
         if (lynx::platform::testMode() && args[0] == "--open-event-test" && args.size() > 2)
@@ -2284,7 +2303,12 @@ public:
     {
         startupFileHandled = true;
         if (fileToOpen != juce::File() && mainWindow != nullptr)
+        {
+            if (std::exchange (startWithoutPlugins, false)) // --no-plugins (round 190ap)
+                mainWindow->getContent().openNextWithoutPlugins (true);
             mainWindow->openFile (fileToOpen);
+            mainWindow->getContent().openNextWithoutPlugins (false); // (a file that did not open leaves nothing behind)
+        }
         else if (mainWindow != nullptr && openTimeReport == juce::File())
             mainWindow->getContent().openStartupProject(); // issue #123 (FL's Startup project)
     }
@@ -3641,6 +3665,11 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
+        // round 190ap: the Versions panel's list of files, and its labels on disk beside them
+        const auto versionsResult = lynx::versionsSelfTest();
+        // round 190ap: a project opened with its plugins off creates none of them and saves their settings unchanged
+        const auto pluginsOffResult = lynx::pluginsOffSelfTest();
+
         // round 177b: automation lanes come back from a project (track, automation, height, folded)
         juce::String lanesResult = "OK";
         {
@@ -3682,7 +3711,7 @@ private:
         const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3720,6 +3749,8 @@ private:
                << "device_change=" << deviceChange << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
+               << "versions_panel=" << versionsResult << "\n"
+               << "plugins_off=" << pluginsOffResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
@@ -9351,6 +9382,149 @@ private:
         juce::File (folderPath).getChildFile ("export-als.txt").replaceWithText (report);
         setApplicationReturnValue (als != juce::File() ? 0 : 1);
         quit();
+    }
+
+    // --versionsshot <prefix> (round 190ap): everything the round adds, offscreen (no window on the desktop):
+    //   -versions.png / -versions-unsaved.png   the Versions panel (a project with versions, backups and labels; a new one)
+    //   -menu-file.png / -menu-file-pluginsoff.png   the File menu, and as it is while the plugins are off
+    //   -pluginsoff-window.png / -pluginsoff-mixer.png   a project opened without its third-party plugins (the tags)
+    //   -pluginsoff-panel.png / -pluginsoff-panel-one.png   the list, all off, then after "Switch on" for one
+    //   -export-default.png / -export.png   the Export window as it opens, and with the additions in use
+    void runVersionsShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+
+        // ---- the Versions panel, on files in a temporary folder
+        const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                              .getChildFile ("lynx-versionsshot-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
+        const juce::ScopeGuard cleanUp { [&root] { root.deleteRecursively(); } };
+        const auto project = root.getChildFile ("Night Drive"), backup = root.getChildFile ("Backup");
+        project.createDirectory();
+        backup.createDirectory();
+        const auto now = juce::Time::getCurrentTime();
+        const auto put = [&now] (const juce::File& folder, const juce::String& name, const char* kind, int kilobytes, double hoursAgo) {
+            const auto time = now - juce::RelativeTime::hours (hoursAgo);
+            const auto file = folder.getChildFile (kind == nullptr ? name + ".lynx" : name + " (" + kind + " on " + time.formatted ("%Y-%m-%d at %Hh%M") + ").lynx");
+            juce::MemoryBlock data ((size_t) kilobytes * 1024, true);
+            file.replaceWithData (data.getData(), data.getSize());
+            file.setLastModificationTime (time);
+        };
+        put (project, "Night Drive", nullptr, 412, 26.0 * 24.0);
+        put (project, "Night Drive_2", nullptr, 688, 9.0 * 24.0);
+        put (project, "Night Drive_3", nullptr, 731, 2.0 * 24.0);
+        put (project, "Night Drive_4", nullptr, 905, 1.6);
+        put (backup, "Night Drive_4", "autosaved", 907, 0.07);
+        put (backup, "Night Drive_4", "autosaved", 906, 0.4);
+        put (backup, "Night Drive_4", "overwritten", 890, 1.6);
+        put (backup, "Night Drive_4", "autosaved", 884, 3.2);
+        put (backup, "Night Drive_3", "overwritten", 720, 2.0 * 24.0);
+        put (backup, "Night Drive_2", "autosaved", 690, 8.0 * 24.0);
+        const lynx::VersionsContext context { project.getChildFile ("Night Drive_4.lynx"), "Night Drive_4", backup, ".lynx" };
+        {
+            const auto entries = lynx::versionEntries (context);
+            const auto label = [&] (const juce::String& startsWith, const char* text) {
+                for (const auto& e : entries)
+                    if (juce::String::fromUTF8 (e.name.c_str()).startsWith (startsWith))
+                    {
+                        lynx::setVersionLabel (context, e, text);
+                        return;
+                    }
+            };
+            label ("Night Drive_2", "first full arrangement");
+            label ("Night Drive_3", "sent to the singer");
+            label ("Night Drive_4 (autosaved", "new bass line");
+        }
+        {
+            lynx::VersionsActions actions;
+            actions.context = [context] { return context; };
+            auto panel = lynx::makeVersionsPanel (actions);
+            shoot (*panel, "versions");
+            lynx::VersionsActions fresh;
+            fresh.context = [backup] { return lynx::VersionsContext { juce::File(), "Untitled", backup, ".lynx" }; };
+            auto empty = lynx::makeVersionsPanel (fresh);
+            shoot (*empty, "versions-unsaved");
+        }
+
+        // ---- the window
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto saveFileMenu = [&] (const char* name) {
+            const auto index = juce::jmax (0, ui.getMenuNamesForSnapshot().indexOf (lynx::tr ("File")));
+            saveMenus (juce::StringArray { lynx::tr ("File") }, std::vector<juce::PopupMenu> { ui.getMenuForSnapshot (index) }, prefix + "-" + name + ".png");
+        };
+        saveFileMenu ("menu-file");
+
+        // ---- a project opened without its third-party plugins (the plugins are not installed: nothing foreign runs)
+        {
+            const auto ref = [] (const char* id, const char* name) {
+                lynx::PluginRef r;
+                r.id = id;
+                r.name = name;
+                r.state = "c2V0dGluZ3M=";
+                return r;
+            };
+            auto song = lynx::Song::makeDefault();
+            while (song.channels.size() < 4)
+                song.channels.push_back (song.channels.front());
+            while (song.mixer.size() < 5)
+                song.mixer.push_back (song.mixer.back());
+            const char* names[] = { "Lead", "Pad" };
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& channel = song.channels[(std::size_t) (c + 2)];
+                channel.instrument = lynx::InstrumentKind::plugin;
+                channel.plugin = ref ("VST3-ShotSynth-11111111-aaaaaaaa", "Shot Synth");
+                channel.name = names[c];
+                channel.mixerTrack = c + 1;
+            }
+            lynx::EffectSlot fx;
+            fx.kind = lynx::EffectKind::plugin;
+            fx.plugin = ref ("VST3-ShotVerb-22222222-bbbbbbbb", "Shot Verb");
+            song.mixer[1].effects.push_back (fx);
+            fx.plugin = ref ("VST3-ShotComp-33333333-cccccccc", "Shot Comp");
+            song.mixer[2].effects.push_back (fx);
+            song.mixer[0].effects.push_back (fx);
+            offline.setSongWithPluginsOff (std::move (song));
+            ui.showDesktopForSnapshot (false);
+            shoot (ui, "pluginsoff-window");
+            ui.showPanelsForSnapshot ({ lynx::workspace::Panel::channelRack, lynx::workspace::Panel::mixer });
+            shoot (ui, "pluginsoff-mixer"); // (the rack's and the mixer's "off" tags together)
+            saveFileMenu ("menu-file-pluginsoff");
+            auto panel = lynx::makePluginsOffPanel (offline);
+            shoot (*panel, "pluginsoff-panel");
+            offline.switchPluginOn ("VST3-ShotVerb-22222222-bbbbbbbb"); // (not installed: "Did not load")
+            auto after = lynx::makePluginsOffPanel (offline);
+            shoot (*after, "pluginsoff-panel-one");
+        }
+
+        // ---- the Export window: as it opens, and with a preset chosen, sections on and a last export to repeat
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto bar = (std::int64_t) lynx::ppq * song.beatsPerBar;
+            song.mode = lynx::PlayMode::song;
+            song.playlist.clear();
+            lynx::Clip clip;
+            clip.length = 32 * bar;
+            song.playlist.push_back (clip);
+            const char* sections[] = { "Intro", "Verse", "Chorus", "Outro" };
+            for (int i = 0; i < 4; ++i)
+            {
+                lynx::Marker m;
+                m.tick = i * 8 * bar;
+                m.name = sections[i];
+                song.addMarker (m);
+            }
+            offline.setSong (std::move (song)); // (also ends the plugins-off mode)
+            auto plain = lynx::makeExportPanel (offline, 0);
+            shoot (*plain, "export-default");
+            auto additions = lynx::makeExportPanelWithAdditions (offline);
+            shoot (*additions, "export");
+        }
     }
 
     void runGamepadShot (const juce::String& prefix)
@@ -14989,6 +15163,7 @@ private:
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;
     bool startupFileHandled = false;
+    bool startWithoutPlugins = false; // --no-plugins project.lynx (round 190ap)
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };

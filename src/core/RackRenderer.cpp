@@ -410,6 +410,21 @@ bool hostsPlugins (const PatcherDoc& doc) noexcept
     return false;
 }
 
+// round 190ap: a plugin the build must create anew (RackState::Factories::rebuildPlugin), alone or inside a Patcher
+bool rebuilds (const RackState::Factories& factories, const PluginRef& ref) { return factories.rebuildPlugin && factories.rebuildPlugin (ref); }
+bool rebuildsInside (const RackState::Factories& factories, const PatcherDoc& doc)
+{
+    if (! factories.rebuildPlugin)
+        return false;
+    for (const auto& n : doc.nodes)
+        if (n.generator ? (n.channel.instrument == InstrumentKind::plugin && rebuilds (factories, n.channel.plugin))
+                              || (n.channel.instrument == InstrumentKind::patcher && rebuildsInside (factories, n.channel.patcher))
+                        : (n.effect.kind == EffectKind::plugin && rebuilds (factories, n.effect.plugin))
+                              || (n.effect.kind == EffectKind::patcher && rebuildsInside (factories, n.effect.patcher)))
+            return true;
+    return false;
+}
+
 // What a Patcher builds its nodes with: the same builders as the rack's channels and slots
 patcher::Factories patcherFactories (double sampleRate, double bpm, const RackState::Factories& factories)
 {
@@ -674,7 +689,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
-                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin))))
+                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin))))
         {
             state->instruments.push_back (previous->instruments[p]);
             state->instruments.back()->configure (channel, song.bpm);
@@ -686,7 +701,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             const auto* old = previous != nullptr && p < previous->instruments.size() ? previous->instruments[p].get() : nullptr;
             if (old != nullptr && previous->song.channels[p].instrument == kind && previous->sampleRate == sampleRate
-                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher)
+                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher) && ! rebuildsInside (factories, channel.patcher)
                 // a node's latency moved since its delay compensation was planned: build it again (issue #113)
                 && (patcher::graphOf (previous->instruments[p].get()) == nullptr
                     || ! patcher::graphOf (previous->instruments[p].get())->latencyStale (&channel.patcher)))
@@ -695,7 +710,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 state->instruments.back()->configure (channel, song.bpm);
                 continue;
             }
-            const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher) ? nullptr : old;
+            const auto* kept = (old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher)) || rebuildsInside (factories, channel.patcher)
+                                   ? nullptr
+                                   : old;
             state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept));
             state->instruments.back()->configure (channel, song.bpm);
             continue;
@@ -783,7 +800,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
-                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin)))
+                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)))
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
@@ -799,13 +816,15 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                                       ? previous->effects[pt][pi].get()
                                       : nullptr;
                 if (old != nullptr && previous->sampleRate == sampleRate
-                    && patcher::sameStructure (previous->song.mixer[pt].effects[pi].patcher, slots[i].patcher)
+                    && patcher::sameStructure (previous->song.mixer[pt].effects[pi].patcher, slots[i].patcher) && ! rebuildsInside (factories, slots[i].patcher)
                     && patcher::acceptValues (previous->effects[pt][pi].get(), slots[i]))
                 {
                     state->effects[t].push_back (previous->effects[pt][pi]);
                     continue;
                 }
-                const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher) ? nullptr : old;
+                const auto* kept = (old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher)) || rebuildsInside (factories, slots[i].patcher)
+                                       ? nullptr
+                                       : old;
                 std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept);
                 effect->prepare (sampleRate);
                 state->effects[t].push_back (std::move (effect));

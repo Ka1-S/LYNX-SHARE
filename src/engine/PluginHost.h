@@ -19,6 +19,7 @@
 #include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
 #include "core/RemotePlugins.h"
+#include "core/PluginHold.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
 #include "core/ModuleWarmup.h"
@@ -558,6 +559,17 @@ private:
     mutable std::mutex stateLock;
     ScanState state;
 };
+
+// "Open without third-party plugins" (round 190ap, core/PluginHold.h): this session's switched-off plugins. While it is
+// on, no hosted plugin that is off is created by any PluginHost of this process (the project's engine, an export's
+// engine, a thumbnail's): createInstance answers "switched off" before it touches the plugin's file, nothing is
+// preloaded or started ahead, and no substitute takes a slot's place. Any thread.
+bool pluginsHeld();                              // the mode is on
+bool pluginHeld (const std::string& id);         // this plugin is off now
+pluginhold::State pluginHoldState();             // a copy, for the lists
+void holdPlugins();                              // all off
+void releasePlugin (const std::string& id);      // this one back on (the caller rebuilds its slots)
+void endPluginHold();                            // the mode off: everything loads again
 
 // Settings → "Substitute missing plugins with LYNX equivalents" (default on; %APPDATA%\LYNX\substitutes.txt).
 bool pluginSubstitutesEnabled();
