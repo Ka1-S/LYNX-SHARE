@@ -64,7 +64,7 @@ enum : std::int32_t
     open = 0, close = 1, setProgram = 2, getProgram = 3, getProgramName = 5, getParamLabel = 6, getParamDisplay = 7,
     getParamName = 8, setSampleRate = 10, setBlockSize = 11, mainsChanged = 12, editGetRect = 13, editOpen = 14,
     editClose = 15, editIdle = 19, getChunk = 23, setChunk = 24, processEvents = 25, getProgramNameIndexed = 29,
-    getPlugCategory = 35, getEffectName = 45, getVendorString = 47, getProductString = 48, getVendorVersion = 49,
+    getOutputProperties = 34, getPlugCategory = 35, getEffectName = 45, getVendorString = 47, getProductString = 48, getVendorVersion = 49,
     canDo = 51, getTailSize = 52, getVstVersion = 58, beginSetProgram = 67, endSetProgram = 68,
     shellGetNextPlugin = 70, startProcess = 71, stopProcess = 72
 };
@@ -386,11 +386,15 @@ public:
         else if (effect->process != nullptr)
             effect->process (effect, inputs.data(), outputs.data(), n);
 
-        // main output: the first one or two outputs (a mono plugin feeds both sides)
+        // main output: the first one or two outputs (a mono plugin feeds both sides); then the other outputs on the
+        // channels of the extra buses (issue #114), as many as are enabled
+        const auto mainChannels = getBusCount (false) > 0 ? getChannelCountOfBus (false, 0) : 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
-            if (numOut > 0)
+            if (numOut > 0 && ch < juce::jmax (2, mainChannels))
                 buffer.copyFrom (ch, 0, scratch, juce::jmin (ch, juce::jmin (numOut, 2) - 1), 0, n);
+            else if (ch < numOut && ch < getTotalNumOutputChannels())
+                buffer.copyFrom (ch, 0, scratch, ch, 0, n);
             else
                 buffer.clear (ch, 0, n);
         }
@@ -537,8 +541,36 @@ private:
         if (! instrument && e.numInputs > 0)
             buses = buses.withInput ("Input", set (e.numInputs), true);
         if (e.numOutputs > 0)
-            buses = buses.withOutput ("Output", set (e.numOutputs), true);
+            buses = buses.withOutput (outputPin (e, 0).first, set (e.numOutputs), true);
+        // Issue #114: the other outputs, in stereo pairs (a last odd one mono), each a bus named as the plugin names
+        // its pins (effGetOutputProperties) and on by default as it flags them, as FL's wrapper lists them in
+        // Processing › Connections
+        for (int ch = 2; ch < e.numOutputs; ch += 2)
+        {
+            const auto [name, active] = outputPin (e, ch);
+            buses = buses.withOutput (name, set (e.numOutputs - ch), active);
+        }
         return buses;
+    }
+
+    // An output pin's label (VstPinProperties: char label[64] first), else "Output n" for its pair; and whether it is
+    // active (kVstPinIsActive; a plugin that does not answer: active)
+    static std::pair<juce::String, bool> outputPin (const abi::Effect& e, int channel)
+    {
+        struct Pin
+        {
+            char label[64];
+            std::int32_t flags, arrangement;
+            char shortLabel[8], future[48];
+        } pin {};
+        auto& effect = const_cast<abi::Effect&> (e);
+        if (effect.dispatcher (&effect, abi::getOutputProperties, channel, 0, &pin, 0.0f) != 0)
+        {
+            pin.label[63] = 0;
+            const auto text = juce::String::fromUTF8 (pin.label).trim();
+            return { text.isNotEmpty() ? text : "Output " + juce::String (channel / 2 + 1), (pin.flags & 1) != 0 };
+        }
+        return { "Output " + juce::String (channel / 2 + 1), true };
     }
 
     void updateTimeInfo (int)
