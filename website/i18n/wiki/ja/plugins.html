@@ -1,0 +1,43 @@
+<figure><a class="shot" href="/assets/img/wiki/plugin-manager-scan.webp"><img src="/assets/img/wiki/plugin-manager-scan.webp" alt="プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある" loading="lazy" width="980" height="270"></a></figure>
+<p>LYNX SHAREは、ほかのメーカーのインストゥルメントとエフェクトのプラグインをホストできます。プラグインフォルダーをスキャンして見つけ、<code>オプション › プラグインマネージャー...</code> に見つかったものが表示されます。LYNX SHARE独自のインストゥルメントとエフェクトについては、<a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a>で説明しています。</p>
+<h2 id="scan-and-add-a-plugin">プラグインをスキャンして追加する</h2>
+<ol><li><code>オプション › プラグインをスキャン</code> を選びます。進行状況はヒントバーに表示され、作業を続けられます。</li><li>プラグインが専用のフォルダーにある場合は、<code>オプション › プラグインマネージャー...</code> を開いて <code>プラグインフォルダー...</code> をクリックし、そのフォルダーを追加してから <code>新しいプラグインを検索</code> をクリックします。</li><li><code>F8</code> を押してプラグインピッカーを開き、プラグイン名の一部を入力します。</li><li>ダブルクリックするか、<code>Enter</code> を押します。インストゥルメントは新しいチャンネルになります。エフェクトは、選択中のミキサーのインサートに入ります。</li></ol>
+<p>初回起動時には、セットアップウィザードがプラグインフォルダーを一覧にして、バックグラウンドでスキャンします。<code>オプション › セットアップウィザード (言語、オーディオ、プラグインフォルダー)...</code> で、もう一度開けます。LYNX SHAREは、起動のたびに数秒後、新しいプラグインも探します。</p>
+<h2 id="formats-per-system">システム別の形式</h2>
+<div class="tablewrap"><table><thead><tr><th>システム</th><th>ホストできる形式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2</td></tr></tbody></table></div>
+<p>macOSでは、VST2はホストできません。Linuxでは、ご自身でインストールした<a href="https://github.com/robbert-vdh/yabridge">yabridge</a>とWineを通して、Windowsのプラグインが動きます。yabridgeが同期するフォルダーを、プラグインフォルダーとして追加してください。</p>
+<h2 id="the-plugin-manager">プラグインマネージャー</h2>
+<div class="tablewrap"><table><thead><tr><th>コントロール</th><th>働き</th></tr></thead><tbody><tr><td>検索ボックス</td><td>名前、ベンダー、形式、ファイルで絞り込む</td></tr><tr><td><code>すべて</code>、<code>インストゥルメント</code>、<code>エフェクト</code>、<code>お気に入り</code>、<code>失敗</code></td><td>一覧に表示するプラグインを選ぶ</td></tr><tr><td>スター列</td><td>お気に入りの印を付ける</td></tr><tr><td><code>ビット</code> 列</td><td>32、64、または32+64 (Windows)</td></tr><tr><td><code>状態</code> 列</td><td><code>OK</code>、<code>ファイルなし</code>、<code>読み込み失敗</code></td></tr><tr><td><code>新しいプラグインを検索</code></td><td>一覧にまだないファイルをスキャンする</td></tr><tr><td><code>すべて再スキャン...</code></td><td>失敗したファイルの記録を消して、すべてのファイルをもう一度調べる</td></tr><tr><td><code>プラグインフォルダー...</code></td><td>スキャンするフォルダーを編集する</td></tr><tr><td><code>プラグインファイルを追加...</code></td><td>プラグインファイルを1つ追加する</td></tr></tbody></table></div>
+<p>プラグインファイルは、1つずつ別プロセスで調べられます。クラッシュしたファイルや、30秒止まったままのファイルは、失敗としてマークされ、以後はスキップされます。Windowsでは、失敗したファイルが理由とともに <code>%APPDATA%\LYNX\scan-failures.log</code> に一覧で残ります。</p>
+<p>標準のフォルダーに加えて、追加したフォルダーがスキャンされます。</p>
+<ul><li>Windows: <code>Common Files\VST3</code>、<code>Common Files\CLAP</code>、<code>Common Files\VST2</code>、Program Files内の <code>VSTPlugins</code> と <code>Steinberg\VSTPlugins</code>。FL Studioがインストールされていれば、FL Studioが使うフォルダーも含まれます。</li><li>macOS: <code>~/Library/Audio/Plug-Ins</code> と <code>/Library/Audio/Plug-Ins</code> にある <code>VST3</code>、<code>Components</code>、<code>CLAP</code>。</li><li>Linux: <code>~/.vst3</code>、<code>~/.clap</code>、<code>~/.lv2</code>、<code>~/.vst</code>、および <code>/usr/lib</code> と <code>/usr/local/lib</code> の下の同じフォルダー。</li></ul>
+<h2 id="docked-and-detached-plugin-windows">ドッキングしたプラグインウィンドウと独立したプラグインウィンドウ</h2>
+<p>プラグインのエディターは、ほかのパネルと同じようにメインウィンドウの中で開きます。プラグインウィンドウのメニューにある <code>切り離し</code> を選ぶと、そのプラグインは専用のウィンドウになります。同じメニューの <code>手前に固定</code> を選ぶと、独立したウィンドウがLYNX SHAREのほかのウィンドウより前面に残ります。</p>
+<p><code>オプション › 全般設定...</code> の <code>新しいプラグインをすべて切り離す</code> をオンにすると、追加するプラグインがすべて独立したウィンドウで開きます。<code>ツール › すべてのプラグインエディターを切り替え</code> では、プロジェクトのすべてのプラグインを <code>ドッキング</code> か <code>切り離し</code> にまとめて切り替えられます。</p>
+<h2 id="run-plugins-in-a-separate-process">プラグインを別プロセスで実行する</h2>
+<p>初期設定では、プラグインはLYNX SHAREの中で動くので、クラッシュしたプラグインがプログラムごと落とすことがあります。オプションを使うと、プラグインごとに専用のプロセスで動かせます。</p>
+<ol><li><code>オプション › 全般設定...</code> を開きます。</li><li><code>プラグインを別プロセスで実行 (クラッシュからLYNX SHAREを保護)</code> をオンにします。</li><li>すでに開いているプラグインに反映するには、プロジェクトを開き直します。</li></ol>
+<p>このようなプラグインがクラッシュしたり応答しなくなったりすると、ミュートされてメッセージが表示され、LYNX SHAREは動き続けます。メッセージの <code>再読み込み</code> を押すと、プロジェクトを開き直さずに、最後の保存またはバックアップの設定でそのプラグインが再び起動します。プラグインのエディターは専用のウィンドウで開き、ドッキングやピン留めはできません。</p>
+<p>1つのプラグインだけに適用するには、プラグインウィンドウのラッパーメニューにある <code>別プロセスで実行</code> または <code>Always run &lt;plugin&gt; in a separate process</code> を使います。プラグインのエディターがクラッシュしたときに出るメッセージにも、後者が表示されます。</p>
+<p>この機能は、WindowsとLinuxで動き、0.1.25からはmacOSでも動きます。</p>
+<p>LYNX SHARE内でクラッシュしたプラグインはオフになり、そのメッセージにも <code>再読み込み</code> があります。あとからは、チャンネルのメニューかエフェクトスロットのメニューにある <code>クラッシュしたプラグインを再読み込み</code> を使います。</p>
+<h2 id="32-bit-plugins-windows-only">32ビットプラグイン (Windowsのみ)</h2>
+<p>Windowsでは、32ビットのVST2とVST3のプラグインは、ブリッジ (<code>LYNX-bridge32.exe</code>) を通して動きます。ブリッジによるレイテンシーの増加はありません。ブリッジの中でクラッシュしたプラグインは単独で止まり、LYNX SHAREは再生を続けます。ブリッジ経由のプラグインのエディターは専用のウィンドウで開き、ドッキングやピン留めはできません。プラグインの32ビット版と64ビット版の両方がインストールされている場合は、プラグインウィンドウの <code>ラッパー設定</code> にある <code>ビット数</code> で、読み込む方を選びます。</p>
+<h2 id="plugin-performance-monitor">プラグインパフォーマンスモニター</h2>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" alt="プラグインパフォーマンスモニター: インストゥルメントとエフェクトごとに1行で、処理時間に占める割合を表示する" loading="lazy" width="720" height="380"></a></figure>
+<p><code>ツール › プラグインパフォーマンスモニター...</code> には、すべてのインストゥルメントとエフェクトが、現在、平均、ピークの処理時間とともに一覧で出ます。100%は、オーディオの長さの間ずっと、プロセッサーコア1つが使われていることを意味します。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>検索</code></td><td>プラグイン、チャンネル、インサートで絞り込む</td></tr><tr><td><code>プラグインのみ</code></td><td>LYNX SHARE独自のインストゥルメントとエフェクトを非表示にする</td></tr><tr><td><code>フリーズ</code></td><td>数値の更新を止める</td></tr><tr><td><code>再生時にリセット</code></td><td>再生を始めるたびに、平均とピークをやり直す</td></tr><tr><td><code>リセット</code></td><td>平均とピークを今すぐクリアする</td></tr></tbody></table></div>
+<h2 id="send-an-instrument-s-outputs-to-separate-inserts">インストゥルメントの出力を別々のインサートに送る</h2>
+<p>複数の出力を持つインストゥルメントプラグインは、出力ごとに別のミキサーインサートで鳴らせます。プラグインのウィンドウで <code>ラッパー設定</code> をクリックし、<code>処理</code> タブを開きます。<code>接続</code> の下に、出力ごとにオン/オフのライトと数字があります。数字は、チャンネル自身のインサートから数えて何番目あとのインサートで鳴らすかを表します。<code>出力を自動マップ</code> は各出力に次のインサートを順に割り当て、<code>リセット</code> は既定に戻します。</p>
+<h2 id="the-plugin-database-folder">Plugin databaseフォルダー</h2>
+<p><a href="/wiki/browser/">ブラウザー</a>のPlugin databaseのフォルダー、プラグインピッカー、プラグインのメニューは、ディスク上の1つのフォルダー、つまりドキュメントフォルダー内の <code>LYNX/Plugin database</code> です。開くには、ブラウザーで <code>プラグインデータベース</code> を右クリックして <code>開く</code> を選びます。</p>
+<ul><li><code>エフェクト</code> と <code>ジェネレーター</code> には、プラグイン1つにつき1つの <code>.lynxplugin</code> ファイルがあります。フォルダーとサブフォルダー (最大4階層) を作って、ファイルを移せます。</li><li>ファイル名を変えると、メニューでのプラグイン名が変わります。ファイルを削除すると、そのプラグインがメニューから消えます。アンインストールはされません。</li><li><code>インストール済み</code> には、すべてのプラグインの項目があります。プラグインを元に戻すには、その項目を <code>エフェクト</code> か <code>ジェネレーター</code> にコピーします。</li></ul>
+<h2 id="open-a-project-without-its-plugins">プラグインなしでプロジェクトを開く</h2>
+<p><code>ファイル › サードパーティ製プラグインなしで開く...</code> は、サードパーティ製のプラグインをすべてオフにしてLYNX SHAREのプロジェクトを開きます。開けないプロジェクトや、読み込み中にクラッシュするプロジェクト向けです。プラグインの保存済みの設定は残ります。<code>ファイル › プラグインをオンに戻す...</code> で、もう一度オンにできます。</p>
+<h2 id="when-a-plugin-is-not-installed">プラグインがインストールされていないとき</h2>
+<p>LYNX SHAREは、まず識別子、次にファイル、次に名前で、同じプラグインを探します。VST2で保存したプロジェクトは同じ製品のVST3で開け、その逆も同様ですが、その場合プラグインはデフォルトの設定で鳴ります。</p>
+<p>エフェクトがまったくインストールされていない場合は、同じ役割のLYNX SHAREのエフェクトがそのスロットに入り、元のプラグインはプロジェクトに残ります。プラグインの保存済みの設定が読み取れる場合は、代わりのエフェクトも対応する設定で始まります。切り替えは、<code>オプション › 全般設定...</code> の <code>見つからないプラグインをLYNX SHAREの同等品で代替</code> です。<a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a>を参照してください。置き換えられたプラグインは、<code>ヘルプ › 見つからないファイル...</code> に一覧で出ます。</p>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>ホストしたプラグインのウィンドウには、プリセットバーがあります。プラグイン自身のプログラム、ユーザーのプリセット、<code>プリセットを保存...</code>、<code>プリセットファイルを読み込む...</code>、<code>プリセットファイルをエクスポート...</code> です。<code>.fxp</code>、<code>.fxb</code>、<code>.vstpreset</code> ファイルは、LYNX SHAREの中で動くプラグインにだけ読み込めます。別プロセスで動くプラグインには読み込めません。</li><li>モニターが計測するのは、そのウィンドウが開いている間だけです。</li><li>プラグインのウィンドウにフォーカスがあるとき、プラグインが使わないキーは、タイピングキーボードのピアノを鳴らします。Windowsでは、ウィンドウのヘッダーにあるキーボードボタンがオフの場合、LYNX SHAREがショートカットを含め、プラグインより先にキーを処理します。</li><li>VST3プラグイン自身のパラメーターメニューは、<code>オートメーションクリップを作成</code> など、LYNX SHAREの項目から始まります。<a href="/wiki/automation/">オートメーション</a>を参照してください。</li><li>プラグインの <code>ラッパー設定</code> にある <code>MIDI</code> の下の <code>MPE</code> を使うと、ノートごとに別のMIDIチャンネルで送られます。<a href="/wiki/midi-controllers/">MIDIコントローラー</a>を参照してください。</li><li>見つからないインストゥルメントの代替は、まだありません。見つからないインストゥルメントのプラグインは、チャンネル名から選ばれた内蔵シンセになります。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a></li><li><a href="/wiki/browser/">ブラウザー</a></li><li><a href="/wiki/mixer/">ミキサー</a></li><li><a href="/wiki/troubleshooting/">トラブルシューティング</a></li></ul>

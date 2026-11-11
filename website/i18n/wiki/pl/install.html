@@ -1,0 +1,33 @@
+<p>Każde wydanie ma wersje dla Windows, macOS i Linuksa na <a href="https://github.com/Ka1-S/LYNX-SHARE/releases">stronie wydań</a>. Pliki są budowane z otagowanego kodu źródłowego przez GitHub Actions i wymienione z sumami SHA-256 w <code>SHA256SUMS.txt</code>. Strona <a href="/download/">Pobieranie</a> odsyła do bieżących.</p>
+<h2 id="install-on-windows">Instalacja w Windows</h2>
+<p>Windows 10 lub 11, 64-bitowy.</p>
+<ol><li>Pobierz <code>LYNX-&lt;version&gt;-setup-x64.exe</code>.</li><li>Uruchom go. Instaluje się tylko dla Twojego użytkownika i nie wymaga praw administratora.</li><li>SmartScreen może ostrzec, bo plik wykonywalny nie jest jeszcze podpisany. Wybierz <code>More info</code>, a potem <code>Run anyway</code>.</li><li>Uruchom LYNX SHARE z menu Start albo ze skrótu na pulpicie.</li></ol>
+<p>Instalator czyni LYNX SHARE programem otwierającym projekty <code>.lynx</code>. Dla plików <code>.flp</code> oferuje LYNX SHARE w <em>Otwórz za pomocą</em>, nie zmieniając domyślnego programu FL Studio.</p>
+<p>Są dwie inne drogi:</p>
+<div class="tablewrap"><table><thead><tr><th>Droga</th><th>Plik lub miejsce</th><th>Co robi</th></tr></thead><tbody><tr><td>Przenośny zip</td><td><code>LYNX-&lt;version&gt;-windows-x64.zip</code></td><td>Rozpakuj go gdziekolwiek i uruchom <code>LYNX.exe</code>. Nic się nie instaluje.</td></tr><tr><td>Microsoft Store</td><td><a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N">LYNX SHARE w Store</a></td><td>Store instaluje program i dba o aktualizacje.</td></tr></tbody></table></div>
+<h2 id="install-on-macos">Instalacja w macOS</h2>
+<p>macOS 11 Big Sur lub nowszy. Jeden uniwersalny plik <code>LYNX-&lt;version&gt;-macos-universal.dmg</code> obejmuje Intela i Apple silicon.</p>
+<ol><li>Otwórz <code>.dmg</code> i przeciągnij LYNX SHARE do <em>Programy</em>.</li><li>Aplikacja nie jest notaryzowana przez Apple i nie ma podpisu Developer ID, więc pierwsze uruchomienie wymaga dodatkowego kroku. Kliknij LYNX SHARE w <em>Programy</em> prawym przyciskiem (lub z Control), wybierz <em>Otwórz</em>, a potem jeszcze raz <em>Otwórz</em>.</li><li>W macOS 15 Sequoia lub nowszym spróbuj raz ją otworzyć, potem przejdź do <em>Ustawienia systemowe › Prywatność i ochrona</em> i kliknij <em>Otwórz mimo to</em>.</li></ol>
+<p>Wariant z Terminalem:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS prosi o dostęp do mikrofonu przy pierwszym nagrywaniu.</p>
+<h2 id="install-on-linux">Instalacja w Linuksie</h2>
+<p>x86_64 z glibc 2.35 lub nowszym (Ubuntu 22.04+, Debian 12+, Fedora 36+, aktualny Arch lub Manjaro). LYNX SHARE wymaga X11 lub XWayland. Dźwięk idzie przez PipeWire, JACK lub ALSA i nie trzeba w tym celu instalować niczego więcej.</p>
+<p>AppImage (<code>LYNX-&lt;version&gt;-x86_64.AppImage</code>):</p>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p>Niektóre dystrybucje potrzebują libfuse2 do uruchamiania AppImage (<code>libfuse2</code> w Ubuntu 22.04, <code>libfuse2t64</code> w 24.04, <code>fuse2</code> w Archu, <code>fuse-libs</code> w Fedorze). Przy pierwszym starcie kreator konfiguracji proponuje dodanie LYNX SHARE do menu aplikacji i otwieranie nim plików <code>.lynx</code>. Możesz to zmienić później w <code>Opcje › Ustawienia ogólne...</code> albo z terminala przez <code>./LYNX-*.AppImage --menu-entry on</code> (lub <code>wył.</code>).</p>
+<p>Jeśli wolisz nie instalować libfuse2, użyj <code>LYNX-&lt;version&gt;-linux-x86_64.tar.gz</code>: rozpakuj go i uruchom <code>./install.sh</code>. To instaluje LYNX SHARE dla Twojego użytkownika w <code>~/.local</code> z wpisem w menu, ikoną i typem pliku <code>.lynx</code>.</p>
+<h2 id="where-settings-are-kept">Gdzie leżą ustawienia</h2>
+<div class="tablewrap"><table><thead><tr><th>System</th><th>Folder ustawień</th></tr></thead><tbody><tr><td>Windows</td><td><code>%APPDATA%\LYNX</code></td></tr><tr><td>macOS</td><td><code>~/Library/Application Support/LYNX</code></td></tr><tr><td>Linux</td><td><code>~/.config/LYNX</code> (lub w <code>$XDG_CONFIG_HOME</code>)</td></tr></tbody></table></div>
+<p>Folder zawiera Twoje opcje, wybrany język (<code>language.txt</code>), skróty (<code>keys.json</code>), foldery pluginów (<code>plugin-folders.txt</code>) i listę przeskanowanych pluginów (<code>plugins.xml</code>).</p>
+<h2 id="update">Aktualizacja</h2>
+<p>Przy starcie LYNX SHARE pyta GitHub o numer najnowszej wersji. Nic o Tobie nie jest wysyłane. Gdy wyjdzie nowa wersja, pasek pokazuje <code>LYNX SHARE &lt;version&gt; is available</code> z przyciskiem <code>Co nowego</code> i przyciskiem aktualizacji. <code>Pomoc › Sprawdź aktualizacje...</code> pyta o to w dowolnej chwili.</p>
+<div class="tablewrap"><table><thead><tr><th>Wersja</th><th>Jak się aktualizuje</th></tr></thead><tbody><tr><td>Instalator Windows</td><td><code>Aktualizuj</code> pobiera nowy instalator, pyta o niezapisane zmiany, instaluje i uruchamia ponownie</td></tr><tr><td>Przenośny zip Windows, macOS</td><td><code>Aktualizuj</code> pobiera nowy plik i pokazuje go w jego folderze</td></tr><tr><td>AppImage na Linuksie</td><td><code>Aktualizuj</code> aktualizuje plik AppImage na miejscu. Gear Lever i AppImageUpdate potrafią to samo z zewnątrz</td></tr><tr><td>Linux <code>.tar.gz</code></td><td><code>Pobierz...</code> otwiera stronę pobierania</td></tr><tr><td>Microsoft Store</td><td>Aktualizuje Store. Ta wersja nie ma własnego sprawdzania aktualizacji</td></tr></tbody></table></div>
+<p>Aby wyłączyć sprawdzanie, otwórz <code>Opcje › Ustawienia ogólne...</code> i odznacz <code>Sprawdzaj aktualizacje automatycznie</code>.</p>
+<h2 id="remove">Usuwanie</h2>
+<ul><li>Instalator Windows: odinstaluj LYNX SHARE z listy <em>Aplikacje i funkcje</em> w Windows.</li><li>Przenośny zip: usuń rozpakowany folder.</li><li>Linux <code>.tar.gz</code>: uruchom <code>./install.sh --uninstall</code>.</li></ul>
+<h2 id="good-to-know">Warto wiedzieć</h2>
+<ul><li>Wersje dla Windows są niepodpisane, dopóki wniosek projektu o podpis kodu nie zostanie przyjęty. Aplikacja macOS ma tylko podpis ad hoc. Pakiety linuksowe nie są podpisane.</li><li>Aby sprawdzić pobrany plik, porównaj jego SHA-256 z wierszem w <code>SHA256SUMS.txt</code> na stronie wydania.</li><li>Instalator, zip, <code>.dmg</code> i <code>.tar.gz</code> zawierają projekt demo <code>Demo.lynx</code>.</li><li>Zamknięcie paska aktualizacji jego przyciskiem zamknięcia pomija tę wersję.</li></ul>
+<h2 id="related">Powiązane</h2>
+<ul><li><a href="/wiki/getting-started/">Zacznij tutaj</a></li><li><a href="/wiki/audio-setup/">Ustawienia audio</a></li><li><a href="/wiki/troubleshooting/">Rozwiązywanie problemów</a></li><li><a href="/download/">Pobieranie</a></li><li><a href="/updates/">Aktualizacje</a></li></ul>

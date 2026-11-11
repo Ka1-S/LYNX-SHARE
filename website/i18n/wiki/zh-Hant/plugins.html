@@ -1,0 +1,43 @@
+<figure><a class="shot" href="/assets/img/wiki/plugin-manager-scan.webp"><img src="/assets/img/wiki/plugin-manager-scan.webp" alt="外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明" loading="lazy" width="980" height="270"></a></figure>
+<p>LYNX SHARE 可以代管其他廠商的樂器和效果器外掛。它透過掃描外掛資料夾來找到它們，<code>選項 › 外掛管理器...</code> 會顯示找到的內容。LYNX SHARE 自己的樂器和效果器，在<a href="/wiki/built-in/">內建樂器與效果器</a>中說明。</p>
+<h2 id="scan-and-add-a-plugin">掃描並新增外掛</h2>
+<ol><li>選擇 <code>選項 › 掃描外掛</code>。進度會顯示在提示列中，你可以繼續工作。</li><li>如果外掛在它自己的資料夾裡，請開啟 <code>選項 › 外掛管理器...</code>，點擊 <code>外掛資料夾...</code>，加入該資料夾，然後點擊 <code>尋找新外掛</code>。</li><li>按 <code>F8</code> 開啟外掛選擇器，輸入外掛名稱的一部分。</li><li>對它按兩下或按 <code>Enter</code>。樂器會成為新通道。效果器會放入所選的混音插入軌。</li></ol>
+<p>第一次啟動時，設定精靈會列出外掛資料夾，並在背景掃描它們。<code>選項 › 設定精靈（語言、音訊、外掛資料夾）...</code> 可以再次開啟它。LYNX SHARE 也會在每次啟動幾秒後尋找新外掛。</p>
+<h2 id="formats-per-system">各系統的格式</h2>
+<div class="tablewrap"><table><thead><tr><th>系統</th><th>代管的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2</td></tr></tbody></table></div>
+<p>macOS 上不代管 VST2。在 Linux 上，Windows 外掛可透過 <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> 和 Wine 運作，這兩者需要你自行安裝：請把 yabridge 同步的資料夾加為外掛資料夾。</p>
+<h2 id="the-plugin-manager">外掛管理器</h2>
+<div class="tablewrap"><table><thead><tr><th>控制項</th><th>作用</th></tr></thead><tbody><tr><td>搜尋框</td><td>依名稱、廠商、格式或檔案篩選</td></tr><tr><td><code>全部</code>、<code>樂器</code>、<code>效果器</code>、<code>我的最愛</code>、<code>失敗</code></td><td>選擇要列出哪些外掛</td></tr><tr><td>星號欄</td><td>標記為我的最愛</td></tr><tr><td><code>位數</code> 欄</td><td>32、64 或 32+64（Windows）</td></tr><tr><td><code>狀態</code> 欄</td><td><code>確定</code>、<code>未找到檔案</code> 或 <code>載入失敗</code></td></tr><tr><td><code>尋找新外掛</code></td><td>掃描清單中還沒有的檔案</td></tr><tr><td><code>全部重新掃描...</code></td><td>忘記失敗的檔案，並重新檢查每個檔案</td></tr><tr><td><code>外掛資料夾...</code></td><td>編輯要掃描的資料夾</td></tr><tr><td><code>新增外掛檔案...</code></td><td>新增單一外掛檔案</td></tr></tbody></table></div>
+<p>每個外掛檔案都在獨立的處理程序中檢查。當機或停止回應 30 秒的檔案會被標記為失敗，之後會略過。在 Windows 上，失敗的檔案及原因列在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</p>
+<p>標準資料夾和你加入的資料夾都會被掃描：</p>
+<ul><li>Windows：<code>Common Files\VST3</code>、<code>Common Files\CLAP</code>、<code>Common Files\VST2</code>、Program Files 下的 <code>VSTPlugins</code> 和 <code>Steinberg\VSTPlugins</code>，以及（若已安裝 FL Studio）FL Studio 使用的資料夾。</li><li>macOS：<code>~/Library/Audio/Plug-Ins</code> 和 <code>/Library/Audio/Plug-Ins</code> 中的 <code>VST3</code>、<code>Components</code> 和 <code>CLAP</code>。</li><li>Linux：<code>~/.vst3</code>、<code>~/.clap</code>、<code>~/.lv2</code>、<code>~/.vst</code>，以及 <code>/usr/lib</code> 和 <code>/usr/local/lib</code> 下的同名資料夾。</li></ul>
+<h2 id="docked-and-detached-plugin-windows">停靠與分離的外掛視窗</h2>
+<p>外掛的編輯器和其他面板一樣，在主視窗內開啟。外掛視窗選單中的 <code>已分離</code> 會讓該外掛有自己的視窗，同一選單中的 <code>固定在最前</code> 則讓分離的視窗保持在 LYNX SHARE 其他視窗之上。</p>
+<p><code>選項 › 一般設定...</code> 中的 <code>分離所有新外掛</code> 會讓你新增的每個外掛都以分離方式開啟。<code>工具 › 將所有外掛編輯器切換為</code> 可為專案的所有外掛設定 <code>已停靠</code> 或 <code>已分離</code>。</p>
+<h2 id="run-plugins-in-a-separate-process">在獨立處理程序中執行外掛</h2>
+<p>預設情況下，外掛在 LYNX SHARE 內部執行，所以當掉的外掛可能會讓整個程式一起當掉。你可以選擇讓每個外掛在自己的處理程序中執行。</p>
+<ol><li>開啟 <code>選項 › 一般設定...</code>。</li><li>開啟 <code>在獨立處理程序中執行外掛（防止外掛崩潰影響LYNX SHARE）</code>。</li><li>重新開啟專案，讓這項設定套用到已開啟的外掛。</li></ol>
+<p>如果這樣的外掛當掉或停止回應，它會被靜音，並出現一則訊息，LYNX SHARE 則繼續執行。訊息中的 <code>重新載入</code> 會用上次儲存或備份的設定重新啟動該外掛，不必重新開啟專案。外掛的編輯器會在自己的視窗中開啟，無法停靠或固定。</p>
+<p>若只想對單一外掛這麼做，請使用外掛視窗封裝器選單中的 <code>在獨立處理程序中執行</code> 或 <code>Always run &lt;plugin&gt; in a separate process</code>。當外掛的編輯器當掉時，出現的訊息也提供第二個選項。</p>
+<p>這在 Windows 和 Linux 上可用，從 0.1.25 起 macOS 也可用。</p>
+<p>在 LYNX SHARE 內當掉的外掛會被關閉，它的訊息也提供 <code>重新載入</code>。之後可以使用通道選單或效果器插槽選單中的 <code>重新載入已崩潰的外掛</code>。</p>
+<h2 id="32-bit-plugins-windows-only">32 位元外掛（僅限 Windows）</h2>
+<p>在 Windows 上，32 位元的 VST2 和 VST3 外掛透過橋接程式（<code>LYNX-bridge32.exe</code>）執行。橋接程式不增加延遲。在其中當掉的外掛會自行停止，LYNX SHARE 則繼續播放。橋接外掛的編輯器會在自己的視窗中開啟，無法停靠或固定。當同一個外掛同時安裝了 32 位元和 64 位元版本時，外掛視窗 <code>封裝器設定</code> 中的 <code>位元數</code> 決定載入哪一個。</p>
+<h2 id="plugin-performance-monitor">外掛效能監視器</h2>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" alt="外掛效能監視器：每個樂器和效果器一列，顯示其佔用的處理時間比例" loading="lazy" width="720" height="380"></a></figure>
+<p><code>工具 › 外掛效能監視器...</code> 會列出每個樂器和效果器所花的處理時間：目前值、平均值和峰值。100% 表示在音訊持續的整段時間裡，一個處理器核心都處於忙碌狀態。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>尋找</code></td><td>依外掛、通道或插入軌篩選</td></tr><tr><td><code>僅外掛</code></td><td>隱藏 LYNX SHARE 自己的樂器和效果器</td></tr><tr><td><code>凍結</code></td><td>停止更新數字</td></tr><tr><td><code>播放時重設</code></td><td>每次開始播放時，重新計算平均值和峰值</td></tr><tr><td><code>重設</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
+<h2 id="send-an-instrument-s-outputs-to-separate-inserts">把樂器的輸出送到各別的插入軌</h2>
+<p>有多個輸出的樂器外掛，可以讓每個輸出在自己的混音器插入軌上播放。在外掛視窗中點擊 <code>封裝器設定</code>，再點 <code>處理</code> 分頁。在 <code>連接</code> 下，每個輸出有一個開關燈號和一個數字：它在通道自己的插入軌之後第幾個插入軌上播放。<code>自動對應輸出</code> 會讓每個輸出使用下一個插入軌，<code>重設</code> 則回到預設值。</p>
+<h2 id="the-plugin-database-folder">外掛資料庫資料夾</h2>
+<p><a href="/wiki/browser/">瀏覽器</a>的外掛資料庫、外掛選擇器和外掛選單中的資料夾，對應磁碟上的一個資料夾：文件資料夾中的 <code>LYNX/Plugin database</code>。要開啟它，在瀏覽器中對 <code>外掛資料庫</code> 按右鍵並選擇 <code>開啟</code>。</p>
+<ul><li><code>效果器</code> 和 <code>產生器</code> 中每個外掛有一個 <code>.lynxplugin</code> 檔案。可以建立資料夾和子資料夾（最多 4 層），再把檔案移進去。</li><li>重新命名檔案，就會改變外掛在選單中的名稱。刪除檔案，就會把外掛從選單中拿掉，但不會解除安裝。</li><li><code>已安裝</code> 裡有每個外掛的項目。把其中一個複製到 <code>效果器</code> 或 <code>產生器</code>，就能把外掛找回來。</li></ul>
+<h2 id="open-a-project-without-its-plugins">不載入外掛開啟專案</h2>
+<p><code>檔案 › 不載入第三方外掛開啟...</code> 會在關閉所有第三方外掛的情況下開啟 LYNX SHARE 專案，適用於無法開啟或載入時當掉的專案。外掛已儲存的設定會保留。<code>檔案 › 重新開啟外掛...</code> 會再把它們開啟。</p>
+<h2 id="when-a-plugin-is-not-installed">外掛未安裝時</h2>
+<p>LYNX SHARE 會先依識別碼尋找同一個外掛，再依檔案，最後依名稱。以 VST2 儲存的專案，可以用同一產品的 VST3 開啟，反之亦然，但這時外掛會以預設設定播放。</p>
+<p>如果效果器完全沒有安裝，會由角色相同的 LYNX SHARE 效果器接手它的插槽，原外掛則保留在專案中。在能讀取外掛已儲存設定的情況下，替代的效果器會以相符的設定開始。開關是 <code>選項 › 一般設定...</code> 中的 <code>用LYNX SHARE對應外掛替代缺失的外掛</code>。見<a href="/wiki/built-in/">內建樂器與效果器</a>。<code>說明 › 缺失的檔案...</code> 會列出被取代的外掛。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>被代管外掛的視窗有預設集列：外掛自己的程式、你的預設集、<code>儲存預設集...</code>、<code>載入預設集檔案...</code> 和 <code>匯出預設集檔案...</code>。<code>.fxp</code>、<code>.fxb</code> 和 <code>.vstpreset</code> 檔案只能載入在 LYNX SHARE 內部執行的外掛，不能載入在獨立處理程序中執行的外掛。</li><li>監視器只在它的視窗開啟時才測量。</li><li>外掛視窗取得焦點時，外掛不使用的按鍵會彈奏打字鍵盤鋼琴。在 Windows 上，如果視窗標題列中的鍵盤按鈕是關閉的，LYNX SHARE 會先於外掛處理按鍵，包括快速鍵。</li><li>VST3 外掛自己的參數選單，開頭是 LYNX SHARE 的項目，例如 <code>建立自動化片段</code>。見<a href="/wiki/automation/">自動化</a>。</li><li>外掛 <code>封裝器設定</code> 中 <code>MIDI</code> 下的 <code>MPE</code>，會讓每個音符在自己的 MIDI 通道上送出。見 <a href="/wiki/midi-controllers/">MIDI 控制器</a>。</li><li>缺少的樂器目前不會被替代。缺少的樂器外掛會變成依通道名稱選出的內建合成器。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/built-in/">內建樂器與效果器</a></li><li><a href="/wiki/browser/">瀏覽器</a></li><li><a href="/wiki/mixer/">混音器</a></li><li><a href="/wiki/troubleshooting/">疑難排解</a></li></ul>

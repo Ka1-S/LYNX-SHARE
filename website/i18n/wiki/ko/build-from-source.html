@@ -1,0 +1,36 @@
+<p>LYNX SHARE는 JUCE 8을 쓴 C++20으로 작성했고 CMake로 빌드합니다. 소스는 <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a>에 GNU Affero General Public License v3.0으로 공개되어 있습니다. 릴리스 파일은 태그가 붙은 소스를 GitHub Actions로 빌드한 것이므로, 코드를 수정하거나 직접 빌드할 때만 이 페이지가 필요합니다.</p>
+<h2 id="build-on-linux">Linux에서 빌드</h2>
+<ol><li>아래에 나온 의존성을 설치합니다.</li><li><code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code>로 소스를 받고 <code>lynx</code> 폴더로 이동합니다.</li><li><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code>로 구성합니다.</li><li><code>cmake --build build</code>로 빌드합니다.</li></ol>
+<p>Ubuntu 24.04의 의존성은 다음과 같습니다.</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">Windows에서 Visual Studio로 빌드</h2>
+<p>&quot;C++를 사용한 데스크톱 개발&quot;이 포함된 Visual Studio 2022 Build Tools, CMake 3.22 이상, Git이 필요합니다.</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">WSL이나 Linux에서 Windows용으로 빌드</h2>
+<p>프로젝트 자체가 이 방식으로 개발됩니다. Visual Studio 없이 Zig로 Windows 프로그램을 크로스 컴파일합니다.</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>결과물은 <code>build-win/LYNX.exe</code>입니다.</p>
+<div class="tablewrap"><table><thead><tr><th>요구 사항</th><th>버전</th><th>기본 위치</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE는 다음 명령으로 받을 수 있습니다.</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>경로가 다르면 환경 변수 <code>ZIG</code>와 <code>JUCE_DIR</code>을 설정합니다.</p>
+<h2 id="build-on-macos">macOS에서 빌드</h2>
+<p>Xcode 명령줄 도구(<code>xcode-select --install</code>), CMake, Ninja가 필요합니다. 예를 들어 <code>brew install cmake ninja</code>로 설치할 수 있습니다.</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code>는 유니버설 앱을 만듭니다. 현재 Mac용으로만 빌드하려면 빼세요.</p>
+<h2 id="run-the-core-tests">코어 테스트 실행</h2>
+<p>코어(모델, 시퀀서, 악기, 이펙트, <code>.flp</code> 가져오기)는 순수 C++이며, C++20 컴파일러만 있으면 JUCE 없이 테스트할 수 있습니다.</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>실행은 <code>N checks, 0 failures</code>로 끝나야 합니다. FL Studio 2026이 설치된 곳의 <code>Data</code> 폴더를 주면 FL Studio에 포함된 <code>.flp</code> 프로젝트도 파싱합니다. 이 스크립트는 작은 도구 두 개도 빌드합니다. <code>.flp</code>를 덤프하는 <code>build-local/flpdump</code>와 <code>build-local/renderwav</code>입니다.</p>
+<p>빌드한 뒤에는 오디오 장치 없이도 프로그램이 스스로 점검할 수 있습니다.</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>보고서는 <code>result=OK</code>로 끝납니다. 더 많은 옵션은 <a href="/wiki/command-line/">명령줄</a> 페이지에 있습니다.</p>
+<h2 id="the-source-tree">소스 트리</h2>
+<div class="tablewrap"><table><thead><tr><th>폴더</th><th>내용</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>모델, 시퀀서, 악기, 이펙트, <code>.flp</code> 가져오기. JUCE 없이 테스트할 수 있는 순수 C++</td></tr><tr><td><code>src/flp/</code></td><td><code>.flp</code> 형식 리더</td></tr><tr><td><code>src/engine/</code></td><td>오디오 엔진: 장치, 그래프, 샘플, 플러그인, 프로젝트 파일</td></tr><tr><td><code>src/ui/</code></td><td>인터페이스: 채널 랙, 피아노 롤, 플레이리스트, 믹서, 창</td></tr><tr><td><code>third_party/</code></td><td>CLAP과 WavPack 디코더</td></tr><tr><td><code>tests/</code></td><td>코어 테스트</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>아키텍처, 현황, 로드맵, FL Studio 동작 분석</td></tr></tbody></table></div>
+<h2 id="good-to-know">알아 두기</h2>
+<ul><li>JUCE 8은 MinGW를 공식 지원하지 않습니다. Zig 빌드 스크립트가 그 차이를 우회합니다. 수정 사항은 <code>cmake/mingw/</code>와 <code>src/platform/MingwFixes.cpp</code>에 있습니다.</li><li><code>build-windows-zig.sh</code>는 한 번에 하나만 실행하세요. Zig 빌드를 동시에 두 개 돌리면 멈출 수 있습니다. 별도의 워크트리에서 병렬로 빌드하려면 <code>ZIG_GLOBAL_CACHE_DIR</code>과 <code>ZIG_LOCAL_CACHE_DIR</code>로 각각 자체 캐시를 지정합니다.</li><li>일부 엔진은 내장 사운드와 테이블을 사용자의 FL Studio 설치에서 읽습니다. 저장소에는 FL Studio의 것이 하나도 들어 있지 않습니다.</li><li><code>docs/</code>의 문서 일부는 아직 포르투갈어로 되어 있으며, 번역 중입니다.</li><li>수정한 버전을 배포하면 네트워크 서비스로 제공하는 경우에도, 라이선스에 따라 같은 라이선스로 그 소스를 공개해야 합니다.</li></ul>
+<h2 id="related">관련 문서</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">전체 개발 환경(SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">Linux에서의 LYNX SHARE(LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">저장소와 README</a></li><li><a href="/wiki/command-line/">명령줄</a></li><li><a href="/wiki/file-formats/">파일 형식</a></li></ul>

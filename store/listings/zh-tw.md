@@ -8,34 +8,35 @@ LYNX SHARE
 
 ## Short description
 
-免費開源的 DAW，採用以 Pattern 為基礎的工作流程：Channel Rack、Piano Roll、Playlist 與 Mixer 一應俱全，還能開啟 .flp 專案。
+免費開源的DAW，提供模式與片段啟動工作流程：Channel Rack、Piano Roll、Playlist、Mixer和片段格線。可開啟.flp、.als和.flm專案。
 
 ## Description
 
-LYNX SHARE是一款免費開源的數位音訊工作站（DAW），讓你做 Beat、寫歌。它採用 Beatmaker 們最愛的 Pattern 式工作流程——步進音序器式的 Channel Rack、Pattern、Piano Roll、支援編曲段落的 Playlist，以及具備 Insert、Send 與側鏈的 Mixer——並且在任何電腦上都能保持輕巧流暢。
+LYNX SHARE是一款免費開源的數位音訊工作站，用來製作節拍和歌曲。它把兩種工作方式結合在一起：預設的FL Studio風格模式工作流程（帶步進音序器的Channel Rack、模式、Piano Roll、帶編曲的Playlist，以及帶插入、傳送和側鏈的Mixer），以及只需切換一個設定的、帶場景的Ableton Live風格片段格線。它在任何PC上都能保持輕快。
 
 • 輕巧：無鎖音訊引擎將軌道與混音軌分散到所有 CPU 核心，自動略過閒置的軌道，長音訊則直接從硬碟串流讀取。
 • 完整：超過 100 款內建樂器與效果器——合成器、鼓機、取樣器、EQ、壓縮器、限幅器、殘響、延遲、音準修正、視覺化工具等等。
 • 你的外掛：支援 VST3、CLAP 與 VST2 樂器和效果器，每個外掛都可選擇在獨立的沙箱程序中執行，外掛當掉也不會拖垮整個工作階段。
-• 可開啟 FL Studio 專案（.flp），保留其中的 Pattern、音符、混音器、自動化與取樣，並可匯入 MIDI 檔案。
+• 你的專案：開啟FL Studio專案（.flp），包括模式、音符、混音器、自動化和取樣；開啟並儲存Ableton Live 11/12組合（.als），包括Session片段；可匯出.flp回到FL Studio；可匯入FL Studio Mobile專案（.flm，部分支援）和MIDI檔案。
+• 輕鬆上手：簡易工作流程給初學者一個包含音軌和時間軸的視窗、起手節奏，以及一鍵就能演奏的樂器。
 • 低延遲：支援 ASIO（包括適用於任何裝置的 LYNX SHARE 自家 ASIO 驅動程式）以及 WASAPI 共用與獨占模式。
 • 錄製音訊與 MIDI、編輯音訊、自動化任何參數，輸出為 WAV、FLAC、MP3、OGG 或分軌（stems）。
 • 介面語言：繁體中文、簡體中文、英文、葡萄牙文、西班牙文、法文、德文、日文、韓文等 15 種語言。
 
 不需帳號、沒有訂閱、沒有廣告，也沒有遙測。LYNX SHARE 是自由軟體（GNU AGPL-3.0），原始碼公開於 GitHub。
 
-LYNX SHARE 是獨立專案，與 Image-Line 沒有任何關聯，也未獲得其認可。FL Studio 是 Image-Line Software 的商標。其他產品名稱均為其各自所有者的商標。
+LYNX SHARE是獨立專案，與Image-Line或Ableton無關聯，也未獲其認可。FL Studio和FL Studio Mobile是Image-Line Software的商標；Ableton和Live是Ableton AG的商標。其他產品名稱是其各自所有者的商標。
 
 LYNX SHARE 目前為 Alpha 版：難免有不夠完善之處，遇到問題請到 GitHub 回報。
 
 ## What's new
 
-LYNX SHARE 0.1.20：首次登上 Microsoft Store。Fruity WaveShaper 與自動化片段支援 FL 風格的節點編輯，新增五款與 FL 逐位元一致的 FL 效果器，Dashboard 控制項可傳送 MIDI，另有大量修正。
+LYNX SHARE 0.1.26：給初學者的簡易工作流程；片段格線的片段檢視、機架和音符機率；Slicex 和 FPC 樂器；帶有樂器、效果器和自動化的 FL Studio Mobile 專案；通道的凍結；停靠的外掛視窗；MIDI 控制器設定檔和第一階段的 MPE；在線上工作階段中共用外掛；以及許多修正。
 
 ## Features
 
-1. Pattern 式工作流程：步進音序器 Channel Rack、Piano Roll、支援編曲段落的 Playlist 與完整的 Mixer
-2. 可開啟 FL Studio 專案（.flp）與 MIDI 檔案
+1. 三種工作流程：預設以模式為基礎（Channel Rack、Piano Roll、Playlist、Mixer），或帶場景的片段格線，或給初學者的簡易工作流程
+2. 開啟FL Studio（.flp）、Ableton Live（.als）和FL Studio Mobile（.flm）專案及MIDI檔案；儲存為.als和.flp
 3. 超過 100 款內建樂器與效果器
 4. 支援 VST3、CLAP 與 VST2 外掛，可選擇在獨立程序中以沙箱執行
 5. 低延遲音訊：ASIO、WASAPI 共用與獨占模式

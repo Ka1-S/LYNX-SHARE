@@ -1,0 +1,36 @@
+<figure><a class="shot" href="/assets/img/wiki/settings-midi.webp"><img src="/assets/img/wiki/settings-midi.webp" alt="设置中的 MIDI 页面：输入设备、带主同步的输出设备，以及外部同步" loading="lazy" width="680" height="620"></a></figure>
+<p>LYNX SHARE 可以接收来自任何 MIDI 输入设备的音符和控制器动作。设备在设置的 MIDI 页面中配置：<code>选项 › MIDI设置...</code>，或按 <code>F10</code>。没有硬件时，电脑键盘和触摸键盘也可以演奏音符。</p>
+<h2 id="connect-a-keyboard">连接键盘</h2>
+<ol><li>插上键盘，打开 <code>选项 › MIDI设置...</code>（<code>F10</code>）。</li><li>在 <code>输入设备</code> 下找到它并勾选。如果列表里没有，点击 <code>刷新设备列表</code>。</li><li>让两个下拉框保持为 <code>任意MIDI通道</code> 和 <code>演奏所选通道</code>。</li><li>关闭设置，在<a href="/wiki/channel-rack/">通道机架</a>中选择一个通道。</li><li>演奏。所选通道会发声。</li></ol>
+<h2 id="input-devices">输入设备</h2>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td>勾选框</td><td>打开或关闭该设备</td></tr><tr><td><code>任意MIDI通道</code></td><td>监听所有 MIDI 通道，或只监听一个通道。<code>MPE 控制器</code> 在这个列表的末尾</td></tr><tr><td><code>演奏所选通道</code></td><td>音符发往通道机架中所选的通道，或始终发往一个固定的通道</td></tr><tr><td><code>力度</code></td><td><code>按演奏</code>、<code>轻（轻弹也更响）</code>、<code>重（需要更用力弹奏）</code> 或 <code>固定（每个音符都是满力度）</code></td></tr><tr><td><code>表演模式通道</code></td><td>表演模式开启时，这个 MIDI 通道上的音符会启动播放列表片段</td></tr><tr><td><code>歌曲标记跳转</code></td><td>这个 MIDI 通道上的音符会让歌曲跳转到某个标记，而不是发声</td></tr><tr><td><code>控制器类型</code></td><td><code>自动检测</code>、<code>通用控制器</code> 或某个控制器配置文件</td></tr><tr><td><code>踏板控制音符释放</code></td><td>默认开启。延音踏板 (CC 64) 或持音踏板 (CC 66) 会保持音符。关闭后，踏板作为控制器发送给插件</td></tr></tbody></table></div>
+<h2 id="link-a-knob-to-a-control">把旋钮关联到控件</h2>
+<ol><li>在 LYNX SHARE 中右键单击旋钮或推子。</li><li>选择 <code>关联到MIDI控制器（转动控制器上的旋钮）</code>。</li><li>转动硬件上的旋钮或推子。关联就建立了。</li></ol>
+<p>关联会随工程一起保存。要移除它，再次右键单击该控件并选择 <code>取消关联控制器</code>。菜单项会显示正在使用的 CC 编号。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>Override global link...</code></td><td>无</td><td>建立一个在所有工程中都有效的关联。它保存在设置中，而不是工程中</td></tr><tr><td><code>移除全局关联</code></td><td>无</td><td>再把它移除</td></tr><tr><td><code>多重链接到控制器</code></td><td><code>Ctrl+J</code></td><td>开启后，你移动的控件会依次与你接下来移动的硬件控件建立关联。它位于 <code>选项</code> 菜单中</td></tr><tr><td><code>拾取（接管模式）</code></td><td>无</td><td>位于 MIDI 页面。控制器只有在到达参数当前值之后才会移动该参数，所以不会突变</td></tr></tbody></table></div>
+<p>MIDI 页面在 <code>关联（此工程，然后全局）</code> 下列出这些关联。<code>控制器类型</code> 为 <code>通用控制器</code> 的设备只会执行你手动关联的内容。</p>
+<p>第三方插件的参数可通过通道菜单或效果器插槽菜单中的 <code>自动化插件参数</code> 访问。那里的每个参数都有同样的关联菜单项。见<a href="/wiki/automation/">自动化</a>。</p>
+<h2 id="controller-profiles">控制器配置文件</h2>
+<p>控制器配置文件会设置好设备的走带按钮、推子、旋钮、打击垫、指示灯和显示屏，无需手动关联。</p>
+<ol><li>打开 <code>选项 › MIDI设置...</code> (<code>F10</code>)，并在 <code>输入设备</code> 下勾选该设备。</li><li>让它的 <code>控制器类型</code> 保持为 <code>自动检测</code>。括号中的名称是根据设备端口名称找到的配置文件。</li><li>如果显示 <code>通用控制器</code>，请自己从列表中选择配置文件。</li><li>阅读框旁边的那一行。<code>Feedback to</code> 给出接收指示灯、电动推子和显示文字的输出端口。</li></ol>
+<div class="tablewrap"><table><thead><tr><th>配置文件</th><th>映射的内容</th></tr></thead><tbody><tr><td><code>Mackie Control Universal</code></td><td>推子对应插入轨的音量和 Master。V-Pot 对应声像、所选通道插件的参数或通道机架的音量。每条通道带有录音待命、独奏、静音和选择，另有推子组切换、播放、停止、录制、倒带、快进、Pattern 或 Song 模式、节拍器、撤销和滚轮。显示屏显示名称和数值</td></tr><tr><td><code>Mackie Control Extender (XT)</code></td><td>对另外 8 条通道带做同样的事。这些设备共用一个组，顺序按 <code>输入设备</code> 列表的顺序</td></tr><tr><td><code>Novation Launchkey MK3 (DAW mode)</code></td><td>旋钮对应声像、音量或插件参数，推子对应音量，推子按钮选择一个插入轨。有切换组、播放、停止、录制、循环、节拍器和撤销按钮。Session 打击垫是所选通道的 16 步。请在键盘的第二个端口上使用</td></tr><tr><td><code>Akai APC Key 25 mk2</code></td><td>旋钮对应音量、声像或插件参数。上面两排打击垫是所选通道的 16 步，下面三排弹奏音符。Track 按钮选择一个插入轨。有停止、播放和录制。请在第二个端口上使用</td></tr><tr><td><code>Arturia KeyLab Essential mk3 (Mackie Control port)</code></td><td>Mackie Control 映射，在键盘的 MCU/HUI 端口上</td></tr><tr><td><code>Korg nanoKONTROL2 (Mackie Control mode)</code></td><td>Mackie Control 映射。它不会被自动检测：请让设备以 Mackie Control 模式启动，并手动选择此类型</td></tr></tbody></table></div>
+<p>发送位置的旋钮和推子使用软接管：只有到达控件的值之后，它们才会移动该控件。你手动关联的控件保持原有关联。<code>控制器配置文件文件夹</code> 会打开存放你自己配置文件 (<code>*.lynxctl</code>) 的文件夹，<code>刷新设备列表</code> 会重新读取它们。</p>
+<p>内置配置文件是根据各厂商的文档编写的。它们还没有在硬件上试过。</p>
+<h2 id="mpe-controllers">MPE 控制器</h2>
+<p>MPE 处于初级阶段。MPE 控制器弹奏的每个音符都有自己的弯音、音色 (CC 74) 和压力。</p>
+<ol><li>在 MIDI 页面中，打开设备上显示 <code>任意MIDI通道</code> 的框，并选择 <code>MPE 控制器</code>。</li><li>在旁边出现的框中选择成员通道，从 <code>通道 2</code> 到 <code>Channels 2-16</code>。</li><li>开始弹奏。录制方法见<a href="/wiki/recording/">录制</a>。</li></ol>
+<ul><li>录制的音符对每一项只保留一个值：弯音保存为微调音高，音色保存为 Mod X，最强的压力保存为 Mod Y。它不是曲线。</li><li>内置乐器中，Sampler 和内置合成器会跟随这些值。</li><li>当插件窗口 <code>封装器设置</code> 中 <code>MIDI</code> 下的 <code>MPE</code> 开启时，第三方插件会收到 MPE。这时每个音符都在自己的 MIDI 通道上发出，通道为 2 到 16。</li><li>还没有用真实的 MPE 控制器试过。</li></ul>
+<h2 id="the-typing-keyboard">电脑键盘</h2>
+<p><code>Ctrl+T</code> 或 <code>选项 › 电脑键盘当钢琴</code> 会把电脑键盘变成钢琴。从 <code>Z</code> 到 <code>M</code> 以及从 <code>Q</code> 到 <code>P</code> 的两排键会演奏所选通道。</p>
+<ul><li>开启时，字母键和数字键都是音符。钢琴卷帘和播放列表中的单字母工具键只有在它关闭时才有效。</li><li>它始终以钢琴卷帘的力度演奏。MIDI 页面上的 <code>力度</code> 设置是给 MIDI 设备用的。</li><li>同样的开关也在 <code>选项 › 常规设置...</code> 中。</li></ul>
+<h2 id="the-touch-keyboard">触摸键盘</h2>
+<figure><a class="shot" href="/assets/img/wiki/touch-keyboard.webp"><img src="/assets/img/wiki/touch-keyboard.webp" alt="触摸键盘：八度按钮、琴键大小、力度模式，以及从 C4 开始的一排钢琴键" loading="lazy" width="820" height="210"></a></figure>
+<p><code>视图 › 触摸键盘</code>（<code>Alt+F7</code>）会打开一个用鼠标或触摸屏演奏的钢琴。它演奏通道机架中所选的通道，并在右侧显示该通道的名称。</p>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>-</code> 和 <code>+</code></td><td>降低或升高一个八度</td></tr><tr><td>琴键大小</td><td><code>小琴键</code>、<code>中琴键</code> 或 <code>大琴键</code></td></tr><tr><td><code>力度：按触摸位置</code></td><td>点在琴键靠上的位置声音轻，靠下的位置声音响</td></tr><tr><td><code>力度：固定</code></td><td>每个音符都使用滑块设定的力度</td></tr><tr><td><code>音名</code></td><td>在琴键上显示音名</td></tr></tbody></table></div>
+<h2 id="midi-sync">MIDI 同步</h2>
+<p>MIDI 页面上的 <code>输出设备</code> 会把走带发送给硬件和其他软件。为某个设备勾选 <code>发送主同步</code>，然后选择 <code>MIDI时钟</code>（含 Start、Continue、Stop 和 Song Position Pointer）或 MIDI Time Code。<code>偏移 (ms)</code> 为正值时延后发送同步，为负值时提前发送。<code>发送全部音符关闭</code> 会在初始化时和导出之后向设备发送该消息。</p>
+<p><code>外部时钟同步</code> 则反过来：LYNX SHARE 跟随你所选输入的 MIDI 时钟，包括其速度、Start、Continue、Stop 和 Song Position Pointer。<code>外部同步偏移（毫秒）</code> 为正值时让 LYNX SHARE 延后播放，为负值时提前播放。<code>状态</code> 会显示时钟是否在运行。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>为 <code>外部时钟同步</code> 选择一个输入，会在 <code>输入设备</code> 下打开该设备。</li><li>由关联的 MIDI 控制器移动的速度不会调整音频片段的大小。请直接输入或设定最终速度。</li><li>要录下你的演奏，见<a href="/wiki/recording/">录音</a>。传入的音符可以在<a href="/wiki/piano-roll/">钢琴卷帘</a>中吸附到某个音阶。</li><li>发送给插件的 MIDI CC、通道触后和弯音可以用 <code>自动化MIDI控制器（CC、触后、弯音）</code> 进行自动化。</li><li>被踏板保持的音符会一直录到踏板抬起的那一刻。</li><li>当你从控制器移动某个控件时，自动化片段不会把该控件收回。下次开始播放时，该控件会重新跟随它的自动化。</li></ul>
+<h2 id="related">相关页面</h2>
+<ul><li><a href="/wiki/recording/">录音</a></li><li><a href="/wiki/automation/">自动化</a></li><li><a href="/wiki/channel-rack/">通道机架</a></li><li><a href="/wiki/settings/">设置</a></li><li><a href="/wiki/shortcuts/">快捷键</a></li></ul>

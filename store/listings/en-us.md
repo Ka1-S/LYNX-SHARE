@@ -12,14 +12,14 @@ LYNX SHARE
 
 ## Short description
 
-Free, open-source DAW with a pattern-based workflow: Channel Rack, Piano Roll, Playlist and Mixer. Opens .flp projects.
+Free, open-source DAW with pattern and clip-launch workflows: Channel Rack, Piano Roll, Playlist, Mixer and a clip grid. Opens .flp, .als and .flm projects.
 
 ## Description
 
-LYNX SHARE is a free, open-source digital audio workstation for making beats and songs. It
-follows the pattern-based workflow loved by beatmakers — a step-sequencer Channel Rack, patterns, a Piano Roll, a
-Playlist with arrangements and a Mixer with inserts, sends and sidechain — and it is built to stay light and fast on
-any PC.
+LYNX SHARE is a free, open-source digital audio workstation for making beats and songs. It brings two ways of working
+together: an FL Studio-style pattern workflow (a step-sequencer Channel Rack, patterns, a Piano Roll, a Playlist with
+arrangements and a Mixer with inserts, sends and sidechain), which is the default, and an Ableton Live-style clip grid
+with scenes, one switch away. It is built to stay light and fast on any PC.
 
 • Lightweight: a lock-free audio engine that spreads channels and mixer tracks across your CPU cores, skips idle
 channels and streams long audio from disk.
@@ -27,7 +27,11 @@ channels and streams long audio from disk.
 limiters, reverbs, delays, pitch correction, visualizers and more.
 • Your plugins: hosts VST3, CLAP and VST2 instruments and effects, each optionally in its own sandbox process so a
 crashing plugin cannot take your session down.
-• Opens FL Studio projects (.flp) with their patterns, notes, mixer, automation and samples, and imports MIDI files.
+• Your projects: opens FL Studio projects (.flp) with their patterns, notes, mixer, automation and samples; opens and
+saves Ableton Live 11/12 sets (.als), Session clips included; exports .flp back to FL Studio; imports FL Studio Mobile
+projects (.flm, partial) and MIDI files.
+• Easy start: a Simple workflow gives beginners one window with the tracks and the timeline, starter beats and
+instruments that play in one click.
 • Low latency: ASIO (including LYNX SHARE's own ASIO driver for any device), WASAPI shared and exclusive modes.
 • Record audio and MIDI, edit audio, automate anything, render to WAV, FLAC, MP3, OGG or stems.
 • Interface in 15 languages: English, Portuguese (Brazil), Spanish, French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian, Japanese, Korean and Chinese (Simplified and Traditional).
@@ -35,20 +39,22 @@ crashing plugin cannot take your session down.
 No account, no subscription, no ads and no telemetry. LYNX SHARE is free software (GNU AGPL-3.0); the source code is on
 GitHub.
 
-LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line. FL Studio is a trademark of Image-Line
-Software. Other product names are trademarks of their respective owners.
+LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line or Ableton. FL Studio and FL
+Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG. Other product
+names are trademarks of their respective owners.
 
 LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub.
 
 ## What's new
 
-LYNX SHARE 0.1.20: first release on the Microsoft Store. FL-style point editing for Fruity WaveShaper and automation clips,
-five more FL effects bit-identical to FL, Dashboard controls that send MIDI, and many fixes.
+LYNX SHARE 0.1.26: a Simple workflow for beginners; a Clip View, racks and note chance for the clip grid; Slicex and
+FPC instruments; FL Studio Mobile projects with instruments, effects and automation; Freeze for channels; docked
+plugin windows; MIDI controller profiles and a first stage of MPE; plugins shared in online sessions; and many fixes.
 
 ## Features
 
-1. Pattern-based workflow: Channel Rack step sequencer, Piano Roll, Playlist with arrangements and a full Mixer
-2. Opens FL Studio projects (.flp) and MIDI files
+1. Three workflows: pattern-based (Channel Rack, Piano Roll, Playlist, Mixer) by default, a clip grid with scenes, or a Simple workflow for beginners
+2. Opens FL Studio (.flp), Ableton Live (.als) and FL Studio Mobile (.flm) projects and MIDI files; saves .als and .flp
 3. 100+ built-in instruments and effects
 4. Hosts VST3, CLAP and VST2 plugins, optionally sandboxed in their own process
 5. Low-latency audio: ASIO, WASAPI shared and exclusive

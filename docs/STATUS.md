@@ -203,17 +203,22 @@ Core Audio / ALSA + JACK (PipeWire).
 - Import and export (`docs/analise/ALS_FORMAT.md`): MIDI / audio / group / return tracks, clips and notes, warp
   markers and modes, mixer and sends with their automation, tempo, time signature, locators; Session clips and scenes
   ↔ the clip grid (launch settings, follow actions, stop buttons).
-- Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler / Drum Rack / Instrument Rack
-  import as the closest LYNX instrument; other Live devices are listed in the report. LYNX's own instruments and
+- Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler / Drum Rack import as the
+  closest LYNX instrument; other Live devices are listed in the report. LYNX's own instruments and
   effects are not converted in exported sets yet (listed in the export report).
-- In progress for 0.1.26: racks (chains, zones, macros), note chance and velocity range in `.als`.
+- Since 0.1.26: Instrument and Audio Effect Racks (chains, zones, macros) both ways; MIDI Effect Racks are written
+  on export only (Live's own are listed as unsupported on import); note chance,
+  velocity range and probability groups, the project key as Live's Scale Mode, and Live 12's MIDI Transformations in
+  the Clip View. A Clip View and Device View are part of the Clip-launch workflow.
 
 ### FL Studio Mobile import (`.flm`, partial)
 - `docs/analise/FLM_FORMAT.md`: tempo, time signature, title; note, drum and audio lanes → patterns, clips and audio
   clips; samples (the project's folder and FL Studio's copy of the app's resources), drum kits, DirectWave
   single-sample programs; rack level, pan and routes on the mixer inserts.
-- In progress for 0.1.26: mute / solo, automation lanes and the main effects (EQ, Filter, Autoduck, reverbs). Other
-  instruments play LYNX's built-in synth for now; what is not converted is listed in the import report.
+- Since 0.1.26: MiniSynth, Transistor Bass, 3x Osc and GMSynth channels on LYNX's engines; FL Studio Mobile's effects
+  as the Pocket effects, with their automation; rack mute / solo, level, pan, pitch bend and send automation as
+  automation clips; note pan, drum note pitch, repeats and slides. Other instruments play LYNX's built-in synth for
+  now; what is not converted is listed in the import report.
 
 ## Confirmed vs approximated (FL import)
 

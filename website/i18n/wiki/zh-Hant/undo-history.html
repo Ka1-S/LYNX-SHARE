@@ -1,0 +1,25 @@
+<figure><a class="shot" href="/assets/img/wiki/history.webp"><img src="/assets/img/wiki/history.webp" alt="復原記錄視窗：從 Start 到 Add notes 共六個步驟，目前的是 Mute: Kick" loading="lazy" width="340" height="420"></a></figure>
+<p>對專案所做的每個編輯都是復原歷程中的一個步驟：新增的音符、移動的片段、推桿、路由變更、速度。<code>編輯 › 復原記錄...</code>（<code>Ctrl+Alt+H</code>）會把這些步驟顯示成清單。另外，LYNX SHARE 在你工作時也會儲存專案的備份副本。</p>
+<h2 id="go-back-to-an-earlier-step">回到較早的步驟</h2>
+<ol><li>選擇 <code>編輯 › 復原記錄...</code>，或按 <code>Ctrl+Alt+H</code>。</li><li>清單顯示各個步驟，最新的在底部。第一列 <code>起點</code> 是專案剛開啟時的樣子。</li><li>點擊一個步驟。專案會回到該步驟剛完成時的狀態，之後的步驟會變成灰色。</li><li>點擊灰色的步驟可以再往前走。</li><li>進行新的編輯，就會從你選擇的步驟繼續。灰色的步驟隨即消失。</li></ol>
+<h2 id="the-undo-keys">復原按鍵</h2>
+<p><code>Ctrl+Z</code> 的運作方式和多數程式不同。它會復原上一個步驟，再按一次則是重做，所以它在最近的兩個狀態之間切換。要繼續往更早的狀態走，請用 <code>Ctrl+Alt+Z</code>。</p>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td><code>復原</code></td><td><code>Ctrl+Z</code></td><td>復原上一個步驟。復原之後再按，則重做下一個步驟，選單項目會顯示為 <code>復原 (重做)</code></td></tr><tr><td><code>向後復原</code></td><td><code>Ctrl+Alt+Z</code></td><td>一律往回走，每按一次一個步驟</td></tr><tr><td><code>重做</code></td><td><code>Ctrl+Y</code> 或 <code>Ctrl+Shift+Z</code></td><td>往前走</td></tr><tr><td><code>復原記錄...</code></td><td><code>Ctrl+Alt+H</code></td><td>開啟清單</td></tr></tbody></table></div>
+<p>每次復原或重做之後，提示列會顯示步驟的名稱和層級，例如 <code>Level 2/3</code>。</p>
+<p>如果你比較喜歡一般的行為，請在 <code>選項 › 一般設定...</code> 中開啟 <code>替代復原模式 (傳統復原，而非在同一快速鍵上復原/重做)</code>。這樣 <code>Ctrl+Z</code> 就一律往回走。</p>
+<h2 id="what-is-a-step-and-what-is-not">什麼算是步驟，什麼不是</h2>
+<ul><li>對專案的編輯都是步驟：音符、樣式、片段、通道、混音器電平和路由、效果器、自動化、速度、靜音。</li><li>錄音是一個步驟。在<a href="/wiki/online-sessions/">線上協作</a>中合併一個部分是一個步驟，<code>用這些錄音合成</code> 也是。</li><li>不改變專案的事情不是步驟：縮放、捲動、移動視窗，以及程式自己的設定。</li><li>儲存和匯出不會被復原。它們寫出的檔案會保留。</li><li>LYNX SHARE 自己的外掛視窗，在 A 和 B 設定旁邊，有針對該外掛變更的獨立復原和重做。</li></ul>
+<h2 id="settings">設定</h2>
+<p>兩項都在 <code>選項 › 一般設定...</code> 中。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>最大復原次數</code></td><td>保留多少步驟：25、50、100、200、500 或 1000。預設為 100</td></tr><tr><td><code>替代復原模式</code></td><td>讓 <code>Ctrl+Z</code> 成為傳統的復原</td></tr></tbody></table></div>
+<h2 id="backups">備份</h2>
+<p>LYNX SHARE 預設每 2 分鐘儲存一次目前開啟專案的備份副本，每個專案保留最新的 10 份。備份是設定資料夾內 <code>autosave</code> 資料夾中的一般 <code>.lynx</code> 檔案，以專案名稱加上 <code>(autosaved on ...)</code> 以及日期和時間命名。</p>
+<p>每次你覆寫既有的專案檔案時，被取代的版本會複製到同一個資料夾，檔名中帶有 <code>(overwritten on ...)</code>。</p>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>作用</th></tr></thead><tbody><tr><td><code>檔案 › 恢復到上一個備份...</code></td><td>詢問之後，以最新的備份取代目前開啟的專案。專案檔案本身只有在你儲存時才會改變</td></tr><tr><td><code>檔案 › 開啟自動儲存資料夾</code></td><td>在檔案管理員中顯示備份</td></tr><tr><td><code>檔案 › 儲存新版本</code>（<code>Ctrl+Alt+S</code>）</td><td>在目前檔案旁邊儲存為 <code>Song_2</code>、<code>Song_3</code>，依此類推</td></tr></tbody></table></div>
+<p><code>選項 › 一般設定...</code> 的 <code>備份</code> 區塊有這些設定：</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>儲存備份副本</code></td><td><code>從不</code>，或以分鐘為單位的間隔</td></tr><tr><td><code>每個專案保留的備份數</code></td><td>1、3、5、10、20 或 50</td></tr><tr><td><code>歌曲播放或彈奏 MIDI 鍵盤時暫緩備份</code></td><td>暫緩備份，以免打斷你</td></tr><tr><td><code>備份之間的最長間隔</code></td><td>5 到 60 分鐘。即使你正在演奏，超過這段時間也會進行備份</td></tr></tbody></table></div>
+<p>如果上一次工作階段意外結束，下次啟動時會提示是否開啟該工作階段儲存的最新備份。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>歷程不會隨專案一起儲存。開啟專案或開始新專案會將它清空。</li><li>歷程滿了之後，最舊的步驟會被丟棄。</li><li>在即時線上工作階段中，復原和重做只會還原你自己的編輯，絕不會動到別人的。</li><li>即使 <code>儲存備份副本</code> 設為 <code>從不</code>，覆寫檔案時產生的副本仍會保留。</li><li>設定資料夾在 Windows 上是 <code>%APPDATA%\LYNX</code>，在 macOS 上是 <code>~/Library/Application Support/LYNX</code>，在 Linux 上是 <code>~/.config/LYNX</code>。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/shortcuts/">快速鍵</a></li><li><a href="/wiki/settings/">設定</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/troubleshooting/">疑難排解</a></li><li><a href="/why/#crash">只有 LYNX SHARE 能做到的事：當機防護</a></li></ul>

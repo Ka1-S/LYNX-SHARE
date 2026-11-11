@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="nojs" data-title="m.home.t" data-desc="m.home.d" data-dict="latest" data-home>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LYNX SHARE — a lightweight DAW with FL Studio-style patterns and Ableton Live-style clips</title>
-<meta name="description" id="mDesc" content="LYNX SHARE is a free, open-source, lightweight DAW for Windows, macOS and Linux. FL Studio-style patterns (Channel Rack, Piano Roll, Playlist, Mixer) and an Ableton Live-style clip grid in one app. Opens .flp, .als and .flm projects.">
-<meta property="og:title" id="mOgT" content="LYNX SHARE — a lightweight DAW with FL Studio-style patterns and Ableton Live-style clips">
-<meta property="og:description" id="mOgD" content="Free and open source. FL Studio-style patterns and Ableton Live-style clips in one lightweight DAW. Opens FL Studio and Ableton Live projects.">
+<title>LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects</title>
+<meta name="description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
+<meta property="og:title" content="LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects">
+<meta property="og:description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
 <meta property="og:site_name" content="LYNX SHARE">
 <meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
-<meta property="og:url" id="mOgU" content="https://lynx-share.com/">
-<meta property="og:locale" id="mOgL" content="en_US">
+<meta property="og:url" content="https://lynx-share.com/">
+<meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
 <meta property="og:locale:alternate" content="zh_TW">
 <meta property="og:locale:alternate" content="nl_NL">
@@ -25,7 +25,7 @@
 <meta property="og:locale:alternate" content="ru_RU">
 <meta property="og:locale:alternate" content="es_ES">
 <meta property="og:locale:alternate" content="tr_TR">
-<link rel="canonical" id="mCanon" href="https://lynx-share.com/">
+<link rel="canonical" href="https://lynx-share.com/">
 <link rel="alternate" hreflang="en" href="https://lynx-share.com/">
 <link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/?lang=zh-Hans">
 <link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/?lang=zh-Hant">
@@ -43,648 +43,134 @@
 <link rel="alternate" hreflang="tr" href="https://lynx-share.com/?lang=tr">
 <link rel="alternate" hreflang="x-default" href="https://lynx-share.com/">
 <script>
-/* language before first paint: ?lang= > saved choice > browser languages > English. The 15 interface languages of
-   LYNX SHARE (src/ui/I18n.cpp, same ids and names); English is inline, the others are i18n/<id>.json, loaded on demand. */
 (function(){
 var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
-// "pt", "pt_BR", "zh-TW", "zh-Hans-CN", "de-AT", "in" -> a language id, "" when not one of ours (same rules as src/ui/I18nLocale.h)
-var pick=window.LYNX_PICK=function(s){
+var pick=function(s){
   var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
   if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
   if(l==="pt")return"pt-BR";if(l==="in")return"id";
   for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
   return"";
 };
-var q=null,lang="",saved="";
+var q=null,lang="",saved="",h=document.documentElement;
 try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
 try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
 lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;
+window.LYNX_LANG=lang;window.LYNX_V="fa0c727b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
-var h=document.documentElement;h.lang=lang;h.dir="ltr";
-if(lang!=="en"){
-  h.className+=" i18n-wait";setTimeout(function(){h.classList.remove("i18n-wait");},2500);
-  window.LYNX_DICT={};window.LYNX_DICT[lang]=fetch("i18n/"+lang+".json?v=0.1.23").then(function(r){return r.json();});
-}
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
 })();
 </script>
 <meta name="theme-color" content="#0d0e12">
-<link rel="icon" href="assets/img/favicon.png?v=0.1.23">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#0d0e12; --bg2:#13141a; --panel:#181a21; --line:#262833; --text:#eceef3; --muted:#9aa0ad; --dim:#6b7080;
-  --red:#e5383b; --red2:#ff5a5f; --redglow:rgba(229,56,59,.45); --green:#3ddc84;
-  --radius:16px; --maxw:1180px;
-}
-:root{--sans:Inter,system-ui,sans-serif;--head:"Space Grotesk",Inter,system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
-/* CJK: the system's font for the language first, then Noto (fetched only for that language, only the glyphs used) */
-:root:lang(ja){--cjk:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,"Noto Sans JP"}
-:root:lang(ko){--cjk:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR"}
-:root:lang(zh-Hans){--cjk:"PingFang SC","Microsoft YaHei UI","Microsoft YaHei","Noto Sans SC"}
-:root:lang(zh-Hant){--cjk:"PingFang TC","Microsoft JhengHei UI","Microsoft JhengHei","Noto Sans TC"}
-:root:lang(ja),:root:lang(ko),:root:lang(zh){--sans:Inter,var(--cjk),sans-serif;--head:"Space Grotesk",Inter,var(--cjk),sans-serif;--mono:"JetBrains Mono",var(--cjk),monospace}
-:lang(ja),:lang(zh){line-break:strict}
-:lang(ko){word-break:keep-all}
-:lang(ja) .hero h1,:lang(ko) .hero h1,:lang(zh) .hero h1{max-width:12em;letter-spacing:0}
-html.i18n-wait body{visibility:hidden}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font:16px/1.6 var(--sans);overflow-x:hidden;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-img{max-width:100%;height:auto;display:block}
-h1,h2,h3{font-family:var(--head);line-height:1.1;letter-spacing:-.02em}
-.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
-::selection{background:var(--red);color:#fff}
-
-/* ---------- progress + nav ---------- */
-#progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--red),var(--red2));z-index:100;box-shadow:0 0 12px var(--redglow)}
-nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .3s,backdrop-filter .3s,border-color .3s;border-bottom:1px solid transparent}
-nav.scrolled{background:rgba(13,14,18,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-color:var(--line)}
-nav .wrap{display:flex;align-items:center;gap:28px;height:68px}
-.brand{display:flex;align-items:center;gap:10px;font-family:var(--head);font-weight:700;font-size:20px;letter-spacing:.06em}
-.brand img{width:34px;height:34px;border-radius:9px}
-.links{display:flex;gap:22px;margin-left:auto;font-size:14px;color:var(--muted)}
-.links a{position:relative;transition:color .2s}
-.links a:hover{color:var(--text)}
-.links a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:100%;background:var(--red);transform:scaleX(0);transform-origin:right;transition:transform .3s}
-.links a:hover::after{transform:scaleX(1);transform-origin:left}
-.navbtns{display:flex;gap:10px;align-items:center}
-.lang{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 26px 6px 9px;font:600 12px var(--sans);transition:.2s;white-space:nowrap}
-.lang svg{width:15px;height:15px;flex:none}
-.lang::after{content:"";position:absolute;right:10px;top:50%;width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-70%) rotate(45deg)}
-.lang:hover,.lang:focus-within{color:var(--text);border-color:var(--dim)}
-.lang:has(select:focus-visible){outline:2px solid var(--red2);outline-offset:2px}
-.lang select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font:16px var(--sans);color:#111;-webkit-appearance:none;appearance:none}
-.lang select option{color:#111;background:#fff}
-.btn{display:inline-flex;align-items:center;gap:10px;border-radius:12px;padding:12px 20px;font-weight:600;font-size:15px;cursor:pointer;border:0;transition:transform .2s,box-shadow .2s,background .2s;position:relative;overflow:hidden;white-space:nowrap}
-.btn svg{width:18px;height:18px;flex:none}
-.btn-red{background:linear-gradient(135deg,var(--red),#c1121f);color:#fff;box-shadow:0 8px 30px -8px var(--redglow)}
-.btn-red:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px var(--redglow)}
-.btn-red::before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);transform:translateX(-100%);animation:shine 3.5s infinite}
-@keyframes shine{0%,60%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-.btn-ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line)}
-.btn-ghost:hover{background:rgba(255,255,255,.09);transform:translateY(-2px)}
-.btn-sm{padding:8px 14px;font-size:13px;border-radius:10px}
-@media (max-width:860px){.links{display:none}.navbtns{margin-left:auto}}
-
-/* ---------- hero ---------- */
-.hero{position:relative;min-height:100vh;padding:140px 0 60px;overflow:hidden}
-#waves{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.aurora{position:absolute;inset:-20%;z-index:0;filter:blur(80px);opacity:.55;pointer-events:none}
-.aurora i{position:absolute;border-radius:50%;mix-blend-mode:screen;animation:float 18s ease-in-out infinite}
-.aurora i:nth-child(1){width:46vw;height:46vw;left:5%;top:0;background:radial-gradient(circle,#e5383b 0,transparent 65%)}
-.aurora i:nth-child(2){width:38vw;height:38vw;right:5%;top:10%;background:radial-gradient(circle,#7a1cac 0,transparent 65%);animation-delay:-6s;animation-duration:22s}
-.aurora i:nth-child(3){width:30vw;height:30vw;left:35%;top:30%;background:radial-gradient(circle,#ff7b00 0,transparent 65%);opacity:.5;animation-delay:-12s;animation-duration:26s}
-@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(6vw,4vh) scale(1.1)}66%{transform:translate(-4vw,-3vh) scale(.92)}}
-.grid-bg{position:absolute;inset:0;z-index:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 10%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 10%,transparent 70%);opacity:.35}
-.hero .wrap{position:relative;z-index:2;text-align:center}
-.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border:1px solid var(--line);border-radius:99px;background:rgba(24,26,33,.7);backdrop-filter:blur(6px);font-size:13px;color:var(--muted)}
-.pill b{background:var(--red);color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;letter-spacing:.05em;white-space:nowrap}
-.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(61,220,132,.6);animation:pulse 2s infinite}
-@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(61,220,132,0)}100%{box-shadow:0 0 0 0 rgba(61,220,132,0)}}
-.hero h1{font-size:clamp(44px,8vw,96px);margin:26px auto 18px;max-width:14ch;font-weight:700}
-.hero h1 .w{display:inline-block;opacity:0;transform:translateY(40px) rotate(4deg);filter:blur(8px);animation:wordIn .9s cubic-bezier(.2,.8,.2,1) forwards}
-@keyframes wordIn{to{opacity:1;transform:none;filter:none}}
-.grad{background:linear-gradient(100deg,#ff8a8c,var(--red) 40%,#ff9f1c 80%);-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:gradmove 6s linear infinite}
-@keyframes gradmove{to{background-position:200% 0}}
-.hero p.lead{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:640px;margin:0 auto 34px}
-.cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.meta{margin-top:16px;font-size:13px;color:var(--dim)}
-.fade-up{opacity:0;transform:translateY(20px);animation:fadeUp .9s cubic-bezier(.2,.8,.2,1) forwards}
-@keyframes fadeUp{to{opacity:1;transform:none}}
-
-.stage{perspective:1600px;margin-top:70px}
-.screen{position:relative;border-radius:14px;transform:rotateX(24deg) scale(.92);transform-origin:50% 0;transition:transform .1s linear;box-shadow:0 40px 120px -20px rgba(0,0,0,.8),0 0 0 1px var(--line),0 0 80px -10px var(--redglow);will-change:transform}
-.screen img{border-radius:14px;width:100%}
-.screen::after{content:"";position:absolute;inset:0;border-radius:14px;background:linear-gradient(180deg,transparent 55%,var(--bg) 100%);pointer-events:none}
-.screen .glare{position:absolute;inset:0;border-radius:14px;background:radial-gradient(600px circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.10),transparent 40%);pointer-events:none;z-index:2}
-
-/* ---------- marquee ---------- */
-.marquee{border-block:1px solid var(--line);background:var(--bg2);overflow:hidden;padding:18px 0;position:relative}
-.marquee::before,.marquee::after{content:"";position:absolute;top:0;bottom:0;width:120px;z-index:2}
-.marquee::before{left:0;background:linear-gradient(90deg,var(--bg2),transparent)}
-.marquee::after{right:0;background:linear-gradient(-90deg,var(--bg2),transparent)}
-.track{display:flex;gap:46px;width:max-content;animation:scroll 40s linear infinite;font-family:var(--head);font-size:18px;color:var(--muted);white-space:nowrap}
-.track span{display:flex;align-items:center;gap:46px}
-.track span::after{content:"✦";color:var(--red)}
-@keyframes scroll{to{transform:translateX(-50%)}}
-
-/* ---------- sections ---------- */
-section{padding:110px 0;position:relative}
-.eyebrow{font:500 13px var(--mono);color:var(--red2);letter-spacing:.14em;text-transform:uppercase}
-.sec-title{font-size:clamp(32px,4.6vw,54px);margin:12px 0 16px;max-width:18ch}
-.sec-lead{color:var(--muted);max-width:620px;font-size:18px}
-.sec-lead.grow{max-width:860px;margin:36px auto 0;text-align:center;font-size:16px}
-.reveal{opacity:0;transform:translateY(40px);transition:opacity .9s cubic-bezier(.2,.8,.2,1),transform .9s cubic-bezier(.2,.8,.2,1)}
-.reveal.in{opacity:1;transform:none}
-.reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}
-
-/* stats */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:56px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:26px 22px}
-.stat .n{font:700 clamp(32px,4vw,46px) var(--head);background:linear-gradient(180deg,#fff,#b9bcc6);-webkit-background-clip:text;background-clip:text;color:transparent}
-.stat .n em{font-style:normal;color:var(--red);-webkit-text-fill-color:var(--red)}
-.stat p{color:var(--muted);font-size:14px}
-@media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
-
-/* cards w/ spotlight */
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:56px}
-@media (max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.cards{grid-template-columns:1fr}}
-.card{position:relative;background:var(--panel);border-radius:var(--radius);padding:28px 24px;overflow:hidden;isolation:isolate;transition:transform .3s}
-.card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:radial-gradient(400px circle at var(--x,50%) var(--y,50%),var(--red2),var(--line) 40%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;z-index:-1}
-.card::after{content:"";position:absolute;inset:0;background:radial-gradient(300px circle at var(--x,50%) var(--y,50%),rgba(229,56,59,.12),transparent 60%);opacity:0;transition:opacity .3s;z-index:-1}
-.card:hover::after{opacity:1}
-.card:hover{transform:translateY(-4px)}
-.card .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:rgba(229,56,59,.12);color:var(--red2);margin-bottom:18px}
-.card .ic svg{width:24px;height:24px}
-.card h3{font-size:20px;margin-bottom:8px}
-.card p{color:var(--muted);font-size:15px}
-
-/* features alternating */
-.feat{display:grid;grid-template-columns:1fr 1.25fr;gap:64px;align-items:center;margin-top:110px}
-.feat.rev{grid-template-columns:1.25fr 1fr}
-.feat.rev .ftxt{order:2}
-@media (max-width:900px){.feat,.feat.rev{grid-template-columns:1fr;gap:30px}.feat.rev .ftxt{order:0}}
-.ftxt h3{font-size:clamp(28px,3.4vw,40px);margin:10px 0 14px}
-.ftxt p{color:var(--muted);font-size:17px}
-.ftxt ul{list-style:none;margin-top:20px;display:grid;gap:10px}
-.ftxt li{display:flex;gap:12px;color:#c9ccd4;font-size:15px}
-.ftxt li::before{content:"";flex:none;width:18px;height:18px;margin-top:3px;border-radius:6px;background:var(--red) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center/12px no-repeat}
-.shot{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.9),0 0 0 1px var(--line);transform-style:preserve-3d;transition:transform .25s ease-out;cursor:zoom-in}
-.shot img{width:100%;transition:transform .8s cubic-bezier(.2,.8,.2,1)}
-.shot:hover img{transform:scale(1.03)}
-.shot .glare{position:absolute;inset:0;background:radial-gradient(500px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.09),transparent 45%);opacity:0;transition:opacity .3s;pointer-events:none}
-.shot:hover .glare{opacity:1}
-
-/* ---------- step sequencer toy ---------- */
-.seq-box{margin-top:56px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:0 40px 100px -40px var(--redglow)}
-.seq-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px}
-.play{width:52px;height:52px;border-radius:50%;border:0;background:var(--red);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 0 0 0 var(--redglow);transition:transform .15s}
-.play:hover{transform:scale(1.06)}
-.play.on{animation:ring 1.2s infinite}
-@keyframes ring{0%{box-shadow:0 0 0 0 var(--redglow)}100%{box-shadow:0 0 0 16px rgba(229,56,59,0)}}
-.play svg{width:22px;height:22px}
-.lcd{font:500 22px var(--mono);background:#08090c;border:1px solid var(--line);border-radius:10px;padding:8px 14px;color:#fff;min-width:110px;text-align:center}
-.lcd small{font-size:11px;color:var(--dim);margin-left:4px}
-.seq-top label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}
-input[type=range]{accent-color:var(--red);width:130px}
-.seq-top .sp{margin-left:auto;display:flex;gap:8px}
-.seq{display:grid;gap:8px}
-.row{display:grid;grid-template-columns:110px repeat(16,1fr);gap:6px;align-items:center}
-.row .nm{font-size:13px;font-weight:600;color:#c9ccd4;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0f1015;border-radius:8px;border-left:3px solid var(--c)}
-.cell{aspect-ratio:1/1;border-radius:6px;background:#23252e;border:0;cursor:pointer;transition:background .12s,transform .12s,box-shadow .12s;position:relative}
-.cell:nth-child(4n+2):not(.on){background:#2a2c36}
-.cell:hover{transform:translateY(-2px)}
-.cell.on{background:var(--c);box-shadow:0 0 14px -2px var(--c)}
-.cell.now{outline:2px solid rgba(255,255,255,.55);outline-offset:1px}
-.cell.hit{animation:hit .25s ease-out}
-@keyframes hit{0%{transform:scale(1.18);filter:brightness(1.6)}100%{transform:none}}
-.vis{height:64px;margin-top:22px;display:flex;gap:3px;align-items:flex-end}
-.vis i{flex:1;background:linear-gradient(0deg,var(--red),#ff9f1c);border-radius:3px 3px 0 0;height:4%;transition:height .08s linear;opacity:.85}
-@media (max-width:700px){.row{grid-template-columns:64px repeat(16,1fr);gap:3px}.row .nm{font-size:11px;padding:6px}.seq-box{padding:16px}.cell{border-radius:4px}}
-
-/* ---------- media ---------- */
-.media{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;margin-top:56px}
-@media (max-width:900px){.media{grid-template-columns:1fr}}
-.video{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 0 0 1px var(--line),0 30px 80px -30px #000;background:#000}
-.video video{width:100%;display:block}
-.vplay{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(circle,rgba(0,0,0,.1),rgba(0,0,0,.55));cursor:pointer;transition:opacity .3s}
-.vplay span{width:84px;height:84px;border-radius:50%;background:var(--red);display:grid;place-items:center;box-shadow:0 0 0 0 var(--redglow);animation:ring 1.6s infinite}
-.vplay svg{width:32px;height:32px;margin-left:4px;color:#fff}
-.vplay.hide{opacity:0;pointer-events:none}
-.player{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px}
-.player h3{font-size:20px}
-.player p{color:var(--muted);font-size:14px}
-.wave{position:relative;height:110px;cursor:pointer}
-.wave canvas{width:100%;height:100%;display:block}
-.pctl{display:flex;align-items:center;gap:14px}
-.pctl .t{font:500 13px var(--mono);color:var(--muted)}
-
-/* built-in plugins */
-.pl-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:40px}
-.pl-f{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 14px;font:600 13px var(--sans);cursor:pointer;transition:.2s}
-.pl-f:hover{color:var(--text);border-color:var(--dim)}
-.pl-f.on{background:rgba(229,56,59,.14);border-color:rgba(229,56,59,.55);color:var(--text)}
-.pl-legend{display:flex;flex-wrap:wrap;gap:14px;margin-left:auto;font-size:12px;color:var(--dim)}
-.pl-legend span{display:inline-flex;align-items:center;gap:6px}
-.pl-legend em{font-style:normal}
-.pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:18px}
-.pl{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px;min-width:0;transition:border-color .2s}
-.pl:hover{border-color:var(--dim)}
-.pl .tx{min-width:0;flex:1}
-.pl b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pl small{display:block;font-size:12px;line-height:1.35;color:var(--dim)}
-.pl .k{font:500 10px var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;flex:none}
-.st{width:9px;height:9px;border-radius:50%;flex:none}
-.st.x{background:var(--green);box-shadow:0 0 8px rgba(61,220,132,.5)}.st.n{background:#c5e85d}.st.c{background:#f0ad4e}.st.a{background:var(--red2)}.st.p{background:var(--dim)}.st.o{background:#7aa7ff;box-shadow:0 0 8px rgba(122,167,255,.45)}
-.pl-all{margin-top:12px}
-.pl-more{margin-top:18px;font-size:14px;color:var(--muted)}
-.pl-more a{color:var(--red2)}
-/* featured plugins (data: FEATURED in the script) */
-.ft-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-top:44px}
-.ft-head h3{font-size:22px}
-.ft-head p{color:var(--muted);font-size:14px}
-.ft-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:18px}
-@media (max-width:1100px){.ft-grid{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.ft-grid{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:18px -24px 0;padding:6px 24px 10px;scroll-padding:0 24px;scrollbar-width:none}.ft-grid::-webkit-scrollbar{display:none}.ft-grid .ft{flex:0 0 80%;scroll-snap-align:start}.ft:hover{transform:none}}
-.ft{--x:50%;--y:0%;position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;padding:18px 18px 16px;border-radius:14px;overflow:hidden;
-  background:radial-gradient(320px circle at var(--x) var(--y),rgba(229,56,59,.13),transparent 60%),linear-gradient(180deg,rgba(255,255,255,.035),transparent 60%),var(--panel);
-  border:1px solid var(--line);transition:transform .35s cubic-bezier(.2,.8,.2,1),border-color .3s,box-shadow .35s}
-.ft::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--red),var(--red2),transparent);transform:scaleX(.25);opacity:.5;transition:transform .5s cubic-bezier(.2,.8,.2,1),opacity .3s}
-.ft:hover{transform:translateY(-4px);border-color:rgba(229,56,59,.45);box-shadow:0 18px 44px -18px var(--redglow)}
-.ft:hover::before{transform:scaleX(1);opacity:1}
-.ft-grid:not(.in) .ft{opacity:0}
-.ft-grid.in .ft{animation:ftIn .8s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*70ms)}
-@keyframes ftIn{from{opacity:0;transform:translateY(26px) scale(.97);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
-.ft .top{display:flex;align-items:center;gap:6px}
-.ft .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--sans);letter-spacing:.03em;border-radius:99px;padding:3px 9px 3px 7px;border:1px solid}
-.ft .badge.x{color:#8ff0b8;border-color:rgba(61,220,132,.4);background:rgba(61,220,132,.08)}
-.ft .badge.o{color:#a9c4ff;border-color:rgba(122,167,255,.4);background:rgba(122,167,255,.08)}
-.ft .badge.n{color:#d8f08f;border-color:rgba(197,232,93,.4);background:rgba(197,232,93,.07)}
-.ft .badge .st{width:7px;height:7px}
-.ft .k{margin-left:auto;font:500 10px var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
-.ft h4{font:700 19px/1.15 var(--head);letter-spacing:-.01em;margin-top:4px}
-.ft .by{font-size:12px;color:var(--dim);margin-top:-4px}
-.ft p{font-size:13.5px;line-height:1.5;color:var(--muted);flex:1}
-.ft .how{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.ft .how svg{width:12px;height:12px;flex:none}
-.ft .eqb{position:absolute;right:14px;bottom:14px;display:flex;align-items:flex-end;gap:2px;height:16px;opacity:.35;transition:opacity .3s}
-.ft .eqb i{width:3px;height:30%;background:var(--red2);border-radius:1px}
-.ft:hover .eqb{opacity:.9}
-.ft:hover .eqb i{animation:eqb .9s ease-in-out infinite alternate}
-.ft .eqb i:nth-child(2){animation-delay:-.3s}.ft .eqb i:nth-child(3){animation-delay:-.6s}.ft .eqb i:nth-child(4){animation-delay:-.15s}
-@keyframes eqb{from{height:20%}to{height:100%}}
-.pl-sub{font-size:22px;margin-top:56px}
-.pl-sub+.pl-bar{margin-top:14px}
-/* gallery */
-.gallery{columns:3 280px;column-gap:16px;margin-top:56px}
-.gallery figure{break-inside:avoid;margin-bottom:16px;border-radius:12px;overflow:hidden;position:relative;cursor:zoom-in;box-shadow:0 0 0 1px var(--line)}
-.gallery img{width:100%;transition:transform .6s cubic-bezier(.2,.8,.2,1),filter .4s}
-.gallery figure:hover img{transform:scale(1.05);filter:brightness(1.1)}
-.gallery figcaption{position:absolute;left:0;right:0;bottom:0;padding:30px 14px 12px;font-size:13px;font-weight:600;background:linear-gradient(transparent,rgba(0,0,0,.8));transform:translateY(100%);transition:transform .35s}
-.gallery figure:hover figcaption{transform:none}
-.lightbox{position:fixed;inset:0;z-index:200;background:rgba(5,5,8,.92);backdrop-filter:blur(8px);display:grid;place-items:center;padding:30px;opacity:0;pointer-events:none;transition:opacity .3s}
-.lightbox.open{opacity:1;pointer-events:auto}
-.lightbox img{max-width:min(1600px,96vw);max-height:90vh;border-radius:12px;transform:scale(.94);transition:transform .4s cubic-bezier(.2,.8,.2,1);box-shadow:0 30px 100px #000}
-.lightbox.open img{transform:none}
-
-/* download */
-.dl{position:relative;border-radius:28px;padding:80px 40px;text-align:center;overflow:hidden;background:radial-gradient(800px 400px at 50% 0%,rgba(229,56,59,.25),transparent 70%),var(--panel);border:1px solid var(--line)}
-.dl h2{font-size:clamp(34px,5vw,60px);margin:14px 0}
-.dl p{color:var(--muted);max-width:560px;margin:0 auto 32px}
-.dl .cta{margin-bottom:22px}
-.dl .small{font-size:13px;color:var(--dim)}
-.dl .small a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
-.ring{position:absolute;border:1px solid rgba(229,56,59,.25);border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%);animation:grow 6s linear infinite;pointer-events:none}
-@keyframes grow{0%{width:0;height:0;opacity:1}100%{width:1400px;height:1400px;opacity:0}}
-.req{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:30px}
-.req span{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:5px 12px;color:var(--muted);background:rgba(0,0,0,.25)}
-.dl .btn small{font-weight:500;font-size:12px;opacity:.75}
-.dl-hint{max-width:640px;margin:0 auto 20px;font-size:13px;line-height:1.6;color:var(--muted);display:grid;gap:6px}
-.dl-hint:empty{display:none}
-.dl-hint b{color:var(--text);font-weight:600}
-.dl-hint code,.dl-plat code,.dl-port code{font:500 12px var(--mono);background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9ccd4;overflow-wrap:anywhere;display:inline-block;max-width:100%;vertical-align:middle}
-.dl-store{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 14px;max-width:640px;margin:0 auto 18px;font-size:13px;color:var(--muted)}
-.dl-store:empty{display:none}
-.dl-store a{display:inline-flex;border-radius:6px;transition:transform .2s}
-.dl-store a:hover{transform:translateY(-2px)}
-.dl-store b{color:var(--text);font-weight:600}
-.dl-other{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin:0 auto 22px;font-size:13px;color:var(--dim)}
-.dl-other a{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px;background:rgba(255,255,255,.03);color:var(--muted);transition:color .2s,border-color .2s}
-.dl-other a:hover{color:var(--text);border-color:var(--dim)}
-.dl-other a b{font-weight:600;color:#c9ccd4}
-.dl .cta .btn small{white-space:nowrap}
-@media (max-width:560px){.dl .cta .btn{white-space:normal;flex-wrap:wrap;justify-content:center;text-align:center;row-gap:2px}}
-/* portable versions: own block so people find them */
-.dl-port{max-width:640px;margin:4px auto 22px;border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;background:rgba(0,0,0,.22)}
-.dl-port:empty{display:none}
-.dl-port h3{font-size:15px;margin:0 0 4px}
-.dl-port p{font-size:13px;color:var(--muted);margin:0 auto 14px;max-width:none}
-.dl-port .pbtns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.dl-port .pbtns a{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.03);color:var(--text);transition:border-color .2s,background .2s}
-.dl-port .pbtns a:hover{border-color:var(--red,#e5383b);background:rgba(229,56,59,.08)}
-.dl-port .pbtns a b{font-size:14px}
-.dl-port .pbtns a small{font-size:12px;color:var(--muted);line-height:1.45}
-@media (max-width:560px){.dl-port .pbtns{grid-template-columns:1fr}}
-.dl-plat{font-size:12px;color:var(--dim);margin:14px auto 0;max-width:620px}
-/* three OS buttons side by side (the visitor's OS gets the accent), stacked on phones */
-.os-btns{display:grid;grid-template-columns:repeat(3,minmax(0,200px));gap:12px;justify-content:center}
-.os-btns .btn{flex-direction:column;justify-content:center;gap:6px;padding:22px 14px 16px;text-align:center;white-space:normal}
-.os-btns .btn svg.os{width:28px;height:28px}
-.os-btns .btn span{font-size:15px}
-.os-btns .btn small{font-weight:500;font-size:12px;opacity:.75}
-.os-btns .btn em{position:absolute;top:7px;right:9px;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
-.hero-dl{margin-bottom:14px}
-.hero-port{display:inline-block;font-size:13px;color:var(--muted);margin:0 0 18px;text-decoration:underline;text-underline-offset:3px}
-.hero-port:hover{color:var(--text)}
-.hero-dl .btn{padding:12px 12px}
-@media (max-width:560px){.os-btns{grid-template-columns:minmax(0,320px)}.os-btns .btn{flex-direction:row;gap:10px;padding:13px 16px;justify-content:flex-start;text-align:left}.os-btns .btn small{margin-left:auto}.os-btns .btn em{display:none}.os-btns .btn svg.os{width:22px;height:22px}}
-
-/* open source */
-.os{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
-@media (max-width:900px){.os{grid-template-columns:1fr}}
-.term{background:#08090c;border:1px solid var(--line);border-radius:14px;overflow:hidden;font:500 14px/1.7 var(--mono)}
-.term .bar{display:flex;gap:7px;padding:12px 14px;border-bottom:1px solid var(--line)}
-.term .bar i{width:11px;height:11px;border-radius:50%;background:#333}
-.term .bar i:first-child{background:var(--red)}
-.term pre{padding:18px;color:#c9ccd4;white-space:pre-wrap;min-height:220px}
-.term .p{color:var(--green)}.term .c{color:var(--dim)}
-.caret{display:inline-block;width:9px;height:17px;background:var(--red);vertical-align:-3px;animation:blink 1s steps(1) infinite}
-@keyframes blink{50%{opacity:0}}
-
-footer{border-top:1px solid var(--line);padding:40px 0;color:var(--dim);font-size:14px}
-footer .wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
-footer .links2{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px 18px}
-footer a:hover{color:var(--text)}
-.note{font-size:12px;color:var(--dim);margin-top:14px;max-width:none}
-.policy{margin-top:56px;padding-top:36px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px;color:var(--muted);font-size:14px;line-height:1.65}
-.policy h3{color:var(--text);font-size:15px;margin:0 0 8px;font-weight:600}
-.policy p{margin:0 0 8px}.policy a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
-.policy a:hover{text-decoration-color:var(--red)}
-.policy .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--red2);border:1px solid rgba(229,56,59,.4);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:1px}
-
-/* ---------- inspired by the classics (data: INSPIRED, generated by scripts/gen-inspired.py) ---------- */
-#classics{background:radial-gradient(900px 500px at 85% 0%,rgba(229,56,59,.10),transparent 70%),radial-gradient(700px 400px at 0% 40%,rgba(122,28,172,.10),transparent 70%)}
-.cl-stats{display:flex;flex-wrap:wrap;gap:12px;margin-top:36px}
-.cl-stat{display:flex;align-items:baseline;gap:10px;background:rgba(24,26,33,.7);border:1px solid var(--line);border-radius:12px;padding:12px 16px;backdrop-filter:blur(6px)}
-.cl-stat b{font:700 28px var(--head);background:linear-gradient(180deg,#fff,#b9bcc6);-webkit-background-clip:text;background-clip:text;color:transparent}
-.cl-stat span{font-size:13px;color:var(--muted)}
-.cl-stat.w b{background:none;color:#f0ad4e;-webkit-text-fill-color:#f0ad4e}
-.cl-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
-.cl-v{margin-top:40px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
-@media (max-width:900px){.cl-v{grid-template-columns:minmax(0,1fr);gap:14px;margin-top:32px}}
-.cl-vh{position:sticky;top:90px;border-left:2px solid var(--red);padding:2px 0 2px 14px}
-@media (max-width:900px){.cl-vh{position:static}}
-.cl-vh h3{font-size:24px}
-.cl-vh p{font:500 11.5px/1.6 var(--mono);color:var(--dim);margin-top:6px;letter-spacing:.02em}
-.cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:14px}
-.cl{--x:50%;--y:0%;position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;padding:18px 18px 16px;border-radius:14px;overflow:hidden;
-  background:radial-gradient(320px circle at var(--x) var(--y),rgba(229,56,59,.13),transparent 60%),linear-gradient(180deg,rgba(255,255,255,.035),transparent 60%),var(--panel);
-  border:1px solid var(--line);transition:transform .35s cubic-bezier(.2,.8,.2,1),border-color .3s,box-shadow .35s}
-.cl::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--red),var(--red2),transparent);transform:scaleX(.25);opacity:.5;transition:transform .5s cubic-bezier(.2,.8,.2,1),opacity .3s}
-.cl:hover{transform:translateY(-4px);border-color:rgba(229,56,59,.45);box-shadow:0 18px 44px -18px var(--redglow)}
-.cl:hover::before{transform:scaleX(1);opacity:1}
-.cl.wip{border-style:dashed;border-color:rgba(240,173,78,.35);background:radial-gradient(320px circle at var(--x) var(--y),rgba(240,173,78,.10),transparent 60%),var(--bg2)}
-.cl.wip::before{background:linear-gradient(90deg,transparent,#f0ad4e,transparent)}
-.cl.wip:hover{border-color:rgba(240,173,78,.6);box-shadow:0 18px 44px -18px rgba(240,173,78,.35)}
-.cl .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.cl .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--sans);letter-spacing:.03em;border-radius:99px;padding:3px 9px 3px 7px;border:1px solid}
-.cl .badge.own{color:#8ff0b8;border-color:rgba(61,220,132,.4);background:rgba(61,220,132,.08)}
-.cl .badge.wip{color:#f6c886;border-color:rgba(240,173,78,.45);background:rgba(240,173,78,.08)}
-.cl .badge .st{width:7px;height:7px}
-.st.w{background:#f0ad4e;animation:pulseW 2s infinite}
-@keyframes pulseW{50%{opacity:.35}}
-.cl .k{margin-left:auto;font:500 10px var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;white-space:nowrap}
-.cl .orig{font:500 11px/1.4 var(--mono);color:var(--dim);letter-spacing:.03em;margin-top:6px;text-transform:uppercase}
-.cl .orig em{font-style:normal;color:var(--muted)}
-.cl h4{font:700 20px/1.15 var(--head);letter-spacing:-.01em;margin-top:-2px}
-.cl p{font-size:13.5px;line-height:1.5;color:var(--muted);flex:1}
-.cl .foot{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:var(--dim)}
-.cl .foot span{display:inline-flex;align-items:center;gap:6px}
-.cl .foot svg{width:13px;height:13px;flex:none}
-.cl .foot .auto{color:#9fc2ff}
-.cl-alt{grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:-10px;font-size:12.5px;color:var(--dim)}
-@media (max-width:900px){.cl-alt{grid-column:1;margin-top:0}}
-.cl-alt>span:first-child{margin-right:2px}
-.cl-chip{font-size:12.5px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:3px 11px;background:rgba(255,255,255,.03);color:var(--muted);flex-wrap:wrap;max-width:100%}
-.cl-chip i{font-style:normal;color:var(--dim)}
-.cl-chip b{font-weight:600;color:#c9ccd4}
-.cl-fl{margin-top:48px;display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px;padding:24px 26px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(120deg,rgba(229,56,59,.12),transparent 55%),var(--panel)}
-.cl-fl h3{font-size:22px}
-.cl-fl p{color:var(--muted);font-size:14px;margin-top:4px}
-.cl-fl .btn{white-space:normal;text-align:center;max-width:100%}
-.cl-fl .chips{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 360px}
-.cl-fl .btn{margin-left:auto}
-.cl-v:not(.in) .cl,.cl-v:not(.in) .cl-vh,.cl-v:not(.in) .cl-alt{opacity:0}
-.cl-v.in .cl,.cl-v.in .cl-vh,.cl-v.in .cl-alt{animation:ftIn .8s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*60ms)}
-.cl-v[hidden]{display:none}
-html.shot .ft,html.shot .cl,html.shot .cl-vh,html.shot .cl-alt{opacity:1!important;animation:none!important}html.shot .hero{min-height:0}html.shot .reveal,html.shot .fade-up,html.shot .hero h1 .w{opacity:1!important;transform:none!important;filter:none!important;animation:none!important;transition:none!important}
-@media (max-width:560px){.pill{font-size:11.5px;padding:5px 10px 5px 6px}.pill b{font-size:10px}.hero{padding-top:110px}.dl{padding:56px 20px}}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation:none!important;transition:none!important}
-  .reveal,.fade-up,.hero h1 .w,.ft-grid .ft,.cl-v .cl,.cl-v .cl-vh,.cl-v .cl-alt{opacity:1;transform:none;filter:none}
-  .screen{transform:none!important}
-}
-</style>
+<link rel="stylesheet" href="/assets/site.css?v=fa0c727b">
 </head>
 <body>
-<div id="progress"></div>
-
-<nav id="nav">
-  <div class="wrap">
-    <a href="#top" class="brand"><img src="assets/img/logo.png?v=0.1.23" alt="">LYNX SHARE</a>
-    <div class="links">
-      <a href="#features" data-i18n="nav.features">Features</a>
-      <a href="#classics" data-i18n="nav.classics">Classics</a>
-      <a href="#try" data-i18n="nav.try">Try it</a>
-      <a href="#media" data-i18n="nav.media">Video</a>
-      <a href="#gallery" data-i18n="nav.gallery">Gallery</a>
-      <a href="#plugins" data-i18n="nav.plugins">Plugins</a>
-      <a href="#source" data-i18n="nav.source">Open source</a>
-    </div>
-    <div class="navbtns">
-      <label class="lang" id="langBox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
-      <a class="btn btn-red btn-sm dl-link" href="#download"><span data-i18n="nav.download">Download</span></a>
-    </div>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
   </div>
-</nav>
-
-<header class="hero" id="top">
-  <div class="aurora"><i></i><i></i><i></i></div>
-  <div class="grid-bg"></div>
-  <canvas id="waves"></canvas>
+</div></header>
+<main>
+<section class="hero" id="top">
   <div class="wrap">
-    <a class="pill fade-up" href="https://github.com/Ka1-S/LYNX-SHARE" style="animation-delay:.1s"><b class="ver-tag">ALPHA</b><span class="dot"></span><span data-i18n="hero.pill">Free &amp; open source · Windows · macOS · Linux</span></a>
-    <h1 id="h1" data-i18n-words="hero.title">A lightweight DAW, fully open source.</h1>
-    <p class="lead fade-up" style="animation-delay:.7s" data-i18n="hero.lead">LYNX SHARE is a lightweight, fully open-source DAW that brings two ways of making music together: the FL Studio-style pattern workflow you already know (Channel Rack, Piano Roll, Playlist and Mixer) and an Ableton Live-style clip grid with scenes, a click apart. A simple mode for beginners is on the way. It opens your .flp and .als projects, saves .als for Live, and is built in modern C++ to run smoothly on any PC.</p>
-    <div class="os-btns hero-dl fade-up" style="animation-delay:.9s" data-os-btns><a class="btn btn-red" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span>Download</span></a></div>
-    <a class="hero-port fade-up" style="animation-delay:.95s" href="#dlPort" data-i18n="hero.port">Portable versions too: no install needed →</a>
-    <div class="cta fade-up" style="animation-delay:1s">
-      <a class="btn btn-ghost" href="https://github.com/Ka1-S/LYNX-SHARE">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 00-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.6 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0012 .5z"/></svg>
-        <span data-i18n="cta.github">View on GitHub</span>
-      </a>
-    </div>
-    <div class="meta fade-up" style="animation-delay:1.05s"><span class="ver-line" data-i18n="ver.latest">Latest release</span> · AGPL-3.0</div>
-    <div class="stage fade-up" style="animation-delay:1.1s">
-      <div class="screen" id="screen"><img src="assets/img/hero.webp?v=0.1.25" alt="LYNX SHARE with the Channel Rack, Piano Roll, Playlist and Mixer open" data-i18n-alt="alt.hero" width="1920" height="1080"><div class="glare"></div></div>
-    </div>
-  </div>
-</header>
-
-<div class="marquee" aria-hidden="true"><div class="track" id="track"></div></div>
-
-<section id="features">
-  <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.why">// why lynx</div>
-    <h2 class="sec-title reveal d1" data-i18n="why.title">Everything you need. Nothing slowing you down.</h2>
-    <p class="sec-lead reveal d2" data-i18n="why.lead">A lock-free engine that spreads channels and mixer tracks across your CPU cores, skips idle channels and streams long audio from disk.</p>
-    <div class="stats">
-      <div class="stat reveal"><div class="n"><span data-count="50">0</span><em>×</em></div><p data-i18n="stat.rt">faster than real time — our 46 s demo renders in 0.93 s</p></div>
-      <div class="stat reveal d1"><div class="n"><span data-count="40">0</span><em>+</em></div><p data-i18n="stat.plugins">FL Studio native plugins recreated or converted on import</p></div>
-      <div class="stat reveal d2"><div class="n"><span data-count="1.1" data-dec="1">0</span><em>M</em></div><p data-i18n="stat.tests">automated checks run on every build</p></div>
-      <div class="stat reveal d3"><div class="n"><span data-count="0">0</span><em> $</em></div><p data-i18n="stat.free">free forever, open source under AGPL-3.0</p></div>
-    </div>
-    <div class="cards">
-      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div><h3 data-i18n="c1.t">Lightweight</h3><p data-i18n="c1.p">Multithreaded audio graph, disk streaming and a GPU-friendly UI. Runs on old laptops too.</p></div>
-      <div class="card reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h2M11 9h2M15 9h2M7 14h2M11 14h2"/></svg></div><h3 data-i18n="c2.t">Two workflows, one DAW</h3><p data-i18n="c2.p">FL Studio-style patterns by default: step sequencer, Piano Roll, Playlist and a Mixer with inserts, sends and sidechain, with the same shortcuts. Prefer clips? Switch the layout style to the Ableton Live-style clip grid, with scenes, launch modes and follow actions.</p></div>
-      <div class="card reveal d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg></div><h3 data-i18n="c3.t">Opens your projects</h3><p data-i18n="c3.p">Imports FL Studio projects (.flp) with channels, samples, patterns, arrangement, automation, mixer and native plugins. Opens and saves Ableton Live 11/12 sets (.als), exports .flp back to FL Studio, and imports FL Studio Mobile projects (.flm, partial).</p></div>
-      <div class="card reveal d3"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></div><h3 data-i18n="c4.t">Clean-room</h3><p data-i18n="c4.p">Behaviour studied and documented, then written from scratch. Not a single line of Image-Line or Ableton code.</p></div>
-    </div>
-    <p class="sec-lead reveal grow" data-i18n="grow.p">The Ableton Live-style side is growing. Today: the clip grid with scenes, and .als sets that go both ways (Session clips land in the clip grid). On the way in 0.1.26: a Live-style Detail View for clips, racks, note chance, and a Simple workflow for beginners (BandLab / FL Studio Mobile-style). FL Studio's workflow stays the default, and nothing is taken away from it.</p>
-
-    <div class="feat">
-      <div class="ftxt reveal"><div class="eyebrow">01 · playlist</div><h3 data-i18n="f1.t">Arrange your whole song</h3><p data-i18n="f1.p">Patterns, audio and automation clips side by side, with markers, arrangements, time selection and a knife tool.</p>
-        <ul><li data-i18n="f1.a">Multiple arrangements per project</li><li data-i18n="f1.b">Automation clips with curves for any knob</li><li data-i18n="f1.c">Song/Pattern mode in one click</li></ul></div>
-      <div class="shot reveal d1" data-tilt><img src="assets/img/playlist.webp?v=0.1.25" alt="Playlist" loading="lazy" width="1600" height="900"><div class="glare"></div></div>
-    </div>
-    <div class="feat rev">
-      <div class="ftxt reveal"><div class="eyebrow">02 · piano roll</div><h3 data-i18n="f2.t">Write melodies fast</h3><p data-i18n="f2.p">Snap, chords and scales, slide and porta notes, velocity and pitch lanes, strum, arpeggiate and randomize tools.</p>
-        <ul><li data-i18n="f2.a">Ghost notes from other channels</li><li data-i18n="f2.b">MIDI import and export</li><li data-i18n="f2.c">Type notes with your PC keyboard</li></ul></div>
-      <div class="shot reveal d1" data-tilt><img src="assets/img/pianoroll.webp?v=0.1.25" alt="Piano Roll" loading="lazy" width="1920" height="1080"><div class="glare"></div></div>
-    </div>
-    <div class="feat">
-      <div class="ftxt reveal"><div class="eyebrow">03 · mixer</div><h3 data-i18n="f3.t">Mix like a pro</h3><p data-i18n="f3.p">Up to 127 inserts, 10 effect slots per track, sends, sidechain, delay compensation and smart disable.</p>
-        <ul><li data-i18n="f3.a">Parametric EQ, compressor, limiter, reverbs, delays…</li><li data-i18n="f3.b">VST3 and CLAP plugins, optionally sandboxed</li><li data-i18n="f3.c">Export WAV, stems and MIDI</li></ul></div>
-      <div class="shot reveal d1" data-tilt><img src="assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"><div class="glare"></div></div>
+    <a class="pill" href="/updates/"><b class="ver-tag">0.1.26-ALPHA</b><span data-i18n="hero.pill">Free &amp; open source · Windows · macOS · Linux</span></a>
+    <h1 data-i18n-words="hero.title"><span class="w" style="--i:0">A</span> <span class="w" style="--i:1">lightweight</span> <span class="w" style="--i:2">DAW,</span> <span class="grad w" style="--i:3">fully open source.</span></h1>
+    <p class="lead" data-i18n="home.lead">LYNX SHARE is a DAW that works the way FL Studio does: Channel rack, Piano roll, Playlist and Mixer, with the same shortcuts. It opens FL Studio projects (.flp), Ableton Live sets (.als) and FL Studio Mobile projects (.flm), and exports .flp and .als back. It is free under the AGPL-3.0 and still an alpha.</p>
+    <div class="os-btns" id="download"><a class="btn btn-ghost" data-os="win" data-dl="win.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6l7.4-1v7H3zM11.4 4.4L21 3v8.6h-9.6zM3 12.4h7.4v7.1L3 18.4zM11.4 12.4H21V21l-9.6-1.4z"/></svg><span>Windows</span><small data-i18n="dl.fInstaller">Installer</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a><a class="btn btn-ghost" data-os="mac" data-dl="mac.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.7-1-2.7-4zM14.1 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.5 2.8-1.3z"/></svg><span>macOS</span><small data-i18n="dl.fUniversal">Universal</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a><a class="btn btn-ghost" data-os="linux" data-dl="linux.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12 2c-2.3 0-3.7 1.8-3.7 4.3 0 1.3.3 2.2-.6 3.6C6.4 11.7 5 13.9 5 16.4c0 .9.2 1.6.5 2.2-.9.3-1.6.9-1.6 1.6 0 1.1 1.7 1.4 3.3 1.6 1 .1 1.9.6 2.8.6.8 0 1.4-.5 2-.5s1.2.5 2 .5c.9 0 1.8-.5 2.8-.6 1.6-.2 3.3-.5 3.3-1.6 0-.7-.7-1.3-1.6-1.6.3-.6.5-1.3.5-2.2 0-2.5-1.4-4.7-2.7-6.5-.9-1.4-.6-2.3-.6-3.6C15.7 3.8 14.3 2 12 2zm-1.6 3.4a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zm3.2 0a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zM12 11c-2 0-3.4 2.3-3.4 5.2 0 1.5.6 2.6 1.6 3h3.6c1-.4 1.6-1.5 1.6-3 0-2.9-1.4-5.2-3.4-5.2z"/></svg><span>Linux</span><small data-i18n="dl.fAppImage">AppImage</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a></div>
+    <div class="meta"><span class="ver-line">v0.1.26-alpha</span> · AGPL-3.0 · <a href="/download/" data-i18n="home.allDl">portable versions and install notes</a></div>
+    <div class="stage">
+      <div class="screen"><img src="/assets/img/hero.webp?v=0.1.25" alt="LYNX SHARE with the Channel Rack, Piano Roll, Playlist and Mixer open" data-i18n-alt="alt.hero" width="1920" height="1080"></div>
     </div>
   </div>
 </section>
 
-<section id="classics">
-  <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.classics">// inspired by the classics</div>
-    <h2 class="sec-title reveal d1" data-i18n="cl.title">The plugins you know, rebuilt natively.</h2>
-    <p class="sec-lead reveal d2" data-i18n="cl.lead">LYNX SHARE ships its own native plugins inspired by the third-party plugins producers use most: EQs, limiters, reverbs, vocal tuning, channel strips. Open a project that uses one you don't have installed and LYNX SHARE loads its equivalent in that slot, keeping the original's settings for when it's back.</p>
-    <div class="cl-stats reveal" id="clStats"></div>
-    <div class="cl-tabs reveal" id="clTabs"></div>
-    <div id="clGroups"></div>
-    <div class="cl-fl reveal" id="clFl"></div>
-    <p class="note" id="clTm"></p>
+<section class="sec" id="features">
+  <div class="wrap split">
+    <div class="prose">
+      <h2 data-i18n="home.whatT">What it does</h2>
+      <p data-i18n="home.what1">You build patterns in the Channel rack and the Piano roll, arrange them with audio and automation clips in the Playlist, and mix in the Mixer: up to 127 insert tracks with 10 effect slots each, sends and sidechain. If you know FL Studio, the windows, mouse gestures and shortcuts are where you expect them.</p>
+      <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes. The same menu (View › Layout style) has a Simple workflow: one window for a first song.</p>
+      <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge.</p>
+      <h3 data-i18n="home.missT">What is missing</h3>
+      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Live's own devices are not converted, and in .flm projects only some of FL Studio Mobile's instruments are recreated. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
+      <p><a class="btn btn-ghost btn-sm" href="/features/" data-i18n="home.moreF">All features</a> <a class="btn btn-ghost btn-sm" href="/wiki/getting-started/" data-i18n="home.moreW">Getting started</a></p>
+    </div>
+    <dl class="facts">
+      <div><dt data-i18n="fact.sys">Systems</dt><dd data-i18n="fact.sysV">Windows 10 / 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel), Linux x86_64 with glibc 2.35 or newer</dd></div>
+      <div><dt data-i18n="fact.ver">Version</dt><dd><span class="ver-line">v0.1.26-alpha</span> (<a href="/updates/" data-i18n="fact.verL">what changed</a>)</dd></div>
+      <div><dt data-i18n="fact.price">Price</dt><dd data-i18n="fact.priceV">Free. No account, no subscription.</dd></div>
+      <div><dt data-i18n="fact.lic">Licence</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
+      <div><dt data-i18n="fact.opens">Opens</dt><dd data-i18n="fact.opensV">.lynx (its own format), .flp, .als (Live 11 and 12), .flm (partial), .mid</dd></div>
+      <div><dt data-i18n="fact.exports">Exports</dt><dd data-i18n="fact.exportsV">WAV, MP3, FLAC, OGG, stems, MIDI, .flp, .als</dd></div>
+      <div><dt data-i18n="fact.plug">Plugins</dt><dd data-i18n="fact.plugV">VST3 and CLAP; Audio Units on macOS; LV2 on Linux; VST2 on Windows and Linux</dd></div>
+      <div><dt data-i18n="fact.lang">Languages</dt><dd data-i18n="fact.langV" data-count="15">15, the same as this site</dd></div>
+    </dl>
   </div>
 </section>
 
-<section id="try" style="background:linear-gradient(180deg,transparent,var(--bg2) 30%,var(--bg2) 70%,transparent)">
+<section class="sec" id="screens">
   <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.try">// try it right here</div>
-    <h2 class="sec-title reveal d1" data-i18n="try.title">Click some steps. Press play.</h2>
-    <p class="sec-lead reveal d2" data-i18n="try.lead">A tiny taste of the Channel Rack, running in your browser. The real thing has unlimited channels, swing, patterns and much more.</p>
-    <div class="seq-box reveal">
-      <div class="seq-top">
-        <button class="play" id="seqPlay" aria-label="Play" data-i18n-aria="aria.play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button>
-        <div class="lcd"><span id="bpmv">124</span><small>BPM</small></div>
-        <label><span data-i18n="try.tempo">Tempo</span> <input type="range" id="bpm" min="80" max="170" value="124"></label>
-        <label>Swing <input type="range" id="swing" min="0" max="60" value="12"></label>
-        <div class="sp"><button class="btn btn-ghost btn-sm" id="rnd" data-i18n="try.rnd">Randomize</button><button class="btn btn-ghost btn-sm" id="clr" data-i18n="try.clr">Clear</button></div>
-      </div>
-      <div class="seq" id="seq"></div>
-      <div class="vis" id="vis"></div>
+    <h2 data-i18n="home.shotsT">The main windows</h2>
+    <div class="shots">
+      <figure class="big"><a class="shot" href="/assets/img/playlist.webp?v=0.1.25"><img src="/assets/img/playlist.webp?v=0.1.25" alt="Playlist" loading="lazy" width="1600" height="900"></a><figcaption data-i18n="home.capPl"><b>Playlist.</b> Pattern, audio and automation clips on tracks, with markers and several arrangements per project.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.25"><img src="/assets/img/pianoroll.webp?v=0.1.25" alt="Piano roll" loading="lazy" width="1920" height="1080"></a><figcaption data-i18n="home.capPr"><b>Piano roll.</b> Notes, slides, chords and scales, with velocity and pitch lanes.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.25"><img src="/assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"></a><figcaption data-i18n="home.capMx"><b>Mixer.</b> Inserts, sends, sidechain and delay compensation.</figcaption></figure>
+    </div>
+    <p class="note" data-i18n="home.shotsN">Screenshots are from LYNX SHARE's own demo project in the current release. More on the <a href="/features/">Features</a> page.</p>
+  </div>
+</section>
+
+<section class="sec" id="only">
+  <div class="wrap">
+    <h2 data-i18n="home.whyT">What only LYNX does</h2>
+    <div class="whyrow"><a class="wcell" href="/why/#online"><b data-i18n="why.online.t">Online sessions</b><span data-i18n="why.online.l">Work on one project with up to three other people, live or by sending files.</span></a><a class="wcell" href="/why/#projects"><b data-i18n="why.projects.t">Opens and writes other DAWs' projects</b><span data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</span></a><a class="wcell" href="/why/#fl-settings"><b data-i18n="why.fl.t">FL plugins' settings open in LYNX's own engines</b><span data-i18n="why.fl.l">A project that uses FL Studio's native plugins plays without FL Studio installed.</span></a><a class="wcell" href="/why/#workflows"><b data-i18n="why.work.t">Three workflows in one program</b><span data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.</span></a><a class="wcell" href="/why/#crash"><b data-i18n="why.crash.t">Plugin crash protection</b><span data-i18n="why.crash.l">A third-party plugin that crashes does not have to take your project with it.</span></a><a class="wcell" href="/why/#free"><b data-i18n="why.free.t">Free on Windows, Linux and macOS</b><span data-i18n="why.free.l">No price, no account, no subscription, and the source is public.</span></a><a class="wcell hot" href="/instruments-and-effects/"><b data-i18n="home.catT" data-args='[&quot;193&quot;]' data-count="193">193 built-in instruments and effects</b><span data-i18n="home.catL">Synths, drums, EQs, compressors, reverbs, delays and tools, each with a picture and a wiki page.</span></a></div>
+    <p style="margin-top:18px"><a class="tlink" href="/why/" data-i18n="home.whyAll">All six, with their limits</a></p>
+    <p style="margin-top:8px"><a class="tlink" href="/fixes/" data-i18n="fix.link">Common complaints about DAWs, and what LYNX SHARE does about them</a></p>
+  </div>
+</section>
+
+<section class="sec" id="latest">
+  <div class="wrap">
+    <h2 data-i18n="home.latestT">Latest update</h2>
+    <div class="latest"><div><div class="ver">0.1.26-alpha</div><time datetime="2026-11-11">2026-11-11</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.26-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.26.t">Simple workflow, racks and Clip View, Slicex and FPC, freeze, controller profiles</h3><p class="muted" data-i18n="u.0.1.26.s">A third layout, the Simple workflow, joins the Pattern and Clip-launch workflows. The Clip-launch side gains a Clip View, a Device View, racks, note chance and Live's MIDI tools. Slicex and FPC are instruments with FL Studio's editors, FL Studio Mobile projects come in with instruments, effects and automation, plugin windows dock, channels can be frozen and common MIDI controllers work from profiles.</p><ul style="margin-top:12px"><li data-i18n="u.0.1.26.n0"><strong>Simple workflow</strong> (View › Layout style, and offered by the setup wizard): one window with the tracks and the timeline. The New track chooser adds a voice, an instrument, a sampler or a starter beat in one click, dropped loops keep time and the project has a key. The Finish dock gives the Master a ready-made sound and saves the song as WAV, MP3 or a package for other apps. The other windows stay one click away.</li><li data-i18n="u.0.1.26.n1"><strong>Clip View, Device View and racks</strong> (Clip-launch workflow): a selected clip opens with Clip, Launch and Notes panels and the Piano roll docked under the grid, and the selected track's effects show as a chain of cards. Instrument and Audio Effect Racks with chains, zones and macros open from Live sets and are written back, and a mixer slot's menu groups it into a rack. A MIDI Effect Rack can be built and is written to a Live set, but Live's own MIDI Effect Racks are not opened yet.</li><li data-i18n="u.0.1.26.n2"><strong>Note chance and MIDI tools</strong>: every note has a Chance and a Velocity range, and Live 12's probability groups are kept in .als sets. Live 12's MIDI tools (Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp and Velocity Shaper) are in the Clip View and in the Piano roll's Tools menu.</li><li data-i18n="u.0.1.26.n3"><strong>Warp markers</strong>: Auto-warp locks an audio clip to the beat, and markers can be added, moved and removed in the audio editor's warp lane. The Playlist shows them as flags on the clip.</li></ul><p class="more"><a class="tlink" href="/updates/#v0.1.26-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
+  </div>
+</section>
+
+<section class="sec" id="source">
+  <div class="wrap split">
+    <div class="prose">
+      <h2 data-i18n="home.srcT">Source code</h2>
+      <p data-i18n="home.src1">LYNX SHARE is written in C++20 with JUCE 8. The code, the tests and the notes on every FL Studio behaviour it reproduces are in one public repository. FL Studio and Live were studied from the outside and the code was written from scratch: nothing from Image-Line or Ableton is in it.</p>
+      <p data-i18n="home.src2">Bug reports and pull requests are welcome. Several fixes in recent releases came from users.</p>
+      <p><a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/issues" data-i18n="home.issues">Report a bug</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/ROADMAP.md">Roadmap</a> <a class="btn btn-ghost btn-sm" href="https://discord.gg/XHKkbtbkY">Discord</a></p>
+    </div>
+    <div class="prose">
+      <pre><code>git clone https://github.com/Ka1-S/LYNX-SHARE
+cd LYNX-SHARE
+scripts/build-local.sh        # builds and runs the tests
+LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
+      <p class="note" data-i18n="home.srcN">Build instructions for each system are in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">docs/SETUP_DEV.md</a>.</p>
     </div>
   </div>
 </section>
 
-<section id="media">
+<section class="sec">
   <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.media">// see &amp; hear</div>
-    <h2 class="sec-title reveal d1" data-i18n="media.title">Made in LYNX SHARE, rendered by LYNX SHARE.</h2>
-    <p class="sec-lead reveal d2" data-i18n="media.lead">The demo song ships with the app (LYNX.exe --showcase). Every sound you hear is LYNX SHARE's own synths, drums and effects.</p>
-    <div class="media">
-      <div class="video reveal">
-        <video id="tour" src="assets/media/lynx-tour.mp4?v=0.1.23" poster="assets/media/poster.jpg?v=0.1.23" preload="metadata" playsinline></video>
-        <div class="vplay" id="vplay" role="button" tabindex="0" aria-label="Play the video tour" data-i18n-aria="aria.playVideo"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></span></div>
-      </div>
-      <div class="player reveal d1">
-        <div class="eyebrow">demo.lynx</div>
-        <h3 data-i18n="media.song">“Demo” — the showcase song</h3>
-        <p data-i18n="media.songp">124 BPM · kick, clap, reese bass, pad, pluck and supersaw. Click the waveform to seek.</p>
-        <div class="wave" id="wave"><canvas></canvas></div>
-        <div class="pctl"><button class="play" id="aPlay" aria-label="Play demo" data-i18n-aria="aria.playDemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><span class="t" id="atime">0:00 / 0:46</span></div>
-        <audio id="audio" src="assets/media/demo.mp3?v=0.1.23" preload="none"></audio>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="gallery">
-  <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.gallery">// screenshots</div>
-    <h2 class="sec-title reveal d1" data-i18n="gal.title">Dark, clean, focused.</h2>
-    <div class="gallery">
-      <figure class="reveal"><img src="assets/img/hero.webp?v=0.1.25" alt="Workspace" data-i18n-alt="alt.ws" loading="lazy"><figcaption data-i18n="g.ws">The whole workspace</figcaption></figure>
-      <figure class="reveal d1"><img src="assets/img/synth.webp?v=0.1.25" alt="Synth" data-i18n-alt="alt.synth" loading="lazy"><figcaption data-i18n="g.synth">Built-in 3-oscillator synth</figcaption></figure>
-      <figure class="reveal d2"><img src="assets/img/rack.webp?v=0.1.25" alt="Channel Rack" loading="lazy"><figcaption>Channel Rack</figcaption></figure>
-      <figure class="reveal"><img src="assets/img/eq.webp?v=0.1.25" alt="Facet EQ" data-i18n-alt="alt.eq" loading="lazy"><figcaption data-i18n="g.eq">8-band Facet EQ</figcaption></figure>
-      <figure class="reveal d1"><img src="assets/img/pianoroll.webp?v=0.1.25" alt="Piano Roll" loading="lazy"><figcaption>Piano Roll</figcaption></figure>
-      <figure class="reveal d2"><img src="assets/img/automation.webp?v=0.1.25" alt="Automation" data-i18n-alt="alt.auto" loading="lazy"><figcaption data-i18n="g.auto">Automation clips</figcaption></figure>
-      <figure class="reveal"><img src="assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy"><figcaption data-i18n="g.mix">Mixer with sends and sidechain</figcaption></figure>
-      <figure class="reveal d1"><img src="assets/img/playlist.webp?v=0.1.25" alt="Playlist" loading="lazy"><figcaption>Playlist</figcaption></figure>
-      <figure class="reveal d2"><img src="assets/img/cliplaunch.webp?v=0.1.25" alt="Clip-launch workflow" loading="lazy"><figcaption>Clip-launch workflow</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section id="plugins">
-  <div class="wrap">
-    <div class="eyebrow reveal" data-i18n="eb.plugins">// built-in plugins</div>
-    <h2 class="sec-title reveal d1" data-i18n="pl.title">Native plugins, rebuilt from scratch.</h2>
-    <p class="sec-lead reveal d2" data-i18n="pl.lead">Each engine is written natively in LYNX SHARE, inspired by an FL Studio plugin and checked against the original running unmodified. Exact means bit-identical output.</p>
-    <div class="ft-head reveal"><h3 data-i18n="ft.title">Featured</h3><p data-i18n="ft.lead">The plugins FL Studio users reach for most, all at Exact or Near-exact quality, plus LYNX SHARE's own reverbs fitted to measurements of producers' favourites.</p></div>
-    <div class="ft-grid reveal" id="ftGrid"></div>
-    <h3 class="pl-sub reveal" data-i18n="pl.sub">Every built-in plugin</h3>
-    <div class="pl-bar reveal">
-      <button class="pl-f on" data-f="all" data-i18n="pl.all">All</button><button class="pl-f" data-f="g" data-i18n="pl.gen">Generators</button><button class="pl-f" data-f="e" data-i18n="pl.fx">Effects</button>
-      <div class="pl-legend"><span><i class="st x"></i><em data-i18n="pl.x">Exact</em></span><span><i class="st n"></i><em data-i18n="pl.n">Near-exact</em></span><span><i class="st c"></i><em data-i18n="pl.c">Close</em></span><span><i class="st a"></i><em data-i18n="pl.a">Approximate</em></span><span><i class="st p"></i><em data-i18n="pl.p">Placeholder</em></span><span><i class="st o"></i><em data-i18n="pl.o">LYNX SHARE original</em></span></div>
-    </div>
-    <div class="pl-grid reveal" id="plGrid"></div>
-    <button class="btn btn-ghost btn-sm pl-all" id="plAll"></button>
-    <p class="pl-more" data-i18n="pl.more">Status, test coverage and what is still missing for each one: <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">docs/PLUGINS.md</a>.</p>
-    <p class="note" data-i18n="pl.tm">FL Studio and its plugin names are trademarks of Image-Line Software, used here only to describe compatibility. LYNX SHARE is not affiliated with Image-Line. No Image-Line code or audio data ships with LYNX SHARE; built-in waves are read from your own FL Studio installation.</p>
-  </div>
-</section>
-
-<section id="source">
-  <div class="wrap os">
-    <div>
-      <div class="eyebrow reveal" data-i18n="eb.source">// open source</div>
-      <h2 class="sec-title reveal d1" data-i18n="os.title">Built in the open.</h2>
-      <p class="sec-lead reveal d2" data-i18n="os.lead">C++20 and JUCE 8. Every feature comes with tests, and every FL Studio behaviour we reproduce is documented. Star the repo, open an issue, send a pull request.</p>
-      <div class="cta reveal d3" style="justify-content:flex-start;margin-top:28px">
-        <a class="btn btn-ghost" href="https://github.com/Ka1-S/LYNX-SHARE"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21l1.4-7L2 9.3l7-.8z"/></svg><span data-i18n="os.star">Star on GitHub</span></a>
-        <a class="btn btn-ghost" href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/ROADMAP.md">Roadmap</a>
-      </div>
-    </div>
-    <div class="term reveal d1"><div class="bar"><i></i><i></i><i></i></div><pre id="term"></pre></div>
-  </div>
-</section>
-
-<section style="padding-top:20px">
-  <div class="wrap">
-    <div class="dl reveal" id="download">
-      <i class="ring"></i><i class="ring" style="animation-delay:-2s"></i><i class="ring" style="animation-delay:-4s"></i>
-      <div class="eyebrow" style="position:relative" data-i18n="eb.download">// download</div>
-      <h2 style="position:relative" data-i18n="dl.title">Start making music.</h2>
-      <p style="position:relative" data-i18n="dl.lead">For Windows, macOS and Linux. No account, no subscription.</p>
-      <div class="os-btns" style="position:relative;margin-bottom:22px" data-os-btns>
-        <a class="btn btn-red" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span>Download</span></a>
-      </div>
-      <div class="dl-store" id="dlStore" style="position:relative"></div>
-      <div class="dl-hint" id="dlHint" style="position:relative"></div>
-      <div class="dl-port" id="dlPort" style="position:relative"></div>
-      <div class="dl-other" id="dlOther" style="position:relative"><span>Windows · macOS · Linux</span></div>
-      <div class="small" style="position:relative"><span class="ver-line" data-i18n="ver.latest">Latest release</span> · <a href="https://github.com/Ka1-S/LYNX-SHARE/releases" data-i18n="dl.all">all releases &amp; checksums</a></div>
-      <div class="req" style="position:relative"><span>Windows 10 / 11 · 64-bit</span><span data-i18n="dl.reqmac">macOS 11+ · Apple Silicon / Intel</span><span>Linux x86_64 · glibc 2.35+</span><span>VST3 · CLAP</span><span data-i18n="dl.alpha">Alpha — expect rough edges</span></div>
-      <div class="dl-plat" style="position:relative" data-i18n="dl.plat">Audio Units on macOS and LV2 on Linux. VST2 hosting, ASIO and the plugin sandbox are Windows-only.</div>
-    </div>
-    <p class="note" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
     <div class="policy" id="signing">
       <div>
         <h3><span data-i18n="sig.title">Code signing policy</span><span class="tag" data-i18n="sig.pending">pending approval</span></h3>
@@ -701,533 +187,25 @@ html.shot .ft,html.shot .cl,html.shot .cl-vh,html.shot .cl-alt{opacity:1!importa
       </div>
       <div id="crash-reports">
         <h3 data-i18n="sig.crash">Crash reports</h3>
-        <p data-i18n="sig.cr">Opt-in only. After a crash or freeze LYNX SHARE asks before sending a report (Settings › General › Crash reports: Ask / Always send / Never). A report holds the LYNX SHARE version, operating system, CPU, graphics card and driver, audio device, the crash or freeze file and the last steps; user names in paths become &lt;user&gt; and file names are dropped. No audio, no projects, no machine name, no IP address is stored. Reports are kept only to fix bugs. To have one deleted, <a href="https://github.com/Ka1-S/LYNX-SHARE/issues/new">open an issue</a> with its id (LYNX SHARE shows it after sending; every sent id is also listed in <code>crash-reports/sent.log</code> in LYNX SHARE's settings folder).</p>
+        <p data-i18n="sig.cr2">Opt-in only. After a crash or freeze LYNX SHARE asks before sending a report (Settings › General › Crash reports: Ask / Always send / Never send). A report holds a random id, the LYNX SHARE version, the operating system, CPU, graphics cards and drivers, screen size, audio device and settings, the crash or freeze file, the session's last 60 steps, and the names and versions of the third-party plugins that were loaded. User names in paths become &lt;user&gt;, and file names are left out unless you tick "include file names". No audio, projects or samples, no machine name and no IP address are stored. Reports are used only to fix bugs. To have one deleted, <a href="https://github.com/Ka1-S/LYNX-SHARE/issues/new">open an issue</a> with its id (LYNX SHARE shows it after sending; every sent id is also listed in <code>crash-reports/sent.log</code> in LYNX SHARE's settings folder).</p>
       </div>
     </div>
   </div>
 </section>
-
-<footer>
-  <div class="wrap">
-    <a href="#top" class="brand" style="font-size:16px"><img src="assets/img/logo.png?v=0.1.23" alt="" style="width:26px;height:26px">LYNX SHARE</a>
-    <span>© 2026 · AGPL-3.0</span>
-    <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
-  </div>
-</footer>
-
-<div class="lightbox" id="lb"><img alt=""></div>
-
 <script>
-(() => {
-if (location.search.includes('shot')) document.documentElement.classList.add('shot');
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-
-/* ---------- i18n ---------- */
-// LYNX_LANGS / LYNX_LANG / LYNX_DICT come from the script in <head> (picked before the first paint).
-// English lives in the page (the data-i18n elements plus EN below); every other language is one i18n/<id>.json:
-// {"ui": {key: text}, "featured": {FEATURED name: text}, "insp": {"vendor/short": text}}; a missing key falls back to English.
-const LANGS = window.LYNX_LANGS, DICTS = window.LYNX_DICT || {}, RTL = new Set([]);   // none of the 15 is right-to-left
-const OGL = {'en':'en_US','zh-Hans':'zh_CN','zh-Hant':'zh_TW','nl':'nl_NL','fr':'fr_FR','de':'de_DE','id':'id_ID','it':'it_IT','ja':'ja_JP','ko':'ko_KR','pl':'pl_PL','pt-BR':'pt_BR','ru':'ru_RU','es':'es_ES','tr':'tr_TR'};
-const SHORT = {'zh-Hans':'简','zh-Hant':'繁','pt-BR':'PT'};
-const EN = {
- 'meta.title':document.title, 'meta.desc':$('#mDesc').content, 'meta.ogDesc':$('#mOgD').content,
- 'hero.title':'A lightweight DAW,|fully open source.', 'aria.step':'{0}, step {1}',
- 'pl.insp':'inspired by {0}', 'pl.showAll':'Show all ({0})',
- 'ft.insert':'Any mixer insert', 'ft.flp':'From .flp projects', 'ft.insertT':'Can be added to any mixer insert',
- 'ft.flpT':'Created when you open an FL Studio project (.flp); its controls stay editable',
- 'cl.own':'Native LYNX SHARE engine', 'cl.wip':'In progress', 'cl.today':'Opens as {0}', 'cl.auto':'Auto-opens in projects',
- 'cl.autoT':'When a project uses {0} and it isn\'t installed, LYNX SHARE loads {1} in its place and keeps the original\'s settings for when it is.',
- 'cl.alt':'Also opens with a stand-in:', 'cl.nat1':'{0} native', 'cl.natN':'{0} native', 'cl.prog':'{0} in progress',
- 'cl.sub1':'{0} stand-in', 'cl.subN':'{0} stand-ins', 'cl.s1':'native engines inspired by the classics',
- 'cl.s2':'third-party plugins that auto-open with an equivalent', 'cl.s3':'new engines in progress',
- 'cl.flP':'{0} FL Studio native plugins rebuilt at Exact or Near-exact quality.', 'cl.flB':'See every built-in plugin',
- 'kind.Limiter':'Limiter', 'kind.Compressor':'Compressor', 'kind.Multiband':'Multiband', 'kind.Gate':'Gate', 'kind.EQ':'EQ',
- 'kind.De-esser':'De-esser', 'kind.Saturation':'Saturation', 'kind.Reverb':'Reverb', 'kind.Delay':'Delay', 'kind.Modulation':'Modulation',
- 'kind.Pitch':'Pitch', 'kind.Channel strip':'Channel strip', 'kind.Stereo':'Stereo', 'kind.Restoration':'Restoration', 'kind.Air EQ':'Air EQ',
- 'dl.for':'Download for {0}', 'dl.dl':'Download', 'dl.more':'More formats:', 'dl.yours':'Your system',
- 'dl.hwin':'<b>Windows 10 or 11, 64-bit.</b> The installer needs no admin rights. The executable is not code-signed yet: if SmartScreen warns, choose <i>More info</i> → <i>Run anyway</i>.',
- 'dl.hmac':'<b>macOS 11 or newer, Apple Silicon or Intel.</b> The app is not notarized by Apple yet: drag LYNX SHARE to Applications, then the first time right-click it → <i>Open</i> → <i>Open</i> (on macOS 15 or newer: try to open it once, then <i>System Settings → Privacy &amp; Security → Open Anyway</i>). Or in Terminal: <code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code>',
- 'dl.hlinux':'<b>Linux x86_64 with glibc 2.35 or newer</b> (Ubuntu 22.04, Debian 12, Fedora 36 or newer). AppImage: <code>chmod +x LYNX-*.AppImage</code>, then run it (some distros need libfuse2). The .tar.gz has an <code>install.sh</code> that installs for your user with a menu entry.',
- 'dl.fInstaller':'Installer', 'dl.fPortable':'Portable', 'dl.fUniversal':'Universal', 'dl.fAppImage':'AppImage', 'dl.fArchive':'Archive',
- 'dl.portTitle':'Portable versions (no install)', 'dl.portLead':'Download, unzip and run: nothing to install, no admin rights needed.',
- 'dl.portWin':'Windows portable (.zip)', 'dl.portWinP':'Unzip to any folder and open <code>LYNX.exe</code>.',
- 'dl.store':'<b>Windows 10 / 11:</b> also on the Microsoft Store, with automatic updates.', 'dl.storeAlt':'Get it from Microsoft',
- 'dl.portLin':'Linux AppImage', 'dl.portLinP':'A single file: <code>chmod +x</code> it and run.',
- 'mq.auto':'Automation clips', 'mq.flp':'.flp import', 'mq.als':'.als import and export', 'mq.clips':'Clip launching', 'mq.disk':'Disk streaming', 'mq.eq':'Parametric EQ', 'mq.ts':'Time-stretch',
- 'mq.midi':'MIDI controllers', 'mq.stems':'Stems export'
-};
-$$('[data-i18n]').forEach(e => EN[e.dataset.i18n] = e.innerHTML);
-$$('[data-i18n-alt]').forEach(e => EN[e.dataset.i18nAlt] = e.alt);
-$$('[data-i18n-aria]').forEach(e => EN[e.dataset.i18nAria] = e.getAttribute('aria-label'));
-let lang = 'en', D = {ui:{}, featured:{}, insp:{}};
-// t('dl.for', 'Linux'): the text in the current language (English when missing), {0} {1}... replaced by the arguments
-const t = (k, ...a) => { let v = D.ui[k] ?? EN[k] ?? k; a.forEach((x,i) => v = v.split('{'+i+'}').join(x)); return v; };
-const h1 = $('#h1');
-function words(text){
-  // words after the "|" get the gradient; Chinese and Japanese have no spaces: split into words with Intl.Segmenter
-  const [plain, accent = ''] = text.split('|'), cjk = /^(ja|zh)/.test(lang);
-  const split = s => {
-    if (!cjk) return s.split(' ').filter(Boolean);
-    if (!window.Intl || !Intl.Segmenter) return Array.from(s.replace(/\s+/g,''));
-    const out = [];
-    for (const g of new Intl.Segmenter(lang, {granularity:'word'}).segment(s.replace(/\s+/g,'')))
-      if (g.isWordLike || !out.length) out.push(g.segment); else out[out.length-1] += g.segment;   // punctuation stays on its word
-    return out;
-  };
-  const ws = [...split(plain).map(w => [w, false]), ...split(accent).map(w => [w, true])];
-  h1.innerHTML = ws.map(([w,g],i)=>`<span class="w${g ? ' grad' : ''}" style="animation-delay:${.15+i*(cjk ? .06 : .09)}s">${w}</span>`).join(cjk ? '' : ' ');
-}
-const langUrl = l => 'https://lynx-share.com/' + (l==='en' ? '' : '?lang=' + (l==='pt-BR' ? 'pt' : l));
-function loadLang(l){
-  if (l==='en') return Promise.resolve({});
-  window.LYNX_FONT(l);
-  DICTS[l] = DICTS[l] || fetch('i18n/'+l+'.json?v=0.1.23').then(r => r.ok ? r.json() : Promise.reject(r.status));
-  return Promise.resolve(DICTS[l]).catch(e => { delete DICTS[l]; throw e; });
-}
-let langSeq = 0;
-function setLang(l){
-  const seq = ++langSeq;
-  return loadLang(l).then(d => { if (seq===langSeq) applyLang(l, d); }, () => { if (seq===langSeq) applyLang('en', {}); })
-    .finally(() => document.documentElement.classList.remove('i18n-wait'));
-}
-function applyLang(l, d){
-  lang = l; D = {ui:d.ui||{}, featured:d.featured||{}, insp:d.insp||{}};
-  const html = document.documentElement; html.lang = l; html.dir = RTL.has(l) ? 'rtl' : 'ltr';
-  document.title = t('meta.title'); $('#mDesc').content = t('meta.desc'); $('#mOgT').content = t('meta.title'); $('#mOgD').content = t('meta.ogDesc');
-  $('#mCanon').href = $('#mOgU').content = langUrl(l); $('#mOgL').content = OGL[l];
-  $$('[data-i18n]').forEach(e => e.innerHTML = t(e.dataset.i18n));
-  $$('[data-i18n-alt]').forEach(e => e.alt = t(e.dataset.i18nAlt));
-  $$('[data-i18n-aria]').forEach(e => e.setAttribute('aria-label', t(e.dataset.i18nAria)));
-  words(t('hero.title'));
-  langSel.value = l; $('#langCode').textContent = SHORT[l] || l.toUpperCase();
-  renderPlugins(); renderFeatured(); renderClassics(); renderDownload(); renderVer(); renderMarquee(); labelSeq();
-}
-const langSel = $('#lang');
-langSel.innerHTML = LANGS.map(([id,name]) => `<option value="${id}" lang="${id}">${name}</option>`).join('');
-langSel.value = window.LYNX_LANG || 'en';
-langSel.onchange = () => {
-  const l = langSel.value;
-  try { localStorage.setItem('lynx-lang', l); } catch(e){}
-  // a ?lang= in the address wins over the saved choice: keep it in step so a reload shows the same language
-  try { const u = new URL(location.href); if (u.searchParams.has('lang')){ if (l==='en') u.searchParams.delete('lang'); else u.searchParams.set('lang', l==='pt-BR' ? 'pt' : l); history.replaceState(null, '', u); } } catch(e){}
-  setLang(l);
-};
-
-/* ---------- built-in plugins (docs/PLUGINS.md) ---------- */
-// [LYNX SHARE engine, inspired by (FL Studio), g/e, status x=exact n=near-exact c=close a=approximate p=placeholder
-//  o=LYNX SHARE original: an own design in the role of a kind of studio processor (no plugin is reproduced)]
-const PLUGINS = [
- ['3x Osc engine','3x Osc','g','x'],['FL Keys engine','FL Keys','g','x'],['DirectWave engine','DirectWave','g','x'],['DX10 engine','Fruity DX10','g','x'],
- ['SimSynth engine','SimSynth','g','x'],['Fruit Kick engine','Fruit Kick','g','x'],['BassDrum engine','BassDrum','g','x'],['Toxic engine','Toxic Biohazard','g','x'],
- ['Plucked! engine','Plucked!','g','x'],['BeepMap engine','BeepMap','g','x'],['Drumaxx engine','Drumaxx','g','x'],['Slayer engine','FL Slayer','g','x'],
- ['MiniSynth engine','MiniSynth','g','n'],['Kepler engine','Kepler','g','n'],['PoiZone engine','PoiZone','g','n'],['Transistor Bass engine','Transistor Bass','g','n'],
- ['Sawer engine','Sawer','g','n'],['Granulizer engine','Fruity Granulizer','g','n'],['Autogun engine','Autogun','g','n'],['DrumSynth engine','Fruity DrumSynth Live','g','n'],
- ['BooBass engine','BooBass','g','n'],['Sampler (FL voice)','FPC, Slicex, Fruity Slicer, Wave Traveller','g','n'],
- ['Sytrus engine','Sytrus','g','c'],['Harmor engine','Harmor','g','c'],['Harmless engine','Harmless','g','c'],['Ogun engine','Ogun','g','c'],['GMS engine','GMS','g','c'],
- ['Morphine engine','Morphine','g','c'],['Sakura / Drumpad models','Sakura, Drumpad','g','c'],['Built-in synth','FLEX','g','a'],['Silent channel','Wasp / Wasp XT','g','p'],['Silent channel','Fruity Dance','g','p'],
- ['Fruity Compressor','Fruity Compressor','e','x'],['Fruity Multiband Compressor','Fruity Multiband Compressor','e','x'],['Reeverb 2','Fruity Reeverb 2','e','x'],['Reeverb','Fruity Reeverb','e','x'],
- ['LuxeVerb','LuxeVerb','e','x'],['Fruity Delay 2','Fruity Delay 2','e','x'],['Fruity Delay 3','Fruity Delay 3','e','x'],['Fruity Delay Bank','Fruity Delay Bank','e','x'],
- ['Multiband Delay','Multiband Delay','e','x'],['Fruity Chorus','Fruity Chorus','e','x'],['Hyper Chorus','Hyper Chorus','e','x'],['Vintage Chorus','Vintage Chorus','e','x'],
- ['Fruity Flanger','Fruity Flanger','e','x'],['Fruity Flangus','Fruity Flangus','e','x'],['Fruity Fast Dist','Fruity Fast Dist','e','x'],['Fruity WaveShaper','Fruity WaveShaper','e','x'],
- ['Fruity Soft Clipper','Fruity Soft Clipper','e','x'],['Fruity Blood Overdrive','Fruity Blood Overdrive','e','x'],['Fruity PanOMatic','Fruity PanOMatic','e','x'],['Fruity Balance','Fruity Balance','e','x'],
- ['Stereo Shaper','Fruity Stereo Shaper','e','x'],['Stereo Enhancer','Fruity Stereo Enhancer','e','x'],['Transient Processor','Transient Processor','e','x'],['Spreader','Spreader','e','x'],
- ['Fruity Fast LP','Fruity Fast LP','e','x'],['Fruity Free Filter','Fruity Free Filter','e','x'],['Fruity Filter','Fruity Filter','e','x'],['Frequency Splitter','Frequency Splitter','e','x'],
- ['Hardcore','Hardcore','e','x'],['Vocoder','Fruity Vocoder','e','x'],['Love Philter','Fruity Love Philter','e','x'],['Pitch Shifter','Pitch Shifter','e','x'],
- ['EQUO','EQUO','e','x'],['Gross Beat','Gross Beat','e','x'],
- ['Parametric EQ','Fruity Parametric EQ 2, Parametric EQ','e','n'],['Fruity Limiter','Fruity Limiter','e','n'],['Effector','Effector','e','n'],['Maximus','Maximus','e','n'],
- ['Soundgoodizer','Soundgoodizer','e','n'],['Convolver','Fruity Convolver','e','n'],['Distructor','Distructor','e','n'],['Vocodex','Vocodex','e','n'],
- ['Vintage Phaser','Vintage Phaser','e','n'],['Squeeze','Fruity Squeeze','e','n'],
- ['Pitch correction','Pitcher','e','c'],['Newtone','Newtone','e','c'],['Newtime','Newtime','e','p'],
- ['LYNX Tune','vocal pitch correctors','e','o'],
- ['EQ','Fruity 7 Band EQ, Fruity Bass Boost','e','a'],['Delay','Fruity Delay (v1)','e','a'],['Chorus','Fruity Phaser','e','a'],['Utility','Fruity Center, Phase Inverter, Send, Transporter','e','a'],
- ['Frequency shifter','Frequency Shifter','e','a'],['Limiter','Emphasis','e','a'],['Parametric EQ','Low Lifter','e','a'],
- ['Ridge Strip','channel strips','e','o'],['Glow Leveler','opto compressors','e','o'],['Hush De-esser','de-essers','e','o'],
- ['Aether','air EQ / exciters','e','o'],['Ember Saturator','analog saturation','e','o'],
- ['Epoch Verb','vintage-digital reverbs (Valhalla VintageVerb)','e','o'],['Atrium','room reverbs (Valhalla Room)','e','o'],['Foil Plate','plate reverbs (Valhalla Plate)','e','o'],
- ['Nebula','delay-reverb networks (Valhalla Supermassive)','e','o'],['Halo','shimmer reverbs (Valhalla Shimmer)','e','o'],['Horizon','echo + reverb (Valhalla FutureVerb)','e','o'],
- ['Echoform','delays (Valhalla Delay)','e','o'],['Spiral Echo','frequency-shifting echo (Valhalla FreqEcho)','e','o'],['Orbit','flangers / choruses (Valhalla SpaceModulator)','e','o'],['Lattice Mod','multitap modulation (Valhalla UberMod)','e','o']
-];
-// Featured strip above the full list. To feature another engine (e.g. a future LYNX SHARE engine inspired by a
-// third-party plugin), add an entry: by = the original's maker, fl = the original plugin, t = g/e,
-// s = x/n (Exact / Near-exact) or o (a LYNX SHARE original fitted to black-box measurements of a third-party plugin), how = insert (any mixer insert) / flp (created from .flp).
-const FEATURED = [
- {n:'3x Osc engine',fl:'3x Osc',by:'FL Studio',t:'g',s:'x',how:'flp',
-  en:'Three-oscillator subtractive synth, FL\'s classic starting point.'},
- {n:'FL Keys engine',fl:'FL Keys',by:'FL Studio',t:'g',s:'x',how:'flp',
-  en:'Light sampled piano, electric piano and keys; samples from your own FL install.'},
- {n:'Gross Beat',fl:'Gross Beat',by:'FL Studio',t:'e',s:'x',how:'flp',
-  en:'Time and volume slicing for stutters, gates and tape stops.'},
- {n:'Fruity Limiter',fl:'Fruity Limiter',by:'FL Studio',t:'e',s:'n',how:'insert',
-  en:'Limiter, compressor and noise gate in one: the master-bus staple.'},
- {n:'Parametric EQ',fl:'Fruity Parametric EQ 2',by:'FL Studio',t:'e',s:'n',how:'insert',
-  en:'Seven-band parametric EQ, linear-phase mode included.'},
- {n:'Soundgoodizer',fl:'Soundgoodizer',by:'FL Studio',t:'e',s:'n',how:'flp',
-  en:'One knob, four characters: instant loudness and punch.'},
- {n:'Maximus',fl:'Maximus',by:'FL Studio',t:'e',s:'n',how:'flp',
-  en:'Multiband mastering maximizer and limiter.'},
- {n:'Fruity Delay 3',fl:'Fruity Delay 3',by:'FL Studio',t:'e',s:'x',how:'insert',
-  en:'Analog-style delay with modulation, diffusion and feedback filtering.'},
- {n:'Reeverb 2',fl:'Fruity Reeverb 2',by:'FL Studio',t:'e',s:'x',how:'insert',
-  en:'Algorithmic reverb, from small rooms to huge halls.'},
- {n:'Fruity Compressor',fl:'Fruity Compressor',by:'FL Studio',t:'e',s:'x',how:'insert',
-  en:'The classic FL compressor, sidechain included.'},
- {n:'Epoch Verb',fl:'ValhallaVintageVerb',by:'Valhalla DSP',t:'e',s:'o',how:'insert',
-  en:'22 vintage-digital reverb algorithms and three eras of colour; VintageVerb settings carry over.'},
- {n:'Nebula',fl:'Valhalla Supermassive',by:'Valhalla DSP',t:'e',s:'o',how:'insert',
-  en:'Huge delay-reverb networks: delay, feedback, density, warp and 22 shapes.'},
- {n:'Atrium',fl:'ValhallaRoom',by:'Valhalla DSP',t:'e',s:'o',how:'insert',
-  en:'Rooms and chambers with separate early and late sections and three-band decay.'},
- {n:'Foil Plate',fl:'ValhallaPlate',by:'Valhalla DSP',t:'e',s:'o',how:'insert',
-  en:'Bright plate reverb with instant onset and twelve plate types.'},
- {n:'Echoform',fl:'ValhallaDelay',by:'Valhalla DSP',t:'e',s:'o',how:'insert',
-  en:'Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch, reverse; ValhallaDelay settings carry over.'}
-];
-function renderFeatured(){
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  const how = {insert: t('ft.insert'), flp: t('ft.flp')};
-  const howT = {insert: t('ft.insertT'), flp: t('ft.flpT')};
-  const ic = {insert:'<path d="M4 6h16M4 12h16M4 18h10"/>', flp:'<path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/>'};
-  $('#ftGrid').innerHTML = FEATURED.map((f,i) =>
-    `<article class="ft" style="--i:${i}"><div class="top"><span class="badge ${f.s}"><i class="st ${f.s}"></i>${t('pl.'+f.s)}</span><span class="k">${f.t==='g'?'GEN':'FX'}</span></div>`+
-    `<h4>${esc(f.n)}</h4><div class="by">${t('pl.insp', esc(f.fl))} · ${esc(f.by)}</div><p>${esc(D.featured[f.n] || f.en)}</p>`+
-    `<div class="how" title="${esc(howT[f.how])}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic[f.how]}</svg>${how[f.how]}</div><div class="eqb" aria-hidden="true"><i></i><i></i><i></i><i></i></div></article>`).join('');
-}
-$('#ftGrid').addEventListener('pointermove', e => { const c = e.target.closest('.ft'); if (!c) return; const r = c.getBoundingClientRect(); c.style.setProperty('--x',(e.clientX-r.left)+'px'); c.style.setProperty('--y',(e.clientY-r.top)+'px'); });
-let plFilter = 'all', plOpen = false;
-function renderPlugins(){
-  const st = {x:'pl.x',n:'pl.n',c:'pl.c',a:'pl.a',p:'pl.p',o:'pl.o'};
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const list = PLUGINS.filter(p => plFilter==='all' || p[2]===plFilter);
-  // collapsed: the first 10 of each type
-  const shown = plOpen ? list : list.filter(p => list.filter(q => q[2]===p[2]).indexOf(p) < 10);
-  const more = $('#plAll'); more.style.display = shown.length < list.length ? '' : 'none';
-  more.textContent = t('pl.showAll', list.length);
-  $('#plGrid').innerHTML = shown.map(([n,fl,ty,s]) =>
-    `<div class="pl" title="${esc(t(st[s]))}"><i class="st ${s}"></i><div class="tx"><b>${esc(n)}</b><small>${t('pl.insp', esc(fl))}</small></div><span class="k">${ty==='g'?'GEN':'FX'}</span></div>`).join('');
-}
-$('#plAll').onclick = () => { plOpen = true; renderPlugins(); };
-$$('.pl-f').forEach(b => b.onclick = () => { plFilter = b.dataset.f; $$('.pl-f').forEach(x => x.classList.toggle('on', x===b)); renderPlugins(); });
-/* ---------- inspired by the classics ---------- */
-/* inspired:begin (generated by scripts/gen-inspired.py) */
-const INSPIRED = {"groups":[{"vendor":"FabFilter","label":"FabFilter","items":[{"short":"Pro-L 2","lynx":"Apex Limiter","state":"own","name":{"en":"Apex Limiter","pt":"Apex Limiter"},"kind":"Limiter","desc":{"en":"Transparent mastering limiter: look-ahead, true-peak ceiling, two-stage release and four styles.","pt":"Limiter de masterização transparente: look-ahead, teto true-peak, release em dois estágios e quatro estilos."},"auto":true},{"short":"Pro-C 2 / 3","lynx":"Crest Compressor","state":"own","name":{"en":"Crest Compressor","pt":"Crest Compressor"},"kind":"Compressor","desc":{"en":"Style compressor fitted to black-box measurements: 11 styles, knee, range, look-ahead, 3-band side-chain EQ, character, oversampling and a live gain-reduction graph.","pt":"Compressor de estilos ajustado a medições caixa-preta: 11 estilos, knee, range, look-ahead, EQ de sidechain de 3 bandas, caráter, oversampling e gráfico de redução de ganho ao vivo."},"auto":true},{"short":"Pro-MB","lynx":"Prism Multiband","state":"own","name":{"en":"Prism Multiband","pt":"Prism Multiband"},"kind":"Multiband","desc":{"en":"4-band dynamics: compress or expand, downward or upward, per-band attack, release, knee and level; transparent while a band rests.","pt":"Dinâmica de 4 bandas: comprime ou expande, para baixo ou para cima, ataque, release, knee e nível por banda; transparente enquanto a banda repousa."},"auto":true},{"short":"Pro-G","lynx":"Sentry Gate","state":"own","name":{"en":"Sentry Gate","pt":"Sentry Gate"},"kind":"Gate","desc":{"en":"Gate and expander with Classic, Clean, Vocal, Guitar and Upward styles, hold, knee, look-ahead and side-chain filters.","pt":"Gate e expansor com estilos Clássico, Limpo, Vocal, Guitarra e Para cima, hold, knee, look-ahead e filtros de sidechain."},"auto":true},{"short":"Pro-Q 2 / 3 / 4","lynx":"Facet EQ","state":"own","name":{"en":"Facet EQ","pt":"Facet EQ"},"kind":"EQ","desc":{"en":"Precision 8-band EQ: bells, shelves, notches and cuts up to 96 dB/oct that keep their analog shape up to Nyquist, zero latency.","pt":"EQ de precisão de 8 bandas: bells, shelves, notches e cortes até 96 dB/oit que mantêm a forma analógica até Nyquist, latência zero."},"auto":true},{"short":"Pro-DS","lynx":"Hush De-esser","state":"own","name":{"en":"Hush De-esser","pt":"Hush De-esser"},"kind":"De-esser","desc":{"en":"Split-band or wideband de-esser with band or high-pass detection, listen mode and 2 ms lookahead.","pt":"De-esser por banda ou banda larga, detecção por banda ou passa-altas, modo listen e lookahead de 2 ms."},"auto":true},{"short":"Saturn","lynx":"Ember Saturator","state":"own","name":{"en":"Ember Saturator","pt":"Ember Saturator"},"kind":"Saturation","desc":{"en":"Tube, tape, transistor and fuzz saturation with tone tilt, auto gain and up to 8x oversampling; up to four bands, each with its own style and drive.","pt":"Saturação valvulada, de fita, transistor e fuzz, com tilt de timbre, ganho automático e oversampling até 8x; até quatro bandas, cada uma com estilo e drive próprios."},"auto":true},{"short":"Pro-R 2","lynx":"LuxeVerb","state":"standin","name":{"en":"LuxeVerb","pt":"LuxeVerb"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"Timeless 3","lynx":"Fruity Delay 3","state":"standin","name":{"en":"Fruity Delay 3","pt":"Fruity Delay 3"},"kind":"","desc":{"en":"","pt":""},"auto":true}]},{"vendor":"Valhalla DSP","label":"Valhalla","items":[{"short":"VintageVerb","lynx":"Epoch Verb","state":"own","name":{"en":"Epoch Verb","pt":"Epoch Verb"},"kind":"Reverb","desc":{"en":"22 vintage-digital reverb algorithms (halls, plates, rooms, chorused and random spaces, gated) with 1970s, 1980s or now colour.","pt":"22 algoritmos de reverb digital vintage (salões, placas, salas, espaços com chorus e aleatórios, gated) com cor dos anos 70, 80 ou atual."},"auto":true},{"short":"Room","lynx":"Atrium","state":"own","name":{"en":"Atrium","pt":"Atrium"},"kind":"Reverb","desc":{"en":"Rooms and chambers with separate early and late sections, three-band decay and twelve room types.","pt":"Salas e câmaras com reflexões iniciais e cauda separadas, decaimento em três bandas e doze tipos de sala."},"auto":true},{"short":"Plate","lynx":"Foil Plate","state":"own","name":{"en":"Foil Plate","pt":"Foil Plate"},"kind":"Reverb","desc":{"en":"Bright plate reverb that speaks at once, with a real plate's frequency-dependent decay and twelve plate types.","pt":"Reverb de placa brilhante e imediato, com o decaimento dependente da frequência de uma placa real e doze tipos de placa."},"auto":true},{"short":"Supermassive","lynx":"Nebula","state":"own","name":{"en":"Nebula","pt":"Nebula"},"kind":"Reverb","desc":{"en":"Huge delay-reverb networks: free or tempo-synced delay, feedback, density, warp and 22 network shapes.","pt":"Redes enormes de delay e reverb: tempo livre ou sincronizado, feedback, densidade, warp e 22 formas de rede."},"auto":true},{"short":"Shimmer","lynx":"Halo","state":"own","name":{"en":"Halo","pt":"Halo"},"kind":"Reverb","desc":{"en":"Shimmer reverb: a ±12-semitone pitch shifter inside the decay, one or two voices.","pt":"Reverb shimmer: transpositor de ±12 semitons dentro do decaimento, uma ou duas vozes."},"auto":true},{"short":"FutureVerb","lynx":"Horizon","state":"own","name":{"en":"Horizon","pt":"Horizon"},"kind":"Reverb","desc":{"en":"Echo into or after a reverb: tape, analog, digital, reverse and octave echoes, eight reverb modes.","pt":"Eco antes ou depois de um reverb: ecos de fita, analógico, digital, reverso e de oitava, oito modos de reverb."},"auto":true},{"short":"Delay","lynx":"Echoform","state":"own","name":{"en":"Echoform","pt":"Echoform"},"kind":"Delay","desc":{"en":"Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %.","pt":"Eco multimodo: caracteres de fita, BBD, analógico, digital, deslocador, altura e reverso, sincronia de tempo, wow / flutter, feedback acima de 100 %."},"auto":true},{"short":"FreqEcho","lynx":"Spiral Echo","state":"own","name":{"en":"Spiral Echo","pt":"Spiral Echo"},"kind":"Delay","desc":{"en":"Frequency-shifting echo: every repeat moves by the shift, opposite on the right side in stereo; filters in the loop.","pt":"Eco com deslocamento de frequência: cada repetição se desloca, ao contrário no lado direito em estéreo; filtros no loop."},"auto":true},{"short":"SpaceModulator","lynx":"Orbit","state":"own","name":{"en":"Orbit","pt":"Orbit"},"kind":"Modulation","desc":{"en":"Modulation machine: barber-pole and through-zero flangers, tri and octo choruses, doubler, ensemble, symphonic.","pt":"Máquina de modulação: flangers barber-pole e through-zero, chorus triplo e óctuplo, dobrador, ensemble, sinfônico."},"auto":true},{"short":"UberMod","lynx":"Lattice Mod","state":"own","name":{"en":"Lattice Mod","pt":"Lattice Mod"},"kind":"Modulation","desc":{"en":"Multitap modulated delay: 1 to 16 taps with spread / slope / skew, detune and vibrato, rotating stereo feedback, diffusion, drive.","pt":"Delay multitap modulado: 1 a 16 taps com spread / inclinação / desvio, desafinação e vibrato, feedback estéreo girando, difusão, drive."},"auto":true}]},{"vendor":"Antares","label":"Antares","items":[{"short":"Auto-Tune","lynx":"LYNX Tune","state":"own","name":{"en":"LYNX Tune","pt":"LYNX Tune"},"kind":"Pitch","desc":{"en":"Real-time vocal pitch correction: key and scale, retune from natural to the hard robot effect, formant preserve, MIDI target notes.","pt":"Afinação vocal em tempo real: tom e escala, retune do natural ao efeito robô, preservação de formantes, notas-alvo por MIDI."},"auto":true}]},{"vendor":"Waves","label":"Waves","items":[{"short":"H-Delay","lynx":"Echoform","state":"own","name":{"en":"Echoform","pt":"Echoform"},"kind":"Delay","desc":{"en":"Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %.","pt":"Eco multimodo: caracteres de fita, BBD, analógico, digital, deslocador, altura e reverso, sincronia de tempo, wow / flutter, feedback acima de 100 %."},"auto":true},{"short":"CLA-2A","lynx":"Glow Leveler","state":"own","name":{"en":"Glow Leveler","pt":"Glow Leveler"},"kind":"Compressor","desc":{"en":"Optical leveler with an electro-optical cell model: ~10 ms attack and a release that lengthens after heavy leveling.","pt":"Nivelador óptico com modelo de célula eletro-óptica: ataque de ~10 ms e release que se alonga após compressão pesada."},"auto":true},{"short":"CLA-76","lynx":"Crest Compressor","state":"own","name":{"en":"Crest Compressor","pt":"Crest Compressor"},"kind":"Compressor","desc":{"en":"Style compressor fitted to black-box measurements: 11 styles, knee, range, look-ahead, 3-band side-chain EQ, character, oversampling and a live gain-reduction graph.","pt":"Compressor de estilos ajustado a medições caixa-preta: 11 estilos, knee, range, look-ahead, EQ de sidechain de 3 bandas, caráter, oversampling e gráfico de redução de ganho ao vivo."},"auto":true},{"short":"SSL E-Channel","lynx":"Ridge Strip","state":"own","name":{"en":"Ridge Strip","pt":"Ridge Strip"},"kind":"Channel strip","desc":{"en":"Console channel strip: high/low-pass, 4-band EQ with two curve families, compressor, gate/expander, EQ/dynamics order.","pt":"Channel strip de console: passa-altas/baixas, EQ de 4 bandas com duas famílias de curva, compressor, gate/expansor, ordem EQ/dinâmica."},"auto":true},{"short":"S1 Imager","lynx":"Stereo Shaper","state":"own","name":{"en":"Stereo Shaper","pt":"Stereo Shaper"},"kind":"Stereo","desc":{"en":"Stereo matrix: how much of each input side reaches left and right, the delay and phase between the channels, width from mono to wide.","pt":"Matriz estéreo: quanto de cada lado da entrada chega à esquerda e à direita, o atraso e a fase entre os canais, largura de mono a aberto."},"auto":true},{"short":"DeEsser","lynx":"Hush De-esser","state":"own","name":{"en":"Hush De-esser","pt":"Hush De-esser"},"kind":"De-esser","desc":{"en":"Split-band or wideband de-esser with band or high-pass detection, listen mode and 2 ms lookahead.","pt":"De-esser por banda ou banda larga, detecção por banda ou passa-altas, modo listen e lookahead de 2 ms."},"auto":true},{"short":"NS1","lynx":"Quell Denoiser","state":"own","name":{"en":"Quell Denoiser","pt":"Quell Denoiser"},"kind":"Restoration","desc":{"en":"One-knob broadband noise suppressor: six phase-coherent bands, each with a downward expander that follows the Amount knob; Listen plays what is taken away.","pt":"Supressor de ruído de banda larga com um botão: seis bandas coerentes em fase, cada uma com um expansor que segue o Amount; Listen toca o que é removido."},"auto":true},{"short":"Doubler","lynx":"Gemini Doubler","state":"own","name":{"en":"Gemini Doubler","pt":"Gemini Doubler"},"kind":"Modulation","desc":{"en":"Two-voice vocal doubler: each voice with its own delay, detune, pitch drift, pan, gain and feedback, plus an octave-down switch and voice shelves.","pt":"Dobrador vocal de duas vozes: cada voz com atraso, detune, deriva de afinação, pan, ganho e realimentação próprios, mais oitava abaixo e shelves nas vozes."},"auto":true},{"short":"Tune Real-Time","lynx":"LYNX Tune","state":"own","name":{"en":"LYNX Tune","pt":"LYNX Tune"},"kind":"Pitch","desc":{"en":"Real-time vocal pitch correction: key and scale, retune from natural to the hard robot effect, formant preserve, MIDI target notes.","pt":"Afinação vocal em tempo real: tom e escala, retune do natural ao efeito robô, preservação de formantes, notas-alvo por MIDI."},"auto":true},{"short":"RVerb, H-Reverb, TrueVerb","lynx":"Reeverb 2","state":"standin","name":{"en":"Reeverb 2","pt":"Reeverb 2"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"SuperTap","lynx":"Fruity Delay 3","state":"standin","name":{"en":"Fruity Delay 3","pt":"Fruity Delay 3"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"L1, L2, L3, L4","lynx":"Limiter","state":"standin","name":{"en":"Limiter","pt":"Limiter"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"Renaissance Compressor","lynx":"Compressor","state":"standin","name":{"en":"Compressor","pt":"Compressor"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"CLA-76, CLA-3A, C1, SSLComp, API-2500","lynx":"Compressor","state":"standin","name":{"en":"Compressor","pt":"Compressor"},"kind":"","desc":{"en":"","pt":""},"auto":true},{"short":"Q10, Renaissance EQ, SSL EQ","lynx":"Parametric EQ","state":"standin","name":{"en":"Parametric EQ","pt":"Parametric EQ"},"kind":"","desc":{"en":"","pt":""},"auto":true}]},{"vendor":"Solid State Logic","label":"SSL","items":[{"short":"Native Channel Strip, 4K E","lynx":"Ridge Strip","state":"own","name":{"en":"Ridge Strip","pt":"Ridge Strip"},"kind":"Channel strip","desc":{"en":"Console channel strip: high/low-pass, 4-band EQ with two curve families, compressor, gate/expander, EQ/dynamics order.","pt":"Channel strip de console: passa-altas/baixas, EQ de 4 bandas com duas famílias de curva, compressor, gate/expansor, ordem EQ/dinâmica."},"auto":true}]},{"vendor":"Soundtoys","label":"Soundtoys","items":[{"short":"Little Plate","lynx":"Foil Plate","state":"own","name":{"en":"Foil Plate","pt":"Foil Plate"},"kind":"Reverb","desc":{"en":"Bright plate reverb that speaks at once, with a real plate's frequency-dependent decay and twelve plate types.","pt":"Reverb de placa brilhante e imediato, com o decaimento dependente da frequência de uma placa real e doze tipos de placa."},"auto":true},{"short":"EchoBoy","lynx":"Echoform","state":"own","name":{"en":"Echoform","pt":"Echoform"},"kind":"Delay","desc":{"en":"Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %.","pt":"Eco multimodo: caracteres de fita, BBD, analógico, digital, deslocador, altura e reverso, sincronia de tempo, wow / flutter, feedback acima de 100 %."},"auto":true},{"short":"PrimalTap","lynx":"Echoform","state":"own","name":{"en":"Echoform","pt":"Echoform"},"kind":"Delay","desc":{"en":"Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %.","pt":"Eco multimodo: caracteres de fita, BBD, analógico, digital, deslocador, altura e reverso, sincronia de tempo, wow / flutter, feedback acima de 100 %."},"auto":true},{"short":"Decapitator","lynx":"Ember Saturator","state":"own","name":{"en":"Ember Saturator","pt":"Ember Saturator"},"kind":"Saturation","desc":{"en":"Tube, tape, transistor and fuzz saturation with tone tilt, auto gain and up to 8x oversampling; up to four bands, each with its own style and drive.","pt":"Saturação valvulada, de fita, transistor e fuzz, com tilt de timbre, ganho automático e oversampling até 8x; até quatro bandas, cada uma com estilo e drive próprios."},"auto":true},{"short":"Little AlterBoy","lynx":"LYNX Tune","state":"own","name":{"en":"LYNX Tune","pt":"LYNX Tune"},"kind":"Pitch","desc":{"en":"Real-time vocal pitch correction: key and scale, retune from natural to the hard robot effect, formant preserve, MIDI target notes.","pt":"Afinação vocal em tempo real: tom e escala, retune do natural ao efeito robô, preservação de formantes, notas-alvo por MIDI."},"auto":true},{"short":"PanMan","lynx":"Auto-pan","state":"standin","name":{"en":"Auto-pan","pt":"Auto-pan"},"kind":"","desc":{"en":"","pt":""},"auto":true}]},{"vendor":"Slate Digital","label":"Slate","items":[{"short":"Fresh Air","lynx":"Aether","state":"own","name":{"en":"Aether","pt":"Aether"},"kind":"Air EQ","desc":{"en":"Air EQ: a broad high shelf up to +15 dB plus an oversampled harmonic exciter, even or odd character.","pt":"EQ de ar: shelf agudo largo até +15 dB e um excitador harmônico com oversampling, caráter par ou ímpar."},"auto":true}]},{"vendor":"Harrison","label":"Harrison","items":[{"short":"32Classic / MPC channel strips","lynx":"Ridge Strip","state":"own","name":{"en":"Ridge Strip","pt":"Ridge Strip"},"kind":"Channel strip","desc":{"en":"Console channel strip: high/low-pass, 4-band EQ with two curve families, compressor, gate/expander, EQ/dynamics order.","pt":"Channel strip de console: passa-altas/baixas, EQ de 4 bandas com duas famílias de curva, compressor, gate/expansor, ordem EQ/dinâmica."},"auto":true},{"short":"De-Esser","lynx":"Hush De-esser","state":"own","name":{"en":"Hush De-esser","pt":"Hush De-esser"},"kind":"De-esser","desc":{"en":"Split-band or wideband de-esser with band or high-pass detection, listen mode and 2 ms lookahead.","pt":"De-esser por banda ou banda larga, detecção por banda ou passa-altas, modo listen e lookahead de 2 ms."},"auto":true}]},{"vendor":"Complete Access (role)","label":"Complete Access (role)","items":[{"short":"channel strips (Slate Virtual Mix Rack)","lynx":"Ridge Strip","state":"own","name":{"en":"Ridge Strip","pt":"Ridge Strip"},"kind":"Channel strip","desc":{"en":"Console channel strip: high/low-pass, 4-band EQ with two curve families, compressor, gate/expander, EQ/dynamics order.","pt":"Channel strip de console: passa-altas/baixas, EQ de 4 bandas com duas famílias de curva, compressor, gate/expansor, ordem EQ/dinâmica."},"auto":true},{"short":"bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp)","lynx":"Crest Compressor","state":"own","name":{"en":"Crest Compressor","pt":"Crest Compressor"},"kind":"Compressor","desc":{"en":"Style compressor fitted to black-box measurements: 11 styles, knee, range, look-ahead, 3-band side-chain EQ, character, oversampling and a live gain-reduction graph.","pt":"Compressor de estilos ajustado a medições caixa-preta: 11 estilos, knee, range, look-ahead, EQ de sidechain de 3 bandas, caráter, oversampling e gráfico de redução de ganho ao vivo."},"auto":true},{"short":"optical levelers (Slate FG-2A, SD-3A, Custom Opto)","lynx":"Glow Leveler","state":"own","name":{"en":"Glow Leveler","pt":"Glow Leveler"},"kind":"Compressor","desc":{"en":"Optical leveler with an electro-optical cell model: ~10 ms attack and a release that lengthens after heavy leveling.","pt":"Nivelador óptico com modelo de célula eletro-óptica: ataque de ~10 ms e release que se alonga após compressão pesada."},"auto":true},{"short":"limiters (Slate FG-X 2, SSL X-Limit, sonible smart:limit, pure:limit)","lynx":"Apex Limiter","state":"own","name":{"en":"Apex Limiter","pt":"Apex Limiter"},"kind":"Limiter","desc":{"en":"Transparent mastering limiter: look-ahead, true-peak ceiling, two-stage release and four styles.","pt":"Limiter de masterização transparente: look-ahead, teto true-peak, release em dois estágios e quatro estilos."},"auto":true},{"short":"EQs (Slate Infinity EQ, FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ, Eiosis AirEQ, SSL X-EQ 2, sonible smart:EQ)","lynx":"Facet EQ","state":"own","name":{"en":"Facet EQ","pt":"Facet EQ"},"kind":"EQ","desc":{"en":"Precision 8-band EQ: bells, shelves, notches and cuts up to 96 dB/oct that keep their analog shape up to Nyquist, zero latency.","pt":"EQ de precisão de 8 bandas: bells, shelves, notches e cortes até 96 dB/oit que mantêm a forma analógica até Nyquist, latência zero."},"auto":true},{"short":"de-essers (SSL DeEss, Slate FG-DS 902, Eiosis E2Deesser, sonible smart:deess)","lynx":"Hush De-esser","state":"own","name":{"en":"Hush De-esser","pt":"Hush De-esser"},"kind":"De-esser","desc":{"en":"Split-band or wideband de-esser with band or high-pass detection, listen mode and 2 ms lookahead.","pt":"De-esser por banda ou banda larga, detecção por banda ou passa-altas, modo listen e lookahead de 2 ms."},"auto":true},{"short":"gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate)","lynx":"Sentry Gate","state":"own","name":{"en":"Sentry Gate","pt":"Sentry Gate"},"kind":"Gate","desc":{"en":"Gate and expander with Classic, Clean, Vocal, Guitar and Upward styles, hold, knee, look-ahead and side-chain filters.","pt":"Gate e expansor com estilos Clássico, Limpo, Vocal, Guitarra e Para cima, hold, knee, look-ahead e filtros de sidechain."},"auto":true},{"short":"reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Rooms, Slate VerbSuite Classics, SSL FlexVerb / PlateVerb / SpringVerb, sonible smart:reverb)","lynx":"Foil Plate","state":"own","name":{"en":"Foil Plate","pt":"Foil Plate"},"kind":"Reverb","desc":{"en":"Bright plate reverb that speaks at once, with a real plate's frequency-dependent decay and twelve plate types.","pt":"Reverb de placa brilhante e imediato, com o decaimento dependente da frequência de uma placa real e doze tipos de placa."},"auto":true},{"short":"delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay)","lynx":"Echoform","state":"own","name":{"en":"Echoform","pt":"Echoform"},"kind":"Delay","desc":{"en":"Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %.","pt":"Eco multimodo: caracteres de fita, BBD, analógico, digital, deslocador, altura e reverso, sincronia de tempo, wow / flutter, feedback acima de 100 %."},"auto":true},{"short":"saturators (Slate Heatwave / Revival, SSL Fusion Vintage Drive / X-Saturator, Harrison Tape Saturator)","lynx":"Ember Saturator","state":"own","name":{"en":"Ember Saturator","pt":"Ember Saturator"},"kind":"Saturation","desc":{"en":"Tube, tape, transistor and fuzz saturation with tone tilt, auto gain and up to 8x oversampling; up to four bands, each with its own style and drive.","pt":"Saturação valvulada, de fita, transistor e fuzz, com tilt de timbre, ganho automático e oversampling até 8x; até quatro bandas, cada uma com estilo e drive próprios."},"auto":true},{"short":"pitch correction (Slate MetaTune)","lynx":"LYNX Tune","state":"own","name":{"en":"LYNX Tune","pt":"LYNX Tune"},"kind":"Pitch","desc":{"en":"Real-time vocal pitch correction: key and scale, retune from natural to the hard robot effect, formant preserve, MIDI target notes.","pt":"Afinação vocal em tempo real: tom e escala, retune do natural ao efeito robô, preservação de formantes, notas-alvo por MIDI."},"auto":true},{"short":"vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp)","lynx":"Compressor","state":"standin","name":{"en":"Compressor","pt":"Compressor"},"kind":"","desc":{"en":"","pt":""},"auto":true}]},{"vendor":"SPL","label":"SPL","items":[{"short":"Transient Designer","lynx":"Strike Shaper","state":"own","name":{"en":"Strike Shaper","pt":"Strike Shaper"},"kind":"Transient designer","desc":{"en":"Level-independent transient designer: Attack ±15 dB and Sustain ±24 dB from two envelopes, no threshold, plus output, parallel mix, soft-clip guard and a detector high-pass.","pt":"Transient designer independente do nível: Attack ±15 dB e Sustain ±24 dB a partir de dois envelopes, sem threshold, mais saída, mix paralelo, proteção soft clip e passa-altas no detector."},"auto":true}]},{"vendor":"Slate Digital (Complete Access)","label":"Slate Digital (Complete Access)","items":[{"short":"VCC Channel (console emulation)","lynx":"Kiln Channel","state":"own","name":{"en":"Kiln Channel","pt":"Kiln Channel"},"kind":"Console","desc":{"en":"Console channel: six measured console models with drive, noise, groups and group bypass, amber VU.","pt":"Canal de console: seis modelos de console medidos com drive, ruído, grupos e bypass de grupo, VU âmbar."},"auto":true}]},{"vendor":"Solid State Logic (Complete Access)","label":"Solid State Logic (Complete Access)","items":[{"short":"Drumstrip (drum channel strip)","lynx":"Shell Channel","state":"own","name":{"en":"Shell Channel","pt":"Shell Channel"},"kind":"Drum strip","desc":{"en":"Drum channel strip: gate, transient shaper, low and high frequency enhancers, listen-mic compressor and 120 process orders.","pt":"Canal de bateria: gate, transient shaper, realçadores de graves e agudos, compressor listen-mic e 120 ordens de processamento."},"auto":true},{"short":"Guitarstrip (guitar / bass channel strip)","lynx":"Fret Channel","state":"own","name":{"en":"Fret Channel","pt":"Fret Channel"},"kind":"Guitar strip","desc":{"en":"Guitar and bass channel strip: phase correction, EQ with filters, five-mode compressor, guitar and bass amps, output mix.","pt":"Canal de guitarra e baixo: correção de fase, EQ com filtros, compressor de cinco modos, amps de guitarra e baixo, mix de saída."},"auto":true}]}],"fl":{"featured":["3x Osc","FL Keys","Gross Beat","Fruity Limiter","Parametric EQ","Soundgoodizer","Maximus","Fruity Delay 3","Reeverb 2","Fruity Compressor","Epoch Verb","Nebula","Atrium","Foil Plate","Echoform","Crest Compressor","Prism Multiband","Sentry Gate"],"exact":76},"tm":{"en":"Product and company names are trademarks of their respective owners. They are used only to describe compatibility and the role each LYNX SHARE engine plays. LYNX SHARE is not affiliated with, endorsed or sponsored by any of them and contains none of their code, presets, graphics or audio.","pt":"Nomes de produtos e empresas são marcas de seus respectivos donos, citadas só para descrever compatibilidade e o papel de cada motor do LYNX SHARE. O LYNX SHARE não é afiliado, endossado nem patrocinado por nenhum deles e não contém código, presets, gráficos nem áudio deles."}};
-/* inspired:end */
-let clVendor = 'all';
-const clSeen = new Set();
-const clIo = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ e.target.classList.add('in'); clSeen.add(e.target.dataset.v); clIo.unobserve(e.target); } }), {threshold:.08, rootMargin:'0px 0px -40px 0px'});
-function renderClassics(){
-  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const T = {own:t('cl.own'),wip:t('cl.wip'),today:n=>t('cl.today',n),auto:t('cl.auto'),autoT:(p,e)=>t('cl.autoT',p,e),alt:t('cl.alt'),all:t('pl.all'),
-      nat:n=>t(n>1?'cl.natN':'cl.nat1',n),prog:n=>t('cl.prog',n),sub:n=>t(n>1?'cl.subN':'cl.sub1',n),
-      s1:t('cl.s1'),s2:t('cl.s2'),s3:t('cl.s3'),flT:'Image-Line FL Studio',flP:n=>t('cl.flP',n),flB:t('cl.flB')};
-  const desc = (g,i) => D.insp[g.vendor+'/'+i.short] || i.desc.en;
-  const all = INSPIRED.groups.flatMap(g => g.items);
-  const ownN = new Set(all.filter(i => i.state==='own').map(i => i.lynx)).size;
-  $('#clStats').innerHTML = [[ownN,T.s1,''],[all.filter(i => i.auto).length,T.s2,''],[all.filter(i => i.state==='wip').length,T.s3,' w']]
-    .map(([n,t,c]) => `<div class="cl-stat${c}"><b>${n}</b><span>${t}</span></div>`).join('');
-  $('#clTabs').innerHTML = [['all',T.all],...INSPIRED.groups.map(g => [g.vendor,g.vendor])]
-    .map(([v,t]) => `<button class="pl-f${v===clVendor?' on':''}" data-v="${esc(v)}">${esc(t)}</button>`).join('');
-  const autoIc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/><path d="M9 15l2 2 4-4"/></svg>';
-  const todayIc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-  $('#clGroups').innerHTML = INSPIRED.groups.map(g => {
-    const main = g.items.filter(i => i.state!=='standin'), alt = g.items.filter(i => i.state==='standin');
-    const n = s => g.items.filter(i => i.state===s).length;
-    const sum = [[n('own'),T.nat],[n('wip'),T.prog],[n('standin'),T.sub]].filter(x => x[0]).map(([c,f]) => f(c)).join(' · ');
-    const cards = main.map((i,k) => {
-      const nm = i.name.en, foot = [];
-      if (i.state==='wip' && i.lynx) foot.push(`<span>${todayIc}${T.today(esc(i.lynx))}</span>`);
-      if (i.auto) foot.push(`<span class="auto" title="${esc(T.autoT(i.short, i.state==='wip' ? i.lynx : nm))}">${autoIc}${T.auto}</span>`);
-      return `<article class="cl ${i.state}" style="--i:${k+1}"><div class="top"><span class="badge ${i.state}"><i class="st ${i.state==='own'?'x':'w'}"></i>${i.state==='own'?T.own:T.wip}</span>${i.kind?`<span class="k">${esc(t('kind.'+i.kind))}</span>`:''}</div>`+
-        `<div class="orig">${t('pl.insp', `<em>${esc(g.label)} ${esc(i.short)}</em>`)}</div><h4>${esc(nm)}</h4><p>${esc(desc(g,i))}</p>`+
-        (foot.length ? `<div class="foot">${foot.join('')}</div>` : '')+`</article>`;
-    }).join('');
-    const alts = alt.length ? `<div class="cl-alt"><span>${T.alt}</span>${alt.map(i => `<span class="cl-chip" title="${esc(T.autoT(i.short, i.lynx))}">${esc(i.short)} <i>→</i> <b>${esc(i.lynx)}</b></span>`).join('')}</div>` : '';
-    return `<div class="cl-v" data-v="${esc(g.vendor)}"${clVendor!=='all'&&clVendor!==g.vendor?' hidden':''}><div class="cl-vh"><h3>${esc(g.vendor)}</h3><p>${sum}</p></div><div class="cl-grid">${cards}</div>${alts}</div>`;
-  }).join('');
-  $$('#clGroups .cl-v').forEach(e => clSeen.has(e.dataset.v) ? e.classList.add('in') : clIo.observe(e));
-  $('#clFl').innerHTML = `<div><h3>${T.flT}</h3><p>${T.flP(INSPIRED.fl.exact)}</p></div><div class="chips">${INSPIRED.fl.featured.map(f => `<span class="cl-chip"><b>${esc(f)}</b></span>`).join('')}</div><a class="btn btn-ghost btn-sm" href="#plugins">${T.flB}</a>`;
-  $('#clTm').textContent = D.ui['cl.tm'] || INSPIRED.tm.en;
-}
-$('#clTabs').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; clVendor = b.dataset.v;
-  $$('#clTabs .pl-f').forEach(x => x.classList.toggle('on', x===b));
-  $$('#clGroups .cl-v').forEach(v => { v.hidden = clVendor!=='all' && clVendor!==v.dataset.v; if (!v.hidden){ v.classList.add('in'); clSeen.add(v.dataset.v); } }); });
-$('#clGroups').addEventListener('pointermove', e => { const c = e.target.closest('.cl'); if (!c) return; const r = c.getBoundingClientRect(); c.style.setProperty('--x',(e.clientX-r.left)+'px'); c.style.setProperty('--y',(e.clientY-r.top)+'px'); });
-/* ---------- download: visitor's OS + per-OS assets (resolved from the GitHub API below) ---------- */
-const RELEASES = 'https://github.com/Ka1-S/LYNX-SHARE/releases/latest';
-const STORE = 'https://apps.microsoft.com/detail/9NQRFBFDCX6N';
-// main = primary package, alt = second format; tests run on asset names, newest release with a match wins
-const DL = {
-  win:  {name:'Windows', main:{re:[/setup.*\.exe$/i, /\.exe$/i], key:'dl.fInstaller', ext:'.exe'},
-         alt:{re:[/windows.*\.zip$/i], key:'dl.fPortable', ext:'.zip'}},
-  mac:  {name:'macOS', main:{re:[/macos.*\.dmg$/i, /\.dmg$/i], key:'dl.fUniversal', ext:'.dmg'}},
-  linux:{name:'Linux', main:{re:[/\.AppImage$/i], key:'dl.fAppImage', ext:''},
-         alt:{re:[/linux.*\.tar\.gz$/i], key:'dl.fArchive', ext:'.tar.gz'}}
-};
-const dlUrl = {};   // 'win.main' -> browser_download_url
-function detectOS(){
-  const q = new URLSearchParams(location.search).get('os');   // ?os=win|mac|linux|any (testing)
-  if (q) return DL[q] ? q : '';
-  const uad = navigator.userAgentData, ua = navigator.userAgent || '';
-  const p = ((uad && uad.platform) || navigator.platform || '').toLowerCase();
-  if ((uad && uad.mobile) || /android|iphone|ipad|ipod/i.test(ua) || /android|iphone|ipad|ipod/.test(p)) return '';
-  if (/mac/.test(p) || /Macintosh|Mac OS X/.test(ua)) return navigator.maxTouchPoints > 1 ? '' : 'mac';   // touch "Mac" = iPadOS
-  if (/win/.test(p) || /Windows/.test(ua)) return 'win';
-  if (/cros/.test(p) || /CrOS/.test(ua)) return '';
-  if (/linux|x11|bsd/.test(p) || /Linux|X11/.test(ua)) return 'linux';
-  return '';
-}
-const userOS = detectOS();
-function renderDownload(){
-  const T = {for:n=>t('dl.for',n), dl:t('dl.dl'), more:t('dl.more'), yours:t('dl.yours')};
-  const H = {win:t('dl.hwin'), mac:t('dl.hmac'), linux:t('dl.hlinux')};
-  const url = (os,k) => dlUrl[os+'.'+k] || RELEASES;
-  const fmt = f => t(f.key) + (f.ext ? ' (' + f.ext + ')' : '');
-  const OSICON = {
-    win:'<svg class="os" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.6l7.4-1v7H3zM11.4 4.4L21 3v8.6h-9.6zM3 12.4h7.4v7.1L3 18.4zM11.4 12.4H21V21l-9.6-1.4z"/></svg>',
-    mac:'<svg class="os" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.7c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.7-1-2.7-4zM14.1 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.5 2.8-1.3z"/></svg>',
-    linux:'<svg class="os" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2c-2.3 0-3.7 1.8-3.7 4.3 0 1.3.3 2.2-.6 3.6C6.4 11.7 5 13.9 5 16.4c0 .9.2 1.6.5 2.2-.9.3-1.6.9-1.6 1.6 0 1.1 1.7 1.4 3.3 1.6 1 .1 1.9.6 2.8.6.8 0 1.4-.5 2-.5s1.2.5 2 .5c.9 0 1.8-.5 2.8-.6 1.6-.2 3.3-.5 3.3-1.6 0-.7-.7-1.3-1.6-1.6.3-.6.5-1.3.5-2.2 0-2.5-1.4-4.7-2.7-6.5-.9-1.4-.6-2.3-.6-3.6C15.7 3.8 14.3 2 12 2zm-1.6 3.4a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zm3.2 0a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zM12 11c-2 0-3.4 2.3-3.4 5.2 0 1.5.6 2.6 1.6 3h3.6c1-.4 1.6-1.5 1.6-3 0-2.9-1.4-5.2-3.4-5.2z"/></svg>'
-  };
-  const chip = (os,k) => `<a href="${url(os,k)}"><b>${DL[os].name}</b>${fmt(DL[os][k])}</a>`;
-  // always all three platforms side by side; the visitor's OS only gets the accent
-  const btns = Object.keys(DL).map(o => `<a class="btn ${o===userOS ? 'btn-red' : 'btn-ghost'}" href="${url(o,'main')}"${o===userOS ? ' aria-current="true"' : ''}>`
-      + `${OSICON[o]}<span>${DL[o].name}</span><small>${fmt(DL[o].main)}</small>${o===userOS ? `<em>${T.yours}</em>` : ''}</a>`).join('');
-  const hint = userOS ? `<div>${H[userOS]}</div>` : Object.keys(DL).map(o => `<div>${H[o]}</div>`).join('');
-  const P = {title:t('dl.portTitle'), lead:t('dl.portLead'), win:[t('dl.portWin'),t('dl.portWinP')], linux:[t('dl.portLin'),t('dl.portLinP')]};
-  const port = [['win','alt'],['linux','main']].map(([o,k]) => `<a href="${url(o,k)}"><b>${P[o][0]}</b><small>${P[o][1]}</small></a>`).join('');
-  $('#dlPort').innerHTML = `<h3>${P.title}</h3><p>${P.lead}</p><div class="pbtns">${port}</div>`;
-  const alts = Object.keys(DL).filter(o => DL[o].alt && o !== 'win');
-  if (userOS) alts.sort((a,b) => (b===userOS) - (a===userOS));
-  const row = `<span>${T.more}</span>` + alts.map(o => chip(o,'alt')).join('');
-  $$('[data-os-btns]').forEach(e => e.innerHTML = btns);
-  $('#dlHint').innerHTML = hint; $('#dlOther').innerHTML = row;
-  // Microsoft's own localized "Get it from Microsoft" badge (light theme for a dark page), linked to the Store listing
-  const badge = {'en':'en-us','zh-Hans':'zh-cn','zh-Hant':'zh-tw','pt-BR':'pt-br'}[lang] || lang;
-  $('#dlStore').innerHTML = `<a href="${STORE}" target="_blank" rel="noopener"><img src="https://get.microsoft.com/images/${badge}%20light.svg" alt="${t('dl.storeAlt')}" width="161" height="44" loading="lazy"></a><span>${t('dl.store')}</span>`;
-}
-setLang(langSel.value);
-
-/* ---------- latest release from GitHub ---------- */
-let rel = null;
-function renderVer(){
-  if (!rel) return;
-  let d = ''; try { d = rel.at ? ' · ' + new Date(rel.at).toLocaleDateString(lang) : ''; } catch(e){}
-  $$('.ver-line').forEach(e => e.textContent = 'v' + rel.v + d);
-}
-fetch('https://api.github.com/repos/Ka1-S/LYNX-SHARE/releases?per_page=10').then(r=>r.ok?r.json():null).then(rs=>{
-  if (!Array.isArray(rs) || !rs.length) return;
-  rs = rs.filter(x=>!x.draft); if (!rs.length) return;
-  const r = rs[0], v = r.tag_name.replace(/^v/,'');
-  rel = {v, at: r.published_at}; renderVer();
-  $$('.ver-tag').forEach(e=>e.textContent = v.toUpperCase());
-  // per OS and format: the newest release that has a matching file (releases up to 0.1.7 are Windows-only)
-  Object.keys(DL).forEach(os => ['main','alt'].forEach(k => {
-    const f = DL[os][k]; if (!f) return;
-    for (const re of f.re) for (const rel of rs){
-      const a = (rel.assets||[]).find(x => re.test(x.name));
-      if (a){ dlUrl[os+'.'+k] = a.browser_download_url; return; }
-    }
-  }));
-  renderDownload();
-}).catch(()=>{});
-
-/* ---------- nav + progress ---------- */
-const nav = $('#nav'), prog = $('#progress'), screen = $('#screen');
-function onScroll(){
-  const y = scrollY, h = document.documentElement.scrollHeight - innerHeight;
-  nav.classList.toggle('scrolled', y > 20);
-  prog.style.width = (h>0 ? y/h*100 : 0) + '%';
-  if (!reduce){
-    const t = Math.min(1, y / (innerHeight*.7));
-    screen.style.transform = `rotateX(${24*(1-t)}deg) scale(${.92+.08*t})`;
-  }
-}
-addEventListener('scroll', onScroll, {passive:true}); onScroll();
-screen.addEventListener('pointermove', e => { const r = screen.getBoundingClientRect(); screen.style.setProperty('--mx', (e.clientX-r.left)+'px'); screen.style.setProperty('--my', (e.clientY-r.top)+'px'); });
-
-/* ---------- marquee ---------- */
-// mq.* keys are translated, the rest are product names
-const items = ['Channel Rack','Piano Roll','Playlist','Mixer','Sidechain','VST3 · CLAP','ASIO','mq.auto','mq.flp','mq.als','mq.clips','mq.disk','mq.eq','mq.ts','mq.midi','mq.stems','Sampler','3x Osc synth','Windows · macOS · Linux'];
-function renderMarquee(){ const half = items.map(k => `<span>${k.startsWith('mq.') ? t(k) : k}</span>`).join(''); $('#track').innerHTML = half + half; }
-
-/* ---------- reveal + counters ---------- */
-const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold:.15, rootMargin:'0px 0px -40px 0px'});
-$$('.reveal').forEach(e => io.observe(e));
-const co = new IntersectionObserver(es => es.forEach(e => {
-  if (!e.isIntersecting) return; co.unobserve(e.target);
-  const el = e.target, to = parseFloat(el.dataset.count), dec = +(el.dataset.dec||0), t0 = performance.now(), dur = 1600;
-  (function step(t){ const p = Math.min(1,(t-t0)/dur), v = to*(1-Math.pow(1-p,4)); el.textContent = v.toFixed(dec); if (p<1) requestAnimationFrame(step); })(t0);
-}), {threshold:.6});
-$$('[data-count]').forEach(e => co.observe(e));
-
-/* ---------- card spotlight + tilt ---------- */
-$$('.card').forEach(c => c.addEventListener('pointermove', e => { const r = c.getBoundingClientRect(); c.style.setProperty('--x',(e.clientX-r.left)+'px'); c.style.setProperty('--y',(e.clientY-r.top)+'px'); }));
-if (!reduce) $$('[data-tilt]').forEach(s => {
-  s.addEventListener('pointermove', e => { const r = s.getBoundingClientRect(), x = (e.clientX-r.left)/r.width-.5, y = (e.clientY-r.top)/r.height-.5;
-    s.style.transform = `perspective(1000px) rotateY(${x*8}deg) rotateX(${-y*8}deg)`; s.style.setProperty('--mx',(x+.5)*100+'%'); s.style.setProperty('--my',(y+.5)*100+'%'); });
-  s.addEventListener('pointerleave', () => s.style.transform = '');
-});
-
-/* ---------- lightbox ---------- */
-const lb = $('#lb'), lbi = lb.querySelector('img');
-$$('.gallery figure, .shot').forEach(f => f.addEventListener('click', () => { const i = f.querySelector('img'); lbi.src = i.src; lbi.alt = i.alt; lb.classList.add('open'); }));
-lb.onclick = () => lb.classList.remove('open');
-addEventListener('keydown', e => { if (e.key==='Escape') lb.classList.remove('open'); });
-
-/* ---------- hero waves canvas ---------- */
-const cv = $('#waves'), cx = cv.getContext('2d'); let W=0,H=0,mx=.5,my=.5;
-function size(){ const d = Math.min(devicePixelRatio||1,2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W*d; cv.height = H*d; cx.setTransform(d,0,0,d,0,0); }
-size(); addEventListener('resize', size);
-addEventListener('pointermove', e => { mx = e.clientX/innerWidth; my = e.clientY/innerHeight; }, {passive:true});
-let heroVisible = true; new IntersectionObserver(es => heroVisible = es[0].isIntersecting).observe($('.hero'));
-function waves(t){
-  if (heroVisible){
-    cx.clearRect(0,0,W,H);
-    const lines = 7, base = H*.62;
-    for (let l=0;l<lines;l++){
-      cx.beginPath();
-      const amp = (18 + l*9) * (0.6 + my*.8), f = .0016 + l*.0003, sp = t*.0004*(1+l*.15), ph = l*.7 + mx*2;
-      for (let x=0;x<=W;x+=8){
-        const env = Math.sin(Math.PI*x/W);
-        const y = base + Math.sin(x*f + sp + ph)*amp*env + Math.sin(x*f*2.3 - sp*1.7)*amp*.35*env + (l-lines/2)*10;
-        x ? cx.lineTo(x,y) : cx.moveTo(x,y);
-      }
-      const a = .08 + .5*(1 - Math.abs(l-(lines-1)/2)/(lines/2))*.4;
-      cx.strokeStyle = l%3===0 ? `rgba(255,159,28,${a*.7})` : `rgba(229,56,59,${a})`;
-      cx.lineWidth = l===3 ? 2 : 1.2; cx.stroke();
-    }
-  }
-  if (!reduce) requestAnimationFrame(waves);
-}
-requestAnimationFrame(waves);
-
-/* ---------- terminal typing ---------- */
-const lines = [
-  ['p','$ git clone https://github.com/Ka1-S/LYNX-SHARE'],['c','Cloning into \'LYNX-SHARE\'... done.'],
-  ['p','$ scripts/build-local.sh'],['c','[core] 1 116 111 checks, 0 failures'],
-  ['p','$ LYNX.exe --export Demo.lynx demo.wav'],['c','song_seconds=46.45  render_ms=927  result=OK']
-];
-const term = $('#term'); let started = false;
-new IntersectionObserver((es,o) => { if (!es[0].isIntersecting || started) return; started = true; o.disconnect();
-  let li = 0, ci = 0, html = '';
-  (function type(){
-    if (li >= lines.length){ term.innerHTML = html + '<span class="p">$ </span><span class="caret"></span>'; return; }
-    const [k,s] = lines[li];
-    if (k==='c'){ html += `<span class="c">${s}</span>\n`; li++; term.innerHTML = html + '<span class="caret"></span>'; return setTimeout(type, 450); }
-    ci++; term.innerHTML = html + `<span class="p">${s.slice(0,ci)}</span><span class="caret"></span>`;
-    if (ci >= s.length){ html += `<span class="p">${s}</span>\n`; li++; ci = 0; return setTimeout(type, 500); }
-    setTimeout(type, 22 + Math.random()*40);
-  })();
-}, {threshold:.5}).observe(term);
-
-/* ---------- step sequencer (Web Audio) ---------- */
-const rows = [
-  {n:'Kick', c:'#e5383b', p:[0,4,8,12]},
-  {n:'Clap', c:'#f4a259', p:[4,12]},
-  {n:'Hat',  c:'#e9c46a', p:[2,6,10,14]},
-  {n:'Snare',c:'#c77dff', p:[15]},
-  {n:'Bass', c:'#4cc9f0', p:[0,3,6,10,11]},
-  {n:'Pluck',c:'#3ddc84', p:[2,7,9,14]}
-];
-const grid = rows.map(r => Array.from({length:16}, (_,i) => r.p.includes(i)));
-const seqEl = $('#seq');
-rows.forEach((r,ri) => {
-  const row = document.createElement('div'); row.className = 'row'; row.style.setProperty('--c', r.c);
-  row.innerHTML = `<div class="nm">${r.n}</div>`;
-  for (let s=0;s<16;s++){ const b = document.createElement('button'); b.className = 'cell' + (grid[ri][s] ? ' on' : ''); b.dataset.step = s+1;
-    b.onclick = () => { grid[ri][s] = !grid[ri][s]; b.classList.toggle('on', grid[ri][s]); if (grid[ri][s]) { ensureCtx(); voice(ri, ctx.currentTime, s); } };
-    row.appendChild(b); }
-  seqEl.appendChild(row);
-});
-const cells = $$('#seq .row').map(r => [...r.querySelectorAll('.cell')]);
-function labelSeq(){ cells.forEach((rc,r) => rc.forEach(c => c.setAttribute('aria-label', t('aria.step', rows[r].n, c.dataset.step)))); }
-const vis = $('#vis'); for (let i=0;i<48;i++) vis.appendChild(document.createElement('i')); const bars = [...vis.children];
-
-let ctx, master, analyser, noiseBuf, playing = false, step = 0, nextT = 0, timer;
-function ensureCtx(){
-  if (ctx) { if (ctx.state==='suspended') ctx.resume(); return; }
-  ctx = new (window.AudioContext||window.webkitAudioContext)();
-  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-  master = ctx.createGain(); master.gain.value = .8; analyser = ctx.createAnalyser(); analyser.fftSize = 256;
-  master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
-  noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
-  drawVis();
-}
-const bassNotes = [36,36,39,36,43,41,36,34,36,36,39,41,43,46,43,39], pluckNotes = [72,75,79,82,79,75,77,74,72,75,79,84,82,79,77,75];
-const hz = m => 440*Math.pow(2,(m-69)/12);
-function env(g,t,a,peak,dec){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+a); g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec); }
-function noise(t,dec,type,freq,q,vol){ const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = ctx.createGain(); env(g,t,.001,vol,dec); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+dec+.05); }
-function voice(r,t,s){
-  if (r===0){ const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(42,t+.12); env(g,t,.002,1,.38); o.connect(g); g.connect(master); o.start(t); o.stop(t+.45); }
-  else if (r===1){ [0,.011,.022].forEach(d => noise(t+d,.16,'bandpass',1400,1.2,.55)); }
-  else if (r===2){ noise(t,.05,'highpass',8000,.7,.32); }
-  else if (r===3){ noise(t,.2,'bandpass',2200,.8,.6); const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 190; env(g,t,.001,.4,.12); o.connect(g); g.connect(master); o.start(t); o.stop(t+.2); }
-  else if (r===4){ const f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = 'lowpass'; f.Q.value = 6; f.frequency.setValueAtTime(1600,t); f.frequency.exponentialRampToValueAtTime(140,t+.22);
-    [0,-8,8].forEach(dt => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(bassNotes[s]); o.detune.value = dt; o.connect(f); o.start(t); o.stop(t+.32); });
-    env(g,t,.004,.28,.26); f.connect(g); g.connect(master); }
-  else { const o = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = 'square'; o2.type = 'sawtooth'; o.frequency.value = hz(pluckNotes[s]); o2.frequency.value = hz(pluckNotes[s])*1.005;
-    f.type = 'lowpass'; f.frequency.setValueAtTime(5000,t); f.frequency.exponentialRampToValueAtTime(400,t+.25); env(g,t,.003,.12,.35); o.connect(f); o2.connect(f); f.connect(g); g.connect(master); o.start(t); o2.start(t); o.stop(t+.4); o2.stop(t+.4); }
-}
-function schedule(){
-  const bpm = +$('#bpm').value, sw = +$('#swing').value/100, sd = 60/bpm/4;
-  while (nextT < ctx.currentTime + .12){
-    const t = nextT + (step%2 ? sd*sw*.66 : 0);
-    rows.forEach((_,r) => { if (grid[r][step]) voice(r,t,step); });
-    const s = step; setTimeout(() => paint(s), Math.max(0,(t-ctx.currentTime)*1000));
-    nextT += sd; step = (step+1)%16;
-  }
-}
-function paint(s){
-  cells.forEach((rc,r) => rc.forEach((c,i) => { c.classList.toggle('now', i===s && playing); if (i===s && grid[r][i] && playing){ c.classList.remove('hit'); void c.offsetWidth; c.classList.add('hit'); } }));
-}
-function drawVis(){
-  const d = new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(d);
-  bars.forEach((b,i) => b.style.height = Math.max(4, d[Math.floor(i*1.6)]/255*100) + '%');
-  requestAnimationFrame(drawVis);
-}
-const sp = $('#seqPlay'), playIc = sp.innerHTML, stopIc = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-sp.onclick = () => {
-  ensureCtx(); playing = !playing; sp.classList.toggle('on', playing); sp.innerHTML = playing ? stopIc : playIc;
-  if (playing){ if (!audio.paused) audio.pause(); step = 0; nextT = ctx.currentTime + .05; timer = setInterval(schedule, 25); schedule(); }
-  else { clearInterval(timer); paint(-1); }
-};
-$('#bpm').oninput = e => $('#bpmv').textContent = e.target.value;
-$('#rnd').onclick = () => { grid.forEach((g,r) => g.forEach((_,i) => { const prob = [.3,.12,.5,.08,.3,.25][r]; g[i] = r===0 ? i%4===0 || Math.random()<.08 : Math.random()<prob; cells[r][i].classList.toggle('on', g[i]); })); };
-$('#clr').onclick = () => { grid.forEach((g,r) => g.forEach((_,i) => { g[i] = false; cells[r][i].classList.remove('on'); })); };
-
-/* ---------- video ---------- */
-const tour = $('#tour'), vplay = $('#vplay');
-vplay.onkeydown = e => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); vplay.click(); } };
-vplay.onclick = () => { tour.controls = true; tour.play(); vplay.classList.add('hide'); if (playing) sp.click(); if (!audio.paused) audio.pause(); };
-tour.addEventListener('pause', () => { if (tour.ended){ vplay.classList.remove('hide'); tour.controls = false; } });
-
-/* ---------- demo player with waveform ---------- */
-const audio = $('#audio'), wave = $('#wave'), wc = wave.querySelector('canvas'), wx = wc.getContext('2d'), ap = $('#aPlay'), at = $('#atime');
-let peaks = [];
-fetch('assets/media/peaks.json?v=0.1.23').then(r=>r.json()).then(p => { peaks = p; drawWave(); }).catch(()=>{});
-let revealP = 0;
-function drawWave(){
-  const d = Math.min(devicePixelRatio||1,2), w = wave.clientWidth, h = wave.clientHeight; wc.width = w*d; wc.height = h*d; wx.setTransform(d,0,0,d,0,0);
-  wx.clearRect(0,0,w,h); if (!peaks.length) return;
-  const n = Math.floor(w/3), pos = audio.duration ? audio.currentTime/audio.duration : 0;
-  const grad = wx.createLinearGradient(0,0,w,0); grad.addColorStop(0,'#e5383b'); grad.addColorStop(1,'#ff9f1c');
-  for (let i=0;i<n;i++){
-    const p = peaks[Math.floor(i/n*peaks.length)] * Math.min(1, revealP*n/ (i+1) );
-    const bh = Math.max(2, p*h*.92);
-    wx.fillStyle = i/n < pos ? grad : '#3a3d4a';
-    wx.fillRect(i*3, (h-bh)/2, 2, bh);
-  }
-}
-new IntersectionObserver((es,o) => { if (!es[0].isIntersecting) return; o.disconnect(); const t0 = performance.now(); (function g(t){ revealP = Math.min(1,(t-t0)/1200); drawWave(); if (revealP<1) requestAnimationFrame(g); })(t0); }, {threshold:.4}).observe(wave);
-addEventListener('resize', drawWave);
-const fmt = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
-function tick(){ drawWave(); at.textContent = fmt(audio.currentTime) + ' / ' + fmt(audio.duration||46); if (!audio.paused) requestAnimationFrame(tick); }
-ap.onclick = () => { if (audio.paused){ if (playing) sp.click(); tour.pause(); audio.play(); } else audio.pause(); };
-audio.onplay = () => { ap.innerHTML = stopIc; ap.classList.add('on'); tick(); };
-audio.onpause = audio.onended = () => { ap.innerHTML = playIc; ap.classList.remove('on'); tick(); };
-wave.onclick = e => { const r = wave.getBoundingClientRect(), f = (e.clientX-r.left)/r.width;
-  const go = () => { audio.currentTime = f*audio.duration; tick(); };
-  if (audio.readyState < 1){ audio.preload = 'auto'; audio.addEventListener('loadedmetadata', go, {once:true}); audio.load(); } else go(); };
-})();
+/* links to sections that moved off this page when the site was split */
+(function(){var m={classics:"/features/#classics","try":"/features/#try",media:"/features/#media",gallery:"/features/#screens",plugins:"/features/#plugins",dlPort:"/download/#dlPort"},h=location.hash.slice(1);if(m[h])location.replace(m[h]);})();
 </script>
+
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=fa0c727b" defer></script>
+<script src="/assets/motion.js?v=fa0c727b" defer></script>
 </body>
 </html>

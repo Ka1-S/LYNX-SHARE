@@ -1,0 +1,6 @@
+[
+  {"key": "wkg.start", "title": "Getting started", "pages": ["getting-started", "install", "audio-setup", "tour", "first-song"]},
+  {"key": "wkg.work", "title": "The workspace", "pages": ["channel-rack", "piano-roll", "playlist", "mixer", "browser", "layouts", "automation", "recording", "exporting", "midi-controllers", "undo-history", "online-sessions", "importing-projects", "plugins", "coming-from-fl-studio", "coming-from-ableton"], "hidden": ["simple-layout"]},
+  {"key": "wkg.plug", "title": "Instruments and effects", "pages": ["built-in"], "catalog": true},
+  {"key": "wkg.ref", "title": "Reference", "pages": ["settings", "shortcuts", "file-formats", "command-line", "build-from-source", "troubleshooting"], "links": [["/faq/", "nav.faq", "FAQ"]]}
+]

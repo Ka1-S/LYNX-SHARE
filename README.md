@@ -5,11 +5,11 @@
 <h1 align="center">LYNX SHARE</h1>
 
 <p align="center"><strong>A lightweight DAW with FL Studio-style patterns and Ableton Live-style clips.</strong><br>
-Channel Rack, Piano Roll, Playlist and Mixer, plus a clip grid with scenes, in C++20 + JUCE 8, built to run well on any PC.<br>
-Opens FL Studio and Ableton Live projects. Windows, macOS and Linux.</p>
+Channel Rack, Piano Roll, Playlist and Mixer, plus a clip grid with scenes and a Simple workflow for a first song, in C++20 + JUCE 8, built to run well on any PC.<br>
+Opens FL Studio, Ableton Live and FL Studio Mobile projects (`.flp`, `.als`, `.flm`). Windows, macOS and Linux.</p>
 
 <p align="center">
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.25%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.26%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
@@ -85,7 +85,7 @@ Lock-free engine, channels and mixer spread across threads, idle channels skippe
 <td width="25%" valign="top">
 
 ### 🍒 Two workflows, one DAW
-FL Studio-style patterns by default: step-sequencer Channel Rack, Piano Roll, Playlist with arrangements and a Mixer with inserts, sends and sidechain, with the same shortcuts. Prefer clips? Switch the layout style to the Ableton Live-style clip grid, with scenes, launch modes and follow actions.
+FL Studio-style patterns by default: step-sequencer Channel Rack, Piano Roll, Playlist with arrangements and a Mixer with inserts, sends and sidechain, with the same shortcuts. Prefer clips? Switch the layout style to the Ableton Live-style clip grid, with scenes, launch modes, follow actions, a Clip View and racks. New to DAWs? The Simple workflow is one window with the tracks and the timeline.
 
 </td>
 <td width="25%" valign="top">
@@ -103,10 +103,11 @@ Behaviour studied through behavioural reverse engineering and documented, then w
 </tr>
 </table>
 
-**The Ableton Live-style side is growing.** Today: the clip grid with scenes, and `.als` sets that go both ways (Session
-clips land in the clip grid). On the way in 0.1.26: a Live-style Detail View for clips, racks, note chance, and a Simple
-workflow for beginners (BandLab / FL Studio Mobile-style). FL Studio's workflow stays the default, and nothing is taken
-away from it.
+**The Ableton Live-style side is growing.** Today: the clip grid with scenes, a Live-style Clip View and Device View,
+instrument, audio-effect and MIDI-effect racks (instrument and audio-effect racks also from `.als`), note chance and velocity range, Live 12's MIDI tools,
+warp markers, and `.als` sets that go both ways (Session clips land in the clip grid). A **Simple workflow** for
+beginners (BandLab / FL Studio Mobile-style) is the third layout style. FL Studio's workflow stays the default, and
+nothing is taken away from it.
 
 ## Features
 
@@ -182,8 +183,10 @@ Any knob or fader (channel, mixer, effect, plugin parameter) becomes a clip with
 - Sampler with zones, slices, time-stretch (Signalsmith Stretch) and disk streaming
 - **LYNX Soundfont**: SF2/SF3 player with a preset search across all your SoundFonts
 - Built-in drums (kick, snare, hat, clap)
+- Slicex, FPC, Fruity Slicer and DirectWave as instruments with FL Studio's editors
 - Layer channels, FL-style VFX note effects (Sequencer/arpeggiator, Key Mapper, Keyboard Splitter…) and controllers (X-Y, X-Y-Z, Dashboard, Envelope, Voltage)
-- VST3 and CLAP plugins on every OS, plus Audio Units on macOS and LV2 on Linux; on Windows and Linux optionally sandboxed in a separate process; a searchable plugin picker with favorites
+- VST3 and CLAP plugins on every OS, plus Audio Units on macOS and LV2 on Linux; optionally sandboxed in a separate process; 32-bit plugins on Windows through a bridge; plugin windows docked in the main window or detached; a searchable plugin picker with favorites
+- MIDI controller profiles (Mackie Control, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3, nanoKONTROL2) and a first stage of MPE
 
 </td>
 <td width="33%" valign="top">
@@ -204,7 +207,8 @@ Any knob or fader (channel, mixer, effect, plugin parameter) becomes a clip with
 - Native `.lynx` format (JSON) with autosave
 - Opens FL Studio `.flp`, Ableton Live `.als` (Live 11/12) and FL Studio Mobile `.flm` (partial) projects, and `.mid`; FL `.fst` presets
 - Exports `.flp` for FL Studio and `.als` for Live 12 or Live 11, with the samples collected
-- Exports WAV 16/24/32f, FLAC and OGG, song or pattern, with dither
+- Exports WAV 16/24/32f, MP3, FLAC and OGG, song, pattern or one file per marker section, stems and MIDI, with dither
+- Freeze a channel (it plays as audio and its instrument is unloaded), project versions and backups in one list, and opening a project without its third-party plugins
 - Note recording (PC keyboard and MIDI) and audio recording, sample-accurate with a round-trip ping, punch in/out with pre/post-roll, loop takes and comping, crash-safe takes
 - Themes (accent color, background, workspace image) and plugin presets
 - Undo/redo on every edit
@@ -264,7 +268,7 @@ LYNX SHARE reads the `.flp` format directly and converts everything that has an 
 
 - **Structure:** channels, real samples (including the Ogg Vorbis WAVs and WavPack files shipped with FL), patterns, slide/porta notes, every arrangement, markers, time-signature changes, automation and controller links.
 - **Mixer:** routing, levels, sidechains, track EQ and native effects with their saved settings (Parametric EQ 2, Limiter, Compressor, Reeverb 2, Delay 3, Maximus, Gross Beat, Effector, Love Philter, Frequency Splitter, Patcher, Pitcher, Vocoder, Newtone/Newtime and more).
-- **Generators on FL's own engines** (checked against FL's DLLs, most of them bit for bit): 3x Osc, SimSynth, MiniSynth, DX10, Kepler, PoiZone, Toxic Biohazard, Transistor Bass, Autogun, Plucked!, BeepMap, Sawer, Granulizer, Drumaxx, FL Slayer, FL Keys, Fruit Kick, Kick, BassDrum, Sakura, Drumpad, BooBass, Fruity DrumSynth Live, GMS, Morphine; Sytrus, Harmless, Harmor (including image synthesis) and Ogun on engines rebuilt from the plugin state. Built-in sounds and tables are read from *your* FL installation, never shipped with LYNX SHARE. DirectWave runs on its own exact engine (filters, modulation matrix and effects); FPC, Slicex, Fruity Slicer and Wave Traveller play as samplers through FL's own interpolators.
+- **Generators on FL's own engines** (checked against FL's DLLs, most of them bit for bit): 3x Osc, SimSynth, MiniSynth, DX10, Kepler, PoiZone, Toxic Biohazard, Transistor Bass, Autogun, Plucked!, BeepMap, Sawer, Granulizer, Drumaxx, FL Slayer, FL Keys, Fruit Kick, Kick, BassDrum, Sakura, Drumpad, BooBass, Fruity DrumSynth Live, GMS, Morphine; Sytrus, Harmless, Harmor (including image synthesis) and Ogun on engines rebuilt from the plugin state. Built-in sounds and tables are read from *your* FL installation, never shipped with LYNX SHARE. DirectWave runs on its own exact engine (filters, modulation matrix and effects); Slicex and FPC run on their own engines with FL's editor layout, their state read and written byte for byte; Fruity Slicer and Wave Traveller play as samplers through FL's own interpolators.
 - **Exact native effects:** Parametric EQ 2, EQUO, Limiter, Compressor, Multiband Compressor, Maximus, Soundgoodizer, Reeverb 2, LuxeVerb, Convolver, Delay 3, Delay Bank, the chorus family, Flangus, Flanger, Fast Dist, WaveShaper, Soft Clipper, Stereo Shaper/Enhancer, Transient Processor, Frequency Splitter, Fast LP, Free Filter, Fruity Filter, Pitch Shifter, Love Philter, Fruity Vocoder, Vocodex, Hardcore, Distructor, Multiband Delay, Gross Beat, Effector, Vintage Phaser, Pitcher and more reproduce FL's algorithms; how each one was decoded is documented in [`docs/analise/`](docs/analise/).
 - **Third-party plugins:** VST3/CLAP plugins inside the Fruity Wrapper are swapped for the same installed plugin, preset included.
 
@@ -283,19 +287,21 @@ Live 11 and Live 12 sets open and save ([format notes](docs/analise/ALS_FORMAT.m
   clip's stretch; Beats, Tones, Texture and Complex as LYNX stretch methods), group and return tracks become mixer
   inserts and sends, plus tempo, time signature, locators, mixer levels and their automation. Session clips and scenes
   go to the clip grid with their launch settings and follow actions (or, as a setting, onto the Playlist). Third-party
-  VST2/VST3 plugins keep their state; Live's Simpler, Sampler, Drum Rack and Instrument Rack become the closest LYNX
-  instrument; other Live devices are listed in the report.
+  VST2/VST3 plugins keep their state; Instrument and Audio Effect Racks come in as racks with their chains, zones and macros (Live's MIDI
+  Effect Racks are not opened yet and are listed in the report); Live's Simpler, Sampler and Drum Rack become the closest LYNX instrument; other Live
+  devices are listed in the report. Note chance, velocity range, probability groups and the scale are kept.
 - **Export:** *File › Export › Ableton Live set (.als)...* writes `<name> Project/<name>.als` for Live 12 or Live 11,
   with the samples collected: tracks, clips, notes, warp markers, groups, returns, mixer, sends, automation, locators
-  and the clip grid as Session view. Third-party plugins go over with their state; LYNX's own instruments and effects
-  are not converted yet (they are listed in the export report).
+  racks, note chance and the clip grid as Session view. Third-party plugins go over with their state; LYNX's own
+  instruments and effects are not converted yet (they are listed in the export report).
 
 ### FL Studio Mobile (`.flm`)
 
 Import only, and partial ([format notes](docs/analise/FLM_FORMAT.md)): tempo, time signature, the arrangement (note,
 drum and audio lanes as patterns, clips and audio clips), samples, drum kits, DirectWave single-sample programs, the
-MiniSynth, Transistor Bass and 3x Osc instruments, and the mixer's levels, panning and routing. Other instruments play LYNX's
-built-in synth for now, and anything not converted is listed in the import report.
+MiniSynth, Transistor Bass, 3x Osc and GMSynth instruments, FL Studio Mobile's effects (as LYNX SHARE's Pocket effects),
+the mixer's levels, panning and routing, and the automation of level, pan, mute, solo, pitch bend and sends. Other
+instruments play LYNX's built-in synth for now, and anything not converted is listed in the import report.
 
 > [!NOTE]
 > Every conversion rule comes from **behavioural** reverse engineering (decompilation studied, official manual and project data), recorded in [`docs/analise/`](docs/analise). Anything not confirmed is flagged as an approximation in [`docs/STATUS.md`](docs/STATUS.md).
@@ -356,7 +362,7 @@ only what changed.
 |---|---|---|---|
 | Plugin formats | VST3, CLAP, VST2 | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
 | Audio drivers | Windows Audio (WASAPI), DirectSound, ASIO, built-in LYNX ASIO driver | Core Audio | PipeWire (native), JACK, ALSA |
-| Out-of-process plugin sandbox | optional | – | optional |
+| Out-of-process plugin sandbox | optional | optional | optional |
 | FL Studio integration (factory samples, plugin database) | FL Studio installation | FL Studio app bundle is looked for (untested) | Windows FL Studio under Wine (`~/.wine` or `$WINEPREFIX`) |
 | Settings folder | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `~/.config/LYNX` (`$XDG_CONFIG_HOME`) |
 

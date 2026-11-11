@@ -106,8 +106,8 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [ ] LYNX's built-in instruments and effects in exported sets (N3; listed in the export report for now)
 - [x] Session view ↔ LYNX's clip grid in .als import and export: scenes, launch modes, quantisation, follow actions (round 181c)
 - [x] Optional Clip-launch workflow layout style beside the default Pattern workflow (round 181a)
-- [ ] Live-style Detail View for clips, racks and note chance (0.1.26, in progress)
-- [ ] Simple workflow layout style for beginners (0.1.26, in progress)
+- [x] Live-style Clip View and Device View, racks and note chance (0.1.26)
+- [x] Simple workflow layout style for beginners (0.1.26)
 - [x] Racks (round 183c, `docs/analise/REA_rodada183c.md`): Audio Effect and Instrument Racks as a Patcher in rack mode,
       with chains, key / velocity / chain-select zones (Live's measured fade laws), chain volume / pan / solo, 16 macros
       with Map mode, variations, Randomize; LYNX's optional variation morph and launch glide; .als import / export
@@ -117,5 +117,6 @@ Ordered to get something usable as early as possible without ever breaking the a
 ## Phase 8: FL Studio Mobile import (round 182c)
 - [x] `.flm` reader: tempo, time signature, arrangement (note, drum and audio lanes), samples, drum kits (`docs/analise/FLM_FORMAT.md`)
 - [x] DirectWave single-sample programs, rack level / pan / routes on the inserts
-- [ ] Mute / solo, automation lanes and the main effects (0.1.26, in progress)
-- [ ] FL Studio Mobile's other instruments (they play LYNX's built-in synth for now)
+- [x] Mute / solo, automation lanes and the effects as Pocket effects (0.1.26)
+- [x] MiniSynth, Transistor Bass, 3x Osc and GMSynth instruments (0.1.26)
+- [ ] FL Studio Mobile's remaining instruments (they play LYNX's built-in synth for now)

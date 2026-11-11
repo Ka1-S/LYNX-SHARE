@@ -9,34 +9,47 @@ LYNX SHARE
 
 ## Short description
 
-DAW gratuita y de código abierto con flujo de trabajo basado en patrones: Channel Rack, Piano Roll, Playlist y Mixer. Abre proyectos .flp.
+DAW gratuito y de código abierto con flujos por patrones y por lanzamiento de clips: Channel Rack, Piano Roll, Playlist, Mixer y una cuadrícula de clips. Abre proyectos .flp, .als y .flm.
 
 ## Description
 
-LYNX SHARE es una estación de trabajo de audio digital (DAW) gratuita y de código abierto para crear beats y canciones. Sigue el flujo de trabajo basado en patrones que tanto gusta a los beatmakers —un Channel Rack con secuenciador por pasos, patrones, Piano Roll, una Playlist con arreglos y un Mixer con inserts, envíos y sidechain— y está pensado para seguir siendo ligero y rápido en cualquier PC.
+LYNX SHARE es una estación de trabajo de audio digital gratuita y de código abierto para crear beats y canciones. Une
+dos formas de trabajar: un flujo de trabajo con patrones al estilo de FL Studio (un Channel Rack con secuenciador por
+pasos, patrones, un Piano Roll, una Playlist con arreglos y un Mixer con inserts, envíos y sidechain), que es el
+predeterminado, y una cuadrícula de clips con escenas al estilo de Ableton Live, a un cambio de distancia. Está hecho
+para seguir siendo ligero y rápido en cualquier PC.
 
 • Ligero: un motor de audio sin bloqueos (lock-free) que reparte los canales y las pistas del mixer entre los núcleos de tu CPU, se salta los canales inactivos y lee el audio largo directamente desde el disco.
 • Completo: más de 100 instrumentos y efectos integrados —sintetizadores, cajas de ritmos, samplers, ecualizadores, compresores, limitadores, reverbs, delays, corrección de afinación, visualizadores y mucho más.
 • Tus plugins: carga instrumentos y efectos VST3, CLAP y VST2, cada uno opcionalmente en su propio proceso aislado (sandbox), para que un plugin que se cuelgue no tumbe tu sesión.
-• Abre proyectos de FL Studio (.flp) con sus patrones, notas, mixer, automatización y samples, e importa archivos MIDI.
+• Tus proyectos: abre proyectos de FL Studio (.flp) con sus patrones, notas, mixer, automatización y samples; abre y
+guarda sets de Ableton Live 11/12 (.als), con los clips de Session; exporta .flp de vuelta a FL Studio; importa
+proyectos de FL Studio Mobile (.flm, parcial) y archivos MIDI.
+• Inicio fácil: un Flujo simple da a quien empieza una ventana con las pistas y la línea de tiempo, ritmos de partida
+e instrumentos que suenan con un clic.
 • Baja latencia: ASIO (incluido el driver ASIO propio de LYNX SHARE, para cualquier dispositivo) y WASAPI en modo compartido y exclusivo.
 • Graba audio y MIDI, edita audio, automatiza cualquier parámetro y exporta a WAV, FLAC, MP3, OGG o stems.
 • Interfaz en 15 idiomas, entre ellos español, inglés, portugués, francés, alemán, italiano, neerlandés, polaco, ruso, turco, japonés, coreano y chino.
 
 Sin cuenta, sin suscripción, sin anuncios y sin telemetría. LYNX SHARE es software libre (GNU AGPL-3.0); el código fuente está en GitHub.
 
-LYNX SHARE es un proyecto independiente, no afiliado a Image-Line ni respaldado por ella. FL Studio es una marca comercial de Image-Line Software. Los demás nombres de productos son marcas comerciales de sus respectivos propietarios.
+LYNX SHARE es un proyecto independiente, sin afiliación ni respaldo de Image-Line ni de Ableton. FL Studio y FL Studio
+Mobile son marcas de Image-Line Software; Ableton y Live son marcas de Ableton AG. Los demás nombres de productos son
+marcas de sus respectivos propietarios.
 
 LYNX SHARE está en fase alfa: puede tener asperezas; por favor, informa de cualquier problema en GitHub.
 
 ## What's new
 
-LYNX SHARE 0.1.20: primera versión en Microsoft Store. Edición de puntos al estilo de FL en Fruity WaveShaper y en los clips de automatización, cinco efectos de FL más idénticos bit a bit a los de FL, controles del Dashboard que envían MIDI y muchas correcciones.
+LYNX SHARE 0.1.26: un Flujo simple para principiantes; un Clip View, racks y probabilidad de nota para la cuadrícula
+de clips; los instrumentos Slicex y FPC; proyectos de FL Studio Mobile con instrumentos, efectos y automatización;
+Congelar para canales; ventanas de plugins acopladas; perfiles de controladores MIDI y una primera etapa de MPE;
+plugins compartidos en sesiones en línea; y muchas correcciones.
 
 ## Features
 
-1. Flujo basado en patrones: secuenciador por pasos Channel Rack, Piano Roll, Playlist con arreglos y un Mixer completo
-2. Abre proyectos de FL Studio (.flp) y archivos MIDI
+1. Tres flujos de trabajo: por patrones (Channel Rack, Piano Roll, Playlist, Mixer) por defecto, una cuadrícula de clips con escenas o un Flujo simple para principiantes
+2. Abre proyectos de FL Studio (.flp), Ableton Live (.als) y FL Studio Mobile (.flm) y archivos MIDI; guarda .als y .flp
 3. Más de 100 instrumentos y efectos integrados
 4. Carga plugins VST3, CLAP y VST2, opcionalmente aislados en su propio proceso
 5. Audio de baja latencia: ASIO, WASAPI compartido y exclusivo

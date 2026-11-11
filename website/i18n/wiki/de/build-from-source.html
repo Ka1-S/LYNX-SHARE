@@ -1,0 +1,36 @@
+<p>LYNX SHARE ist in C++20 mit JUCE 8 geschrieben und wird mit CMake gebaut. Der Quellcode liegt unter <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a> und steht unter der GNU Affero General Public License v3.0. Die Release-Dateien baut GitHub Actions aus dem getaggten Quellcode. Diese Seite brauchst du also nur, wenn du den Code ändern oder selbst bauen willst.</p>
+<h2 id="build-on-linux">Unter Linux bauen</h2>
+<ol><li>Installiere die unten aufgeführten Abhängigkeiten.</li><li>Hole den Quellcode mit <code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code> und wechsle in den Ordner <code>lynx</code>.</li><li>Konfiguriere mit <code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code>.</li><li>Baue mit <code>cmake --build build</code>.</li></ol>
+<p>Die Abhängigkeiten unter Ubuntu 24.04:</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">Unter Windows mit Visual Studio bauen</h2>
+<p>Voraussetzung sind die Visual Studio 2022 Build Tools mit „Desktopentwicklung mit C++“, CMake 3.22 oder neuer und Git.</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">Für Windows aus WSL oder Linux bauen</h2>
+<p>So wird das Projekt selbst entwickelt: Das Windows-Programm wird mit Zig cross-kompiliert, ohne Visual Studio.</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>Das Ergebnis ist <code>build-win/LYNX.exe</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>Voraussetzung</th><th>Version</th><th>Standardort</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE holst du so:</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>Setze die Umgebungsvariablen <code>ZIG</code> und <code>JUCE_DIR</code>, wenn deine Pfade abweichen.</p>
+<h2 id="build-on-macos">Unter macOS bauen</h2>
+<p>Du brauchst die Xcode Command Line Tools (<code>xcode-select --install</code>), CMake und Ninja, zum Beispiel über <code>brew install cmake ninja</code>.</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code> erzeugt eine Universal-App. Lässt du es weg, wird nur für den aktuellen Mac gebaut.</p>
+<h2 id="run-the-core-tests">Die Core-Tests ausführen</h2>
+<p>Der Core (Modell, Sequencer, Instrumente, Effekte und <code>.flp</code>-Import) ist reines C++ und wird ohne JUCE getestet, mit jedem C++20-Compiler.</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>Der Lauf muss mit <code>N checks, 0 failures</code> enden. Gibst du den Ordner <code>Data</code> einer FL-Studio-2026-Installation an, liest er auch die <code>.flp</code>-Projekte ein, die mit FL Studio mitkommen. Das Skript baut außerdem zwei kleine Werkzeuge: <code>build-local/flpdump</code>, das eine <code>.flp</code> ausgibt, und <code>build-local/renderwav</code>.</p>
+<p>Nach einem Build kann das Programm sich selbst prüfen, ohne Audiogerät:</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>Der Bericht endet mit <code>result=OK</code>. Weitere Optionen stehen auf der Seite <a href="/wiki/command-line/">Kommandozeile</a>.</p>
+<h2 id="the-source-tree">Der Quellbaum</h2>
+<div class="tablewrap"><table><thead><tr><th>Ordner</th><th>Was er enthält</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>Modell, Sequencer, Instrumente, Effekte und <code>.flp</code>-Import. Reines C++, ohne JUCE testbar</td></tr><tr><td><code>src/flp/</code></td><td>Der Leser für das <code>.flp</code>-Format</td></tr><tr><td><code>src/engine/</code></td><td>Die Audio-Engine: Gerät, Graph, Samples, Plugins, Projektdateien</td></tr><tr><td><code>src/ui/</code></td><td>Die Oberfläche: Channel Rack, Piano Roll, Playlist, Mixer, Fenster</td></tr><tr><td><code>third_party/</code></td><td>CLAP und der WavPack-Decoder</td></tr><tr><td><code>tests/</code></td><td>Die Core-Tests</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>Architektur, Status, Roadmap und die Verhaltensanalyse von FL Studio</td></tr></tbody></table></div>
+<h2 id="good-to-know">Gut zu wissen</h2>
+<ul><li>JUCE 8 unterstützt MinGW offiziell nicht. Das Zig-Build-Skript umgeht die Unterschiede. Die Korrekturen liegen in <code>cmake/mingw/</code> und <code>src/platform/MingwFixes.cpp</code>.</li><li>Führe immer nur ein <code>build-windows-zig.sh</code> gleichzeitig aus. Zwei Zig-Builds auf einmal können hängen bleiben. Für parallele Builds in getrennten Worktrees gib jedem mit <code>ZIG_GLOBAL_CACHE_DIR</code> und <code>ZIG_LOCAL_CACHE_DIR</code> einen eigenen Cache.</li><li>Manche Engines lesen eingebaute Klänge und Tabellen aus deiner eigenen FL-Studio-Installation. Im Repository steckt nichts von FL Studio.</li><li>Ein Teil der Dokumentation in <code>docs/</code> ist noch auf Portugiesisch. Sie wird gerade übersetzt.</li><li>Wenn du eine veränderte Version weitergibst, auch als Netzwerkdienst, verlangt die Lizenz, dass du ihren Quellcode unter derselben Lizenz veröffentlichst.</li></ul>
+<h2 id="related">Siehe auch</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">Die komplette Entwicklungsumgebung (SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LYNX SHARE unter Linux (LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">Das Repository und seine README</a></li><li><a href="/wiki/command-line/">Kommandozeile</a></li><li><a href="/wiki/file-formats/">Dateiformate</a></li></ul>

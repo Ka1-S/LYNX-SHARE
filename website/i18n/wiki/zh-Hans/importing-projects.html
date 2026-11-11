@@ -1,0 +1,30 @@
+<p><code>文件 › 打开...</code>（<code>Ctrl+O</code>）可以打开 LYNX SHARE 自己的 <code>.lynx</code> 工程，也可以打开 <code>.flp</code>、<code>.als</code>、<code>.flm</code> 和 <code>.mid</code> 文件。来自其他程序的工程属于导入：它会成为一个新的、未保存的 LYNX SHARE 工程，原文件绝不会被写入。</p>
+<h2 id="open-a-project-from-another-program">打开来自其他程序的工程</h2>
+<ol><li>选择 <code>文件 › 打开...</code>，然后选取 <code>.flp</code>、<code>.als</code>、<code>.flm</code> 或 <code>.mid</code> 文件。</li><li>等待 LYNX SHARE 查找工程的插件和采样。</li><li>如果有内容没有找到，会打开 <code>缺失的文件</code> 窗口。请把它指向你的采样，或者关闭它。</li><li>标题栏现在会显示工程的来源，例如“（从 FL Studio 导入）”。</li><li>选择 <code>文件 › 保存</code>。LYNX SHARE 会询问把 <code>.lynx</code> 文件写到哪里。</li></ol>
+<h2 id="what-comes-over">能带过来什么</h2>
+<div class="tablewrap"><table><thead><tr><th>格式</th><th>会转换</th><th>不会转换</th></tr></thead><tbody><tr><td><code>.flp</code>（FL Studio）</td><td>通道、采样、样式、滑音和滑奏音符、所有编排、标记、拍号变化、自动化、控制器关联、带路由的混音台、侧链、轨道 EQ 和原生效果器</td><td>FLEX 包是加密的，永远不会被打开。FLEX 通道会得到一个按其预设名称选定的合成器音色</td></tr><tr><td><code>.als</code>（Live 11 和 12）</td><td>MIDI 轨道、音频轨道、编组轨道和返回轨道，速度、拍号、定位点、循环，音量、声像、静音、独奏和发送及其自动化，会话片段和场景，扭曲标记</td><td>Live 自己的效果器会被丢弃。机架只保留它的第一条链。Simpler、Sampler 和鼓机架会变成 LYNX SHARE 采样器</td></tr><tr><td><code>.flm</code>（FL Studio Mobile）</td><td>速度、拍号、每个通道一个混音插入轨、每条泳道一条播放列表轨道、样式、带偏移和音高的音频片段、鼓组、DW Sampler 采样和 <code>.dwp</code> 程序</td><td>FLM 的效果器和自动化泳道。FLM 的其他发生器改用内置合成器播放</td></tr><tr><td><code>.mid</code></td><td>音符、拍号和所有速度变化</td><td>MIDI 文件不含声音：通道会得到 LYNX SHARE 合成器或一个 MIDI Out 通道</td></tr></tbody></table></div>
+<p><code>.flp</code> 中的第三方 VST2、VST3 和 CLAP 插件，以及 <code>.als</code> 中的 VST2 和 VST3 插件，如果你的电脑上安装了相同的插件，就会带着保存的状态加载。</p>
+<h2 id="fl-studio-s-own-plugins">FL Studio 自己的插件</h2>
+<p>FL Studio 的发生器和效果器不会被加载。LYNX SHARE 读取它们保存的设置，并在自己重建的引擎上播放。每个引擎都有一个质量等级，从 <code>Exact</code>（在所有测试过的状态下都与原版逐位一致）到 <code>Placeholder</code>（设置会保留，但插件静音或让音频直通）。各等级的含义见<a href="/wiki/coming-from-fl-studio/">从 FL Studio 转来</a>。</p>
+<p>没有安装 FL Studio 也能打开 <code>.flp</code>。有些引擎需要波形、采样或脉冲响应，它们会在运行时从你自己的 FL Studio 安装中读取。</p>
+<h2 id="missing-samples">缺失的采样</h2>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="缺失的文件窗口的采样标签页：找到的文件为绿色，缺失的为琥珀色，带有 Search folder、Locate 和 Skip" loading="lazy" width="760" height="560"></a></figure>
+<p><code>采样</code> 标签页列出每个未找到的采样，以及它保存的路径和使用它的对象。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>作用</th></tr></thead><tbody><tr><td><code>搜索文件夹...</code></td><td>在文件夹及其子文件夹中搜索所有缺失的采样</td></tr><tr><td><code>定位...</code></td><td>询问某一个采样在哪里。在同一文件夹中找到的其他采样也会一并采用</td></tr><tr><td><code>跳过</code></td><td>略过该采样。它的通道保持静默</td></tr></tbody></table></div>
+<p><code>应用</code> 会使用已找到的文件。</p>
+<p><code>自动找到</code> 标签页列出 LYNX SHARE 自己在其他文件夹中找到的文件。请保存工程，以保留这些新位置。</p>
+<h2 id="missing-plugins">缺失的插件</h2>
+<p>LYNX SHARE 按标识符查找每个第三方插件，然后按文件，再按名称。以 VST2 保存的工程可以用同一产品的 VST3 打开，反过来也一样，但此时使用默认设置。</p>
+<p>当某个效果器没有安装时，一个作用相同的 LYNX SHARE 效果器会占据这个插槽：混响换混响，压缩器换压缩器。</p>
+<ul><li>插槽显示原插件的名称，并带有 LYNX SHARE 徽标。</li><li>如果能读取保存的状态，就会转换设置。否则替代插件从默认预设开始。产品、它们的替代插件，以及每个产品转换哪些内容的对照表，见 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGIN_FALLBACK.md">PLUGIN_FALLBACK.md</a>。</li><li>原插件参数的自动化会保留，但不会驱动替代插件。</li><li>原插件的引用和状态仍保留在工程中。装上该插件后，工程会再次用它打开。</li><li>替代插件插槽右键菜单中的 <code>旁通此工程的所有LYNX SHARE替代</code> 可一次性关闭所有替代插件。</li></ul>
+<p>开关是 <code>选项 › 常规设置...</code> 中的 <code>用LYNX SHARE对应插件替代缺失的插件</code>，默认开启。关闭后，缺失效果器的插槽会从混音台中略去。缺失的乐器不做替代。它会变成一个内置合成器，预设按通道名称选定。</p>
+<p>要找回真正的插件，请先安装它，选择 <code>选项 › 扫描插件</code>，然后重新打开工程。</p>
+<h2 id="midi-files">MIDI 文件</h2>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="导入 MIDI 数据窗口：轨道、通道、通道类型和选项" loading="lazy" width="550" height="373"></a></figure>
+<p><code>文件 › 打开...</code> 会从 MIDI 文件创建新工程。<code>文件 › 导入 › MIDI文件...</code> 则先打开 <code>导入MIDI数据</code> 窗口，让你选择导入什么。</p>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>要导入哪些轨道？</code></td><td>所有轨道，或其中一条</td></tr><tr><td><code>要导入哪些通道？</code></td><td>单击某个 MIDI 通道可将其略去。右键单击则只保留该通道</td></tr><tr><td><code>通道类型</code></td><td><code>LYNX SHARE合成器</code> 或 <code>MIDI Out</code></td></tr><tr><td><code>开始新工程</code></td><td>开始一个空白工程。关闭：添加到已打开的工程中</td></tr><tr><td><code>每个轨道创建一个通道</code></td><td>关闭：每个 MIDI 通道一个通道</td></tr><tr><td><code>为新通道设置混音轨道</code></td><td>把新通道路由到连续的混音插入轨</td></tr><tr><td><code>导入拍号</code></td><td>文件的拍号成为工程的拍号</td></tr></tbody></table></div>
+<p>在<a href="/wiki/piano-roll/">钢琴卷帘</a>中按 <code>Ctrl+M</code> 可把 MIDI 文件导入当前通道。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li><code>帮助 › 缺失的文件...</code> 可以在之后再次打开该窗口。<code>帮助 › Last FL Studio import report</code> 列出哪些内容被近似还原、被略去或未安装。</li><li>Live 套装的会话片段会进入片段启动布局的片段网格。<code>选项 › 常规设置...</code> 中的 <code>Live 工程的会话片段</code> 则会改为把它们放在播放列表上。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/file-formats/">文件格式</a></li><li><a href="/wiki/coming-from-fl-studio/">从 FL Studio 转来</a></li><li><a href="/wiki/coming-from-ableton/">从 Ableton Live 转来</a></li><li><a href="/wiki/plugins/">插件</a></li><li><a href="/wiki/exporting/">导出</a></li></ul>
