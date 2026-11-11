@@ -5249,6 +5249,7 @@ public:
             if (const auto& at = alignedChannelEditorPosition(); at.has_value())
                 setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
         setVisible (true);
+        markLinkedWindow (*this, channel, -1); // FL's Auto select linked modules (round 187a)
         keepAboveMainWindow (*this);
     }
 

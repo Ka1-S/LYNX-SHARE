@@ -6114,6 +6114,8 @@ countries: jp
 "Allow the plugin to handle keystrokes before the host does" = "ホストより先にプラグインがキー入力を処理する"
 "Disable typing keyboard priority by default" = "タイピングキーボードの優先をデフォルトで無効にする"
 "Disable typing keyboard priority for all newly added plugins by default" = "新しく追加するすべてのプラグインでタイピングキーボードの優先をデフォルトで無効にする"
+"Auto select linked modules" = "リンクされたモジュールを自動選択"
+"Focusing plugin windows selects mixer tracks" = "プラグインウィンドウにフォーカスするとミキサートラックを選択します"
 "Mute / unmute" = "ミュート / ミュート解除"
 "Portamento / deselect" = "ポルタメント / 選択解除"
 "Shift+arrows" = "Shift+矢印"
@@ -8370,3 +8372,4 @@ countries: jp
 "Octaver" = "オクターバー"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "計測: リファレンスに合わせたモデル。クラシック: それ以前に保存したプロジェクトのモデル"

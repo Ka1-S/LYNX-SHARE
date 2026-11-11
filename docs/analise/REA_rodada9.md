@@ -78,6 +78,17 @@ Top-level chunks (`FUN_0086d4c0`):
 Old versions (< 0xF424B) stored a pad counter and one block per pad without chunks
 (`FUN_0086c5e0`); they do not appear in the demos.
 
+**Versions in FL 2026's own files (round 190m) [DATA]:** 65 states in `Data` — `0x1E84E403` (2,000,100; 61 states),
+`0x1E848E` (2,000,014; 4 `.fst` kits) and `0xF424B` (1,000,011; the five kits in `System/FL Mobile/Instruments`).
+All three use the `id:u32 size:u64` container. What changes at 2,000,014 is the **text**: pad names, layer paths and
+the loop name are UTF-16LE from there on and one byte per character in 1,000,011 (this corrects the note above about
+chunk sizes). Every state has the same chunk order: 32 × `2`, then `1`, `3`, `5`, `4` (each optional); a pad is
+`0x64 0x65 0x66`, its layers, `0x67 0x68` twice, `0x6A`; a pad without a sample still has one layer with an empty
+path. `src/core/Fpc.{h,cpp}` reads and writes all of them byte for byte (test
+`fpc190m_fl_kits_and_projects_round_trip_byte_for_byte`), and `Empty.fst` is `fpc::emptyKit()`. Envelope blob:
+`u32 1, u32 3, u32 n`, `n × 24` bytes, 36-byte tail, in all 4,160 envelopes; the pan envelope has **one** point
+(0, 0.5, tension 0.2) by default, the volume envelope four.
+
 ### 1.2 Pad (chunk `2`, reader/writer `FUN_0086cc50`)
 
 | id | Size | Content |

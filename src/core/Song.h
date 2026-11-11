@@ -776,6 +776,7 @@ struct ChannelDef
     PluginRef plugin;       // used when instrument == plugin
     std::vector<std::uint8_t> controllerState; // instrument == controller: FL Envelope Controller state
     std::vector<float> modelParams; // instrument == sakura / drumpad / boobass / drumsynth / harmless: FL's raw state parameters
+                                    // instrument == minisynth: { 1 } = FL Studio Mobile's build of the engine (core/MiniSynth.h)
     std::vector<std::uint8_t> pluginState; // instrument == sytrus / harmor / ogun / gms / morphine / fruitkick / bassdrum: the FL plugin's saved state (record 0xD5)
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth

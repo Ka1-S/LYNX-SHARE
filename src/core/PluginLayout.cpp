@@ -2648,7 +2648,9 @@ Layout crestCompressor()
     v.push_back (onPage (label (20, 530, 70, 22, TR_NOOP ("Link mode")), 2));
     v.push_back (onPage (tabs (92, 530, 360, 22, "Link mode", TR_NOOP ("Stereo|Mid only|Side only|Mid > side|Side > mid")), 2));
     v.push_back (onPage (label (470, 530, 50, 22, TR_NOOP ("Scale")), 2));
-    v.push_back (onPage (tabs (520, 530, 230, 22, "Meter scale", TR_NOOP ("9 dB|18 dB|36 dB|72 dB|90 dB")), 2));
+    v.push_back (onPage (tabs (520, 530, 200, 22, "Meter scale", TR_NOOP ("9 dB|18 dB|36 dB|72 dB|90 dB")), 2));
+    // round 190v: the two-way / vari-mu law (classic = round 108's, what a project saved before loads with)
+    v.push_back (onPage (tabs (726, 530, 106, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys), 2));
     v.push_back (onPage (toggle (20, 562, 160, 20, "Input meter", TR_NOOP ("Input meter")), 2));
     // round 137 (Pro-C 3's side-chain Host Sync / MIDI inputs): the detector hears a pulse instead of the audio
     v.push_back (onPage (label (192, 562, 52, 20, TR_NOOP ("Trigger")), 2));
@@ -2832,6 +2834,9 @@ Layout sentryGate()
     // round 135: oversampling (the reference's bottom bar)
     v.push_back (label (8, 482, 90, 22, TR_NOOP ("Oversampling")));
     v.push_back (tabs (96, 482, 176, 22, "Oversampling", TR_NOOP ("Off|2x|4x|8x")));
+    // round 190v: the Vocal style's noise reduction (classic = none, what a project saved before loads with)
+    v.push_back (label (300, 482, 56, 22, TR_NOOP ("Model")));
+    v.push_back (tabs (360, 482, 180, 22, "Law", TR_NOOP ("Classic|Measured")));
     return l;
 }
 

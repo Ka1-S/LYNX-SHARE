@@ -30,7 +30,7 @@ Clean-room notes for LYNX's .als import/export. Evidence tags:
 | `Scenes/Scene{Name, Color, Tempo, IsTempoEnabled, TimeSignatureId, IsTimeSignatureEnabled, FollowAction}` | Session scene rows. ClipSlot *i* of every track belongs to Scene *i* |
 | `Transport{LoopOn, LoopStart, LoopLength, CurrentTime}` | arrangement loop (beats) |
 | `GroovePool/Grooves/Groove` | grooves (each holds a MIDI clip pattern, Base, Quantization, Timing, Random, Velocity) |
-| `ScaleInformation{Root, Name}`, `InKey` | Live 12 project scale |
+| `ScaleInformation{Root, Name}`, `InKey` | Live 12 project scale. `Name` = index into the scale chooser (C Bhairav = Root 0, Name 22 in a Live 12.4 save); LYNX's project key round-trips through it since round 190o (`core/LiveScales.h`, REA_rodada190o.md §4) |
 | `SendsPre/SendPreBool` | per return: send is pre-fader |
 | `Grid`, `ViewStates`, `SequencerNavigator` | UI state |
 

@@ -6114,6 +6114,8 @@ countries: nl be
 "Allow the plugin to handle keystrokes before the host does" = "De plug-in toetsaanslagen laten verwerken vóór de host"
 "Disable typing keyboard priority by default" = "Voorrang van het typtoetsenbord standaard uitschakelen"
 "Disable typing keyboard priority for all newly added plugins by default" = "Voorrang van het typtoetsenbord standaard uitschakelen voor alle nieuw toegevoegde plug-ins"
+"Auto select linked modules" = "Gekoppelde modules automatisch selecteren"
+"Focusing plugin windows selects mixer tracks" = "Een plug-invenster focussen selecteert de mixertrack"
 "Mute / unmute" = "Dempen / dempen opheffen"
 "Portamento / deselect" = "Portamento / deselecteren"
 "Shift+arrows" = "Shift+pijlen"
@@ -8370,3 +8372,4 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Gemeten: het model dat op de referentie is afgestemd; klassiek: dat van projecten die eerder zijn opgeslagen"

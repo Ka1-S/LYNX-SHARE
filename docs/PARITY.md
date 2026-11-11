@@ -65,8 +65,8 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 4 | 8 | 135 | 183b: sound 2 → 4 (fxparity 3.00 → 3.25, verb 7.84 → 8.35 on the matched settings; 45-setting bank 2.25 → 2.81 / 6.79 → 7.54; music level error 4.2 → 1.2 dB): echo as pre-delay, EQ / colour / mode laws measured |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | trial187b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference; trial187b: all 14 styles nulled on programme (5.3 → 5.4), Upward / Classic refitted |
-| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only) |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | trial187b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference; trial187b: all 14 styles nulled on programme (5.3 → 5.4), Upward / Classic refitted; round 190v: Two-way and Vari-mu refitted on a threshold × ratio × knee × attack grid (gain error 4.3 → 1.9 dB and 5.7 → 0.55 dB) |
+| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only); round 190v: the Vocal style's noise reduction (noise probes 3.7 → 4.9) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
@@ -2308,8 +2308,96 @@ Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Wa
 Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
 FL Studio Mobile plugin is the open sound check.
 
+## Round 190o: Live's MIDI Transformations (core) and Scale Mode in .als (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Span, Strum (grid % + tension curve), Ornament (flam, grace notes), Recombine, Arpeggiate (18 styles), Connect, Chop | its own Piano roll tools (Strum, Arpeggiate, Chop, Articulate, Flam…) | Clip View › Transform panel | ⚠️ core only (`core/MidiTools.h`), note for note against a Live 12.4 save; the panel is the next slice. FL's tools unchanged |
+| Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
+| Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
+
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
 export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
 have no Detached state: their imported flags are kept as they were.
+
+## Round 190v: Crest's Two-way and Vari-mu laws, Sentry's Vocal noise reduction
+
+Black-box, from round trial190k's reference renders of LYNX's own test signals (no reference plug-in ran in this round).
+Tools and tables: `/mnt/e/lynx-work/parity190v` (`crest/bank.py`, `sentry/sbank.py`, `hash/hash.md`). Gain error = the rms
+difference between the reference's and LYNX's gain in 5 ms windows; score = `scripts/fxparity.py`.
+
+### Crest Compressor: Two-way and Vari-mu (reference styles 5 and 7 of 13)
+
+Measured on 1 kHz stairs, pink-noise stairs and a step probe at thresholds −12 … −48 dB × ratios 2 / 4 / 10 × knees
+0 … 72 dB × attacks 0.25 / 10 / 100 ms, plus a release sweep (about 880 renders) and the earlier banks.
+
+- **Two-way** is one law over the whole grid (186 static curves fitted to 0.08 dB rms): a fixed gain, upward compression
+  under threshold − 6.3 dB and downward compression over threshold + 3 dB, both corners rounded by the knee. The fixed
+  gain falls as the threshold rises above −36 dB and as the attack gets slower. Its detector follows the amplitude
+  (not the level in dB) with τ = 0.12 × attack and 0.19 × release, so the release knob now sets the recovery (it was
+  back within 3 ms whatever the knob). Round 108's stairs at threshold −18 are one line of this grid (0.26 → 0.08 dB and
+  3.0 → 0.15 dB on its two replicas): no conflict, nothing of the old fit is kept.
+- **Vari-mu** reduces by the level more than by the overshoot: each static curve is a soft corner into a straight
+  line whose slope, corner and width come from a measured table (threshold × ratio × knee). The corner stops following
+  the threshold under about −30 dB and a larger knee reduces less (ratio 4 at 0 dBFS: −14.6 / −13.0 / −10.8 dB at knee
+  0 / 18 / 72; the old law reduced more with the knee). The detector keeps its timing; the release no longer shortens
+  with a slow attack, and attacks under 0.9 ms act like 0.9 ms (pink noise read 0.4 dB hot).
+- Cost: Two-way about 20 % less CPU than before, Vari-mu the same (its curve comes from a table), no latency change.
+- Auto gain with Two-way follows the new law (one capture: threshold −18, ratio 2, knee 24, attack 30 ms), at most 3 dB
+  over the other styles' make-up.
+
+| Style | Bank | Files | Gain error before | after | Score before | after | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| Two-way | tp172b + trial187b (incl. round 108 replicas) | 60 | 4.00 dB | 2.18 | 2.52 | 5.05 | 49 / 10 / 1 |
+| Two-way | 190k knee grid | 72 | 4.20 | 1.75 | 2.31 | 4.71 | 72 / 0 / 0 |
+| Two-way | 190k threshold × ratio × knee × attack, release | 370 | 4.36 | 1.89 | 2.39 | 3.94 | 293 / 75 / 2 |
+| Two-way | all | 506 | 4.29 | 1.91 | 2.39 | 4.19 | 418 / 85 / 3 |
+| Vari-mu | tp172b + trial187b (incl. round 108 replicas) | 61 | 4.38 | 0.67 | 2.28 | 6.26 | 61 / 0 / 0 |
+| Vari-mu | 190k knee grid | 72 | 4.52 | 0.23 | 2.39 | 6.93 | 72 / 0 / 0 |
+| Vari-mu | 190k threshold × ratio × knee × attack, release | 370 | 6.15 | 0.57 | 2.55 | 6.03 | 340 / 24 / 6 |
+| Vari-mu | all | 507 | 5.74 | 0.55 | 2.49 | 6.19 | 477 / 24 / 6 |
+
+Not better: three Two-way pink-noise files at threshold −12, attack 10 ms (gain error 1.76 → 2.02, 1.80 → 2.07 and
+1.69 → 1.84 dB; the old law's level error happened to cross zero exactly there, the new one sits 1 dB low on pink
+noise everywhere) and nine files whose 0–10 score fell by one or more steps with the gain error within 0.12 dB
+(pink noise that is hardly compressed, two attack-100 stairs, one vocal).
+
+Old projects sound the same: the laws are versioned by Crest's appended `Law` parameter (on = measured, for new
+instances and for reference states translated on load; a project or preset saved before has no such parameter and
+loads with it off = round 108's laws, `upgradeLoadedEffectParams`, like Prism's `Detector`). No control in the editor;
+the parameter list shows it as measured / classic. `hash/hash.md`: all 36 legacy-state renders (every style and
+voicing of Crest and Sentry) are bit-identical to 0.1.25; a new instance differs only in the three refitted styles.
+No factory preset uses Two-way, Vari-mu or Sentry's Vocal style, so none moved.
+For reference, the level of the measured law against the classic one on the grid (mean over knees and attacks):
+Two-way −1 … +1 dB at thresholds −12 / −18, +2 dB at −24, +3.5 at −30, +5 at −36, +4.5 … +6 at −48; Vari-mu within
+about 1 dB at −12 / −18, +1.5 dB at −24, +3 at −30, +5 at −36 and +8 … +11 dB at −48.
+
+Open: the reference's Two-way depends on frequency (100 Hz gets about 1.4 dB more gain than 1 kHz, 8 kHz 4.5 – 6.7 dB
+more reduction: probably bands); not modelled, it is most of the remaining 1.9 dB.
+
+### Sentry Gate: the Vocal style's noise reduction
+
+The reference's Vocal style turns hiss-like sound down when it starts after a pause and lets it come back while it
+lasts; its other styles do not, and neither do LYNX's (bit-identical, also Vocal with ducking).
+Sentry's appended `Law` parameter versions it the same way: projects saved before load with it off and render
+bit-identically (no noise reduction).
+
+- What counts: the part above 4 kHz, when it holds most of the power (10 % → 75 % of it: none → full). White noise
+  low-passed at 2 kHz, tones, music and voiced notes pass untouched.
+- Depth at the onset: 0.375 dB per dB of that part above −62.8 dBFS (white noise at −20 dBFS: −16 dB), × √(1 − 1 / ratio),
+  softly limited by the range, less with a longer hold (none at 250 ms). The deeper of the gate and the reduction applies.
+- Recovery: in gain, with a time constant that grows with the level (1.9 s at −20 dBFS, 0.6 s at −30, 0.15 s at −42).
+- It arms again after a pause of 60 ms + 1.5 × the hold (fully after 250 ms more).
+
+| Bank | Files | Gain error before | after | Worse | Score before | after | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| tp172b Vocal settings (programme) | 76 | 11.22 dB | 11.07 | 0 | 5.64 | 5.64 | 0 / 76 / 0 |
+| trial187b G6 / G7 | 10 | 15.59 | 15.47 | 0 | 5.40 | 5.40 | 0 / 10 / 0 |
+| 190k noise probes N1 – N7 | 35 | 15.19 | 14.32 | 0 | 3.69 | 4.86 | 17 / 18 / 0 |
+| 190k T* | 8 | 16.47 | 16.29 | 0 | 6.12 | 6.12 | 0 / 8 / 0 |
+
+(The gain error is dominated by windows where one gate is open and the other closed.) Open: the reference seems to
+learn — with a 200 ms hold it stops reducing repeated bursts after about 3 s, a kick after a 0.2 s gap loses 7 dB, and
+at thresholds −25 / −10 its onsets are far deeper (−30 … −40 dB); none of that is modelled.
