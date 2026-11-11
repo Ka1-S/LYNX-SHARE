@@ -638,7 +638,7 @@ def main():
     insp_en = {g["vendor"] + "/" + i["short"]: i["desc"]["en"] for g in ins["groups"] for i in g["items"] if i["desc"]["en"]}
     dump = lambda d: json.dumps(d, ensure_ascii=False, indent=0) + "\n"
     files = {"i18n/en.json": dump({"ui": ui, "featured": featured_en, "insp": insp_en}), "i18n/updates/en.json": dump(upd), "i18n/catalog/en.json": dump(cen),
-             "wiki/search.json": json.dumps(search, ensure_ascii=False, separators=(",", ":")) + "\n"}
+             "wiki/search.json": json.dumps({"g": {g["key"]: g["title"] for g in index}, "p": search}, ensure_ascii=False, separators=(",", ":")) + "\n"}
     lk = vkey(latest) + "."
     for f in sorted((OUT / "i18n/updates").glob("*.json")) if (OUT / "i18n/updates").is_dir() else []:
         d = upd if f.stem == "en" else json.loads(f.read_text(encoding="utf-8"))

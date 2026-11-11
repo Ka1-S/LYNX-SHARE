@@ -4,8 +4,9 @@
 const box = document.getElementById('wq'), res = document.getElementById('wres');
 if (!box || !res) return;
 const t = window.LYNX_T || (k => k);
-let index = null, sel = 0, hits = [];
-const load = () => index ? Promise.resolve(index) : fetch('/wiki/search.json?v=' + (window.LYNX_V || '')).then(r => r.json()).then(d => index = d);
+let index = null, groups = {}, sel = 0, hits = [];
+const group = k => { const v = t(k); return v === k ? (groups[k] || '') : v; };
+const load = () => index ? Promise.resolve(index) : fetch('/wiki/search.json?v=' + (window.LYNX_V || '')).then(r => r.json()).then(d => { groups = d.g; return index = d.p; });
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const title = e => { const v = e[1] ? t(e[1]) : e[2]; return v === e[1] ? e[2] : v; };
@@ -27,7 +28,7 @@ function search(q){
 function draw(){
   if (!box.value.trim()){ res.hidden = true; return; }
   res.hidden = false;
-  res.innerHTML = hits.length ? hits.map(([, e, head], i) => `<a href="${e[0]}${head ? '#' + head.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : ''}" class="${i === sel ? 'on' : ''}">${esc(title(e))}<small>${esc(head || t(e[3]))}</small></a>`).join('')
+  res.innerHTML = hits.length ? hits.map(([, e, head], i) => `<a href="${e[0]}${head ? '#' + head.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : ''}" class="${i === sel ? 'on' : ''}">${esc(title(e))}<small>${esc(head || group(e[3]))}</small></a>`).join('')
                               : `<p>${esc(t('ws.none'))}</p>`;
 }
 box.addEventListener('input', () => load().then(() => { hits = search(box.value); sel = 0; draw(); }));
@@ -38,6 +39,8 @@ box.addEventListener('keydown', e => {
   else if (e.key === 'Escape'){ res.hidden = true; box.blur(); }
 });
 document.addEventListener('click', e => { if (!e.target.closest('.wsearch')) res.hidden = true; });
+// /wiki/?q=reverb opens with the results shown
+try { const q = new URLSearchParams(location.search).get('q'); if (q){ box.value = q; load().then(() => { hits = search(q); draw(); }); } } catch (x) {}
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '');
   if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !typing)){ e.preventDefault(); box.scrollIntoView({block: 'nearest'}); box.focus(); box.select(); }
