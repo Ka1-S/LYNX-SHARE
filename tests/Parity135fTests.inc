@@ -100,7 +100,7 @@ TEST (parity135f_apex_new_params)
 {
     using namespace lynx::apex;
     const auto& inf = info();
-    CHECK ((int) inf.params.size() == paramCount && paramCount == 22);
+    CHECK ((int) inf.params.size() == paramCount && paramCount == 24);
     auto p = parity135f::defaults (lynx::EffectKind::apexLimiter);
     CHECK (oversamplingFactor (p[pOversampling]) == 1 && p[pSidechain] < 0.5f && displayMode (p[pDisplayMode]) == 0);
     CHECK (std::abs (loudnessTarget (p[pLoudnessTarget]) + 14.0) < 1e-9);

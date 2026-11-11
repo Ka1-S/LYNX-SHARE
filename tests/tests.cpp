@@ -17454,6 +17454,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bugs190cTests.inc"
 #include "Parity190vTests.inc"
 #include "Parity190arFetTests.inc"
+#include "Parity190arApexTests.inc"
 #include "Slicex190lTests.inc"
 #include "Parity190alTests.inc"
 #include "Slicex190hTests.inc"

@@ -124,6 +124,7 @@ struct Core
         histL.fill (0.0); histR.fill (0.0); scHistL.fill (0.0); scHistR.fill (0.0);
         pos = 0;
         fastL = fastR = slowL = slowR = 0.0; // dB
+        levelDb = 0.0;
         peakL = peakR = 0.0;
         dcXL = dcXR = dcYL = dcYR = 0.0;
         err = {};
@@ -161,6 +162,17 @@ struct Core
         dcR = std::exp (-2.0 * pi * 5.0 / sampleRate);
         bits = ditherHere ? ditherBits (p[pDither]) : 0;
         shaping = noiseShaping (p[pShaping]);
+        // round 190ar: the levelling stage. Limiters with a threshold under their ceiling were measured (tone bursts,
+        // black-box) to hold the steady level at the threshold with a slow attack (about 9 ms in their transparent
+        // style, under 1 ms in the fast one) and the release time, while the ceiling only catches what the attack lets
+        // through: transients keep their size. Here: after the gain, the linked peak over Level threshold is taken down
+        // (∞ : 1, 6 dB knee) with Level attack and Release; the limiter then works on the result. 0 dB = off.
+        const double levelThr = levelThresholdDb (p[pLevelThreshold]);
+        const bool levelling = levelThr < -0.05;
+        const double levelKnee = std::pow (10.0, (levelThr - 3.0) / 20.0);
+        const double kLevelUp = 1.0 - std::exp (-1.0 / std::max (1.0, levelAttackMs (p[pLevelAttack]) * 0.001 * sampleRate));
+        const double kLevelDown = 1.0 - std::exp (-1.0 / std::max (1.0, rel));
+        if (! levelling) levelDb = 0.0;
         const auto& ip = interp();
         const int len = (int) inL.size();
         const int pad = maxLook - look + extraDelay;
@@ -176,6 +188,25 @@ struct Core
                 const double yl = xl - dcXL + dcR * dcYL, yr = xr - dcXR + dcR * dcYR;
                 dcXL = xl; dcXR = xr; dcYL = yl; dcYR = yr;
                 xl = yl; xr = yr;
+            }
+            if (levelling)
+            {
+                const double pk = std::max (std::abs (xl), std::abs (xr)) * gain;
+                double need = 0.0;
+                if (pk > levelKnee)
+                {
+                    const double o = 20.0 * std::log10 (pk) - levelThr;
+                    need = o >= 3.0 ? o : (o + 3.0) * (o + 3.0) / 12.0;
+                }
+                levelDb += (need - levelDb) * (need > levelDb ? kLevelUp : kLevelDown);
+                if (levelDb > 1.0e-4)
+                {
+                    const double g = std::pow (10.0, -levelDb / 20.0);
+                    xl *= g; xr *= g;
+                    minGain = std::min (minGain, g);
+                }
+                else
+                    levelDb = 0.0;
             }
             std::rotate (histL.begin(), histL.begin() + 1, histL.end()); histL.back() = xl * gain;
             std::rotate (histR.begin(), histR.begin() + 1, histR.end()); histR.back() = xr * gain;
@@ -279,6 +310,7 @@ struct Core
     SlidingMin minAll, minL, minR;
     double fastL = 0.0, fastR = 0.0, slowL = 0.0, slowR = 0.0; // release stages, dB
     double peakL = 0.0, peakR = 0.0; // round tp172b3: the detected peaks over ~10 ms (the headroom under the ceiling)
+    double levelDb = 0.0; // round 190ar: the levelling stage's reduction, dB
 };
 
 class ApexLimiterEffect final : public Effect
@@ -451,6 +483,8 @@ const char* styleName (Style s) noexcept
     return names[(int) s];
 }
 double attackMs (float v) noexcept { const double x = std::clamp ((double) v, 0.0, 1.0); return 10000.0 * x * x * x * x; }
+double levelThresholdDb (float v) noexcept { return -36.0 * (double) std::clamp (v, 0.0f, 1.0f); }
+double levelAttackMs (float v) noexcept { return 0.1 * std::pow (1000.0, (double) std::clamp (v, 0.0f, 1.0f)); }
 int ditherBits (float v) noexcept
 {
     static constexpr int b[] { 0, 16, 18, 20, 22, 24 };
@@ -469,7 +503,9 @@ const EffectInfo& info()
                                   { "Unity gain", 0.0f }, { "Audition", 0.0f }, { "DC filter", 0.0f }, { "Meter scale", 0.4f },
                                   // round 135
                                   { "Oversampling", 0.0f }, { "Peak meter", 1.0f }, { "Display", 0.0f }, { "Loudness reset", 0.0f },
-                                  { "Side chain", 0.0f }, { "Loudness meter", 0.0f }, { "Loudness target", 0.6f } } };
+                                  { "Side chain", 0.0f }, { "Loudness meter", 0.0f }, { "Loudness target", 0.6f },
+                                  // round 190ar: off (0 dB) and 9 ms
+                                  { "Level threshold", 0.0f }, { "Level attack", 0.6514f } } };
     return i;
 }
 
@@ -492,6 +528,11 @@ std::string paramText (int p, float v)
         case pDisplayMode: { static const char* n[] = { "Fast", "Slow", "Slow down", "Infinite", "Off" }; return n[displayMode (v)]; }
         case pLoudnessReset: return "Reset";
         case pLoudnessTarget: std::snprintf (t, sizeof (t), "%.0f LUFS", loudnessTarget (v)); break;
+        case pLevelThreshold:
+            if (levelThresholdDb (v) > -0.05) return "Off";
+            std::snprintf (t, sizeof (t), "%.1f dB", levelThresholdDb (v));
+            break;
+        case pLevelAttack: std::snprintf (t, sizeof (t), levelAttackMs (v) < 10.0 ? "%.2f ms" : "%.1f ms", levelAttackMs (v)); break;
         case pAttack:
         {
             const auto ms = attackMs (v);

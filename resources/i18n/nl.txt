@@ -8868,3 +8868,7 @@ countries: nl be
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Een afbeelding (PNG) in het formaat van Fruity Dance: 8 frames naast elkaar, één rij per beweging en een tekstbestand met dezelfde naam met één bewegingsnaam per regel"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "De breedte van de afbeelding moet 8 frames zijn en de hoogte één frame voor elke regel van het namenbestand ({0})."
 "Clean|FET" = "Clean|FET"
+"Levelling" = "Nivellering"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivellering: houdt het niveau met een trage attack op een drempel onder het plafond, het plafond vangt de rest op (standaard uit)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Drempel van de nivellering: het niveau dat onder het plafond wordt gehouden (Off: geen nivellering)"
+"Levelling attack: how much of a transient passes before the level is held" = "Attack van de nivellering: hoeveel van een transiënt doorkomt voordat het niveau wordt vastgehouden"

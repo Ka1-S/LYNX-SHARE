@@ -8901,3 +8901,7 @@ countries: kr
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance 형식의 이미지(PNG): 가로 8프레임, 동작마다 한 줄, 같은 이름의 텍스트 파일에 한 줄에 동작 이름 하나"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "이미지의 너비는 8프레임, 높이는 이름 파일({0})의 각 줄마다 한 프레임이어야 합니다."
 "Clean|FET" = "클린|FET"
+"Levelling" = "레벨링"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "레벨링: 느린 어택으로 실링 아래의 스레숄드에 레벨을 유지하고 나머지는 실링이 잡습니다 (기본값은 꺼짐)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "레벨링 스레숄드: 실링 아래에 유지되는 레벨 (Off: 레벨링 없음)"
+"Levelling attack: how much of a transient passes before the level is held" = "레벨링 어택: 레벨이 유지되기 전에 트랜지언트가 얼마나 통과하는지"
