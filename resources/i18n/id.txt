@@ -8929,3 +8929,5 @@ countries: id
 
 # --- Round 190bj: QA fixes
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (baris terakhir lembar) ditampilkan saat penari ditahan dengan mouse."
+"Show complete piano roll preview" = "Tampilkan pratinjau Piano Roll lengkap"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: pratinjau not sebuah channel menampilkan seluruh pattern meskipun pattern lebih panjang daripada yang ditampilkan rack; jika mati, pratinjau bergulir bersama langkah"

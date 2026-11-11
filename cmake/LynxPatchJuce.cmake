@@ -73,6 +73,7 @@
 #    the Playlist's and the Mixer's cached pictures (redrawn while scrolling, 1920x1000 px) that readback cost more than
 #    the drawing. A context made while juce::lynxSkipImageReadback is set skips it; LYNX sets it only around images it
 #    never reads back (the picture is only drawn to the window; a new device gets a full repaint anyway).
+#    Round 190bm (0.1.25: the Mixer and the Playlist black): see fix 22.
 # 17. Windows only, juce_gui_basics/native/juce_FileChooser_windows.cpp (round 180a): at the first selection change in a
 #    native file dialog JUCE types Home and End with SendInput (its workaround for a cut-off file name), into whatever
 #    window has the focus at that moment: another program, if the user moved on while the dialog opened. The keys now go
@@ -104,6 +105,16 @@
 #    into its own menu (getItemCount / getItem / executeMenuItem, e.g. Surge XT). JUCE's menu held the plugin's items
 #    only, and its getItem compared tags where the SDK passes an index. Without a hook, or for a menu without a
 #    parameter, it is JUCE's menu as before.
+# 22. Windows only, juce_graphics/native/juce_Direct2DImage_windows.cpp (round 190bm; a 0.1.25 user saw the Mixer and
+#    the Playlist black): fix 16 left the image's software copy as allocated (black), and JUCE reads that copy whenever
+#    the image is drawn by anything but the Direct2D device it was painted on: a window drawn by the software renderer
+#    (LYNX's GPU rendering switched off, which LYNX also does by itself after a crash in the graphics driver), a window
+#    on a monitor of another adapter than the first, the pages of a new device after the adapters changed. The
+#    readback is now put off, not dropped: the device bitmap that holds the picture is remembered (beside the class:
+#    its header is also compiled into juce_gui_basics from the unpatched tree, so its layout must stay) and read back
+#    the moment the copy is needed. The flag applies to one image (`lynxNoReadbackImage`), not to every Graphics made
+#    meanwhile. A picture whose device is gone is counted (`lynxImageContentLost`; the caches repaint), and reading
+#    from such a device returns false instead of reading through a null mapping.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -179,6 +190,30 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("image contexts without readback (member)" "LYNX patch (round 174e2): the flag when made"
             "        ImagePixelData::Ptr backup;|NL|    };"
             "        ImagePixelData::Ptr backup;|NL|        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|    };")
+        lynx_juce_fix("image readback put off (definitions)" "LYNX patch (round 190bm): the readback put off"
+            "bool lynxSkipImageReadback = false;|NL|"
+            "bool lynxSkipImageReadback = false;|NL||NL|// LYNX patch (round 190bm): the readback put off (cmake/LynxPatchJuce.cmake, fix 22). The flag above applies to one|NL|// image only (lynxNoReadbackImage, its pixel data), and a skipped readback is only put off: the device bitmap that|NL|// holds the picture is remembered and read back when the software copy is needed (the image drawn by a software|NL|// renderer, another device's pages, a software context). A picture that could not be read back any more is counted.|NL|const ImagePixelData* lynxNoReadbackImage = nullptr;|NL|int lynxImageContentLost = 0;|NL||NL|struct LynxPendingReadback|NL|{|NL|    ComSmartPtr<ID2D1DeviceContext1> context;|NL|    ComSmartPtr<ID2D1Bitmap1> bitmap;|NL|    ImagePixelData::Ptr backing;|NL|};|NL||NL|static std::atomic<int> lynxPendingCount { 0 };|NL||NL|static CriticalSection& lynxPendingLock()|NL|{|NL|    static CriticalSection lock;|NL|    return lock;|NL|}|NL||NL|static std::map<const ImagePixelData*, LynxPendingReadback>& lynxPendingReadbacks()|NL|{|NL|    static std::map<const ImagePixelData*, LynxPendingReadback> pending;|NL|    return pending;|NL|}|NL||NL|static void lynxForgetPending (const ImagePixelData* image)|NL|{|NL|    if (lynxPendingCount.load() == 0)|NL|        return;|NL||NL|    LynxPendingReadback released; // (its COM objects are released outside the lock)|NL|    const ScopedLock lock (lynxPendingLock());|NL|    auto& pending = lynxPendingReadbacks();|NL||NL|    if (const auto found = pending.find (image); found != pending.end())|NL|    {|NL|        released = found->second;|NL|        pending.erase (found);|NL|        --lynxPendingCount;|NL|    }|NL|}|NL||NL|static void lynxSetPending (const ImagePixelData* image,|NL|                            ComSmartPtr<ID2D1DeviceContext1> context,|NL|                            ComSmartPtr<ID2D1Bitmap1> bitmap,|NL|                            ImagePixelData::Ptr backing)|NL|{|NL|    const ScopedLock lock (lynxPendingLock());|NL|    auto& pending = lynxPendingReadbacks();|NL||NL|    if (pending.find (image) == pending.end())|NL|        ++lynxPendingCount;|NL||NL|    pending[image] = LynxPendingReadback { context, bitmap, backing };|NL|}|NL||NL|/*  Brings the software copy of the image up to date, unless its picture lives on exceptOnDevice. */|NL|static void lynxReadBackPending (const ImagePixelData* image, ID2D1Device1* exceptOnDevice)|NL|{|NL|    if (lynxPendingCount.load() == 0)|NL|        return;|NL||NL|    LynxPendingReadback toRead;|NL||NL|    {|NL|        const ScopedLock lock (lynxPendingLock());|NL|        auto& pending = lynxPendingReadbacks();|NL|        const auto found = pending.find (image);|NL||NL|        if (found == pending.end())|NL|            return;|NL||NL|        if (exceptOnDevice != nullptr && getDeviceForContext (found->second.context) == exceptOnDevice)|NL|            return;|NL||NL|        toRead = found->second;|NL|        pending.erase (found);|NL|        --lynxPendingCount;|NL|    }|NL||NL|    if (! readFromDirect2DBitmap (toRead.context, toRead.bitmap, toRead.backing))|NL|        ++lynxImageContentLost;|NL|}|NL|")
+        lynx_juce_fix("image readback from a device that went away" "LYNX patch (round 190bm): a device that went away"
+            "    readableBitmap->CopyFromBitmap (&dstPoint, bitmap, &srcRect);|NL|"
+            "    // LYNX patch (round 190bm): a device that went away gives nothing to read (was: a read through a null mapping)|NL|    if (readableBitmap == nullptr || FAILED (readableBitmap->CopyFromBitmap (&dstPoint, bitmap, &srcRect)))|NL|        return false;|NL||NL|    {|NL|        D2D1_MAPPED_RECT probe{};|NL||NL|        if (FAILED (readableBitmap->Map (D2D1_MAP_OPTIONS_READ, &probe)) || probe.bits == nullptr)|NL|            return false;|NL||NL|        readableBitmap->Unmap();|NL|    }|NL|")
+        lynx_juce_fix("image readback put off (image deleted)" "LYNX patch (round 190bm): nothing left to read"
+            "Direct2DPixelData::~Direct2DPixelData()|NL|{|NL|"
+            "Direct2DPixelData::~Direct2DPixelData()|NL|{|NL|    lynxForgetPending (this); // LYNX patch (round 190bm): nothing left to read back|NL|")
+        lynx_juce_fix("image readback put off (another device)" "LYNX patch (round 190bm): another device's pages"
+            "    const auto device1 = getDeviceForContext (context);|NL||NL|    if (device1 == nullptr)|NL|        return pagesForDevice.end();|NL|"
+            "    const auto device1 = getDeviceForContext (context);|NL||NL|    if (device1 == nullptr)|NL|        return pagesForDevice.end();|NL||NL|    // LYNX patch (round 190bm): another device's pages are filled from the software copy: it is brought up to date|NL|    lynxReadBackPending (this, device1);|NL|")
+        lynx_juce_fix("image readback put off (software context)" "LYNX patch (round 190bm): the software context draws"
+            "        for (auto& pair : pagesForDevice)|NL|            pair.second.markOutdated();|NL||NL|        return backingData->createLowLevelContext();"
+            "        lynxReadBackPending (this, nullptr); // LYNX patch (round 190bm): the software context draws over the picture|NL||NL|        for (auto& pair : pagesForDevice)|NL|            pair.second.markOutdated();|NL||NL|        return backingData->createLowLevelContext();")
+        lynx_juce_fix("image readback put off (pixels read)" "LYNX patch (round 190bm): the copy is read"
+            "    backingData->initialiseBitmapData (bitmap, x, y, mode);|NL|"
+            "    lynxReadBackPending (this, nullptr); // LYNX patch (round 190bm): the copy is read (or partly written) from here|NL|    backingData->initialiseBitmapData (bitmap, x, y, mode);|NL|")
+        lynx_juce_fix("image readback put off (context end)" "LYNX patch (round 190bm): put off, not dropped"
+            "            if (! skipReadback) // LYNX patch (round 174e2): readback skipped when asked|NL|                readFromDirect2DBitmap (storedContext, storedTarget, backup);"
+            "            if (! skipReadback) // LYNX patch (round 174e2): readback skipped when asked|NL|                readFromDirect2DBitmap (storedContext, storedTarget, backup);|NL||NL|            // LYNX patch (round 190bm): put off, not dropped: read back when the software copy is needed|NL|            if (skipReadback)|NL|                lynxSetPending (self.get(), storedContext, storedTarget, backup);|NL|            else|NL|                lynxForgetPending (self.get());")
+        lynx_juce_fix("image readback put off (one image)" "LYNX patch (round 190bm): for one image"
+            "        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|"
+            "        // LYNX patch (round 174e2): the flag when made|NL|        // LYNX patch (round 190bm): for one image only (a Graphics made on another image meanwhile reads back as ever)|NL|        const bool skipReadback = lynxSkipImageReadback && lynxNoReadbackImage == self.get();|NL|")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"

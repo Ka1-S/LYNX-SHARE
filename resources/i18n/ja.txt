@@ -8929,3 +8929,5 @@ countries: jp
 
 # --- Round 190bj: QA fixes
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"
+"Show complete piano roll preview" = "ピアノロールのプレビュー全体を表示"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "チャンネルラック: パターンがラックの表示幅より長くても、チャンネルのノートプレビューにパターン全体を表示します。オフの場合はステップと一緒にスクロールします"

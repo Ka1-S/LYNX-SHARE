@@ -128,6 +128,26 @@ inline double followViewStart (double viewStart, double viewTicks, double tick, 
     return viewStart;
 }
 
+// Follow inside a loop of `loopTicks` (the Piano Roll in Pattern mode: the pattern's length; feedback 190bm: "it always
+// jumps when it reaches the end"). The playhead never passes the loop's end, so:
+//  - a view that already shows the loop's end doesn't page forward when the playhead nears its right edge (the right
+//    margin is for a playhead that goes on; here the next page would show nothing and the wrap would page straight
+//    back: two full repaints, a blink). A loop that fits the view never moves it.
+//  - a page forward stops with the loop's end at the view's right edge instead of running past it;
+//  - the wrap is one jump back (the playhead is left of the view). `loopTicks` <= 0: followViewStart as it is.
+inline double followViewStartInLoop (double viewStart, double viewTicks, double tick, double leadTicks, double rightMarginTicks, double loopTicks)
+{
+    if (loopTicks <= 0.0 || tick < 0.0 || viewTicks <= 0.0)
+        return followViewStart (viewStart, viewTicks, tick, leadTicks, rightMarginTicks);
+
+    const auto endInView = loopTicks <= viewStart + viewTicks;
+    if (tick >= viewStart && tick <= viewStart + viewTicks - (endInView ? 0.0 : rightMarginTicks))
+        return viewStart;
+    if (tick < viewStart && tick < viewTicks - rightMarginTicks) // (the wrap, or a seek near the start: the first page)
+        return 0.0;
+    return std::max (0.0, std::min (tick - leadTicks, loopTicks - viewTicks));
+}
+
 // --- Stop ------------------------------------------------------------------------------------------------------
 
 // Where Stop sends the playhead. `alreadyStopped`: Stop pressed while nothing plays (or its second click of a

@@ -10,6 +10,7 @@
 // always work.
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -108,6 +109,25 @@ struct TypingKey
 };
 TypingKey typingPianoKey (int key, int octave, int root, int layout);
 std::vector<int> typingPianoNotes (int key, int octave, int root, int layout); // typingPianoKey().notes
+
+// The typing keyboard goes by the key's PLACE, not its letter, as FL's does (FL's key table is indexed by the scan
+// codes 2..0x35, FUN_01182670 / FUN_011828c0, round 169f): on a German keyboard (QWERTZ) the key left of X plays the
+// Z row's first note although it types Y; on AZERTY the Q row starts at the key that types A, and the number row plays
+// without Shift. Shortcuts (Ctrl+Z...) stay by character.
+namespace typingpiano
+{
+    // The key a US keyboard has at PC scan code `scanCode` (set 1: 0x02 = '1' ... 0x10 = 'Q' ... 0x2C = 'Z' ... 0x35 =
+    // '/'; the same numbers as Linux's evdev key codes), upper case; 0 for a key outside the typing block (the ISO
+    // key next to the left Shift, 0x56, has no US place).
+    int usKeyOfScanCode (int scanCode) noexcept;
+    int scanCodeOfUsKey (int key) noexcept; // the reverse; 0 for none
+    // The scan code of the key that gives `keyCode` (the UI's key code: the key's unshifted character in the user's
+    // keyboard layout); 0 = not known (no such key in the layout, or the platform can't tell).
+    using ScanCodeLookup = std::function<int (int keyCode)>;
+    // The US key at the place of the key that gives `keyCode`: what typingPianoKey() is asked for. A key whose place
+    // is not known stays as it is (by character, as before); a key at a place outside the typing block gives 0.
+    int physicalKey (int keyCode, const ScanCodeLookup& scanCodeOf);
+}
 
 // The upper-case printable character of a key code (JUCE's getKeyCode()), or 0 for any other key. On Windows JUCE's
 // F-keys, numpad keys and arrows are VK | 0x10000: a plain towupper() of them (16-bit) gave F4 -> 'S', F1 -> 'P',

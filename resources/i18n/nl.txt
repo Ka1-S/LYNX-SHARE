@@ -8929,3 +8929,5 @@ countries: nl be
 
 # --- Round 190bj: QA fixes
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (de laatste rij van het blad) wordt getoond zolang de danser met de muis wordt vastgehouden."
+"Show complete piano roll preview" = "Volledige Piano Roll-voorvertoning tonen"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: de nootvoorvertoning van een kanaal toont het hele pattern, ook als het langer is dan het rack laat zien; uit: ze schuift mee met de stappen"

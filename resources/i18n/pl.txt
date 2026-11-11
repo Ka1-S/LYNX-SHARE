@@ -8929,3 +8929,5 @@ countries: pl
 
 # --- Round 190bj: QA fixes
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (ostatni wiersz arkusza) jest pokazywany, gdy tancerz jest trzymany myszą."
+"Show complete piano roll preview" = "Pokaż pełny podgląd Piano Roll"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: podgląd nut kanału pokazuje cały pattern, nawet gdy jest dłuższy niż widoczna część racka; wyłączone: przewija się razem z krokami"

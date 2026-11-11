@@ -8929,3 +8929,5 @@ countries: tw hk mo
 
 # --- Round 190bj: QA fixes
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表單的最後一列）在用滑鼠按住舞者時顯示。"
+"Show complete piano roll preview" = "顯示完整的鋼琴捲軸預覽"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道機架：即使樣式比機架顯示的範圍長，通道的音符預覽也會顯示整個樣式；關閉時，預覽會隨步進一起捲動"

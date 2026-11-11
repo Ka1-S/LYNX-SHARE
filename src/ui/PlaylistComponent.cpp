@@ -301,11 +301,25 @@ public:
         const auto clip = g.getClipBounds();
         const auto lanes = owner.gridArea();
 
-        if (image.isNull() || image.getBounds() != imageBounds)
+        // (round 190bm) a window drawn without the GPU gets a software picture; a picture lost with its graphics
+        // device is painted again; no picture at all (no size, no memory): straight to the window
+        const auto software = ui::windowDrawnByCpu (owner);
+        const auto losses = ui::pictureLossCount();
+        if (image.isNull() || image.getBounds() != imageBounds || software != softwareImage || losses != lossesSeen)
         {
-            image = juce::Image (juce::Image::RGB, juce::jmax (1, imageBounds.getWidth()), juce::jmax (1, imageBounds.getHeight()), false);
+            if (image.isNull() || image.getBounds() != imageBounds || software != softwareImage)
+                image = ui::makePicture (imageBounds.getWidth(), imageBounds.getHeight(), software);
+            softwareImage = software;
+            lossesSeen = losses;
             spare = {};
             valid.clear();
+        }
+        ui::notePicture ("Playlist", image, scale, softwareImage, owner, noted);
+        if (image.isNull())
+        {
+            drawnView = owner.cacheView();
+            owner.paintEntireComponent (g, false);
+            return;
         }
 
         // a zoom gesture left scaled lanes in the picture (round 174f): once it is over they are painted exactly
@@ -373,9 +387,18 @@ public:
         if (moving || ! invalid.isEmpty())
         {
             if (moving && (spare.isNull() || spare.getBounds() != image.getBounds()))
-                spare = juce::Image (juce::Image::RGB, image.getWidth(), image.getHeight(), false);
+            {
+                spare = ui::makePicture (image.getWidth(), image.getHeight(), softwareImage);
+                if (spare.isNull()) // (no memory for the second picture: this frame straight to the window)
+                {
+                    valid.clear();
+                    drawnView = view;
+                    owner.paintEntireComponent (g, false);
+                    return;
+                }
+            }
             auto& target = moving ? spare : image;
-            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            const ui::ScopedNoImageReadback noReadback (target); // (the picture is normally only drawn to the window)
             juce::Graphics imageGraphics (target);
             if (moving)
             {
@@ -421,6 +444,8 @@ public:
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
         owner.paintPlayhead (g);
+        if (ui::pictureLostMeanwhile (lossesSeen, lossRetries))
+            owner.repaint();
     }
 
     bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
@@ -518,6 +543,10 @@ private:
     bool lanesScaled = false; // the lanes are a zoom gesture's scaled picture
     int scaledSteps = 0;
     double lastLargeMs = 0.0;
+    bool softwareImage = false; // the pictures are software images (the window is drawn without the GPU)
+    int lossesSeen = 0;         // ui::pictureLossCount() when the picture was last known good
+    int lossRetries = 0;
+    juce::String noted; // ui::notePicture's memory
 };
 
 // What the cached picture depends on beyond what repaints say (round 174e2)
