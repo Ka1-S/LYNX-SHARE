@@ -705,7 +705,9 @@ public:
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
-        lookahead = std::max (1, (int) std::lround (lookaheadSeconds * sr));
+        // (never past the delay line: it holds 1.5 ms at 192 kHz, and a device above that rate wrote past its end —
+        // issue #134: the default project has this limiter on its Master)
+        lookahead = std::clamp ((int) std::lround (lookaheadSeconds * sr), 1, (int) delay[0].size());
         attack = (float) (1.0 - std::exp (-1.0 / (lookahead * 0.3)));
         reset();
     }

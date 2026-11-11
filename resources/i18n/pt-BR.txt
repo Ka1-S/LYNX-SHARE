@@ -1563,6 +1563,8 @@ countries: br
 "Controller type" = "Tipo de controlador"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Controlador genérico: ligue um knob ou fader pelo menu de botão direito de um controle > Vincular ao controlador MIDI."
 "Pickup (takeover mode)" = "Captura (modo takeover)"
+"Foot pedal controls note off" = "O pedal controla o fim das notas"
+"Disable to send sustain to plugins" = "Desative para enviar o sustain aos plugins"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Um controlador só move um parâmetro depois de alcançar o valor atual dele, então nada pula."
 "Links in this project" = "Vínculos neste projeto"
 "ch. {0}" = "can. {0}"
@@ -8209,6 +8211,15 @@ countries: br
 "Send the time selection to the comp" = "Enviar a seleção de tempo ao comp"
 "Send the time selection of the take lane to its comp" = "Enviar a seleção de tempo da trilha de take ao comp"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Conexões"
+"Auto map outputs" = "Mapear saídas automaticamente"
+"Assign all outputs incrementally" = "Atribuir todas as saídas em sequência"
+"Set all inputs and outputs to their default values" = "Voltar todas as entradas e saídas aos valores padrão"
+"Refresh inputs and outputs (after a change in the plugin)" = "Atualizar entradas e saídas (após uma mudança no plugin)"
+"Mixer track offset for output {0}" = "Deslocamento de faixa do mixer da saída {0}"
+"Deactivate output {0}" = "Desativar saída {0}"
+"Activate output {0}" = "Ativar saída {0}"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Controle de videogame"
 "Use a game controller" = "Usar um controle de videogame"
