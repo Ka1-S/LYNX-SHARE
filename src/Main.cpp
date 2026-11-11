@@ -11478,17 +11478,20 @@ private:
         {
             constexpr int cell = 120, cols = 8;
             juce::Image sheet (juce::Image::ARGB, 130 + cols * cell, lynx::dance::moveCount * cell + 10, true);
-            juce::Graphics g (sheet);
-            g.fillAll (lynx::theme::colour::bg0);
-            for (int m = 0; m < lynx::dance::moveCount; ++m)
             {
-                g.setColour (lynx::theme::colour::textSecondary);
-                g.setFont (14.0f);
-                g.drawText (lynx::dance::moveName (m), 8, m * cell + 5, 118, cell, juce::Justification::centredLeft);
-                for (int k = 0; k < cols; ++k)
+                // (the picture is complete when its Graphics is gone: round 190ba, the file was blank on Windows)
+                juce::Graphics g (sheet);
+                g.fillAll (lynx::theme::colour::bg0);
+                for (int m = 0; m < lynx::dance::moveCount; ++m)
                 {
-                    const auto pose = lynx::dance::pose (m, k / (double) cols + (m == lynx::dance::freestyle ? k * 2 : 0), 1);
-                    lynx::dancer::draw (g, { 130.0f + (k + 0.5f) * cell, (float) (m + 1) * cell - 6.0f }, 92.0f, pose, false, juce::Colour (0xffff3048));
+                    g.setColour (lynx::theme::colour::textSecondary);
+                    g.setFont (14.0f);
+                    g.drawText (lynx::dance::moveName (m), 8, m * cell + 5, 118, cell, juce::Justification::centredLeft);
+                    for (int k = 0; k < cols; ++k)
+                    {
+                        const auto pose = lynx::dance::pose (m, k / (double) cols + (m == lynx::dance::freestyle ? k * 2 : 0), 1);
+                        lynx::dancer::draw (g, { 130.0f + (k + 0.5f) * cell, (float) (m + 1) * cell - 6.0f }, 92.0f, pose, false, juce::Colour (0xffff3048));
+                    }
                 }
             }
             savePng (sheet, prefix + "-moves.png");
@@ -11562,19 +11565,21 @@ private:
                 // the animation as the stage draws it: a row of moments of the move "Wave" (blending on), then mirrored,
                 // then the row shown while the dancer is held
                 juce::Image strip (juce::Image::ARGB, fw * 12, fh * 3 + 20, true);
-                juce::Graphics g (strip);
-                g.fillAll (lynx::theme::colour::bg0);
                 int solid = 0;
-                for (int line = 0; line < 3; ++line)
                 {
-                    lynx::dance::SheetAnimator animator (3);
-                    for (int k = 0; k < 12; ++k)
+                    juce::Graphics g (strip);
+                    g.fillAll (lynx::theme::colour::bg0);
+                    for (int line = 0; line < 3; ++line)
                     {
-                        const auto frame = animator.advance (k / 12.0 + 0.001, loaded->layout.rows, 4, line == 1, true, 0.5f, line == 2);
-                        const juce::Point<float> feet ((k + 0.5f) * fw, (float) (line + 1) * fh + 5.0f);
-                        lynx::dancer::drawSheet (g, *loaded, feet, 1.0f, frame);
-                        solid += lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (0.0f, -70.0f)) ? 1 : 0;
-                        ok = ok && ! lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (-(float) fw * 0.5f + 1.0f, -(float) fh + 1.0f));
+                        lynx::dance::SheetAnimator animator (3);
+                        for (int k = 0; k < 12; ++k)
+                        {
+                            const auto frame = animator.advance (k / 12.0 + 0.001, loaded->layout.rows, 4, line == 1, true, 0.5f, line == 2);
+                            const juce::Point<float> feet ((k + 0.5f) * fw, (float) (line + 1) * fh + 5.0f);
+                            lynx::dancer::drawSheet (g, *loaded, feet, 1.0f, frame);
+                            solid += lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (0.0f, -70.0f)) ? 1 : 0;
+                            ok = ok && ! lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (-(float) fw * 0.5f + 1.0f, -(float) fh + 1.0f));
+                        }
                     }
                 }
                 sheetReport << "sheet_body_solid=" << solid << "/36\n";
