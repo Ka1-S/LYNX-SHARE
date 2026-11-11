@@ -1,0 +1,21 @@
+#pragma once
+
+// Slicex's editor (round 190r, core/Slicex.h; FL's form is 714 × 625, REA_rodada190r.md): the masters and the Mod X / Y
+// pad, the layering row, the region settings, the filter and the articulator editor (envelope, LFO and the four maps
+// of pan, volume, cutoff, resonance, speed and sample start for each of the 8 groups), the deck tool row, the deck
+// wave editors with their regions, and the keyboard with the key map. LYNX draws it with its own look.
+
+#include <functional>
+#include <memory>
+
+#include <juce_gui_basics/juce_gui_basics.h>
+
+namespace lynx
+{
+class AudioEngine;
+struct ChannelDef;
+struct Song;
+
+// `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)
+std::unique_ptr<juce::Component> makeSlicexEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel);
+} // namespace lynx

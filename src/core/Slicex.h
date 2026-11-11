@@ -179,6 +179,8 @@ std::vector<std::uint8_t> write (const State& state);
 State fresh();
 // Puts a sample file on a deck (by reference; its regions come from the file's cue points): one default record per region
 void setDeckFile (State& state, int deck, const std::string& path, int regions);
+// the deck's beat grid (Deck::beatStart / beatEnd): the tempo FL shows is beats · 60 / duration
+void setDeckBeats (State& state, int deck, double start, double end);
 
 // ---- the laws (FL's single-precision arithmetic)
 float masterVolume (std::int32_t raw) noexcept;      // 0…16000, 12800 = 1: (11^x − 1)/10

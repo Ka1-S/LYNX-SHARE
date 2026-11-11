@@ -474,6 +474,7 @@ if(LYNX_BUILD_APP)
         src/ui/WaveTravellerEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
+        src/ui/SlicexEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

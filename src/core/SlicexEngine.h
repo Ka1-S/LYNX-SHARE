@@ -83,4 +83,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> d;
 };
+// For editors: a curve's levels at `count` equal steps across its length (a map: across x = 0…1), with FL's curve
+// shapes, and one cycle of an articulator's LFO wave (−1…1, from its start phase)
+std::vector<float> curveLevels (const Curve& curve, bool map, int count);
+std::vector<float> lfoCycle (const Articulator& articulator, int count);
 } // namespace lynx::slicex

@@ -3229,6 +3229,8 @@ private:
                 // not one of the engines that must sound here (Linux / macOS CI: "SILENT 1 [Fruity Slicer]", 0.1.25)
                 if (kind == lynx::InstrumentKind::fruityslicer && one.channels[0].samplePath.empty())
                     continue;
+                if (kind == lynx::InstrumentKind::slicex && one.channels[0].samplePath.empty()) // (the same: no sample on its decks yet)
+                    continue;
                 if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
                     one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
                 one.mixer[2].effects.clear();
@@ -12247,6 +12249,13 @@ private:
                         lynx::showFlVoiceTarget (*frame, target);
                         saveWindow (std::move (frame), juce::String ("-fruityslicer-envelope-") + name + ".png");
                     }
+                    break;
+                }
+            // round 190r: Slicex's editor
+            for (int c = 0; c < (int) offline.getSong().channels.size(); ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::slicex)
+                {
+                    saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-slicex.png");
                     break;
                 }
 

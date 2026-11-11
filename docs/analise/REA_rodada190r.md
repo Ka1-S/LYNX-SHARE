@@ -52,3 +52,69 @@ The project FL itself saved (22 dumped notes at tick positions that fall between
 notes, with −65 dB on four of them and −35 dB in the last 20 ms. Both are outside Slicex: where the host puts a note
 that starts between two samples, and what the host does with the last note at the end of a render. Open (the rack
 path, not the plugin).
+
+## 3. The editor (slice 3, stage 1) [EXEC for FL's window and menus, form resource for the coordinates]
+
+FL's form is 714 × 625 (`SynthPanel`, form resource of round 188c; FL's window photographed at 100 % in this round:
+default state, LFO / velocity / envelope parts, and the Options, layering, region, envelope, File and Regions menus).
+LYNX draws the same layout a quarter larger (893 × 781) with its own look (`ui/SlicexEditor.cpp`); every control sits
+at the form's coordinates:
+
+| area (form px) | FL controls | LYNX |
+|---|---|---|
+| top, y 0–99 | master level, randomness, LFO and pitch sliders (x 22 / 46 / 71 / 95, 20 × 75); the X / Y pad (132, 9, 77 × 77) with the Mod X / Y wheels and "Smooth up modulation"; Options button; layering mode combo (424, 9), "Layer regions of same deck only", crossfade selector; "Dump deck A to piano roll after editing"; logo | the same controls on the same spots, bound to the masters and the options block; the layering combo carries FL's eight names (All, All (gain-compensated), Velocity-mapped, Modulation X-mapped, Modulation Y-mapped, Random, Cycle, Song time-synced); the Options menu holds the four settings that live in the state (Sample start covers whole length, Link velocity to volume, Loop half of regions, HQ envelopes) |
+| ArtPanel, y 99–297, left | "More region settings", current region combo, output track offset, cut group; four rows (pan / volume, cutoff / resonance, pitch, delay / start), each with its articulator group digit and amount wheel | the 17 ints of the region record (`RegionField`) |
+| ArtPanel, middle | articulator group selector (1–8), filter type and mode selectors, ENV / CUT / RES wheels | the group's filter header |
+| ArtPanel, right | editor target (pan, volume, cutoff, resonance, speed, start), articulator part (envelope, LFO, velocity, Mod X, Mod Y, random), the envelope editor with its knob rows (ATT / DEC / SUS / REL; SPD / TNS / SKEW / PW on the LFO part; TEMPO and GLOBAL) | the graph is drawn from the engine's own curve code (`slicex::curveLevels`, `lfoCycle`), so a segment's shape is the one the voices play; points move, are added (right click on the graph) and deleted, decay / loop / sustain marks and the 13 curve modes are in the point's menu |
+| DeckPanel, y 296–362 | loop / play / stop, the Edison-style menu buttons and tools, deck selector, sample rate, tempo, title | stage 1: loop / play / stop, File (load sample), Regions (set all cut groups), deck selector, single / dual deck, the labels (title from the WAV's INAM, length and selection in bar:beat:tick) |
+| decks, y 362–563 | deck A (and deck B in dual view): the wave with its regions | wave, region starts and names, the key a keyed region plays in its lower left corner (as FL shows "C#5"), click selects and plays the region, drop a file to load it; the region's menu has FL's "Trigger note" |
+| KbPanel, y 571–625 | base octave, two-row pad keyboard | the same two rows; keys with regions are marked in the deck's colour; a click plays the channel's note; the key's menu is FL's ("Assign current region to this key", "Select region assigned to this key") |
+
+The state is edited as FL's own (`slicex::parse` → change → `slicex::write` into the channel's plugin state; the
+instrument takes it live). A sample loaded on a deck is referenced by its path (`setDeckFile`): deck A's in the channel's
+sample path, deck B's in its one zone (round 190l). Assigning a key embeds the deck's WAV with the trigger list (§1),
+as FL does when a deck is edited.
+
+**Not in stage 1** (the buttons are not drawn rather than drawn dead): the Edison tools of the deck row (format, edit,
+tools, snap, select, zoom menus; normalize, fades, script, stretch, auto-slicing, add marker, save, drag, dump to piano
+roll, scrub, spectrum view) and the rest of the File / Regions menus, the display mode selector and the "view keyboard"
+button (the window keeps the full layout), the Options menu's macros, region rename / delete / clone / purpose, moving
+region starts in the wave, the time scroller, the envelope's time zoom and options menu, "Lock audio data" and "Leave
+unedited audio data on disk".
+
+### 3.1 Live pass (Windows build, real window)
+
+Add channel → Slicex, File → Load sample ("DL Breaker.wav" of FL's packs), click regions, switch ENV / LFO, drag an
+envelope node, open the layering combo, the region menu and the key menu, assign region 8 to a key. What it showed
+and what was fixed:
+
+- FL's packs are packed WAVs (Ogg Vorbis in a WAV, format tag 0x674f): the data chunk is the packed stream and the
+  length is in `fact`. `slicex::wavRegions` took the data size for the length, so a key could not be assigned on such
+  a file. Fixed (length from `fact` when the format is not PCM / float).
+- A referenced WAV now shows its own region names ("Kick", "Snare", as FL does) instead of "Marker #n".
+- A loaded sample gets its beat grid from the file's ACID beat count ("DL Breaker": 8 beats in 8 s; FL shows 60BPM,
+  LYNX now too). A file without one is taken at the project's tempo [HYP: FL's own guess for untagged files was not
+  measured].
+- The region and key menus of a right click open at the mouse.
+- The region combo shows the plain name ("Kick"), with a heading per deck only when both decks have regions.
+
+## 4. A new Slicex ("add channel")
+
+`natives::instrumentEngines()` lists Slicex; a new channel is `slicex::fresh()` (FL's Default preset values, both decks
+empty), silent until a deck has a sample, as FL's is.
+
+## 5. Best way?
+
+- **FL:** one window holds everything: two decks sliced by markers, a region panel with per-region pan / volume / filter
+  / pitch / delay / start, 8 articulator groups (envelope + LFO + four maps on six targets), layering of regions that
+  share a key, and a keyboard map. Proof: the form resource (round 188c), the state (190h) and FL's renders (190l, §2).
+- **Ableton:** Simpler's Slice mode cuts by transient, beat, region or manually, plays slices mono / poly / through, and
+  shares one filter and one envelope for all slices; per-slice settings need "Slice to Drum Rack" (one Simpler per pad).
+  It is quicker to reach and has less to learn; it has no per-slice articulation inside the one device.
+- **Users:** Slicex is liked for depth (drop a loop, chop, replay slices in any order, per-slice treatment) and
+  disliked for its window management and dated, dense panel; Fruity Slicer is seen as the quick one with beat-grid
+  chops (https://ecksesontress.blogspot.com/2025/04/the-1-reason-to-use-slicer-over-slicex.html,
+  https://www.audeobox.com/learn/compare/fl-studio-vs-ableton/, FL's manual pages for Slicex and Fruity Slicer).
+- **Verdict:** FL-exact layout as the default (projects and habits carry over). A possible addition, not built: a
+  "simple" display mode with only the wave, the region row and the keyboard (FL's own display modes already go that
+  way); to be proposed to the coordinator, not switched on by a round.

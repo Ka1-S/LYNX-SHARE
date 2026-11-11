@@ -185,6 +185,7 @@ APP_SOURCES+=(src/core/FruitySlicer.cpp src/ui/FruitySlicerEditor.cpp)
 APP_SOURCES+=(src/ui/FlVoicePanel.cpp)
 APP_SOURCES+=(src/core/Slicex.cpp src/core/SlicexEngine.cpp)
 APP_SOURCES+=(src/core/SlicexInstrument.cpp)
+APP_SOURCES+=(src/ui/SlicexEditor.cpp)
 # Windows file association (.lynx) and its icon
 APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Package.cpp src/platform/NativeEmbed.cpp)
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
