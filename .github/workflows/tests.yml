@@ -20,7 +20,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp
+      # (the runners' package mirror sometimes fails to resolve for a minute: try again instead of failing the job)
+      - run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp && break; [ $i = 6 ] && exit 1; sleep 30; done
       - run: /usr/bin/python3 -m unittest discover -s server/tests -p 'test_*.py' -v
 
   # Round speed185a: a Core job took 76-130 min, ~90 % of it compiling the core again for every tool (now once, in
@@ -46,7 +47,7 @@ jobs:
       - name: ccache
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then sudo apt-get install -y -q ccache > /dev/null || { sudo apt-get update -q && sudo apt-get install -y -q ccache; }
+          if [[ "$RUNNER_OS" == Linux ]]; then sudo apt-get install -y -q ccache > /dev/null || for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q ccache && break; [ $i = 6 ] && exit 1; sleep 30; done
           else brew list ccache > /dev/null 2>&1 || brew install ccache; fi
       - uses: actions/cache/restore@v4
         with:
@@ -95,9 +96,11 @@ jobs:
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q ccache ninja-build pkg-config xvfb libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev
+          for i in 1 2 3 4 5 6; do
+            sudo apt-get update -q && sudo apt-get install -y -q ccache ninja-build pkg-config xvfb libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev \
+              libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev && break
+            [ $i = 6 ] && exit 1; sleep 30
+          done
 
       - name: macOS build dependencies
         if: runner.os == 'macOS'

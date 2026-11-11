@@ -67,6 +67,9 @@ std::vector<Action> makeActions()
         // round 177d (an FL wishlist item): solo the selected channel from any window, no key by default (bind one in
         // the shortcut editor); again = every channel plays (FL's channel solo)
         { "channel.soloSelected", TR_NOOP ("Solo the selected channel (from any window)"), Context::global, {} },
+        // round 190an (CROSS-DAW F13): FL's Add › Automation for last tweaked parameter as a key action. FL gives it
+        // no key (DFM Add_AutoLastMenu has no ShortCut and ShortcutsModule has no action for it), so none by default
+        { "automation.lastTweaked", TR_NOOP ("Create automation clip for the last tweaked control"), Context::global, {} },
 
         // workspace panels
         { "panel.playlist", TR_NOOP ("Show, focus or hide the Playlist"), Context::global, { chord (f5) } },
@@ -189,6 +192,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.articulate", TR_NOOP ("Articulate..."), Context::pianoRoll, { chord ('L', alt) } },
         { "pianoRoll.riffMachine", TR_NOOP ("Riff machine..."), Context::pianoRoll, { chord ('E', alt) } },
         { "pianoRoll.chordProgression", TR_NOOP ("Generate chord progression..."), Context::pianoRoll, { chord ('P', alt) } },
+        // FL's "Run last script again" (Piano roll scripts, round 190as)
+        { "pianoRoll.runLastScript", TR_NOOP ("Run last script again"), Context::pianoRoll, { chord ('Y', ctrl | alt) } },
         // note colours and the Select menu (REA round 153: FL's keys from its piano roll manual)
         { "pianoRoll.colourSelected", TR_NOOP ("Colour the selected notes with the note colour"), Context::pianoRoll, { chord ('C', alt) } },
         { "pianoRoll.selectByColour", TR_NOOP ("Select the notes of the same colour"), Context::pianoRoll, { chord ('C', shift) } },
@@ -247,6 +252,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::pianoRoll, { chord ('Z') } },
         { "pianoRoll.tool.listen", TR_NOOP ("Tool: Listen"), Context::pianoRoll, { chord ('Y') } },
         { "pianoRoll.slide", TR_NOOP ("Slide notes on/off (new notes)"), Context::pianoRoll, { chord ('S') } },
+        // round 190an (LYNX's own option; FL has none, so no key by default): the Piano roll's Snap to scale switch
+        { "pianoRoll.scaleSnap", TR_NOOP ("Snap notes to the scale on/off"), Context::pianoRoll, {} },
         { "pianoRoll.previousChannel", TR_NOOP ("Previous channel"), Context::pianoRoll, { chord ('G') } },
         { "pianoRoll.nextChannel", TR_NOOP ("Next channel"), Context::pianoRoll, { chord ('K') } },
         { "pianoRoll.previousChannelWithNotes", TR_NOOP ("Previous channel with notes"), Context::pianoRoll, { chord ('H') } },
@@ -321,6 +328,29 @@ std::vector<Action> makeActions()
         { "playlist.collapseAllGroups", TR_NOOP ("Collapse all grouped tracks"), Context::playlist, {} },
         { "playlist.expandAllGroups", TR_NOOP ("Expand all grouped tracks"), Context::playlist, {} },
         { "playlist.purgeUnusedAudio", TR_NOOP ("Purge unused audio clips"), Context::playlist, {} },
+        // round 189e: FL's Playlist Edit / Select items it lacked (EEMenu as the Playlist enables it, FL 2026 shots f04/f06)
+        { "playlist.shiftLeft", TR_NOOP ("Shift the selected clips left (one snap step)"), Context::playlist, { chord (left, shift) } },
+        { "playlist.shiftRight", TR_NOOP ("Shift the selected clips right (one snap step)"), Context::playlist, { chord (right, shift) } },
+        { "playlist.shiftUp", TR_NOOP ("Shift the selected clips up (one track)"), Context::playlist, { chord (up, shift) } },
+        { "playlist.shiftDown", TR_NOOP ("Shift the selected clips down (one track)"), Context::playlist, { chord (down, shift) } },
+        // round 190ag (issue #147): FL's editor KeyDown (FUN_00e52360) sends Left / Right with Alt held, with or without
+        // Shift, to the same shift as Shift+Left / Right (FUN_00e51730), which then steps by a pixel's worth of ticks
+        { "playlist.nudgeLeft", TR_NOOP ("Nudge the selected clips left (fine step, no snap)"), Context::playlist, { chord (left, alt), chord (left, alt | shift) } },
+        { "playlist.nudgeRight", TR_NOOP ("Nudge the selected clips right (fine step, no snap)"), Context::playlist, { chord (right, alt), chord (right, alt | shift) } },
+        { "playlist.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::playlist, { chord (insert, ctrl | alt) } },
+        { "playlist.trimSpace", TR_NOOP ("Trim selection (keep only the time selection)"), Context::playlist, {} },
+        { "playlist.deselect", TR_NOOP ("Deselect (clips and time)"), Context::playlist, { chord ('D', ctrl) } },
+        { "playlist.selectBySource", TR_NOOP ("Select by selected source"), Context::playlist, { chord ('C', shift) } },
+        { "playlist.invertSelection", TR_NOOP ("Invert selection"), Context::playlist, { chord ('I', shift) } },
+        // round 189g: FL's Edit / Select options ([DFM ShortcutsModule] EEMakeUniqueAsSampleAction, EELeftResizingAction
+        // ShortCut 49188 = Ctrl+Alt+Home, EEShiftMouseWheelNudgeAction, EECreateNewClipsWithManualFadesAction,
+        // EESnapFadeHandlesAction, EESelMagicAction)
+        { "playlist.makeUniqueAsSample", TR_NOOP ("Make the selected audio clips unique as samples"), Context::playlist, {} },
+        { "playlist.leftResizing", TR_NOOP ("Allow resizing clips from the left on/off"), Context::playlist, { chord (home, ctrl | alt) } },
+        { "playlist.wheelNudging", TR_NOOP ("Nudge clips with Shift+mouse wheel on/off"), Context::playlist, {} },
+        { "playlist.manualFades", TR_NOOP ("Create new clips with manual fades on/off"), Context::playlist, {} },
+        { "playlist.snapFadeHandles", TR_NOOP ("Snap fade handles on/off"), Context::playlist, {} },
+        { "playlist.magicLasso", TR_NOOP ("Magic lasso (circle clips with the mouse to select them) on/off"), Context::playlist, {} },
 
         // Browser (focused)
         { "browser.previous", TR_NOOP ("Previous file (preview)"), Context::browser, { chord (up) } },

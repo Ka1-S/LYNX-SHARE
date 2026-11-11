@@ -76,6 +76,7 @@ TEST (flq170i2_fpc_volume_law_and_velocity)
         std::replace (q.begin(), q.end(), '\\', '/');
         return ! existingPathIgnoringCase (q).empty();
     };
+    options.fpcAsPads = true; // (a channel per pad: the zones' gains are checked; round 190q's FPC channel plays the same zones)
     const auto song = importFlp (project, options);
     bool seen = false;
     for (const auto& c : song.channels)

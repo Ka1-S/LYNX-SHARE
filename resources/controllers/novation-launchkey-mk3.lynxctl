@@ -1,0 +1,79 @@
+# Novation Launchkey MK3 (25 / 37 / 49 / 61) in its DAW mode. docs/CONTROLLERS.md explains the format.
+#
+# Source (maker document only): "Launchkey [MK3] Programmer's Reference Guide, Version 1" (Novation / Focusrite),
+# https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launchkey_mk3_programmer_s_reference_guide_v1_en.pdf
+#  - DAW mode on / off: note 0Ch on channel 16 (9F 0C 7F / 9F 0C 00), on the DAW port only.
+#  - pots CC 21-28, faders CC 53-60 and 61 (49 / 61 keys), fader buttons CC 37-44, pot mode report CC 9
+#    (1 Volume, 2 Device, 3 Pan), all on channel 16; Session pads: notes 96-103 (top) and 112-119 on channel 1.
+#  - pad colour: a note on channel 1 with a palette index (5 = red in the guide's example); the fader buttons' white
+#    LEDs: the button's CC on channel 16.
+#  - display: F0 00 20 29 02 0F 04 <row> <text> F7, 16 characters per row.
+#
+# Read from the guide's figures by position, not from printed names (check on a device): which of CC 102 / 103 is
+# Track left, the button numbers 74-77 and 115-118, and the value of <row> for the two display rows (0 and 1 here).
+#
+# Use this type on the keyboard's second port (the guide's "DAW In/Out", "second interface on Windows"); the first
+# port carries the keys, wheels and the Drum pads and stays a generic controller. The Launchkey 88 has another
+# display header (12h instead of 0Fh): everything works but its display stays empty.
+
+[device]
+name = Novation Launchkey MK3 (DAW mode)
+maker = Novation
+source = Launchkey [MK3] Programmer's Reference Guide, Version 1, https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launchkey_mk3_programmer_s_reference_guide_v1_en.pdf
+match = *Launchkey MK3*DAW*, MIDIIN2 (*Launchkey MK3*
+strips = 8
+# the keyboard's own pot modes (Shift + pad): it reports the one chosen and starts in Pan
+layers = Pan, Volume, Device
+
+[init]
+send = 9F 0C 7F
+
+[exit]
+send = 9F 0C 00
+
+[input]
+cc 9 ch 16 value 1 = layer Volume
+cc 9 ch 16 value 2 = layer Device
+cc 9 ch 16 value 3 = layer Pan
+cc 21-28 ch 16 = mixer.pan layer=Pan
+cc 21-28 ch 16 = mixer.volume layer=Volume
+cc 21-28 ch 16 = plugin.param layer=Device
+
+# faders and their buttons (49 / 61 keys)
+cc 53-60 ch 16 = mixer.volume
+cc 61 ch 16 = master.volume
+cc 37-44 ch 16 = mixer.select
+
+# buttons
+cc 102 ch 16 = mixer.bank.left        # Track left
+cc 103 ch 16 = mixer.bank.right       # Track right
+cc 106 ch 16 = channel.previous       # Scene up
+cc 107 ch 16 = channel.next           # Scene down
+cc 76 ch 16 = transport.metronome     # Click
+cc 77 ch 16 = edit.undo
+cc 115 ch 16 = transport.play
+cc 116 ch 16 = transport.stop
+cc 117 ch 16 = transport.record
+cc 118 ch 16 = transport.loop
+cc 104 ch 1 = pattern.next            # > (scene launch)
+cc 105 ch 1 = pattern.previous        # Stop / Solo / Mute
+
+# Session pads: the selected channel's 16 steps
+note 96-103 ch 1 = pad.step 1
+note 112-119 ch 1 = pad.step 9
+
+# the rest of the DAW port (Shift, Capture MIDI, Quantise, Device select / lock, mode reports): nothing yet
+cc 0-127 ch 16 = ignore
+cc 108 ch 1 = ignore
+
+[feedback]
+pad.step 1 = note 96-103 ch 1 on=5 off=0
+pad.step 9 = note 112-119 ch 1 on=5 off=0
+mixer.select = cc 37-44 ch 16
+
+[display]
+write = F0 00 20 29 02 0F 04 {row} {text} F7
+width = 16
+cells = 1
+row 1 = channel.selected.name
+row 2 = layer.name

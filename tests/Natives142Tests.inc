@@ -118,7 +118,8 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (e.kind == InstrumentKind::wavetraveller || e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::fruityslicer // (play the channel's sample:
+            CHECK (e.kind == InstrumentKind::fpc // (FL's empty kit: no samples, silent as FL)
+                   || e.kind == InstrumentKind::wavetraveller || e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex // (play the channel's sample:
                    || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // none yet, silent as FL; Drumaxx: pad 1's key
         }
     }
@@ -201,9 +202,18 @@ TEST (natives142_engines_from_the_fl_installation)
         ++made;
         CHECK (c->instrument == e.kind && c->name == e.name);
         if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller
-            || e.kind == InstrumentKind::fruityslicer) // (play the channel's sample: none yet)
+            || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex) // (play the channel's sample: none yet)
             continue;
-        const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 36 : 60); // (FL's Default Kit: the kick on 36, round 169e)
+        auto key = e.kind == InstrumentKind::drumaxx ? 36 : 60; // (FL's Default Kit: the kick on 36, round 169e)
+        if (e.kind == InstrumentKind::fpc) // (round 190q: a pad's key; FL's new FPC comes with a kit)
+        {
+            const auto pads = fpcChannelPads (*c);
+            CHECK (! pads.empty());
+            if (pads.empty())
+                continue;
+            key = pads.front().key;
+        }
+        const auto rms = natives142::renderChannel (*c, fl, key);
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
         if (! (rms > 1.0e-3))
         {

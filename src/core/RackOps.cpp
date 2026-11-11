@@ -1193,7 +1193,7 @@ void prepareForMidiExport (Song& song)
         // Controller became MIDI Out, the automation clip stayed and took no MIDI channel). LYNX's automation clips
         // aren't channels, so every channel converts.
         midictl::MidiOutSettings settings;
-        if (c.plugin.name == "FPC")
+        if (c.plugin.name == "FPC" || c.instrument == InstrumentKind::fpc)
         {
             settings.channel = drums;
         }

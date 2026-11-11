@@ -578,4 +578,331 @@ inline void reverseAudio (Song& song, int clip, std::int64_t wholeFileTicks)
             c.offset = std::max<std::int64_t> (0, wholeFileTicks - (c.offset + played));
         }
 }
+// Playlist › Edit › Shift left / right (Shift+Left / Shift+Right; EEShiftL/RAction Tag -1 / 1 → FUN_00eb32a0 →
+// FUN_00e51730 (editor, Tag, 0), round 189e): the selected clips move by `delta` ticks (one snap step; with Alt held
+// one pixelStepTicks, round 190ag), held so that none starts before the song start: the whole selection stops together
+// and keeps its spacing. Clips that land on other clips simply overlap them, as after a drag. Returns the move applied.
+inline std::int64_t shiftClipsInTime (std::vector<Clip>& playlist, const std::vector<int>& selection, std::int64_t delta)
+{
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            delta = std::max (delta, -playlist[(std::size_t) i].start);
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].start += delta;
+    return delta;
+}
+
+// FL's fine step (round 190ag, issue #147; FUN_00e51730 with Alt held, and the Shift+wheel nudge): one pixel's worth of
+// ticks at the current zoom (the editor's ticks-per-pixel, rounded), never less than one tick.
+inline std::int64_t pixelStepTicks (double pixelsPerTick)
+{
+    return pixelsPerTick > 0.0 ? std::max<std::int64_t> (1, (std::int64_t) std::llround (1.0 / pixelsPerTick)) : 1;
+}
+
+// After a keyboard shift FL keeps the edge that leads the move in view (FUN_00e51730 -> FUN_00e7e290 with 1/32 of the
+// view as the margin, round 190ag): `edge` is the earliest start (moving earlier) or the latest end (moving later) of
+// the moved clips. When it is closer than one margin to the side of the view it moves towards (or past it), the view
+// scrolls so that the edge sits three margins inside that side. Returns the new scroll position in ticks.
+inline double scrollToShowEdge (double scrollTicks, double viewPixels, double pixelsPerTick, std::int64_t edge, bool movingLater)
+{
+    if (viewPixels <= 0.0 || pixelsPerTick <= 0.0)
+        return scrollTicks;
+    const auto margin = std::max (1.0, std::round (viewPixels / 32.0));
+    const auto ticksPerPixel = 1.0 / pixelsPerTick;
+    if (movingLater)
+        return (double) edge > scrollTicks + (viewPixels - margin) * ticksPerPixel
+                   ? std::max (0.0, (double) edge - (viewPixels - 3.0 * margin) * ticksPerPixel) : scrollTicks;
+    return (double) edge < scrollTicks + margin * ticksPerPixel ? std::max (0.0, (double) edge - 3.0 * margin * ticksPerPixel) : scrollTicks;
+}
+
+// Playlist › Edit › "Nudge clips with mouse wheel" (Shift+wheel, FUN_00e82270, round 189g; checked in FL 2026: the clips
+// stay, their content moves, "playlist shift clip"): the content of the chosen clips moves `delta` ticks earlier (their
+// offset grows; negative = later), held so that no offset goes below 0. Returns the shift applied.
+inline std::int64_t shiftClipContent (std::vector<Clip>& playlist, const std::vector<int>& clips, std::int64_t delta)
+{
+    for (auto i : clips)
+        if (i >= 0 && i < (int) playlist.size())
+            delta = std::max (delta, -playlist[(std::size_t) i].offset);
+    for (auto i : clips)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].offset += delta;
+    return delta;
+}
+
+// Playlist › Edit › Shift up / down (Shift+Up / Shift+Down; EEShiftU/DAction Tag 1 / -1 → FUN_00eb3300 → FUN_00e51730
+// (editor, 0, Tag); checked live in FL 2026, round 189e shot f11: every selected clip moves one track down): the
+// selected clips move `tracks` tracks (negative = up), held inside tracks 1..500. Returns the move applied.
+inline int shiftClipsTrack (std::vector<Clip>& playlist, const std::vector<int>& selection, int tracks)
+{
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            tracks = std::clamp (tracks, -playlist[(std::size_t) i].track, 499 - playlist[(std::size_t) i].track);
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].track += tracks;
+    return tracks;
+}
+
+// Playlist › Select › "Select by selected source" (Shift+C; EESelBySourceAction → FUN_00eb1da0, Playlist only, round 189e):
+// every clip of the current clip source `source` (the Picker's: a pattern, an audio-clip channel or an automation); an
+// audio clip of another audio-clip channel of the same file counts too (FL compares the channels' sample). Empty when there
+// is none (FL: "No clips selected|There are no clips associated with the currently selected source clip.").
+inline std::vector<int> clipsOfSource (const Song& song, const Clip& source)
+{
+    std::vector<int> out;
+    const auto samplePath = [&song] (int channel) -> const std::string* {
+        if (channel < 0 || channel >= (int) song.channels.size() || song.channels[(std::size_t) channel].instrument != InstrumentKind::audioClip)
+            return nullptr;
+        return &song.channels[(std::size_t) channel].samplePath;
+    };
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto& o = song.playlist[(std::size_t) i];
+        if (o.kind != source.kind)
+            continue;
+        auto same = false;
+        if (source.kind == ClipKind::pattern)
+            same = o.pattern == source.pattern;
+        else if (source.kind == ClipKind::automation)
+            same = o.automation == source.automation;
+        else if (source.kind == ClipKind::audio)
+        {
+            const auto* a = samplePath (o.channel);
+            const auto* b = samplePath (source.channel);
+            same = o.channel == source.channel || (a != nullptr && b != nullptr && ! a->empty() && *a == *b);
+        }
+        if (same)
+            out.push_back (i);
+    }
+    return out;
+}
+
+// Playlist › Select › "Invert selection" (Shift+I; EEInvertSelAction → FUN_00eb1ae0): every clip not selected now.
+inline std::vector<int> invertedSelection (int clipCount, const std::vector<int>& selection)
+{
+    std::vector<bool> chosen ((std::size_t) std::max (0, clipCount), false);
+    for (auto i : selection)
+        if (i >= 0 && i < clipCount)
+            chosen[(std::size_t) i] = true;
+    std::vector<int> out;
+    for (int i = 0; i < clipCount; ++i)
+        if (! chosen[(std::size_t) i])
+            out.push_back (i);
+    return out;
+}
+// Make unique as sample (round 189l): the clip now plays `channel`, a file holding what it played, from its start; its own
+// pitch, stretch and reverse are in the file, so they are reset
+inline void resetRenderedClip (Clip& c, int channel) noexcept
+{
+    c.channel = channel;
+    c.offset = 0;
+    c.offsetFraction = 0.0f;
+    c.pitch = 0.0f;
+    c.stretch = 1.0;
+    c.reversed = false;
+}
+
+// --- FL's per-clip edge declicker (round 189i, REA FLEngine_x64.dll) --------------------------------------------------------
+// The fade handle menu (PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d02e00 / FUN_00d01bc0) stores, per side,
+// "Manual" (fade flags bit 0 / 1, FUN_00cfbf60: turning it off also zeroes that side's fade) and the Declicker choice
+// (flags >> 2 & 7 / >> 14 & 7, FUN_00cfc020 via FUN_00d03100): Automatic 0, Enabled 2 ("use channel declicker"),
+// Disabled 3 ("bypass declicker"); 1 is FL's own "Automatic, joined seamlessly" (FUN_00d011a0 resets 0 / 1 and sets 1
+// where two clips continue each other). FL /R renders (round 189l) play 1 as Automatic: the channel's declicker is
+// skipped only on a side that is Disabled, manual or has a fade.
+enum DeclickChoice
+{
+    declickAutomatic = 0,
+    declickJoined = 1,
+    declickEnabled = 2,
+    declickDisabled = 3
+};
+
+inline int declickChoice (const Clip& c, int side) noexcept
+{
+    return (int) ((c.flFadeFlags >> (side == 0 ? 2 : 14)) & 7u);
+}
+
+inline void setDeclickChoice (Clip& c, int side, int choice) noexcept
+{
+    const auto shift = side == 0 ? 2u : 14u;
+    c.flFadeFlags = (c.flFadeFlags & ~(7u << shift)) | (((std::uint32_t) choice & 7u) << shift);
+}
+
+inline bool manualFade (const Clip& c, int side) noexcept
+{
+    return (c.flFadeFlags & (side == 0 ? 1u : 2u)) != 0;
+}
+
+// FL's Manual item (FUN_00cfbf60): on / off per side; off also zeroes that side's fade (FL keeps only automatic
+// crossfades on a side that isn't manual)
+inline void setManualFade (Clip& c, int side, bool on) noexcept
+{
+    const auto bit = side == 0 ? 1u : 2u;
+    c.flFadeFlags = on ? (c.flFadeFlags | bit) : (c.flFadeFlags & ~bit);
+    if (! on)
+        (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+}
+
+
+// --- FL's Create crossfade (fade handle menu Tag 100, round 189n; FLEngine 2026 [DECOMP] FUN_00d02580 -> per clip
+// FUN_00d02410, neighbour FUN_00d02310 / FUN_00cf9930, FUN_00cfd680 sets the fades, FUN_00cfaf80 clamps them; menu
+// state FUN_00cfc310 / FUN_00d023d0) ----
+
+// FL's FUN_00cf7580: `a` and `b` already crossfade — neither side manual, a's fade out == b's fade in, and a's fade out
+// starts where b starts. (Two touching clips without fades pass it too, as in FL.)
+inline bool flCrossfadePair (const Clip& a, const Clip& b) noexcept
+{
+    return ! manualFade (a, 1) && ! manualFade (b, 0) && a.fadeOut == b.fadeIn && a.end() - a.fadeOut == b.start;
+}
+
+// The clip that `index` would crossfade with on `side` (0 = before it / its fade in, 1 = after it / its fade out), or -1:
+// the nearest clip of the same track, in start order, that overlaps it or already crossfades with it (FL's search with
+// flags 2: any clip kind; FL's array is sorted by start). Before: every earlier clip is tried; after: the search stops
+// at the first clip that starts past this one's end.
+inline int crossfadeNeighbour (const std::vector<Clip>& clips, int index, int side)
+{
+    if (index < 0 || index >= (int) clips.size())
+        return -1;
+    const auto& c = clips[(std::size_t) index];
+    const auto before = [&clips] (int x, int y) {
+        const auto& a = clips[(std::size_t) x];
+        const auto& b = clips[(std::size_t) y];
+        return a.start != b.start ? a.start < b.start : x < y;
+    };
+    const auto end = [] (const Clip& k) { return k.start + std::max<std::int64_t> (1, k.length); };
+    if (side == 0)
+    {
+        int best = -1; // the latest-starting earlier clip that overlaps or crossfades
+        for (int i = 0; i < (int) clips.size(); ++i)
+        {
+            const auto& o = clips[(std::size_t) i];
+            if (i == index || o.track != c.track || ! before (i, index) || (best >= 0 && before (i, best)))
+                continue;
+            if (c.start < end (o) || flCrossfadePair (o, c))
+                best = i;
+        }
+        return best;
+    }
+    // after: walk the later clips nearest first, up to the first that starts past this clip's end
+    std::vector<int> later;
+    for (int i = 0; i < (int) clips.size(); ++i)
+        if (i != index && clips[(std::size_t) i].track == c.track && before (index, i))
+            later.push_back (i);
+    std::sort (later.begin(), later.end(), before);
+    for (auto i : later)
+    {
+        const auto& o = clips[(std::size_t) i];
+        if (end (c) < o.start)
+            break;
+        if (o.start < end (c) || flCrossfadePair (c, o))
+            return i;
+    }
+    return -1;
+}
+
+// FL's Create crossfade on one pair, `a` the earlier clip: when they overlap by 0 < overlap <= the shorter clip, a's fade
+// out and b's fade in become the overlap and stop being manual. Each clip keeps its other fade: a's fade in comes first
+// (FUN_00cfaf80 mode 1), b's fade out comes first (mode 2). Pattern clips get no fades. True if it changed them.
+inline bool createCrossfade (Clip& a, Clip& b) noexcept
+{
+    const auto overlap = a.start + std::max<std::int64_t> (1, a.length) - b.start;
+    if (overlap <= 0 || overlap > std::min (a.length, b.length))
+        return false;
+    a.flFadeFlags &= ~2u; // FUN_01065840 (a, 0): a's fade out is no longer manual
+    b.flFadeFlags &= ~1u; // FUN_01065830 (b, 0)
+    if (a.kind == ClipKind::pattern || b.kind == ClipKind::pattern)
+        return false;
+    a.fadeOut = overlap;
+    a.fadeIn = std::min (a.length, a.fadeIn);
+    a.fadeOut = std::max<std::int64_t> (0, std::min (a.fadeOut, a.length - a.fadeIn));
+    b.fadeIn = overlap;
+    b.fadeOut = std::min (b.length, b.fadeOut);
+    b.fadeIn = std::max<std::int64_t> (0, std::min (b.fadeIn, b.length - b.fadeOut));
+    return true;
+}
+
+// FL's Create crossfade from a fade handle of `clicked` on `side`. A clicked clip that is selected: every selected clip
+// crossfades with the clip after it, or else with the one before it. Not selected: only the clicked clip, with its
+// neighbour on that side. Returns how many pairs changed.
+inline int createCrossfades (std::vector<Clip>& clips, int clicked, int side, const std::vector<int>& selection)
+{
+    if (clicked < 0 || clicked >= (int) clips.size())
+        return 0;
+    const auto selected = std::find (selection.begin(), selection.end(), clicked) != selection.end();
+    int changed = 0;
+    const auto pair = [&] (int a, int b) {
+        if (a >= 0 && b >= 0 && createCrossfade (clips[(std::size_t) a], clips[(std::size_t) b]))
+            ++changed;
+    };
+    if (! selected)
+    {
+        const auto other = crossfadeNeighbour (clips, clicked, side);
+        side == 0 ? pair (other, clicked) : pair (clicked, other);
+        return changed;
+    }
+    for (auto i : selection)
+    {
+        if (i < 0 || i >= (int) clips.size())
+            continue;
+        if (const auto next = crossfadeNeighbour (clips, i, 1); next >= 0)
+            pair (i, next);
+        else
+            pair (crossfadeNeighbour (clips, i, 0), i);
+    }
+    return changed;
+}
+
+// The fade handle menu's "Create crossfade" is enabled (FUN_00d023d0) when one of the menu's clips has a neighbour on
+// that side that is as selected as it is (both selected or both not). Side -1 = no handle (FL's handle kind 0, the audio
+// clip menu): FUN_00d02310 takes the neighbour before, else the one after.
+inline bool canCreateCrossfade (const std::vector<Clip>& clips, const std::vector<int>& targets, int side, const std::vector<int>& selection)
+{
+    const auto isSelected = [&selection] (int i) { return std::find (selection.begin(), selection.end(), i) != selection.end(); };
+    for (auto i : targets)
+    {
+        auto other = crossfadeNeighbour (clips, i, side < 0 ? 0 : side);
+        if (side < 0 && other < 0)
+            other = crossfadeNeighbour (clips, i, 1);
+        if (other >= 0 && isSelected (other) == isSelected (i))
+            return true;
+    }
+    return false;
+}
+
+// FL's audio clip menu › Fades › "Crossfade selected" (Tag 100, round 189o; [DECOMP] EEAUFadesComputeCrossfadesMenuClick
+// FUN_012447a0 -> FUN_00d01bc0 action 0x15 = the same FUN_00d02580 as Create crossfade, with no handle). FL shows the
+// item (FUN_01236e30 -> FUN_00cfc9b0, FUN_00840720 = Visible) only when the clicked clip is selected and one selected
+// clip has a selected neighbour (before it, else after it). It then crossfades every selected clip with the clip after
+// it, or else with the one before it (createCrossfades on a selected clip).
+inline bool showCrossfadeSelected (const std::vector<Clip>& clips, int clicked, const std::vector<int>& selection)
+{
+    if (std::find (selection.begin(), selection.end(), clicked) == selection.end())
+        return false;
+    std::vector<int> targets;
+    for (auto i : selection)
+        if (i >= 0 && i < (int) clips.size())
+            targets.push_back (i);
+    return canCreateCrossfade (clips, targets, -1, selection);
+}
+
+// --- FL's Normalize on the gain handle (Tags 110 / 111, round 189n; [DECOMP] FUN_00d029b0) ----
+// Normalize (and "Normalize selection individually"): each audio clip's gain = 1 / its peak, kept in the gain handle's
+// range -96.1 ... +36 dB (FUN_01064dc0, FUN_010657d0). The peak is the largest |sample| of every channel of the file over
+// the part the clip plays (FUN_01064c60 / FUN_00692980). A silent clip keeps its gain.
+inline constexpr float normalizeGainMin = 1.5667499610572122e-05f, normalizeGainMax = 63.095699310302734f;
+inline float normalizeGain (float peak, float current) noexcept
+{
+    return peak == 0.0f ? current : std::clamp (1.0f / peak, normalizeGainMin, normalizeGainMax);
+}
+// "Normalize selection as a group" (FUN_00d026f0): every selected audio clip of the Playlist gets the same gain, 1 / the
+// largest of their peaks, with no range limit; all silent = no change.
+inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
+{
+    float top = 0.0f;
+    for (auto p : peaks)
+        top = std::max (top, p);
+    return top == 0.0f ? 0.0f : 1.0f / top;
+}
+
 } // namespace lynx::clipops

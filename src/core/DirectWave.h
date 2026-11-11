@@ -149,6 +149,8 @@ public:
     // adds `n` frames to interleaved stereo `out`
     void render (float* out, int n);
     bool active() const;
+    // the program's delay / chorus / reverb still sound after the last voice (round 190aj): the channel is not idle yet
+    bool ringing() const;
 
     std::uint32_t randState = 1;              // the C run-time's rand() state the plugin draws from
 

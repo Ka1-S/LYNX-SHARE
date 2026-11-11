@@ -836,6 +836,11 @@ std::vector<float> readWaveMono (const std::vector<std::uint8_t>& b)
 
 // ------------------------------------------------------------------------------------------------------- public
 
+bool threeOscIsFlm (const ChannelDef& channel) noexcept
+{
+    return channel.instrument == InstrumentKind::threeosc && channel.modelParams.size() > 1 && channel.modelParams[1] >= 0.5f;
+}
+
 bool threeOscStateUsable (const std::vector<std::uint8_t>& state)
 {
     Params p;
@@ -930,6 +935,7 @@ struct Setup
     std::shared_ptr<const HqSet> hq;
     int ppq = 96;
     double tempo = 140.0;
+    bool mobile = false; // a channel from a .flm: FLM's envelope stepping and whole-sample ticks (core/ThreeOsc.h)
 };
 
 class ThreeOscInstrument final : public Instrument
@@ -955,6 +961,7 @@ public:
         take();
         engine.custom = current.custom, engine.hqCustomSet = current.hq;
         engine.hostHq = hostHq != nullptr && hostHq();
+        engine.S.setMobile (current.mobile);
         engine.init (current.P, sr, current.snap.data(), current.ppq, current.tempo);
         engine.reset();
         tickPhase = 0.0;
@@ -968,8 +975,11 @@ public:
         pitchCents.store (channel.sampler.pitch * 100.0f);
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
+        // a channel from a .flm (core/ThreeOsc.h): the note's velocity is the voice's level as it is, times a gain
+        flmLevel.store (threeOscIsFlm (channel) ? (channel.modelParams.size() > 2 ? std::clamp (channel.modelParams[2], 0.0f, 4.0f) : 1.0f) : -1.0f);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath)
+        const auto mobile = threeOscIsFlm (channel);
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath && mobile == lastMobile)
             return;
         Params p;
         if (! parseNormalised (channel.pluginState, p))
@@ -977,7 +987,7 @@ public:
         auto s = std::make_unique<Setup>();
         s->P = p;
         std::memcpy (s->snap.data(), channel.pluginState.data() + 0x60, snapshotSize);
-        s->ppq = ppq, s->tempo = tempo;
+        s->ppq = ppq, s->tempo = tempo, s->mobile = mobile;
         if (channel.samplePath == wavePath)
             s->custom = uiCustom;
         else if (auto w = channel.samplePath.empty() ? std::vector<float> {} : threeOscCustomWave (channel.samplePath); ! w.empty())
@@ -987,7 +997,7 @@ public:
             hqFixed (1); // (builds the band-limited tables here, not on the audio thread)
         if (p.hq && s->custom != nullptr)
             s->hq = hqCustom (*s->custom); // (the custom wave's band-limited tables: only for HQ states)
-        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, wavePath = channel.samplePath;
+        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, wavePath = channel.samplePath, lastMobile = mobile;
         delete incoming.exchange (s.release());
     }
 
@@ -1021,7 +1031,8 @@ public:
     {
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
-        const auto initVol = (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+        const auto mobile = flmLevel.load();
+        const auto initVol = mobile >= 0.0f ? (float) (vel * (double) mobile) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
         const auto k = std::clamp (key, 0, 127);
         const auto knob = pitchCents.load();
         const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);
@@ -1062,7 +1073,7 @@ public:
     {
         const auto playing = lastTicks >= 0.0 && ticks != lastTicks;
         lastTicks = ticks;
-        if (playing)
+        if (playing && ! current.mobile) // (FLM's module clock runs free, in whole samples)
             tickPhase = ticks / (double) ppq * (double) current.ppq;
     }
 
@@ -1088,7 +1099,9 @@ public:
             }
         }
         // FL's sequencer ticks (PPQ per beat): a tick boundary starts a new host block, NewTick first
-        const auto perSample = current.tempo * (double) current.ppq / (60.0 * rate);
+        // (FLM's module counts its ticks in whole samples: round(fs·60 / (tempo·PPQ)), 230 at 120 BPM and 44.1 kHz)
+        const auto perSample = current.mobile ? 1.0 / std::max (1.0, std::round (60.0 * rate / (current.tempo * (double) current.ppq)))
+                                              : current.tempo * (double) current.ppq / (60.0 * rate);
         for (int done = 0; done < n;)
         {
             if (std::fabs (tickPhase - std::round (tickPhase)) < 1e-9)
@@ -1133,6 +1146,7 @@ private:
             engine.custom = current.custom, engine.hqCustomSet = current.hq;
             engine.hostHq = hostHq != nullptr && hostHq();
             std::memcpy (engine.snap.data(), current.snap.data(), snapshotSize);
+            engine.S.setMobile (current.mobile);
             engine.timing (current.ppq, current.tempo); // (FL: parameters and tempo reach the plugin while voices play)
             engine.update();
             retired.store (s);
@@ -1144,6 +1158,7 @@ private:
     Setup current;
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::atomic<float> pitchCents { 0.0f };
+    std::atomic<float> flmLevel { -1.0f }; // ≥ 0: a channel from a .flm, the gain on its notes' velocities
     LiveChannelPitch live; // (audio thread)
     std::atomic<int> maxPoly { 0 };
     std::vector<std::uint8_t> state;
@@ -1151,6 +1166,7 @@ private:
     std::shared_ptr<const std::vector<float>> uiCustom;
     int lastPpq = -1;
     double lastTempo = -1.0;
+    bool lastMobile = false;
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, tickPhase = 0.0, lastTicks = -1.0;

@@ -51,6 +51,7 @@ const std::vector<Allowed>& allowed()
         { "Kiln Channel", "Group I/O", "inert", "editor-only: Input / Output edits reach the group's other channels; no DSP of its own" },
         { "Kiln Channel", "Group", "inert", "routing only: which group's Group bypass this channel follows (a lone instance sounds the same in every group, as the original)" },
         { "Ember Saturator", "Classic auto", "inert", "editor-only: with Auto on, editing Classic drive also sets Classic output (linkedEdit); no DSP of its own" },
+        { "Ember Saturator", "Classic hot law", "inert", "not-in-programme: it changes styles T and P above Classic drive 5 only, a corner the context search does not reach; tests/Parity190arTests.inc renders both values there" },
         { "Multiband Delay", "Target", "inert", "editor-only: which cells (volume / pan) the band display draws" },
         { "Auto-pan", "Manual trigger", "inert", "momentary: each press while playing fires the trigger source once (RhythmPan.cpp); a value set before the render is the saved one, not a press" },
         { "Fruity Delay 3", "Keep pitch", "inert", "not-in-programme: acts only while the delay time is being changed (automation); a fixed time renders the same" },
@@ -190,6 +191,8 @@ void auditRange (int from, int to)
         third.only.clear();
         for (const auto& f : rep.broken)
         {
+            if (f.what == "NaN") // (round 190bb: say where)
+                std::printf ("  %s: NaN / inf with \"%s\" = %s (%g)\n", rep.name.c_str(), f.control.c_str(), f.text.c_str(), f.value);
             CHECK (f.what != "NaN");
             if (f.what != "NaN" && ! isAllowed (rep.name, f.control, f.what))
                 third.only.push_back (f.control);

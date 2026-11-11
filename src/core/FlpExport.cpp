@@ -1,5 +1,6 @@
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/Fpc.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +11,9 @@
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/FlStateWrite.h"
 #include "core/FlWrapper.h"
+#include "core/FruityDance.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
 #include "core/TimeStretch.h"
@@ -82,6 +85,8 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
     { InstrumentKind::fruityslicer, "Fruity Slicer", false },
+    { InstrumentKind::slicex, "Slicex", false },
+    { InstrumentKind::fpc, "FPC", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept
@@ -145,6 +150,15 @@ std::vector<std::uint8_t> le32s (std::initializer_list<std::uint32_t> values)
     return out;
 }
 
+std::vector<std::uint8_t> le32s (const std::vector<std::uint32_t>& values)
+{
+    std::vector<std::uint8_t> out;
+    for (const auto v : values)
+        for (int k = 0; k < 4; ++k)
+            out.push_back ((std::uint8_t) (v >> (8 * k)));
+    return out;
+}
+
 // FL 2026's Fruity Limiter as it comes (version 7, 169 bytes) [DATA: FL 2026's own templates, e.g. "Cheese's recording
 // setup"]: the substitute for LYNX's Limiter (option B, and the Master, which can't be bounced)
 const std::uint8_t fruityLimiterDefault[169] = {
@@ -157,6 +171,31 @@ const std::uint8_t fruityLimiterDefault[169] = {
     0x00, 0x00, 0x00, 0x00, 0x0a, 0x1a, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x8a, 0x02, 0x00, 0x00, 0xe8, 0x03, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x5b, 0x10, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// FL 2026's Fruity Parametric EQ 2 as a new instance saves it (version 8, 354 bytes) [DATA: captured in round 189k, FL
+// 2026 saving a project whose Master slot had the plugin with no state; the same bytes as its Default.fst preset except
+// 0x131]: the base the Master looks' EQ is written over (core/FlStateWrite.h). A new instance has HQ with the
+// alternative design on (0x124 = 3).
+const std::uint8_t parametricEq2Default[354] = {
+    0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xab, 0x2a, 0x00, 0x00, 0x1c, 0x47, 0x00, 0x00,
+    0x8e, 0x63, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x72, 0x9c, 0x00, 0x00, 0xe4, 0xb8, 0x00, 0x00, 0x55, 0xd5, 0x00, 0x00,
+    0xbc, 0x9c, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00,
+    0x44, 0x63, 0x00, 0x00, 0xbc, 0x9c, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
+    0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xab, 0x2a, 0x00, 0x00,
+    0x1c, 0x47, 0x00, 0x00, 0x8e, 0x63, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x72, 0x9c, 0x00, 0x00, 0xe4, 0xb8, 0x00, 0x00,
+    0x55, 0xd5, 0x00, 0x00, 0xbc, 0x9c, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00,
+    0x44, 0x63, 0x00, 0x00, 0x44, 0x63, 0x00, 0x00, 0xbc, 0x9c, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
+    0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x7f, 0x00,
+    0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00,
+    0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
 // option B's clean mappings: the LYNX effect → an FL plugin with its state
@@ -252,6 +291,29 @@ std::vector<std::uint8_t> fruityLimiterDefaultState()
     return std::vector<std::uint8_t> (std::begin (fruityLimiterDefault), std::end (fruityLimiterDefault));
 }
 
+std::vector<std::uint8_t> parametricEq2DefaultState()
+{
+    return std::vector<std::uint8_t> (std::begin (parametricEq2Default), std::end (parametricEq2Default));
+}
+
+std::optional<std::pair<std::string, std::vector<std::uint8_t>>> nativeLookState (const EffectSlot& s)
+{
+    if (s.look == 0)
+        return std::nullopt;
+    switch (s.kind)
+    {
+        case EffectKind::parametricEq:
+            if (peqfl::lawOf (s.params) != peqfl::Law::peq2)
+                return std::nullopt;
+            return std::pair { std::string ("Fruity Parametric EQ 2"), flstate::parametricEq2 (s.params, parametricEq2DefaultState()) };
+        case EffectKind::fruityMultiband: return std::pair { std::string ("Fruity Multiband Compressor"), flstate::multiband (s.params) };
+        case EffectKind::stereoEnhancer: return std::pair { std::string ("Fruity Stereo Enhancer"), flstate::stereoEnhancer (s.params) };
+        case EffectKind::fruitySoftClipper: return std::pair { std::string ("Fruity Soft Clipper"), flstate::softClipper (s.params) };
+        case EffectKind::fruityLimiter: return std::pair { std::string ("Fruity Limiter"), flstate::limiter (s.params, fruityLimiterDefaultState()) };
+        default: return std::nullopt;
+    }
+}
+
 std::uint64_t fingerprint (const ChannelDef& c)
 {
     Hash h;
@@ -343,7 +405,7 @@ bool effectExportable (const EffectSlot& s, const Options& options)
         return true;
     if (s.kind == EffectKind::plugin)
         return s.plugin.foreign.format != ForeignPlugin::Format::none || (options.pluginRecord && options.pluginRecord (s.plugin, false));
-    if (originMatches (s))
+    if (originMatches (s) || nativeLookState (s))
         return true;
     return options.lynxOnly == LynxOnly::substitute && substituteFor (s).has_value();
 }
@@ -583,6 +645,7 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
             set (0x01000000u, ref->hostKeysFirst);
             fixed = (ref->maxSizeBuffers ? 1u : 0u) | (ref->hostMaxBuffer ? 2u : 0u);
             flags2 = (ref->allNotesOffOnStop ? 0u : 0x1000u) | (ref->allowHostKeys ? 0x800u : 0u);
+            set (0x8u, ref->processInactive); // "Process inactive inputs and outputs" (round 188d)
         }
         else if (p.hasWrapperOptions)
         {
@@ -595,10 +658,34 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
         o.insert (o.end(), tail.begin(), tail.end());
         r.record (0x02, o);
     }
-    // 0x1E / 0x1F / 0x20: one input and one output bus (FL lays them out again from the plugin)
-    r.record (0x1E, le32s ({ 1, 1, 0, 0 }));
-    r.record (0x1F, le32s ({ 0, instrument ? 0u : 1u, 0 }));
-    r.record (0x20, le32s ({ 0, 1, 0 }));
+    // 0x1E / 0x1F / 0x20: Processing › Connections, 12 bytes per input / output {i32 offset, u32 active, u32 0}
+    // [DATA round 188d]; without a mapping one input and one output (FL lays them out again from the plugin)
+    {
+        const auto* ins = ref != nullptr ? &ref->inputs : (p.hasRoutes ? &p.inputRoutes : nullptr);
+        const auto* outs = ref != nullptr ? &ref->outputs : (p.hasRoutes ? &p.outputRoutes : nullptr);
+        if ((ins != nullptr && ! ins->empty()) || (outs != nullptr && ! outs->empty()))
+        {
+            auto list = [] (const std::vector<PluginOutputRoute>& routes) {
+                std::vector<std::uint32_t> words;
+                for (const auto& route : routes)
+                    words.insert (words.end(), { (std::uint32_t) route.offset, route.isActive (true) ? 1u : 0u, 0u });
+                return le32s (words);
+            };
+            // (an effect whose inputs alone are mapped: its output as below, one default entry)
+            const auto outputs = outs->empty() && ! instrument ? std::vector<PluginOutputRoute> { { 0, 1 } } : *outs;
+            r.record (0x1E, le32s ({ (std::uint32_t) ins->size(), (std::uint32_t) outputs.size(), 0, 0 }));
+            if (! ins->empty())
+                r.record (0x1F, list (*ins));
+            if (! outputs.empty())
+                r.record (0x20, list (outputs));
+        }
+        else
+        {
+            r.record (0x1E, le32s ({ 1, 1, 0, 0 }));
+            r.record (0x1F, le32s ({ 0, instrument ? 0u : 1u, 0 }));
+            r.record (0x20, le32s ({ 0, 1, 0 }));
+        }
+    }
 
     std::uint32_t type = 0;
     switch (p.format)
@@ -816,6 +903,13 @@ struct Converter
             if (g > 1.0f)
                 report.notes.push_back (channelLabel (def, index) + ": the Sampler's Gain is above FL's channel volume range (capped at 100%)");
         }
+        // a hosted plugin (round 190ad, REA_rodada190ad.md): FL's wrapper plays it √2 over LYNX's own channel law. A
+        // project with FL's levels writes the knob as it is; one with LYNX's own gets the volume that sounds the same
+        if (def.instrument == InstrumentKind::plugin && ! song.flPluginLevels)
+        {
+            const auto g = channelGain (volume) * 0.70710678f;
+            volume = (float) std::clamp (std::log (10.0 * g + 1.0) / std::log (11.0), 0.0, 1.0);
+        }
         // warp markers that bend the tempo inside the file (round 175a, M1): FL's channel stretch has one tempo
         if (def.sampler.keepPitch && def.sampler.stretchBeats > 0.0f
             && ! warpStretchMap (def.sampler.warp, 1.0e9, 1000.0, 1.0e9).empty()) // (any file length: do the markers bend)
@@ -946,8 +1040,15 @@ struct Converter
             c.type = flp::ChannelType::instrument;
             c.pluginName = name;
             c.pluginState = originMatches (def) && ! def.flOrigin.state.empty() ? def.flOrigin.state : def.pluginState;
+            // a dancer edited in LYNX keeps LYNX's text state: FL gets its own bytes (the sprite sheet's file included)
+            if (def.instrument == InstrumentKind::fruitydance)
+                if (const auto dancer = dance::fromState (c.pluginState))
+                    c.pluginState = dance::toFl (*dancer);
             if (c.pluginState.empty() && def.instrument == InstrumentKind::threeosc)
                 c.pluginState = defaultThreeOscState();
+            if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)
+                if (const auto kit = fpc::read (c.pluginState))
+                    c.pluginState = fpc::write (*kit);
             const auto* g = generatorFor (def.instrument);
             if ((g != nullptr && g->channelSample) || samplerLike (def.instrument))
                 c.samplePath = path (def.samplePath);
@@ -1105,6 +1206,32 @@ struct Converter
             }
             default: return std::nullopt;
         }
+    }
+
+    // A hosted effect's side input (slot.sidechain, picked with LYNX's "SC" picker or set by input 2's index) as FL's
+    // input 2 index (round 189j): its place in insert t's inputs list as written here — [t, then every insert routed
+    // to t, the level-0 sidechain routes included, ascending] (REA_rodada22 §1, core/MixerOps.h insertInputs). An
+    // index already there that names another insert is replaced: the slot's source is what LYNX plays. True when
+    // `inputs` changed.
+    bool withSideIndex (std::vector<PluginOutputRoute>& inputs, int t, int source) const
+    {
+        if (t <= 0 || source <= 0 || source == t || source >= (int) song.mixer.size())
+            return false;
+        auto k = 1;
+        for (int u = 1; u < source; ++u)
+            if (u != t && (song.routes (u, t) || feedsSideInput (u, t)))
+                ++k;
+        if (inputs.size() > 1 && inputs[1].offset == k && inputs[1].isActive (true))
+            return false;
+        if (inputs.size() < 2)
+            inputs.resize (2);
+        inputs[1] = { k, inputs[1].active == 0 ? (std::int8_t) -1 : inputs[1].active };
+        return true;
+    }
+    bool feedsSideInput (int source, int t) const
+    {
+        const auto& fx = song.mixer[(std::size_t) t].effects;
+        return std::any_of (fx.begin(), fx.end(), [source] (const EffectSlot& e) { return e.sidechain == source || e.sidechain2 == source; });
     }
 
     // the inserts whose effects take insert `source` as a side-chain input (LYNX keeps the source, FL a level-0 route)
@@ -1506,13 +1633,29 @@ struct Converter
                 }
                 else if (fx.kind == EffectKind::plugin)
                 {
-                    if (const auto record = hosted (fx.plugin, false))
+                    if (auto record = hosted (fx.plugin, false))
                     {
                         slot.plugin = "Fruity Wrapper";
-                        slot.state = writeWrapper (*record, false, fx.plugin.foreign.format == ForeignPlugin::Format::none ? &fx.plugin : nullptr);
+                        // the side input picked with LYNX's "SC" picker is FL's input 2 index (round 189j)
+                        auto ref = fx.plugin;
+                        if (ref.foreign.format == ForeignPlugin::Format::none)
+                            withSideIndex (ref.inputs, t, fx.sidechain);
+                        else if (withSideIndex (record->inputRoutes, t, fx.sidechain) && ! record->hasRoutes)
+                        {
+                            record->hasRoutes = true;
+                            record->outputRoutes = { { 0, 1 } };
+                        }
+                        slot.state = writeWrapper (*record, false, ref.foreign.format == ForeignPlugin::Format::none ? &ref : nullptr);
                         slot.wrapperFlags = withFlDetached (slot.wrapperFlags, fx.plugin.detached); // (issue #116)
                         what = record->name + " (Fruity Wrapper)";
                     }
+                }
+                else if (const auto native = nativeLookState (fx))
+                {
+                    // a Master look's slot (round 189k): FL's own plugin with the slot's settings
+                    slot.plugin = native->first;
+                    slot.state = native->second;
+                    what = native->first;
                 }
                 else if (originMatches (fx))
                 {
@@ -1548,6 +1691,12 @@ struct Converter
         fixSideInputs();
         if (! song.vcas.empty())
             report.notes.push_back ("VCA faders: FL Studio has none; their levels are baked into the member tracks' faders (their automation and mutes are left out)");
+        // LYNX's pre-fader sends (round 190aq): FL has post-fader routes only, so they are written as those
+        if (const auto pre = std::accumulate (song.mixer.begin(), song.mixer.end(), 0, [] (int n, const MixerTrack& m) {
+                return n + (int) std::count_if (m.sends.begin(), m.sends.end(), [] (const MixerSend& s) { return s.pre; });
+            }); pre > 0)
+            report.notes.push_back ("Pre-fader sends: FL Studio's sends are post-fader; " + std::to_string (pre)
+                                    + (pre == 1 ? " pre-fader send is" : " pre-fader sends are") + " written as post-fader (they follow the track's fader in FL)");
         report.exact.push_back ("Mixer: " + std::to_string (song.mixer.size()) + " tracks (names, colours, routes, sends, levels, EQ)");
     }
 

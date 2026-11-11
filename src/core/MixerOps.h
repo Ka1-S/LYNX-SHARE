@@ -4,6 +4,7 @@
 // sidechain gestures, linking channels, effect slot reordering). Pure functions over the Song model:
 // no JUCE, unit-tested in tests/WorkflowP2Tests.inc.
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -62,6 +63,17 @@ std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int
 // Mixer › "Remove unused inserts at the end"). Returns how many were removed.
 int removeUnusedTrailingInserts (Song& song, int keep = 0);
 
+// Mixer menu › "Show only used inserts" (round 163; the rule made exact in round 190am): which strips take no room.
+// An insert is hidden only when ALL of these hold:
+//  - it is not the Master;
+//  - it is not in `keep` (the selected inserts, those brought back with "+", and those whose meter moved: an insert
+//    that receives audio always shows);
+//  - nothing uses it (Song::insertInUse): no channel plays into it, no insert sends to it and it sends nowhere but
+//    the Master, no effect slot, no audio input, no Playlist track link, no effect's sidechain or extra output points
+//    at it, its name, fader, pan, separation, mute, solo, colour, EQ and output are the defaults, nothing automates it.
+// Returns one flag per insert plus one for the "+" button (never hidden). Nothing in the song changes.
+std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep);
+
 // Channels whose output goes to `track`.
 std::vector<int> channelsOn (const Song& song, int track);
 
@@ -78,6 +90,15 @@ int routeTo (Song& song, const std::vector<int>& sources, int to, bool only);
 // Sidechain link: a level-0 send from `from` to `to` (so `from` is processed first) and every compressor
 // or vocoder on `to` without a side input listens to `from`. Returns how many effects now listen.
 int sidechainTo (Song& song, int from, int to);
+
+// FL's inputs list of an insert (REA_rodada22 §1, round 188d [EXEC]): [the insert itself, then every insert routed
+// to it — at any level, level 0 = sidechain only — in ascending order]. A plugin's "sidechain index" k in the
+// wrapper's Processing › Connections picks entry k (0 = the insert's own audio).
+std::vector<int> insertInputs (const Song& song, int track);
+// The source insert of sidechain index k on `track`, or −1 (k ≤ 0, or past the list)
+int sidechainIndexSource (const Song& song, int track, int k);
+// The index of `source` in `track`'s inputs list, or 0 when it is not there
+int sidechainIndexOf (const Song& song, int track, int source);
 
 // The effects a sidechain link feeds (round 170h): LYNX's Compressor, FL's Fruity Limiter / Fruity Compressor
 // (FL users sidechain with these) and the vocoder.

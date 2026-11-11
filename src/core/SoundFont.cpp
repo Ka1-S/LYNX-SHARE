@@ -1014,7 +1014,7 @@ public:
         chorus.prepare (rate);
         for (auto& v : voices)
             v.active = false;
-        if (offlineRendering() && handle != nullptr)
+        if ((offlineRendering() || renderInProgress()) && handle != nullptr)
             handle->wait(); // an export waits for the font
     }
 
@@ -1117,7 +1117,8 @@ public:
         // switches to offline rendering, so the wait in prepare() never ran for a project without hosted plugins, and
         // the notes played before the loader thread finished were dropped below: a short export from the start of the
         // song came out silent or missing its first notes. (Live playback never waits: the flag is only set by renders.)
-        if (handle != nullptr && ! handle->finished() && offlineRendering())
+        // (renderInProgress(): the render-quality flag is off in an export without "HQ for all plugins", round 190ba)
+        if (handle != nullptr && ! handle->finished() && (offlineRendering() || renderInProgress()))
             handle->wait();
         const auto* font = handle != nullptr ? handle->font() : nullptr;
         if (font != lastFont)

@@ -4,15 +4,19 @@
 #include "platform/Package.h"
 
 #include "core/LayoutStyle.h"
+#include "core/LynxExtras.h"
+#include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/LinuxRealtime.h"
 #include "ui/AutomationUi.h"
+#include "ui/DetailView.h"
 #include "ui/Dialogs.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
 
@@ -109,9 +113,9 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
-                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
-                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
+                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
@@ -273,6 +277,10 @@ public:
                 [this] (bool on) { options.keepEditorsOpen = on; });
         toggle (firstChannel, tr ("Select first channel with notes when the pattern changes"), options.selectFirstChannelWithNotes,
                 [this] (bool on) { options.selectFirstChannelWithNotes = on; });
+        // FL's General › Miscellaneous (round 189o): the Paint tool is monophonic without Shift
+        toggle (monoPaint, tr ("Monophonic painting in piano roll"), options.monophonicPainting,
+                [this] (bool on) { options.monophonicPainting = on; });
+        monoPaint.setTooltip (tr ("On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round"));
         // FL's next Miscellaneous box, DisablePlugFocusDefaultBox (off; round 187a, issue #96)
         toggle (noTypingPriority, tr ("Disable typing keyboard priority by default"), options.disableTypingPriority,
                 [this] (bool on) { options.disableTypingPriority = on; });
@@ -289,6 +297,10 @@ public:
                 [this] (bool on) { options.stretchedClipsLoop = on; });
         clipsLoop.setTooltip (tr ("On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio"));
         // FL's Options › General › Miscellaneous (round 177b): where "Create automation clip" puts the clip
+        // FL's General › Miscellaneous › "Detach all new plugins" (issue #116): plugin windows dock in the desktop by default
+        toggle (detachNew, tr ("Detach all new plugins"), options.detachNewPlugins, [this] (bool on) { options.detachNewPlugins = on; });
+        detachNew.setTooltip (tr ("On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, "
+                                  "behind a panel you click. Each plugin's window menu › Detached changes it for that plugin"));
         toggle (autoClipsAtPlayback, tr ("Create automation clips at the playback position"), options.autoClipsAtPlayback,
                 [this] (bool on) { options.autoClipsAtPlayback = on; });
         autoClipsAtPlayback.setTooltip (tr ("On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song"));
@@ -351,6 +363,21 @@ public:
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        // FL's General › Miscellaneous (round 189o): at most 25 plugin editors open, the oldest closes; FL warns before
+        // turning it off (FUN_013559c0) and keeps it on with No
+        toggle (limitEditors, tr ("Limit the number of open plugin editors"), options.limitEditors, [this] (bool on) {
+            options.limitEditors = on;
+            if (on)
+                return;
+            juce::AlertWindow::showOkCancelBox (
+                juce::MessageBoxIconType::WarningIcon, tr ("Warning"),
+                tr ("It is recommended to keep this setting turned on for performance reasons. Are you sure you want to turn it off?"),
+                tr ("Yes"), tr ("No"), this, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer (this)] (int result) {
+                    if (safe != nullptr && result == 0)
+                        safe->limitEditors.setToggleState (true, juce::sendNotification);
+                }));
+        });
+        limitEditors.setTooltip (tr ("Limit the number of open plugin editor windows to 25"));
         // FL's "Manage messages" (round 186c): which questions are asked; a ticked "Remember my choice" unticks its message
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
@@ -441,7 +468,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &autoSelectLinked, &noTypingPriority, &hoverValues })
+        for (auto* t : { &typingPiano, &keepEditors, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -472,6 +499,7 @@ private:
         sandboxNote.setBounds (r.full (16).translated (0, -3));
         substitutes.setBounds (r.full (24));
         substitutesNote.setBounds (r.full (16).translated (0, -3));
+        limitEditors.setBounds (r.full (24));
         {
             auto row = r.full();
             managePlugins.setBounds (row.removeFromLeft (180));
@@ -501,6 +529,16 @@ private:
         styleToggle (t, text);
         t.setToggleState (value, juce::dontSendNotification);
         t.onClick = [this, &t, set = std::move (set)] { change ([&] { set (t.getToggleState()); }); };
+    }
+
+    // the LYNX extras page switches this one too (round 190am): the copy kept here follows when the page comes back
+    void visibilityChanged() override
+    {
+        if (isVisible() && hooks.getGeneral)
+        {
+            options.hoverValues = hooks.getGeneral().hoverValues;
+            hoverValues.setToggleState (options.hoverValues, juce::dontSendNotification);
+        }
     }
 
     static void selectNearest (juce::ComboBox& box, int value)
@@ -596,7 +634,7 @@ private:
     juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
     juce::Label messagesNote;
@@ -1188,14 +1226,64 @@ private:
 // ================================================================================================================
 // MIDI
 // ================================================================================================================
-// One input device: on/off, which MIDI channel it listens to and what it plays.
+// One input device: on/off, which MIDI channel it listens to, what it plays, and its controller type (FL's Options ›
+// MIDI "Controller type" of the selected input; round 190aw: the controller profiles of core/ControllerProfile.h).
 class MidiInputRow final : public juce::Component
 {
 public:
+    // What the Controller type list offers and shows for this device.
+    struct Controllers
+    {
+        std::vector<std::pair<std::string, juce::String>> profiles; // id, name as listed
+        juce::String detected;                                      // the profile its port name matches ("" = none)
+        juce::String status;                                        // where the feedback goes
+    };
+
     MidiInputRow (const juce::String& deviceName, const prefs::MidiInputPrefs& p, const std::vector<std::string>& channels,
-                  std::function<void (const prefs::MidiInputPrefs&)> changed)
+                  const Controllers& controllers, std::function<void (const prefs::MidiInputPrefs&)> changed)
         : prefsNow (p), onChange (std::move (changed))
     {
+        typeLabel.setText (tr ("Controller type"), juce::dontSendNotification);
+        typeLabel.setFont (theme::font (theme::type::small));
+        typeLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        addAndMakeVisible (typeLabel);
+        // FL's list: "(generic controller)" first, then the device scripts; LYNX adds the automatic choice on top
+        type.addItem (controllers.detected.isNotEmpty() ? tr ("Detect automatically ({0})", { controllers.detected })
+                                                        : tr ("Detect automatically ({0})", { tr ("Generic controller") }),
+                      1);
+        type.addItem (tr ("Generic controller"), 2);
+        if (! controllers.profiles.empty())
+            type.addSeparator();
+        auto chosen = p.controller.empty() ? 1 : p.controller == controller::genericChoice ? 2 : 0;
+        for (int i = 0; i < (int) controllers.profiles.size(); ++i)
+        {
+            type.addItem (controllers.profiles[(std::size_t) i].second, i + 3);
+            typeIds.push_back (controllers.profiles[(std::size_t) i].first);
+            if (p.controller == controllers.profiles[(std::size_t) i].first)
+                chosen = i + 3;
+        }
+        if (chosen == 0) // a profile that is gone (kept; the device runs as a generic controller)
+        {
+            typeIds.push_back (p.controller);
+            chosen = (int) typeIds.size() + 2;
+            type.addItem (juce::String::fromUTF8 (p.controller.c_str()), chosen);
+        }
+        type.setSelectedId (chosen, juce::dontSendNotification);
+        type.setTooltip (tr ("A controller profile sets up the device's transport buttons, faders, knobs, pads, lights and display. "
+                             "Controls you link by hand keep their links."));
+        type.onChange = [this] {
+            const auto id = type.getSelectedId();
+            prefsNow.controller = id <= 1 ? std::string() : id == 2 ? std::string (controller::genericChoice) : typeIds[(std::size_t) (id - 3)];
+            update();
+        };
+        styleCombo (type);
+        addAndMakeVisible (type);
+        status.setText (controllers.status, juce::dontSendNotification);
+        status.setFont (theme::font (theme::type::small));
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        status.setMinimumHorizontalScale (1.0f);
+        addAndMakeVisible (status);
+
         enabled.setButtonText (deviceName);
         enabled.setToggleState (p.enabled, juce::dontSendNotification);
         enabled.onClick = [this] {
@@ -1207,11 +1295,29 @@ public:
         channel.addItem (tr ("Any MIDI channel"), 1);
         for (int c = 1; c <= 16; ++c)
             channel.addItem (tr ("MIDI channel {0}", { juce::String (c) }), c + 1);
-        channel.setSelectedId (p.midiChannel + 1, juce::dontSendNotification);
+        // issue #108 (a LYNX addition; FL has no MPE input): the device is an MPE controller — every channel is
+        // taken (channel 1 = master, the member channels from 2 up carry one note each with its bend, CC 74, pressure)
+        channel.addSeparator();
+        channel.addItem (tr ("MPE controller"), mpeItem);
+        channel.setTooltip (tr ("MPE controller: each note has its own MIDI channel; its pitch bend, timbre (CC 74) and pressure are played and recorded per note (fine pitch, Mod X, Mod Y)"));
+        channel.setSelectedId (p.mpe ? mpeItem : p.midiChannel + 1, juce::dontSendNotification);
         channel.onChange = [this] {
-            prefsNow.midiChannel = channel.getSelectedId() - 1;
+            prefsNow.mpe = channel.getSelectedId() == mpeItem;
+            if (! prefsNow.mpe)
+                prefsNow.midiChannel = channel.getSelectedId() - 1;
+            update();
+            resized();
+        };
+        for (int n = 15; n >= 1; --n)
+            zone.addItem (n == 1 ? tr ("Channel 2") : tr ("Channels 2-{0}", { juce::String (n + 1) }), n);
+        zone.setTooltip (tr ("MPE member channels (lower zone): the MIDI channels that carry one note each"));
+        zone.setSelectedId (juce::jlimit (1, 15, p.mpeMembers), juce::dontSendNotification);
+        zone.onChange = [this] {
+            prefsNow.mpeMembers = zone.getSelectedId();
             update();
         };
+        styleCombo (zone);
+        addChildComponent (zone);
 
         plays.addItem (tr ("Plays the selected channels"), 1);
         for (int i = 0; i < (int) channels.size(); ++i)
@@ -1234,11 +1340,26 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced (8, 4);
-        plays.setBounds (r.removeFromRight (230));
-        r.removeFromRight (8);
-        channel.setBounds (r.removeFromRight (150));
-        r.removeFromRight (8);
-        enabled.setBounds (r);
+        auto top = r.removeFromTop (26);
+        plays.setBounds (top.removeFromRight (230));
+        top.removeFromRight (8);
+        channel.setBounds (top.removeFromRight (150));
+        top.removeFromRight (8);
+        zone.setVisible (prefsNow.mpe);
+        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice; the channel box keeps its column)
+        {
+            zone.setBounds (top.removeFromRight (124));
+            top.removeFromRight (8);
+        }
+        enabled.setBounds (top);
+        r.removeFromTop (4);
+        // the second line, as the output rows have: the controller type under the device's name
+        auto bottom = r.removeFromTop (26);
+        bottom.removeFromLeft (28); // (under the name, past the check box)
+        typeLabel.setBounds (bottom.removeFromLeft (110));
+        type.setBounds (bottom.removeFromLeft (260));
+        bottom.removeFromLeft (10);
+        status.setBounds (bottom);
     }
 
     void paint (juce::Graphics& g) override
@@ -1251,7 +1372,9 @@ private:
     void update (bool notify = true)
     {
         channel.setEnabled (prefsNow.enabled);
+        zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
+        type.setEnabled (prefsNow.enabled);
         if (notify && onChange)
             onChange (prefsNow);
     }
@@ -1259,7 +1382,10 @@ private:
     prefs::MidiInputPrefs prefsNow;
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
-    juce::ComboBox channel, plays;
+    juce::ComboBox channel, plays, type, zone;
+    juce::Label typeLabel, status;
+    std::vector<std::string> typeIds; // [item id − 3] the profile's id
+    static constexpr int mpeItem = 100;
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
@@ -1417,9 +1543,19 @@ public:
         styleLabel (noDevices, tr ("No MIDI input devices found. Connect one and refresh the list."));
         refresh.onClick = [this] {
             if (persistent)
+            {
+                engine.reloadControllerProfiles(); // (FL's "Update MIDI scripts": the user's profile files are read again)
                 engine.reconnectMidiInputs(); // also wakes a device that stopped sending
+            }
             rebuildInputs();
         };
+        profilesFolder.setTooltip (tr ("Your own controller profiles (*.lynxctl) go here; Refresh device list reads them again"));
+        profilesFolder.onClick = [] {
+            const auto folder = AudioEngine::controllerProfilesFolder();
+            folder.createDirectory();
+            folder.revealToUser();
+        };
+        add (profilesFolder);
 
         styleLabel (velocityLabel, tr ("Velocity"));
         velocityBox.addItem (tr ("As played"), 1);
@@ -1512,7 +1648,7 @@ public:
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
-            sampleDevices = { "Arturia KeyLab 49", "Akai MPD218" };
+            sampleDevices = { "Mackie Control", "Akai MPD218", sampleMpeDevice }; // (one with a built-in controller profile, one generic, one shown as an MPE controller, issue #108)
             sampleOutputs = { "Roland TR-8S", "Korg volca sample" };
             auto p = engine.getMidiPrefs();
             prefs::MidiOutputPrefs drums;
@@ -1554,8 +1690,13 @@ private:
         if (rows.empty())
             noDevices.setBounds (r.full (24));
         for (auto& row : rows)
-            row->setBounds (r.full (34).translated (0, -4));
-        refresh.setBounds (r.full().removeFromLeft (150));
+            row->setBounds (r.full (66).translated (0, -4));
+        {
+            auto buttons = r.full();
+            refresh.setBounds (buttons.removeFromLeft (150));
+            buttons.removeFromLeft (8);
+            profilesFolder.setBounds (buttons.removeFromLeft (210));
+        }
 
         r.section (outputsTitle);
         outputsNote.setBounds (r.full (32).translated (0, -4));
@@ -1579,11 +1720,8 @@ private:
         jumpNote.setBounds (r.indented (32).translated (0, -3));
 
         r.section (controllersTitle);
-        {
-            auto row = r.row (typeLabel, 0, 36);
-            typeLabel.setBounds (typeLabel.getBounds().withTrimmedTop (6));
-            typeValue.setBounds (row.withTrimmedTop (6));
-        }
+        typeLabel.setVisible (false); // (round 190aw: the Controller type is each input device's, above, as in FL)
+        typeValue.setBounds (r.full (20));
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.full (16).translated (0, -3));
         footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
@@ -1611,6 +1749,13 @@ private:
             hooks.midiChanged();
     }
 
+    // the LYNX extras page switches the game controller too (round 190am)
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            gamepadToggle.setToggleState (engine.getMidiPrefs().gamepad, juce::dontSendNotification);
+    }
+
     void load()
     {
         const juce::ScopedValueSetter<bool> guard (loading, true);
@@ -1635,6 +1780,9 @@ private:
         removeAll.setEnabled (! engine.getSong().midiLinks.empty());
     }
 
+    // --snapshot: the sample devices answer on a port of their own name
+    static std::string sampleFeedback (const juce::String& input) { return input.toStdString(); }
+
     // the project's links, then the global ones (settings; FL's "Override global link...", REA round 146)
     int linkRows() const { return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size()); }
 
@@ -1652,13 +1800,39 @@ private:
         for (const auto& c : engine.getSong().channels)
             channels.push_back (c.name);
 
+        // the controller profiles (round 190aw): FL lists its device scripts with "(user)" after the user's own
+        const auto& controllers = engine.getControllers();
+        MidiInputRow::Controllers types;
+        for (const auto& profile : controllers.library().profiles)
+            types.profiles.push_back ({ profile->id, profile->user ? tr ("{0} (user)", { juce::String::fromUTF8 (profile->name.c_str()) })
+                                                                   : juce::String::fromUTF8 (profile->name.c_str()) });
+        std::sort (types.profiles.begin(), types.profiles.end(),
+                   [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
+
         for (const auto& name : names)
         {
-            auto row = std::make_unique<MidiInputRow> (name, engine.getMidiPrefs().input (name.toStdString()), channels,
+            auto settings = engine.getMidiPrefs().input (name.toStdString());
+            if (! persistent && name == sampleMpeDevice) // (the snapshot's sample row for an MPE controller)
+                settings.mpe = true;
+            const auto detected = controllers.library().detect (name.toStdString());
+            types.detected = detected != nullptr ? juce::String::fromUTF8 (detected->name.c_str()) : juce::String();
+            types.status = {};
+            if (settings.enabled && controllers.library().resolve (settings.controller, name.toStdString()) != nullptr)
+            {
+                const auto output = persistent ? controllers.outputOf (name.toStdString()) : sampleFeedback (name);
+                types.status = output.empty() ? tr ("No output port for its lights and display") : tr ("Feedback to {0}", { juce::String::fromUTF8 (output.c_str()) });
+            }
+            auto row = std::make_unique<MidiInputRow> (name, settings, channels, types,
                                                        [this] (const prefs::MidiInputPrefs& in) {
                                                            auto p = engine.getMidiPrefs();
+                                                           const auto typeChanged = p.input (in.name).controller != in.controller;
                                                            p.setInput (in);
                                                            set (p);
+                                                           if (typeChanged) // (the row's status line follows the new type)
+                                                               juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MidiPage> (this)] {
+                                                                   if (safe != nullptr)
+                                                                       safe->rebuildInputs();
+                                                               });
                                                        });
             add (*row);
             rows.push_back (std::move (row));
@@ -1771,6 +1945,7 @@ private:
     bool loading = false;
     std::size_t channelCount = 0;
     juce::StringArray sampleDevices;
+    static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;
     std::vector<std::unique_ptr<MidiOutputRow>> outputRows;
     juce::StringArray sampleOutputs, clockInputs;
@@ -1781,12 +1956,216 @@ private:
     SectionTitle inputsTitle { tr ("Input devices") }, notesTitle { tr ("Notes") }, controllersTitle { tr ("Controllers") };
     juce::Label inputsNote, noDevices, velocityLabel, velocityNote, perfLabel, perfNote, typeLabel, typeValue, pickupNote, linksLabel, jumpLabel, jumpNote;
     juce::TextButton refresh { tr ("Refresh device list") }, removeLink { tr ("Remove link") }, removeAll { tr ("Remove all") };
+    juce::TextButton profilesFolder { tr ("Controller profiles folder") };
     juce::ComboBox velocityBox, perfBox, jumpBox;
     juce::ToggleButton pickup, footPedal, gamepadToggle;
     juce::Label gamepadNote;
     juce::ListBox links;
 };
+
+// ================================================================================================================
+// LYNX extras (round 190am)
+// ================================================================================================================
+class ExtrasPage final : public ScrollingPage
+{
+public:
+    ExtrasPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
+    {
+        styleNote (intro, tr ("LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio "
+                              "until you switch one on. Each switch is the same setting as in the place its line names."));
+        intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (intro);
+        std::string_view section;
+        for (const auto& item : extras::items)
+        {
+            if (item.section != section)
+            {
+                section = item.section;
+                titles.push_back (std::make_unique<SectionTitle> (tr (std::string (item.section).c_str())));
+                add (*titles.back());
+            }
+            auto& row = *rows.emplace_back (std::make_unique<Row>());
+            row.id = std::string (item.id);
+            row.title = titles.back().get();
+            styleToggle (row.toggle, tr (std::string (item.title).c_str()));
+            row.toggle.setComponentID (juce::String (row.id)); // (--snapshot and tests find a switch by its id)
+            row.toggle.onClick = [this, &row] {
+                setLynxExtra (engine, hooks, row.id, row.toggle.getToggleState(), persistent);
+                refresh(); // (what the app really did, e.g. an action that was refused)
+            };
+            styleNote (row.note, tr (std::string (item.note).c_str()));
+            add (row.toggle);
+            add (row.note);
+        }
+        refresh();
+    }
+
+    // another page or a menu may have switched one meanwhile
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            refresh();
+    }
+
+    int layout (int width) override
+    {
+        Rows r (width);
+        const auto noteFont = theme::font (theme::type::small);
+        const auto linesOf = [&noteFont] (const juce::Label& label, int w) {
+            juce::AttributedString text (label.getText());
+            text.setFont (noteFont);
+            juce::TextLayout fitted;
+            fitted.createLayout (text, (float) juce::jmax (40, w - 8));
+            return juce::jmax (1, fitted.getNumLines());
+        };
+        intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
+        const SectionTitle* title = nullptr;
+        for (auto& row : rows)
+        {
+            if (row->title != title)
+            {
+                r.section (*row->title, title == nullptr);
+                title = row->title;
+            }
+            row->toggle.setBounds (r.full (24));
+            const auto noteWidth = r.area.getWidth() - noteIndent;
+            const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
+            row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
+        }
+        return r.bottom();
+    }
+
+private:
+    struct Row
+    {
+        std::string id;
+        SectionTitle* title = nullptr;
+        juce::ToggleButton toggle;
+        juce::Label note;
+    };
+
+    void refresh()
+    {
+        for (auto& row : rows)
+            row->toggle.setToggleState (lynxExtraOn (engine, hooks, row->id), juce::dontSendNotification);
+    }
+
+    static constexpr int noteIndent = 27; // under the caption, past the check box
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    bool persistent;
+    juce::Label intro;
+    std::vector<std::unique_ptr<SectionTitle>> titles;
+    std::vector<std::unique_ptr<Row>> rows;
+};
 } // namespace
+
+bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
+{
+    if (id == "mixer.loudness") return MixerStrips::showLoudness;
+    if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
+    if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
+    if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
+    if (id == "playlist.automationLanes") return autolanes::shown();
+    if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
+    if (id == "detail.windowKey") return DetailView::extraWindowKey;
+    if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
+    return false;
+}
+
+void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id, bool on, bool persistent)
+{
+    if (lynxExtraOn (engine, hooks, id) == on)
+        return;
+    const auto saved = [] { // the main window writes ui-options.txt
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    };
+    // a view option with an action: the action is what its menu item runs (it also refreshes the editor and saves)
+    const auto toggledBy = [&hooks] (const char* action) { return hooks.runAction && hooks.runAction (action); };
+
+    if (id == "mixer.loudness")
+    {
+        if (mixeroptions::setShowLoudness)
+            mixeroptions::setShowLoudness (on);
+        else
+            MixerStrips::showLoudness = on;
+        saved();
+    }
+    else if (id == "mixer.usedOnly")
+    {
+        if (mixeroptions::setShowUsedOnly)
+            mixeroptions::setShowUsedOnly (on);
+        else
+            MixerStrips::showUsedOnly = on;
+        saved();
+    }
+    else if (id == "mixer.keepLostLinks")
+    {
+        MixerStrips::keepLostLinks = on;
+        saved();
+    }
+    else if (id == "mixer.followPlaylist")
+    {
+        MixerStrips::followPlaylist = on;
+        if (on)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        saved();
+    }
+    else if (id == "playlist.automationLanes")
+    {
+        if (! toggledBy ("playlist.automationLanes"))
+        {
+            autolanes::setShown (on);
+            saved();
+        }
+    }
+    else if (id == "pianoRoll.songBarsRuler")
+    {
+        if (! toggledBy ("pianoRoll.songBarsRuler"))
+        {
+            PianoRollComponent::songBarsRuler = on;
+            saved();
+        }
+    }
+    else if (id == "general.hoverValues")
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.hoverValues = on;
+            hooks.setGeneral (options);
+        }
+    }
+    else if (id == "record.lastLoopPassPlays")
+    {
+        auto options = engine.getRecordOptions();
+        options.lastLoopPassPlays = on;
+        engine.setRecordOptions (options);
+        saved();
+    }
+    else if (id == "detail.windowKey" || id == "detail.selectInMixer")
+    {
+        (id == "detail.windowKey" ? DetailView::extraWindowKey : DetailView::extraSelectInMixer) = on;
+        saved();
+    }
+    else if (id == "midi.gamepad")
+    {
+        auto prefs = engine.getMidiPrefs();
+        prefs.gamepad = on;
+        engine.setMidiPrefs (prefs, persistent);
+        if (hooks.midiChanged)
+            hooks.midiChanged();
+    }
+}
+
+std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
+{
+    return std::make_unique<ExtrasPage> (engine, hooks, persistent);
+}
 
 std::unique_ptr<juce::Component> makeGeneralPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
 {

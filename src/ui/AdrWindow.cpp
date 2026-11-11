@@ -919,6 +919,7 @@ private:
             ChannelDef ch;
             ch.name = name;
             ch.instrument = InstrumentKind::audioClip;
+            ch.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
             ch.samplePath = path;
             ch.mixerTrack = likeChannel >= 0 && likeChannel < (int) s.channels.size() ? s.channels[(std::size_t) likeChannel].mixerTrack : s.claimFreeInsert();
             s.channels.push_back (ch);
@@ -1062,6 +1063,7 @@ private:
                 ChannelDef ch;
                 ch.name = "ADR beeps";
                 ch.instrument = InstrumentKind::audioClip;
+                ch.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
                 ch.samplePath = beepPath;
                 ch.mixerTrack = s.claimFreeInsert();
                 if (ch.mixerTrack > 0 && ch.mixerTrack < (int) s.mixer.size())

@@ -1254,11 +1254,14 @@ Layout lynxTune()
     v.push_back (toggle (490, 22, 82, 18, "Formant preserve", TR_NOOP ("Formant")));
     // round 166c: SHIFT and the THROAT beside it (the modelled throat length, formant on only); Transpose, or the
     // steps of the scale while IN SCALE is on
-    v.push_back (knob (510, 60, 22, "Formant shift", TR_NOOP ("SHIFT"), 82, bipolar));
-    v.push_back (knob (552, 60, 22, "Throat length", TR_NOOP ("THROAT"), 82, 0));
-    v.push_back (when (stepper (584, 40, 78, 22, "Transpose", TR_NOOP ("Transpose"), 25), "Transpose in scale", 0.0f, 0.49f));
-    v.push_back (when (stepper (584, 40, 78, 22, "Scale transpose", TR_NOOP ("Scale steps"), 15), "Transpose in scale", 0.5f, 1.0f));
-    v.push_back (toggle (584, 66, 78, 18, "Transpose in scale", TR_NOOP ("In scale")));
+    // round 190bb (issue #103): + BREATH (Breathiness: aspiration noise with the voice's formants), the third knob of
+    // the voice-character group; the transpose column moves 16 px right and loses 8 px of width to make room
+    v.push_back (knob (506, 60, 22, "Formant shift", TR_NOOP ("SHIFT"), 82, bipolar));
+    v.push_back (knob (542, 60, 22, "Throat length", TR_NOOP ("THROAT"), 82, 0));
+    v.push_back (knob (578, 60, 22, "Breathiness", TR_NOOP ("BREATH"), 82, 0));
+    v.push_back (when (stepper (600, 40, 70, 22, "Transpose", TR_NOOP ("Transpose"), 25), "Transpose in scale", 0.0f, 0.49f));
+    v.push_back (when (stepper (600, 40, 70, 22, "Scale transpose", TR_NOOP ("Scale steps"), 15), "Transpose in scale", 0.5f, 1.0f));
+    v.push_back (toggle (600, 66, 70, 18, "Transpose in scale", TR_NOOP ("In scale")));
     v.push_back (knob (700, 44, 30, "Reference", TR_NOOP ("A4"), 70, showValue));
     v.push_back (knob (760, 44, 30, "Mix", TR_NOOP ("MIX"), 70, showValue));
     // --- correction row
@@ -2182,6 +2185,8 @@ Layout withEmberClassic (Layout l)
     add (label (536, 330, 80, 34, TR_NOOP ("Style"), alignLeft));
     // projects saved before round 165 keep round 136's Punish until switched to the measured law
     add (when (tabs (40, 336, 150, 22, "Classic law", TR_NOOP ("Old|Measured")), "Classic law", 0.0f, 0.5f));
+    // … and those saved before round 190ar keep round trial187b's high-drive tables until switched (the row above it)
+    add (when (tabs (40, 310, 150, 22, "Classic hot law", TR_NOOP ("Old|Measured")), "Classic hot law", 0.0f, 0.5f));
     add (toggle (604, 336, 116, 24, "Voicing", TR_NOOP ("Advanced"), inverted));
     return l;
 }
@@ -4475,6 +4480,12 @@ Layout poizoneMain()
     return l;
 }
 } // namespace
+
+const Layout* transistorBassFlmLayout()
+{
+    static const Layout mobile = transistorBassMobileLayout();
+    return &mobile;
+}
 
 const Layout* instrumentLayout (InstrumentKind kind)
 {

@@ -28,34 +28,13 @@
 #include <vector>
 
 #include "core/AudioEdit.h"
+#include "core/ScriptDialog.h"
 
 namespace lynx::audioedit::script
 {
-struct Control
-{
-    enum class Type
-    {
-        value,    // AddInput: a number (0..1 by default)
-        knob,     // AddInputKnob: a float in min..max
-        knobInt,  // AddInputKnobInt
-        combo,    // AddInputCombo: the option's index
-        checkbox, // AddInputCheckbox
-        text,     // AddInputText
-        surface   // AddInputSurface (a Control Surface preset): not available in LYNX, shown as a note
-    };
-    Type type = Type::value;
-    std::string name, hint; // name: "Group: Label" inside a group
-    double value = 0.0, minimum = 0.0, maximum = 1.0;
-    std::vector<std::string> options;
-    std::string text;
-};
-
-struct Form
-{
-    std::string title, description;
-    std::vector<Control> controls;
-    bool restoreValues = true; // ScriptDialog.restoreFormValues: the last run's values come back
-};
+// the forms a script asks for (core/ScriptDialog.h: shared with the Piano roll's scripts)
+using Control = scriptform::Control;
+using Form = scriptform::Form;
 
 // What the editor provides (all called on the Python thread; they must not wait for the user)
 struct Host
@@ -85,8 +64,8 @@ struct Outcome
 Outcome run (const std::string& source, Document& doc, Range selection, const std::vector<Form>& answers, const Host& host);
 
 // The last values a form had (per script path), for restoreFormValues; remember() after the user confirms
-void remember (const std::string& scriptKey, const Form& form);
-void restore (const std::string& scriptKey, Form& form);
+using scriptform::remember;
+using scriptform::restore;
 
 // The scripts LYNX ships (its own, written for LYNX): folder / name / source
 struct Builtin

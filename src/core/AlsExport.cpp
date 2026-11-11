@@ -20,6 +20,8 @@
 #include "core/Inflate.h"
 #include "core/LiveScales.h"
 #include "core/OggVorbis.h"
+#include "core/Patcher.h"
+#include "core/Rack.h"
 #include "core/TimeStretch.h"
 #include "core/XmlLite.h"
 
@@ -352,6 +354,196 @@ struct Exporter
         return true;
     }
 
+
+    // ---- racks (round 183c, REA_rodada183c): a LYNX rack as Live's Audio Effect / Instrument / MIDI Effect Rack, with
+    // its chains, zones, chain mixers, macros, variations and the macro mappings onto what Live gets (plugins, nested
+    // racks, chain volume / pan, the selector). LYNX's built-in effects in a chain are listed, as on a track.
+
+    // A macro mapping on a parameter element: Live's KeyMidi (channel 16, the macro) before its Manual, and the range in
+    // the parameter's own units [DATA]
+    void addMapping (Node& parameter, int macro, double min, double max)
+    {
+        Node key = sk["MacroKeyMidi"];
+        key.value ("NoteOrController", num (macro));
+        auto at = std::find_if (parameter.kids.begin(), parameter.kids.end(), [] (const Node& k) { return k.name == "Manual"; });
+        parameter.kids.insert (at, std::move (key));
+        if (auto* range = parameter.child ("MidiControllerRange"))
+        {
+            range->value ("Min", num (min));
+            range->value ("Max", num (max));
+        }
+    }
+
+    bool rackDevice (const PatcherDoc& doc, bool on, const std::string& label, Node& out, int depth = 0)
+    {
+        const auto* r = rack::rackOf (doc);
+        if (r == nullptr || depth > 8)
+            return false;
+        const auto kind = r->kind;
+        const std::string tag = kind == RackDoc::Kind::instrument ? "InstrumentGroupDevice" : kind == RackDoc::Kind::midiEffect ? "MidiEffectGroupDevice" : "AudioEffectGroupDevice";
+        const std::string branchTag = kind == RackDoc::Kind::instrument ? "InstrumentBranch" : kind == RackDoc::Kind::midiEffect ? "MidiEffectBranch" : "AudioEffectBranch";
+        const std::string chainPath = kind == RackDoc::Kind::instrument ? "DeviceChain/MidiToAudioDeviceChain/Devices"
+                                      : kind == RackDoc::Kind::midiEffect ? "DeviceChain/MidiToMidiDeviceChain/Devices"
+                                                                         : "DeviceChain/AudioToAudioDeviceChain/Devices";
+        out = sk[tag];
+        if (out.name.empty())
+            return false;
+        out.value ("On/Manual", boolean (on));
+        out.value ("UserName", ! r->name.empty() ? r->name : label);
+        // where each node went: its device element, to put the macro mappings on
+        std::map<int, std::pair<int, int>> placeOf; // node → (chain, device index)
+        auto* branches = out.child ("Branches");
+        for (int c = 0; c < (int) r->chains.size(); ++c)
+        {
+            const auto& chain = r->chains[(std::size_t) c];
+            Node b = sk[branchTag];
+            b.set ("Id", num (c));
+            b.value ("Name/EffectiveName", chain.name);
+            b.value ("Name/UserName", chain.name);
+            b.value ("IsSoloed", boolean (chain.solo));
+            b.value ("IsSelected", boolean (c == r->selectedChain));
+            b.value ("MixerDevice/Speaker/Manual", boolean (chain.active));
+            b.value ("MixerDevice/Volume/Manual", num (std::clamp ((double) chain.volume, minGain, maxGain)));
+            b.value ("MixerDevice/Panorama/Manual", num ((double) chain.pan));
+            auto zone = [&b] (const std::string& path, const RackZone& z) {
+                b.value (path + "/Min", num (z.lo));
+                b.value (path + "/Max", num (z.hi));
+                b.value (path + "/CrossfadeMin", num (z.fadeLo));
+                b.value (path + "/CrossfadeMax", num (z.fadeHi));
+            };
+            zone ("BranchSelectorRange", chain.select);
+            zone ("ZoneSettings/KeyRange", chain.key);
+            zone ("ZoneSettings/VelocityRange", chain.velocity);
+            if (auto* devices = b.at (chainPath))
+                for (const auto n : chain.nodes)
+                {
+                    if (n < 0 || n >= (int) doc.nodes.size())
+                        continue;
+                    const auto& node = doc.nodes[(std::size_t) n];
+                    Node d;
+                    bool made = false;
+                    if (node.generator && node.channel.instrument == InstrumentKind::plugin)
+                        made = pluginDevice (node.channel.plugin, true, true, d);
+                    else if (node.generator && rack::isRack (node.channel))
+                        made = rackDevice (node.channel.patcher, true, node.label, d, depth + 1);
+                    else if (! node.generator && node.effect.kind == EffectKind::plugin)
+                        made = pluginDevice (node.effect.plugin, false, node.effect.enabled, d);
+                    else if (! node.generator && rack::isRack (node.effect))
+                        made = rackDevice (node.effect.patcher, node.effect.enabled, node.label, d, depth + 1);
+                    if (! made)
+                    {
+                        note ("Rack device not exported (LYNX built-in or not VST2 / VST3): " + patcher::nodeName (node) + " in " + chain.name);
+                        continue;
+                    }
+                    d.set ("Id", num ((int) devices->kids.size()));
+                    placeOf[n] = { c, (int) devices->kids.size() };
+                    devices->add (std::move (d));
+                }
+            if (branches != nullptr)
+                branches->add (std::move (b));
+        }
+        for (int k = 0; k < rackMacroCount; ++k)
+        {
+            const auto n = std::to_string (k);
+            const auto& m = r->macros[(std::size_t) k];
+            out.value ("MacroControls." + n + "/Manual", num ((double) m.value));
+            out.value ("MacroDisplayNames." + n, m.name.empty() ? "Macro " + std::to_string (k + 1) : m.name);
+            out.value ("MacroDefaults." + n, num (m.defaultValue < 0.0f ? -1.0 : (double) m.defaultValue));
+            out.value ("ExcludeMacroFromRandomization." + n, boolean (m.excludeFromRandom));
+            out.value ("ExcludeMacroFromSnapshots." + n, boolean (m.excludeFromVariations));
+        }
+        out.value ("NumVisibleMacroControls", num (r->shownMacros));
+        out.value ("ChainSelector/Manual", num ((double) r->selector));
+        out.value ("ChainSelectorFilterMidiCtrl", boolean (r->selectorFiltersCtrl));
+        out.value ("IsAutoSelectEnabled", boolean (r->autoSelect));
+        out.value ("AreMacroControlsVisible", boolean (r->showMacros));
+        out.value ("IsBranchesListVisible", boolean (r->showChains));
+        out.value ("AreDevicesVisible", boolean (r->showDevices));
+        out.value ("IsRangesEditorVisible", boolean (r->zoneEditor >= 0));
+        out.value ("AreMacroVariationsControlsVisible", boolean (r->showVariations));
+        if (auto* snapshots = out.at ("MacroVariations/MacroSnapshots"))
+            for (int i = 0; i < (int) r->variations.size(); ++i)
+            {
+                const auto& v = r->variations[(std::size_t) i];
+                Node s = sk["MacroSnapshot"];
+                s.set ("Id", num (i));
+                s.value ("SnapshotName", v.name);
+                for (int k = 0; k < rackMacroCount; ++k)
+                {
+                    const auto has = v.has[(std::size_t) k];
+                    s.value ("MacroValues." + std::to_string (k), num (has ? (double) v.values[(std::size_t) k] : -1.0));
+                    s.value ("MacroHasValue." + std::to_string (k), boolean (has));
+                }
+                snapshots->add (std::move (s));
+            }
+        // the mappings
+        for (int k = 0; k < rackMacroCount; ++k)
+            for (const auto& x : r->macros[(std::size_t) k].mappings)
+            {
+                Node* parameter = nullptr;
+                double lo = x.min, hi = x.max;
+                switch (x.target)
+                {
+                    case RackMapping::Target::selector:
+                        parameter = out.child ("ChainSelector");
+                        lo *= 127.0, hi *= 127.0;
+                        break;
+                    case RackMapping::Target::chainVolume:
+                    case RackMapping::Target::chainPan:
+                        if (branches != nullptr && x.chain >= 0 && x.chain < (int) branches->kids.size())
+                            parameter = branches->kids[(std::size_t) x.chain].at (x.target == RackMapping::Target::chainVolume ? "MixerDevice/Volume" : "MixerDevice/Panorama");
+                        if (x.target == RackMapping::Target::chainVolume)
+                            lo = rack::volumeGain (x.min), hi = rack::volumeGain (x.max);
+                        else
+                            lo = x.min * 2.0 - 1.0, hi = x.max * 2.0 - 1.0;
+                        break;
+                    case RackMapping::Target::param:
+                    {
+                        const auto place = placeOf.find (x.node);
+                        if (place == placeOf.end() || branches == nullptr)
+                            break;
+                        auto* devices = branches->kids[(std::size_t) place->second.first].at (chainPath);
+                        if (devices == nullptr)
+                            break;
+                        auto& device = devices->kids[(std::size_t) place->second.second];
+                        if (device.name == "AudioEffectGroupDevice" || device.name == "InstrumentGroupDevice" || device.name == "MidiEffectGroupDevice")
+                        {
+                            if (x.param < rackMacroCount)
+                                parameter = device.child ("MacroControls." + std::to_string (x.param));
+                            lo *= 127.0, hi *= 127.0;
+                        }
+                        else if (device.name == "PluginDevice" && device.at ("PluginDesc/VstPluginInfo") != nullptr)
+                        {
+                            // a VST2 parameter (Live keeps 0..1 and the parameter's index as its id [DATA]); VST3 ids are not
+                            // LYNX's indices: listed
+                            if (auto* list = device.child ("ParameterList"))
+                            {
+                                Node p = sk["PluginFloatParameter"];
+                                p.set ("Id", num ((int) list->kids.size()));
+                                p.value ("ParameterName", "");
+                                p.value ("ParameterId", num (x.param));
+                                p.value ("VisualIndex", num ((int) list->kids.size()));
+                                p.value ("ParameterValue/Manual", num (rack::mappedValue (x, r->macros[(std::size_t) k].value)));
+                                if (auto* lastUser = p.child ("LastUserRange"))
+                                {
+                                    lastUser->value ("First", "Invalid");
+                                    lastUser->value ("Last", "Invalid");
+                                }
+                                list->add (std::move (p));
+                                parameter = list->kids.back().child ("ParameterValue");
+                            }
+                        }
+                        else
+                            note ("Macro mapping not exported (a VST3 parameter): " + patcher::nodeName (doc.nodes[(std::size_t) x.node]));
+                        break;
+                    }
+                }
+                if (parameter != nullptr)
+                    addMapping (*parameter, k, lo, hi);
+            }
+        return true;
+    }
+
     // ---- tracks
     Node trackNode (const LiveTrack& t, int trackId, int returns, const std::vector<int>& groupIds)
     {
@@ -461,6 +653,15 @@ struct Exporter
             {
                 Node d;
                 if (pluginDevice (fx.plugin, false, fx.enabled, d))
+                {
+                    addDevice (track, std::move (d));
+                    continue;
+                }
+            }
+            if (rack::isRack (fx)) // (round 183c)
+            {
+                Node d;
+                if (rackDevice (fx.patcher, fx.enabled, {}, d))
                 {
                     addDevice (track, std::move (d));
                     continue;
@@ -830,7 +1031,8 @@ struct Exporter
             const auto& ch = song.channels[i];
             if (ch.instrument == InstrumentKind::audioClip)
                 continue;
-            const auto plugin = ch.instrument == InstrumentKind::plugin;
+            // (a plugin or an Instrument Rack (round 183c) is a device of its own: its track goes out even with no notes)
+            const auto plugin = ch.instrument == InstrumentKind::plugin || rack::isRack (ch);
             if (! plays[i] && ! plugin)
                 continue;
             LiveTrack t;
@@ -839,7 +1041,8 @@ struct Exporter
             t.colour = ch.colour;
             t.channel = (int) i;
             t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
-            t.gain = channelGain (ch.volume);
+            // (a hosted plugin in a project with FL's levels plays √2 over the curve, round 190ad)
+            t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f);
             t.pan = ch.pan;
             tracks.push_back (t);
             if (! plugin && ch.instrument != InstrumentKind::plugin)
@@ -1031,6 +1234,12 @@ struct Exporter
                     else
                         note ("Plugin not exported (not VST2 or VST3, or not found): " + ch.name);
                 }
+                else if (rack::isRack (ch)) // (round 183c: an Instrument Rack)
+                {
+                    Node d;
+                    if (rackDevice (ch.patcher, true, {}, d))
+                        addDevice (n, std::move (d));
+                }
                 if (auto* events = n.at ("DeviceChain/MainSequencer/ClipTimeable/ArrangerAutomation/Events"))
                     for (const auto* c : patternClips)
                     {
@@ -1132,7 +1341,18 @@ struct Exporter
                 Node b;
                 b.name = "SendPreBool";
                 b.set ("Id", num (r));
-                b.set ("Value", "false");
+                // LYNX's pre-fader sends (round 190aq): Live's switch is per return, so a return is "Pre" when every
+                // send into it is pre-fader (a mix of both stays "Post", noted below)
+                const auto target = returnInsert[(std::size_t) r];
+                int preSends = 0, postSends = 0;
+                for (std::size_t m = 1; m < song.mixer.size(); ++m)
+                    for (const auto& s : song.mixer[m].sends)
+                        if (s.target == target && returnOf.count (s.target) != 0 && s.target != busOf ((int) m))
+                            (s.pre ? preSends : postSends)++;
+                if (preSends > 0 && postSends > 0)
+                    note ("Pre-fader sends: Live switches Pre / Post per return track, so the sends to " + song.mixer[(std::size_t) target].name
+                          + " are all exported post-fader");
+                b.set ("Value", preSends > 0 && postSends == 0 ? "true" : "false");
                 pre->add (std::move (b));
             }
         }

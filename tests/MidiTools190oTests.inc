@@ -222,7 +222,9 @@ TEST (mt190o_arpeggiate_as_live)
     CHECK ((keys (A::upDown) == std::vector<int> { 60, 64, 67, 72, 67, 64, 60, 64 }));
     CHECK ((keys (A::upAndDown) == std::vector<int> { 60, 64, 67, 72, 72, 67, 64, 60 }));
     CHECK ((keys (A::converge) == std::vector<int> { 60, 72, 64, 67, 60, 72, 64, 67 }));
-    CHECK ((keys (A::diverge) == std::vector<int> { 67, 64, 72, 60, 67, 64, 72, 60 }));
+    // round 190aa: Live plays a triad's Diverge 64 60 67 (middle, then the lower of the pair first); four notes follow
+    // the same rule [INFERRED]
+    CHECK ((keys (A::diverge) == std::vector<int> { 64, 67, 60, 72, 64, 67, 60, 72 }));
     CHECK ((keys (A::pinkyUp) == std::vector<int> { 60, 72, 64, 72, 67, 72, 60, 72 }));
     CHECK ((keys (A::thumbUp) == std::vector<int> { 60, 64, 60, 67, 60, 72, 60, 64 }));
     CHECK (keys (A::chordTrigger).size() == 32);

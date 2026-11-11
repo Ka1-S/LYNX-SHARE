@@ -113,7 +113,11 @@ public:
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
+    juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
+    juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
+    // --no-plugins project.lynx (round 190ap): the next .lynx project opens with its third-party plugins off
+    void openNextWithoutPlugins (bool on) { nextOpenWithoutPlugins = on; }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
     juce::PopupMenu getPanelMenuForSnapshot (workspace::Panel panel)
@@ -122,6 +126,7 @@ public:
         addPanelMenuItems (panel, menu);
         return menu;
     }
+    juce::PopupMenu getFullRecordMenuForSnapshot() { return buildRecordMenu(); } // the record button's whole menu
     juce::PopupMenu getRecordMenuForSnapshot()
     {
         juce::PopupMenu menu;
@@ -171,7 +176,11 @@ private:
     void showImportReport();
     void importFlp (const juce::File& file);
     void flpImported (const juce::File& file); // after the import: title, recent files, missing files
-    void openLynxProject (const juce::File& file);
+    void openLynxProject (const juce::File& file, bool withoutPlugins = false);
+    // round 190ap: "Open without third-party plugins" (File menu; --no-plugins on the command line): the project opens
+    // with every hosted plugin switched off, its settings kept; the panel switches them back on
+    void chooseFileToOpenWithoutPlugins();
+    void showPluginsOff();
     // The "Missing files" window (ui/MissingFilesDialog.h) for the current project; `afterOpening`: shown by opening a
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
@@ -184,6 +193,7 @@ private:
     int sandboxDeathsSeen = 0; // separate-process plugins that died (engine/PluginSandbox.h, round 176a) already announced
     void announceEditorCrash (const juce::String& plugin);
     void announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32);
+    void reloadCrashedPlugins (const juce::String& plugin); // round 190ao: a crash prompt's "Reload"
     void showHelp();
     void closeUnfocusedWindows();
     void closeHelp();
@@ -254,6 +264,8 @@ private:
     void loadUiSettings();
     void saveUiSettings();
     bool persistent = true;
+    bool nextOpenWithoutPlugins = false; // --no-plugins (round 190ap)
+    bool shownPluginsOff = false;        // what the title says now
     StartupOptions startup; // splash screen and start-up sound (read by Main.cpp before this window exists)
 
     // menu bar
@@ -314,6 +326,7 @@ private:
     int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
+    void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
@@ -325,6 +338,7 @@ private:
     // cancelled dialog or a failed save).
     void save (bool askForFile, std::function<void()> afterSaved = {});
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
+    void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
@@ -340,6 +354,9 @@ private:
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
     void revertToLastBackup();
+    // round 190ap: the Versions panel (saved versions and backups of this project) and its "Open as a copy"
+    void showVersions();
+    void openProjectAsCopy (const juce::File& file, const juce::String& name);
     void exportPackage();
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     liveui::Context liveContext();       // the live session's (round 169b)
@@ -363,6 +380,13 @@ private:
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written
     int autosaveMinutes = 2, autosaveKeep = 10; // Settings › General › Backup
+    juce::int64 lastBackupMs = 0;  // when the last timed backup was written, and for which project (Song::projectId)
+    std::string lastBackupProject;
+    juce::String simpleSaveStatus() const;
+public:
+    // --simpleshot: the status texts as drawn (saved, not saved yet, backed up now / minutes ago)
+    static juce::String simpleSaveStatusText (bool modified, bool hasFile, juce::int64 backupMs, juce::int64 nowMs);
+private:
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
     bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
@@ -378,6 +402,7 @@ private:
     void showPatternMenu();
 
     AudioEngine& engine;
+    std::unique_ptr<class ControllerBridge> controllerBridge; // (round 190aw)
 
     IconButton newButton { "new", Icon::newFile }, openButton { "open", Icon::open }, saveButton { "save", Icon::save },
         exportButton { "export", Icon::exportAudio }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo };
@@ -403,6 +428,7 @@ private:
     void applyStepEdit();
     void refreshRecordOptionButtons();
     void showRecordMenu();
+    juce::PopupMenu buildRecordMenu(); // (what showRecordMenu shows)
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
     void showTypingPianoMenu();
@@ -653,6 +679,7 @@ private:
     juce::String importedSuffix; // " (imported from FL Studio)" in the title until saved as .lynx
     juce::String projectName; // suggested name for export (also from an imported .flp)
     HeldNotes heldKeys; // notes the typing piano is playing (tag: the key code)
+    bool wasForeground = true; // (the Plugin database folder is read again when LYNX comes back to the front: issue #104)
     // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
     std::unique_ptr<LiveSessionManager> live;
 

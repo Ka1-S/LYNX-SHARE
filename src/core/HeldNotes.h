@@ -177,6 +177,18 @@ public:
         return staleCount;
     }
 
+    // The targets `note` started, kept (issue #108: an MPE note's expression goes where its note on went)
+    int targetsOf (int note, Target* out) const
+    {
+        if (note < 0 || note > 127)
+            return 0;
+
+        const auto& e = notes[(std::size_t) note];
+        for (int i = 0; i < e.count; ++i)
+            out[i] = e.targets[(std::size_t) i];
+        return e.count;
+    }
+
     // The targets `note` started (forgotten); returns how many. 0: the note was not down.
     int noteOff (int note, Target* out)
     {

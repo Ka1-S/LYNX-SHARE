@@ -11,7 +11,7 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 |---|---|---|
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
 | `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
-| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, MiniSynth; other instruments play a built-in synth for now |
+| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, MiniSynth, Transistor Bass, 3x Osc; other instruments play a built-in synth for now |
 | `.mid` | any app | opened as a project |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
@@ -30,7 +30,7 @@ the project stays the same.
 Send your project to a friend, who records their part in their own LYNX SHARE with their own plugins and sends it back; you
 merge it into your project. Phase 1 works with files only: no network, no account, no server. Send the package however
 you like (e-mail, WhatsApp, a shared cloud folder, a USB stick). The live version (both of you in the same project at
-the same time) is planned, see [design/ONLINE_SESSIONS.md](design/ONLINE_SESSIONS.md).
+the same time) is described [below](#online-sessions-live).
 
 ### 1. The host sends the project
 
@@ -92,3 +92,83 @@ of them, after the ones you use) and their own Playlist tracks (16 of them).
 - Stand-ins are saved next to the project in `Stand-ins/`. A part that did not change is not rendered again.
 - The package keeps every plugin's settings (opaque, as the plugin saved them). Nothing is uploaded anywhere.
 - Both sides should use the same LYNX SHARE version (the open summary warns when they differ).
+
+## Online sessions: live
+
+Up to four people in the same project at the same time, over the internet, with no account and no router setup.
+Everything travels encrypted with a key made from the invite code; the LYNX SHARE relay only passes the sealed
+data on. Everyone must use the same LYNX SHARE version.
+
+1. The host opens the project and chooses **File › Online session › Start live session...**, picks a name and what
+   guests may edit, and sends the **invite code** to the others.
+2. Each guest chooses **File › Online session › Join live session...** and types the code; the host lets them in.
+3. Everyone works in their own part (their channels, patterns, inserts and Playlist rows, in their colour). Samples
+   and recordings arrive in the background; parts made with plugins you do not have play as stand-ins.
+4. **Session chat...**, **People and permissions...** (host) and **Follow the host's transport** (guests) are in the
+   same menu.
+
+### When something goes wrong
+
+- **The connection drops**: LYNX SHARE reconnects by itself for up to 15 minutes; keep working, your edits wait
+  and are sent when the line is back.
+- **The host's LYNX SHARE closes or crashes**: guests see *Waiting for the host...*. When the host starts LYNX SHARE
+  again it asks whether to resume the session; everyone carries on.
+- **A guest's LYNX SHARE closes or crashes**: for the others that guest is just away, and their place, part, colour
+  and permissions are kept. At the next start LYNX SHARE asks **Go back in?** — *Go back in* returns you as
+  yourself with everything you had changed, also what had not reached the host yet; *Leave the session* gives the
+  place up. To leave on purpose use **Leave live session**. The question is offered for 12 hours.
+- **Away for long in a full session**: when someone new knocks and every place is taken, the guest who has been away
+  the longest loses their place (their part stays in the project).
+
+### Limits
+
+- **Audio files**: one guest may send 1 GB into a session. Beyond that the host is asked once whether to
+  **Raise the limit** for that guest; until then the new files stay on the guest's computer (notes, mixer and
+  everything else still go through). A whole session may move 8 GB; after that no new audio files travel. For a
+  big project, send it first with **Send project...** and start the live session from the same project.
+- **The relay**: a session may stay open for 3 days and is closed after 12 hours without any activity; the relay
+  also limits how much one session and one connection may move per day. LYNX SHARE tells you when the relay
+  closed a session for that reason.
+
+## Live sessions: use a plugin only the host has
+
+In a live session (**File › Online session › Start live session...** / **Join live session...**) the host can let the
+guests use plugins that are installed only on the host's computer. The guest writes the notes and turns the knobs; the
+host's computer makes the sound with its plugin and sends it back as audio. It is for writing, arranging and mixing —
+**not for playing live**: what you hear follows your changes after a moment.
+
+### The host shares a plugin
+
+1. **File › Online session › Share plugins with guests...**
+2. Tick the plugins your guests may use. Nothing is shared until you tick it, and sharing stops when the session ends.
+3. Read the notice at the top: the plugin stays on your computer and runs under your licence; LYNX SHARE never sends the
+   plugin, its files, its presets or its licence. **Some plugin licences don't allow other people to operate the
+   plugin, even remotely — check the licence of each plugin before you share it.**
+4. The list shows who is using each plugin. Untick one to stop sharing it: the guests keep hearing the last render,
+   nothing new is rendered.
+
+While a guest uses your plugin, their channel is in your project like any other: you hear it with your own plugin,
+and you can open the plugin's window and change it — your changes reach the guest's sliders when you close the window.
+Renders are made in the background a moment after the last change, never while you play or record.
+
+### A guest uses it
+
+1. Add a channel (**Channel Rack › + › Plugin (VST/VST3/CLAP)**) or an effect (an empty slot of one of your inserts ›
+   **Plugin**): the host's shared plugins are at the top, under **On {host}'s computer**, each marked *played by
+   {host}*.
+2. Write notes for the channel as usual. A moment later the channel plays the host's render (amber **R** badge).
+3. Open the channel's plugin (click its name) for the **parameter editor**: every parameter of the plugin as a slider
+   (search at the top; double-click resets one; right-click › *Create automation clip* automates it). The line at
+   the top says **Updating...** while the host renders and **Up to date** when what you hear matches your changes.
+4. If the host goes offline or stops sharing the plugin, the last render keeps playing.
+
+### Good to know
+
+- Only people who may edit can use shared plugins ("Listen only" guests cannot), and only on their own channels and
+  inserts unless the host gave them more rights (**People and permissions...**).
+- A guest's computer sends notes and values between 0 and 100 %, nothing else: no preset, no file, no state.
+- What a shared plugin sounds like is its default sound plus its parameters. Things a plugin keeps outside its
+  parameters (a sample loaded in its window, for example) are not part of it.
+- When the session ends the guest keeps the audio renders of their part (what the host chose under "guests keep");
+  the plugin and its settings stay with the host, whose project keeps the plugin as it sounded.
+- Use these sounds for the song you are making together; don't redistribute them as samples.

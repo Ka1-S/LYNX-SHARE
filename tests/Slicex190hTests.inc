@@ -34,7 +34,6 @@ std::vector<std::uint8_t> wavWith (std::uint32_t frames, const std::vector<Cue>&
         put32 (fmt, v);
     put32 (cue, (std::uint32_t) cues.size());
     tag (adtl, "adtl");
-    tag (tlst, "tlst");
     std::uint32_t keyed = 0;
     for (const auto& c : cues)
         keyed += c.key >= 0 ? 1u : 0u;
@@ -86,7 +85,7 @@ std::vector<std::uint8_t> wavWith (std::uint32_t frames, const std::vector<Cue>&
     chunk (body, "cue ", cue);
     chunk (body, "LIST", adtl);
     if (keyed > 0)
-        chunk (body, "LIST", tlst);
+        chunk (body, "tlst", tlst); // (a chunk of its own, as FL writes it: round 190r)
     std::vector<std::uint8_t> out;
     tag (out, "RIFF");
     put32 (out, (std::uint32_t) body.size());
@@ -358,14 +357,16 @@ TEST (slicex190h_engine_plays_each_region_on_its_key_at_the_samples_own_pitch)
     const int id = rig.play (61);
     CHECK (id >= 0 && rig.engine.voiceCount() == 1);
     rig.run (12000);
-    // the region's own frames, unity gain on both sides, then nothing: the slice ends on its last frame
+    // the region's own frames, unity gain on both sides; its last frame is then held into the 20 ms closing declick
+    // (round 190l: FL's renders of regions that end before their note)
     bool exact = true;
     for (int i = 0; i < 11025; ++i)
         exact = exact && rig.left[(std::size_t) i] == (*rig.audio)[(std::size_t) (11025 + i)] && rig.right[(std::size_t) i] == rig.left[(std::size_t) i];
     CHECK (exact);
     bool silent = true;
-    for (int i = 11025; i < 12000; ++i)
+    for (int i = 11025 + 882 + 48; i < 12000; ++i)
         silent = silent && std::abs (rig.left[(std::size_t) i]) < 1e-6f;
+    CHECK (rig.left[11030] > 0.15f); // (still close to the held 0.2)
     CHECK (silent);
     CHECK (rig.engine.idle() && ! rig.engine.noteActive (id));
 }
@@ -440,7 +441,7 @@ TEST (slicex190h_engine_region_settings_pitch_pan_volume_delay_reverse)
     rig.engine.killAll();
     rig.play (60, 0, 1200.0f);
     rig.run (7000);
-    CHECK (std::abs (rig.left[3000] - 0.4f) < 1e-3f && std::abs (rig.left[5400] - 0.4f) < 1e-3f && std::abs (rig.left[6000]) < 1e-5f);
+    CHECK (std::abs (rig.left[3000] - 0.4f) < 1e-3f && std::abs (rig.left[5400] - 0.4f) < 1e-3f && std::abs (rig.left[6500]) < 1e-5f);
     // colours 14 and 15 play the region backwards (its last frame first); odd colours play deck B (empty here)
     rig.left.clear(), rig.right.clear();
     rig.engine.killAll();

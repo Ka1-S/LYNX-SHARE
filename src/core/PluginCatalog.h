@@ -69,6 +69,10 @@ struct Folders
     std::map<std::string, std::string> of; // plugin key → folder path
     std::set<std::string> effects, generators; // the folders (each parent of a folder is a folder too)
     int view = 0; // how the menus show them: MenuView (saved as "view<TAB>n")
+    // Built-in plugins the user took out of the Plugin database (round 190ba, issue #104: their entry file was deleted
+    // from the database folder, core/PluginDbFolder.h): they get no default folder, so the menus' folders and the
+    // picker leave them out, as FL does with a deleted entry. Not saved here: the database folder says it.
+    std::set<std::string> hidden;
 
     std::set<std::string>& kind (bool instruments) noexcept { return instruments ? generators : effects; }
     const std::set<std::string>& kind (bool instruments) const noexcept { return instruments ? generators : effects; }

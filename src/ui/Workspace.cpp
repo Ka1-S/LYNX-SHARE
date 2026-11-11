@@ -617,9 +617,15 @@ private:
 // --- the desktop -------------------------------------------------------------------------------
 
 // Issue #116: native child frames follow the main window's native window (made again) and the desktop's place in it
-struct Workspace::PeerWatch final : juce::ComponentMovementWatcher
+// and the main window's scale (moved to a display with another scale: they are placed again and the docked editors told)
+struct Workspace::PeerWatch final : juce::ComponentMovementWatcher, juce::ComponentPeer::ScaleFactorListener
 {
-    explicit PeerWatch (Workspace& w) : juce::ComponentMovementWatcher (&w), owner (w) {}
+    explicit PeerWatch (Workspace& w) : juce::ComponentMovementWatcher (&w), owner (w) { watchScale(); }
+    ~PeerWatch() override
+    {
+        if (peer != nullptr && juce::ComponentPeer::isValidPeer (peer))
+            peer->removeScaleFactorListener (this);
+    }
     void componentMovedOrResized (bool wasMoved, bool) override
     {
         if (wasMoved)
@@ -627,11 +633,29 @@ struct Workspace::PeerWatch final : juce::ComponentMovementWatcher
     }
     void componentPeerChanged() override
     {
+        watchScale();
         owner.rehostNativeFrames();
         owner.applyLayout(); // (a panel left plain while there was no native window yet)
     }
     void componentVisibilityChanged() override { owner.applyLayout(); }
+    void nativeScaleFactorChanged (double) override
+    {
+        // (after JUCE has resized the main window for the new scale)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<Workspace> (&owner)] {
+            if (safe != nullptr)
+                nativechild::followParentScale (*safe);
+        });
+    }
+    void watchScale()
+    {
+        if (peer != nullptr && juce::ComponentPeer::isValidPeer (peer))
+            peer->removeScaleFactorListener (this);
+        peer = owner.getPeer();
+        if (peer != nullptr)
+            peer->addScaleFactorListener (this);
+    }
     Workspace& owner;
+    juce::ComponentPeer* peer = nullptr;
 };
 
 Workspace::Workspace()
@@ -651,6 +675,7 @@ Workspace::Workspace()
 Workspace::~Workspace()
 {
     saveState();
+    nativeFader.reset();
     peerWatch.reset();
     // the native child frames go before the main window's native window does
     for (auto& f : frames)
@@ -721,6 +746,7 @@ void Workspace::nativeToFront (Panel panel)
     // click on it does (applyLayout keeps them where they were among the panels)
     if (auto& frame = *frames[(std::size_t) panel]; isNativePanel (panel) && nativechild::isAttached (frame) && frame.isVisible())
         frame.toFront (false);
+    nativechild::raiseOverlays();
 }
 
 void Workspace::hide (Panel panel)
@@ -768,6 +794,7 @@ void Workspace::activate (Panel panel)
 
     if (! layout[panel].detached && ! isBackgroundPanel (panel))
         frames[(std::size_t) panel]->toFront (false);
+    nativechild::raiseOverlays();
 
     setFocusedPanel (panel);
 }
@@ -935,6 +962,102 @@ bool Workspace::isDetachedWindowActive() const
     return false;
 }
 
+// Round 190i (issue #116): the open / close fade of round 179a for the panels that are native child windows. A child
+// window can't fade as a component does (the animator's picture of a closing panel would be a window of its own), so
+// the window's own alpha moves: the system blends it over whatever is behind it, a docked plugin editor included.
+// An opening panel is shown at alpha 0 and rises; a closing one stays shown while it falls and is hidden at the end.
+// The timer runs only during a fade.
+struct Workspace::NativeFader final : private juce::Timer
+{
+    // where `frame` is heading: shown or not (a frame that is fading out counts as hidden)
+    bool heading (const juce::Component& frame) const
+    {
+        for (const auto& f : fades)
+            if (f.frame == &frame)
+                return f.in;
+        return frame.isVisible();
+    }
+    int direction (const juce::Component& frame) const
+    {
+        for (const auto& f : fades)
+            if (f.frame == &frame)
+                return f.in ? 1 : -1;
+        return 0;
+    }
+    void start (juce::Component& frame, bool in)
+    {
+        const auto fading = direction (frame) != 0;
+        drop (frame);
+        if (in && ! fading)
+            frame.setAlpha (0.0f); // (turning round in the middle of a fade: from the alpha it has)
+        if (in)
+            frame.setVisible (true);
+        fades.push_back ({ &frame, in, juce::Time::getMillisecondCounterHiRes() });
+        if (! isTimerRunning())
+            startTimerHz (60);
+    }
+    // ends a fade at once: full alpha, shown or hidden as the caller sets it next
+    void stop (juce::Component& frame)
+    {
+        if (direction (frame) == 0)
+            return;
+        drop (frame);
+        frame.setAlpha (1.0f);
+    }
+    double scale = 1.0;
+
+private:
+    struct Fade
+    {
+        juce::Component::SafePointer<juce::Component> frame;
+        bool in;
+        double last; // ms, the clock at the previous step
+    };
+    std::vector<Fade> fades;
+
+    void drop (const juce::Component& frame)
+    {
+        std::erase_if (fades, [&frame] (const Fade& f) { return f.frame == &frame; });
+    }
+    void timerCallback() override
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        for (auto& f : fades)
+        {
+            if (f.frame == nullptr)
+                continue;
+            const auto step = (float) ((now - f.last) / (ui::motion::panelFadeMs * juce::jmax (0.01, scale)));
+            f.last = now;
+            const auto alpha = juce::jlimit (0.0f, 1.0f, f.frame->getAlpha() + (f.in ? step : -step));
+            const auto ended = f.in ? alpha >= 1.0f : alpha <= 0.0f;
+            if (! ended && f.frame->isVisible())
+            {
+                f.frame->setAlpha (alpha);
+                continue;
+            }
+            if (! f.in)
+                f.frame->setVisible (false);
+            f.frame->setAlpha (1.0f); // (opaque again: the window leaves the layered mode)
+            f.frame = nullptr;
+        }
+        std::erase_if (fades, [] (const Fade& f) { return f.frame == nullptr; });
+        if (fades.empty())
+            stopTimer();
+    }
+};
+
+int Workspace::nativeFadeDirection (Panel panel) const
+{
+    return nativeFader != nullptr ? nativeFader->direction (*frames[(std::size_t) panel]) : 0;
+}
+
+void Workspace::setNativeFadeScale (double scale)
+{
+    if (nativeFader == nullptr)
+        nativeFader = std::make_unique<NativeFader>();
+    nativeFader->scale = scale;
+}
+
 void Workspace::applyLayout (bool fadePanels)
 {
     if (! layoutReady)
@@ -962,6 +1085,8 @@ void Workspace::applyLayout (bool fadePanels)
         {
             if (window == nullptr)
             {
+                if (nativeFader != nullptr)
+                    nativeFader->stop (frame);
                 nativechild::detach (frame);
                 removeChildComponent (&frame);
                 frame.setVisible (true);
@@ -995,6 +1120,8 @@ void Workspace::applyLayout (bool fadePanels)
             }
             else if (! isNativePanel (panel) && nativechild::isAttached (frame))
             {
+                if (nativeFader != nullptr)
+                    nativeFader->stop (frame);
                 nativechild::detach (frame);
                 addChildComponent (frame);
             }
@@ -1002,9 +1129,19 @@ void Workspace::applyLayout (bool fadePanels)
             placeFrame (frame, state.maximised ? getLocalBounds() : toJuce (state.bounds));
             if (nativechild::isAttached (frame))
             {
+                // a panel the user opens or closes fades as the plain ones below do, by its window's alpha (round 190i)
+                if (nativeFader == nullptr)
+                    nativeFader = std::make_unique<NativeFader>();
                 const auto show = state.visible && isVisible();
-                nativeShown[(std::size_t) i] = show && ! frame.isVisible();
-                frame.setVisible (show); // (no fade: a child window has no transparency)
+                const auto shown = nativeFader->heading (frame);
+                nativeShown[(std::size_t) i] = show && ! shown;
+                if (show != shown && fadePanels && ui::motion::enabled() && isShowing())
+                    nativeFader->start (frame, show);
+                else if (show != shown)
+                {
+                    nativeFader->stop (frame);
+                    frame.setVisible (show);
+                }
             }
             // a panel the user opens or closes fades in or out (Settings › General › Animations, round 179a), after
             // the stacking order below is set
@@ -1060,6 +1197,7 @@ void Workspace::applyLayout (bool fadePanels)
         });
     }
 
+    nativechild::raiseOverlays();
     setFocusedPanel (layout.focused);
     repaint();
 }

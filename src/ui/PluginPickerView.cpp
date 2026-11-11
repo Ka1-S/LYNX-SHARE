@@ -440,6 +440,7 @@ private:
     // --- the plugins -----------------------------------------------------------------------------------------------
     void collectTiles()
     {
+        quickpick::refreshPluginDatabase (engine); // (the folders as they are on disk now: issue #104)
         auto& host = engine.getPluginHost();
         const auto genEntries = quickpick::generatorEntries (engine);
         const auto fxEntries = quickpick::effectEntries (engine);
@@ -497,6 +498,7 @@ private:
                 ChannelDef c;
                 c.name = name;
                 c.instrument = InstrumentKind::audioClip;
+                c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
                 return c;
             };
             add (std::move (audio));

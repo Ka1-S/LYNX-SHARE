@@ -122,7 +122,8 @@ TEST (dance165_state_keys_and_poses)
     CHECK (read (toState (s)) == s);
     CHECK (! fromState ({ 1, 2, 3 }) && read ({}) == Settings {});
 
-    // FL's state: int version, then move, mirrored, shown, scale (/64), speed, x, y (+ display options)
+    // FL's state: int version, then move, mirrored, shown, blend (/256; round 190ba: it is FL's "Blend" slider, not a
+    // size), speed, x, y (+ display options)
     std::vector<std::uint8_t> fl (40, 0);
     auto put = [&fl] (int at, std::int32_t v) { std::memcpy (fl.data() + at, &v, 4); };
     put (0, 1);
@@ -134,7 +135,7 @@ TEST (dance165_state_keys_and_poses)
     put (24, 300);
     put (28, 420);
     const auto f = fromFl (fl);
-    CHECK (f && f->move == jumping && f->mirrored && f->visible && std::abs (f->scale - 1.5f) < 1.0e-6f && f->speed == 1.0f && f->x == 300 && f->y == 420);
+    CHECK (f && f->move == jumping && f->mirrored && f->visible && f->scale == 1.0f && std::abs (f->blend - 0.375f) < 1.0e-6f && f->speed == 1.0f && f->x == 300 && f->y == 420);
     put (20, 96);
     CHECK (fromFl (fl) && std::abs (fromFl (fl)->speed - 4.0f) < 1.0e-6f);
     put (20, -96);

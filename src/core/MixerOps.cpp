@@ -359,6 +359,15 @@ bool insertTrack (Song& song, int at)
     return insertTracks (song, at, 1) == 1;
 }
 
+std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep)
+{
+    const auto tracks = (int) song.mixer.size();
+    std::vector<bool> hidden ((std::size_t) tracks + 1, false);
+    for (int t = 1; t < tracks; ++t)
+        hidden[(std::size_t) t] = keep.count (t) == 0 && ! song.insertInUse (t);
+    return hidden;
+}
+
 int removeUnusedTrailingInserts (Song& song, int keep)
 {
     int removed = 0;
@@ -617,6 +626,32 @@ int sidechainTo (Song& song, int from, int to)
         }
 
     return linked;
+}
+
+std::vector<int> insertInputs (const Song& song, int track)
+{
+    std::vector<int> list { track };
+    for (int from = 1; from < (int) song.mixer.size(); ++from)
+        if (from != track && song.routes (from, track))
+            list.push_back (from);
+    return list;
+}
+
+int sidechainIndexSource (const Song& song, int track, int k)
+{
+    if (k <= 0)
+        return -1;
+    const auto list = insertInputs (song, track);
+    return k < (int) list.size() ? list[(std::size_t) k] : -1;
+}
+
+int sidechainIndexOf (const Song& song, int track, int source)
+{
+    const auto list = insertInputs (song, track);
+    for (std::size_t k = 1; k < list.size(); ++k)
+        if (list[k] == source)
+            return (int) k;
+    return 0;
 }
 
 bool listensToSidechain (EffectKind kind) noexcept
@@ -1707,6 +1742,7 @@ int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
             stem.resize (dot);
         c.name = stem;
         c.instrument = InstrumentKind::audioClip;
+        c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
         c.samplePath = f.path;
         c.mixerTrack = 0; // FL: "---"
         song.channels.push_back (c);

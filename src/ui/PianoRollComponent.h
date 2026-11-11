@@ -4,6 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
+#include "core/ScaleSnap.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
@@ -13,6 +14,7 @@
 #include "ui/ValueControl.h"
 #include "core/NoteEdit.h"
 #include "core/MidiImport.h"
+#include "core/ScriptDialog.h"
 
 namespace lynx
 {
@@ -120,6 +122,9 @@ public:
     static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
     void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
+    // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
+    // without Shift (noteedit::monophonicPaint). Saved with the UI options.
+    static inline bool monophonicPainting = false;
     // the keys of the selection, on every change (the toolbar's chord panel)
     static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
@@ -147,6 +152,12 @@ public:
     std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }
     std::int64_t timeSelectionTo() const noexcept { return timeTo; }
     std::vector<int> selectionForTests() const { return selection; }
+    // The MIDI Tools panel (round 190s): the notes a tool works on (the selection, or every note of the channel when
+    // nothing is selected: `selected` false), and its result becomes the selection.
+    std::vector<int> midiToolNotes (bool& selected) const { selected = ! selection.empty(); return selectionOrAll(); }
+    void selectMidiToolResult (std::vector<int> indices) { setSelection (std::move (indices)); }
+    std::int64_t midiToolGrid() const { return gridTicks(); }
+    void openMidiTools(); // Tools › MIDI Tools: the panel in its own small window
     std::int64_t markerKeyTickForTests() const { return markerKeyTick(); }
     juce::String chordBubbleTextForTests() const { return chordBubble.isVisible() ? chordBubble.getText() : juce::String(); }
 
@@ -162,6 +173,9 @@ public:
     std::vector<int> noteIndicesForSnapshot() const { return selectionOrAll(); }
     std::int64_t gridForSnapshot() const { return gridTicks(); }
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
+    juce::PopupMenu getScriptsMenuForSnapshot() { return scriptsMenu(); }
+    // runs a Piano roll script by its menu name (LYNX's own, or a file of the script folders)
+    void runScriptForSnapshot (const juce::String& name);
     juce::PopupMenu getStampMenuForSnapshot() { return stampMenu(); }
     void squeezeToolbarForSnapshot (int pixels); // the toolbar as in a window `pixels` narrower (negative: back)
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
@@ -330,6 +344,7 @@ private:
     int scaleRoot() const;  // 0..11
     int scaleIndex() const; // index into notetools::scales(), 0 = none
     int snapKey (int key) const; // the key itself, or the nearest in-scale key while scale snap is on
+    scalesnap::Scale snapScale() const; // the chosen scale and the Snap to scale switch (core/ScaleSnap.h)
     void publishScale();
     bool scaleSnap = false;
     double panStartTicks = 0.0;
@@ -340,6 +355,30 @@ private:
     void zoomAll();
     void centreOnPlayhead();
     juce::PopupMenu toolsMenu();
+
+    // --- scripts (Tools › Scripts: FL's Piano roll scripts, round 190as; ui/PianoRollScripts.cpp) ---------------------
+    struct ScriptRef
+    {
+        juce::String name;  // menu name
+        juce::String key;   // the form memory's key (the script's path, or "lynx:<name>")
+        std::string source; // a built-in script's text (a file is read when it runs)
+        juce::File file;
+    };
+    struct ScriptJob;
+    struct ScriptResult;
+    juce::PopupMenu scriptsMenu();
+    void addScriptItems (juce::PopupMenu& menu);
+    void runScript (const ScriptRef& ref);
+    void runLastScript();
+    void scriptStep (std::shared_ptr<ScriptJob> job, std::vector<scriptform::Form> answers, bool preview);
+    void scriptFinished (std::shared_ptr<ScriptJob> job, ScriptResult& result, bool preview, std::uint64_t ticket);
+    bool scriptTargetStill (const ScriptJob& job) const;
+    void showScriptPattern (const Pattern& pattern, const std::vector<int>& select, bool undoable);
+    void commitScript (const ScriptJob& job, const Pattern& result, const std::vector<int>& select, std::int64_t from, std::int64_t to, bool takeTimeSelection);
+    void showScriptText (const juce::String& title, const juce::String& text);
+    ScriptRef lastScript;
+    bool scriptBusy = false;
+    std::uint64_t scriptTicket = 0;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::PopupMenu midiMenu();
 
@@ -379,6 +418,11 @@ private:
     gesture::HeightZoomDrag keyZoomDrag;
     gesture::SpanZoomDrag timeZoomDrag;
     void beginKeyZoom (const juce::MouseEvent&);
+    // round 190j: the zoom wheel (FL's VZoomSelect) at the right end of the overview strip
+    static constexpr int zoomWheelSize = 16;
+    juce::Rectangle<int> zoomWheelArea() const;
+    int zoomAnchorKey() const; // the key whose centre stays put: the middle of the notes in view, else of the view
+    void setRowHeightAround (int height, int key, int centreY);
     void beginTimeZoom (const juce::MouseEvent&);
 
     // smooth wheel scrolling
@@ -401,7 +445,7 @@ private:
     std::int64_t grabOffset = 0;    // note tick - mouse tick at drag start
     std::int64_t lastLength = ticksPerStep * 2;
     int previewKey = -1;
-    int lastScaleDragKeys = 0; // (a snap-to-scale group drag: the mouse's semitones last applied)
+    int lastScaleDragKeys = 0; // (a snap-to-scale drag: the scale steps last applied)
     NoteMask litKeys {}; // keys sounding on the channel(s) shown: lit on the keyboard (issue #14, FL)
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }

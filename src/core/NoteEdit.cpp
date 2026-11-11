@@ -373,6 +373,34 @@ std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixel
     return step;
 }
 
+std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator, double minPixels)
+{
+    numerator = std::max (1, numerator);
+    denominator = std::clamp (denominator, 1, 16);
+    const auto step = (std::int64_t) ticksPerStep;
+    const auto beat = std::max<std::int64_t> (1, 16 / denominator) * step;
+    const auto bar = numerator * beat;
+    const auto min = std::floor (std::max (1.0, minPixels)); // (FL compares against a whole number of pixels)
+    if (! (pixelsPerTick > 0.0))
+        return bar;
+
+    const auto stepPixels = (double) step * pixelsPerTick, beatPixels = (double) beat * pixelsPerTick;
+    const auto odd = (numerator & 1) != 0;
+    if (stepPixels >= min)
+        return step;
+    if (min <= stepPixels * 2.0 && ! (denominator == 16 && odd))
+        return step * 2;
+    if (beatPixels >= min)
+        return beat;
+    if (min <= beatPixels * 2.0 && ! odd)
+        return beat * 2;
+
+    auto bars = bar;
+    while ((double) bars * pixelsPerTick < min && bars <= bar * 16)
+        bars *= 2;
+    return bars;
+}
+
 std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength)
 {
     const auto bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
@@ -465,6 +493,39 @@ void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::in
     for (auto& m : markers)
         if (m.tick >= at)
             m.tick += length;
+}
+
+void sliceInsertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length)
+{
+    if (length <= 0)
+        return;
+
+    const auto count = clips.size();
+    for (std::size_t i = 0; i < count; ++i)
+        if (clips[i].start < at && clips[i].end() > at)
+        {
+            auto rest = splitClip (clips[i], at);
+            clampFades (clips[i]);
+            clampFades (rest);
+            clips.push_back (rest);
+        }
+
+    insertTime (clips, markers, at, length);
+}
+
+void trimTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to)
+{
+    if (to <= from)
+        return;
+
+    std::int64_t end = to;
+    for (const auto& c : clips)
+        end = std::max (end, c.end());
+    for (const auto& m : markers)
+        end = std::max (end, m.tick + 1);
+
+    deleteTime (clips, markers, to, end);
+    deleteTime (clips, markers, 0, from);
 }
 
 void deleteTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to)

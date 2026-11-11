@@ -28,6 +28,9 @@ struct DeckAudio
     std::int64_t frames = 0;
     double sampleRate = 44100.0;
     std::vector<WavRegion> regions;
+    // the sample's own beat count for a deck whose WAV is not in the state (the file's ACID beat count, else FL's
+    // guess from its length); 0 = unknown, the state's saved range is used as before (round 190aj)
+    double beats = 0.0;
 };
 // Regions for a sample that only has marker positions (its cue points): each runs to the next one
 std::vector<WavRegion> regionsFromMarkers (const std::vector<std::int64_t>& starts, std::int64_t frames);
@@ -61,6 +64,9 @@ public:
     std::shared_ptr<Program> setProgram (std::shared_ptr<Program> program) noexcept;
     void setRate (int sampleRate, bool rendering) noexcept; // FL's sample-rate message (with the host's rendering flag)
     void setTempo (float bpm) noexcept;
+    // where the song is (beats from its start, and seconds), before the notes of a block: the LFOs with a global phase
+    // and the "song time" layering read it
+    void setSongPosition (double beats, double seconds) noexcept;
     void setInterpolation (int quality) noexcept;            // FL's interpolation index (core/FlResampler.h)
 
     int trigger (const Note& note) noexcept;                 // → the note's id (−1: nothing mapped to the key)
@@ -80,4 +86,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> d;
 };
+// For editors: a curve's levels at `count` equal steps across its length (a map: across x = 0…1), with FL's curve
+// shapes, and one cycle of an articulator's LFO wave (−1…1, from its start phase)
+std::vector<float> curveLevels (const Curve& curve, bool map, int count);
+std::vector<float> lfoCycle (const Articulator& articulator, int count);
 } // namespace lynx::slicex

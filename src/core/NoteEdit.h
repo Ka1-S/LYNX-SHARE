@@ -118,6 +118,19 @@ std::int64_t snapNearest (double tick, const std::vector<std::int64_t>& candidat
 // whose width on screen is at least `minPixels`, i.e. the lines the editor draws ("Screen" grid).
 std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixels = 16.0);
 
+// The step of FL's "Line" and "Cell" snaps at a zoom (round 190ax; FL 2026 FLEngine FUN_00e59e90, which both modes
+// share: they differ in how a position is rounded, not in the step; docs/analise/REA_rodada190ax.md). With `min` =
+// minPixels truncated to whole pixels (FL: 10), the first of these that holds:
+//   a step is at least `min` wide                        -> one step
+//   two steps are (not in x/16 with an odd numerator)    -> two steps (half a beat in x/4)
+//   a beat is                                            -> one beat
+//   two beats are, and the numerator is even             -> two beats
+//   otherwise                                            -> one bar, doubled while narrower than `min` (up to 32 bars)
+// So it is never finer than a step, however far in the zoom goes. (FL's one exception, 1 tick at its maximum zoom of
+// 8 px per tick, is out of reach here: at 96 PPQ that is 3072 px per bar and LYNX's editors stop at 800.)
+// numerator / denominator: the time signature (a beat is 16 / denominator steps, a bar `numerator` beats).
+std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator = 4, double minPixels = 10.0);
+
 // "bar:step:tick" (bar and step from 1, tick from 0; 16 steps per 4/4 bar) <-> ticks.
 std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength = false); // lengths count bars and steps from 0
 bool parseTime (const std::string& text, int beatsPerBar, std::int64_t& ticks, bool isLength = false);
@@ -144,6 +157,15 @@ void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::in
 // Removes [from, to) from the timeline: what lies inside is deleted, clips crossing an edge are cut,
 // and everything after `to` (clips and markers) moves left.
 void deleteTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
+
+// Playlist › Edit › "Slice & insert space" (Ctrl+Alt+Ins; EESliceInsSpaceAction, Tag 0 → FUN_00eb35f0 / FUN_00e3b2b0,
+// round 189e): the clips crossing `at` are cut there first, then `length` ticks are inserted as insertTime does.
+void sliceInsertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length);
+
+// Playlist › Edit › "Trim selection" (EETrimSpaceAction → FUN_00eb35f0, its "trim space" branch, round 189e): the space
+// after `to` (to the end of the song) and then the space before `from` are deleted as deleteTime does, so only the time
+// selection is left, at the song start.
+void trimTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
 
 // Indices of the clips that overlap [from, to).
 std::vector<int> clipsInTime (const std::vector<Clip>& clips, std::int64_t from, std::int64_t to);
@@ -308,4 +330,9 @@ int addPatternAutoMarker (Pattern& pattern, std::int64_t tick);
 void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar);
 // the pattern's signature at `tick`: its last signature marker at or before it, else beatsPerBar / 4
 std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar);
+// FL's Paint tool in the Piano roll (round 189o; FLEngine 2026 [DECOMP] FUN_00e5cd20: mode 0x11 "mono paint" when
+// Shift != General › "Monophonic painting in piano roll", PRPaintMode, off by default): with the option on, a plain
+// stroke paints monophonically and Shift paints chords / layers as before.
+inline bool monophonicPaint (bool shiftDown, bool monophonicOption) noexcept { return shiftDown != monophonicOption; }
+
 } // namespace lynx::noteedit

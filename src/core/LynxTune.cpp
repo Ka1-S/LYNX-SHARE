@@ -82,6 +82,14 @@ double vibratoAmplitudeOf (float v) noexcept { return 30.0 * (double) std::clamp
 // [model] (the reference trial could no longer be hosted in round 166c, REA_rodada166c §2): amount A swings the level
 // by ±A % with the vibrato's pitch (30 = ±30 %: +2.3 / −3.1 dB), up when the pitch is up
 double vibratoAmplitudeDepth (double amount) noexcept { return std::clamp (amount, 0.0, 30.0) / 100.0; }
+// round 190bb: Breathiness — a square law up to breathFull ([model], REA_rodada190bb-tune §3: at 100 % the breath of a
+// synthetic sung vowel is 8 … 10 dB over its harmonics above 2 kHz and 2 … 15 dB under the voice overall, a very
+// breathy voice; half travel is 12 dB less)
+double breathGain (float v) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    return breathFull * x * x;
+}
 int scaleTransposeSteps (float v) noexcept { return stepped (v, 15) - 7; }
 float scaleTransposeValue (int steps) noexcept { return (float) (std::clamp (steps, -7, 7) + 7) / 14.0f; }
 int transposeInScaleNote (int note, std::uint16_t mask, int steps) noexcept
@@ -208,6 +216,7 @@ const EffectInfo& info()
         e.params.push_back ({ "Vibrato variation", 0.0f });
         e.params.push_back ({ "Transpose in scale", 0.0f });
         e.params.push_back ({ "Scale transpose", 0.5f }); // 0 steps
+        e.params.push_back ({ "Breathiness", 0.0f });     // round 190bb (issue #103)
         return e;
     }();
     return i;
@@ -403,7 +412,7 @@ std::string paramText (int param, float v)
         std::snprintf (t, sizeof t, "%.1f", vibratoAmplitudeOf (v));
         return t;
     }
-    if (param == vibratoFormant || param == vibratoVariation)
+    if (param == vibratoFormant || param == vibratoVariation || param == breathiness)
     {
         std::snprintf (t, sizeof t, "%.0f%%", 100.0 * (double) std::clamp (v, 0.0f, 1.0f));
         return t;
@@ -442,7 +451,7 @@ class Tune final : public Effect
 public:
     // `initial` (may be null): the slot's parameters, so the range / low-latency path (the latency) is known after
     // prepare(), before the first block (issue #113)
-    explicit Tune (const EffectParams* initial = nullptr) : dry ((std::size_t) (2 * dryRing), 0.0f)
+    explicit Tune (const EffectParams* initial = nullptr) : dry ((std::size_t) (2 * dryRing), 0.0f), voicedRing ((std::size_t) dryRing, 0)
     {
         if (initial != nullptr)
         {
@@ -455,6 +464,7 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         sr = std::clamp (sampleRate > 0.0 ? sampleRate : 44100.0, 8000.0, maxRate);
+        breath.prepare (sr); // round 190bb (here only: configure() also runs on the audio thread)
         configure (curRange, curLow);
     }
 
@@ -480,6 +490,10 @@ public:
         candidate = -1;
         scaleOffset = 0;
         varRate = varDepth = varRateAim = varDepthAim = 1.0;
+        breath.reset(); // round 190bb
+        std::fill (voicedRing.begin(), voicedRing.end(), (std::uint8_t) 0);
+        breathNow = breathGate = 0.0;
+        breathRunning = false;
     }
 
     void setHeldNotes (const NoteMask* channels, int count) noexcept override
@@ -582,6 +596,21 @@ public:
         auto side = [] (double v) { return v / std::pow (1.0 + std::pow (std::abs (v / 1.2707), 2.0545), 1.0 / 2.0545); };
         const double sideB = side (0.341);
         const auto preserve = p[formantPreserve] >= 0.5f;
+        // round 190bb: Breathiness. At 0 (and once a level left over has faded) the stage is skipped: nothing of it
+        // runs and the output is what it was before the round.
+        const auto breathAim = breathGain (p[breathiness]);
+        const bool breathOn = breathAim > 0.0 || breathNow > 1e-6;
+        if (! breathOn && breathRunning)
+        {
+            breath.reset();
+            std::fill (voicedRing.begin(), voicedRing.end(), (std::uint8_t) 0);
+            breathNow = breathGate = 0.0;
+            breathRunning = false;
+        }
+        const auto breathSmooth = 1.0 - std::exp (-1.0 / (0.01 * sr));
+        // the voiced / unvoiced decision describes the input at the detector's window centre; the output is the input
+        // `latency` samples ago
+        const auto voicedDelay = std::clamp (latency - det.windowCentre(), 0, dryRing - 1);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
         const auto dt = 1.0 / sr;
         const auto stereo = r != nullptr && r != l;
@@ -806,6 +835,17 @@ public:
                     y[c] = (float) (y[c] + activity * lift * hpY[c]);
                 }
             }
+            if (breathOn) // round 190bb: aspiration noise shaped by the corrected voice, on voiced sounds only
+            {
+                breathRunning = true;
+                voicedRing[(std::size_t) (dryPos & (dryRing - 1))] = unvoicedFor <= 0.0 ? 1 : 0; // (dryPos: already advanced; the offset is constant)
+                const auto voicedThen = voicedRing[(std::size_t) ((dryPos - voicedDelay) & (dryRing - 1))] != 0;
+                breathNow += breathSmooth * (breathAim - breathNow);
+                breathGate += breathSmooth * ((voicedThen ? 1.0 : 0.0) - breathGate);
+                const auto nz = breath.process (stereo ? 0.5f * (y[0] + y[1]) : y[0], (float) (breathNow * breathGate));
+                y[0] += nz;
+                y[1] += nz;
+            }
             if (vibLevel != 0.0) // round 166c: the created vibrato's level swing
                 for (auto& v : y)
                     v = (float) (v * (1.0 + vibLevel));
@@ -844,6 +884,8 @@ public:
                 toneActive = toneActive || g > 0.0;
             }
         }
+        if (breathOn)
+            breath.tidy();
         meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
         meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
 
@@ -908,6 +950,11 @@ private:
     int candidate = -1;
     int scaleOffset = 0; // round 166c: transpose in scale — the current target's offset (semitones)
     double varRate = 1.0, varDepth = 1.0, varRateAim = 1.0, varDepthAim = 1.0; // round 166c: vibrato variation
+    // round 190bb: Breathiness
+    vocal::BreathNoise breath;
+    std::vector<std::uint8_t> voicedRing; // the voiced flag per input sample (written while the stage runs)
+    double breathNow = 0.0, breathGate = 0.0;
+    bool breathRunning = false;
     std::uint32_t rng = 0x2545F491u;
     double nextRandom() noexcept // −1 … 1 (xorshift; real-time safe)
     {

@@ -1900,7 +1900,7 @@ public:
         {
 #if JUCE_WINDOWS
             DWORD done = 0;
-            if (writeEnd == nullptr || ! WriteFile (writeEnd, p, (DWORD) juce::jmin<std::size_t> (bytes, 1 << 24), &done, nullptr) || done == 0)
+            if (writeEnd == nullptr || ! WriteFile (writeEnd, p, (DWORD) std::min<std::size_t> (bytes, 1 << 24), &done, nullptr) || done == 0)
                 return false;
 #else
             const auto done = ::write (fd, p, bytes);
