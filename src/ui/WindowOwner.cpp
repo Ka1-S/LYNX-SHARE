@@ -177,7 +177,7 @@ void removeDialogTextFocus()
 
 juce::Image logoImage()
 {
-    return juce::ImageCache::getFromMemory (logo::png256, (int) sizeof (logo::png256));
+    return juce::ImageCache::getFromMemory (logo::png512, (int) sizeof (logo::png512));
 }
 
 void applyWindowChrome (juce::Component& window)
