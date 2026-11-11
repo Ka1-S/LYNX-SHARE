@@ -189,6 +189,22 @@ bool dropOnHeader (Song& song, int track, const std::string& path, const std::st
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
 
+// Audio clips and the channels they play (round 190ax).
+namespace lynx::audioclips
+{
+// A Playlist audio clip only sounds on an audio clip channel: its voice key (audioClipKey) is no note for a Sampler,
+// which drops it, so a clip that points at a Sampler channel showed its waveform and played nothing (a file dropped on
+// an audio clip channel's Channel rack row turned it into a Sampler; so does a project written by hand). The channels
+// such clips point at, in every clip list (arrangements, clip grid), are put right: a Sampler with a file and no notes
+// becomes the audio clip channel it is used as; one that also plays notes keeps them and its clips move to an audio
+// clip copy of it (same file, levels and mixer track). Clips on channels that hold no sample file are left as they
+// are. Returns how many channels were changed or added.
+int repairChannels (Song& song);
+// The same channel loads another file: an audio clip channel stays one (FL: the channel's type does not change with
+// its sample), a Granulizer / Wave Traveller keeps its engine, every other channel becomes a Sampler named after it.
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name);
+} // namespace lynx::audioclips
+
 // FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).
 namespace lynx::autoclipplace
 {
