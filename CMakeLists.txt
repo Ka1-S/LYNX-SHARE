@@ -196,6 +196,7 @@ add_library(lynx_core STATIC
     src/core/FacetEq.cpp
     src/core/ApexLimiter.cpp
     src/core/Mastering.cpp
+    src/core/MasterLooks.cpp
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
@@ -519,6 +520,7 @@ if(LYNX_BUILD_APP)
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
+        src/ui/FinishDock.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

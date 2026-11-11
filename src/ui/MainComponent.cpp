@@ -2690,6 +2690,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
                 toggleSampleBrowser();
         };
         host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
+        host.setSideDock = [this] (juce::Component* c, int width) { playlistArea.setSideDock (c, width); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
         // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
         playlist.onTrackEffects = [this] (int insert) {

@@ -76,7 +76,7 @@ CORE="$CORE src/core/OggVorbis.cpp"
 # export options, MP3 encoding, plugin performance monitor, clip properties / arrangements (round 84)
 CORE="$CORE src/core/ExportOptions.cpp src/core/Mp3Encoder.cpp src/core/Mp3Decoder.cpp src/core/PluginMonitor.cpp src/core/PlaylistOps.cpp src/core/QuickRender.cpp src/core/ProjectContents.cpp src/core/TempoDetect.cpp src/core/AutoWarp.cpp src/core/ScoreLog.cpp src/core/ChannelLoops.cpp src/core/PatternBlocks.cpp src/core/ChannelBurn.cpp src/core/AutoSampler.cpp"
 # LYNX's Facet EQ and Apex Limiter (round 99)
-CORE="$CORE src/core/FacetEq.cpp src/core/ApexLimiter.cpp src/core/Mastering.cpp"
+CORE="$CORE src/core/FacetEq.cpp src/core/ApexLimiter.cpp src/core/Mastering.cpp src/core/MasterLooks.cpp"
 # LYNX's dynamics suite and FabFilter state translation (round 108)
 CORE="$CORE src/core/DynamicsSuite.cpp src/core/FabFilterStates.cpp"
 # LYNX's voice tools: Quell Denoiser, Gemini Doubler (round 119)
