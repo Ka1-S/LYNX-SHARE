@@ -110,8 +110,12 @@ void PianoRollComponent::addScriptItems (juce::PopupMenu& menu)
         r.source = b.source;
         menu.addItem (r.name, free, false, [this, r] { runScript (r); });
     }
+    const auto mine = myScriptsFolder();
     for (const auto& [title, dir] : scriptFolders())
     {
+        // (an FL folder without scripts is left out; My scripts always shows)
+        if (dir != mine && dir.findChildFiles (juce::File::findFiles, true, "*.pyscript").isEmpty())
+            continue;
         menu.addSectionHeader (title);
         auto addFolder = [this, free] (const juce::File& d, juce::PopupMenu& into, auto& self, int depth) -> bool {
             bool any = false;
