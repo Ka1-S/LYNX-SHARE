@@ -8487,6 +8487,8 @@ countries: cn sg
 "Show controls on audio tracks" = "在音频轨道上显示控件"
 "Show levels on audio tracks" = "在音频轨道上显示电平"
 "Show levels on instrument tracks" = "在乐器轨道上显示电平"
+"Start offset" = "起始偏移"
+"Sample start offset" = "采样起始偏移"
 "Keyboard style" = "键盘样式"
 "Flat keys" = "平面琴键"
 "Piano keys (lines between the white keys)" = "钢琴琴键（白键之间有分隔线）"

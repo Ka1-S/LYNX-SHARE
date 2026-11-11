@@ -8487,6 +8487,8 @@ countries: tr
 "Show controls on audio tracks" = "Ses parçalarında denetimleri göster"
 "Show levels on audio tracks" = "Ses parçalarında seviyeleri göster"
 "Show levels on instrument tracks" = "Enstrüman parçalarında seviyeleri göster"
+"Start offset" = "Başlangıç kayması"
+"Sample start offset" = "Örnek başlangıç kayması"
 "Keyboard style" = "Klavye stili"
 "Flat keys" = "Düz tuşlar"
 "Piano keys (lines between the white keys)" = "Piyano tuşları (beyaz tuşlar arasında çizgiler)"

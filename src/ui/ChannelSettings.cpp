@@ -2923,6 +2923,11 @@ public:
         // to round them to 0.25 and cap them at 64, and every other edit in this panel wrote the rounded value back
         stretch.setSkewFactorFromMidPoint (16.0);
         stretch.addMouseListener (&stretchMenu, false);
+        // round 190w: FL's Playback › START OFFSET ([DFM] SmpStartOfsWheel, Max 16384, default 0; hint "Sample start
+        // offset"): where notes start, a fraction of the region (.flp 0xD7 0x90, SamplerSettings::startOffset)
+        setup (startOffsetKnob, startOffsetLabel, TR_NOOP ("Start offset"), 0.0, 1.0, 1.0 / 16384.0, "");
+        startOffsetKnob.setNumDecimalPlacesToDisplay (3);
+        startOffsetKnob.setTooltip (tr ("Sample start offset"));
         setup (regionStart, regionStartLabel, TR_NOOP ("Start"), 0.0, 1.0, 0.001, "");
         setup (regionEnd, regionEndLabel, TR_NOOP ("End"), 0.0, 1.0, 0.001, "");
         setup (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), 20.0, 20000.0, 1.0, " Hz");
@@ -3001,6 +3006,9 @@ public:
 
         wave.setEmptyText (tr ("No sample loaded"));
         wave.setTooltip (tr ("The sample: colours show where it is bass-heavy (warm) or bright (cool); outside Start/End is dimmed"));
+        // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
+        // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
+        wave.onClick = [this] { previewFromDisplay(); };
         addAndMakeVisible (wave);
 
         refresh();
@@ -3010,7 +3018,54 @@ public:
             startTimerHz (30); // the knobs follow their automation while the song plays (issue #12)
     }
 
-    ~SettingsPanel() override { engine.removeChangeListener (this); }
+    ~SettingsPanel() override
+    {
+        stopPreview();
+        engine.removeChangeListener (this);
+    }
+
+    // FL's sample display click: the channel's root note, the sample from its start offset; a second click stops it
+    void previewFromDisplay()
+    {
+        const auto* c = current();
+        if (c == nullptr || ref.index < 0)
+            return;
+        if (previewKey >= 0)
+        {
+            stopPreview();
+            return;
+        }
+        previewKey = juce::jlimit (0, 127, c->misc.rootNote);
+        previewSeen = false;
+        previewFrames = 0;
+        engine.sendLiveNote (ref.index, previewKey, 100.0f / 128.0f, true); // (FL's default velocity)
+    }
+
+    void stopPreview()
+    {
+        if (previewKey >= 0 && ref.index >= 0)
+            engine.sendLiveNote (ref.index, previewKey, 0.0f, false);
+        previewKey = -1;
+        wave.setLocator (-1.0f);
+    }
+
+    // the locator follows the preview's voice; the preview ends with it (or ~2 s after a note that never sounded)
+    void followPreview()
+    {
+        if (previewKey < 0)
+            return;
+        const auto instrument = engine.getChannelInstrument (ref.index);
+        const auto at = instrument != nullptr ? instrument->playPosition() : -1.0f;
+        ++previewFrames;
+        if (at >= 0.0f)
+            previewSeen = true;
+        if ((previewSeen && at < 0.0f) || (! previewSeen && previewFrames > 60))
+        {
+            stopPreview();
+            return;
+        }
+        wave.setLocator (at);
+    }
 
     void resized() override
     {
@@ -3055,7 +3110,7 @@ public:
 
         area.removeFromTop (8);
         area.removeFromTop (6);
-        place (area.removeFromTop (110), { { &regionStart, &regionStartLabel }, { &regionEnd, &regionEndLabel } });
+        place (area.removeFromTop (110), { { &startOffsetKnob, &startOffsetLabel }, { &regionStart, &regionStartLabel }, { &regionEnd, &regionEndLabel } });
         area.removeFromTop (6);
         {
             auto filterRow = area.removeFromTop (110);
@@ -3171,6 +3226,7 @@ private:
             stretchMethod.setSelectedId ((int) c->sampler.stretchMethod + 1, juce::dontSendNotification);
             stretchMethod.setEnabled (c->sampler.keepPitch);
             regionStart.setValue (c->sampler.regionStart, juce::dontSendNotification);
+            startOffsetKnob.setValue (c->sampler.startOffset, juce::dontSendNotification);
             regionEnd.setValue (c->sampler.regionEnd, juce::dontSendNotification);
             cutoff.setValue (c->sampler.cutoff, juce::dontSendNotification);
             resonance.setValue (c->sampler.resonance, juce::dontSendNotification);
@@ -3186,6 +3242,7 @@ private:
             wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
             wave.setRegion (c->sampler.regionStart, c->sampler.regionEnd);
             wave.setReversed (c->sampler.reverse);
+            wave.setStartOffset (c->sampler.startOffset); // round 190w (FL dims the region before it)
 
             if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
                 w->setName (tr ("Sampler settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) })
@@ -3232,6 +3289,7 @@ private:
     {
         if (isShowing())
             showAutomation (false);
+        followPreview();
     }
 
     // the Song's value of `param` (a knob that shows its automation must not write the automated value back)
@@ -3273,6 +3331,8 @@ private:
             pitch.setValue (s.pitch, juce::dontSendNotification);
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
+        s.startOffset = (float) startOffsetKnob.getValue();
+        wave.setStartOffset (s.startOffset);
         s.release = (float) release.getValue();
         s.reverse = reverse.getToggleState();
         s.cut = cut.getToggleState();
@@ -3365,17 +3425,19 @@ private:
         }
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stretch));
     }
-    MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance;
+    MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance, startOffsetKnob;
     std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
     std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
     std::uint32_t shownGeneration = 0;
     bool dropHighlight = false;
     juce::Label pitchLabel, gainLabel, attackLabel, releaseLabel, decayLabel, sustainLabel, stretchLabel, regionStartLabel, regionEndLabel,
-        cutoffLabel, resonanceLabel;
+        cutoffLabel, resonanceLabel, startOffsetLabel;
     juce::ToggleButton reverse, cut, keepPitch, porta;
     juce::ComboBox filterType, stretchMethod;
     juce::TextButton modulationButton, precomputeButton;
     ui::WaveformDisplay wave;
+    int previewKey = -1, previewFrames = 0; // round 190w: the display's preview note (-1 = none)
+    bool previewSeen = false;
 };
 
 // Built-in synth page: 3 oscillators, envelope and filter.

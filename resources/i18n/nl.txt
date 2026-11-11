@@ -8448,6 +8448,8 @@ countries: nl be
 "Show controls on audio tracks" = "Bediening op audiotracks tonen"
 "Show levels on audio tracks" = "Niveaus op audiotracks tonen"
 "Show levels on instrument tracks" = "Niveaus op instrumenttracks tonen"
+"Start offset" = "Startverschuiving"
+"Sample start offset" = "Startverschuiving van de sample"
 "Keyboard style" = "Klavierstijl"
 "Flat keys" = "Vlakke toetsen"
 "Piano keys (lines between the white keys)" = "Pianotoetsen (lijnen tussen de witte toetsen)"

@@ -8448,6 +8448,8 @@ countries: fr be ch ca lu
 "Show controls on audio tracks" = "Afficher les contrôles sur les pistes audio"
 "Show levels on audio tracks" = "Afficher les niveaux sur les pistes audio"
 "Show levels on instrument tracks" = "Afficher les niveaux sur les pistes d'instrument"
+"Start offset" = "Décalage de départ"
+"Sample start offset" = "Décalage de départ de l'échantillon"
 "Keyboard style" = "Style du clavier"
 "Flat keys" = "Touches plates"
 "Piano keys (lines between the white keys)" = "Touches de piano (lignes entre les touches blanches)"

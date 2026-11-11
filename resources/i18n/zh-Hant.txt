@@ -8487,6 +8487,8 @@ countries: tw hk mo
 "Show controls on audio tracks" = "在音訊軌道上顯示控制項"
 "Show levels on audio tracks" = "在音訊軌道上顯示電平"
 "Show levels on instrument tracks" = "在樂器軌道上顯示電平"
+"Start offset" = "起始偏移"
+"Sample start offset" = "取樣起始偏移"
 "Keyboard style" = "鍵盤樣式"
 "Flat keys" = "平面琴鍵"
 "Piano keys (lines between the white keys)" = "鋼琴琴鍵（白鍵之間有分隔線）"

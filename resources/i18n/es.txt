@@ -8448,6 +8448,8 @@ countries: es mx ar co cl pe ve
 "Show controls on audio tracks" = "Mostrar controles en las pistas de audio"
 "Show levels on audio tracks" = "Mostrar niveles en las pistas de audio"
 "Show levels on instrument tracks" = "Mostrar niveles en las pistas de instrumento"
+"Start offset" = "Desplazamiento de inicio"
+"Sample start offset" = "Desplazamiento de inicio de la muestra"
 "Keyboard style" = "Estilo del teclado"
 "Flat keys" = "Teclas planas"
 "Piano keys (lines between the white keys)" = "Teclas de piano (líneas entre las teclas blancas)"

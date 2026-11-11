@@ -8448,6 +8448,8 @@ countries: id
 "Show controls on audio tracks" = "Tampilkan kontrol pada trek audio"
 "Show levels on audio tracks" = "Tampilkan level pada trek audio"
 "Show levels on instrument tracks" = "Tampilkan level pada trek instrumen"
+"Start offset" = "Offset awal"
+"Sample start offset" = "Offset awal sampel"
 "Keyboard style" = "Gaya keyboard"
 "Flat keys" = "Tuts datar"
 "Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"

@@ -8487,6 +8487,8 @@ countries: pl
 "Show controls on audio tracks" = "Pokazuj kontrolki na ścieżkach audio"
 "Show levels on audio tracks" = "Pokazuj poziomy na ścieżkach audio"
 "Show levels on instrument tracks" = "Pokazuj poziomy na ścieżkach instrumentów"
+"Start offset" = "Przesunięcie początku"
+"Sample start offset" = "Przesunięcie początku sampla"
 "Keyboard style" = "Styl klawiatury"
 "Flat keys" = "Płaskie klawisze"
 "Piano keys (lines between the white keys)" = "Klawisze fortepianu (linie między białymi klawiszami)"

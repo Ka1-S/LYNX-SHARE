@@ -1528,6 +1528,7 @@ struct SamplerVoice
     float envStep = 0.0f;  // attack step (> 0) or release step (< 0)
     int stage = 1;         // 0 attack, 1 decay, 2 sustain, 3 release
     double first = 0.0, last = 0.0; // played region: first and last frame (inclusive)
+    double regionFirst = 0.0, regionLast = 0.0; // the whole region, before the start offset and slicing (round 190w: the locator)
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f; // clip fades
     std::uint8_t fadeShape = 0; // bit 0 / 1: the fade-in / fade-out is on the S curve (else straight)
     float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade tensions
@@ -1772,6 +1773,8 @@ public:
         }
         auto first = clipMode ? 0.0 : std::floor (total * knobStart);
         auto last = clipMode ? total : std::max (first + 1.0, std::floor (total * knobEnd));
+        // (the locator counts over the whole region, from before the start offset and across slices; round 190w)
+        const auto regionFirst = first, regionLast = last;
         if (const auto offset = (double) startOffset.load (std::memory_order_relaxed); ! clipMode && offset > 0.0)
             first += offset * (last - first + 1.0); // FL: a fraction of the region's frames (not floored, FL render §4)
         auto sliced = false;
@@ -1861,7 +1864,10 @@ public:
             target->loopWhileHeld = zone->zone.loopMode == 2;
         }
         target->position = startFrame;
+        newestVoice = (int) (target - voices.data()); // (the locator follows it, round 190w)
         target->first = first;
+        target->regionFirst = regionFirst;
+        target->regionLast = regionLast;
         target->last = last;
         target->cutAtEnd = sliced && slices.cutAtEnd;
         target->clipElapsed = clipFades[0];
@@ -2470,6 +2476,12 @@ public:
             int n;
             ~Advance() { at += n; }
         } advance { songSample, n };
+        // round 190w: the newest voice's place in its region, for the channel settings' locator, after every block
+        const struct Publish
+        {
+            SamplerInstrument& s;
+            ~Publish() { s.publishPosition(); }
+        } publish { *this };
 
         if (sample == nullptr && zones.empty())
             return;
@@ -3013,13 +3025,30 @@ public:
         return std::none_of (voices.begin(), voices.end(), [] (const auto& v) { return v.active; });
     }
 
+public:
+    float playPosition() const noexcept override { return shownPosition.load (std::memory_order_relaxed); }
+
 private:
+    void publishPosition() noexcept
+    {
+        auto at = -1.0f;
+        if (newestVoice >= 0 && newestVoice < (int) voices.size())
+        {
+            const auto& v = voices[(std::size_t) newestVoice];
+            if (v.active && ! v.stolen && v.regionLast > v.regionFirst)
+                at = (float) std::clamp ((v.position - v.regionFirst) / (v.regionLast - v.regionFirst), 0.0, 1.0);
+        }
+        shownPosition.store (at, std::memory_order_relaxed);
+    }
+
     std::shared_ptr<const SampleData> sample;
     VoiceShaper* shaper = nullptr; // (FPC's layers, round 190z)
     bool clipMode = false;
     double sampleRate = 44100.0;
     float fadeStep = 0.01f;
     std::array<SamplerVoice, 16> voices {};
+    int newestVoice = -1;                     // the voice the last note started (audio thread)
+    std::atomic<float> shownPosition { -1.0f }; // playPosition()
     std::array<KeyShift, 16> shifts {};
     std::array<std::unique_ptr<VoicePitchShifter>, keyShiftVoices> shifterPool;
     std::array<int, keyShiftVoices> shifterUser {}; // the voice using each shifter (-1 = none)

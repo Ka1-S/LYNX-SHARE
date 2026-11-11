@@ -8448,6 +8448,8 @@ countries: it ch sm
 "Show controls on audio tracks" = "Mostra i controlli sulle tracce audio"
 "Show levels on audio tracks" = "Mostra i livelli sulle tracce audio"
 "Show levels on instrument tracks" = "Mostra i livelli sulle tracce strumento"
+"Start offset" = "Offset di inizio"
+"Sample start offset" = "Offset di inizio del campione"
 "Keyboard style" = "Stile della tastiera"
 "Flat keys" = "Tasti piatti"
 "Piano keys (lines between the white keys)" = "Tasti di pianoforte (linee tra i tasti bianchi)"

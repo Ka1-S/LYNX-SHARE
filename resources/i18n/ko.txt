@@ -8487,6 +8487,8 @@ countries: kr
 "Show controls on audio tracks" = "오디오 트랙에 컨트롤 표시"
 "Show levels on audio tracks" = "오디오 트랙에 레벨 표시"
 "Show levels on instrument tracks" = "악기 트랙에 레벨 표시"
+"Start offset" = "시작 오프셋"
+"Sample start offset" = "샘플 시작 오프셋"
 "Keyboard style" = "건반 스타일"
 "Flat keys" = "평면 건반"
 "Piano keys (lines between the white keys)" = "피아노 건반 (흰 건반 사이에 선)"

@@ -8487,6 +8487,8 @@ countries: jp
 "Show controls on audio tracks" = "オーディオトラックにコントロールを表示"
 "Show levels on audio tracks" = "オーディオトラックにレベルを表示"
 "Show levels on instrument tracks" = "インストゥルメントトラックにレベルを表示"
+"Start offset" = "開始オフセット"
+"Sample start offset" = "サンプルの開始オフセット"
 "Keyboard style" = "鍵盤のスタイル"
 "Flat keys" = "フラットな鍵盤"
 "Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"

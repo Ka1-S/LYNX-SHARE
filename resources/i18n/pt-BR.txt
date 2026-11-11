@@ -8570,6 +8570,8 @@ countries: br
 "Show controls on audio tracks" = "Mostrar controles nas trilhas de áudio"
 "Show levels on audio tracks" = "Mostrar níveis nas trilhas de áudio"
 "Show levels on instrument tracks" = "Mostrar níveis nas trilhas de instrumento"
+"Start offset" = "Deslocamento do início"
+"Sample start offset" = "Deslocamento do início da amostra"
 "Keyboard style" = "Estilo do teclado"
 "Flat keys" = "Teclas planas"
 "Piano keys (lines between the white keys)" = "Teclas de piano (linhas entre as teclas brancas)"
