@@ -1,0 +1,21 @@
+<p>LYNX SHAREは、Windows、macOS、Linuxで使える、無料のオープンソースDAWです。パターンを中心に作業します。チャンネルラックとピアノロールでパターンを打ち込み、プレイリストでアレンジし、ミキサーでミックスします。FL Studioのプロジェクト (<code>.flp</code>) とAbleton Liveのセット (<code>.als</code>) を開け、独自の <code>.lynx</code> 形式で保存します。</p>
+<p>アルファ版です。バグがあることを前提に、こまめに保存してください。</p>
+<h2 id="get-it-running">起動するまで</h2>
+<ol><li>下の表で、お使いのシステムが対応していることを確認します。</li><li>ダウンロードしてインストールします。各システムの手順は<a href="/wiki/install/">インストール</a>にあります。</li><li>起動します。短いセットアップウィザードで、言語の選択、オーディオ出力のテスト、プラグインフォルダーの一覧表示を行い、そのフォルダーはバックグラウンドでスキャンされます。ウィザードはスキップでき、あとから <code>オプション › セットアップウィザード (言語、オーディオ、プラグインフォルダー)...</code> で開き直せます。</li><li>音が出ないときは、<a href="/wiki/audio-setup/">オーディオの設定</a>へ進んでください。</li><li><a href="/wiki/tour/">ウィンドウの紹介</a>を読んでから、<a href="/wiki/first-song/">最初の1曲</a>を作ります。</li></ol>
+<h2 id="what-you-need">必要なもの</h2>
+<div class="tablewrap"><table><thead><tr><th>システム</th><th>要件</th></tr></thead><tbody><tr><td>Windows</td><td>Windows 10または11、64ビット</td></tr><tr><td>macOS</td><td>macOS 11 Big Sur以降、Intel版またはApple silicon版</td></tr><tr><td>Linux</td><td>glibc 2.35以降のx86_64 (Ubuntu 22.04以降、Debian 12以降、Fedora 36以降、最新のArchまたはManjaro)、X11またはXWayland</td></tr></tbody></table></div>
+<p>オーディオインターフェースは必要ありません。LYNX SHAREは、システムがすでに使っているサウンドデバイスで再生します。FL Studioも必要ありません。同じコンピューターにFL Studioがインストールされていれば、LYNX SHAREはそのサンプルを見つけ、<code>.flp</code> プロジェクトにも同じプラグインファイルを使います。</p>
+<p>サードパーティのプラグインは任意です。LYNX SHAREには独自のインストゥルメントとエフェクトがあり、<a href="/instruments-and-effects/">カタログ</a>に載っています。</p>
+<h2 id="save-your-work">作業を保存する</h2>
+<p><code>Ctrl+S</code> で保存、<code>Ctrl+Shift+S</code> で名前を付けて保存、<code>Ctrl+Alt+S</code> で新しいバージョンの保存 (Song_2、Song_3 と続く) です。自動保存もあり、<code>ファイル › 自動保存フォルダーを開く</code> と <code>ファイル › 最新のバックアップに戻す...</code> から利用できます。</p>
+<p><code>ファイル › テンプレートから新規作成</code> には、4つの出発点があります。空、ベーシックビート、808入りのトラップ、ハウスです。</p>
+<h2 id="the-demo-project">デモプロジェクト</h2>
+<p>Windowsのインストーラーとzip、macOSの <code>.dmg</code>、Linuxの <code>.tar.gz</code> には、デモプロジェクトの <code>Demo.lynx</code> が入っています。<code>ファイル › 開く...</code> (<code>Ctrl+O</code>) で開きます。Windowsでは、インストール先のフォルダーの <code>LYNX.exe</code> の隣にあります。</p>
+<p>ターミナルから生成することもできます。<a href="/wiki/command-line/">コマンドライン</a>を参照してください。</p>
+<pre><code>LYNX.exe --showcase out.lynx</code></pre>
+<h2 id="where-to-go-next">次に読むもの</h2>
+<div class="tablewrap"><table><thead><tr><th>やりたいこと</th><th>読むページ</th></tr></thead><tbody><tr><td>各ウィンドウを知る</td><td><a href="/wiki/channel-rack/">チャンネルラック</a>、<a href="/wiki/piano-roll/">ピアノロール</a>、<a href="/wiki/playlist/">プレイリスト</a>、<a href="/wiki/mixer/">ミキサー</a>、<a href="/wiki/browser/">ブラウザー</a></td></tr><tr><td>ほかのプログラムのプロジェクトを開く</td><td><a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a>、<a href="/wiki/coming-from-ableton/">Ableton Liveから移る方へ</a></td></tr><tr><td>手持ちのVST、CLAP、LV2、AUプラグインを使う</td><td><a href="/wiki/plugins/">サードパーティのプラグイン</a></td></tr><tr><td>キーを調べる</td><td><a href="/wiki/shortcuts/">ショートカット</a></td></tr><tr><td>問題を解決する</td><td><a href="/wiki/troubleshooting/">トラブルシューティング</a>と<a href="/faq/">FAQ</a></td></tr></tbody></table></div>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>プログラムのファイル名は、Windowsでは <code>LYNX.exe</code>、macOSとLinuxでは <code>LYNX</code> です。設定フォルダーの名前も <code>LYNX</code> です。</li><li>WindowsとmacOSでは、初回起動時にシステムの警告が出ることがあります。Windows版にはまだコード署名がなく、macOS版は公証されていないためです。何をクリックするかは<a href="/wiki/install/">インストール</a>で説明しています。</li><li>LYNX SHAREが対応していない言語のシステムでは、インターフェースは初期設定で英語になります。<code>オプション › 全般設定...</code> で変更できます。新しい言語は、再起動後に反映されます。</li><li>FL Studioプロジェクトの中のFLEXパックは暗号化されていて、開くことはありません。そのチャンネルには、プリセット名から選ばれたシンセのパッチが付きます。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/install/">インストール</a></li><li><a href="/wiki/audio-setup/">オーディオの設定</a></li><li><a href="/wiki/tour/">ウィンドウの紹介</a></li><li><a href="/wiki/first-song/">最初の1曲</a></li><li><a href="/download/">ダウンロード</a></li></ul>

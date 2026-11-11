@@ -1,0 +1,53 @@
+<p>以下の見出しは、1つが1つの問題です。見つからない場合は、最後に書いてある方法で報告してください。</p>
+<h2 id="starting-the-program">プログラムの起動</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: 初回起動時にSmartScreenが警告する</h3>
+<p>実行ファイルにはまだコード署名がないため、初めて実行するときにSmartScreenが警告を出すことがあります。</p>
+<ol><li><code>More info</code> をクリックします。</li><li><code>Run anyway</code> をクリックします。</li></ol>
+<p>インストーラーに管理者権限は不要です。</p>
+<h3 id="macos-cannot-be-opened">macOS: 「開けません」と表示される</h3>
+<p>このアプリはAppleによる公証を受けておらず、Developer IDの署名もないため、初回起動には追加の手順が1つ必要です。</p>
+<ol><li>LYNX SHAREを <code>Applications</code> にドラッグします。</li><li>右クリック (またはControlキーを押しながらクリック) して、<code>開く</code> を選びます。</li><li>もう一度 <code>開く</code> をクリックします。</li></ol>
+<p>macOS 15 Sequoia以降では、一度開こうとしてから、<code>System Settings › Privacy &amp; Security</code> へ進み、<code>Open Anyway</code> をクリックします。または、ターミナルで次を実行します。</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>初めて録音するときに、macOSがマイクへのアクセスを尋ねます。</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: AppImageが起動しない</h3>
+<p>LYNX SHAREには、glibc 2.35以降のx86_64システム (Ubuntu 22.04、Debian 12、Fedora 36、最新のArchまたはManjaro) と、X11またはXWaylandが必要です。</p>
+<ol><li>下の2つのコマンドで、ファイルを実行可能にして実行します。</li><li>それでも起動しない場合は、libfuse2をインストールします。パッケージ名は、Ubuntu 22.04では <code>libfuse2</code>、Ubuntu 24.04では <code>libfuse2t64</code>、Archでは <code>fuse2</code>、Fedoraでは <code>fuse-libs</code> です。</li><li>インストールしたくない場合は、代わりに <code>.tar.gz</code> をダウンロードして展開し、<code>./install.sh</code> を実行します。</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> は、メニュー項目とともに、<code>~/.local</code> の下に現在のユーザー用としてLYNX SHAREをインストールします。<code>./install.sh --uninstall</code> で削除します。</p>
+<h2 id="sound">サウンド</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">音が出ない、またはオーディオデバイスが違う</h3>
+<ol><li><code>オプション › オーディオ設定...</code> を開きます。</li><li>ドライバーを選びます。</li><li>出力デバイスを選びます。</li></ol>
+<div class="tablewrap"><table><thead><tr><th>システム</th><th>ドライバー</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI)、DirectSound、ASIO、内蔵のLYNX ASIOドライバー</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (ネイティブ)、JACK、ALSA。初回起動時は、LYNX SHAREがこの中でデバイスのある最初のものを開く</td></tr></tbody></table></div>
+<p>ASIOはWindowsのドライバーモデルで、Windowsにしかありません。<code>オプション › セットアップウィザード (言語、オーディオ、プラグインフォルダー)...</code> でも、オーディオデバイスをテストできます。<a href="/wiki/audio-setup/">オーディオの設定</a>を参照してください。</p>
+<h3 id="linux-the-sound-breaks-up">Linux: 音が途切れる</h3>
+<p>オーディオスレッドは、リアルタイム優先度で動かす必要があります。</p>
+<ol><li><code>オプション › オーディオ設定...</code> を開いて、<code>状態</code> を読みます。スレッドがリアルタイム優先度を得たかどうかが表示されます。</li><li>得られていない場合は、rtkitをインストールします (<code>sudo apt install rtkit</code>、<code>sudo dnf install rtkit</code>、または <code>sudo pacman -S rtkit</code>)。あるいは、JACKの環境と同じように、リアルタイムの制限付きで自分を <code>オーディオ</code> グループに追加します。</li><li>一度ログアウトして、ログインし直します。</li></ol>
+<p>詳細は<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>にあります。</p>
+<h2 id="plugins">プラグイン</h2>
+<h3 id="a-plugin-crashes">プラグインがクラッシュする</h3>
+<p>専用のプロセスで実行すると、止まるのはそのプラグインだけになります。</p>
+<ol><li><code>オプション › 全般設定...</code> を開きます。</li><li><code>プラグインを別プロセスで実行 (クラッシュからLYNX SHAREを保護)</code> をオンにします。</li><li>プロジェクトを開き直します。</li></ol>
+<p>専用のプロセスでクラッシュしたり、応答しなくなったりしたプラグインは、ミュートされます。プロジェクトを保存して開き直すと、そのプラグインが再び読み込まれます。<a href="/wiki/plugins/">サードパーティのプラグイン</a>を参照してください。</p>
+<h3 id="a-plugin-is-not-in-the-list">プラグインが一覧にない</h3>
+<ol><li><code>オプション › プラグインをスキャン</code> を選びます。</li><li>それでも見つからない場合は、<code>オプション › プラグインマネージャー...</code> を開き、<code>プラグインフォルダー...</code> をクリックして、そのプラグインのフォルダーを追加します。</li><li><code>失敗</code> タブを見ます。スキャンに失敗したプラグインファイルは、スキップされます。Windowsでは、理由が <code>%APPDATA%\LYNX\scan-failures.log</code> に書かれています。</li><li><code>すべて再スキャン...</code> をクリックすると、失敗したファイルをもう一度試します。</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">プロジェクトがインストールされていないプラグインを使っている</h3>
+<p>エフェクトは、同じ役割のLYNX SHAREのエフェクトに置き換えられ、その設定はプロジェクトに残ります。<code>ヘルプ › 見つからないファイル...</code> に、足りないものが一覧で出ます。<a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a>を参照してください。</p>
+<h3 id="video-does-not-work-on-linux">Linuxでビデオが動かない</h3>
+<p>ビデオトラックと <code>Export with video</code> には、FFmpegが必要です。インストール方法は、LYNX SHAREが案内します。</p>
+<h2 id="crash-reports">クラッシュレポート</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="次回の起動時に表示されるクラッシュレポートの確認。送信、送信内容を表示、送信しないのボタンがある" loading="lazy"></a></figure>
+<p>クラッシュレポートは、オプトインです。クラッシュやフリーズのあと、次の起動時に、レポートを送るかどうかを尋ねます。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>働き</th></tr></thead><tbody><tr><td><code>送信内容を表示</code></td><td>送信される文面そのままを表示する</td></tr><tr><td><code>代わりにGitHubで報告</code></td><td>GitHubのイシューフォームを、入力済みの状態で開く。ファイルは自分で添付する</td></tr><tr><td><code>レポートのフォルダーを開く</code></td><td>レポートのファイルを、お使いのコンピューター上で表示する</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>オフのときは、各ファイルの拡張子だけが送られる</td></tr><tr><td><code>確認せずに常に送信</code></td><td>以後のレポートを、確認なしで送る</td></tr></tbody></table></div>
+<p><code>オプション › 全般設定...</code> の <code>クラッシュレポート</code> で、<code>Ask</code> (初期設定)、<code>常に送信</code>、<code>送信しない</code> を選べます。</p>
+<p>レポートには、LYNX SHAREのバージョン、オペレーティングシステム、CPU、グラフィックスカードとそのドライバー、画面サイズ、オーディオドライバーとデバイス、クラッシュまたはフリーズのファイル、セッションの直近60ステップ、読み込まれていたサードパーティのプラグインの名前とバージョンが含まれます。</p>
+<p>オーディオ、プロジェクト、サンプル、お使いのコンピューターの名前、ユーザー名は含まれません。サーバーはIPアドレスを保存しません。送信したIDは、設定フォルダーの <code>crash-reports\sent.log</code> に一覧で残ります。レポートの削除を依頼するには、そのIDを添えてイシューを立ててください。全文は<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">プライバシーポリシー</a>にあります。</p>
+<h2 id="report-a-problem">問題を報告する</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="問題を報告ウィンドウ: 説明ボックス、任意のメールアドレス、送信ボタン" loading="lazy"></a></figure>
+<ol><li><code>ヘルプ › 問題を報告...</code> を選びます。</li><li>何が起きたかを説明します。メールアドレスは任意で、返信が欲しいときに入力します。</li><li>問題がクラッシュだった場合は、<code>最新のクラッシュ / フリーズファイルとこのセッションのステップを添付</code> にチェックを入れたままにします。</li><li><code>送信内容を表示</code> をクリックして、文面を確認します。</li><li><code>送る</code> をクリックします。それまでは何も送信されません。</li></ol>
+<p><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>でイシューを立てることもできます。</p>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>クラッシュのあとは、プロジェクトのバックアップコピーが、LYNX SHAREの自動保存フォルダーにあります。</li><li>クラッシュにプラグインが関わっていた場合は、確認の画面で、以後そのプラグインを別プロセスで実行するかどうかを選べます。</li><li>設定フォルダーは、Windowsでは <code>%APPDATA%\LYNX</code>、macOSでは <code>~/Library/Application Support/LYNX</code>、Linuxでは <code>~/.config/LYNX</code> です。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/audio-setup/">オーディオの設定</a></li><li><a href="/wiki/plugins/">サードパーティのプラグイン</a></li><li><a href="/wiki/install/">インストール</a></li><li><a href="/faq/">FAQ</a></li><li><a href="/why/#crash">クラッシュからの保護</a></li></ul>

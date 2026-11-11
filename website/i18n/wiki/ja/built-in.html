@@ -1,0 +1,31 @@
+<figure><a class="shot" href="/assets/img/wiki/quickadd.webp"><img src="/assets/img/wiki/quickadd.webp" alt="クイック追加パレット。左がインストゥルメント、右がエフェクトで、それぞれに内蔵または内蔵FLエンジンのタグが付いている" loading="lazy"></a></figure>
+<p>LYNX SHAREには独自のインストゥルメントとエフェクトが付属しているので、サードパーティのプラグインがなくてもプロジェクトを再生できます。種類は3つあります。LYNX SHAREオリジナル (シンセ、サンプラー、SoundFontプレーヤー、ドラム、EQ、コンプレッサー、リミッター、リバーブ、ディレイ)、FL Studioのネイティブプラグインの設定を再生するために書かれたエンジン、そして有名なサードパーティのプラグインの代わりを務めるエフェクトです。</p>
+<p>どれも<a href="/instruments-and-effects/">カタログ</a>に専用のページがあります。<code>ヘルプ › 内蔵プラグイン (オンライン一覧)...</code> を開くと、各エンジンの状態が載った一覧が表示されます。</p>
+<h2 id="add-an-instrument-and-an-effect">インストゥルメントとエフェクトを追加する</h2>
+<ol><li><code>F6</code> を押してチャンネルラックを表示します。</li><li>最後の行の下にある <code>+ チャンネルを追加</code> ボックスをクリックして、インストゥルメントを選びます。メニューはカテゴリー別にまとまっています。</li><li><code>F9</code> を押してミキサーを表示し、そのチャンネルの出力先のインサートを選択します。</li><li>エフェクトパネルの空きスロットをクリックして、エフェクトを選びます。エフェクトのウィンドウが開きます。</li><li>スロットの名前をクリックすると、そのウィンドウを非表示にしたり、もう一度表示したりできます。</li></ol>
+<h2 id="the-plugin-picker">プラグインピッカー</h2>
+<p><code>F8</code> を押すとプラグインピッカーが開きます。画面全体に広がり、すべてのジェネレーターとエフェクトが、それぞれのエディターの絵として並びます。カテゴリーは下端のタブです。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>キー</th><th>働き</th></tr></thead><tbody><tr><td>検索</td><td>文字を入力</td><td>一致しないプラグインが暗くなる</td></tr><tr><td>プラグインを順に移動</td><td><code>Up</code> / <code>Down</code></td><td>ハイライトを動かす</td></tr><tr><td>追加</td><td><code>Enter</code>、ダブルクリック、右クリック</td><td>ジェネレーターは新しいチャンネルになる。エフェクトは選択中のミキサーのインサートに入る</td></tr><tr><td>絵をドラッグ</td><td></td><td>チャンネルラックへ: 新しいチャンネル。チャンネルへ: そのインストゥルメントを置き換え。ミキサーのインサートまたはスロットへ: 追加</td></tr><tr><td>閉じる</td><td><code>Esc</code> または <code>F8</code></td><td>何も追加せずにピッカーを閉じる</td></tr></tbody></table></div>
+<p>LYNX SHARE自身のプラグインの絵は、LYNX SHAREがバックグラウンドで描きます。サードパーティのプラグインは、エディターを一度開くまで、メーカー名だけの無地のタイルで表示されます。</p>
+<p><code>編集 › クイック追加パレット...</code> を開くと、代わりにシンプルなリストが出ます。左がインストゥルメント、右がエフェクトで、入力するにつれて絞り込まれます。<code>Tab</code> でリストを切り替え、<code>Enter</code> でハイライト中の項目を追加します。<a href="/wiki/browser/">ブラウザー</a>のプラグインデータベース (<code>Shift+F8</code>) には、同じプラグインがツリーで並びます。</p>
+<figure><a class="shot" href="/assets/img/wiki/browser-plugins.webp"><img src="/assets/img/wiki/browser-plugins.webp" alt="FLエンジンのフォルダーを開いたブラウザーのプラグインデータベース" loading="lazy"></a></figure>
+<h2 id="presets">プリセット</h2>
+<p>内蔵エフェクトのウィンドウには、ヘッダーにプリセットバーがあります。</p>
+<div class="tablewrap"><table><thead><tr><th>コントロール</th><th>働き</th></tr></thead><tbody><tr><td>矢印</td><td>前または次のプリセット</td></tr><tr><td>プリセット名</td><td>メニューを開く: <code>LYNX SHAREプリセット</code>、<code>ユーザープリセット</code>、<code>FL Studioプリセット</code> (ある場合)、<code>プリセットを保存...</code>、<code>プリセットフォルダーを表示</code></td></tr><tr><td><code>A</code> / <code>B</code></td><td>比べるための2つの設定。隣のボタンは、聞こえている方をもう一方にコピーする</td></tr></tbody></table></div>
+<p>プリセット名と、AとBの設定は、プロジェクトと一緒に保存されます。</p>
+<h2 id="what-opens-fl-s-settings-means">「FLの設定を開く」とは</h2>
+<p>FL Studioのネイティブプラグインが読み込まれることはありません。LYNX SHAREにはそれぞれ専用のエンジンがあり、そのエンジンが、FLのプラグインが保存した設定を読みます。これは2か所で働きます。</p>
+<ul><li><code>.flp</code> プロジェクト。FLのジェネレーターとエフェクトは、それぞれLYNX SHAREのエンジンで、保存された設定のまま開きます。コントロールは引き続き編集とオートメーションができます。</li><li><code>.fst</code> プリセット。ブラウザーでシンセのプリセットをダブルクリックすると新しいチャンネルができ、エフェクトのプリセットはミキサーのインサートにドラッグできます。埋まっているエフェクトスロットを右クリックして <code>FLプリセット</code> を選ぶと、お使いのFL Studioのインストールで見つかったプリセットが一覧に出ます。</li></ul>
+<p>各エンジンが元のプラグインにどこまで近いかは、エンジンごとに Exact から Placeholder までの段階で示されます。段階の意味は<a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a>で説明しています。</p>
+<h2 id="engines-that-need-your-fl-studio-installation">お使いのFL Studioのインストールが必要なエンジン</h2>
+<p>LYNX SHAREには、Image-Lineのコード、オーディオ、波形データは含まれていません。一部のエンジンは、元のプラグインに属する波形、サンプル、インパルス、テーブルを必要とし、動作中にお使いのFL Studioのインストールから読み込みます。</p>
+<div class="tablewrap"><table><thead><tr><th>種類</th><th>エンジン</th></tr></thead><tbody><tr><td>インストゥルメント</td><td>FL Keys, DirectWave, BassDrum, Toxic Biohazard, FL Slayer, MiniSynth, Kepler, Transistor Bass, Sawer, Autogun, Fruity DrumSynth Live, BooBass, Harmor, Harmless, GMS, Morphine</td></tr><tr><td>エフェクト</td><td>Hardcore, Maximus, Soundgoodizer, Fruity Convolver, Distructor, Vocodex</td></tr></tbody></table></div>
+<p>ファイルが見つからない場合、こうしたエンジンの追加は失敗することがあります。FL Studioのインストールのデータファイルが見つからない、または読み込めなかった、というメッセージが出ます。</p>
+<h2 id="stand-ins-for-third-party-plugins">サードパーティのプラグインの代替</h2>
+<p>プロジェクトがサードパーティのエフェクトを使っていて、それがインストールされていない場合、同じ役割のLYNX SHAREのエフェクトがそのスロットに入ります。リバーブにはリバーブ、ディレイにはディレイです。</p>
+<ul><li>スロットには、元のプラグインの名前とLYNX SHAREのバッジが表示されます。</li><li>保存された状態が読める場合は、その設定が変換されます。読めない場合、代替はデフォルトのプリセットから始まります。</li><li>元のプラグインとその設定はプロジェクトに残ります。そのプラグインをインストールすれば、次からは元のプラグインでプロジェクトが開きます。</li><li>代替のスロットを右クリックして <code>このプロジェクトのLYNX SHARE代替をすべてバイパス</code> を選ぶと、代替なしの状態で聴けます。</li></ul>
+<p>切り替えは <code>オプション › 全般設定...</code> の <code>見つからないプラグインをLYNX SHAREの同等品で代替</code> で、初期設定ではオンです。新しいプロジェクトでは、空のスロットのメニューの <code>LYNX SHAREの同等品</code> の下に同じエフェクトが並びます。</p>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>見つからないインストゥルメントの代替は、まだありません。見つからないインストゥルメントのプラグインは、チャンネル名から選ばれた内蔵シンセになります。</li><li>元のプラグインのパラメーターのオートメーションは残りますが、代替は動かしません。</li><li>FLEXパックは暗号化されていて、開くことはありません。FLEXのチャンネルには、プリセット名から選ばれたシンセのパッチが付きます。</li><li>1つのインサートには、エフェクトスロットが10個あります。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/instruments-and-effects/">インストゥルメントとエフェクトのカタログ</a></li><li><a href="/wiki/plugins/">サードパーティのプラグイン</a></li><li><a href="/wiki/channel-rack/">チャンネルラック</a></li><li><a href="/wiki/mixer/">ミキサー</a></li><li><a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a></li></ul>

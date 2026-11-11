@@ -1,0 +1,25 @@
+<figure><a class="shot" href="/assets/img/wiki/history.webp"><img src="/assets/img/wiki/history.webp" alt="元に戻す履歴ウィンドウ。StartからAdd notesまでの6ステップがあり、Mute: Kickが現在のステップ" loading="lazy"></a></figure>
+<p>プロジェクトへの編集は、すべて元に戻す履歴の1ステップになります。追加したノート、動かしたクリップ、フェーダー、ルーティングの変更、テンポなどです。<code>編集 › 元に戻す履歴...</code> (<code>Ctrl+Alt+H</code>) で、ステップが一覧で表示されます。これとは別に、LYNX SHAREは作業中にプロジェクトのバックアップコピーを保存します。</p>
+<h2 id="go-back-to-an-earlier-step">前のステップに戻る</h2>
+<ol><li><code>編集 › 元に戻す履歴...</code> を選ぶか、<code>Ctrl+Alt+H</code> を押します。</li><li>一覧には、新しいステップが下になるように並びます。最初の行 <code>開始</code> は、プロジェクトを開いたときの状態です。</li><li>ステップをクリックします。プロジェクトはそのステップの直後の状態に戻り、それより後のステップはグレーになります。</li><li>グレーのステップをクリックすると、また先へ進みます。</li><li>新しい編集をすると、選んだステップから続けられます。このとき、グレーのステップは消えます。</li></ol>
+<h2 id="the-undo-keys">元に戻すキー</h2>
+<p><code>Ctrl+Z</code> は、多くのプログラムとは動作が異なります。最後のステップを元に戻し、もう一度押すとやり直すので、直近の2つの状態を行き来します。さらにさかのぼるには、<code>Ctrl+Alt+Z</code> を使います。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>キー</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻す</code></td><td><code>Ctrl+Z</code></td><td>最後のステップを元に戻します。元に戻した後は、次のステップをやり直し、メニュー項目は <code>元に戻す (やり直し)</code> になります</td></tr><tr><td><code>さかのぼって元に戻す</code></td><td><code>Ctrl+Alt+Z</code></td><td>常に戻ります。1回押すごとに1ステップです</td></tr><tr><td><code>やり直し</code></td><td><code>Ctrl+Y</code> または <code>Ctrl+Shift+Z</code></td><td>先へ進みます</td></tr><tr><td><code>元に戻す履歴...</code></td><td><code>Ctrl+Alt+H</code></td><td>一覧を開きます</td></tr></tbody></table></div>
+<p>元に戻す、またはやり直すたびに、ヒントバーにステップの名前とレベルが表示されます。たとえば <code>Level 2/3</code> です。</p>
+<p>従来の動作がよければ、<code>オプション › 全般設定...</code> で <code>代替の元に戻すモード (同じショートカットで元に戻す/やり直しではなく、従来の元に戻す)</code> をオンにします。すると <code>Ctrl+Z</code> は、常に1つ戻ります。</p>
+<h2 id="what-is-a-step-and-what-is-not">ステップになるものとならないもの</h2>
+<ul><li>プロジェクトへの編集はステップになります。ノート、パターン、クリップ、チャンネル、ミキサーのレベルとルーティング、エフェクト、オートメーション、テンポ、ミュートです。</li><li>録音は1ステップです。<a href="/wiki/online-sessions/">オンラインセッション</a>でのパートの統合や、<code>これらのテイクでコンプを作成</code> も同じです。</li><li>プロジェクトを変えないものはステップになりません。ズーム、スクロール、ウィンドウの移動、プログラム自体の設定です。</li><li>保存とエクスポートは元に戻りません。書き出されたファイルはそのまま残ります。</li><li>LYNX SHARE独自のプラグインウィンドウには、AとBの設定の隣に、そのプラグインの変更用の、別の元に戻す/やり直しがあります。</li></ul>
+<h2 id="settings">設定</h2>
+<p>どちらも <code>オプション › 全般設定...</code> にあります。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻すの最大回数</code></td><td>保持するステップ数: 25、50、100、200、500、1000。既定は100です</td></tr><tr><td><code>代替の元に戻すモード</code></td><td><code>Ctrl+Z</code> を従来の元に戻すにします</td></tr></tbody></table></div>
+<h2 id="backups">バックアップ</h2>
+<p>LYNX SHAREは、既定では2分ごとに、開いているプロジェクトのバックアップコピーを保存し、プロジェクトごとに最新の10個を保持します。バックアップは通常の <code>.lynx</code> ファイルで、設定フォルダー内の <code>autosave</code> フォルダーにあり、プロジェクト名に <code>(autosaved on ...)</code> と日時が付いた名前になります。</p>
+<p>既存のプロジェクトファイルに上書き保存するたびに、置き換えられるバージョンが、名前に <code>(overwritten on ...)</code> が付いた状態で同じフォルダーにコピーされます。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>働き</th></tr></thead><tbody><tr><td><code>ファイル › 最新のバックアップに戻す...</code></td><td>確認のうえ、開いているプロジェクトを最新のバックアップに置き換えます。プロジェクトファイル自体は、保存したときだけ変わります</td></tr><tr><td><code>ファイル › 自動保存フォルダーを開く</code></td><td>バックアップをファイルマネージャーに表示します</td></tr><tr><td><code>ファイル › 新しいバージョンを保存</code> (<code>Ctrl+Alt+S</code>)</td><td>現在のファイルの隣に、<code>Song_2</code>、<code>Song_3</code> のように保存します</td></tr></tbody></table></div>
+<p><code>オプション › 全般設定...</code> の <code>バックアップ</code> セクションには、次の設定があります。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>バックアップコピーを保存</code></td><td><code>しない</code>、または分単位の間隔</td></tr><tr><td><code>プロジェクトごとに保持するバックアップ数</code></td><td>1、3、5、10、20、50</td></tr><tr><td><code>曲の再生中やMIDIキーボードの演奏中はバックアップを待つ</code></td><td>作業の邪魔にならないよう、バックアップを保留します</td></tr><tr><td><code>バックアップ間の最長待ち時間</code></td><td>5～60分。演奏中でも、この時間がたつとバックアップが作られます</td></tr></tbody></table></div>
+<p>直前のセッションが予期せず終了した場合、次回の起動時に、そのセッションが保存した最新のバックアップを開くかどうかを尋ねられます。</p>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>履歴はプロジェクトと一緒には保存されません。プロジェクトを開く、または新規作成すると、履歴は空になります。</li><li>履歴がいっぱいになると、最も古いステップから削除されます。</li><li>ライブのオンラインセッションでは、元に戻す/やり直しで戻るのは、自分の編集だけで、他の人の編集は戻りません。</li><li><code>バックアップコピーを保存</code> が <code>しない</code> でも、ファイルに上書き保存するときに作られるコピーは保持されます。</li><li>設定フォルダーは、Windowsでは <code>%APPDATA%\LYNX</code>、macOSでは <code>~/Library/Application Support/LYNX</code>、Linuxでは <code>~/.config/LYNX</code> です。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/shortcuts/">ショートカット</a></li><li><a href="/wiki/settings/">設定</a></li><li><a href="/wiki/file-formats/">ファイル形式</a></li><li><a href="/wiki/troubleshooting/">トラブルシューティング</a></li><li><a href="/why/#crash">LYNX SHAREだけにできること: クラッシュへの備え</a></li></ul>

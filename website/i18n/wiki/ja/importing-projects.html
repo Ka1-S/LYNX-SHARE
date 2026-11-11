@@ -1,0 +1,30 @@
+<p><code>ファイル › 開く...</code> (<code>Ctrl+O</code>) では、LYNX SHARE独自の <code>.lynx</code> プロジェクトのほか、<code>.flp</code>、<code>.als</code>、<code>.flm</code>、<code>.mid</code> のファイルも開けます。ほかのプログラムのプロジェクトは読み込みとして扱われ、保存されていない新しいLYNX SHAREプロジェクトになります。元のファイルに書き込むことはありません。</p>
+<h2 id="open-a-project-from-another-program">ほかのプログラムのプロジェクトを開く</h2>
+<ol><li><code>ファイル › 開く...</code> を選んで、<code>.flp</code>、<code>.als</code>、<code>.flm</code>、<code>.mid</code> のファイルを指定します。</li><li>LYNX SHAREがプロジェクトのプラグインとサンプルを探す間、待ちます。</li><li>見つからないものがあると、<code>見つからないファイル</code> ウィンドウが開きます。サンプルの場所を指定するか、閉じてください。</li><li>タイトルバーに、プロジェクトの元の場所が表示されます。例: 「(FL Studioからインポート)」。</li><li><code>ファイル › 保存</code> を選びます。<code>.lynx</code> ファイルの保存先を尋ねられます。</li></ol>
+<h2 id="what-comes-over">読み込まれるもの</h2>
+<div class="tablewrap"><table><thead><tr><th>形式</th><th>変換されるもの</th><th>変換されないもの</th></tr></thead><tbody><tr><td><code>.flp</code> (FL Studio)</td><td>チャンネル、サンプル、パターン、スライドとポルタのノート、すべてのアレンジ、マーカー、拍子の変更、オートメーション、コントローラーのリンク、ルーティング付きのミキサー、サイドチェーン、トラックEQ、ネイティブエフェクト</td><td>FLEXパックは暗号化されていて、開くことはありません。FLEXのチャンネルには、プリセット名から選ばれたシンセのパッチが付きます</td></tr><tr><td><code>.als</code> (Live 11と12)</td><td>MIDI、オーディオ、グループ、リターンの各トラック、テンポ、拍子、ロケーター、ループ、ボリューム、パン、ミュート、ソロ、センドとそのオートメーション、セッションクリップとシーン、ワープマーカー</td><td>Live自身のエフェクトは外されます。ラックは最初のチェーンだけが残ります。Simpler、Sampler、ドラムラックは、LYNX SHAREのサンプラーになります</td></tr><tr><td><code>.flm</code> (FL Studio Mobile)</td><td>テンポ、拍子、チャンネルごとに1つのミキサーインサート、レーンごとに1つのプレイリストトラック、パターン、オフセットとピッチ付きのオーディオクリップ、ドラムキット、DW Samplerのサンプルと <code>.dwp</code> プログラム</td><td>FLMのエフェクトとオートメーションレーン。FLMのほかのジェネレーターは、内蔵シンセで鳴ります</td></tr><tr><td><code>.mid</code></td><td>ノート、拍子、すべてのテンポ変更</td><td>MIDIファイルには音が含まれません。チャンネルには、LYNX SHAREのシンセかMIDI Outチャンネルが付きます</td></tr></tbody></table></div>
+<p><code>.flp</code> の中のサードパーティのVST2、VST3、CLAPのプラグイン、および <code>.als</code> の中のVST2とVST3のプラグインは、同じプラグインがお使いのコンピューターにインストールされていれば、保存された状態のまま読み込まれます。</p>
+<h2 id="fl-studio-s-own-plugins">FL Studio自身のプラグイン</h2>
+<p>FL Studioのジェネレーターとエフェクトは読み込まれません。LYNX SHAREは保存された設定を読み、作り直したエンジンで再生します。各エンジンには品質レベルがあり、<code>Exact</code> (テストしたすべての状態で元のものとビット単位で一致) から <code>Placeholder</code> (設定は保持されるが、プラグインは無音か、オーディオをそのまま通すだけ) までの段階です。レベルの意味は<a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a>で説明しています。</p>
+<p><code>.flp</code> は、FL Studioがインストールされていなくても開けます。一部のエンジンは、波形、サンプル、インパルスを必要とし、実行時にお使いのFL Studioのインストールから読み込みます。</p>
+<h2 id="missing-samples">見つからないサンプル</h2>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="見つからないファイルのウィンドウのサンプルタブ: 見つかったファイルは緑、見つからないものは琥珀色で、フォルダーを検索、場所を指定、スキップのボタンがある" loading="lazy"></a></figure>
+<p><code>サンプル</code> タブに、見つからなかったすべてのサンプルが、保存されていたパスとそれを使っているものとともに並びます。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>働き</th></tr></thead><tbody><tr><td><code>フォルダーを検索...</code></td><td>フォルダーとそのサブフォルダーから、見つからないサンプルをすべて探す</td></tr><tr><td><code>場所を指定...</code></td><td>1つのサンプルの場所を尋ねる。同じフォルダーにあるほかのサンプルも、一緒に見つかる</td></tr><tr><td><code>スキップ</code></td><td>そのサンプルを外す。チャンネルは無音のままになる</td></tr></tbody></table></div>
+<p><code>適用</code> を押すと、見つかったファイルが使われます。</p>
+<p><code>自動検出</code> タブには、LYNX SHAREが別のフォルダーで自動的に見つけたファイルが並びます。新しい場所を残すには、プロジェクトを保存してください。</p>
+<h2 id="missing-plugins">見つからないプラグイン</h2>
+<p>LYNX SHAREは、サードパーティのプラグインを、識別子、ファイル、名前の順で探します。VST2で保存したプロジェクトは同じ製品のVST3で開け、その逆も同様ですが、設定はデフォルトになります。</p>
+<p>エフェクトがインストールされていない場合、同じ役割のLYNX SHAREのエフェクトがそのスロットに入ります。リバーブにはリバーブ、コンプレッサーにはコンプレッサーです。</p>
+<ul><li>スロットには、元のプラグインの名前とLYNX SHAREのバッジが表示されます。</li><li>保存された状態が読める場合は、設定が変換されます。読めない場合、代替はデフォルトのプリセットから始まります。製品、その代替、それぞれで何が変換されるかの一覧は、<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGIN_FALLBACK.md">PLUGIN_FALLBACK.md</a>にあります。</li><li>元のプラグインのパラメーターのオートメーションは残りますが、代替は動かしません。</li><li>元のプラグインの参照と状態はプロジェクトに残ります。そのプラグインをインストールすれば、次からは元のプラグインでプロジェクトが開きます。</li><li>代替スロットの右クリックメニューにある <code>このプロジェクトのLYNX SHARE代替をすべてバイパス</code> で、すべての代替を一度にオフにできます。</li></ul>
+<p>切り替えは <code>オプション › 全般設定...</code> の <code>見つからないプラグインをLYNX SHAREの同等品で代替</code> で、初期設定ではオンです。オフにすると、見つからないエフェクトのスロットはミキサーから外れます。見つからないインストゥルメントの代替はありません。チャンネル名から選ばれたプリセットを持つ内蔵シンセになります。</p>
+<p>本物のプラグインを戻すには、インストールして <code>オプション › プラグインをスキャン</code> を選び、プロジェクトをもう一度開いてください。</p>
+<h2 id="midi-files">MIDIファイル</h2>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="MIDIデータのインポートウィンドウ: トラック、チャンネル、チャンネルタイプ、オプション" loading="lazy"></a></figure>
+<p><code>ファイル › 開く...</code> は、MIDIファイルから新しいプロジェクトを作ります。<code>ファイル › インポート › MIDIファイル...</code> は、先に <code>MIDIデータをインポート</code> ウィンドウを開き、取り込む内容を選べます。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>インポートするトラックは？</code></td><td>すべてのトラック、または1つ</td></tr><tr><td><code>インポートするチャンネルは？</code></td><td>MIDIチャンネルをクリックすると、除外される。右クリックすると、そのチャンネルだけが残る</td></tr><tr><td><code>チャンネルタイプ</code></td><td><code>LYNX SHAREシンセ</code> または <code>MIDI Out</code></td></tr><tr><td><code>新規プロジェクトを開始</code></td><td>空のプロジェクトを始める。オフ: 開いているプロジェクトに追加する</td></tr><tr><td><code>トラックごとに1チャンネルを作成</code></td><td>オフ: MIDIチャンネルごとに1つのチャンネル</td></tr><tr><td><code>新しいチャンネルにミキサートラックを設定</code></td><td>新しいチャンネルを、連続したミキサーのインサートにルーティングする</td></tr><tr><td><code>拍子をインポート</code></td><td>ファイルの拍子が、プロジェクトの拍子になる</td></tr></tbody></table></div>
+<p><a href="/wiki/piano-roll/">ピアノロール</a>で <code>Ctrl+M</code> を押すと、MIDIファイルを現在のチャンネルに読み込みます。</p>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li><code>ヘルプ › 見つからないファイル...</code> で、あとから見つからないファイルのウィンドウをもう一度開けます。<code>ヘルプ › Last FL Studio import report</code> には、近似されたもの、省かれたもの、インストールされていないものが一覧で出ます。</li><li>Liveのセットのセッションクリップは、クリップ起動レイアウトのクリップグリッドに入ります。代わりにプレイリストに置くには、<code>オプション › 全般設定...</code> の <code>Live セットのセッションクリップ</code> を使います。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/file-formats/">ファイル形式</a></li><li><a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a></li><li><a href="/wiki/coming-from-ableton/">Ableton Liveから移る方へ</a></li><li><a href="/wiki/plugins/">サードパーティのプラグイン</a></li><li><a href="/wiki/exporting/">エクスポート</a></li></ul>
