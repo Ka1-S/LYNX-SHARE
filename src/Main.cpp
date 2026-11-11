@@ -11582,6 +11582,42 @@ private:
                         }
                     }
                 }
+                // mirrored = the same frame flipped left-right, on whatever renderer this build draws with
+                {
+                    lynx::dance::SheetFrame plain;
+                    plain.row = 3;
+                    plain.column = 2;
+                    auto turned = plain;
+                    turned.mirrored = true;
+                    juce::Image a (juce::Image::ARGB, fw, fh, true), b (juce::Image::ARGB, fw, fh, true);
+                    {
+                        juce::Graphics ga (a);
+                        lynx::dancer::drawSheet (ga, *loaded, { fw * 0.5f, (float) fh }, 1.0f, plain);
+                    }
+                    {
+                        juce::Graphics gb (b);
+                        lynx::dancer::drawSheet (gb, *loaded, { fw * 0.5f, (float) fh }, 1.0f, turned);
+                    }
+                    int same = 0, flippedSame = 0, solidPixels = 0;
+                    for (int y = 0; y < fh; ++y)
+                        for (int x = 0; x < fw; ++x)
+                        {
+                            const auto pa = a.getPixelAt (x, y);
+                            if (pa.getAlpha() < 200)
+                                continue;
+                            ++solidPixels;
+                            auto near = [pa] (juce::Colour c) {
+                                return std::abs ((int) c.getRed() - (int) pa.getRed()) + std::abs ((int) c.getGreen() - (int) pa.getGreen())
+                                           + std::abs ((int) c.getBlue() - (int) pa.getBlue()) + std::abs ((int) c.getAlpha() - (int) pa.getAlpha()) < 12;
+                            };
+                            same += near (b.getPixelAt (x, y)) ? 1 : 0;
+                            flippedSame += near (b.getPixelAt (fw - 1 - x, y)) ? 1 : 0;
+                        }
+                    const auto flips = solidPixels > 500 && flippedSame >= solidPixels * 98 / 100 && same < solidPixels * 95 / 100;
+                    sheetReport << "sheet_mirror_flips=" << (flips ? 1 : 0) << " (" << flippedSame << " of " << solidPixels << " solid pixels match flipped, " << same
+                                << " unflipped)\n";
+                    ok = ok && flips;
+                }
                 sheetReport << "sheet_body_solid=" << solid << "/36\n";
                 ok = ok && solid >= 18;
                 savePng (strip, prefix + "-sheet-frames.png");

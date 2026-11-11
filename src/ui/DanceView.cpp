@@ -1,6 +1,7 @@
 #include "ui/DanceView.h"
 
 #include <cmath>
+#include <cstring>
 
 #include "core/Instruments.h"
 #include "ui/NativeChild.h"
@@ -333,6 +334,24 @@ juce::Image frameImage (const Sheet& sheet, const dance::SheetFrame& frame)
     }
     return out;
 }
+
+// the picture flipped left-right, as a picture of its own (a negative scale is not drawn flipped by every renderer:
+// Windows' showed the frame unflipped)
+juce::Image flipped (const juce::Image& source)
+{
+    const auto w = source.getWidth(), h = source.getHeight();
+    juce::Image out (juce::Image::ARGB, w, h, false);
+    const juce::Image::BitmapData from (source, 0, 0, w, h);
+    juce::Image::BitmapData dest (out, juce::Image::BitmapData::writeOnly);
+    for (int y = 0; y < h; ++y)
+    {
+        const auto* p = from.getLinePointer (y);
+        auto* d = dest.getLinePointer (y);
+        for (int x = 0; x < w; ++x)
+            std::memcpy (d + (w - 1 - x) * dest.pixelStride, p + x * from.pixelStride, 4);
+    }
+    return out;
+}
 } // namespace
 
 std::shared_ptr<const Sheet> sheetFor (const std::string& path, SheetError* error)
@@ -379,13 +398,11 @@ juce::Rectangle<float> sheetBox (const Sheet& sheet, juce::Point<float> feet, fl
 void drawSheet (juce::Graphics& g, const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame)
 {
     const auto box = sheetBox (sheet, feet, scale);
-    const auto picture = frameImage (sheet, frame);
+    const auto picture = frame.mirrored ? flipped (frameImage (sheet, frame)) : frameImage (sheet, frame);
     juce::Graphics::ScopedSaveState save (g);
     g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
     g.setOpacity (1.0f);
-    const auto t = frame.mirrored ? juce::AffineTransform::scale (-scale, scale).translated (box.getRight(), box.getY())
-                                  : juce::AffineTransform::scale (scale, scale).translated (box.getX(), box.getY());
-    g.drawImageTransformed (picture, t);
+    g.drawImageTransformed (picture, juce::AffineTransform::scale (scale, scale).translated (box.getX(), box.getY()));
 }
 
 bool sheetSolidAt (const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame, juce::Point<float> point)
