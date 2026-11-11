@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Klip başlatma iş akışı: solda klip ve sahne gridi, sağda Picker ve Playlist](/assets/img/cliplaunch.webp)
 
-0.1.25'te `Görünüm › Yerleşim stili` menüsünde iki giriş vardır: `Pattern iş akışı (varsayılan)` ve `Klip başlatma iş akışı`. Aynı seçim `Seçenekler › Genel ayarlar` içinde, Workflow başlığı altında da bulunur. Seçim programı kapattığınızda korunur.
+`Görünüm › Yerleşim stili` menüsünde üç giriş vardır: `Pattern iş akışı (varsayılan)`, `Klip başlatma iş akışı` ve `Basit iş akışı`. Aynı seçim `Seçenekler › Genel ayarlar` içinde, Workflow başlığı altında da bulunur. Seçim programı kapattığınızda korunur.
 
 Pattern iş akışı; Channel Rack, pattern'ler ve Playlist'ten oluşur. Klip başlatma iş akışı, Playlist'in yanına sahneli bir klip gridi ekler. Pattern'ler ve Channel Rack kullanılabilir kalır.
 
@@ -73,4 +73,4 @@ Bir Live seti açtığınızda Session klipleri ve sahneleri, başlatma ayarlar�
 - [Proje içe aktarma](/wiki/importing-projects/)
 - [Yalnızca LYNX'in yaptıkları: iş akışları](/why/#workflows)
 
-Yeni başlayanlar için sadeleştirilmiş bir yerleşim 0.1.25'te yok. Bkz. [Basit yerleşim](/wiki/simple-layout/).
+Üçüncü giriş, ilk şarkı için tek bir penceredir. Bkz. [Basit yerleşim](/wiki/simple-layout/).

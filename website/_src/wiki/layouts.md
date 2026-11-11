@@ -5,7 +5,7 @@ status: full
 ---
 ![The Clip-launch workflow: a grid of clips and scenes on the left, the Picker and the Playlist on the right](/assets/img/cliplaunch.webp)
 
-`View › Layout style` has two entries in 0.1.25: `Pattern workflow (default)` and `Clip-launch workflow`. The same choice is in `Options › General settings`, under Workflow. The choice is kept when you close the program.
+`View › Layout style` has three entries: `Pattern workflow (default)`, `Clip-launch workflow` and `Simple workflow`. The same choice is in `Options › General settings`, under Workflow. The choice is kept when you close the program.
 
 The Pattern workflow is the Channel rack, patterns and the Playlist. The Clip-launch workflow adds a clip grid with scenes beside the Playlist. Patterns and the Channel rack stay available.
 
@@ -75,4 +75,4 @@ Choose `View › Layout style › Pattern workflow (default)`. The window layout
 - [Importing projects](/wiki/importing-projects/)
 - [What only LYNX does: workflows](/why/#workflows)
 
-A simplified beginner layout is not in 0.1.25. See [Simple layout](/wiki/simple-layout/).
+The third entry is one window for a first song. See [Simple layout](/wiki/simple-layout/).

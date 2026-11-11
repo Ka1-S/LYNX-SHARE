@@ -1,5 +1,5 @@
 ---
-source: 3be62b0434
+source: 937b8d8778
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
@@ -72,8 +72,8 @@ File itu adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek b
 
 `File › Buka...` juga menerima proyek `.flm`. Impornya parsial.
 
-- Diimpor: tempo, birama, satu insert mixer per channel FLM, satu track Playlist per lane, pattern (setiap putaran loop sebagai clip), clip audio dengan offset dan pitch, drum kit, sample DW Sampler (sebagai sampler) dan program `.dwp` (di DirectWave).
-- Tidak diimpor: efek dan jalur otomasi FLM. Generator FLM lainnya dimainkan dengan synth bawaan.
+- Diimpor: tempo, birama, satu insert mixer per channel FLM, satu track Playlist per lane, pattern (setiap putaran loop sebagai clip), clip audio dengan offset dan pitch, drum kit, sample DW Sampler (sebagai sampler), program `.dwp` (di DirectWave), instrumen MiniSynth, Transistor Bass, 3x Osc, dan GMSynth, efek FLM (sebagai efek Pocket), serta otomasi level, pan, mute, solo, pitch bend, dan send.
+- Tidak diimpor: instrumen FLM lainnya, yang dimainkan dengan synth bawaan.
 - Sample dicari di sebelah `.flm` dan di salinan sumber daya FLM milik FL Studio. `.dwp` yang tidak ditemukan dimainkan dengan pengganti.
 
 ## Baik diketahui

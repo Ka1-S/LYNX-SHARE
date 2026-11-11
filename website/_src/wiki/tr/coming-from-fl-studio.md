@@ -1,5 +1,5 @@
 ---
-source: 3be62b0434
+source: 937b8d8778
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
@@ -72,8 +72,8 @@ Dosya bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL'nin kendi jen
 
 `Dosya › Aç...` ayrıca `.flm` projelerini de alır. İçe aktarma kısmidir.
 
-- İçe aktarılanlar: tempo, ölçü işareti, her FLM kanalı için bir mixer insert'i, her şerit için bir Playlist izi, pattern'ler (her döngü turu bir klip olarak), ofset ve pitch'iyle ses klipleri, davul kitleri, DW Sampler sample'ları (sampler olarak) ve `.dwp` programları (DirectWave'de).
-- İçe aktarılmayanlar: FLM'nin efektleri ve otomasyon şeritleri. Diğer FLM jeneratörleri dahili synth ile çalar.
+- İçe aktarılanlar: tempo, ölçü işareti, her FLM kanalı için bir mixer insert'i, her şerit için bir Playlist izi, pattern'ler (her döngü turu bir klip olarak), ofset ve pitch'iyle ses klipleri, davul kitleri, DW Sampler sample'ları (sampler olarak), `.dwp` programları (DirectWave'de), MiniSynth, Transistor Bass, 3x Osc ve GMSynth enstrümanları, FLM'nin efektleri (Pocket efektleri olarak) ve seviye, pan, mute, solo, pitch bend ve send otomasyonu.
+- İçe aktarılmayanlar: FLM'nin dahili synth ile çalan diğer enstrümanları.
 - Sample'lar `.flm` dosyasının yanında ve FL Studio'daki FLM kaynakları kopyasında aranır. Bulunamayan bir `.dwp` yerine geçici bir ses çalar.
 
 ## Bilmekte fayda var

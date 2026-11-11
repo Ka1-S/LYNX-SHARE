@@ -1,5 +1,5 @@
 ---
-source: 3be62b0434
+source: 937b8d8778
 ---
 LYNX SHARE behoudt de workflow die je kent: een Channel Rack, patterns, een Playlist en een Mixer, op dezelfde toetsen. Het opent `.flp`-projecten rechtstreeks en kan er ook een terugschrijven.
 
@@ -72,8 +72,8 @@ Het bestand is een FL Studio 2026-project. Samplers, audioclips, de eigen genera
 
 `Bestand › Openen...` accepteert ook `.flm`-projecten. De import is gedeeltelijk.
 
-- Geïmporteerd: tempo, maatsoort, één mixer-insert per FLM-kanaal, één Playlist-track per lane, patterns (elke looppassage als clip), audioclips met offset en pitch, drumkits, DW Sampler-samples (als samplers) en `.dwp`-programma's (in DirectWave).
-- Niet geïmporteerd: de effecten en automatiseringslanes van FLM. Andere FLM-generators spelen de ingebouwde synth.
+- Geïmporteerd: tempo, maatsoort, één mixer-insert per FLM-kanaal, één Playlist-track per lane, patterns (elke looppassage als clip), audioclips met offset en pitch, drumkits, DW Sampler-samples (als samplers), `.dwp`-programma's (in DirectWave), de instrumenten MiniSynth, Transistor Bass, 3x Osc en GMSynth, de effecten van FLM (als Pocket-effecten) en de automatisering van level, pan, mute, solo, pitch bend en sends.
+- Niet geïmporteerd: de andere instrumenten van FLM, die de ingebouwde synth spelen.
 - Samples worden gezocht naast de `.flm` en in de kopie van FL Studio van de FLM-bronnen. Een `.dwp` die niet gevonden wordt, speelt een vervanger.
 
 ## Goed om te weten

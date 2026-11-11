@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Praca z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 
-`Widok › Styl układu` ma w 0.1.25 dwie pozycje: `Praca na wzorcach (domyślnie)` i `Praca z uruchamianiem klipów`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Sposób pracy. Wybór jest zapamiętywany po zamknięciu programu.
+`Widok › Styl układu` ma trzy pozycje: `Praca na wzorcach (domyślnie)`, `Praca z uruchamianiem klipów` i `Prosty sposób pracy`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Sposób pracy. Wybór jest zapamiętywany po zamknięciu programu.
 
 Praca na wzorcach to Channel Rack, patterny i Playlist. Praca z uruchamianiem klipów dodaje obok Playlisty siatkę klipów ze scenami. Patterny i Channel Rack pozostają dostępne.
 
@@ -73,4 +73,4 @@ Wybierz `Widok › Styl układu › Praca na wzorcach (domyślnie)`. Układ okie
 - [Import projektów](/wiki/importing-projects/)
 - [Co robi tylko LYNX: sposoby pracy](/why/#workflows)
 
-Uproszczonego układu dla początkujących nie ma w 0.1.25. Zobacz [Układ prosty](/wiki/simple-layout/).
+Trzecia pozycja to jedno okno na pierwszy utwór. Zobacz [Układ prosty](/wiki/simple-layout/).

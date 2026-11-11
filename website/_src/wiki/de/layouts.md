@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Der Clip-Start-Arbeitsablauf: links ein Raster aus Clips und Szenen, rechts die Auswahl und die Playlist](/assets/img/cliplaunch.webp)
 
-`Ansicht › Layout-Stil` hat in 0.1.25 zwei Einträge: `Pattern-Arbeitsablauf (Standard)` und `Clip-Start-Arbeitsablauf`. Dieselbe Wahl gibt es unter `Optionen › Allgemeine Einstellungen`, im Bereich Arbeitsablauf. Die Wahl bleibt erhalten, wenn du das Programm schließt.
+`Ansicht › Layout-Stil` hat drei Einträge: `Pattern-Arbeitsablauf (Standard)`, `Clip-Start-Arbeitsablauf` und `Einfacher Arbeitsablauf`. Dieselbe Wahl gibt es unter `Optionen › Allgemeine Einstellungen`, im Bereich Arbeitsablauf. Die Wahl bleibt erhalten, wenn du das Programm schließt.
 
 Der Pattern-Arbeitsablauf besteht aus Channel Rack, Patterns und Playlist. Der Clip-Start-Arbeitsablauf ergänzt neben der Playlist ein Clip-Raster mit Szenen. Patterns und das Channel Rack bleiben verfügbar.
 
@@ -73,4 +73,4 @@ Wähle `Ansicht › Layout-Stil › Pattern-Arbeitsablauf (Standard)`. Das Fenst
 - [Projekte importieren](/wiki/importing-projects/)
 - [Was nur LYNX kann: Workflows](/why/#workflows)
 
-Ein vereinfachtes Anfänger-Layout gibt es in 0.1.25 nicht. Siehe [Einfaches Layout](/wiki/simple-layout/).
+Der dritte Eintrag ist ein Fenster für einen ersten Song. Siehe [Einfaches Layout](/wiki/simple-layout/).

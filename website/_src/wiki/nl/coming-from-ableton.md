@@ -1,5 +1,5 @@
 ---
-source: dd1a0a9e61
+source: 5551746a5b
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Een rapport na de export toont wat is weggelaten.
 ## Goed om te weten
 
 - De eigen devices van Live worden niet nagemaakt. De eigen effecten van Live worden bij het importeren weggelaten.
-- Racks behouden alleen hun eerste keten.
+- Instrument-, Audio Effect- en MIDI Effect Racks komen binnen met hun ketens, zones en macro's.
 - Het importrapport toont wat is weggelaten.
 - Live knipt overlappende audioclips in een geëxporteerde set bij.
 - Warp-markeringen uit een Live-set blijven bij het importeren behouden en worden bij het exporteren teruggeschreven.

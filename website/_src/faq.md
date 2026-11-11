@@ -21,11 +21,11 @@ No. LYNX SHARE is an independent program with an FL Studio-style workflow. FL St
 
 ## Does it open Ableton Live sets?
 
-Yes, sets saved by Live 11 and 12 (`.als`): tracks, clips, mixer settings, automation and VST2 or VST3 plugins. Live's own effects are dropped, racks keep their first chain, and Simpler, Sampler and drum racks become LYNX SHARE samplers. See [Coming from Ableton Live](/wiki/coming-from-ableton/).
+Yes, sets saved by Live 11 and 12 (`.als`): tracks, clips, mixer settings, automation and VST2 or VST3 plugins. Racks come in with their chains and macros, Simpler, Sampler and drum racks become LYNX SHARE samplers, and Live's other devices are dropped. See [Coming from Ableton Live](/wiki/coming-from-ableton/).
 
 ## Does it open FL Studio Mobile projects?
 
-Partly. A `.flm` opens with its arrangement, samples, drum kits and DirectWave programs. FLM's effects are not imported yet.
+Partly. A `.flm` opens with its arrangement, samples, drum kits and DirectWave programs, the MiniSynth, Transistor Bass, 3x Osc and GMSynth instruments, FL Studio Mobile's effects and its automation. Other instruments play the built-in synth.
 
 ## Can I send a project back to FL Studio or Live?
 
@@ -58,3 +58,7 @@ Fifteen: English, Simplified Chinese, Traditional Chinese, Dutch, French, German
 ## How do I report a bug or contribute?
 
 Open an issue at [github.com/Ka1-S/LYNX-SHARE/issues](https://github.com/Ka1-S/LYNX-SHARE/issues), or use `Help › Report a problem...` inside the program. The source code is in the same repository, and pull requests from contributors have been merged in past releases.
+
+## Is there a simpler layout for beginners?
+
+Yes. `View › Layout style › Simple workflow` shows one window with the tracks and the timeline, and the setup wizard offers it at the first start. The Pattern workflow stays the default, and the same menu switches back. See [Simple layout](/wiki/simple-layout/).

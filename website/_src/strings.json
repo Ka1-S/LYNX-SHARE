@@ -8,7 +8,7 @@
   "text": {
     "m.home.t": "LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects",
     "m.home.d": "LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.",
-    "m.features.d": "What LYNX SHARE does in the current release: the windows, the clip-launch layout, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.",
+    "m.features.d": "What LYNX SHARE does in the current release: the windows, the Clip-launch and Simple layouts, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.",
     "m.download.d": "Download LYNX SHARE for Windows, macOS or Linux: installer, portable zip, dmg, AppImage and tar.gz, with install notes for each system.",
     "m.updates.d": "What is new, better and fixed in each LYNX SHARE release, newest first.",
     "m.wiki.d": "The LYNX SHARE manual: getting started, every window of the workspace, a page for each built-in instrument and effect, settings, shortcuts, file formats and troubleshooting.",
@@ -33,7 +33,7 @@
     "dl.fInstaller": "Installer",
     "dl.fUniversal": "Universal",
     "dl.fAppImage": "AppImage",
-    "m.why.d": "What LYNX SHARE does that other DAWs do not: online sessions, FL Studio and Ableton Live projects both ways, FL plugin settings on its own engines, two workflows, plugin crash protection, free on three systems.",
+    "m.why.d": "What LYNX SHARE does that other DAWs do not: online sessions, FL Studio and Ableton Live projects both ways, FL plugin settings on its own engines, three workflows, plugin crash protection, free on three systems.",
     "m.fixes.d": "Common complaints about FL Studio, Ableton Live and DAWs in general, and what the released LYNX SHARE does about each one, with its limits.",
     "m.cat.d": "Every instrument, effect and tool built into LYNX SHARE, each with a picture of its editor, what it is for and a link to its wiki page.",
     "nav.why": "Why LYNX",

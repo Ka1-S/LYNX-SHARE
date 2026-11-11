@@ -1,5 +1,5 @@
 ---
-source: dd1a0a9e61
+source: 5551746a5b
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto a la Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Un informe tras la exportación lista lo que quedó fuera.
 ## Conviene saber
 
 - Los dispositivos propios de Live no se recrean. Los efectos propios de Live se descartan al importar.
-- Los racks conservan solo su primera cadena.
+- Los racks de instrumento, de efecto de audio y de efecto MIDI entran con sus cadenas, zonas y macros.
 - El informe de importación lista lo que quedó fuera.
 - Live recorta los clips de audio que se solapan en un set exportado.
 - Los marcadores de warp de un set de Live se conservan al importar y se escriben de nuevo al exportar.

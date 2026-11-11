@@ -1,7 +1,7 @@
 ---
-source: 3c371b355f
+source: c457d438ee
 ---
-LYNX SHARE enregistre les projets en fichiers `.lynx`. Il ouvre aussi les projets d'autres programmes, charge les fichiers audio usuels et exporte de l'audio, du MIDI et des projets pour d'autres programmes. Le tableau liste tous les formats de la version 0.1.25 alpha.
+LYNX SHARE enregistre les projets en fichiers `.lynx`. Il ouvre aussi les projets d'autres programmes, charge les fichiers audio usuels et exporte de l'audio, du MIDI et des projets pour d'autres programmes. Le tableau liste tous les formats de la version 0.1.26 alpha.
 
 Un projet ouvert depuis le format d'un autre programme est un import. `Fichier › Enregistrer` demande alors où écrire un fichier `.lynx`, et le fichier d'origine n'est jamais modifié.
 
@@ -20,8 +20,8 @@ Un projet ouvert depuis le format d'un autre programme est un import. `Fichier �
 | `.zip` | `Fichier › Ouvrir...` l'extrait dans un dossier et ouvre le projet qui s'y trouve | `Fichier › Exporter › Projet avec samples (.zip)...` | Ouvre aussi le paquet de boucles zippé de FL Studio |
 | `.lynxpack` | S'ouvre après un résumé. Une partie est fusionnée dans le projet de l'hôte | `Fichier › Session en ligne › Envoyer le projet...` | Un projet ou une partie envoyé dans une [session en ligne](/wiki/online-sessions/). Les parties à plugins tiers voyagent sous forme de rendus audio avec les réglages du plugin |
 | `.flp` | `Fichier › Ouvrir...` | `Fichier › Exporter › Projet FL Studio...`, un projet FL Studio 2026 ou un paquet de boucles zippé | Les plugins natifs jouent sur des moteurs recréés, plus ou moins exacts. Les packs FLEX ne sont jamais ouverts. À l'export, les instruments et effets propres à LYNX sont rendus en audio ou remplacés par le plugin FL le plus proche, et les modulateurs sont laissés de côté. Voir [Venir de FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Fichier › Ouvrir...` | Non | Projet FL Studio Mobile. Partiel : les effets et l'automation de FLM ne sont pas importés |
-| `.als` | `Fichier › Ouvrir...`, sets de Live 11 et 12 | `Fichier › Exporter › Set Ableton Live (.als)...`, pour Live 12 ou Live 11 | À l'import, les effets propres à Live sont abandonnés et les racks gardent leur première chaîne. À l'export, les instruments et effets propres à LYNX SHARE ne sont pas convertis, et l'automation des paramètres d'effets et les routages d'insert à insert sont abandonnés. Voir [Venir d'Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `Fichier › Ouvrir...` | Non | Projet FL Studio Mobile. Partiel : les instruments autres que MiniSynth, Transistor Bass, 3x Osc, GMSynth et DirectWave jouent le synthé intégré |
+| `.als` | `Fichier › Ouvrir...`, sets de Live 11 et 12 | `Fichier › Exporter › Set Ableton Live (.als)...`, pour Live 12 ou Live 11 | À l'import, les effets propres à Live sont abandonnés. À l'export, les instruments et effets propres à LYNX SHARE ne sont pas convertis, et l'automation des paramètres d'effets et les routages d'insert à insert sont abandonnés. Voir [Venir d'Ableton Live](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `Fichier › Ouvrir...` crée un nouveau projet. `Fichier › Importer › Fichier MIDI...` et le Piano Roll importent dans le projet actuel | `Fichier › Exporter › Fichier MIDI...` (`Ctrl+Shift+M`) | |
 | `.wav` | Comme sample ou comme clip audio | `Fichier › Exporter › Fichier Wave...`, 16 bits, 24 bits ou 32 bits flottant | Dither, informations de tempo, marqueurs de boucle et marqueurs de la Playlist en option |
 | `.mp3` | Comme sample ou comme clip audio | `Fichier › Exporter › Fichier MP3...` | Débit constant |

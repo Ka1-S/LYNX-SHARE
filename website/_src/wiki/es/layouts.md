@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![El flujo de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 
-`Ver › Estilo de diseño` tiene dos entradas en la 0.1.25: `Flujo por patrones (predeterminado)` y `Flujo por lanzamiento de clips`. La misma opción está en `Opciones › Configuración general`, bajo Flujo de trabajo. La elección se conserva al cerrar el programa.
+`Ver › Estilo de diseño` tiene tres entradas: `Flujo por patrones (predeterminado)`, `Flujo por lanzamiento de clips` y `Flujo simple`. La misma opción está en `Opciones › Configuración general`, bajo Flujo de trabajo. La elección se conserva al cerrar el programa.
 
 El flujo por patrones es el Channel Rack, los patrones y la Playlist. El flujo por lanzamiento de clips añade una cuadrícula de clips con escenas junto a la Playlist. Los patrones y el Channel Rack siguen disponibles.
 
@@ -73,4 +73,4 @@ Elige `Ver › Estilo de diseño › Flujo por patrones (predeterminado)`. Vuelv
 - [Importar proyectos](/wiki/importing-projects/)
 - [Lo que solo hace LYNX: flujos de trabajo](/why/#workflows)
 
-Un diseño sencillo para principiantes no está en la 0.1.25. Mira [Diseño sencillo](/wiki/simple-layout/).
+La tercera entrada es una ventana para una primera canción. Mira [Diseño sencillo](/wiki/simple-layout/).

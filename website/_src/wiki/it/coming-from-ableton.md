@@ -1,5 +1,5 @@
 ---
-source: dd1a0a9e61
+source: 5551746a5b
 ---
 ![Il layout a lancio di clip: una griglia di clip con le scene accanto alla Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Un report dopo l'esportazione elenca ciò che è stato lasciato fuori.
 ## Da sapere
 
 - I dispositivi propri di Live non vengono ricreati. Gli effetti propri di Live vengono scartati all'importazione.
-- I rack conservano solo la prima catena.
+- I Rack di strumenti, di effetti audio e di effetti MIDI arrivano con le loro catene, zone e macro.
 - Il report di importazione elenca ciò che è stato lasciato fuori.
 - Live taglia le clip audio che si sovrappongono in un set esportato.
 - I marker di warp di un set di Live vengono conservati all'importazione e riscritti all'esportazione.

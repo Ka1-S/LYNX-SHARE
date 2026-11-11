@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![De Clipstart-werkwijze: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
 
-`Beeld › Lay-outstijl` heeft in 0.1.25 twee items: `Patroonwerkwijze (standaard)` en `Clipstart-werkwijze`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Werkwijze. De keuze blijft bewaard als je het programma sluit.
+`Beeld › Lay-outstijl` heeft drie items: `Patroonwerkwijze (standaard)`, `Clipstart-werkwijze` en `Eenvoudige werkwijze`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Werkwijze. De keuze blijft bewaard als je het programma sluit.
 
 De Patroonwerkwijze is het Channel Rack, patterns en de Playlist. De Clipstart-werkwijze voegt naast de Playlist een clipraster met scènes toe. Patterns en het Channel Rack blijven beschikbaar.
 
@@ -73,4 +73,4 @@ Kies `Beeld › Lay-outstijl › Patroonwerkwijze (standaard)`. De vensterindeli
 - [Projecten importeren](/wiki/importing-projects/)
 - [Wat alleen LYNX doet: workflows](/why/#workflows)
 
-Een vereenvoudigde beginnersindeling zit niet in 0.1.25. Zie [Eenvoudige lay-out](/wiki/simple-layout/).
+Het derde item is één venster voor een eerste nummer. Zie [Eenvoudige lay-out](/wiki/simple-layout/).

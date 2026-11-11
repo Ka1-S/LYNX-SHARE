@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![O fluxo por disparo de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
 
-`Exibir › Estilo de layout` tem duas entradas na 0.1.25: `Fluxo por padrões (padrão)` e `Fluxo por disparo de clipes`. A mesma escolha está em `Opções › Configurações gerais`, em Fluxo de trabalho. A escolha é mantida quando você fecha o programa.
+`Exibir › Estilo de layout` tem três entradas: `Fluxo por padrões (padrão)`, `Fluxo por disparo de clipes` e `Fluxo simples`. A mesma escolha está em `Opções › Configurações gerais`, em Fluxo de trabalho. A escolha é mantida quando você fecha o programa.
 
 O fluxo por padrões é o Channel Rack, os patterns e a Playlist. O fluxo por disparo de clipes acrescenta uma grade de clipes com cenas ao lado da Playlist. Os patterns e o Channel Rack continuam disponíveis.
 
@@ -73,4 +73,4 @@ Escolha `Exibir › Estilo de layout › Fluxo por padrões (padrão)`. O layout
 - [Importar projetos](/wiki/importing-projects/)
 - [O que só o LYNX faz: fluxos de trabalho](/why/#workflows)
 
-Um layout simplificado para iniciantes não existe na 0.1.25. Veja [Layout simples](/wiki/simple-layout/).
+A terceira entrada é uma janela para a primeira música. Veja [Layout simples](/wiki/simple-layout/).

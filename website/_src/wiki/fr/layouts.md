@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Le flux par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 
-`Vue › Style de disposition` propose deux entrées dans la version 0.1.25 : `Flux par patterns (par défaut)` et `Flux par lancement de clips`. Le même choix existe dans `Options › Réglages généraux`, sous Flux de travail. Le choix est conservé quand vous fermez le programme.
+`Vue › Style de disposition` propose trois entrées : `Flux par patterns (par défaut)`, `Flux par lancement de clips` et `Flux simple`. Le même choix existe dans `Options › Réglages généraux`, sous Flux de travail. Le choix est conservé quand vous fermez le programme.
 
 Le flux par patterns, c'est le Channel Rack, les patterns et la Playlist. Le flux par lancement de clips ajoute une grille de clips avec des scènes à côté de la Playlist. Les patterns et le Channel Rack restent disponibles.
 
@@ -73,4 +73,4 @@ Choisissez `Vue › Style de disposition › Flux par patterns (par défaut)`. L
 - [Importer des projets](/wiki/importing-projects/)
 - [Ce que seul LYNX fait : les flux de travail](/why/#workflows)
 
-Une disposition simplifiée pour débutants n'existe pas dans la version 0.1.25. Voir [Disposition simple](/wiki/simple-layout/).
+La troisième entrée est une fenêtre pour un premier morceau. Voir [Disposition simple](/wiki/simple-layout/).

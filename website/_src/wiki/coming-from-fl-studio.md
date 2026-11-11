@@ -74,8 +74,8 @@ The file is an FL Studio 2026 project. Samplers, audio clips, FL's own generator
 
 `File › Open...` also takes `.flm` projects. The import is partial.
 
-- Imported: tempo, time signature, one mixer insert per FLM channel, one Playlist track per lane, patterns (each loop pass as a clip), audio clips with offset and pitch, drum kits, DW Sampler samples (as samplers) and `.dwp` programs (in DirectWave).
-- Not imported: FLM's effects and automation lanes. Other FLM generators play the built-in synth.
+- Imported: tempo, time signature, one mixer insert per FLM channel, one Playlist track per lane, patterns (each loop pass as a clip), audio clips with offset and pitch, drum kits, DW Sampler samples (as samplers), `.dwp` programs (in DirectWave), the MiniSynth, Transistor Bass, 3x Osc and GMSynth instruments, FLM's effects (as Pocket effects) and the automation of level, pan, mute, solo, pitch bend and sends.
+- Not imported: FLM's other instruments, which play the built-in synth.
 - Samples are searched next to the `.flm` and in FL Studio's copy of the FLM resources. A `.dwp` that is not found plays a stand-in.
 
 ## Good to know

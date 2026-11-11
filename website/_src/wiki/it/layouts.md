@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Il Clip-launch workflow: una griglia di clip e scene a sinistra, il Selettore e la Playlist a destra](/assets/img/cliplaunch.webp)
 
-`Vista › Stile del layout` ha due voci nella 0.1.25: `Flusso a pattern (predefinito)` e `Flusso a lancio di clip`. La stessa scelta è in `Opzioni › Impostazioni generali`, sotto Flusso di lavoro. La scelta si mantiene quando chiudi il programma.
+`Vista › Stile del layout` ha tre voci: `Flusso a pattern (predefinito)`, `Flusso a lancio di clip` e `Flusso semplice`. La stessa scelta è in `Opzioni › Impostazioni generali`, sotto Flusso di lavoro. La scelta si mantiene quando chiudi il programma.
 
 Il flusso a pattern è il Channel Rack, i pattern e la Playlist. Il flusso a lancio di clip aggiunge una griglia di clip con scene accanto alla Playlist. I pattern e il Channel Rack restano disponibili.
 
@@ -73,4 +73,4 @@ Scegli `Vista › Stile del layout › Flusso a pattern (predefinito)`. Il layou
 - [Importare progetti](/wiki/importing-projects/)
 - [Cosa fa solo LYNX: i flussi di lavoro](/why/#workflows)
 
-Un layout semplificato per principianti non c'è nella 0.1.25. Vedi [Layout semplice](/wiki/simple-layout/).
+La terza voce è una sola finestra per un primo brano. Vedi [Layout semplice](/wiki/simple-layout/).

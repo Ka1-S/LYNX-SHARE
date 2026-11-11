@@ -1,9 +1,9 @@
 ---
-source: 1c353ba51c
+source: b4f9b5e040
 ---
 ![Alur kerja peluncuran klip: kisi clip dan scene di kiri, Picker dan Playlist di kanan](/assets/img/cliplaunch.webp)
 
-`Tampilan › Gaya tata letak` punya dua entri di 0.1.25: `Alur kerja pattern (bawaan)` dan `Alur kerja peluncuran klip`. Pilihan yang sama ada di `Opsi › Pengaturan umum`, di bawah Workflow. Pilihan itu tersimpan saat kamu menutup program.
+`Tampilan › Gaya tata letak` punya tiga entri: `Alur kerja pattern (bawaan)`, `Alur kerja peluncuran klip`, dan `Alur kerja sederhana`. Pilihan yang sama ada di `Opsi › Pengaturan umum`, di bawah Workflow. Pilihan itu tersimpan saat kamu menutup program.
 
 Alur kerja Pattern adalah Channel Rack, pattern, dan Playlist. Alur kerja peluncuran klip menambahkan kisi clip dengan scene di samping Playlist. Pattern dan Channel Rack tetap tersedia.
 
@@ -73,4 +73,4 @@ Pilih `Tampilan › Gaya tata letak › Alur kerja pattern (bawaan)`. Tata letak
 - [Mengimpor proyek](/wiki/importing-projects/)
 - [Yang hanya dilakukan LYNX: alur kerja](/why/#workflows)
 
-Tata letak pemula yang disederhanakan belum ada di 0.1.25. Lihat [Tata letak sederhana](/wiki/simple-layout/).
+Entri ketiga adalah satu jendela untuk lagu pertama. Lihat [Tata letak sederhana](/wiki/simple-layout/).

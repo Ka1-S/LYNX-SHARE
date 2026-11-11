@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5e76a1c9";
+window.LYNX_LANG=lang;window.LYNX_V="6655767d";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -74,7 +74,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5e76a1c9">
+<link rel="stylesheet" href="/assets/site.css?v=6655767d">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -104,10 +104,10 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="prose">
       <h2 data-i18n="home.whatT">What it does</h2>
       <p data-i18n="home.what1">You build patterns in the Channel rack and the Piano roll, arrange them with audio and automation clips in the Playlist, and mix in the Mixer: up to 127 insert tracks with 10 effect slots each, sends and sidechain. If you know FL Studio, the windows, mouse gestures and shortcuts are where you expect them.</p>
-      <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes (View › Layout style).</p>
+      <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes. The same menu (View › Layout style) has a Simple workflow: one window for a first song.</p>
       <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge.</p>
       <h3 data-i18n="home.missT">What is missing</h3>
-      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Live's own devices are not converted, and .flm import leaves out FL Studio Mobile's effects. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
+      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Live's own devices are not converted, and in .flm projects only some of FL Studio Mobile's instruments are recreated. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
       <p><a class="btn btn-ghost btn-sm" href="/features/" data-i18n="home.moreF">All features</a> <a class="btn btn-ghost btn-sm" href="/wiki/getting-started/" data-i18n="home.moreW">Getting started</a></p>
     </div>
     <dl class="facts">
@@ -138,7 +138,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="only">
   <div class="wrap">
     <h2 data-i18n="home.whyT">What only LYNX does</h2>
-    <div class="whyrow"><a class="wcell" href="/why/#online"><b data-i18n="why.online.t">Online sessions</b><span data-i18n="why.online.l">Work on one project with up to three other people, live or by sending files.</span></a><a class="wcell" href="/why/#projects"><b data-i18n="why.projects.t">Opens and writes other DAWs' projects</b><span data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</span></a><a class="wcell" href="/why/#fl-settings"><b data-i18n="why.fl.t">FL plugins' settings open in LYNX's own engines</b><span data-i18n="why.fl.l">A project that uses FL Studio's native plugins plays without FL Studio installed.</span></a><a class="wcell" href="/why/#workflows"><b data-i18n="why.work.t">Two workflows in one program</b><span data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes when you want one.</span></a><a class="wcell" href="/why/#crash"><b data-i18n="why.crash.t">Plugin crash protection</b><span data-i18n="why.crash.l">A third-party plugin that crashes does not have to take your project with it.</span></a><a class="wcell" href="/why/#free"><b data-i18n="why.free.t">Free on Windows, Linux and macOS</b><span data-i18n="why.free.l">No price, no account, no subscription, and the source is public.</span></a><a class="wcell hot" href="/instruments-and-effects/"><b data-i18n="home.catT" data-args='[&quot;167&quot;]' data-count="167">167 built-in instruments and effects</b><span data-i18n="home.catL">Synths, drums, EQs, compressors, reverbs, delays and tools, each with a picture and a wiki page.</span></a></div>
+    <div class="whyrow"><a class="wcell" href="/why/#online"><b data-i18n="why.online.t">Online sessions</b><span data-i18n="why.online.l">Work on one project with up to three other people, live or by sending files.</span></a><a class="wcell" href="/why/#projects"><b data-i18n="why.projects.t">Opens and writes other DAWs' projects</b><span data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</span></a><a class="wcell" href="/why/#fl-settings"><b data-i18n="why.fl.t">FL plugins' settings open in LYNX's own engines</b><span data-i18n="why.fl.l">A project that uses FL Studio's native plugins plays without FL Studio installed.</span></a><a class="wcell" href="/why/#workflows"><b data-i18n="why.work.t">Three workflows in one program</b><span data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.</span></a><a class="wcell" href="/why/#crash"><b data-i18n="why.crash.t">Plugin crash protection</b><span data-i18n="why.crash.l">A third-party plugin that crashes does not have to take your project with it.</span></a><a class="wcell" href="/why/#free"><b data-i18n="why.free.t">Free on Windows, Linux and macOS</b><span data-i18n="why.free.l">No price, no account, no subscription, and the source is public.</span></a><a class="wcell hot" href="/instruments-and-effects/"><b data-i18n="home.catT" data-args='[&quot;167&quot;]' data-count="167">167 built-in instruments and effects</b><span data-i18n="home.catL">Synths, drums, EQs, compressors, reverbs, delays and tools, each with a picture and a wiki page.</span></a></div>
     <p style="margin-top:18px"><a class="tlink" href="/why/" data-i18n="home.whyAll">All six, with their limits</a></p>
     <p style="margin-top:8px"><a class="tlink" href="/fixes/" data-i18n="fix.link">Common complaints about DAWs, and what LYNX SHARE does about them</a></p>
   </div>
@@ -205,7 +205,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5e76a1c9" defer></script>
-<script src="/assets/motion.js?v=5e76a1c9" defer></script>
+<script src="/assets/site.js?v=6655767d" defer></script>
+<script src="/assets/motion.js?v=6655767d" defer></script>
 </body>
 </html>
