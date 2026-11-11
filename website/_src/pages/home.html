@@ -1,0 +1,110 @@
+<section class="hero" id="top">
+  <div class="wrap">
+    <a class="pill" href="/updates/"><b class="ver-tag">{{VER_UP}}</b><span data-i18n="hero.pill">Free &amp; open source · Windows · macOS · Linux</span></a>
+    <h1 data-i18n-words="hero.title">A lightweight DAW, <span class="grad">fully open source.</span></h1>
+    <p class="lead" data-i18n="home.lead">LYNX SHARE is a DAW that works the way FL Studio does: Channel rack, Piano roll, Playlist and Mixer, with the same shortcuts. It opens FL Studio projects (.flp), Ableton Live sets (.als) and FL Studio Mobile projects (.flm), and exports .flp and .als back. It is free under the AGPL-3.0 and still an alpha.</p>
+    <div class="os-btns" id="download">{{OS_BTNS}}</div>
+    <div class="meta"><span class="ver-line">{{VER_LINE}}</span> · AGPL-3.0 · <a href="/download/" data-i18n="home.allDl">portable versions and install notes</a></div>
+    <div class="stage">
+      <div class="screen"><img src="/assets/img/hero.webp?v=0.1.25" alt="LYNX SHARE with the Channel Rack, Piano Roll, Playlist and Mixer open" data-i18n-alt="alt.hero" width="1920" height="1080"></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="features">
+  <div class="wrap split">
+    <div class="prose">
+      <h2 data-i18n="home.whatT">What it does</h2>
+      <p data-i18n="home.what1">You build patterns in the Channel rack and the Piano roll, arrange them with audio and automation clips in the Playlist, and mix in the Mixer: up to 127 insert tracks with 10 effect slots each, sends and sidechain. If you know FL Studio, the windows, mouse gestures and shortcuts are where you expect them.</p>
+      <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes (View › Layout style).</p>
+      <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge.</p>
+      <h3 data-i18n="home.missT">What is missing</h3>
+      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Live's own devices are not converted, and .flm import leaves out FL Studio Mobile's effects. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
+      <p><a class="btn btn-ghost btn-sm" href="/features/" data-i18n="home.moreF">All features</a> <a class="btn btn-ghost btn-sm" href="/wiki/getting-started/" data-i18n="home.moreW">Getting started</a></p>
+    </div>
+    <dl class="facts">
+      <div><dt data-i18n="fact.sys">Systems</dt><dd data-i18n="fact.sysV">Windows 10 / 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel), Linux x86_64 with glibc 2.35 or newer</dd></div>
+      <div><dt data-i18n="fact.ver">Version</dt><dd><span class="ver-line">{{VER_LINE}}</span> (<a href="/updates/" data-i18n="fact.verL">what changed</a>)</dd></div>
+      <div><dt data-i18n="fact.price">Price</dt><dd data-i18n="fact.priceV">Free. No account, no subscription.</dd></div>
+      <div><dt data-i18n="fact.lic">Licence</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
+      <div><dt data-i18n="fact.opens">Opens</dt><dd data-i18n="fact.opensV">.lynx (its own format), .flp, .als (Live 11 and 12), .flm (partial), .mid</dd></div>
+      <div><dt data-i18n="fact.exports">Exports</dt><dd data-i18n="fact.exportsV">WAV, MP3, FLAC, OGG, stems, MIDI, .flp, .als</dd></div>
+      <div><dt data-i18n="fact.plug">Plugins</dt><dd data-i18n="fact.plugV">VST3 and CLAP; Audio Units on macOS; LV2 on Linux; VST2 on Windows and Linux</dd></div>
+      <div><dt data-i18n="fact.lang">Languages</dt><dd data-i18n="fact.langV" data-count="15">15, the same as this site</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="sec" id="screens">
+  <div class="wrap">
+    <h2 data-i18n="home.shotsT">The main windows</h2>
+    <div class="shots">
+      <figure class="big"><a class="shot" href="/assets/img/playlist.webp?v=0.1.25"><img src="/assets/img/playlist.webp?v=0.1.25" alt="Playlist" loading="lazy" width="1600" height="900"></a><figcaption data-i18n="home.capPl"><b>Playlist.</b> Pattern, audio and automation clips on tracks, with markers and several arrangements per project.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.25"><img src="/assets/img/pianoroll.webp?v=0.1.25" alt="Piano roll" loading="lazy" width="1920" height="1080"></a><figcaption data-i18n="home.capPr"><b>Piano roll.</b> Notes, slides, chords and scales, with velocity and pitch lanes.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.25"><img src="/assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"></a><figcaption data-i18n="home.capMx"><b>Mixer.</b> Inserts, sends, sidechain and delay compensation.</figcaption></figure>
+    </div>
+    <p class="note" data-i18n="home.shotsN">Screenshots are from LYNX SHARE's own demo project in the current release. More on the <a href="/features/">Features</a> page.</p>
+  </div>
+</section>
+
+<section class="sec" id="only">
+  <div class="wrap">
+    <h2 data-i18n="home.whyT">What only LYNX does</h2>
+    {{WHYROW}}
+    <p style="margin-top:18px"><a class="tlink" href="/why/" data-i18n="home.whyAll">All six, with their limits</a></p>
+    <p style="margin-top:8px"><a class="tlink" href="/fixes/" data-i18n="fix.link">Common complaints about DAWs, and what LYNX SHARE does about them</a></p>
+  </div>
+</section>
+
+<section class="sec" id="latest">
+  <div class="wrap">
+    <h2 data-i18n="home.latestT">Latest update</h2>
+    {{LATEST}}
+  </div>
+</section>
+
+<section class="sec" id="source">
+  <div class="wrap split">
+    <div class="prose">
+      <h2 data-i18n="home.srcT">Source code</h2>
+      <p data-i18n="home.src1">LYNX SHARE is written in C++20 with JUCE 8. The code, the tests and the notes on every FL Studio behaviour it reproduces are in one public repository. FL Studio and Live were studied from the outside and the code was written from scratch: nothing from Image-Line or Ableton is in it.</p>
+      <p data-i18n="home.src2">Bug reports and pull requests are welcome. Several fixes in recent releases came from users.</p>
+      <p><a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/issues" data-i18n="home.issues">Report a bug</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/ROADMAP.md">Roadmap</a> <a class="btn btn-ghost btn-sm" href="https://discord.gg/XHKkbtbkY">Discord</a></p>
+    </div>
+    <div class="prose">
+      <pre><code>git clone https://github.com/Ka1-S/LYNX-SHARE
+cd LYNX-SHARE
+scripts/build-local.sh        # builds and runs the tests
+LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
+      <p class="note" data-i18n="home.srcN">Build instructions for each system are in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">docs/SETUP_DEV.md</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="policy" id="signing">
+      <div>
+        <h3><span data-i18n="sig.title">Code signing policy</span><span class="tag" data-i18n="sig.pending">pending approval</span></h3>
+        <p data-i18n="sig.p1">Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>.</p>
+        <p data-i18n="sig.p2">Release files are built from the public source by <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/.github/workflows/release.yml">GitHub Actions</a>, and every signing request is approved by hand.</p>
+      </div>
+      <div>
+        <h3 data-i18n="sig.team">Team roles</h3>
+        <p data-i18n="sig.roles">Authors, reviewers and approvers: <a href="https://github.com/Ka1-S">Ka1-S</a> (repository owner).</p>
+      </div>
+      <div>
+        <h3 data-i18n="sig.privacy">Privacy</h3>
+        <p data-i18n="sig.pp">This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">Privacy policy</a></p>
+      </div>
+      <div id="crash-reports">
+        <h3 data-i18n="sig.crash">Crash reports</h3>
+        <p data-i18n="sig.cr2">Opt-in only. After a crash or freeze LYNX SHARE asks before sending a report (Settings › General › Crash reports: Ask / Always send / Never send). A report holds a random id, the LYNX SHARE version, the operating system, CPU, graphics cards and drivers, screen size, audio device and settings, the crash or freeze file, the session's last 60 steps, and the names and versions of the third-party plugins that were loaded. User names in paths become &lt;user&gt;, and file names are left out unless you tick "include file names". No audio, projects or samples, no machine name and no IP address are stored. Reports are used only to fix bugs. To have one deleted, <a href="https://github.com/Ka1-S/LYNX-SHARE/issues/new">open an issue</a> with its id (LYNX SHARE shows it after sending; every sent id is also listed in <code>crash-reports/sent.log</code> in LYNX SHARE's settings folder).</p>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+/* links to sections that moved off this page when the site was split */
+(function(){var m={classics:"/features/#classics","try":"/features/#try",media:"/features/#media",gallery:"/features/#screens",plugins:"/features/#plugins",dlPort:"/download/#dlPort"},h=location.hash.slice(1);if(m[h])location.replace(m[h]);})();
+</script>

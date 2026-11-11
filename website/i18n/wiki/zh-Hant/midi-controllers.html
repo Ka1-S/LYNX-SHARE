@@ -1,0 +1,26 @@
+<figure><a class="shot" href="/assets/img/wiki/settings-midi.webp"><img src="/assets/img/wiki/settings-midi.webp" alt="設定的 MIDI 頁面：輸入裝置、帶有主同步的輸出裝置，以及外部同步" loading="lazy" width="680" height="620"></a></figure>
+<p>LYNX SHARE 可以從任何 MIDI 輸入裝置接收音符和控制器動作。裝置在設定的 MIDI 頁面中設定：<code>選項 › MIDI設定...</code>，或按 <code>F10</code>。沒有硬體時，電腦鍵盤和觸控鍵盤也能彈奏音符。</p>
+<h2 id="connect-a-keyboard">連接鍵盤</h2>
+<ol><li>接上鍵盤，開啟 <code>選項 › MIDI設定...</code>（<code>F10</code>）。</li><li>在 <code>輸入裝置</code> 下找到它並勾選。如果沒有列出，請按一下 <code>重新整理裝置清單</code>。</li><li>讓兩個選單維持 <code>任意MIDI通道</code> 和 <code>演奏所選通道</code>。</li><li>關閉設定，在<a href="/wiki/channel-rack/">通道機架</a>中選取一個通道。</li><li>彈奏。所選的通道就會發聲。</li></ol>
+<h2 id="input-devices">輸入裝置</h2>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td>勾選框</td><td>開啟或關閉該裝置</td></tr><tr><td><code>任意MIDI通道</code></td><td>聆聽所有 MIDI 通道，或只聆聽某一個通道</td></tr><tr><td><code>演奏所選通道</code></td><td>音符送到通道機架中所選的通道，或永遠送到某個固定的通道</td></tr><tr><td><code>力度</code></td><td><code>按演奏</code>、<code>輕（輕彈也更響）</code>、<code>重（需要更用力彈奏）</code> 或 <code>固定（每個音符都是滿力度）</code></td></tr><tr><td><code>表演模式通道</code></td><td>表演模式開啟時，這個 MIDI 通道上的音符會啟動播放清單片段</td></tr><tr><td><code>歌曲標記跳轉</code></td><td>這個 MIDI 通道上的音符不演奏，而是把歌曲移到某個標記</td></tr></tbody></table></div>
+<h2 id="link-a-knob-to-a-control">把旋鈕關聯到控制項</h2>
+<ol><li>在 LYNX SHARE 中的旋鈕或推桿上按右鍵。</li><li>選擇 <code>關聯到MIDI控制器（轉動控制器上的旋鈕）</code>。</li><li>轉動硬體上的旋鈕或推桿。關聯就建立了。</li></ol>
+<p>關聯會隨專案一起儲存。要移除它，請再次在控制項上按右鍵並選擇 <code>取消關聯控制器</code>。選單項目會顯示正在使用的 CC 編號。</p>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td><code>Override global link...</code></td><td>無</td><td>建立一個在所有專案中都有效的關聯。它存放在設定中，而不是專案中</td></tr><tr><td><code>移除全域關聯</code></td><td>無</td><td>再把它移除</td></tr><tr><td><code>多重連結到控制器</code></td><td><code>Ctrl+J</code></td><td>開啟時，你移動的控制項會依序與你接下來移動的硬體控制器關聯起來。它位於 <code>選項</code> 選單中</td></tr><tr><td><code>拾取（接管模式）</code></td><td>無</td><td>在 MIDI 頁面上。控制器要到達參數目前的數值之後才會移動它，所以數值不會突然跳動</td></tr></tbody></table></div>
+<p>MIDI 頁面會在 <code>關聯（此專案，然後全域）</code> 下列出這些關聯。同一頁上的 <code>控制器類型</code> 顯示 <code>通用控制器</code>。</p>
+<p>第三方外掛的參數可以透過通道選單或效果器插槽選單中的 <code>自動化外掛參數</code> 找到。那裡的每個參數都有同樣的關聯項目。見<a href="/wiki/automation/">自動化</a>。</p>
+<h2 id="the-typing-keyboard">電腦鍵盤</h2>
+<p><code>Ctrl+T</code>，或 <code>選項 › 電腦鍵盤當鋼琴</code>，會把電腦鍵盤變成鋼琴。從 <code>Z</code> 到 <code>M</code> 以及從 <code>Q</code> 到 <code>P</code> 的按鍵列會彈奏所選的通道。</p>
+<ul><li>開啟時，字母和數字鍵都是音符。鋼琴捲軸和播放清單中單一字母的工具鍵，只有在它關閉時才有效。</li><li>它永遠以鋼琴捲軸的力度彈奏。MIDI 頁面上的 <code>力度</code> 設定是給 MIDI 裝置用的。</li><li>同一個開關也在 <code>選項 › 一般設定...</code> 中。</li></ul>
+<h2 id="the-touch-keyboard">觸控鍵盤</h2>
+<figure><a class="shot" href="/assets/img/wiki/touch-keyboard.webp"><img src="/assets/img/wiki/touch-keyboard.webp" alt="觸控鍵盤：八度按鈕、琴鍵大小、力度模式，以及從 C4 開始的一排鋼琴琴鍵" loading="lazy" width="820" height="210"></a></figure>
+<p><code>檢視 › 觸控鍵盤</code>（<code>Alt+F7</code>）會開啟一個用滑鼠或觸控螢幕彈奏的鋼琴。它彈奏通道機架中所選的通道，並在右側顯示通道名稱。</p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>-</code> 和 <code>+</code></td><td>降低或升高一個八度</td></tr><tr><td>琴鍵大小</td><td><code>小琴鍵</code>、<code>中琴鍵</code> 或 <code>大琴鍵</code></td></tr><tr><td><code>力度：按觸控位置</code></td><td>靠近琴鍵上方彈得輕，靠近下方彈得重</td></tr><tr><td><code>力度：固定</code></td><td>每個音符都使用滑桿設定的力度</td></tr><tr><td><code>音名</code></td><td>在琴鍵上顯示音名</td></tr></tbody></table></div>
+<h2 id="midi-sync">MIDI 同步</h2>
+<p>MIDI 頁面的 <code>輸出裝置</code> 會把走帶傳送給硬體和其他軟體。為某個裝置勾選 <code>傳送主同步</code>，再選擇 <code>MIDI時鐘</code>（含 Start、Continue、Stop 和 Song Position Pointer）或 MIDI Time Code。<code>偏移 (ms)</code> 設為正值時同步較晚送出，負值則較早。<code>傳送全部音符關閉</code> 會在初始化時以及匯出之後，把該訊息送給裝置。</p>
+<p><code>外部時鐘同步</code> 的方向相反：LYNX SHARE 跟隨你所選輸入的 MIDI 時鐘，包括它的速度、Start、Continue、Stop 和 Song Position Pointer。<code>外部同步偏移（毫秒）</code> 設為正值時 LYNX SHARE 播放較晚，負值則較早。<code>狀態</code> 會顯示時鐘是否正在運作。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>為 <code>外部時鐘同步</code> 選擇一個輸入，會在 <code>輸入裝置</code> 下開啟該裝置。</li><li>由已關聯的 MIDI 控制器移動的速度，不會調整音訊片段的大小。請輸入或設定最終的速度。</li><li>要錄製你彈奏的內容，見<a href="/wiki/recording/">錄音</a>。輸入的音符可以在<a href="/wiki/piano-roll/">鋼琴捲軸</a>中貼齊到音階。</li><li>送到外掛的 MIDI CC、通道觸後和彎音，可以用 <code>自動化MIDI控制器（CC、觸後、彎音）</code> 做成自動化。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/recording/">錄音</a></li><li><a href="/wiki/automation/">自動化</a></li><li><a href="/wiki/channel-rack/">通道機架</a></li><li><a href="/wiki/settings/">設定</a></li><li><a href="/wiki/shortcuts/">快速鍵</a></li></ul>

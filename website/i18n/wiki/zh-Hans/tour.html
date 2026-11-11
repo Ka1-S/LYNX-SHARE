@@ -1,0 +1,25 @@
+<figure><a class="shot" href="/assets/img/wiki/desktop.webp"><img src="/assets/img/wiki/desktop.webp" alt="带有演示工程的主窗口：顶部是工具栏，左侧是浏览器，后面是播放列表，通道机架浮在它上面" loading="lazy" width="1600" height="900"></a></figure>
+<p>LYNX SHARE 只有一个主窗口。工具栏沿顶部排列。它下面是一个桌面，里面放着五个窗口：浏览器、播放列表、通道机架、钢琴卷帘和混音台。刚启动时，浏览器在左侧，播放列表占满其余部分，通道机架浮在它上面。钢琴卷帘和混音台是隐藏的，直到你调出它们。</p>
+<h2 id="find-your-way-around">熟悉环境</h2>
+<ol><li>把鼠标指向任何控件。菜单下方的提示栏会说明它的作用，以及它接受哪些鼠标按键和按键。</li><li>按 <code>F6</code> 隐藏通道机架，再按一次 <code>F6</code> 显示它。</li><li>按 <code>F9</code> 显示混音台，再按 <code>F7</code> 显示钢琴卷帘。</li><li>拖动窗口的标题条可移动它。双击标题可将其最大化，再双击则还原。</li><li>选择 <code>视图 › 重置布局</code>，把一切恢复原样。</li></ol>
+<h2 id="the-toolbar">工具栏</h2>
+<figure><a class="shot" href="/assets/img/wiki/toolbar-1920.webp"><img src="/assets/img/wiki/toolbar-1920.webp" alt="工具栏：菜单和提示栏、走带、主控旋钮、录制选项、吸附和样式、窗口按钮、文件按钮、和弦显示、电平表和输出监视器" loading="lazy" width="1600" height="62"></a></figure>
+<p>从左到右，采用默认布局：</p>
+<div class="tablewrap"><table><thead><tr><th>分组</th><th>包含什么</th></tr></thead><tbody><tr><td>菜单和提示栏</td><td>菜单 <code>文件</code>、<code>编辑</code>、<code>添加</code>、<code>样式</code>、<code>视图</code>、<code>选项</code>、<code>工具</code> 和 <code>帮助</code>，下方是提示栏。始终排在最前</td></tr><tr><td>走带控制</td><td><code>样式</code> 和 <code>歌曲</code> 模式按钮、播放、停止和录制，以 BPM 表示的速度，以及以小节、拍和步表示的位置</td></tr><tr><td>主控音量和音高</td><td><code>主控</code> 音量旋钮和以音分为单位的 <code>音高</code> 旋钮</td></tr><tr><td>录制选项</td><td>节拍器、预备拍、循环录音、步进输入和其他录制开关</td></tr><tr><td>吸附和样式</td><td>主吸附（默认是 <code>线（跟随缩放）</code>）、当前样式、新建样式的按钮和样式菜单</td></tr><tr><td>窗口快捷键</td><td>每个窗口一个按钮，外加插件选择器</td></tr><tr><td>文件和撤销</td><td>新建、打开、保存、导出、撤销和重做</td></tr><tr><td>和弦检测</td><td>说出 MIDI 设备或打字键盘上正在弹奏的和弦名称</td></tr><tr><td>CPU、内存和复音</td><td>音频 CPU 负载、已用内存和发声数</td></tr><tr><td>输出监视器</td><td>输出的示波器。单击可依次切换它的其他模式</td></tr></tbody></table></div>
+<p>还有一个名为 <code>多重链接到控制器</code> 的分组，默认是隐藏的。</p>
+<p><code>选项 › 工具栏</code> 可更改工具栏：<code>编辑工具栏（拖动面板以移动、添加或移除）</code>、<code>分隔符</code>、<code>隐藏工具栏面板</code>、<code>预设</code>、每个分组各一个开关，以及 <code>图标大小</code>（小、中或大）。</p>
+<h2 id="transport">走带控制</h2>
+<div class="tablewrap"><table><thead><tr><th>控件</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>样式模式</td><td><code>L</code></td><td>循环播放当前样式。右键单击该按钮可显示通道机架</td></tr><tr><td>歌曲模式</td><td><code>L</code></td><td>播放播放列表中的编排。右键单击该按钮可显示播放列表</td></tr><tr><td>播放</td><td><code>Space</code></td><td>播放。再按一次则停止并回到起始位置。<code>Ctrl+Space</code> 暂停</td></tr><tr><td>停止</td><td></td><td>停止并回到开头。双击还会发送所有音符关闭</td></tr><tr><td>录制</td><td><code>R</code></td><td>开启或关闭录制。见<a href="/wiki/recording/">录音</a></td></tr></tbody></table></div>
+<h2 id="the-hint-bar">提示栏</h2>
+<p>空闲时，提示栏显示 <code>Point at anything for help</code>，并提示 <code>F1</code> 打开快捷键表、<code>F5</code> 到 <code>F9</code> 对应各窗口、<code>Space</code> 播放和停止。指向某个控件时，它会说出该控件的名称，并列出拖动、<code>Ctrl</code>、<code>Alt</code> 和右键单击在那里的作用。后台插件扫描这类耗时的任务会在其中报告进度。</p>
+<h2 id="the-five-windows">五个窗口</h2>
+<div class="tablewrap"><table><thead><tr><th>窗口</th><th>按键</th><th>用途</th></tr></thead><tbody><tr><td><a href="/wiki/playlist/">播放列表</a></td><td><code>F5</code></td><td>把样式、音频和自动化片段编排成歌曲</td></tr><tr><td><a href="/wiki/channel-rack/">通道机架</a></td><td><code>F6</code></td><td>每个乐器一行，显示当前样式的各个步</td></tr><tr><td><a href="/wiki/piano-roll/">钢琴卷帘</a></td><td><code>F7</code></td><td>当前样式中某个通道的音符</td></tr><tr><td><a href="/wiki/mixer/">混音台</a></td><td><code>F9</code></td><td>带推子的插入轨、效果器和路由</td></tr><tr><td><a href="/wiki/browser/">浏览器</a></td><td><code>Alt+F8</code></td><td>采样、预设、工程的内容和插件数据库</td></tr></tbody></table></div>
+<p>每个按键都会显示对应窗口并使其获得焦点，如果该窗口已有焦点则将其隐藏。单独按 <code>F8</code> 会打开插件选择器，它不属于这五个窗口。工具栏的窗口按钮与这些按键作用相同。右键单击其中一个，会以最大化方式显示该窗口。<code>Enter</code> 最大化或还原播放列表。</p>
+<h2 id="how-windows-move-and-dock">窗口如何移动和停靠</h2>
+<p>每个窗口都有一个标题条。它的左侧是一个菜单按钮，里面是该窗口自己的选项，随后是 <code>已分离（独立窗口）</code>、<code>已最大化</code> 和 <code>关闭</code>。右侧是最大化和关闭按钮。</p>
+<ul><li>拖动标题条可移动窗口。它会吸附到其他窗口和边缘。按住 <code>Alt</code> 移动可不吸附。</li><li>拖动边缘可调整大小。</li><li><code>已分离（独立窗口）</code> 会把窗口变成独立的系统窗口，适合第二台显示器。分离后的窗口有一个 <code>停靠</code> 按钮，可把它放回去。<code>视图 › 分离的面板（独立窗口）</code> 列出这五个窗口。</li><li><code>视图 › 找回屏幕外的面板</code> 可找回跑到桌面之外的窗口。</li><li><code>视图 › 布局另存为...</code> 以一个名称保存当前排列，<code>视图 › 加载布局</code> 则把某个排列调回来。</li></ul>
+<p>浏览器是桌面的背景：它始终停靠在一侧，其他窗口总是位于它之上。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>在你移动、调整大小或分离任何东西之前，每当主窗口改变大小，各窗口都会回到它们的默认位置。之后，你的排列会被记住，并随窗口缩放。</li><li><code>F12</code> 关闭插件、通道设置和工具窗口。它不会关闭这五个主窗口。</li><li>打字键盘钢琴开启时（<code>Ctrl+T</code>），字母键演奏音符，大多数单字母快捷键会暂停。</li><li><code>视图 › 布局样式</code> 在样式工作流程（默认）和片段启动工作流程之间切换，后者会在播放列表旁边增加一个片段网格。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/first-song/">你的第一首歌</a></li><li><a href="/wiki/layouts/">布局</a></li><li><a href="/wiki/shortcuts/">快捷键</a></li><li><a href="/wiki/settings/">设置</a></li></ul>

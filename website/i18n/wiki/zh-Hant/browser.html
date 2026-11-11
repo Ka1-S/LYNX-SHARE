@@ -1,0 +1,34 @@
+<figure><a class="shot" href="/assets/img/wiki/browser-tree.webp"><img src="/assets/img/wiki/browser-tree.webp" alt="左側的瀏覽器：三個分頁、搜尋框、資料夾樹和預覽條" loading="lazy" width="1600" height="900"></a></figure>
+<p>瀏覽器會列出你的取樣資料夾、目前專案的內容，以及 LYNX SHARE 認得的外掛。按 <code>Alt+F8</code> 可顯示或隱藏它。單按 <code>F8</code> 會開啟外掛選擇器，這是一個獨立的全螢幕檢視，列出所有樂器和效果器。</p>
+<h2 id="load-a-sample-into-the-project">把取樣載入專案</h2>
+<ol><li>按 <code>Alt+F8</code> 顯示瀏覽器。</li><li>在 <code>全部</code> 分頁中，點擊資料夾將其開啟。</li><li>點擊音訊檔案即可試聽。用 <code>Up</code> 和 <code>Down</code> 逐一切換檔案，每個檔案都會預覽。</li><li>對檔案按兩下，會在<a href="/wiki/channel-rack/">通道機架</a>中新增一個載入該取樣的通道。</li><li>或者把檔案拖到<a href="/wiki/playlist/">播放清單</a>，得到一個音訊片段。</li></ol>
+<h2 id="tabs">分頁</h2>
+<div class="tablewrap"><table><thead><tr><th>分頁</th><th>顯示內容</th></tr></thead><tbody><tr><td>ALL</td><td>目前專案、外掛資料庫和所有取樣資料夾</td></tr><tr><td>PROJECT</td><td>只顯示目前專案用到的內容：樣式、效果器、產生器、自動化、音訊檔案</td></tr><tr><td>STARRED</td><td>你加上星標的檔案和資料夾（按右鍵，再選 <code>已加星標</code>）</td></tr></tbody></table></div>
+<h2 id="browse-and-preview">瀏覽與預覽</h2>
+<ul><li>點擊資料夾可展開或收合。按右鍵會出現選單（全部摺疊、在檔案管理器中顯示）。</li><li>點擊音訊檔案即可試聽。清單下方的預覽條會顯示它的波形。點擊預覽條可再聽一次，也可以從預覽條拖曳，效果等同拖曳檔案本身。</li><li>預覽條上方的面板會顯示所選檔案的日期、大小和路徑。</li></ul>
+<h2 id="use-a-sample">使用取樣</h2>
+<div class="tablewrap"><table><thead><tr><th>操作</th><th>作用</th></tr></thead><tbody><tr><td>按兩下</td><td>新增載入該取樣的通道</td></tr><tr><td>拖到通道機架</td><td>新增通道；放在某一列上則載入到該列</td></tr><tr><td>拖到播放清單</td><td>音訊片段</td></tr><tr><td><code>Enter</code></td><td>把檔案載入所選通道</td></tr><tr><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>切換到上一個或下一個檔案，並載入所選通道</td></tr></tbody></table></div>
+<p>最後一項讓你在樣式播放的同時，原地試聽不同的取樣。</p>
+<h2 id="other-file-types">其他檔案類型</h2>
+<ul><li><strong>專案</strong>：按兩下即可開啟。</li><li><strong>MIDI 檔案</strong>：按兩下會把它當作專案開啟。</li><li><strong>SoundFont 或 SFZ</strong>：點擊可預覽，按兩下會建立 LYNX Soundfont 通道（或載入到所選通道）。</li><li><strong>混音器預設集</strong>：按兩下會載入到所選的混音插入軌，也可以拖到某個插入軌上。</li><li><strong>效果器預設集</strong>：拖到混音插入軌上。</li></ul>
+<h2 id="plugin-database">外掛資料庫</h2>
+<p>外掛資料庫項目會列出 LYNX SHARE 的內建樂器和效果器，以及已安裝的外掛。按 <code>Shift+F8</code> 可直接跳到這裡。</p>
+<ul><li>對樂器按兩下可新增為通道，也可以把它拖到通道機架。</li><li>對效果器按兩下可加到<a href="/wiki/mixer/">混音器</a>中所選的插入軌，也可以把它拖到插入軌或效果插槽上。</li><li><code>F2</code> 可重新命名所選外掛。</li><li>對外掛按右鍵並選擇 <code>移到資料夾</code>，即可把外掛分類到資料夾。混音器的插槽選單和通道機架的新增選單隨後會列出每個頂層資料夾。</li></ul>
+<h2 id="the-project-tab">PROJECT 分頁</h2>
+<p>這裡列出的樣式，點擊可設為目前樣式，按兩下會在<a href="/wiki/piano-roll/">鋼琴捲軸</a>中開啟，也可以拖進播放清單。目前專案區段還會列出復原記錄：點擊其中一步即可回到那個狀態。</p>
+<h2 id="search">搜尋</h2>
+<p>按 <code>Ctrl+F</code> 可把游標移到搜尋框。它會搜尋所選資料夾（或所有資料夾）及其下層。在 PROJECT 分頁中，它搜尋的是專案裡的項目。</p>
+<p>所有詞都必須符合。搜尋框也接受 <code>OR</code>、用減號排除某個詞，以及 <code>*</code> 萬用字元：</p>
+<pre><code>kick -loop
+snare OR clap
+hat*.wav</code></pre>
+<p>資料夾會在背景建立索引。瀏覽器選單中的 <code>重新整理搜尋索引</code> 會重建索引。</p>
+<h2 id="your-own-folders">你自己的資料夾</h2>
+<p>用瀏覽器資料夾清單中的 <code>新增資料夾</code>，可以新增放有取樣、專案或 SoundFont 的資料夾。搜尋資料夾在 <code>選項 › 檔案設定（搜尋資料夾）</code> 中設定。</p>
+<h2 id="keys">快速鍵</h2>
+<p>方向鍵、<code>Enter</code> 和 <code>F2</code> 需要瀏覽器取得焦點才有效。</p>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td>顯示瀏覽器</td><td><code>Alt+F8</code></td><td>顯示或隱藏瀏覽器</td></tr><tr><td>外掛選擇器</td><td><code>F8</code></td><td>開啟全螢幕外掛選擇器</td></tr><tr><td>外掛資料庫</td><td><code>Shift+F8</code></td><td>跳到外掛資料庫項目</td></tr><tr><td>搜尋</td><td><code>Ctrl+F</code></td><td>把游標移到搜尋框</td></tr><tr><td>切換並預覽</td><td><code>Up</code> / <code>Down</code></td><td>選取上一個或下一個檔案並播放</td></tr><tr><td>關閉資料夾</td><td><code>Left</code></td><td>關閉資料夾，或回到上一層</td></tr><tr><td>開啟資料夾</td><td><code>Right</code></td><td>開啟資料夾</td></tr><tr><td>載入</td><td><code>Enter</code></td><td>把檔案載入所選通道</td></tr><tr><td>切換並載入</td><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>切換到上一個或下一個檔案，並載入所選通道</td></tr><tr><td>重新命名外掛</td><td><code>F2</code></td><td>重新命名外掛資料庫中所選的外掛</td></tr></tbody></table></div>
+<h2 id="good-to-know">須知</h2>
+<ul><li>從清單中移除資料夾，不會把它從磁碟刪除。</li><li><code>F8</code> 和 <code>Alt+F8</code> 不一樣。<code>F8</code> 是外掛選擇器，<code>Alt+F8</code> 是瀏覽器。</li><li>搜尋結果來自在背景建立的索引。瀏覽器選單中的 <code>重新整理搜尋索引</code> 可重建索引。</li><li><code>Enter</code> 會把檔案載入所選通道。按兩下則會新增通道。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/channel-rack/">通道機架</a></li><li><a href="/wiki/plugins/">第三方外掛</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/undo-history/">復原與歷程</a></li><li><a href="/instruments-and-effects/">樂器與效果器</a></li></ul>

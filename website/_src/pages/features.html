@@ -1,0 +1,176 @@
+<div class="phead"><div class="wrap">
+  <h1 data-i18n="fe.h1">Features</h1>
+  <p data-i18n="fe.sub">What is in the current release, window by window, and where it still falls short. The <a class="tlink" href="/wiki/">wiki</a> explains how to use each part.</p>
+</div></div>
+
+<section class="sec" id="screens">
+  <div class="wrap">
+    <h2 data-i18n="fe.winT">The windows</h2>
+    <p class="lead" data-i18n="fe.winL">The layout follows FL Studio: Browser, Channel rack, Piano roll, Playlist and Mixer, each opened and closed with the same keys as there.</p>
+
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/playlist.webp?v=0.1.25"><img src="/assets/img/playlist.webp?v=0.1.25" alt="Playlist" width="1600" height="900"></a></figure>
+      <div><h3>Playlist</h3>
+        <p data-i18n="fe.plP">Pattern, audio and automation clips on tracks. Right-click a clip for split, chop, merge, reverse, normalize and fit to tempo.</p>
+        <ul><li data-i18n="fe.plA">Several arrangements in one project, markers and time selection</li><li data-i18n="fe.plB">Automation clips with curves for any knob or fader, and optional automation lanes under tracks</li><li data-i18n="fe.plC">Audio recording with loop takes and comping</li><li data-i18n="fe.plD">Video tracks with a timecode ruler (export with video needs FFmpeg)</li></ul>
+      </div>
+    </div>
+
+    <div class="frow narrow flip">
+      <figure><a class="shot" href="/assets/img/rack.webp?v=0.1.25"><img src="/assets/img/rack.webp?v=0.1.25" alt="Channel rack" loading="lazy"></a></figure>
+      <div><h3>Channel rack</h3>
+        <p data-i18n="fe.crP">A step sequencer with one row per instrument. Each channel has volume, pan, mute and solo, and each pattern its own name, colour and length.</p>
+        <ul><li data-i18n="fe.crA">Swing, cut groups, an arpeggiator and layer channels</li><li data-i18n="fe.crB">The PC keyboard plays notes like a piano</li></ul>
+      </div>
+    </div>
+
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.25"><img src="/assets/img/pianoroll.webp?v=0.1.25" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
+      <div><h3>Piano roll</h3>
+        <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colours, note groups, and slide and porta notes.</p>
+        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li></ul>
+      </div>
+    </div>
+
+    <div class="frow flip">
+      <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.25"><img src="/assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"></a></figure>
+      <div><h3>Mixer</h3>
+        <p data-i18n="fe.mxP">Up to 127 insert tracks. Each has 10 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
+        <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li></ul>
+      </div>
+    </div>
+
+    <div class="frow narrow">
+      <figure><a class="shot" href="/assets/img/automation.webp?v=0.1.25"><img src="/assets/img/automation.webp?v=0.1.25" alt="Automation" data-i18n-alt="alt.auto" loading="lazy"></a></figure>
+      <div><h3 data-i18n="fe.auT">Automation and controllers</h3>
+        <p data-i18n="fe.auP">Any knob or fader of a channel, the mixer, an effect or a plugin can become a clip with points and curves. MIDI controllers can be linked to any parameter, and modulators (an LFO or a random source) move a knob around its own value.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="clips">
+  <div class="wrap">
+    <h2 data-i18n="fe.clT">Clip-launch layout</h2>
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/cliplaunch.webp?v=0.1.25"><img src="/assets/img/cliplaunch.webp?v=0.1.25" alt="Clip-launch workflow" loading="lazy"></a></figure>
+      <div>
+        <p data-i18n="fe.clP">An optional layout (View › Layout style) puts a grid of clips and scenes next to the Playlist, in the manner of Ableton Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
+        <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The pattern layout stays the default and nothing changes in it.</p>
+        <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="formats">
+  <div class="wrap">
+    <h2 data-i18n="fe.fmT">Projects from other programs</h2>
+    <p class="lead" data-i18n="fe.fmL">An imported project is saved as a .lynx file, and the original is never changed. After each import a report lists what was approximated or left out.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th data-i18n="fe.fmH1">Format</th><th data-i18n="fe.fmH2">Open</th><th data-i18n="fe.fmH3">Export</th><th data-i18n="fe.fmH4">Limits</th></tr></thead>
+      <tbody>
+        <tr><td>.flp<br><span class="muted">FL Studio</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmFlp">Channels, samples, patterns, arrangement, automation and mixer come in. FL Studio's native plugins play on LYNX SHARE's engines (see the list below). On export, what FL Studio does not have is rendered to audio or left out.</td></tr>
+        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation and VST2 / VST3 plugins. Simpler, Sampler and drum racks become samplers. Live's own effects are dropped and racks keep their first chain. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
+        <tr><td>.flm<br><span class="muted">FL Studio Mobile</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmFlm">Arrangement, samples, drum kits and DirectWave programs. FL Studio Mobile's effects are not imported yet.</td></tr>
+        <tr><td>.mid</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmMid">As a new project, or into the current one from the Piano roll.</td></tr>
+        <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3</td><td>WAV, MP3, FLAC, OGG</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted"><a class="tlink" href="/wiki/file-formats/" data-i18n="fe.fmMore">Every format and its limits</a></p>
+  </div>
+</section>
+
+<section class="sec" id="box">
+  <div class="wrap">
+    <h2 data-i18n="fe.boxT">Instruments and effects</h2>
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/synth.webp?v=0.1.25"><img src="/assets/img/synth.webp?v=0.1.25" alt="Synth" data-i18n-alt="alt.synth" loading="lazy"></a><figcaption data-i18n="fe.synC">The built-in synth: 3 oscillators, a multimode filter with keytracking, FM and ring modulation, envelopes and 4 LFOs.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/eq.webp?v=0.1.25"><img src="/assets/img/eq.webp?v=0.1.25" alt="Facet EQ" data-i18n-alt="alt.eq" loading="lazy"></a><figcaption data-i18n="fe.eqC">Facet EQ: 8 bands, cuts up to 96 dB/oct, dynamic bands and a pre/post analyser, at zero latency.</figcaption></figure>
+    </div>
+    <div class="cols" style="margin-top:34px">
+      <div><h3 data-i18n="fe.insT">Instruments</h3><ul>
+        <li data-i18n="fe.ins1">Sampler with zones, slices, time-stretch and disk streaming</li>
+        <li data-i18n="fe.ins2">LYNX Soundfont, an SF2 / SF3 player</li>
+        <li data-i18n="fe.ins3">Built-in drums: kick, snare, hat, clap</li>
+        <li data-i18n="fe.ins4">Note effects (sequencer, key mapper, keyboard splitter) and controllers (X-Y, envelope, voltage)</li></ul></div>
+      <div><h3 data-i18n="fe.fxT">Effects</h3><ul>
+        <li data-i18n="fe.fx1">EQs, compressor with sidechain, limiter, gate</li>
+        <li data-i18n="fe.fx2">Delays, reverbs, chorus, filters, distortion</li>
+        <li data-i18n="fe.fx3">Vocoder, pitch correction, pitch and frequency shifters</li>
+        <li data-i18n="fe.fx4">Patcher: a node graph of effects, instruments and plugins</li>
+        <li data-i18n="fe.fx5">Hardware insert for outboard gear, with delay compensation</li></ul></div>
+      <div><h3 data-i18n="fe.hostT">Third-party plugins</h3><ul>
+        <li data-i18n="fe.host1">VST3 and CLAP on every system</li>
+        <li data-i18n="fe.host2">Audio Units on macOS, LV2 on Linux, VST2 on Windows and Linux</li>
+        <li data-i18n="fe.host3">32-bit VST2 and VST3 on Windows, through a bridge</li>
+        <li data-i18n="fe.host4">A plugin can run in its own process, so a crash in it does not take the project down</li>
+        <li data-i18n="fe.host5">ASIO is Windows-only</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="plugins">
+  <div class="wrap">
+    <h2 data-i18n="fe.pluT">FL Studio's plugins, recreated</h2>
+    <div class="prose" style="max-width:780px">
+      {{CAT_SUB}}
+      <p data-i18n="why.fl.p1">{{WHY_FL_P1}}</p>
+      <p data-i18n="why.fl.x2">{{WHY_FL_X2}}</p>
+    </div>
+    <p style="margin-top:18px"><a class="btn btn-red btn-sm" href="/instruments-and-effects/" data-i18n="cat.h1">Instruments and effects</a> <a class="btn btn-ghost btn-sm" href="/wiki/built-in/" data-i18n="why.guide">Read the guide</a></p>
+    <p class="muted" style="margin-top:14px" data-i18n="pl.more">Status, test coverage and what is still missing for each one: <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">docs/PLUGINS.md</a>.</p>
+    <p class="note" data-i18n="pl.tm">FL Studio and its plugin names are trademarks of Image-Line Software, used here only to describe compatibility. LYNX SHARE is not affiliated with Image-Line. No Image-Line code or audio data ships with LYNX SHARE; built-in waves are read from your own FL Studio installation.</p>
+  </div>
+</section>
+
+<section class="sec" id="classics">
+  <div class="wrap">
+    <h2 data-i18n="fe.insT2">Stand-ins for third-party plugins</h2>
+    <p class="lead" data-i18n="fe.insL">LYNX SHARE has its own effects that play the role of widely used third-party plugins. If a project uses one of those plugins and it is not installed, the LYNX SHARE effect loads in its slot and the original's settings are kept for when it is back.</p>
+    <p><a class="btn btn-ghost btn-sm" href="/wiki/plugins/#when-a-plugin-is-not-installed" data-i18n="why.guide">Read the guide</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/v0.1.25-alpha/docs/PLUGINS.md#inspired-by-the-classics">docs/PLUGINS.md (0.1.25)</a></p>
+  </div>
+</section>
+
+<section class="sec" id="media">
+  <div class="wrap">
+    <h2 data-i18n="fe.demoT">The demo song</h2>
+    <p class="lead" data-i18n="fe.demoL">The demo project comes with the program. Every sound in it is from LYNX SHARE's own synths, drums and effects, and the audio below was exported by LYNX SHARE.</p>
+    <div class="media">
+      <div class="video"><video id="tour" src="/assets/media/lynx-tour.mp4?v=0.1.23" poster="/assets/media/poster.jpg?v=0.1.23" preload="none" controls playsinline></video></div>
+      <div class="player">
+        <h3>Demo.lynx</h3>
+        <p data-i18n="media.songp">124 BPM · kick, clap, reese bass, pad, pluck and supersaw. Click the waveform to seek.</p>
+        <div class="wave" id="wave"><canvas></canvas></div>
+        <div class="pctl"><button class="play" id="aPlay" aria-label="Play demo" data-i18n-aria="aria.playDemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><span class="t" id="atime">0:00 / 0:46</span></div>
+        <audio id="audio" src="/assets/media/demo.mp3?v=0.1.23" preload="none"></audio>
+        <noscript><audio src="/assets/media/demo.mp3?v=0.1.23" controls preload="none"></audio></noscript>
+      </div>
+    </div>
+    <p class="note" data-i18n="fe.demoN">The video is a slideshow of screenshots over the demo song. It was made for an earlier version, so some windows look different now.</p>
+  </div>
+</section>
+
+<section class="sec" id="try">
+  <div class="wrap">
+    <h2 data-i18n="fe.tryT">A step sequencer in the browser</h2>
+    <p class="lead" data-i18n="fe.tryL">This is a toy made for this page, not the program: six rows and sixteen steps, to show how the Channel rack's step grid works. Click steps, then press play.</p>
+    <div class="seq-box">
+      <div class="seq-top">
+        <button class="play" id="seqPlay" aria-label="Play" data-i18n-aria="aria.play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button>
+        <div class="lcd"><span id="bpmv">124</span><small>BPM</small></div>
+        <label><span data-i18n="try.tempo">Tempo</span> <input type="range" id="bpm" min="80" max="170" value="124"></label>
+        <label>Swing <input type="range" id="swing" min="0" max="60" value="12"></label>
+        <div class="sp"><button class="btn btn-ghost btn-sm" id="rnd" data-i18n="try.rnd">Randomize</button><button class="btn btn-ghost btn-sm" id="clr" data-i18n="try.clr">Clear</button></div>
+      </div>
+      <div class="seq" id="seq"></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="engine">
+  <div class="wrap prose" style="max-width:820px">
+    <h2 data-i18n="fe.engT">Performance</h2>
+    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent and streams long audio files from disk. Measured against FL Studio 2026 on the developer's PC, it used 2.5 to 7 times less RAM and rendered the demo songs 2 to 3 times faster. The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/analise/REA_rodada116.md">benchmark notes</a>; your results will differ.</p>
+  </div>
+</section>

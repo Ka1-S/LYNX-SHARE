@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="fe.h1" data-desc="m.features.d">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features · LYNX SHARE</title>
+<meta name="description" content="What LYNX SHARE does in the current release: the windows, the clip-launch layout, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta property="og:title" content="Features · LYNX SHARE">
+<meta property="og:description" content="What LYNX SHARE does in the current release: the windows, the clip-launch layout, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/features/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/features/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/features/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/features/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/features/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/features/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/features/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/features/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/features/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/features/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/features/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/features/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/features/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/features/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/features/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/features/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/features/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/features/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="d56f6a02";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=d56f6a02">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" aria-current="page" data-i18n="nav.features">Features</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap">
+  <h1 data-i18n="fe.h1">Features</h1>
+  <p data-i18n="fe.sub">What is in the current release, window by window, and where it still falls short. The <a class="tlink" href="/wiki/">wiki</a> explains how to use each part.</p>
+</div></div>
+
+<section class="sec" id="screens">
+  <div class="wrap">
+    <h2 data-i18n="fe.winT">The windows</h2>
+    <p class="lead" data-i18n="fe.winL">The layout follows FL Studio: Browser, Channel rack, Piano roll, Playlist and Mixer, each opened and closed with the same keys as there.</p>
+
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/playlist.webp?v=0.1.25"><img src="/assets/img/playlist.webp?v=0.1.25" alt="Playlist" width="1600" height="900"></a></figure>
+      <div><h3>Playlist</h3>
+        <p data-i18n="fe.plP">Pattern, audio and automation clips on tracks. Right-click a clip for split, chop, merge, reverse, normalize and fit to tempo.</p>
+        <ul><li data-i18n="fe.plA">Several arrangements in one project, markers and time selection</li><li data-i18n="fe.plB">Automation clips with curves for any knob or fader, and optional automation lanes under tracks</li><li data-i18n="fe.plC">Audio recording with loop takes and comping</li><li data-i18n="fe.plD">Video tracks with a timecode ruler (export with video needs FFmpeg)</li></ul>
+      </div>
+    </div>
+
+    <div class="frow narrow flip">
+      <figure><a class="shot" href="/assets/img/rack.webp?v=0.1.25"><img src="/assets/img/rack.webp?v=0.1.25" alt="Channel rack" loading="lazy" width="1074" height="420"></a></figure>
+      <div><h3>Channel rack</h3>
+        <p data-i18n="fe.crP">A step sequencer with one row per instrument. Each channel has volume, pan, mute and solo, and each pattern its own name, colour and length.</p>
+        <ul><li data-i18n="fe.crA">Swing, cut groups, an arpeggiator and layer channels</li><li data-i18n="fe.crB">The PC keyboard plays notes like a piano</li></ul>
+      </div>
+    </div>
+
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.25"><img src="/assets/img/pianoroll.webp?v=0.1.25" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
+      <div><h3>Piano roll</h3>
+        <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colours, note groups, and slide and porta notes.</p>
+        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li></ul>
+      </div>
+    </div>
+
+    <div class="frow flip">
+      <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.25"><img src="/assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"></a></figure>
+      <div><h3>Mixer</h3>
+        <p data-i18n="fe.mxP">Up to 127 insert tracks. Each has 10 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
+        <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li></ul>
+      </div>
+    </div>
+
+    <div class="frow narrow">
+      <figure><a class="shot" href="/assets/img/automation.webp?v=0.1.25"><img src="/assets/img/automation.webp?v=0.1.25" alt="Automation" data-i18n-alt="alt.auto" loading="lazy" width="760" height="300"></a></figure>
+      <div><h3 data-i18n="fe.auT">Automation and controllers</h3>
+        <p data-i18n="fe.auP">Any knob or fader of a channel, the mixer, an effect or a plugin can become a clip with points and curves. MIDI controllers can be linked to any parameter, and modulators (an LFO or a random source) move a knob around its own value.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="clips">
+  <div class="wrap">
+    <h2 data-i18n="fe.clT">Clip-launch layout</h2>
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/cliplaunch.webp?v=0.1.25"><img src="/assets/img/cliplaunch.webp?v=0.1.25" alt="Clip-launch workflow" loading="lazy" width="1920" height="1080"></a></figure>
+      <div>
+        <p data-i18n="fe.clP">An optional layout (View › Layout style) puts a grid of clips and scenes next to the Playlist, in the manner of Ableton Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
+        <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The pattern layout stays the default and nothing changes in it.</p>
+        <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="formats">
+  <div class="wrap">
+    <h2 data-i18n="fe.fmT">Projects from other programs</h2>
+    <p class="lead" data-i18n="fe.fmL">An imported project is saved as a .lynx file, and the original is never changed. After each import a report lists what was approximated or left out.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th data-i18n="fe.fmH1">Format</th><th data-i18n="fe.fmH2">Open</th><th data-i18n="fe.fmH3">Export</th><th data-i18n="fe.fmH4">Limits</th></tr></thead>
+      <tbody>
+        <tr><td>.flp<br><span class="muted">FL Studio</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmFlp">Channels, samples, patterns, arrangement, automation and mixer come in. FL Studio's native plugins play on LYNX SHARE's engines (see the list below). On export, what FL Studio does not have is rendered to audio or left out.</td></tr>
+        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation and VST2 / VST3 plugins. Simpler, Sampler and drum racks become samplers. Live's own effects are dropped and racks keep their first chain. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
+        <tr><td>.flm<br><span class="muted">FL Studio Mobile</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmFlm">Arrangement, samples, drum kits and DirectWave programs. FL Studio Mobile's effects are not imported yet.</td></tr>
+        <tr><td>.mid</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmMid">As a new project, or into the current one from the Piano roll.</td></tr>
+        <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3</td><td>WAV, MP3, FLAC, OGG</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted"><a class="tlink" href="/wiki/file-formats/" data-i18n="fe.fmMore">Every format and its limits</a></p>
+  </div>
+</section>
+
+<section class="sec" id="box">
+  <div class="wrap">
+    <h2 data-i18n="fe.boxT">Instruments and effects</h2>
+    <div class="frow">
+      <figure><a class="shot" href="/assets/img/synth.webp?v=0.1.25"><img src="/assets/img/synth.webp?v=0.1.25" alt="Synth" data-i18n-alt="alt.synth" loading="lazy" width="720" height="510"></a><figcaption data-i18n="fe.synC">The built-in synth: 3 oscillators, a multimode filter with keytracking, FM and ring modulation, envelopes and 4 LFOs.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/eq.webp?v=0.1.25"><img src="/assets/img/eq.webp?v=0.1.25" alt="Facet EQ" data-i18n-alt="alt.eq" loading="lazy" width="960" height="560"></a><figcaption data-i18n="fe.eqC">Facet EQ: 8 bands, cuts up to 96 dB/oct, dynamic bands and a pre/post analyser, at zero latency.</figcaption></figure>
+    </div>
+    <div class="cols" style="margin-top:34px">
+      <div><h3 data-i18n="fe.insT">Instruments</h3><ul>
+        <li data-i18n="fe.ins1">Sampler with zones, slices, time-stretch and disk streaming</li>
+        <li data-i18n="fe.ins2">LYNX Soundfont, an SF2 / SF3 player</li>
+        <li data-i18n="fe.ins3">Built-in drums: kick, snare, hat, clap</li>
+        <li data-i18n="fe.ins4">Note effects (sequencer, key mapper, keyboard splitter) and controllers (X-Y, envelope, voltage)</li></ul></div>
+      <div><h3 data-i18n="fe.fxT">Effects</h3><ul>
+        <li data-i18n="fe.fx1">EQs, compressor with sidechain, limiter, gate</li>
+        <li data-i18n="fe.fx2">Delays, reverbs, chorus, filters, distortion</li>
+        <li data-i18n="fe.fx3">Vocoder, pitch correction, pitch and frequency shifters</li>
+        <li data-i18n="fe.fx4">Patcher: a node graph of effects, instruments and plugins</li>
+        <li data-i18n="fe.fx5">Hardware insert for outboard gear, with delay compensation</li></ul></div>
+      <div><h3 data-i18n="fe.hostT">Third-party plugins</h3><ul>
+        <li data-i18n="fe.host1">VST3 and CLAP on every system</li>
+        <li data-i18n="fe.host2">Audio Units on macOS, LV2 on Linux, VST2 on Windows and Linux</li>
+        <li data-i18n="fe.host3">32-bit VST2 and VST3 on Windows, through a bridge</li>
+        <li data-i18n="fe.host4">A plugin can run in its own process, so a crash in it does not take the project down</li>
+        <li data-i18n="fe.host5">ASIO is Windows-only</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="plugins">
+  <div class="wrap">
+    <h2 data-i18n="fe.pluT">FL Studio's plugins, recreated</h2>
+    <div class="prose" style="max-width:780px">
+      <p data-i18n="cat.sub" data-args='[&quot;167&quot;, &quot;0.1.25&quot;]' data-count="167">167 instruments, effects and tools are built into LYNX SHARE 0.1.25. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
+      <p data-i18n="why.fl.p1">FL Studio's own plugins cannot be loaded by another program. LYNX SHARE has its own engine for most of them, written from scratch, and reads each plugin's saved settings from the .flp or from an .fst preset. A Sytrus channel opens as LYNX SHARE's Sytrus engine with the same patch, a Fruity Limiter slot as its limiter with the same values.</p>
+      <p data-i18n="why.fl.x2">Some engines need wave data or samples that belong to FL Studio. LYNX SHARE reads those from your own FL Studio installation and ships none of them.</p>
+    </div>
+    <p style="margin-top:18px"><a class="btn btn-red btn-sm" href="/instruments-and-effects/" data-i18n="cat.h1">Instruments and effects</a> <a class="btn btn-ghost btn-sm" href="/wiki/built-in/" data-i18n="why.guide">Read the guide</a></p>
+    <p class="muted" style="margin-top:14px" data-i18n="pl.more">Status, test coverage and what is still missing for each one: <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">docs/PLUGINS.md</a>.</p>
+    <p class="note" data-i18n="pl.tm">FL Studio and its plugin names are trademarks of Image-Line Software, used here only to describe compatibility. LYNX SHARE is not affiliated with Image-Line. No Image-Line code or audio data ships with LYNX SHARE; built-in waves are read from your own FL Studio installation.</p>
+  </div>
+</section>
+
+<section class="sec" id="classics">
+  <div class="wrap">
+    <h2 data-i18n="fe.insT2">Stand-ins for third-party plugins</h2>
+    <p class="lead" data-i18n="fe.insL">LYNX SHARE has its own effects that play the role of widely used third-party plugins. If a project uses one of those plugins and it is not installed, the LYNX SHARE effect loads in its slot and the original's settings are kept for when it is back.</p>
+    <p><a class="btn btn-ghost btn-sm" href="/wiki/plugins/#when-a-plugin-is-not-installed" data-i18n="why.guide">Read the guide</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/v0.1.25-alpha/docs/PLUGINS.md#inspired-by-the-classics">docs/PLUGINS.md (0.1.25)</a></p>
+  </div>
+</section>
+
+<section class="sec" id="media">
+  <div class="wrap">
+    <h2 data-i18n="fe.demoT">The demo song</h2>
+    <p class="lead" data-i18n="fe.demoL">The demo project comes with the program. Every sound in it is from LYNX SHARE's own synths, drums and effects, and the audio below was exported by LYNX SHARE.</p>
+    <div class="media">
+      <div class="video"><video id="tour" src="/assets/media/lynx-tour.mp4?v=0.1.23" poster="/assets/media/poster.jpg?v=0.1.23" preload="none" controls playsinline></video></div>
+      <div class="player">
+        <h3>Demo.lynx</h3>
+        <p data-i18n="media.songp">124 BPM · kick, clap, reese bass, pad, pluck and supersaw. Click the waveform to seek.</p>
+        <div class="wave" id="wave"><canvas></canvas></div>
+        <div class="pctl"><button class="play" id="aPlay" aria-label="Play demo" data-i18n-aria="aria.playDemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button><span class="t" id="atime">0:00 / 0:46</span></div>
+        <audio id="audio" src="/assets/media/demo.mp3?v=0.1.23" preload="none"></audio>
+        <noscript><audio src="/assets/media/demo.mp3?v=0.1.23" controls preload="none"></audio></noscript>
+      </div>
+    </div>
+    <p class="note" data-i18n="fe.demoN">The video is a slideshow of screenshots over the demo song. It was made for an earlier version, so some windows look different now.</p>
+  </div>
+</section>
+
+<section class="sec" id="try">
+  <div class="wrap">
+    <h2 data-i18n="fe.tryT">A step sequencer in the browser</h2>
+    <p class="lead" data-i18n="fe.tryL">This is a toy made for this page, not the program: six rows and sixteen steps, to show how the Channel rack's step grid works. Click steps, then press play.</p>
+    <div class="seq-box">
+      <div class="seq-top">
+        <button class="play" id="seqPlay" aria-label="Play" data-i18n-aria="aria.play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button>
+        <div class="lcd"><span id="bpmv">124</span><small>BPM</small></div>
+        <label><span data-i18n="try.tempo">Tempo</span> <input type="range" id="bpm" min="80" max="170" value="124"></label>
+        <label>Swing <input type="range" id="swing" min="0" max="60" value="12"></label>
+        <div class="sp"><button class="btn btn-ghost btn-sm" id="rnd" data-i18n="try.rnd">Randomize</button><button class="btn btn-ghost btn-sm" id="clr" data-i18n="try.clr">Clear</button></div>
+      </div>
+      <div class="seq" id="seq"></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="engine">
+  <div class="wrap prose" style="max-width:820px">
+    <h2 data-i18n="fe.engT">Performance</h2>
+    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent and streams long audio files from disk. Measured against FL Studio 2026 on the developer's PC, it used 2.5 to 7 times less RAM and rendered the demo songs 2 to 3 times faster. The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/analise/REA_rodada116.md">benchmark notes</a>; your results will differ.</p>
+  </div>
+</section>
+
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=d56f6a02" defer></script>
+<script src="/assets/features.js?v=d56f6a02" defer></script>
+<script src="/assets/motion.js?v=d56f6a02" defer></script>
+</body>
+</html>

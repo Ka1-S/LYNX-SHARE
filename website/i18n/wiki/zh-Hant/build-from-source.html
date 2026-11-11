@@ -1,0 +1,36 @@
+<p>LYNX SHARE 以 C++20 搭配 JUCE 8 撰寫，並用 CMake 建置。原始碼在 <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a>，採用 GNU Affero General Public License v3.0 授權。發行檔由 GitHub Actions 從帶標籤的原始碼建置，所以只有在你想修改程式碼或自行建置時才需要這一頁。</p>
+<h2 id="build-on-linux">在 Linux 上建置</h2>
+<ol><li>安裝下方列出的相依套件。</li><li>用 <code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code> 取得原始碼，然後進入 <code>lynx</code> 資料夾。</li><li>用 <code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code> 進行設定。</li><li>用 <code>cmake --build build</code> 建置。</li></ol>
+<p>Ubuntu 24.04 上的相依套件：</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">在 Windows 上用 Visual Studio 建置</h2>
+<p>需要安裝了「使用 C++ 的桌面開發」的 Visual Studio 2022 Build Tools、CMake 3.22 或更新版本，以及 Git。</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">從 WSL 或 Linux 建置 Windows 版</h2>
+<p>專案本身就是這樣開發的：Windows 程式用 Zig 交叉編譯，不需要 Visual Studio。</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>結果是 <code>build-win/LYNX.exe</code>。</p>
+<div class="tablewrap"><table><thead><tr><th>需求</th><th>版本</th><th>預設位置</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE 可以這樣取得：</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>如果你的路徑不同，請設定環境變數 <code>ZIG</code> 和 <code>JUCE_DIR</code>。</p>
+<h2 id="build-on-macos">在 macOS 上建置</h2>
+<p>需要 Xcode 命令列工具（<code>xcode-select --install</code>）、CMake 和 Ninja，例如可透過 <code>brew install cmake ninja</code> 安裝。</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code> 會產生通用應用程式。省略它則只為目前這台 Mac 建置。</p>
+<h2 id="run-the-core-tests">執行核心測試</h2>
+<p>核心（模型、音序器、樂器、效果器和 <code>.flp</code> 匯入）是純 C++，不需要 JUCE，用任何 C++20 編譯器都能測試。</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>執行結果必須以 <code>N checks, 0 failures</code> 結尾。如果指定 FL Studio 2026 安裝位置的 <code>Data</code> 資料夾，它還會解析隨 FL Studio 附帶的 <code>.flp</code> 專案。這個腳本也會建置兩個小工具：<code>build-local/flpdump</code>（傾印 <code>.flp</code>）和 <code>build-local/renderwav</code>。</p>
+<p>建置之後，程式不需要音訊裝置就能自我檢查：</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>報告結尾會是 <code>result=OK</code>。更多選項在<a href="/wiki/command-line/">命令列</a>頁面。</p>
+<h2 id="the-source-tree">原始碼樹</h2>
+<div class="tablewrap"><table><thead><tr><th>資料夾</th><th>內容</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>模型、音序器、樂器、效果器和 <code>.flp</code> 匯入。純 C++，不需要 JUCE 即可測試</td></tr><tr><td><code>src/flp/</code></td><td><code>.flp</code> 格式讀取器</td></tr><tr><td><code>src/engine/</code></td><td>音訊引擎：裝置、圖、取樣、外掛、專案檔案</td></tr><tr><td><code>src/ui/</code></td><td>介面：通道機架、鋼琴捲軸、播放清單、混音器、視窗</td></tr><tr><td><code>third_party/</code></td><td>CLAP 和 WavPack 解碼器</td></tr><tr><td><code>tests/</code></td><td>核心測試</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>、<code>renderwav</code>、<code>comparewav</code>、<code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>架構、狀態、路線圖，以及對 FL Studio 行為的分析</td></tr></tbody></table></div>
+<h2 id="good-to-know">須知</h2>
+<ul><li>JUCE 8 並未正式支援 MinGW。Zig 建置腳本會處理這些差異。修正內容在 <code>cmake/mingw/</code> 和 <code>src/platform/MingwFixes.cpp</code>。</li><li>一次只能執行一個 <code>build-windows-zig.sh</code>。同時跑兩個 Zig 建置可能會卡住。若要在不同的工作樹中平行建置，請用 <code>ZIG_GLOBAL_CACHE_DIR</code> 和 <code>ZIG_LOCAL_CACHE_DIR</code> 為每個建置指定各自的快取。</li><li>有些引擎會從你自己的 FL Studio 安裝讀取內建音色和表格。儲存庫中沒有任何來自 FL Studio 的內容。</li><li><code>docs/</code> 中有一部分文件仍是葡萄牙文，正在翻譯中。</li><li>如果你散布修改過的版本，包括作為網路服務提供，授權條款要求你以相同授權公開它的原始碼。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">完整開發環境（SETUP_DEV.md）</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">Linux 上的 LYNX SHARE（LINUX.md）</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">儲存庫及其 README</a></li><li><a href="/wiki/command-line/">命令列</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li></ul>

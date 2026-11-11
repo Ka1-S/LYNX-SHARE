@@ -1,0 +1,36 @@
+<p>LYNX SHARE написан на C++20 с JUCE 8 и собирается через CMake. Исходники лежат на <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a> под лицензией GNU Affero General Public License v3.0. Релизные файлы GitHub Actions собирает из помеченных тегами исходников, так что эта страница нужна только тем, кто хочет изменить код или собрать программу для себя.</p>
+<h2 id="build-on-linux">Сборка в Linux</h2>
+<ol><li>Установите зависимости из списка ниже.</li><li>Получите исходники командой <code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code> и перейдите в папку <code>lynx</code>.</li><li>Настройте проект командой <code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code>.</li><li>Соберите командой <code>cmake --build build</code>.</li></ol>
+<p>Зависимости в Ubuntu 24.04:</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">Сборка в Windows с Visual Studio</h2>
+<p>Нужны Visual Studio 2022 Build Tools с компонентом «Разработка классических приложений на C++», CMake 3.22 или новее и Git.</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">Сборка для Windows из WSL или Linux</h2>
+<p>Так ведётся разработка самого проекта: программа для Windows кросс-компилируется с помощью Zig, без Visual Studio.</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>Результат лежит в <code>build-win/LYNX.exe</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>Требование</th><th>Версия</th><th>Место по умолчанию</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE можно скачать так:</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>Если ваши пути другие, задайте переменные окружения <code>ZIG</code> и <code>JUCE_DIR</code>.</p>
+<h2 id="build-on-macos">Сборка в macOS</h2>
+<p>Нужны утилиты командной строки Xcode (<code>xcode-select --install</code>), CMake и Ninja, например из <code>brew install cmake ninja</code>.</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code> даёт универсальное приложение. Уберите параметр, чтобы собрать только для текущего Mac.</p>
+<h2 id="run-the-core-tests">Запуск тестов ядра</h2>
+<p>Ядро (модель, секвенсор, инструменты, эффекты и импорт <code>.flp</code>) написано на чистом C++ и тестируется без JUCE любым компилятором C++20.</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>Прогон должен закончиться строкой <code>N checks, 0 failures</code>. Если указать папку <code>Data</code> установки FL Studio 2026, скрипт разберёт и проекты <code>.flp</code>, которые поставляются с FL Studio. Скрипт также собирает два небольших инструмента: <code>build-local/flpdump</code>, который выводит содержимое <code>.flp</code>, и <code>build-local/renderwav</code>.</p>
+<p>После сборки программа может проверить себя без аудиоустройства:</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>Отчёт заканчивается строкой <code>result=OK</code>. Другие параметры описаны на странице <a href="/wiki/command-line/">Командная строка</a>.</p>
+<h2 id="the-source-tree">Структура исходников</h2>
+<div class="tablewrap"><table><thead><tr><th>Папка</th><th>Что в ней</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>Модель, секвенсор, инструменты, эффекты и импорт <code>.flp</code>. Чистый C++, тестируется без JUCE</td></tr><tr><td><code>src/flp/</code></td><td>Читатель формата <code>.flp</code></td></tr><tr><td><code>src/engine/</code></td><td>Аудиодвижок: устройство, граф, сэмплы, плагины, файлы проектов</td></tr><tr><td><code>src/ui/</code></td><td>Интерфейс: Channel Rack, Piano Roll, Playlist, Mixer, окна</td></tr><tr><td><code>third_party/</code></td><td>CLAP и декодер WavPack</td></tr><tr><td><code>tests/</code></td><td>Тесты ядра</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>Архитектура, состояние, дорожная карта и анализ поведения FL Studio</td></tr></tbody></table></div>
+<h2 id="good-to-know">Что полезно знать</h2>
+<ul><li>JUCE 8 официально не поддерживает MinGW. Скрипт сборки на Zig обходит различия. Исправления лежат в <code>cmake/mingw/</code> и <code>src/platform/MingwFixes.cpp</code>.</li><li>Запускайте только один <code>build-windows-zig.sh</code> за раз. Две сборки Zig одновременно могут зависнуть. Для параллельных сборок в отдельных рабочих копиях дайте каждой свой кэш через <code>ZIG_GLOBAL_CACHE_DIR</code> и <code>ZIG_LOCAL_CACHE_DIR</code>.</li><li>Некоторые движки читают встроенные звуки и таблицы из вашей собственной установки FL Studio. В репозитории нет ничего из FL Studio.</li><li>Часть документации в <code>docs/</code> пока на португальском. Её переводят.</li><li>Если вы распространяете изменённую версию, в том числе как сетевой сервис, лицензия требует опубликовать её исходники под той же лицензией.</li></ul>
+<h2 id="related">Связанные страницы</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">Полная среда разработки (SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LYNX SHARE в Linux (LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">Репозиторий и его README</a></li><li><a href="/wiki/command-line/">Командная строка</a></li><li><a href="/wiki/file-formats/">Форматы файлов</a></li></ul>

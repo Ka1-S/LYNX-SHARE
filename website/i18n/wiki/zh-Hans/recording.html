@@ -1,0 +1,27 @@
+<figure><a class="shot" href="/assets/img/wiki/record-dialog.webp"><img src="/assets/img/wiki/record-dialog.webp" alt="录制窗口询问要录什么：音频、音符和自动化、全部，或录入音频编辑器的音频" loading="lazy" width="475" height="389"></a></figure>
+<p>走带中的录制按钮或 <code>R</code> 键会开启录制。第一次时，会有一个窗口询问你想录什么。音频会作为音频片段进入<a href="/wiki/playlist/">播放列表</a>。音符会进入当前样式。你移动的控件会变成自动化。</p>
+<h2 id="record-a-microphone-or-an-instrument">录制话筒或乐器</h2>
+<ol><li>打开 <code>选项 › 音频设置...</code>，选择一个输入设备。</li><li>打开<a href="/wiki/mixer/">混音台</a>（<code>F9</code>），选择一个空的插入轨。</li><li>点击插入轨效果器插槽上方的输入框，选择一个输入。立体声对排在前面，单个通道标有 <code>（单声道）</code>。</li><li>点击输入框旁边的录音预备按钮。</li><li>按 <code>R</code>，选择 <code>音频，作为音频片段录入播放列表</code>。</li><li>如果播放没有自动开始，就按播放，然后演奏。</li><li>按停止。这一遍录音就成了播放列表上的一个音频片段。</li></ol>
+<p><code>Shift+R</code> 用一个键完成第 4 到 6 步：它预备所选插入轨，只录制音频，并开始播放。再按一次则停止。</p>
+<h2 id="what-the-recording-window-offers">录制窗口提供什么</h2>
+<div class="tablewrap"><table><thead><tr><th>选项</th><th>作用</th></tr></thead><tbody><tr><td><code>音频，作为音频片段录入播放列表</code></td><td>预备所选的混音台插入轨，如果它没有输入，会询问输入</td></tr><tr><td><code>音符和自动化</code></td><td>录制来自 MIDI 键盘或电脑键盘的音符，以及你移动的控件</td></tr><tr><td><code>全部</code></td><td>音符、自动化，以及来自已预备插入轨的音频</td></tr><tr><td><code>音频，录入音频编辑器</code></td><td>在歌曲播放时，把输入录入一个新的音频编辑器</td></tr></tbody></table></div>
+<p>勾选 <code>不再询问</code> 可保留你的选择。之后，右键单击录制按钮可打开录制过滤器：<code>自动化</code>、<code>音符</code>、<code>音频</code>、<code>片段</code>，以及用来重新显示该窗口的 <code>开始录制时询问录制内容</code>。</p>
+<h2 id="the-input-box-of-an-insert">插入轨的输入框</h2>
+<figure><a class="shot" href="/assets/img/wiki/mixer-input.webp"><img src="/assets/img/wiki/mixer-input.webp" alt="插入轨 3 已预备、输入框设为输入 1 和 2 的混音台" loading="lazy" width="1600" height="900"></a></figure>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>音频输入源</code></td><td>这个插入轨播放和录制的设备输入，或 <code>（无）</code></td></tr><tr><td><code>录制</code></td><td>从哪里截取录音：<code>仅外部输入</code>、<code>外部和混音器输入</code>、<code>效果后</code>、<code>EQ 后</code>、<code>电平和声像后</code> 或 <code>轨道后</code></td></tr><tr><td><code>同时将干输入录为第二个录音（LYNX）</code></td><td>在处理过的录音旁边保留未经处理的输入</td></tr><tr><td><code>监听外部输入</code></td><td><code>关</code>、<code>预备时</code>、<code>自动（预备时，回放时除外）</code> 或 <code>开</code></td></tr><tr><td><code>录音保护（无法预备）</code></td><td>防止这个插入轨被误预备</td></tr></tbody></table></div>
+<h2 id="recording-notes">录制音符</h2>
+<p>音符来自 MIDI 键盘、电脑键盘（<code>Ctrl+T</code>）或触摸键盘，并进入当前样式中所选的通道。见 <a href="/wiki/midi-controllers/">MIDI 控制器</a>。</p>
+<ul><li><code>混合录制的音符</code>（<code>Ctrl+B</code>）决定是叠录还是替换。开：新音符加入样式原有的音符。关：被录制通道的旧音符会被清除。</li><li><code>将录制的音符量化到全局吸附</code> 在录制选项中。</li><li><code>步进输入</code>（<code>Ctrl+E</code>）在停止时可用：你弹的每个音符会依次以一个吸附步长为间隔进入样式。</li><li><code>捕获 MIDI</code>（<code>Ctrl+Shift+Alt+R</code>）会把你刚刚弹过的音符放进样式，即使当时没有开启录制。</li></ul>
+<p>录制时你移动的控件，在歌曲模式下写成自动化片段，在样式模式下写成样式事件。见<a href="/wiki/automation/">自动化</a>。</p>
+<h2 id="recording-options">录制选项</h2>
+<p>这些选项在 <code>选项 › 录制</code> 和录制按钮的右键菜单中。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>预备拍</code></td><td><code>Ctrl+P</code></td><td>录制开始前播放 0、1、2 或 4 小节节拍器</td></tr><tr><td><code>节拍器</code></td><td><code>Ctrl+M</code></td><td>播放时发出咔嗒声</td></tr><tr><td><code>等待第一个音符再开始</code></td><td><code>Ctrl+I</code></td><td>录制等到你开始演奏才开始</td></tr><tr><td><code>循环录音</code></td><td>无</td><td>录制循环进行，而不是一直往后走</td></tr><tr><td><code>音频：在循环区域上插入录音</code></td><td>无</td><td>播放整个循环区域，只保留其中的音频</td></tr><tr><td><code>音频：预滚</code> 和 <code>post-roll</code></td><td>无</td><td>在切入之前和切出之后播放 0、1、2 或 4 小节</td></tr><tr><td><code>录制时开始播放</code></td><td>无</td><td>开启录制的同时也按下播放</td></tr><tr><td><code>停止录制时取消插入轨的预备</code></td><td>无</td><td>每遍录音之后释放已预备的插入轨</td></tr></tbody></table></div>
+<h2 id="loop-recording-and-takes">循环录制和录音</h2>
+<p>开启 <code>循环录音</code> 后，在歌曲模式下录制会在循环区域内循环，在样式模式下则在样式内循环。关闭时，录制会一直往后播放。</p>
+<p>音频循环录制的每一遍都会落在下一条空闲的播放列表轨道上，这些轨道构成一个组。<code>混合录制的音符</code> 决定停止后播放什么：关闭时每一遍都静音，开启时全部播放。右键单击该组中的一条轨道并选择 <code>用这些录音合成</code>，可以用这些录音合成出一个完整录音。录制选项中的 <code>循环录音后仅播放最后一遍</code> 则退回到单条轨道。</p>
+<h2 id="where-recordings-are-saved">录音保存在哪里</h2>
+<ul><li>已保存的工程把它的录音放在工程文件旁边的 <code>Audio/Recorded</code> 中。</li><li>未保存的工程录到你的音乐文件夹里的 <code>LYNX/Recordings</code>。</li><li>录音是 WAV 文件，采样率与音频设备相同，为 24 位或 32 位浮点。格式和录音名称在 <code>选项 › 音频设置...</code> 的 <code>录制</code> 下设置。</li><li><code>打开录音文件夹</code> 在录制按钮的右键菜单中。<code>文件 › 删除未使用的录音并保存...</code> 会移除工程不再使用的录音。</li></ul>
+<h2 id="good-to-know">须知</h2>
+<ul><li>没有输入的已预备插入轨什么也录不到。LYNX SHARE 会告诉你，并指向输入框。</li><li>磁盘剩余空间不足 30 秒时，录制会拒绝开始；不足 10 分钟时会发出警告。</li><li>没有预备任何东西时，<code>选项 › 录制输入音频</code> 会把前两个输入通道录入一个新的插入轨。</li><li>在 macOS 上，第一次录音时系统会请求麦克风权限。</li><li>如果录音时 LYNX SHARE 关闭了，下次启动时会提示把恢复的录音放到播放列表上。</li></ul>
+<h2 id="related">相关页面</h2>
+<ul><li><a href="/wiki/audio-setup/">音频设置</a></li><li><a href="/wiki/mixer/">混音台</a></li><li><a href="/wiki/automation/">自动化</a></li><li><a href="/wiki/midi-controllers/">MIDI 控制器</a></li><li><a href="/wiki/troubleshooting/">故障排除</a></li></ul>

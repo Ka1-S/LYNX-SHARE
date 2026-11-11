@@ -1,0 +1,53 @@
+<p>아래의 각 제목이 문제 하나입니다. 해당하는 문제가 없으면 끝에 설명한 대로 보고해 주세요.</p>
+<h2 id="starting-the-program">프로그램 시작</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: 처음 실행할 때 SmartScreen 경고</h3>
+<p>실행 파일에 아직 코드 서명이 없어서 처음 실행할 때 SmartScreen이 경고를 표시할 수 있습니다.</p>
+<ol><li><code>More info</code> 항목을 클릭합니다.</li><li><code>Run anyway</code> 항목을 클릭합니다.</li></ol>
+<p>설치 프로그램에는 관리자 권한이 필요하지 않습니다.</p>
+<h3 id="macos-cannot-be-opened">macOS: &quot;열 수 없음&quot;</h3>
+<p>이 앱은 Apple의 공증을 받지 않았고 Developer ID 서명도 없어서 처음 실행할 때 한 단계가 더 필요합니다.</p>
+<ol><li>LYNX SHARE를 <code>Applications</code> 폴더로 끌어다 놓습니다.</li><li>우클릭(Control 클릭)하고 <code>열기</code> 항목을 선택합니다.</li><li><code>열기</code> 버튼을 한 번 더 클릭합니다.</li></ol>
+<p>macOS 15 Sequoia 이상에서는 한 번 열어 보려고 시도한 뒤 <code>System Settings › Privacy &amp; Security</code> 항목으로 가서 <code>Open Anyway</code> 버튼을 클릭합니다. 터미널을 쓰는 방법도 있습니다.</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>처음 녹음할 때 macOS가 마이크 접근 권한을 요청합니다.</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: AppImage가 시작되지 않음</h3>
+<p>LYNX SHARE에는 glibc 2.35 이상의 x86_64 시스템(Ubuntu 22.04, Debian 12, Fedora 36, 최신 Arch 또는 Manjaro)과 X11 또는 XWayland가 필요합니다.</p>
+<ol><li>아래 두 명령으로 파일을 실행 가능하게 만들고 실행합니다.</li><li>그래도 시작되지 않으면 libfuse2를 설치합니다. 패키지 이름은 Ubuntu 22.04에서 <code>libfuse2</code>, Ubuntu 24.04에서 <code>libfuse2t64</code>, Arch에서 <code>fuse2</code>, Fedora에서 <code>fuse-libs</code>입니다.</li><li>설치하고 싶지 않다면 <code>.tar.gz</code>를 다운로드해서 풀고 <code>./install.sh</code>를 실행합니다.</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code>는 현재 사용자의 <code>~/.local</code> 아래에 메뉴 항목과 함께 LYNX SHARE를 설치합니다. <code>./install.sh --uninstall</code>은 제거합니다.</p>
+<h2 id="sound">사운드</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">소리가 나지 않거나 오디오 장치가 잘못됨</h3>
+<ol><li><code>옵션 › 오디오 설정...</code> 메뉴를 엽니다.</li><li>드라이버를 고릅니다.</li><li>출력 장치를 고릅니다.</li></ol>
+<div class="tablewrap"><table><thead><tr><th>시스템</th><th>드라이버</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO, 내장 LYNX ASIO 드라이버</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire(네이티브), JACK, ALSA. 처음 시작하면 LYNX SHARE는 이 중 장치가 있는 첫 번째 드라이버를 엽니다</td></tr></tbody></table></div>
+<p>ASIO는 Windows 드라이버 모델이어서 Windows에만 있습니다. <code>옵션 › 설정 마법사(언어, 오디오, 플러그인 폴더)...</code> 메뉴에서도 오디오 장치를 테스트합니다. <a href="/wiki/audio-setup/">오디오 설정</a>을 참고하세요.</p>
+<h3 id="linux-the-sound-breaks-up">Linux: 소리가 끊김</h3>
+<p>오디오 스레드는 실시간 우선순위로 실행되어야 합니다.</p>
+<ol><li><code>옵션 › 오디오 설정...</code> 메뉴를 열고 <code>상태</code> 항목을 읽습니다. 오디오 스레드가 실시간 우선순위를 받았는지 표시됩니다.</li><li>받지 못했다면 rtkit를 설치하거나(<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code>, <code>sudo pacman -S rtkit</code>), JACK 환경처럼 실시간 제한이 설정된 <code>오디오</code> 그룹에 사용자를 추가합니다.</li><li>로그아웃했다가 다시 로그인합니다.</li></ol>
+<p>자세한 내용은 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>에 있습니다.</p>
+<h2 id="plugins">플러그인</h2>
+<h3 id="a-plugin-crashes">플러그인이 충돌함</h3>
+<p>플러그인만 멈추도록 플러그인을 자체 프로세스에서 실행합니다.</p>
+<ol><li><code>옵션 › 일반 설정...</code> 메뉴를 엽니다.</li><li><code>플러그인을 별도 프로세스에서 실행(충돌로부터 LYNX SHARE 보호)</code> 옵션을 켭니다.</li><li>프로젝트를 다시 엽니다.</li></ol>
+<p>자체 프로세스에서 충돌했거나 응답을 멈춘 플러그인은 뮤트됩니다. 프로젝트를 저장하고 다시 열면 플러그인이 다시 로드됩니다. <a href="/wiki/plugins/">서드파티 플러그인</a>을 참고하세요.</p>
+<h3 id="a-plugin-is-not-in-the-list">플러그인이 목록에 없음</h3>
+<ol><li><code>옵션 › 플러그인 스캔</code> 메뉴를 선택합니다.</li><li>그래도 없으면 <code>옵션 › 플러그인 관리자...</code> 메뉴를 열고 <code>플러그인 폴더...</code> 버튼을 클릭해 플러그인의 폴더를 추가합니다.</li><li><code>실패</code> 탭을 봅니다. 스캔에 실패한 플러그인 파일은 건너뜁니다. Windows에서는 이유가 <code>%APPDATA%\LYNX\scan-failures.log</code>에 있습니다.</li><li><code>모두 다시 스캔...</code> 버튼을 클릭하면 실패한 파일을 다시 시도합니다.</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">프로젝트가 설치되지 않은 플러그인을 사용함</h3>
+<p>이펙트는 같은 역할을 하는 LYNX SHARE 이펙트로 대체되고, 설정은 프로젝트에 유지됩니다. <code>도움말 › 누락된 파일...</code> 메뉴에는 누락된 항목이 나열됩니다. <a href="/wiki/built-in/">내장 악기와 이펙트</a>를 참고하세요.</p>
+<h3 id="video-does-not-work-on-linux">Linux에서 비디오가 동작하지 않음</h3>
+<p>비디오 트랙과 <code>Export with video</code> 옵션에는 FFmpeg가 필요합니다. LYNX SHARE가 설치 방법을 알려 줍니다.</p>
+<h2 id="crash-reports">충돌 보고서</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="다음 시작 때 표시되는 충돌 보고서 질문: Send, Show what will be sent, Don't send" loading="lazy" width="640" height="244"></a></figure>
+<p>충돌 보고서는 사용자가 선택해야 보내집니다. 충돌이나 멈춤이 있고 나면 다음에 시작할 때 보고서를 보낼지 묻습니다.</p>
+<div class="tablewrap"><table><thead><tr><th>명령</th><th>동작</th></tr></thead><tbody><tr><td><code>전송할 내용 보기</code></td><td>전송될 텍스트를 그대로 보여 줍니다</td></tr><tr><td><code>대신 GitHub에 보고</code></td><td>미리 채워진 GitHub 이슈 양식을 엽니다. 파일은 직접 첨부합니다</td></tr><tr><td><code>보고서 폴더 열기</code></td><td>컴퓨터에 있는 보고서 파일을 보여 줍니다</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>끄면 각 파일의 확장자만 전송됩니다</td></tr><tr><td><code>묻지 않고 항상 보내기</code></td><td>앞으로의 보고서를 묻지 않고 보냅니다</td></tr></tbody></table></div>
+<p><code>옵션 › 일반 설정...</code> 메뉴의 <code>충돌 보고서</code> 옵션은 <code>Ask</code>(기본값), <code>항상 보내기</code>, <code>보내지 않음</code> 중에서 정합니다.</p>
+<p>보고서에는 LYNX SHARE 버전, 운영 체제, CPU, 그래픽 카드와 드라이버, 화면 크기, 오디오 드라이버와 장치, 충돌 또는 멈춤 파일, 세션의 마지막 60단계, 로드된 서드파티 플러그인의 이름과 버전이 들어 있습니다.</p>
+<p>오디오, 프로젝트, 샘플, 컴퓨터 이름, 사용자 이름은 들어 있지 않습니다. 서버는 IP 주소를 저장하지 않습니다. 전송된 ID는 설정 폴더의 <code>crash-reports\sent.log</code>에 나열됩니다. 보고서를 삭제하고 싶다면 그 ID를 적어 이슈를 여세요. 전체 내용은 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">개인정보 처리방침</a>에 있습니다.</p>
+<h2 id="report-a-problem">문제 보고</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="Report a problem 창: 설명 상자, 선택 사항인 이메일 주소, Send 버튼" loading="lazy" width="640" height="364"></a></figure>
+<ol><li><code>도움말 › 문제 보고...</code> 메뉴를 선택합니다.</li><li>무슨 일이 있었는지 설명합니다. 이메일 주소는 선택 사항이며 답변을 받고 싶을 때만 적습니다.</li><li>문제가 충돌이었다면 <code>최신 충돌 / 멈춤 파일과 이번 세션의 단계 첨부</code> 옵션을 체크한 채로 둡니다.</li><li><code>전송할 내용 보기</code> 버튼을 클릭해 텍스트를 확인합니다.</li><li><code>보내기</code> 버튼을 클릭합니다. 그 전에는 아무것도 전송되지 않습니다.</li></ol>
+<p><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>에서 이슈를 열 수도 있습니다.</p>
+<h2 id="good-to-know">알아 두면 좋은 점</h2>
+<ul><li>충돌 후에는 프로젝트의 백업 사본이 LYNX SHARE의 자동 저장 폴더에 있습니다.</li><li>충돌에 플러그인이 관련되어 있으면, 질문에서 앞으로 그 플러그인을 별도 프로세스에서 실행하도록 제안합니다.</li><li>설정 폴더는 Windows에서 <code>%APPDATA%\LYNX</code>, macOS에서 <code>~/Library/Application Support/LYNX</code>, Linux에서 <code>~/.config/LYNX</code>입니다.</li></ul>
+<h2 id="related">관련 문서</h2>
+<ul><li><a href="/wiki/audio-setup/">오디오 설정</a></li><li><a href="/wiki/plugins/">서드파티 플러그인</a></li><li><a href="/wiki/install/">설치</a></li><li><a href="/faq/">FAQ</a></li><li><a href="/why/#crash">충돌 방지</a></li></ul>

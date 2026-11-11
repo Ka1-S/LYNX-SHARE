@@ -1,0 +1,35 @@
+<figure><a class="shot" href="/assets/img/mixer.webp"><img src="/assets/img/mixer.webp" alt="混音台" loading="lazy" width="1920" height="1080"></a></figure>
+<p>每个通道都经过一个混音台插入轨播放。每个插入轨都有推子、声像、静音和独奏、峰值电平表、十个各带干/湿量的效果器插槽，以及一个内置 EQ。除非你把插入轨路由到别处，所有插入轨最终都汇入主控。按 <code>F9</code> 显示或隐藏混音台。</p>
+<p>一个工程最多可以有 127 个插入轨。混音台上有一个用来添加新插入轨的添加条。混音台标题栏中的下拉框可以在八种轨道条布局中选择，从 <code>紧凑</code> 到 <code>特大</code>。</p>
+<h2 id="put-an-effect-on-a-channel">给通道加效果器</h2>
+<ol><li>在<a href="/wiki/channel-rack/">通道机架</a>中选择通道，按 <code>Ctrl+L</code>。通道会被送到一个空闲的插入轨，该插入轨会采用通道的名称和颜色。</li><li>按 <code>F9</code> 显示混音台，点击那个插入轨的轨道条。</li><li>在效果器面板中，点击一个空插槽，选择一个效果器。</li><li>点击插槽的名称，可显示或隐藏该效果器的窗口。</li><li>点击插槽的指示灯可旁通该效果器，方便对比。</li></ol>
+<h2 id="send-a-channel-to-an-insert">把通道送到某个插入轨</h2>
+<p>在通道机架中，拖动通道的路由框（或在上面使用滚轮）来选择插入轨编号。双击该框会在混音台中显示那个插入轨。</p>
+<p>通道机架中的 <code>Ctrl+L</code> 可以同时作用于多个所选通道。每个通道各自进入一个空闲的插入轨。</p>
+<p>当混音台处于焦点时，<code>Ctrl+L</code> 会把所选通道链接到所选插入轨，<code>Ctrl+Shift+L</code> 则把它们链接到从该插入轨开始的连续插入轨。</p>
+<h2 id="select-and-move-inserts">选择和移动插入轨</h2>
+<ul><li>点击一个轨道条来选中它。</li><li><code>Ctrl</code>+点击，或在多个轨道条上拖动，可选择一个范围。<code>Ctrl+Shift</code>+点击可添加或取消一个。</li><li>向两侧拖动轨道条，或按 <code>Alt+Left</code> 和 <code>Alt+Right</code>，可移动所选插入轨。</li><li>右键单击轨道条打开插入轨菜单。<code>F2</code> 为所选插入轨重命名并设置颜色。</li></ul>
+<p>移动、插入或删除插入轨时，发送、侧链和自动化都会跟着它们所在的插入轨走。</p>
+<h2 id="mute-and-solo">静音和独奏</h2>
+<p>点击静音指示灯可让插入轨静音。右键单击它或 <code>Ctrl</code>+点击则为独奏。<code>S</code> 让所选插入轨独奏，<code>Alt+S</code> 让它们连同输入给它们的插入轨一起独奏。</p>
+<h2 id="effects">效果器</h2>
+<p>效果器面板显示所选插入轨的十个插槽。</p>
+<ul><li>拖动插槽，或在其上使用滚轮，可向上或向下移动它。</li><li>右键单击插槽可得到它的选项（替换、移动、删除）。</li><li><code>Del</code> 删除所选插槽中的插件。</li><li>面板标题栏中的开关可打开或关闭该插入轨的所有效果器。</li><li>你可以把效果器从<a href="/wiki/browser/">浏览器</a>的插件数据库拖到插入轨或效果器插槽上。</li></ul>
+<h2 id="insert-eq">插入轨 EQ</h2>
+<p>每个插入轨都有自己的 EQ。拖动一个频段来设定它的频率和电平，用滚轮调整宽度，双击频段可把它恢复到 0 dB。右键单击 EQ 的标题可将其旁通。如果你想要一个没有内置 EQ 的混音台，可以让新工程以干净的混音台开始。</p>
+<h2 id="routing-sends-and-sidechain">路由、发送和侧链</h2>
+<figure><a class="shot" href="/assets/img/wiki/mixer-sends.webp"><img src="/assets/img/wiki/mixer-sends.webp" alt="选中了 Kick 插入轨的混音台，它的发送在轨道条下方画成连线，效果器面板在右侧" loading="lazy" width="1600" height="900"></a></figure>
+<p>选中你想要路由的插入轨。这时其他每个轨道条上都会出现一个路由开关：</p>
+<ul><li>点击另一个轨道条上的开关，可把所选插入轨发送到那里。启用后拖动可设定发送电平。</li><li><code>Ctrl</code>+点击只路由到那个插入轨。</li><li><code>Shift</code>+点击建立侧链发送。<code>Ctrl+Shift</code>+点击则建立仅侧链发送。</li><li>右键单击会以菜单形式打开同样的选项。</li></ul>
+<p>带侧输入的效果器，例如压缩器，有一个 <code>侧链来源</code> 选择器，列出可供监听的插入轨。选择其中一个会自动为你建立路由。</p>
+<h2 id="groups-and-vca-faders">编组和 VCA 推子</h2>
+<p>混音台的编组可以用它的折叠箭头折叠（或用 <code>Alt</code>+点击折叠所有编组）。VCA 推子会移动其成员插入轨的电平，而这些插入轨仍保留各自的推子。从插入轨菜单创建：在“编组”下选择 <code>VCA › 用所选新建 VCA</code>。</p>
+<h2 id="recording">录音</h2>
+<p>每个插入轨都有一个录音预备按钮。预备了一个插入轨后，按录制和播放会把它的音频输入录到一个播放列表片段中。<code>Shift+R</code> 一步完成预备所选插入轨并开始录音。见<a href="/wiki/recording/">录音</a>。</p>
+<h2 id="keys">按键</h2>
+<p><code>Ctrl+L</code> 和 <code>Ctrl+Shift+L</code> 只有在混音台具有焦点时才是这个含义。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>链接通道</td><td><code>Ctrl+L</code></td><td>把所选通道链接到所选插入轨</td></tr><tr><td>链接到连续插入轨</td><td><code>Ctrl+Shift+L</code></td><td>把所选通道链接到从所选插入轨开始的各个插入轨</td></tr><tr><td>移动插入轨</td><td><code>Alt+Left</code> / <code>Alt+Right</code></td><td>移动所选插入轨</td></tr><tr><td>重命名并设置颜色</td><td><code>F2</code></td><td>为所选插入轨重命名并设置颜色</td></tr><tr><td>独奏</td><td><code>S</code></td><td>让所选插入轨独奏</td></tr><tr><td>连同来源独奏</td><td><code>Alt+S</code></td><td>让所选插入轨和输入给它们的插入轨一起独奏</td></tr><tr><td>删除效果器</td><td><code>Del</code></td><td>删除所选插槽中的插件</td></tr><tr><td>预备并录音</td><td><code>Shift+R</code></td><td>预备所选插入轨并开始录音</td></tr></tbody></table></div>
+<h2 id="good-to-know">须知</h2>
+<ul><li><code>渲染为音频</code>（把插入轨合并为音频片段）播放时，比它所替换的插入轨大约响 5 dB。这是 0.1.25 发布说明中的已知问题。</li><li><code>Ctrl+L</code> 在通道机架和混音台中的作用不同。在机架中它挑选空闲的插入轨；在混音台中它使用所选的插入轨。</li><li>路由开关出现在其他轨道条上，而不是所选的那个上。</li><li>上限为每个工程 127 个插入轨，每个插入轨十个效果器插槽。</li></ul>
+<h2 id="related">相关页面</h2>
+<ul><li><a href="/wiki/channel-rack/">通道机架</a></li><li><a href="/wiki/recording/">录音</a></li><li><a href="/wiki/automation/">自动化</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/instruments-and-effects/">乐器和效果器</a></li></ul>

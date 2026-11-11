@@ -12,7 +12,7 @@ update_target()
 {
     local answer code url
     answer="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$UPDATE_ADDRESS?check=$$")" || return 1
-    code="${answer%% *}"; url="${answer#* }"
+    code="${answer%% *}"; url="${answer#* }"; url="${url%%\?*}"   # the server echoes our ?check= query on the redirect
     case "$code" in
         404) return 0 ;;
         302) [[ "$url" =~ ^https://github\.com/$UPDATE_REPO/releases/download/v[^/]+/LYNX-[^/]+\.AppImage\.zsync$ ]] || return 1

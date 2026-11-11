@@ -1,0 +1,29 @@
+<figure><a class="shot" href="/assets/img/wiki/automation.webp"><img src="/assets/img/wiki/automation.webp" alt="여섯 마디에 걸쳐 올라가는 커브가 있는 오토메이션 에디터" loading="lazy" width="760" height="300"></a></figure>
+<p>오토메이션 클립은 <a href="/wiki/playlist/">플레이리스트</a> 위의 커브로, 곡이 재생되는 동안 컨트롤 하나를 움직입니다. 채널의 볼륨, 믹서 페이더, 플러그인 파라미터, 템포 등이 대상입니다. 클립에는 전용 편집 창인 오토메이션 에디터가 있습니다.</p>
+<p>컨트롤을 움직이는 방법은 세 가지가 더 있습니다. 이벤트는 패턴 안에 저장된 값입니다. 링크는 MIDI 노브나 내부 컨트롤러가 컨트롤을 움직이게 합니다. 모듈레이터는 노브를 자기 값 주변에서 흔들어 줍니다.</p>
+<h2 id="automate-a-knob">노브 오토메이션하기</h2>
+<ol><li>재생 헤드를 오토메이션이 시작될 곳으로 옮기거나, 플레이리스트에서 시간 범위를 선택합니다.</li><li>노브나 페이더를 우클릭하고 <code>오토메이션 클립 만들기</code>을 선택합니다.</li><li>클립이 첫 번째 빈 플레이리스트 트랙에 놓이고 오토메이션 에디터가 열립니다. 커브는 컨트롤의 현재 값에서 평평한 선으로 시작합니다.</li><li>에디터를 클릭해 포인트를 추가하고, 드래그해서 원하는 자리로 옮깁니다.</li><li><code>Alt</code>를 누른 채 구간을 위나 아래로 드래그하면 휘어집니다.</li><li>송 모드에서 곡을 재생합니다. 컨트롤이 커브를 따라갑니다.</li></ol>
+<p>같은 클립을 만드는 다른 방법입니다.</p>
+<ul><li><code>추가 › 마지막으로 조정한 파라미터의 오토메이션</code>는 마지막으로 움직인 컨트롤의 클립을 만듭니다.</li><li>마지막 조정 표시와 <code>도구 › 마지막 조정</code>는 컨트롤을 우클릭할 때와 같은 메뉴를 엽니다.</li><li>서드파티 플러그인은 채널 랙의 채널 메뉴나 믹서의 이펙트 슬롯 메뉴를 열고 <code>플러그인 파라미터 오토메이션</code>를 사용합니다. 그 옆에 <code>MIDI 컨트롤러 오토메이션(CC, 애프터터치, 피치 벤드)</code>가 있습니다.</li></ul>
+<p>에디터를 다시 열려면 클립을 더블 클릭하거나, 우클릭해서 <code>포인트 편집...</code>를 선택합니다. 컨트롤 자체 메뉴의 <code>오토메이션 클립 편집...</code>도 같은 일을 합니다.</p>
+<h2 id="the-automation-editor">오토메이션 에디터</h2>
+<div class="tablewrap"><table><thead><tr><th>명령</th><th>키</th><th>기능</th></tr></thead><tbody><tr><td>새 포인트</td><td>클릭 또는 우클릭 후 드래그</td><td>포인트를 추가하고, 버튼을 누르고 있는 동안 움직입니다</td></tr><tr><td>포인트 이동</td><td>드래그</td><td><code>Shift</code>는 시간을, <code>Ctrl</code>은 값을 고정하고, <code>Alt</code>는 스냅을 무시합니다</td></tr><tr><td>구간 휘기</td><td><code>Alt</code>+위/아래 드래그</td><td>마우스 아래 구간의 텐션을 바꿉니다</td></tr><tr><td>텐션 핸들</td><td>위/아래 드래그</td><td>구간을 휘게 합니다. <code>Ctrl</code>을 누르면 더 세밀하고, 우클릭하면 직선이 됩니다</td></tr><tr><td>커브 위의 포인트</td><td><code>Shift</code>+우클릭</td><td>선 위에 포인트를 추가합니다</td></tr><tr><td>포인트 메뉴</td><td>포인트 우클릭</td><td><code>값 입력...</code>, <code>값 복사</code>, <code>값 붙여넣기</code>, <code>포인트 삭제</code>, 그리고 전체의 크기 조절, 뒤집기, 직선화를 위한 <code>커브 전체</code></td></tr><tr><td>줌</td><td><code>Ctrl</code>+휠</td><td>보기를 확대/축소합니다</td></tr><tr><td>스크롤</td><td>가운데 버튼 드래그</td><td>보기를 옮깁니다</td></tr></tbody></table></div>
+<h2 id="lfo-mode">LFO 모드</h2>
+<figure><a class="shot" href="/assets/img/wiki/automation-lfo.webp"><img src="/assets/img/wiki/automation-lfo.webp" alt="삼각파와 SPD, TNS, SKEW, PW, AMNT 노브가 보이는 LFO 모드의 오토메이션 에디터" loading="lazy" width="760" height="346"></a></figure>
+<p>에디터 위쪽의 <code>LFO</code>를 체크합니다. 이제 파형이 클립의 값을 만들고, 그리는 포인트는 값 자체가 아니라 LFO의 진폭을 정합니다.</p>
+<div class="tablewrap"><table><thead><tr><th>설정</th><th>기능</th></tr></thead><tbody><tr><td><code>SPD</code></td><td>한 주기의 길이이며 단위는 박입니다</td></tr><tr><td><code>TNS</code></td><td>파형의 텐션입니다</td></tr><tr><td><code>SKEW</code></td><td>파형의 기울임입니다</td></tr><tr><td><code>PW</code></td><td>펄스 폭입니다</td></tr><tr><td><code>AMNT</code></td><td>LFO가 값을 움직이는 폭입니다</td></tr><tr><td><code>MUL</code></td><td>켜면 LFO가 엔벨로프 레벨에 곱해지고, 끄면 더해집니다</td></tr></tbody></table></div>
+<h2 id="events-in-a-pattern">패턴 안의 이벤트</h2>
+<figure><a class="shot" href="/assets/img/wiki/eventeditor.webp"><img src="/assets/img/wiki/eventeditor.webp" alt="볼륨 이벤트가 막대로 그려진 이벤트 에디터" loading="lazy" width="980" height="400"></a></figure>
+<p>이벤트는 패턴에 속하며 그 패턴이 재생되는 곳마다 재생됩니다. 컨트롤을 우클릭하고 <code>패턴의 이벤트 편집</code>을 선택하면 그 컨트롤의 이벤트 에디터가 열립니다.</p>
+<ul><li><code>그리기</code>는 드래그하는 대로 값을 정하고, 우클릭 드래그는 지웁니다. <code>선</code>은 직선 램프를 그립니다. <code>선택</code>는 아래쪽 도구가 적용될 시간 범위를 표시합니다.</li><li><code>스냅</code>은 1/2 스텝에서 1마디까지 고를 수 있습니다.</li><li><code>스케일</code>, <code>오프셋</code>, <code>랜덤화</code>는 선택 영역 또는 패턴 전체의 이벤트를 바꿉니다.</li><li><code>LFO</code>는 1박에서 4마디 길이의 사인, 삼각, 사각파를 씁니다.</li><li><code>지우기</code>는 이벤트를 지웁니다.</li><li><code>오토메이션으로...</code>은 이벤트를 오토메이션 클립으로 바꾸고 패턴에서 제거합니다.</li><li><code>파일</code>은 이벤트를 <code>.fsc</code> 파일로 열고 저장하며, MIDI 파일도 가져옵니다.</li></ul>
+<p>같은 우클릭 메뉴의 <code>이 위치로 송 초기화</code>은 곡이 시작될 때마다 컨트롤이 돌아갈 값을 저장합니다.</p>
+<h2 id="recording-your-moves">움직임 녹음하기</h2>
+<p>녹음 필터에서 <code>오토메이션</code>을 체크해 녹음을 켜고, 재생을 누른 다음 컨트롤을 움직입니다. 송 모드에서는 움직임이 오토메이션 클립이 됩니다. 패턴 모드에서는 현재 패턴의 이벤트가 됩니다. <a href="/wiki/recording/">녹음</a>을 참고하세요.</p>
+<h2 id="links-and-modulators">링크와 모듈레이터</h2>
+<ul><li><code>MIDI 컨트롤러에 연결(컨트롤러의 노브를 움직이세요)</code>는 <a href="/wiki/midi-controllers/">MIDI 컨트롤러</a>에서 다룹니다.</li><li><code>내부 컨트롤러에 연결</code>는 프로젝트의 엔벨로프, Formula, Peak Controller가 컨트롤을 움직이게 합니다. 먼저 그중 하나를 추가해야 합니다.</li><li><code>모듈레이트</code>는 LYNX SHARE 노브를 자기 값 주변에서 움직이는 LFO나 랜덤 소스 같은 모듈레이터를 연결합니다. <code>도구 › 모듈레이터...</code>에 목록이 있습니다.</li></ul>
+<h2 id="automation-lanes">오토메이션 레인</h2>
+<p>레인은 기본적으로 꺼져 있습니다. 플레이리스트 메뉴에서 <code>오토메이션 레인</code>를 켜세요. 그러면 각 트랙 헤더에 트랙 아래에 레인을 추가하는 버튼이 생기고, 컨트롤 메뉴에 <code>레인에서 오토메이션</code>이 추가됩니다. 레인에서는 클릭으로 포인트를 추가하거나 드래그하고, 우클릭으로 삭제하고, <code>Alt</code>+드래그로 선을 휘게 합니다. 레인 메뉴에는 <code>오토메이션 클립으로</code>이 있습니다.</p>
+<h2 id="good-to-know">알아 두기</h2>
+<ul><li>새 클립은 시간 선택이 있으면 그 지점에서, 없으면 송 모드의 재생 헤드에서 시작합니다. 곡의 처음에서 시작하려면 <code>옵션 › 일반 설정...</code>에서 <code>재생 위치에 오토메이션 클립 만들기</code>을 끕니다.</li><li>한 컨트롤에 클립이 여러 개면 각각 자기 자리에서 재생됩니다. 첫 클립 앞에서는 컨트롤이 자기 값을 유지합니다.</li><li>클립이 시작되면 컨트롤은 약 8 ms 안에 새 값에 도달합니다. FL Studio는 부드럽게 미끄러지듯 이동하므로, 가져온 프로젝트는 그 지점에서 약간 다를 수 있습니다.</li><li>같은 컨트롤의 클립이 겹치는 곳에서는 LYNX SHARE가 고르는 클립이 FL Studio가 고르는 것과 다를 수 있습니다.</li><li>모듈레이터는 LYNX SHARE 자체 노브에서만 작동하며, <code>.flp</code>로 내보낼 때는 빠집니다.</li></ul>
+<h2 id="related">관련 문서</h2>
+<ul><li><a href="/wiki/playlist/">플레이리스트</a></li><li><a href="/wiki/recording/">녹음</a></li><li><a href="/wiki/midi-controllers/">MIDI 컨트롤러</a></li><li><a href="/wiki/mixer/">믹서</a></li><li><a href="/wiki/shortcuts/">단축키</a></li></ul>

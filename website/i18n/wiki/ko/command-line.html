@@ -1,0 +1,29 @@
+<p>LYNX SHARE는 창을 열지 않고도 실행할 수 있습니다. 옵션 하나는 프로젝트를 오디오로 렌더링하고, 다른 옵션들은 FL Studio 프로젝트나 Ableton Live 세트로 변환하며, 테스트용 옵션도 여러 개 있습니다. 프로젝트 자체의 검사에도 같은 옵션을 씁니다.</p>
+<p>프로그램 파일은 Windows에서 <code>LYNX.exe</code>, macOS와 Linux에서 <code>LYNX</code>입니다. macOS의 전체 경로는 <code>/Applications/LYNX.app/Contents/MacOS/LYNX</code>입니다. 옵션은 모든 시스템에서 같습니다.</p>
+<h2 id="render-a-project-to-a-file">프로젝트를 파일로 렌더링하기</h2>
+<ol><li>프로그램이 있는 폴더에서 터미널을 엽니다. Windows에서는 설치 폴더이거나 zip을 푼 폴더입니다.</li><li>자신의 프로젝트와 출력 파일로 <code>LYNX.exe --export project.flp out.flac</code>을 실행합니다.</li><li>프로그램이 종료될 때까지 기다립니다. 창은 열리지 않습니다.</li><li>출력 파일 옆에 쓰인 <code>out.flac.txt</code>를 읽습니다. 가져온 프로젝트라면 무엇이 변환되었고, 근사되었고, 제외되었는지, 어떤 플러그인을 찾았고 어떤 것이 없었는지가 나열됩니다.</li></ol>
+<h2 id="open-a-project">프로젝트 열기</h2>
+<pre><code>LYNX.exe project.lynx</code></pre>
+<p>창과 함께 LYNX SHARE를 시작하고 파일을 엽니다. <code>.lynx</code>, <code>.flp</code>, <code>.als</code>, <code>.flm</code>, <code>.mid</code>를 받습니다. 상대 경로는 현재 폴더 기준입니다.</p>
+<h2 id="options-for-everyday-use">일상적으로 쓰는 옵션</h2>
+<div class="tablewrap"><table><thead><tr><th>옵션</th><th>동작</th></tr></thead><tbody><tr><td><code>--export &lt;project&gt; &lt;out&gt;</code></td><td>꼬리까지 포함해 곡 전체를 렌더링하며, 내보내기 창과 같은 방식입니다. <code>&lt;out&gt;</code>의 확장자가 형식을 정합니다. <code>.wav</code>(24비트), <code>.flac</code>, <code>.ogg</code>, <code>.mp3</code>(320 kbps)</td></tr><tr><td><code>--export ... --pattern</code></td><td>현재 패턴만 렌더링합니다</td></tr><tr><td><code>--export ... --insert N</code></td><td>믹서 인서트 N의 출력만 렌더링합니다</td></tr><tr><td><code>--export ... --rate N</code></td><td>다른 샘플 레이트(Hz)로 렌더링합니다</td></tr><tr><td><code>--stems &lt;project&gt; &lt;base.wav&gt;</code></td><td>채널이 있는 믹서 인서트마다 WAV 하나를 씁니다. <code>base - 1.wav</code>, <code>base - 2.wav</code> 등입니다</td></tr><tr><td><code>--export-flp &lt;project&gt; &lt;out.flp&gt;</code></td><td>FL Studio 프로젝트를 씁니다. <code>out.zip</code>을 주면 압축된 루프 패키지를 씁니다</td></tr><tr><td><code>--export-flp ... --substitute</code></td><td>LYNX 전용 플러그인을 오디오로 렌더링하지 않고 가장 비슷한 FL 플러그인으로 바꿉니다</td></tr><tr><td><code>--export-als &lt;project&gt; &lt;folder&gt;</code></td><td>Live 12용 Ableton Live 세트를 <code>&lt;folder&gt;/&lt;name&gt; Project/&lt;name&gt;.als</code>에 씁니다</td></tr><tr><td><code>--export-als ... --live11</code></td><td>Live 11용 세트를 씁니다</td></tr><tr><td><code>--devices &lt;report.txt&gt;</code></td><td>이 컴퓨터의 오디오 드라이버 종류와 장치를 나열합니다</td></tr><tr><td><code>--showcase &lt;out.lynx&gt;</code></td><td>LYNX SHARE 자체 데모 프로젝트를 씁니다</td></tr><tr><td><code>--lang &lt;id&gt;</code></td><td>이번 실행에서만 다른 인터페이스 언어를 씁니다. 예: <code>--lang pt-BR</code></td></tr><tr><td><code>--menu-entry on</code> 또는 <code>꺼짐</code></td><td>Linux AppImage 전용: 애플리케이션 메뉴에 LYNX SHARE를 추가하거나 제거합니다</td></tr></tbody></table></div>
+<p><code>--export</code>, <code>--stems</code>, <code>--export-flp</code>는 프로젝트로 <code>.lynx</code>, <code>.flp</code>, <code>.als</code>를 받습니다. <code>--export-als</code>는 <code>.flm</code>도 받습니다.</p>
+<p>예시:</p>
+<pre><code>LYNX.exe --export song.lynx song.wav
+LYNX.exe --export song.lynx drums.wav --insert 1
+LYNX.exe --stems song.lynx song.wav
+LYNX.exe --export-flp song.lynx song.flp
+LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --devices devices.txt
+LYNX --lang de</code></pre>
+<h2 id="options-meant-for-testing">테스트용 옵션</h2>
+<p>LYNX SHARE 자체를 점검하기 위한 옵션입니다. 버그 보고에 유용합니다.</p>
+<div class="tablewrap"><table><thead><tr><th>옵션</th><th>동작</th></tr></thead><tbody><tr><td><code>--selftest &lt;report.txt&gt; [demo.lynx]</code></td><td>오디오 장치 없이 셀프 테스트를 실행합니다. 통과하면 보고서가 <code>result=OK</code>로 끝납니다</td></tr><tr><td><code>--snapshot &lt;prefix&gt; [project]</code></td><td>인터페이스와 창을 접두사를 붙인 이름의 PNG 파일로 그립니다. 이 위키의 그림도 이렇게 만들었습니다</td></tr><tr><td><code>--render &lt;project&gt; &lt;out.wav&gt; &lt;seconds&gt;</code></td><td>현재 패턴을 지정한 초만큼 24비트 WAV로 렌더링합니다</td></tr><tr><td><code>--plugintest &lt;plugin&gt; &lt;report.txt&gt;</code></td><td>VST3 또는 CLAP 플러그인 하나를 로드해 테스트합니다</td></tr><tr><td><code>--sandboxtest &lt;plugin&gt; &lt;report.txt&gt;</code></td><td>멈춘 플러그인도 포함해 플러그인을 별도 프로세스에서 테스트합니다</td></tr><tr><td><code>--scantest &lt;folder&gt; &lt;report.txt&gt;</code></td><td>폴더의 플러그인을 별도 프로세스에서 스캔합니다</td></tr><tr><td><code>--fldb &lt;report.txt&gt; [project.flp]</code></td><td>여기서 찾은 FL Studio 설치, 그 플러그인 데이터베이스, 프로젝트의 플러그인 일치 결과를 보고합니다</td></tr><tr><td><code>--devicetest &lt;type&gt; &lt;device&gt; &lt;report.txt&gt;</code></td><td>오디오 드라이버를 열어 1초 동안 무음을 재생하고 결과를 보고합니다</td></tr><tr><td><code>--uiperf &lt;project&gt; &lt;report.txt&gt;</code></td><td>믹서, 플레이리스트, 채널 랙의 그리기 시간을 측정합니다</td></tr></tbody></table></div>
+<p>예시:</p>
+<pre><code>LYNX.exe --selftest report.txt
+LYNX.exe --snapshot shots/s project.lynx
+LYNX --devicetest PipeWire &quot;System default&quot; out.txt</code></pre>
+<h2 id="good-to-know">알아 두면 좋은 점</h2>
+<ul><li>결과는 터미널이 아니라 파일로 나갑니다. <code>--export</code>는 <code>&lt;out&gt;.txt</code>, <code>--export-flp</code>는 <code>&lt;out.flp&gt;.txt</code>를 쓰고, <code>--export-als</code>는 폴더에 <code>export-als.txt</code>를, <code>--stems</code>는 <code>&lt;base.wav&gt;.txt</code>를 씁니다.</li><li>프로그램은 표준 입력을 읽습니다. 셸 루프에서는 호출마다 <code>&lt; /dev/null</code>을 붙이세요.</li><li><code>--snapshot</code>은 환경 변수 <code>LYNX_SNAPSHOT_SIZE</code>로 달리 지정하지 않으면 1280x720으로 그립니다. 예를 들어 <code>1920x1080</code>을 지정할 수 있습니다.</li><li><code>--lang</code>은 <code>옵션 › 일반 설정...</code> 메뉴에 나열된 언어의 ID를 받습니다. 예를 들어 <code>en</code>, <code>pt-BR</code>, <code>de</code>, <code>es</code>, <code>fr</code>, <code>ja</code>입니다. 알 수 없는 ID는 무시됩니다.</li><li><code>--export</code>는 내보내기 창과 같은 렌더링 경로를 쓰지만, 창의 다른 옵션은 적용되지 않습니다. 디더, 비트 깊이, 노멀라이즈가 필요하면 창을 사용하세요.</li><li>소스에는 테스트 옵션이 훨씬 더 많습니다. 내부용이어서 버전마다 바뀔 수 있습니다.</li></ul>
+<h2 id="related">관련 문서</h2>
+<ul><li><a href="/wiki/exporting/">내보내기</a></li><li><a href="/wiki/file-formats/">파일 형식</a></li><li><a href="/wiki/build-from-source/">소스에서 빌드</a></li><li><a href="/wiki/troubleshooting/">문제 해결</a></li></ul>

@@ -1,0 +1,33 @@
+<p>各リリースには、Windows、macOS、Linux向けのビルドが<a href="https://github.com/Ka1-S/LYNX-SHARE/releases">リリースページ</a>に用意されています。ファイルは、タグ付けされたソースからGitHub Actionsでビルドされ、SHA-256が <code>SHA256SUMS.txt</code> に載っています。<a href="/download/">ダウンロード</a>ページから、最新のファイルにリンクしています。</p>
+<h2 id="install-on-windows">Windowsにインストールする</h2>
+<p>Windows 10または11、64ビット。</p>
+<ol><li><code>LYNX-&lt;version&gt;-setup-x64.exe</code> をダウンロードします。</li><li>実行します。現在のユーザー用にだけインストールされ、管理者権限は不要です。</li><li>実行ファイルにはまだコード署名がないため、SmartScreenが警告を出すことがあります。<code>More info</code> を選び、続けて <code>Run anyway</code> を選びます。</li><li>スタートメニューか、デスクトップのショートカットからLYNX SHAREを起動します。</li></ol>
+<p>インストーラーは、LYNX SHAREを <code>.lynx</code> プロジェクトを開くプログラムとして登録します。<code>.flp</code> ファイルについては、FL Studioの既定の設定は変えずに、<em>プログラムから開く</em> の候補にLYNX SHAREを加えます。</p>
+<p>ほかに2つの方法があります。</p>
+<div class="tablewrap"><table><thead><tr><th>方法</th><th>ファイルまたは場所</th><th>働き</th></tr></thead><tbody><tr><td>ポータブルzip</td><td><code>LYNX-&lt;version&gt;-windows-x64.zip</code></td><td>好きな場所に展開して、<code>LYNX.exe</code> を実行します。何もインストールされません。</td></tr><tr><td>Microsoft Store</td><td><a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N">StoreのLYNX SHARE</a></td><td>Storeがインストールし、更新も続けます。</td></tr></tbody></table></div>
+<h2 id="install-on-macos">macOSにインストールする</h2>
+<p>macOS 11 Big Sur以降。ユニバーサルの <code>LYNX-&lt;version&gt;-macos-universal.dmg</code> 1つで、IntelとApple siliconの両方に対応します。</p>
+<ol><li><code>.dmg</code> を開いて、LYNX SHAREを <em>アプリケーション</em> にドラッグします。</li><li>このアプリはAppleによる公証を受けておらず、Developer IDの署名もないため、初回起動には余分な手順が必要です。 <em>アプリケーション</em> のLYNX SHAREを右クリック (またはControlキーを押しながらクリック) し、 <em>開く</em> を選び、もう一度 <em>開く</em> を選びます。</li><li>macOS 15 Sequoia以降では、一度開こうとしてから、 <em>システム設定 › プライバシーとセキュリティ</em> へ進み、 <em>このまま開く</em> をクリックします。</li></ol>
+<p>ターミナルを使う方法:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>初めて録音するときに、macOSがマイクへのアクセスを尋ねます。</p>
+<h2 id="install-on-linux">Linuxにインストールする</h2>
+<p>glibc 2.35以降のx86_64 (Ubuntu 22.04以降、Debian 12以降、Fedora 36以降、最新のArchまたはManjaro)。LYNX SHAREにはX11またはXWaylandが必要です。オーディオはPipeWire、JACK、ALSAのいずれかを通り、そのために追加でインストールするものはありません。</p>
+<p>AppImage (<code>LYNX-&lt;version&gt;-x86_64.AppImage</code>):</p>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p>ディストリビューションによっては、AppImageの実行にlibfuse2が必要です (Ubuntu 22.04では <code>libfuse2</code>、24.04では <code>libfuse2t64</code>、Archでは <code>fuse2</code>、Fedoraでは <code>fuse-libs</code>)。初回起動時にセットアップウィザードが、LYNX SHAREをアプリケーションメニューに加えるかどうか、<code>.lynx</code> ファイルをLYNX SHAREで開くようにするかどうかを尋ねます。あとから <code>オプション › 全般設定...</code> で切り替えられ、ターミナルから <code>./LYNX-*.AppImage --menu-entry on</code> (または <code>オフ</code>) でも切り替えられます。</p>
+<p>libfuse2をインストールしたくない場合は、<code>LYNX-&lt;version&gt;-linux-x86_64.tar.gz</code> を使います。展開して <code>./install.sh</code> を実行してください。メニュー項目、アイコン、<code>.lynx</code> ファイルタイプとともに、<code>~/.local</code> の下に現在のユーザー用としてLYNX SHAREがインストールされます。</p>
+<h2 id="where-settings-are-kept">設定の保存場所</h2>
+<div class="tablewrap"><table><thead><tr><th>システム</th><th>設定フォルダー</th></tr></thead><tbody><tr><td>Windows</td><td><code>%APPDATA%\LYNX</code></td></tr><tr><td>macOS</td><td><code>~/Library/Application Support/LYNX</code></td></tr><tr><td>Linux</td><td><code>~/.config/LYNX</code> (または <code>$XDG_CONFIG_HOME</code> の下)</td></tr></tbody></table></div>
+<p>このフォルダーには、オプション、選んだ言語 (<code>language.txt</code>)、ショートカット (<code>keys.json</code>)、プラグインフォルダー (<code>plugin-folders.txt</code>)、スキャン済みプラグインの一覧 (<code>plugins.xml</code>) が入っています。</p>
+<h2 id="update">アップデート</h2>
+<p>起動時に、LYNX SHAREはGitHubに最新のバージョン番号を尋ねます。あなたに関する情報は何も送られません。新しいバージョンが出ると、バーに <code>LYNX SHARE &lt;version&gt; is available</code> と表示され、<code>新機能</code> ボタンとアップデートのボタンが付きます。<code>ヘルプ › アップデートを確認...</code> で、いつでも確認できます。</p>
+<div class="tablewrap"><table><thead><tr><th>ビルド</th><th>更新の方法</th></tr></thead><tbody><tr><td>Windowsのインストーラー</td><td><code>アップデート</code> が新しいインストーラーをダウンロードし、未保存の変更について尋ねたあと、インストールして再起動する</td></tr><tr><td>Windowsのポータブルzip、macOS</td><td><code>アップデート</code> が新しいファイルをダウンロードし、そのフォルダーを表示する</td></tr><tr><td>Linux AppImage</td><td><code>アップデート</code> がAppImageファイルをその場で更新する。Gear LeverやAppImageUpdateでも、外部から同じことができる</td></tr><tr><td>Linux <code>.tar.gz</code></td><td><code>ダウンロード...</code> でダウンロードページを開く</td></tr><tr><td>Microsoft Store</td><td>Storeが更新する。このビルドには独自の更新確認がない</td></tr></tbody></table></div>
+<p>確認をオフにするには、<code>オプション › 全般設定...</code> を開いて、<code>アップデートを自動で確認</code> のチェックを外します。</p>
+<h2 id="remove">削除する</h2>
+<ul><li>Windowsのインストーラー版: Windowsの <em>アプリと機能</em> の一覧からLYNX SHAREをアンインストールします。</li><li>ポータブルzip: 展開したフォルダーを削除します。</li><li>Linux <code>.tar.gz</code>: <code>./install.sh --uninstall</code> を実行します。</li></ul>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>Windowsのビルドは、プロジェクトのコード署名の申請が承認されるまで、署名がありません。macOSのアプリには、アドホック署名しかありません。Linuxのパッケージは署名されていません。</li><li>ダウンロードを検証するには、そのSHA-256を、リリースページの <code>SHA256SUMS.txt</code> の該当行と比べてください。</li><li>インストーラー、zip、<code>.dmg</code>、<code>.tar.gz</code> には、デモプロジェクトの <code>Demo.lynx</code> が入っています。</li><li>アップデートバーを閉じるボタンで閉じると、そのバージョンはスキップされます。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/getting-started/">はじめに</a></li><li><a href="/wiki/audio-setup/">オーディオの設定</a></li><li><a href="/wiki/troubleshooting/">トラブルシューティング</a></li><li><a href="/download/">ダウンロード</a></li><li><a href="/updates/">アップデート</a></li></ul>

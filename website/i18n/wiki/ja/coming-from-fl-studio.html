@@ -1,0 +1,27 @@
+<p>LYNX SHAREは、慣れ親しんだワークフローをそのまま残しています。チャンネルラック、パターン、プレイリスト、ミキサーがあり、キーも同じです。<code>.flp</code> プロジェクトを直接開け、書き戻すこともできます。</p>
+<p>LYNX SHAREは独立したプログラムです。Image-Lineとは提携しておらず、承認も後援も受けておらず、Image-Lineのコードは含まれていません。FL Studioは、Image-Line Softwareの登録商標です。</p>
+<h2 id="open-a-flp-project">.flpプロジェクトを開く</h2>
+<ol><li><code>ファイル › 開く...</code> (<code>Ctrl+O</code>) を選び、<code>.flp</code> を指定します。</li><li>LYNX SHAREがプロジェクトのプラグインとサンプルを解決してから開きます。タイトルには「(imported from FL Studio)」と表示されます。</li><li><code>ヘルプ › Last FL Studio import report</code> を選ぶと、近似されたもの、省かれたもの、見つからなかったものが読めます。</li><li><code>ヘルプ › 見つからないファイル...</code> を選ぶと、見つからないサンプルとプラグインが分かります。</li><li><code>ファイル › 保存</code> を選びます。<code>.lynx</code> ファイルの保存先を尋ねられます。<code>.flp</code> 自体が書き換えられることはありません。</li></ol>
+<h2 id="what-maps-to-what">何が何に対応するか</h2>
+<div class="tablewrap"><table><thead><tr><th>FL Studio</th><th>LYNX SHARE</th></tr></thead><tbody><tr><td>プレイリスト、チャンネルラック、ピアノロール、ミキサー</td><td>同じ名前で、<code>F5</code>、<code>F6</code>、<code>F7</code>、<code>F9</code></td></tr><tr><td>プラグインピッカー</td><td><code>F8</code></td></tr><tr><td>ブラウザー</td><td><code>Alt+F8</code></td></tr><tr><td>パターン / ソングモード</td><td><code>L</code></td></tr><tr><td>元に戻す</td><td><code>Ctrl+Z</code> で元に戻し、元に戻した後はやり直します。<code>Ctrl+Alt+Z</code> はさかのぼって元に戻します</td></tr><tr><td>新しいバージョンを保存</td><td><code>Ctrl+Alt+S</code></td></tr><tr><td>エクスポート</td><td><code>Ctrl+R</code>、MP3は <code>Ctrl+Shift+R</code>、MIDIは <code>Ctrl+Shift+M</code></td></tr><tr><td>ミキサーのインサート、センド、サイドチェーン</td><td>同じです。インサートごとのエフェクトスロットは10個</td></tr><tr><td>Fruity Wrapper</td><td>サードパーティのプラグインは直接ホストします。<a href="/wiki/plugins/">サードパーティのプラグイン</a>をご覧ください</td></tr><tr><td>ネイティブのジェネレーターとエフェクト</td><td>LYNX SHAREが再現したエンジンで再生します。下を参照してください</td></tr><tr><td><code>.flp</code> プロジェクトファイル</td><td><code>.lynx</code> プロジェクトファイル</td></tr></tbody></table></div>
+<p>すべてのキーは <code>ヘルプ › ショートカット</code> に一覧があります。</p>
+<h2 id="what-is-imported">インポートされるもの</h2>
+<ul><li>チャンネル、サンプル、パターン、スライドノートとポルタノート、すべてのアレンジメント、マーカー、拍子の変更、オートメーション、コントローラーのリンク。</li><li>ミキサー: ルーティング、レベル、サイドチェーン、トラックEQ、保存された設定付きのネイティブエフェクト。</li><li>Fruity Wrapper内のサードパーティのVST3、VST2、CLAPプラグイン: お使いのコンピューターにインストールされている同じプラグインに、保存された状態ごと置き換えられます。</li></ul>
+<h2 id="fl-studio-native-plugins">FL Studioのネイティブプラグイン</h2>
+<p>FL Studio自身のジェネレーターとエフェクトは読み込まれません。LYNX SHAREは、再現したエンジンでそれらを再生し、それぞれに品質レベルがあります。</p>
+<div class="tablewrap"><table><thead><tr><th>レベル</th><th>意味</th></tr></thead><tbody><tr><td>Exact</td><td>テストしたすべての状態で、オリジナルとビット単位で一致</td></tr><tr><td>Near-exact</td><td>ほとんどの状態でビット単位で一致し、残りの差は約 -100 dB以下</td></tr><tr><td>Close</td><td>同じアルゴリズムで、テストしたほぼすべての状態でオリジナルとの差が -60 dB以内</td></tr><tr><td>Approximate</td><td>保存された設定を、LYNX SHAREの内蔵シンセまたはエフェクトに割り当て</td></tr><tr><td>Placeholder</td><td>状態は保持され、プラグインは無音か、オーディオをそのまま通します</td></tr></tbody></table></div>
+<p>すべてのエンジンのレベルと、それぞれにまだ足りないものは、<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">PLUGINS.md</a>にあります。<a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a>もご覧ください。</p>
+<h2 id="what-needs-your-own-fl-studio-installation">お使いのFL Studioのインストールが必要なもの</h2>
+<p><code>.flp</code> を開くのに、FL Studioのインストールは必要ありません。同じコンピューターにインストールがあると、次の2つが加わります。</p>
+<ul><li>FL Studioの付属サンプルとプラグインデータベース。これにより、スキャンなしでサンプルとプラグインが見つかります。</li><li>一部のエンジンが必要とする内蔵の波形、サンプル、インパルス、テーブル (FL Keys、Soundgoodizer、Maximus、そのほかPLUGINS.mdで剣標が付いているもの)。実行時にお使いのインストールから読み込まれ、LYNX SHAREには同梱されていません。</li></ul>
+<p>Linuxでは、LYNX SHAREはWine上のWindows版FL Studioを探します。macOSではアプリバンドルを探しますが、動作は未確認です。</p>
+<h2 id="export-back-to-flp">.flpへ書き出して戻す</h2>
+<ol><li><code>ファイル › エクスポート › FL Studio プロジェクト...</code> を選びます。</li><li><code>FL Studio プロジェクト (.flp)</code> または <code>Zip ループパッケージ (.zip、すべてのサンプル付き)</code> を選びます。</li><li>FL Studioにないものの扱いを選びます。オーディオにレンダリングする (同じ音になります)、または最も近いFLプラグインを使う (編集可能のままですが、音が変わることがあります。LYNX専用のインストゥルメントは省かれます) のどちらかです。</li></ol>
+<p>ファイルはFL Studio 2026のプロジェクトです。サンプラー、オーディオクリップ、FL自身のジェネレーターとエフェクト、サードパーティのプラグイン (Fruity Wrapper内)、パターン、プレイリスト、ミキサー、オートメーションが、設定ごと移ります。レポートには、正確に移ったもの、レンダリングされたもの、置き換えられたもの、省かれたものが一覧されます。</p>
+<h2 id="fl-studio-mobile-flm">FL Studio Mobile (.flm)</h2>
+<p><code>ファイル › 開く...</code> は <code>.flm</code> プロジェクトも開けます。インポートは部分的です。</p>
+<ul><li>インポートされるもの: テンポ、拍子、FLMのチャンネルごとに1つのミキサーインサート、レーンごとに1つのプレイリストのトラック、パターン (ループの各パスが1つのクリップ)、オフセットとピッチ付きのオーディオクリップ、ドラムキット、DW Samplerのサンプル (サンプラーとして)、<code>.dwp</code> プログラム (DirectWave内)。</li><li>インポートされないもの: FLMのエフェクトとオートメーションレーン。ほかのFLMジェネレーターは、内蔵シンセで再生されます。</li><li>サンプルは、<code>.flm</code> の隣と、FL StudioにあるFLMリソースのコピーから探されます。見つからない <code>.dwp</code> は、代用品で再生されます。</li></ul>
+<h2 id="good-to-know">知っておくと便利なこと</h2>
+<ul><li>FLEXパックは暗号化されており、開かれることはありません。FLEXのチャンネルには、プリセット名から選ばれたシンセのパッチが付きます。</li><li>モジュレーターは <code>.flp</code> のエクスポートから除外され、エクスポートレポートにもそう書かれます。</li><li>インポートレポートには、内蔵シンセで近似されたもの、対応するものがなかったもの、見つかったプラグインとインストールされていないプラグイン、省かれた、または部分的に再現されたエフェクト、見つからないサンプルの数が一覧されます。</li><li>インストールされていないサードパーティのエフェクトは、同じ役割のLYNX SHAREのエフェクトに置き換えられます。元のエフェクトはプロジェクトに残ります。</li></ul>
+<h2 id="related">関連ページ</h2>
+<ul><li><a href="/wiki/built-in/">内蔵のインストゥルメントとエフェクト</a></li><li><a href="/wiki/plugins/">サードパーティのプラグイン</a></li><li><a href="/wiki/file-formats/">ファイル形式</a></li><li><a href="/wiki/shortcuts/">ショートカット</a></li><li><a href="/why/#fl-settings">FLの設定に関してLYNX SHAREだけができること</a></li></ul>

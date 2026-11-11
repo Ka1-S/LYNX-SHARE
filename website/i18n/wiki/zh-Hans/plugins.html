@@ -1,0 +1,32 @@
+<figure><a class="shot" href="/assets/img/wiki/plugin-manager-scan.webp"><img src="/assets/img/wiki/plugin-manager-scan.webp" alt="插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查" loading="lazy" width="980" height="270"></a></figure>
+<p>LYNX SHARE 可以承载其他厂商的乐器和效果器插件。它通过扫描插件文件夹来找到它们，<code>选项 › 插件管理器...</code> 会显示它找到了什么。LYNX SHARE 自己的乐器和效果器在<a href="/wiki/built-in/">内置乐器和效果器</a>中介绍。</p>
+<h2 id="scan-and-add-a-plugin">扫描并添加插件</h2>
+<ol><li>选择 <code>选项 › 扫描插件</code>。进度显示在提示栏中，你可以继续工作。</li><li>如果插件在它自己的文件夹中，请打开 <code>选项 › 插件管理器...</code>，单击 <code>插件文件夹...</code>，添加该文件夹，然后单击 <code>查找新插件</code>。</li><li>按 <code>F8</code> 打开插件选择器，输入插件名称的一部分。</li><li>双击它或按 <code>Enter</code>。乐器会变成新通道。效果器会进入所选的混音台插入轨。</li></ol>
+<p>首次启动时，设置向导会列出插件文件夹，并在后台扫描它们。<code>选项 › 设置向导（语言、音频、插件文件夹）...</code> 可再次打开它。每次启动几秒钟后，LYNX SHARE 也会查找新插件。</p>
+<h2 id="formats-per-system">各系统的格式</h2>
+<div class="tablewrap"><table><thead><tr><th>系统</th><th>承载的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2</td></tr></tbody></table></div>
+<p>macOS 上不承载 VST2。在 Linux 上，Windows 插件可通过 <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> 和 Wine 使用，二者需要你自己安装：把 yabridge 同步到的文件夹添加为插件文件夹。</p>
+<h2 id="the-plugin-manager">插件管理器</h2>
+<div class="tablewrap"><table><thead><tr><th>控件</th><th>作用</th></tr></thead><tbody><tr><td>搜索框</td><td>按名称、厂商、格式或文件筛选</td></tr><tr><td><code>全部</code>、<code>乐器</code>、<code>效果器</code>、<code>收藏</code>、<code>失败</code></td><td>选择列出哪些插件</td></tr><tr><td>星标列</td><td>标记收藏</td></tr><tr><td><code>位数</code> 列</td><td>32、64 或 32+64（Windows）</td></tr><tr><td><code>状态</code> 列</td><td><code>确定</code>、<code>未找到文件</code> 或 <code>加载失败</code></td></tr><tr><td><code>查找新插件</code></td><td>扫描列表中还没有的文件</td></tr><tr><td><code>全部重新扫描...</code></td><td>忘掉失败的文件，并重新检查每一个文件</td></tr><tr><td><code>插件文件夹...</code></td><td>编辑被扫描的文件夹</td></tr><tr><td><code>添加插件文件...</code></td><td>添加单个插件文件</td></tr></tbody></table></div>
+<p>每个插件文件都在独立进程中检查。崩溃或卡住 30 秒的文件会被标记为失败，之后会被跳过。在 Windows 上，失败的文件及原因列在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</p>
+<p>标准文件夹会被扫描，外加你添加的文件夹：</p>
+<ul><li>Windows：<code>Common Files\VST3</code>、<code>Common Files\CLAP</code>、<code>Common Files\VST2</code>，以及 Program Files 下的 <code>VSTPlugins</code> 和 <code>Steinberg\VSTPlugins</code>，如果安装了 FL Studio，还有它使用的文件夹。</li><li>macOS：<code>~/Library/Audio/Plug-Ins</code> 和 <code>/Library/Audio/Plug-Ins</code> 中的 <code>VST3</code>、<code>Components</code> 和 <code>CLAP</code>。</li><li>Linux：<code>~/.vst3</code>、<code>~/.clap</code>、<code>~/.lv2</code>、<code>~/.vst</code>，以及 <code>/usr/lib</code> 和 <code>/usr/local/lib</code> 下的同名文件夹。</li></ul>
+<h2 id="run-plugins-in-a-separate-process">在独立进程中运行插件</h2>
+<p>默认情况下，插件在 LYNX SHARE 内部运行，所以崩溃的插件可能拖垮整个程序。作为一个选项，可以让每个插件在自己的进程中运行。</p>
+<ol><li>打开 <code>选项 › 常规设置...</code>。</li><li>打开 <code>在独立进程中运行插件（防止插件崩溃影响LYNX SHARE）</code>。</li><li>重新打开工程，使其对已经打开的插件生效。</li></ol>
+<p>如果这样的插件崩溃或停止响应，它会被静音，并出现一条消息，LYNX SHARE 则继续运行。保存工程并重新打开，即可再次加载该插件。插件的编辑器在它自己的窗口中打开。</p>
+<p>如果只想对某一个插件这样做，请使用插件窗口封装器菜单中的 <code>在独立进程中运行</code> 或 <code>Always run &lt;plugin&gt; in a separate process</code>。当插件的编辑器崩溃时，出现的消息里也提供第二个选项。</p>
+<p>这在 Windows 和 Linux 上可用，自 0.1.25 起 macOS 上也可用。</p>
+<h2 id="32-bit-plugins-windows-only">32 位插件（仅限 Windows）</h2>
+<p>在 Windows 上，32 位的 VST2 和 VST3 插件通过桥接程序（<code>LYNX-bridge32.exe</code>）运行。桥接不会增加延迟。在其中崩溃的插件会自行停止，而 LYNX SHARE 继续播放。桥接插件的编辑器在它自己的窗口中打开。当一个插件同时安装了 32 位和 64 位版本时，插件窗口 <code>封装器设置</code> 中的 <code>位数</code> 决定加载哪一个。</p>
+<h2 id="plugin-performance-monitor">插件性能监视器</h2>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" alt="插件性能监视器：每个乐器和效果器占一行，显示其占用的处理时间份额" loading="lazy" width="720" height="380"></a></figure>
+<p><code>工具 › 插件性能监视器...</code> 列出每个乐器和效果器所占用的处理时间：当前值、平均值和峰值。100% 表示在音频持续的整段时间里，一个处理器核心一直处于忙碌状态。</p>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>查找</code></td><td>按插件、通道或插入轨筛选</td></tr><tr><td><code>仅插件</code></td><td>隐藏 LYNX SHARE 自己的乐器和效果器</td></tr><tr><td><code>冻结</code></td><td>停止更新数字</td></tr><tr><td><code>播放时重置</code></td><td>每次开始播放时重新计算平均值和峰值</td></tr><tr><td><code>重置</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
+<h2 id="when-a-plugin-is-not-installed">插件没有安装时</h2>
+<p>LYNX SHARE 先按标识符查找同一个插件，然后按文件，再按名称。以 VST2 保存的工程可以用同一产品的 VST3 打开，反过来也一样，但此时插件使用默认设置播放。</p>
+<p>如果某个效果器完全没有安装，一个作用相同的 LYNX SHARE 效果器会占据它的插槽，而原插件仍保留在工程中。见<a href="/wiki/built-in/">内置乐器和效果器</a>。<code>帮助 › 缺失的文件...</code> 会列出被替换的插件。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>被承载插件的窗口有一个预设栏：插件自己的程序、你的预设、<code>保存预设...</code>、<code>加载预设文件...</code> 和 <code>导出预设文件...</code>。<code>.fxp</code>、<code>.fxb</code> 和 <code>.vstpreset</code> 文件只能加载到在 LYNX SHARE 内部运行的插件中，不能加载到在独立进程中运行的插件。</li><li>监视器只在它的窗口打开时才测量。</li><li>缺失的乐器目前不做替代。缺失的乐器插件会变成按通道名称选定的内置合成器。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/built-in/">内置乐器和效果器</a></li><li><a href="/wiki/browser/">浏览器</a></li><li><a href="/wiki/mixer/">混音台</a></li><li><a href="/wiki/troubleshooting/">故障排除</a></li></ul>
