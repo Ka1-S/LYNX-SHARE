@@ -370,7 +370,13 @@ TEST (fpc190q_flp_round_trip_is_byte_exact)
     // LYNX → .flp → LYNX → .flp: the FPC channel stays one FPC channel, its state the same bytes, the two files equal
     using namespace lynx;
     const auto kit = fpc190q::testKit();
-    const auto song = fpc190q::kitSong (kit);
+    // the song as LYNX keeps one: its pattern named, FL's 125 inserts (an .flp always carries FL's whole mixer, and the
+    // import names FL's unnamed pattern and inserts as FL shows them)
+    auto song = fpc190q::kitSong (kit);
+    song.patterns[0].name = "Pattern 1";
+    song.mixer = Song::defaultMixer (125);
+    for (auto& t : song.mixer)
+        t.effects.clear();
     const auto state = fpc::write (kit);
     flpexport::Options options;
     flpexport::Report report;
@@ -388,6 +394,7 @@ TEST (fpc190q_flp_round_trip_is_byte_exact)
 
     FlpImportOptions import;
     import.fileExists = [] (const std::string&) { return true; };
+    import.roots.factoryData = "C:/FL"; // (the kick's layers are under %FLStudioFactoryData%: without a root they are not found)
     const auto back = importFlp (project, import);
     const ChannelDef* channel = nullptr;
     for (const auto& c : back.channels)

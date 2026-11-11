@@ -1473,11 +1473,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     }
         }
 
+        // (a kit without a pad that plays, such as FL's "Empty" kit, still becomes an FPC channel when one is asked
+        // for: a kit preset loaded onto an FPC channel)
         if (c.pluginName == "FPC")
-            if (auto pads = fpcPads (c.pluginState))
+            if (auto pads = fpcPads (c.pluginState); pads || options.fpcAsChannel)
             {
                 std::vector<DrumPad> found;
-                for (auto pad : *pads)
+                for (auto pad : pads ? *pads : std::vector<DrumPad>())
                 {
                     std::vector<SampleZone> layers;
                     for (auto layer : pad.layers)
