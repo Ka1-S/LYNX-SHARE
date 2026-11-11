@@ -4149,6 +4149,12 @@ countries: ru by kz
 "Let the plugin know when rendering to an audio file" = "Сообщать плагину о рендере в аудиофайл"
 "Compatibility" = "Совместимость"
 "Remote control" = "Дистанционное управление"
+"Allows authenticated local applications to read and edit this project." = "Разрешает локальным приложениям, прошедшим аутентификацию, читать и редактировать этот проект."
+"Enable local remote control" = "Включить локальное дистанционное управление"
+"Remote control active — local clients can read and edit this project." = "Дистанционное управление активно — локальные клиенты могут читать и редактировать этот проект."
+"Remote control could not start. Disable and re-enable to retry." = "Не удалось запустить дистанционное управление. Отключите и снова включите его, чтобы повторить попытку."
+"Remote control is off." = "Дистанционное управление отключено."
+"The remote control setting could not be saved." = "Не удалось сохранить настройку дистанционного управления."
 "Channel type" = "Тип канала"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Снимите отметку с MIDI-каналов, которые нужно отфильтровать (правый клик: только этот)"
 "LYNX SHARE synth" = "Синт LYNX SHARE"
@@ -8306,6 +8312,13 @@ countries: ru by kz
 "Mixer groups follow the Playlist (LYNX)" = "Группы микшера следуют за Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Расставить инсерты как в Playlist"
 "{0} insert(s) moved to follow the Playlist" = "Перемещено инсертов вслед за Playlist: {0}"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "Удалённая операция с историей отменена до изменения истории."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "Операция с историей не завершена; проект или его история могли измениться. Проверьте их состояние перед дальнейшей отменой или повтором действий."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Не удалось подготовить операцию с историей. Позиция в истории не изменилась; проверьте устройство перед повторной попыткой."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Устройство изменилось после этой удалённой правки. Отмена/повтор отклонены, чтобы сохранить эти изменения."
+
 "Keyboard style" = "Стиль клавиатуры"
 "Flat keys (FL Studio style)" = "Плоские клавиши (стиль FL Studio)"
 "Piano keys (lines between the white keys)" = "Клавиши пианино (линии между белыми клавишами)"

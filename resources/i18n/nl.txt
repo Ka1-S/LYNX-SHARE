@@ -4149,6 +4149,12 @@ countries: nl be
 "Let the plugin know when rendering to an audio file" = "De plugin laten weten wanneer er naar een audiobestand wordt gerenderd"
 "Compatibility" = "Compatibiliteit"
 "Remote control" = "Afstandsbediening"
+"Allows authenticated local applications to read and edit this project." = "Staat geauthenticeerde lokale toepassingen toe dit project te lezen en te bewerken."
+"Enable local remote control" = "Lokale afstandsbediening inschakelen"
+"Remote control active — local clients can read and edit this project." = "Afstandsbediening actief — lokale clients kunnen dit project lezen en bewerken."
+"Remote control could not start. Disable and re-enable to retry." = "De afstandsbediening kon niet worden gestart. Schakel deze uit en weer in om het opnieuw te proberen."
+"Remote control is off." = "De afstandsbediening is uitgeschakeld."
+"The remote control setting could not be saved." = "De instelling voor afstandsbediening kon niet worden opgeslagen."
 "Channel type" = "Kanaaltype"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Deselecteer MIDI-kanalen om ze uit te filteren (rechtsklik: alleen deze)"
 "LYNX SHARE synth" = "LYNX-SHARE-synth"
@@ -8306,6 +8312,13 @@ countries: nl be
 "Mixer groups follow the Playlist (LYNX)" = "Mixergroepen volgen de Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Inserts ordenen zoals de Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) verplaatst om de Playlist te volgen"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "De externe geschiedenisbewerking is geannuleerd voordat de geschiedenis werd gewijzigd."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "De geschiedenisbewerking is niet voltooid; het project of de geschiedenis kan zijn gewijzigd. Controleer de toestand voordat je verdergaat met ongedaan maken/opnieuw uitvoeren."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "De geschiedenisbewerking kon niet worden voorbereid. De positie in de geschiedenis is niet gewijzigd; controleer het apparaat voordat je het opnieuw probeert."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Een apparaat is gewijzigd na deze externe bewerking. Ongedaan maken/opnieuw uitvoeren is geweigerd om die wijzigingen te behouden."
+
 "Keyboard style" = "Klavierstijl"
 "Flat keys (FL Studio style)" = "Vlakke toetsen (FL Studio-stijl)"
 "Piano keys (lines between the white keys)" = "Pianotoetsen (lijnen tussen de witte toetsen)"

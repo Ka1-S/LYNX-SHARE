@@ -48,6 +48,34 @@ struct PluginCrash
 int pluginCrashCount() noexcept;
 std::vector<PluginCrash> pluginCrashes();
 
+// The audio thread cannot wait for hosted state access. Keep the last contended automation value per parameter,
+// in storage allocated when the instance is created, and apply it before the next available processing block.
+class HostedParameterChanges
+{
+public:
+    explicit HostedParameterChanges (int count);
+    bool contains (int index) const noexcept { return index >= 0 && index < count; }
+    void defer (int index, float value) noexcept;
+    void clear (int index) noexcept;
+    float latest (int index) const noexcept;
+    void observed (int index, float value) noexcept;
+    void beginRestore() noexcept { restoreEpoch.fetch_add (1, std::memory_order_acq_rel); }
+    bool takePending() noexcept { return pending.exchange (false, std::memory_order_acq_rel); }
+    bool take (int index, float& value) noexcept;
+    int size() const noexcept { return count; }
+
+private:
+    struct Value
+    {
+        std::atomic<std::uint64_t> deferred { 0 }; // restore epoch and float bits, published as one value
+        std::atomic<float> cached { -1.0f };
+    };
+    const int count;
+    std::unique_ptr<Value[]> values;
+    std::atomic<bool> pending { false };
+    std::atomic<std::uint32_t> restoreEpoch { 1 };
+};
+
 // A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
 // one per output bus (bus 0 = the main output); a plugin with one bus of more than two channels (a bridged plugin)
 // in stereo pairs. `channel` = its first channel in the plugin's buffer.
@@ -104,7 +132,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
-    // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
+    // State restoration is serialized with this instance's processing by its callback lock.
+    bool restoreState (const std::string& state);
+    // UI/controllers may wait for this instance's current block; audio-side calls only try the lock.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
@@ -113,7 +143,7 @@ public:
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
     void noteOnMidi (int key, float velocity, int midiChannel) noexcept override;
     void noteOffMidi (int key, int midiChannel) noexcept override;
-    void midiMessage (const std::uint8_t* bytes, int size) noexcept override { midi.addEvent (bytes, size, 0); }
+    void midiMessage (const std::uint8_t* bytes, int size) noexcept override { queueMidi (bytes, size); }
     void pitchBend (float) noexcept override {} // (the plugin takes the raw MIDI pitch bend, midiMessage)
     int takeMidiOutput (MidiOutNote* out, int max) noexcept override;
     // Issue #14: the channel's PITCH knob, fine tune and main pitch reach the plugin as MIDI pitch bend (scaled by the
@@ -136,6 +166,7 @@ public:
 
 private:
     void mixOutputs (const float* const* channels, int numChannels, int at, int count, float gl, float gr, float* left, float* right) noexcept;
+    friend juce::String pluginStateContentionSelfTest();
     std::vector<PluginOutputInfo> outs;
     std::unique_ptr<std::atomic<int>[]> routeOffset;   // [output]
     std::unique_ptr<std::atomic<bool>[]> routeActive;  // [output]
@@ -168,9 +199,16 @@ private:
     HostedKeys heldKeys; // per MIDI channel: the notes on (their note offs on stop / jump, round 169c)
     void hold (int channel, int key, bool on) noexcept { heldKeys.set (channel, key, on); }
     void releaseHeldKeys() noexcept; // a note off for each held key
+    void queueMidi (const void* bytes, int size, int offset = 0) noexcept;
+    void queueMidi (const juce::MidiMessage& message, int offset = 0) noexcept { queueMidi (message.getRawData(), message.getRawDataSize(), offset); }
+    void rememberMidi (const juce::MidiBuffer& messages) noexcept;
+    void recoverMidi() noexcept;
+    HostedKeys deliveredKeys; // note-ons actually sent, so an overflow can release them without replaying missed notes
+    bool midiOverflow = false, recoveryMidi = false;
     HostBlockClock blockClock; // where each plugin block starts in the renderer's chunk (the play head's position)
 
     std::unique_ptr<juce::AudioPluginInstance> plugin;
+    mutable HostedParameterChanges parameterChanges;
     juce::AudioBuffer<float> buffer;
     juce::MidiBuffer midi;
     midictl::State midiControls;
@@ -213,7 +251,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
-    // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
+    // State restoration is serialized with this instance's processing by its callback lock.
+    bool restoreState (const std::string& state);
+    // UI/controllers may wait for this instance's current block; audio-side calls only try the lock.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
@@ -233,11 +273,13 @@ public:
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
 
 private:
+    friend juce::String pluginStateContentionSelfTest();
     void failed (std::uint32_t code) noexcept;
     void flushMidiControls() noexcept;
     void findSideChannel() noexcept;
 
     std::unique_ptr<juce::AudioPluginInstance> plugin;
+    mutable HostedParameterChanges parameterChanges;
     juce::AudioBuffer<float> buffer;
     juce::MidiBuffer midi;
     midictl::State midiControls;
@@ -262,6 +304,7 @@ bool hasSideBus (const juce::AudioPluginInstance& plugin);
 // --selftest: a stand-in plugin with a stereo sidechain bus (it outputs its side input) inside PluginEffect, plain and
 // with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
 juce::String pluginSidechainSelfTest();
+juce::String pluginStateContentionSelfTest();
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.
 // UI thread, except the scan functions (any thread; one scan at a time) and the background scan.
@@ -428,6 +471,11 @@ public:
     // `wanted`: how many ready instances of this exact plugin+state the rack needs so far (one the VST3 automation
     // remap already created counts, so it is not created twice)
     void preload (const PluginRef& ref, int wanted = 1);
+    // Prepare one exact instance before an atomic control edit. A failure is reported
+    // to the caller and is not cached; the next rack build consumes the ready instance.
+    bool preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                         const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate = {});
+    void discardPreloaded (const PluginRef& ref, double sampleRate);
     void clearPreloaded();
     int preloadedCount() const;
     // Called on the message thread just before a hosted plugin is created (the progress panel names it and repaints).
