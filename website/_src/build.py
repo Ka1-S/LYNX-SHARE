@@ -191,10 +191,21 @@ SIZES = json.loads((SRC / "img-sizes.json").read_text(encoding="utf-8"))     # w
 SIZES.update({"/assets/img/plugins/%s.webp" % k: v[:2] for k, v in json.loads((SRC / "catalog-img.json").read_text(encoding="utf-8")).items()})
 
 
+def dense_srcset(tag):
+    """srcset with the @2x file when scripts/site-shots.sh drew one (twice the size, drawn by the program at 2x) for a
+    picture of the site's own outside plugins/ (the plugin cards choose their srcset themselves, see plugin_img)."""
+    src = re.search(r'\ssrc="(/assets/img/(?!plugins/)[^"?]+?)\.(webp|png)(\?[^"]*)?"', tag)
+    if " srcset=" in tag or not src or not (OUT / (src.group(1) + "@2x." + src.group(2))[1:]).is_file():
+        return tag
+    one = "%s.%s%s" % (src.group(1), src.group(2), src.group(3) or "")
+    two = "%s@2x.%s%s" % (src.group(1), src.group(2), src.group(3) or "")
+    return tag.replace(src.group(0), '%s srcset="%s 1x, %s 2x"' % (src.group(0), one, two), 1)
+
+
 def sized(page):
     """width and height on every picture of the site's own that lacks them: nothing is stretched, nothing jumps on load."""
     def fix(m):
-        tag = m.group(0)
+        tag = dense_srcset(m.group(0))
         src = re.search(r'\ssrc="([^"?]+)', tag)
         if " width=" in tag or not src or src.group(1) not in SIZES:
             return tag
