@@ -3402,6 +3402,13 @@ void setOfflineRendering (bool on) noexcept { offlineRenderingFlag.store (on); }
 bool offlineRendering() noexcept { return offlineRenderingFlag.load(); }
 namespace
 {
+std::atomic<bool> renderInProgressFlag { false };
+}
+
+void setRenderInProgress (bool on) noexcept { renderInProgressFlag.store (on); }
+bool renderInProgress() noexcept { return renderInProgressFlag.load(); }
+namespace
+{
 std::atomic<bool> hqAllFlag { false };
 }
 void setHqForAllPlugins (bool on) noexcept { hqAllFlag.store (on); }
