@@ -65,7 +65,7 @@ struct State
     bool operator== (const State& o) const
     {
         return folders.of == o.folders.of && folders.effects == o.folders.effects && folders.generators == o.folders.generators
-               && folders.hidden == o.folders.hidden && names == o.names;
+               && folders.hidden == o.folders.hidden && folders.top == o.folders.top && names == o.names;
     }
 };
 
@@ -96,6 +96,10 @@ Report refresh (const std::string& root, const std::vector<Plugin>& plugins, Sta
 // removed when nothing else is left in it. Call refresh() afterwards (the tree may say it slightly differently, e.g.
 // a folder name with characters a file name cannot have).
 Report apply (const std::string& root, const std::vector<Plugin>& plugins, const State& state);
+
+// The entry file of a plugin (round 190bf: the Browser's "Open parent folder", "Locate file", "Delete file..." on an
+// entry, FL's System items): its place under Effects / Generators (the first A-Z), else its Installed entry; "" = none.
+std::string entryFile (const std::string& root, const std::string& key, bool instrument);
 
 // One entry file's text / what it says (tests, tools)
 struct Entry

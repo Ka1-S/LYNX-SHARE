@@ -455,8 +455,12 @@ private:
         for (const auto& f : fxEntries)
             if (f.folder != 3)
                 fxBuiltins.push_back ({ f.key, f.key.rfind ("lynx:fx:", 0) == 0 ? f.key.substr (8) : f.key, f.flPlugin, f.flPlugin });
-        const auto genFolders = plugincatalog::withDefaultCategories (host.databaseFolders(), true, genBuiltins);
-        const auto fxFolders = plugincatalog::withDefaultCategories (host.databaseFolders(), false, fxBuiltins);
+        // (a built-in plugin at the top of the database, in no folder, keeps its default category here: round 190bf left
+        // the picker as it was, FL's picker was not seen with root entries)
+        auto database = host.databaseFolders();
+        database.top.clear();
+        const auto genFolders = plugincatalog::withDefaultCategories (database, true, genBuiltins);
+        const auto fxFolders = plugincatalog::withDefaultCategories (database, false, fxBuiltins);
         auto categoryOf = [] (const plugincatalog::Folders& folders, const std::string& key) {
             if (const auto it = folders.of.find (key); it != folders.of.end() && ! it->second.empty())
                 return it->second.substr (0, it->second.find ('/')); // (a sub-folder belongs to its top folder's tab)

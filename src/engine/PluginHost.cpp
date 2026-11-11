@@ -1954,7 +1954,7 @@ void PluginHost::setPluginName (const std::string& key, const std::string& name)
 void PluginHost::setDatabaseFolders (const plugincatalog::Folders& folders)
 {
     const auto viewOnly = folders.of == userFolders.of && folders.effects == userFolders.effects && folders.generators == userFolders.generators
-                          && folders.hidden == userFolders.hidden;
+                          && folders.hidden == userFolders.hidden && folders.top == userFolders.top;
     userFolders = folders;
     if (persistent)
         settingsFolder().getChildFile ("plugin-database.txt").replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));

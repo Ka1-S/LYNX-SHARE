@@ -50,6 +50,7 @@ CORE="$CORE src/core/MissingFiles.cpp"
 # the plugin picker's catalog (round 151)
 CORE="$CORE src/core/PluginCatalog.cpp"
 CORE="$CORE src/core/PluginDbFolder.cpp"
+CORE="$CORE src/core/FolderWatcher.cpp"
 # project safety: backups, versions, packages (REA round 118)
 CORE="$CORE src/core/ProjectSafety.cpp"
 # Online Sessions P1: stable ids, parts, stand-ins (round 168a)

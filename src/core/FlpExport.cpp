@@ -1043,7 +1043,7 @@ struct Converter
             // a dancer edited in LYNX keeps LYNX's text state: FL gets its own bytes (the sprite sheet's file included)
             if (def.instrument == InstrumentKind::fruitydance)
                 if (const auto dancer = dance::fromState (c.pluginState))
-                    c.pluginState = dance::toFl (*dancer);
+                    c.pluginState = dance::toFl (*dancer, options.flFactoryData);
             if (c.pluginState.empty() && def.instrument == InstrumentKind::threeosc)
                 c.pluginState = defaultThreeOscState();
             if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)

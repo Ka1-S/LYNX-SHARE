@@ -695,7 +695,7 @@ bool WavTakeWriter::open (const std::string& path, double sampleRate, int channe
 
 bool WavTakeWriter::writeHeader()
 {
-    const auto bytes = format == SampleFormat::pcm24 ? 3 : 4;
+    const auto bytes = bytesPerSample (format);
     const auto data = (std::uint64_t) written * (std::uint64_t) (bytes * numChannels);
     const auto data32 = (std::uint32_t) std::min<std::uint64_t> (data, 0xFFFFFFFFull - headerSize);
     unsigned char h[headerSize] {};
@@ -703,7 +703,7 @@ bool WavTakeWriter::writeHeader()
     put32 (h + 4, data32 + headerSize - 8);
     std::memcpy (h + 8, "WAVEfmt ", 8);
     put32 (h + 16, 16);
-    put16 (h + 20, format == SampleFormat::pcm24 ? 1 : 3);
+    put16 (h + 20, format == SampleFormat::float32 ? 3 : 1);
     put16 (h + 22, (std::uint32_t) numChannels);
     put32 (h + 24, (std::uint32_t) std::llround (rate));
     put32 (h + 28, (std::uint32_t) std::llround (rate) * (std::uint32_t) (bytes * numChannels));
@@ -721,7 +721,7 @@ bool WavTakeWriter::write (const float* const* data, int n)
 {
     if (file == nullptr || n <= 0)
         return file != nullptr;
-    const auto bytes = format == SampleFormat::pcm24 ? 3 : 4;
+    const auto bytes = bytesPerSample (format);
     buffer.resize ((std::size_t) n * (std::size_t) (bytes * numChannels));
     auto* p = buffer.data();
     for (int i = 0; i < n; ++i)
@@ -734,6 +734,15 @@ bool WavTakeWriter::write (const float* const* data, int n)
                 std::memcpy (&u, &x, 4);
                 put32 (p, u);
                 p += 4;
+            }
+            else if (format == SampleFormat::pcm16)
+            {
+                if (! (x == x))
+                    x = 0.0f;
+                const auto v = (std::int32_t) std::lrint (std::clamp ((double) x, -1.0, 1.0) * 32767.0);
+                p[0] = (unsigned char) v;
+                p[1] = (unsigned char) (v >> 8);
+                p += 2;
             }
             else
             {
@@ -995,7 +1004,7 @@ std::string takeName (const std::string& trackName, int take)
 
 double minutesLeft (std::int64_t bytesFree, double sampleRate, int channels, SampleFormat format) noexcept
 {
-    const auto perSecond = sampleRate * std::max (1, channels) * (format == SampleFormat::pcm24 ? 3 : 4);
+    const auto perSecond = sampleRate * std::max (1, channels) * bytesPerSample (format);
     return perSecond > 0.0 ? (double) std::max<std::int64_t> (0, bytesFree) / perSecond / 60.0 : 0.0;
 }
 } // namespace lynx::takes

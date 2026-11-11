@@ -40,6 +40,9 @@ std::shared_ptr<const Sheet> sheetFor (const std::string& path, SheetError* erro
 // The frame standing at `feet` (its bottom centre), `scale` screen pixels per picture pixel
 void drawSheet (juce::Graphics& g, const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame);
 juce::Rectangle<float> sheetBox (const Sheet& sheet, juce::Point<float> feet, float scale);
+// FL's "Reflect" (round 190bf): `figure` drawn mirrored at the feet, `depth` pixels deep, fading out downwards from
+// `opacity` (0 = nothing)
+void drawReflection (juce::Graphics& g, juce::Point<float> feet, float depth, float opacity, const std::function<void (juce::Graphics&)>& figure);
 // Is the frame's picture solid at that point? (the clicks go through its transparent parts, as through FL's dancer)
 bool sheetSolidAt (const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame, juce::Point<float> point);
 } // namespace dancer
@@ -89,6 +92,8 @@ private:
         std::shared_ptr<const dancer::Sheet> sheet;
         dance::SheetAnimator animator;
         dance::SheetFrame frame;
+        std::int64_t lastCycle = 0; // (FL's "Sync changes": LYNX's dancer changes its move when a cycle starts)
+        bool floating = false;      // its window is kept in front (FL's "Keep in front")
     };
     class Window;
 
@@ -99,6 +104,7 @@ private:
     static juce::Rectangle<float> bodyBox (const Dancer& d);
     static bool hits (const Dancer& d, juce::Point<float> p); // the body (a sheet: a solid pixel of its frame)
     static void drawDancer (juce::Graphics& g, const Dancer& d);
+    static float reflectionDepth (const Dancer& d); // FL's "Reflect": how far the mirror image reaches under the feet
     bool windowed() const;                                // the dancers have windows of their own now
     void syncWindow (Dancer& d, bool windows);            // made, placed, shown / hidden as the dancer is
     void invalidate (Dancer& d, juce::Rectangle<float> r); // its window, or the stage's area r

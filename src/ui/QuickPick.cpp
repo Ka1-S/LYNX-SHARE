@@ -23,6 +23,7 @@
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/PluginWindow.h"
+#include "ui/Theme.h"
 
 namespace lynx::quickpick
 {
@@ -230,7 +231,9 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
     auto& host = engine.getPluginHost();
     const auto folders = plugincatalog::withDefaultCategories (host.databaseFolders(), instruments, builtins);
     const auto tree = plugincatalog::menuTree (folders, instruments, keys);
-    if (tree.empty()) return false;
+    // FL's root entries (round 190bf, fl190be Q3): plugins at the top of Effects / Generators, in no folder
+    const auto root = plugincatalog::rootItems (folders, instruments, keys);
+    if (tree.empty() && root.empty()) return false;
     const auto view = (plugincatalog::MenuView) host.databaseFolders().view;
     auto label = [&] (int i) { return shownName (engine, entries[(std::size_t) i].key, entries[(std::size_t) i].label); };
     auto addItems = [&] (juce::PopupMenu& m, std::vector<int> items) {
@@ -245,8 +248,16 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
         return m;
     };
     if (view == plugincatalog::MenuView::simple)
-        addItems (menu, plugincatalog::allItems (tree));
+    {
+        auto all = plugincatalog::allItems (tree); // (one A-Z list, root entries among the rest)
+        all.insert (all.end(), root.begin(), root.end());
+        addItems (menu, all);
+    }
     else
+    {
+        // Categories: the root entries first, without a heading, then each folder under its own (FL's order)
+        if (view != plugincatalog::MenuView::tree)
+            addItems (menu, root);
         for (const auto& f : tree)
         {
             if (view == plugincatalog::MenuView::tree)
@@ -258,6 +269,10 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
             for (const auto& sub : f.sub) menu.addSubMenu (juce::String::fromUTF8 (sub.name.c_str()), submenu (sub));
             addItems (menu, f.items);
         }
+        // Tree: the folders as submenus first, then the root entries
+        if (view == plugincatalog::MenuView::tree)
+            addItems (menu, root);
+    }
     menu.addSeparator();
     return true;
 }
@@ -304,6 +319,17 @@ juce::File pluginDatabaseFolder()
 juce::File pluginDatabaseFolder (bool instruments, const std::string& userFolder)
 {
     return juce::File (juce::String::fromUTF8 (plugindb::folderOnDisk (pluginDatabaseFolder().getFullPathName().toStdString(), instruments, userFolder).c_str()));
+}
+
+juce::File pluginDatabaseEntry (const std::string& key, bool instruments)
+{
+    const auto path = plugindb::entryFile (pluginDatabaseFolder().getFullPathName().toStdString(), key, instruments);
+    return path.empty() ? juce::File() : juce::File (juce::String::fromUTF8 (path.c_str()));
+}
+
+void markPluginDatabaseChanged()
+{
+    lastDatabaseRefresh = 0; // (the next menu, picker or Browser reads the folder again, without the two-second wait)
 }
 
 void refreshPluginDatabase (AudioEngine& engine, bool force)
@@ -510,14 +536,46 @@ void addFolderViewItems (juce::PopupMenu& menu, AudioEngine& engine)
     const auto& folders = engine.getPluginHost().databaseFolders();
     // FL's view switch under the list (radio items): Categories / Simple / Tree
     menu.addSeparator();
+    // (one setting for every list: the Add menu, the Channel Rack's "+" menu and the mixer slots' menus)
     static const char* const names[] { TR_NOOP ("Categories"), TR_NOOP ("Simple"), TR_NOOP ("Tree") };
     for (int v = 0; v < 3; ++v)
-        menu.addItem (tr (names[v]), true, folders.view == v, [&engine, v] {
+        addRadioItem (menu, tr (names[v]), folders.view == v, [&engine, v] {
             auto& h = engine.getPluginHost();
             auto f = h.databaseFolders();
             f.view = v;
             h.setDatabaseFolders (f);
         });
+}
+
+void addRadioItem (juce::PopupMenu& menu, const juce::String& text, bool selected, std::function<void()> action)
+{
+    // FL's radio items (a dot, not a tick): a small circle drawn as the item's icon, filled when it is the one chosen
+    auto icon = std::make_unique<juce::DrawableComposite>();
+    constexpr float size = 14.0f;
+    {
+        auto ring = std::make_unique<juce::DrawablePath>();
+        juce::Path p;
+        p.addEllipse (2.5f, 2.5f, size - 5.0f, size - 5.0f);
+        ring->setPath (p);
+        ring->setFill (juce::Colours::transparentBlack);
+        ring->setStrokeFill (selected ? theme::colour::accent : theme::colour::textSecondary);
+        ring->setStrokeType (juce::PathStrokeType (1.3f));
+        icon->addAndMakeVisible (ring.release());
+    }
+    if (selected)
+    {
+        auto dot = std::make_unique<juce::DrawablePath>();
+        juce::Path p;
+        p.addEllipse (size * 0.5f - 2.6f, size * 0.5f - 2.6f, 5.2f, 5.2f);
+        dot->setPath (p);
+        dot->setFill (theme::colour::accent);
+        icon->addAndMakeVisible (dot.release());
+    }
+    icon->setBoundingBox (juce::Parallelogram<float> (juce::Rectangle<float> (size, size)));
+    juce::PopupMenu::Item item (text);
+    item.setImage (std::move (icon));
+    item.setAction (std::move (action));
+    menu.addItem (std::move (item));
 }
 
 bool inUserFolder (AudioEngine& engine, const std::string& key)

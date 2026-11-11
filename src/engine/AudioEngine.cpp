@@ -1531,7 +1531,7 @@ AudioEngine::RecordingSettings loadRecordingSettings()
         const auto key = raw.upToFirstOccurrenceOf ("=", false, false).trim();
         const auto value = raw.fromFirstOccurrenceOf ("=", false, false);
         if (key == "format")
-            s.format = value.trim() == "float32" ? takes::SampleFormat::float32 : takes::SampleFormat::pcm24;
+            s.format = value.trim() == "float32" ? takes::SampleFormat::float32 : value.trim() == "pcm16" ? takes::SampleFormat::pcm16 : takes::SampleFormat::pcm24;
         else if (key == "trackTakeNames")
             s.trackTakeNames = value.getIntValue() != 0;
         else if (key == "manualOffset")
@@ -1553,7 +1553,7 @@ void AudioEngine::setRecordingSettings (const RecordingSettings& settings)
 {
     recordingSettings = settings;
     juce::String text;
-    text << "format=" << (settings.format == takes::SampleFormat::float32 ? "float32" : "pcm24") << "\n"
+    text << "format=" << (settings.format == takes::SampleFormat::float32 ? "float32" : settings.format == takes::SampleFormat::pcm16 ? "pcm16" : "pcm24") << "\n"
          << "trackTakeNames=" << (settings.trackTakeNames ? 1 : 0) << "\n"
          << "manualOffset=" << settings.manualOffset << "\n"
          << "useMeasured=" << (settings.useMeasured ? 1 : 0) << "\n"

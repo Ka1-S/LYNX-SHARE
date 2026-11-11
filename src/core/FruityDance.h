@@ -46,6 +46,13 @@ struct Settings
     std::uint32_t colour = 0xffff3048; // the outfit (ARGB)
     float blend = 0.25f;     // a sprite sheet's "Blend" (FL's motion blending: the part of each frame that fades to the next)
     std::string sheet;       // a sprite sheet's picture file (UTF-8; empty: LYNX's own dancer)
+    // FL's display options (round 190bf, FL's editor: Sync changes, Solid, Keep in front, On desktop, Reflect; all on and
+    // Reflect 64 / 256 in a new Fruity Dance). sync: a move changes at the next cycle's start (off: at once); solid:
+    // the dancer takes the mouse (off: clicks go through it); keepInFront: kept in front of the panels and docked
+    // plugins; onDesktop: FL's "Don't minimize window along with application" (kept for FL; LYNX's dancers live in the
+    // main window); reflect: the opacity of the faded mirror image under the dancer.
+    bool sync = true, solid = true, keepInFront = true, onDesktop = true;
+    float reflect = 0.25f;
 
     bool operator== (const Settings&) const = default;
 };
@@ -53,10 +60,19 @@ struct Settings
 // LYNX's own state ("LYNX dance 1", key=value lines)
 std::vector<std::uint8_t> toState (const Settings& s);
 std::optional<Settings> fromState (const std::vector<std::uint8_t>& state);
-// FL's Fruity Dance state (40 bytes or more); nullopt = not one
-std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state);
-// FL's state for an exported .flp (version 2: the settings, FL's default display options, the sheet's file)
-std::vector<std::uint8_t> toFl (const Settings& s);
+// FL's Fruity Dance state (40 bytes or more); nullopt = not one. `flFactoryData`: FL's install folder (what FL's
+// %FLStudioFactoryData% stands for, e.g. C:\Program Files\Image-Line\FL Studio 2026), to find a sheet FL saved
+// inside it; "" = not known (such a path then stays as FL wrote it).
+std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state, const std::string& flFactoryData = {});
+// FL's state for an exported .flp (version 2: the settings, the display options, the sheet's file: as FL writes it,
+// "%FLStudioFactoryData%\<rest>" for a file inside `flFactoryData`, else the full path; UTF-8, the length in bytes)
+std::vector<std::uint8_t> toFl (const Settings& s, const std::string& flFactoryData = {});
+// The sheet's file as FL keeps it (round 190bf, fl190be Q5: FL 2026 saved its own Count.png as
+// "%FLStudioFactoryData%\Plugins\Fruity\Generators\Fruity Dance\Artwork\Count.png" and a copy elsewhere as its
+// full path, never relative to the project) and back
+extern const char* const flFactoryToken; // "%FLStudioFactoryData%"
+std::string expandFlSheetPath (const std::string& stored, const std::string& flFactoryData);
+std::string flSheetPath (const std::string& path, const std::string& flFactoryData);
 // either (LYNX's text first, then FL's bytes); the defaults when neither
 Settings read (const std::vector<std::uint8_t>& state);
 
@@ -146,7 +162,8 @@ public:
     explicit SheetAnimator (std::uint32_t seed = 1) noexcept;
     // `cycles`: the dancer's clock (as `pose`); `move`: the move value; `held`: dragged with the mouse (the last row,
     // blend 0.7)
-    SheetFrame advance (double cycles, int rows, int move, bool mirrored, bool playing, float blend, bool held = false) noexcept;
+    // `sync`: FL's "Sync changes" (off: a move other than Freestyle shows at once instead of at the cycle's start)
+    SheetFrame advance (double cycles, int rows, int move, bool mirrored, bool playing, float blend, bool held = false, bool sync = true) noexcept;
     int row() const noexcept { return shownRow; }
 
 private:

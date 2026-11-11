@@ -14048,6 +14048,37 @@ private:
                 lynx::quickpick::addGeneratorMenu (generators, offline, [] (lynx::ChannelDef) {}, {}, nullptr, nullptr);
                 lynx::quickpick::addFolderViewItems (generators, offline);
                 saveMenus (juce::StringArray { "Mixer slot: add an effect", "Channel Rack: add" }, { effects, generators }, prefix + "-menus170b.png");
+                // round 190bf (fl190be Q3): the Channel Rack's "+" menu in FL's three views, with two root entries (plugins
+                // at the top of the database, in no folder) and the Categories / Simple / Tree switch at the end
+                {
+                    auto& host = offline.getPluginHost();
+                    const auto keep = host.databaseFolders();
+                    auto folders = keep;
+                    int added = 0;
+                    for (const auto& e : lynx::quickpick::generatorEntries (offline))
+                        if (e.folder == 3 && e.available && added < 2) // (installed plugins: FL's root entries are such)
+                        {
+                            folders.top.insert (e.key);
+                            ++added;
+                        }
+                    for (const auto& e : lynx::quickpick::generatorEntries (offline))
+                        if (e.folder != 3 && added < 2)
+                        {
+                            folders.top.insert (e.key);
+                            ++added;
+                        }
+                    static const char* const views[] { "categories", "simple", "tree" };
+                    for (int v = 0; v < 3; ++v)
+                    {
+                        folders.view = v;
+                        host.setDatabaseFolders (folders);
+                        juce::PopupMenu plus;
+                        lynx::quickpick::addGeneratorMenu (plus, offline, [] (lynx::ChannelDef) {}, {}, nullptr, nullptr);
+                        lynx::quickpick::addFolderViewItems (plus, offline);
+                        saveMenus (juce::StringArray { juce::String ("Channel Rack +: ") + views[v] }, { plus }, prefix + "-menus190bf-" + views[v] + ".png");
+                    }
+                    host.setDatabaseFolders (keep);
+                }
                 offline.setSong (before);
                 offline.dispatchPendingMessages();
             }
@@ -14910,6 +14941,9 @@ private:
             ui.getBrowserForSnapshot().showPluginDatabaseForSnapshot(); // round 142: the Plugin database's FL engines
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-browser-plugins.png");
+            // round 190bf (fl190be Q1): the Plugin database's right-click menus, a folder's and an entry's (FL's System group)
+            saveMenus (juce::StringArray { "Plugin database: folder", "Plugin database: entry" }, ui.getBrowserForSnapshot().pluginDatabaseMenusForSnapshot(),
+                       prefix + "-browser190bf-menus.png");
             ui.getBrowserForSnapshot().setTab (lynx::BrowserComponent::allTab);
             saveWindow (ui.getBrowserForSnapshot().makeFoldersPanelForSnapshot(), "-browser-folders.png"); // round 164
             {
