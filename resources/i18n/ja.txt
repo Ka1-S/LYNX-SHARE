@@ -8363,3 +8363,4 @@ countries: jp
 "LOW LAT" = "低レイテンシー"
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "「録音中は低レイテンシー」によりバイパス中: このエフェクトは {0} ms のレイテンシーを加え、録音待機中またはモニター中のインサートがここを通っています。そのインサートの録音待機を解除すると元に戻ります"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "録音中は低レイテンシー (録音待機中またはモニター中のインサートで、レイテンシーを加えるエフェクトをバイパスします)"
+"Preview in time (loops play at the project's tempo, on the beat)" = "テンポに合わせて試聴 (ループはプロジェクトのテンポで、拍の頭から再生されます)"

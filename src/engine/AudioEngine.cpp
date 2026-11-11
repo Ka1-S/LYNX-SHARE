@@ -317,6 +317,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    previewAlive->store (false); // (round 190aq: a preview still being prepared ends without touching the engine)
+    previewJobs.stop();
     stopTimer();
     rackExchange.dispose = nullptr; // (from here the racks are freed at once)
     rackDisposer.flush();
@@ -374,6 +376,7 @@ void AudioEngine::buildInitialGraph()
     }
     auto previewOwned = std::make_unique<PreviewPlayer>();
     preview = previewOwned.get();
+    preview->setTransport (&transport); // (round 190aq: "Preview in time" starts on its beats)
     preview->setVolume (controls::previewGain (previewVolume));
     preview->setEditorVolume (controls::previewGain (editorVolume));
     auto previewNode = graph.addNode (std::move (previewOwned));
@@ -950,8 +953,161 @@ void AudioEngine::copyScope (float* destination, int count) const noexcept
 
 void AudioEngine::previewFile (const juce::File& file)
 {
-    if (preview != nullptr)
-        preview->playBrowser (file.existsAsFile() ? samples.load (file.getFullPathName()) : nullptr);
+    ++previewSerial; // (a preview still being prepared is dropped)
+    previewTiming = {};
+    if (preview == nullptr)
+        return;
+    auto sample = file.existsAsFile() ? samples.load (file.getFullPathName()) : nullptr;
+    if (! previewInTime || sample == nullptr)
+    {
+        preview->playBrowser (std::move (sample)); // FL's preview: the file as it is, at once
+        return;
+    }
+
+    // "Preview in time" (round 190aq, core/PreviewTempo.h): the file's tempo from its ACID beats or its name (cheap,
+    // here), else from LYNX's tempo detection (on the worker); a file that can have none plays as it always did
+    const auto path = file.getFullPathName();
+    const auto name = file.getFileName().toStdString();
+    const auto external = transport.externalBpm.load (std::memory_order_relaxed);
+    const auto projectBpm = external > 0.0 ? external : transport.bpm.load (std::memory_order_relaxed);
+    auto found = previewtempo::quick (*sample, name);
+    auto known = found.bpm > 0.0;
+    if (! known)
+        if (const auto it = previewTempos.find (path); it != previewTempos.end())
+        {
+            found = it->second;
+            known = true;
+        }
+    if (! known && ! previewtempo::worthDetecting (*sample))
+    {
+        preview->playBrowser (std::move (sample));
+        return;
+    }
+
+    PreviewTiming timing;
+    timing.path = path;
+    timing.projectBpm = projectBpm;
+    timing.fileBpm = found.bpm;
+    timing.source = found.source;
+    timing.ratio = previewtempo::stretchRatio (found.bpm, projectBpm);
+    timing.inTime = found.bpm > 0.0;
+    if (known)
+    {
+        if (found.bpm <= 0.0) // (analysed before: no tempo)
+        {
+            preview->playBrowser (std::move (sample));
+            return;
+        }
+        if (timing.ratio == 1.0) // already at the project's tempo: only the start waits for the beat
+        {
+            startPreviewInTime (path, std::move (sample), timing);
+            return;
+        }
+        for (const auto& s : previewStretches)
+            if (s.path == path && s.ratio == timing.ratio && s.sample != nullptr)
+            {
+                startPreviewInTime (path, s.sample, timing);
+                return;
+            }
+    }
+
+    // the tempo detection and / or the stretch, off the message thread; what was playing stops now
+    preview->playBrowser (nullptr);
+    timing.pending = true;
+    previewTiming = timing;
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    previewJobs.post ([this, alive = previewAlive, serial = previewSerial, path, sample, timing, known, started]() mutable {
+        if (! alive->load())
+            return;
+        auto found = previewtempo::Found { timing.fileBpm, timing.source };
+        if (! known)
+            found = previewtempo::detect (*sample);
+        timing.fileBpm = found.bpm;
+        timing.source = found.source;
+        timing.inTime = found.bpm > 0.0;
+        timing.ratio = previewtempo::stretchRatio (found.bpm, timing.projectBpm);
+        std::shared_ptr<const SampleData> out = sample;
+        if (timing.inTime && timing.ratio != 1.0)
+            if (auto stretched = timeStretch (*sample, timing.ratio, StretchMethod::general); stretched != nullptr && stretched->frames() > 1)
+                out = std::move (stretched);
+        timing.prepareMs = juce::Time::getMillisecondCounterHiRes() - started;
+        {
+            const std::lock_guard<std::mutex> lock (previewResultLock);
+            previewResults.push_back ({ serial, path, sample, out, timing, found, ! known });
+        }
+        juce::MessageManager::callAsync ([this, alive] {
+            if (alive->load())
+                takePreviewResults();
+        });
+    });
+}
+
+// The prepared previews, on the message thread: the tempo and the stretch are kept for the next click on the same
+// file, and the newest one plays unless another file was clicked meanwhile.
+void AudioEngine::takePreviewResults()
+{
+    std::vector<PreviewResult> results;
+    {
+        const std::lock_guard<std::mutex> lock (previewResultLock);
+        results.swap (previewResults);
+    }
+    for (auto& r : results)
+    {
+        if (r.detected)
+        {
+            if (previewTempos.size() > 512)
+                previewTempos.clear();
+            previewTempos[r.path] = r.found;
+        }
+        if (r.out != r.sample)
+        {
+            if (previewStretches.size() >= 6)
+                previewStretches.erase (previewStretches.begin());
+            previewStretches.push_back ({ r.path, r.timing.ratio, r.out });
+        }
+        if (r.serial != previewSerial || preview == nullptr)
+            continue; // another file was clicked meanwhile (or the preview was stopped)
+        lastPreviewPrepareMs = r.timing.prepareMs;
+        if (! r.timing.inTime)
+        {
+            previewTiming = {};
+            preview->playBrowser (r.out); // no tempo found: as it is
+            continue;
+        }
+        startPreviewInTime (r.path, r.out, r.timing);
+    }
+}
+
+void AudioEngine::finishPreviewJobs()
+{
+    previewJobs.waitIdle();
+    takePreviewResults();
+}
+
+void AudioEngine::startPreviewInTime (const juce::String& path, std::shared_ptr<const SampleData> sample, const PreviewTiming& timing)
+{
+    previewTiming = timing;
+    previewTiming.path = path;
+    previewTiming.pending = false;
+    previewTiming.inTime = true;
+    previewTiming.frames = sample != nullptr ? sample->frames() : 0;
+    previewHandedAtMs = juce::Time::getMillisecondCounterHiRes();
+    preview->setSyncLatency (getLatencySamples());
+    preview->playBrowser (std::move (sample), 0.8f, true);
+}
+
+int AudioEngine::getPreviewBeatStarts() const noexcept { return preview != nullptr ? preview->beatStarts() : 0; }
+
+double AudioEngine::getPreviewInTimeProgress() const noexcept
+{
+    if (previewTiming.pending)
+        return 0.0;
+    if (! previewTiming.inTime || preview == nullptr)
+        return -1.0;
+    const auto position = preview->getPlayPosition();
+    if (position < 0.0) // (the audio thread takes the sample at its next block)
+        return juce::Time::getMillisecondCounterHiRes() - previewHandedAtMs < 200.0 ? 0.0 : -1.0;
+    return previewTiming.frames > 1 ? juce::jlimit (0.0, 1.0, position / (double) (previewTiming.frames - 1)) : 0.0;
 }
 
 void AudioEngine::setInputScale (int scale, int root) noexcept

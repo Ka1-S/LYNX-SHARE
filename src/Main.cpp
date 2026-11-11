@@ -26,6 +26,7 @@
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
+#include "engine/PreviewPlayer.h"
 #include "engine/Metronome.h"
 #include "engine/AudioLogger.h"
 #include "engine/DllAsioDevice.h"
@@ -2713,6 +2714,91 @@ private:
                            && live.getLatencySamples() == before && live.lowLatencyBypassedCount() == 0;
         }
 
+        // The Browser's "Preview in time" (round 190aq): a loop whose name gives its tempo is stretched to the project's
+        // and starts on the beat; a one-shot plays as it always did; off, nothing changes
+        bool previewInTimeOk = false;
+        double previewPrepareMs = 0.0;
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-preview");
+            dir.deleteRecursively();
+            dir.createDirectory();
+            auto writeWav = [&dir] (const juce::String& name, int frames, bool loop) {
+                const auto wav = dir.getChildFile (name);
+                juce::WavAudioFormat format;
+                juce::AudioBuffer<float> audio (1, frames);
+                for (int i = 0; i < frames; ++i) // a click on every beat of 120 BPM over a tone, or a decaying hit
+                    audio.setSample (0, i, loop ? (i % 24000 < 400 ? 0.8f : 0.0f) + 0.1f * std::sin (0.02f * (float) i)
+                                                : 0.6f * std::exp (-(float) i / 2000.0f) * std::sin (0.05f * (float) i));
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                }
+                return wav;
+            };
+            const auto loop = writeWav ("selftest loop 120 bpm.wav", 96000, true); // 4 beats at 120 BPM
+            const auto hit = writeWav ("selftest hit.wav", 14400, false);         // 0.3 s
+            lynx::AudioEngine player (false);
+            const auto projectBpm = player.getTransport().bpm.load();
+            // off (FL's preview): nothing is prepared, the file plays as it is
+            player.previewFile (loop);
+            const auto offOk = ! player.getPreviewTiming().pending && ! player.getPreviewTiming().inTime;
+            player.setPreviewInTime (true);
+            player.previewFile (hit); // a one-shot: as it always played, at once
+            const auto hitOk = ! player.getPreviewTiming().pending && ! player.getPreviewTiming().inTime;
+            player.previewFile (loop);
+            const auto queued = player.getPreviewTiming().pending || std::abs (projectBpm - 120.0) < 0.2;
+            player.finishPreviewJobs();
+            const auto timing = player.getPreviewTiming();
+            previewPrepareMs = player.getLastPreviewPrepareMs();
+            const auto wanted = lynx::previewtempo::stretchRatio (120.0, projectBpm);
+            const auto stretchedOk = timing.inTime && ! timing.pending && timing.source == lynx::previewtempo::Source::name
+                                     && std::abs (timing.fileBpm - 120.0) < 1.0e-9 && std::abs (timing.ratio - wanted) < 1.0e-12
+                                     && std::abs ((double) timing.frames - 96000.0 * wanted) < 96000.0 * 0.01;
+            // the second click on the same file has its stretch ready
+            player.previewFile (loop);
+            const auto cachedOk = ! player.getPreviewTiming().pending && player.getPreviewTiming().inTime && player.getPreviewTiming().frames == timing.frames;
+            player.previewFile ({});
+            const auto stoppedOk = ! player.getPreviewTiming().inTime && player.getPreviewInTimeProgress() < 0.0;
+
+            // the start: on the next heard beat while the transport plays (sample exact), at once when it is stopped
+            auto firstSample = [] (bool playing, double startTick, int latency) {
+                lynx::Transport transport;
+                transport.sampleRate.store (48000.0);
+                transport.bpm.store (120.0); // 0.04 ticks per sample
+                transport.playing.store (playing);
+                transport.positionTicks.store (startTick);
+                lynx::PreviewPlayer p;
+                p.prepareToPlay (48000.0, 512);
+                p.setTransport (&transport);
+                p.setSyncLatency (latency);
+                auto dc = std::make_shared<lynx::SampleData>();
+                dc->sampleRate = 48000.0;
+                dc->left.assign (48000, 0.5f);
+                p.playBrowser (dc, 1.0f, true);
+                juce::AudioBuffer<float> block (2, 512);
+                juce::MidiBuffer midi;
+                for (int done = 0; done < 48000; done += 512)
+                {
+                    p.processBlock (block, midi);
+                    for (int i = 0; i < 512; ++i)
+                        if (block.getSample (0, i) != 0.0f)
+                            return done + i;
+                    if (playing)
+                        transport.positionTicks.store (transport.positionTicks.load() + 512 * transport.ticksPerSample());
+                }
+                return -1;
+            };
+            const auto beatOk = firstSample (true, 480.0, 0) == 12000   // half a beat to go: 480 ticks / 0.04
+                                && firstSample (true, 480.0, 100) == 12100 // the song is heard 100 samples late (PDC)
+                                && firstSample (true, 960.0, 0) == 0       // on a beat: now
+                                && firstSample (false, 480.0, 0) == 0;     // stopped: a free start
+            previewInTimeOk = loop.existsAsFile() && hit.existsAsFile() && offOk && hitOk && queued && stretchedOk && cachedOk && stoppedOk && beatOk;
+            dir.deleteRecursively();
+        }
+
         // LYNX substitutes (round 98): a missing plugin's slot plays a built-in equivalent and the project keeps the
         // original reference byte for byte (.flp record and LYNX plugin state)
         bool substituteOk = false;
@@ -3460,7 +3546,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3481,6 +3567,7 @@ private:
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "pre_fader_sends=" << (preSendOk ? "OK" : "ERROR") << "\n"
                << "low_latency_recording=" << (lowLatencyOk ? "OK" : "ERROR") << "\n"
+               << "preview_in_time=" << (previewInTimeOk ? "OK" : "ERROR") << " (2 s loop prepared in " << juce::String (previewPrepareMs, 1) << " ms)\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"

@@ -2206,6 +2206,8 @@ void MainComponent::loadUiSettings()
             engine.getTransport().metronomeVolume.store ((float) controls::clampUtilityVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue()));
         else if (key == "previewVolume")
             engine.setPreviewVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
+        else if (key == "previewInTime") // the Browser's "Preview in time" (round 190aq)
+            engine.setPreviewInTime (on);
         else if (key == "editorVolume")
             engine.setEditorVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
         else if (key == "rackPianoRollView")
@@ -2365,6 +2367,7 @@ void MainComponent::saveUiSettings()
                                       + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
                                       + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
+                                      + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
                                       + "\naskWhatToRecord=" + juce::String (engine.getRecordOptions().askWhatToRecord ? 1 : 0)

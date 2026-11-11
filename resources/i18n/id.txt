@@ -8363,3 +8363,4 @@ countries: id
 "LOW LAT" = "LAT RENDAH"
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "Dilewati oleh \"Latensi rendah saat merekam\": efek ini menambah latensi {0} ms dan sebuah insert yang siap rekam atau dimonitor melewatinya. Efek kembali aktif saat insert itu tidak lagi siap rekam"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Latensi rendah saat merekam (melewati efek yang menambah latensi pada insert yang siap rekam atau dimonitor)"
+"Preview in time (loops play at the project's tempo, on the beat)" = "Pratinjau sesuai tempo (loop dimainkan pada tempo proyek, tepat di ketukan)"

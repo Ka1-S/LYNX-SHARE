@@ -8363,3 +8363,4 @@ countries: ru by kz
 "LOW LAT" = "НИЗК. ЗАД."
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "Обойдён функцией «Низкая задержка при записи»: этот эффект добавляет {0} мс задержки, а через него проходит инсерт, готовый к записи или с мониторингом. Он вернётся, когда запись на этом инсерте будет отключена"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Низкая задержка при записи (обходит эффекты, добавляющие задержку на инсертах, готовых к записи или с мониторингом)"
+"Preview in time (loops play at the project's tempo, on the beat)" = "Прослушивание в темпе (лупы звучат в темпе проекта, с доли)"

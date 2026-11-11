@@ -450,3 +450,143 @@ TEST (audiox190aq_low_latency_slot_restarts_clean)
         renderer.process (after.get(), false, 0.0, 256, l.data(), r.data(), &live);
     CHECK (own->resets == 1 && own->blocks > ran);
 }
+
+// --- the Browser's "Preview in time" (core/PreviewTempo.h) -----------------------------------------------------
+
+#include "core/PreviewTempo.h"
+
+namespace audiox190aq
+{
+// a drum-like loop of `beats` beats at `bpm`: a kick on each beat, a noise hat between, over a quiet tone
+inline std::shared_ptr<lynx::SampleData> drumLoop (double bpm, int beats, double rate = 44100.0, double tailSeconds = 0.0)
+{
+    auto d = std::make_shared<lynx::SampleData>();
+    d->sampleRate = rate;
+    const auto n = (std::size_t) std::llround (((double) beats * 60.0 / bpm + tailSeconds) * rate);
+    d->left.assign (n, 0.0f);
+    std::uint32_t seed = 7;
+    const auto beat = 60.0 / bpm * rate;
+    for (int b = 0; b < beats * 2; ++b)
+    {
+        const auto start = (std::size_t) std::llround ((double) b * beat * 0.5);
+        const bool kick = b % 2 == 0;
+        for (std::size_t i = 0; i < (std::size_t) (0.12 * rate) && start + i < n; ++i)
+        {
+            const auto t = (double) i / rate;
+            seed = seed * 1664525u + 1013904223u;
+            const auto noise = (float) (seed >> 8) / 8388608.0f - 1.0f;
+            d->left[start + i] += kick ? (float) (0.8 * std::exp (-t * 30.0) * std::sin (6.283185307179586 * (50.0 + 80.0 * std::exp (-t * 40.0)) * t))
+                                       : 0.25f * noise * (float) std::exp (-t * 90.0);
+        }
+    }
+    for (std::size_t i = 0; i < n; ++i)
+        d->left[i] += 0.1f * (float) std::sin (6.283185307179586 * 110.0 * (double) i / rate);
+    return d;
+}
+} // namespace audiox190aq
+
+TEST (audiox190aq_preview_tempo_from_the_name)
+{
+    using namespace lynx;
+    using previewtempo::nameTempo;
+    // "bpm" beside a number, either side, any case; the file must be a beat long or more
+    CHECK (nameTempo ("Break Scatty 174 bpm.wav", 4.0) == 174.0);
+    CHECK (nameTempo ("loop_128BPM.wav", 7.5) == 128.0);
+    CHECK (nameTempo ("BPM_98 groove.flac", 4.0) == 98.0);
+    CHECK (nameTempo ("bpm140-top.wav", 3.0) == 140.0);
+    CHECK (nameTempo ("Kick 120 bpm.wav", 0.3) == 0.0); // a hit cut from a 120 BPM kit
+    CHECK (nameTempo ("Riser 500bpm.wav", 4.0) == 0.0); // out of range
+    // a bare number: only when the file is that many whole beats (two or more)
+    CHECK (nameTempo ("Loop_128_Am.wav", 7.5) == 128.0);   // 16 beats
+    CHECK (nameTempo ("Drums 120 A.wav", 2.0) == 120.0);   // 4 beats
+    CHECK (nameTempo ("Snare 100.wav", 0.35) == 0.0);      // a one-shot with a number
+    CHECK (nameTempo ("Pad 100.wav", 3.1) == 0.0);         // 5.17 beats: not a loop at that tempo
+    CHECK (nameTempo ("808 Sub.wav", 2.0) == 0.0 && nameTempo ("Dm7 chord 4bars.wav", 8.0) == 0.0);
+    CHECK (nameTempo ("Vocal take 12.wav", 8.0) == 0.0);
+
+    // ACID first, then the name; a file longer than a loop has none
+    SampleData s;
+    s.sampleRate = 48000.0;
+    s.left.assign (96000, 0.0f); // 2 s
+    s.acidBeats = 4.0f;
+    auto found = previewtempo::quick (s, "Loop 90 bpm.wav");
+    CHECK (found.source == previewtempo::Source::acid && std::abs (found.bpm - 120.0) < 1.0e-9);
+    s.acidBeats = 0.0f;
+    found = previewtempo::quick (s, "Loop 90 bpm.wav");
+    CHECK (found.source == previewtempo::Source::name && found.bpm == 90.0);
+    found = previewtempo::quick (s, "Loop.wav");
+    CHECK (found.source == previewtempo::Source::none && found.bpm == 0.0);
+    s.acidBeats = 0.25f; // 7.5 BPM: not a usable tempo
+    CHECK (previewtempo::quick (s, "Loop.wav").bpm == 0.0);
+    s.left.assign ((std::size_t) (48000 * 80), 0.0f); // 80 s: a song or a take
+    s.acidBeats = 160.0f;
+    CHECK (previewtempo::quick (s, "Song 120 bpm.wav").bpm == 0.0 && ! previewtempo::worthDetecting (s));
+    s.left.assign (48000, 0.0f); // 1 s: too short to analyse
+    CHECK (! previewtempo::worthDetecting (s));
+}
+
+TEST (audiox190aq_preview_tempo_detected_only_for_loops)
+{
+    using namespace lynx;
+    // a 4-bar drum loop with no tempo in its name: LYNX's detection finds it
+    const auto loop = audiox190aq::drumLoop (120.0, 16);
+    const auto found = previewtempo::find (*loop, "Drums.wav");
+    CHECK (found.source == previewtempo::Source::detected && std::abs (found.bpm - 120.0) < 0.3);
+    const auto slow = audiox190aq::drumLoop (90.0, 16, 48000.0);
+    CHECK (std::abs (previewtempo::find (*slow, "Groove.wav").bpm - 90.0) < 0.3);
+
+    // not a loop of whole beats (a tail after it), a decaying tone, silence: no tempo, they play as they are
+    const auto tail = audiox190aq::drumLoop (120.0, 8, 44100.0, 0.7);
+    CHECK (previewtempo::find (*tail, "Tail.wav").bpm == 0.0);
+    SampleData tone;
+    tone.sampleRate = 44100.0;
+    tone.left.resize (44100 * 3);
+    for (std::size_t i = 0; i < tone.left.size(); ++i)
+        tone.left[i] = (float) (0.7 * std::exp (-(double) i / 44100.0 * 1.5) * std::sin (6.283185307179586 * 220.0 * (double) i / 44100.0));
+    CHECK (previewtempo::find (tone, "Bell.wav").bpm == 0.0);
+    SampleData silence;
+    silence.sampleRate = 44100.0;
+    silence.left.assign (44100 * 4, 0.0f);
+    CHECK (previewtempo::find (silence, "Nothing.wav").bpm == 0.0);
+}
+
+TEST (audiox190aq_preview_stretch_ratio_and_beat_start)
+{
+    using namespace lynx;
+    using previewtempo::stretchRatio;
+    CHECK (std::abs (stretchRatio (120.0, 140.0) - 120.0 / 140.0) < 1.0e-12); // faster: shorter
+    CHECK (std::abs (stretchRatio (174.0, 140.0) - 174.0 / 140.0) < 1.0e-12);
+    CHECK (std::abs (stretchRatio (90.0, 128.0) - 90.0 / 128.0) < 1.0e-12);   // up to 1.5 times: the project's tempo
+    CHECK (stretchRatio (128.0, 128.0) == 1.0 && stretchRatio (128.05, 128.0) == 1.0); // within 0.1 %: untouched
+    CHECK (stretchRatio (70.0, 140.0) == 1.0);                                  // half-time: as it is
+    CHECK (std::abs (stretchRatio (87.0, 140.0) - 174.0 / 140.0) < 1.0e-12);  // read an octave up
+    CHECK (std::abs (stretchRatio (170.0, 80.0) - 85.0 / 80.0) < 1.0e-12);    // read an octave down
+    CHECK (stretchRatio (0.0, 140.0) == 1.0 && stretchRatio (120.0, 0.0) == 1.0);
+    for (const auto file : { 40.0, 61.0, 87.0, 99.0, 133.0, 174.0, 300.0 })
+        for (const auto project : { 60.0, 95.0, 128.0, 140.0, 175.0 })
+        {
+            const auto r = stretchRatio (file, project);
+            CHECK (r >= 1.0 / 1.5 - 1.0e-9 && r <= 1.5 + 1.0e-9);
+        }
+
+    // the stretch itself (LYNX's own stretcher): the loop comes out at the project's tempo, the same pitch
+    const auto loop = audiox190aq::drumLoop (120.0, 16);
+    const auto ratio = stretchRatio (120.0, 140.0);
+    const auto out = timeStretch (*loop, ratio, StretchMethod::general);
+    CHECK (out != nullptr);
+    if (out != nullptr)
+    {
+        CHECK (std::abs ((double) out->frames() - (double) loop->frames() * ratio) < 4.0);
+        CHECK (out->sampleRate == loop->sampleRate);
+        CHECK (std::abs (previewtempo::detect (*out).bpm - 140.0) < 0.5); // 16 beats in 6.857 s
+    }
+
+    // the start: how long until the next beat is heard (960 ticks per beat; 0.04 ticks per sample = 120 BPM at 48 kHz)
+    using previewtempo::samplesToNextBeat;
+    CHECK (samplesToNextBeat (0.0, 0.04, 0) == 0.0 && samplesToNextBeat (1920.0, 0.04, 0) == 0.0);
+    CHECK (std::abs (samplesToNextBeat (480.0, 0.04, 0) - 12000.0) < 1.0e-6);
+    CHECK (std::abs (samplesToNextBeat (959.0, 0.04, 0) - 25.0) < 1.0e-6);
+    CHECK (std::abs (samplesToNextBeat (480.0, 0.04, 100) - 12100.0) < 1.0e-6); // what is heard is 100 samples behind
+    CHECK (std::abs (samplesToNextBeat (0.0, 0.04, 100) - 100.0) < 1.0e-6);     // (before the song's first beat is heard)
+    CHECK (samplesToNextBeat (480.0, 0.0, 0) == 0.0);                             // stopped tempo: now
+}

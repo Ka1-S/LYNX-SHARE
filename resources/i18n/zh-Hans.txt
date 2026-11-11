@@ -8363,3 +8363,4 @@ countries: cn sg
 "LOW LAT" = "低延迟"
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "已被“录音时低延迟”旁通：此效果器会增加 {0} 毫秒延迟，并且有已预备录音或正在监听的插入轨经过它。取消该插入轨的录音预备后它会恢复"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "录音时低延迟（在已预备录音或正在监听的插入轨上旁通会增加延迟的效果器）"
+"Preview in time (loops play at the project's tempo, on the beat)" = "按速度试听（循环以工程速度播放，并从拍点开始）"

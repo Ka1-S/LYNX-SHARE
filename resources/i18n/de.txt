@@ -8363,3 +8363,4 @@ countries: de at ch li lu
 "LOW LAT" = "LOW LAT"
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "Umgangen durch „Niedrige Latenz bei der Aufnahme“: Dieser Effekt fügt {0} ms Latenz hinzu und ein scharfgeschalteter oder abgehörter Insert läuft durch ihn. Er kehrt zurück, wenn dieser Insert entschärft wird"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Niedrige Latenz bei der Aufnahme (umgeht Effekte, die auf scharfgeschalteten oder abgehörten Inserts Latenz hinzufügen)"
+"Preview in time (loops play at the project's tempo, on the beat)" = "Vorhören im Takt (Loops spielen im Projekttempo, auf dem Schlag)"

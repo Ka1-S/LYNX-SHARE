@@ -8363,3 +8363,4 @@ countries: tr
 "LOW LAT" = "DÜŞÜK GEC"
 "Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed" = "\"Kayıt sırasında düşük gecikme\" tarafından atlandı: bu efekt {0} ms gecikme ekliyor ve kayda hazır ya da izlenen bir insert buradan geçiyor. O insert kayıttan çıkarılınca geri gelir"
 "Low latency while recording (bypasses effects that add latency on armed or monitored inserts)" = "Kayıt sırasında düşük gecikme (kayda hazır veya izlenen insert'lerde gecikme ekleyen efektleri atlar)"
+"Preview in time (loops play at the project's tempo, on the beat)" = "Tempoda ön dinleme (döngüler projenin temposunda, vuruşta çalar)"
