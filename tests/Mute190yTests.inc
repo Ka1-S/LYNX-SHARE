@@ -160,3 +160,32 @@ TEST (mute190y_muted_insert_runs_its_effects_like_fl)
     Song s;
     CHECK (! s.muteRunsEffects);
 }
+
+// Round 190y, LYNX option "Muted inserts don't process" (off by default): on, a muted insert skips its effects, EQ and
+// meter as LYNX did before (its Fruity Send goes quiet, unlike FL); off, the FL numbers above hold.
+TEST (mute190y_option_muted_inserts_dont_process)
+{
+    using namespace lynx;
+    const auto setup = [] (bool option) {
+        return [option] (Song& s) {
+            s.muteRunsEffects = true;
+            s.mutedInsertsSkip = option;
+            s.mixer[1].muted = true;
+            s.mixer[1].sends.clear();
+            s.mixer[1].effects.push_back (send105::sendSlot (0, 256, 256, 2));
+            s.mixer[3].toMaster = false; // (insert 3's channel off the Master: only insert 1's paths are heard)
+        };
+    };
+    const auto peak = [] (const mute190y::Result& r) {
+        float p = 0.0f;
+        for (std::size_t i = 0; i < r.l.size(); ++i)
+            p = std::max ({ p, std::abs (r.l[i]), std::abs (r.r[i]) });
+        return p;
+    };
+    const auto off = mute190y::render (setup (false), true);
+    const auto on = mute190y::render (setup (true), true);
+    CHECK (peak (off) > 0.1f && off.insert1 > 0.1f); // FL: the Fruity Send is heard, the meter moves
+    CHECK (peak (on) == 0.0f && on.insert1 == 0.0f && on.insert2 == 0.0f); // the old way: nothing runs
+    Song s;
+    CHECK (! s.mutedInsertsSkip); // off by default
+}

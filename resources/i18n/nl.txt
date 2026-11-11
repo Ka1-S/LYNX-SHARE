@@ -8833,3 +8833,5 @@ countries: nl be
 "Scripts" = "Scripts"
 "Run last script again" = "Laatste script opnieuw uitvoeren"
 "Open script folder..." = "Scriptmap openen..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Gedempte inserts verwerken niets (LYNX, bespaart CPU; dit project)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Gedempte inserts slaan hun effecten over: een Fruity Send of controller erin wordt stil, de meter stopt en de effecten beginnen opnieuw bij het ontdempen (FL laat ze doorlopen)"

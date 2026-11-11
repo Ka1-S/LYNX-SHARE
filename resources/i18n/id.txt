@@ -8833,3 +8833,5 @@ countries: id
 "Scripts" = "Skrip"
 "Run last script again" = "Jalankan lagi skrip terakhir"
 "Open script folder..." = "Buka folder skrip..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "Insert yang dibisukan tidak memproses (LYNX, hemat CPU; proyek ini)"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "Insert yang dibisukan melewati efeknya: Fruity Send atau kontroler di dalamnya diam, meternya berhenti, dan efeknya mulai dari awal saat dinyalakan lagi (FL tetap menjalankannya)"

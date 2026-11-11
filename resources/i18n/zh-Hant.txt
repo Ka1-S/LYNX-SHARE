@@ -8866,3 +8866,5 @@ countries: tw hk mo
 "Scripts" = "指令碼"
 "Run last script again" = "再次執行上一個指令碼"
 "Open script folder..." = "開啟指令碼資料夾..."
+"Muted inserts don't process (LYNX, saves CPU; this project)" = "靜音的插入軌不處理（LYNX，節省 CPU；此專案）"
+"Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)" = "靜音的插入軌會跳過其效果：其中的 Fruity Send 或控制器會靜默，電平表停止，取消靜音時效果從頭開始（FL 會讓它們繼續運行）"
