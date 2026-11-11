@@ -8,6 +8,7 @@ JavaScript; the script adds the language switch, direct download links and the s
 | Home | `/` | `_src/pages/home.html` |
 | Features | `/features/` | `_src/pages/features.html` |
 | Why LYNX | `/why/` | `_src/pages/why.html` (what only LYNX SHARE does, each with its limits) |
+| What LYNX fixes | `/fixes/` | `_src/pages/fixes.html` (common complaints about DAWs and what the RELEASED version does about each; things only in the source go in its "Being built" list). Linked from Home and Why LYNX |
 | Instruments and effects | `/instruments-and-effects/` | `_src/catalog.json`, `_src/catalog-img.json` |
 | Download | `/download/` | `_src/pages/download.html` |
 | Updates | `/updates/` | `_src/updates.json` |
@@ -30,7 +31,11 @@ Python 3 standard library only. **The built pages are committed**: edit the sour
 markdown subset the wiki uses (headings, lists, tables, code, links, one picture), and the page list.
 `assets/site.css` and `assets/site.js` are shared by every page; `assets/features.js` (Features), `assets/catalog.js`
 (the catalogue's filter) and `assets/wiki.js` (the wiki search over `wiki/search.json`, which the build writes) belong
-to one page each.
+to one page each. `assets/motion.js` is loaded last on every page: reveals on scroll, numbers that count up
+(`data-count`), the glass header, tilt and glare on screenshots. The entrances at the top of a page and all hover
+motion are CSS (`site.css`, "motion"). Motion is on only under `html.mo`, which the script in `<head>` sets unless the
+visitor asked for reduced motion; a page hides something only when `motion.js` ran and the thing is below the fold, so
+a failed script never leaves a blank page. Stills for checking a page: add `?shot` (no motion at all).
 The server never serves `_src/` (`.htaccess`).
 
 Look at the result with `python3 -m http.server -d website 8000` (links are root-absolute, so open it through a
@@ -77,8 +82,13 @@ Pictures are drawn by the released program itself, off-screen (no window, no inp
     python3 website/_src/import-shots.py R               # needs Pillow; writes assets/img/plugins, assets/img/wiki
 
 `import-shots.py` converts the render each entry names in `img` and every `/assets/img/wiki/<name>.webp` a page or
-article uses (from `snap/s-<name>.png`), and writes the sizes to `_src/catalog-img.json`. A plugin without a render
-gets a name plate on its card, never a made-up picture.
+article uses (from `snap/s-<name>.png`), and writes the sizes to `_src/catalog-img.json` and `_src/img-sizes.json`.
+The build puts `width` and `height` on every picture from those two files, and the stylesheet never shows a picture
+above its own size. `--artshot` also draws each editor at twice the size: that becomes `<id>@2x.webp` (`srcset`). The
+other modes of the program draw at 100% only, so window and dialog pictures have no @2x file. A plugin without a
+render gets a name plate on its card, never a made-up picture. If `R/logo-<version>.png` (the logo that version
+draws, from its `src/ui/LogoData.h`) differs from the brand's mark, the logo button in the plugin headers is painted
+over with `assets/img/logo.png`; see the note at the top of the script.
 
 ## Other notes
 

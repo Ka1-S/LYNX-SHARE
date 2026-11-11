@@ -1,4 +1,4 @@
-<figure><a class="shot" href="/assets/img/wiki/settings-general.webp"><img src="/assets/img/wiki/settings-general.webp" alt="设置窗口的常规页面，顶部是七个页面标签" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/settings-general.webp"><img src="/assets/img/wiki/settings-general.webp" alt="设置窗口的常规页面，顶部是七个页面标签" loading="lazy" width="680" height="620"></a></figure>
 <p>设置窗口有七个页面：音频、MIDI、常规、主题、文件、工程和信息。前五个属于程序本身。工程和信息属于已打开的工程，并随工程一起保存。每个页面在 <code>选项</code> 菜单顶部都有各自的条目。</p>
 <h2 id="change-a-setting">更改设置</h2>
 <ol><li>打开 <code>选项</code> 菜单，选择一个页面，例如 <code>常规设置...</code>。</li><li>点击顶部的另一个标签，切换到其他页面。</li><li>更改设置。它会立即生效，只有语言和界面字体例外，它们在 LYNX SHARE 重新启动后才生效。</li></ol>
@@ -6,7 +6,7 @@
 <h2 id="audio">音频</h2>
 <p><code>选项 › 音频设置...</code>。驱动程序、设备、采样率、缓冲区大小和录制。<a href="/wiki/audio-setup/">音频设置</a>介绍了这个页面。</p>
 <h2 id="midi">MIDI</h2>
-<figure><a class="shot" href="/assets/img/wiki/settings-midi.webp"><img src="/assets/img/wiki/settings-midi.webp" alt="MIDI 页面：输入设备、带主同步的输出设备，以及外部同步" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/settings-midi.webp"><img src="/assets/img/wiki/settings-midi.webp" alt="MIDI 页面：输入设备、带主同步的输出设备，以及外部同步" loading="lazy" width="680" height="620"></a></figure>
 <p><code>选项 › MIDI设置...</code></p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td>输入设备</td><td>每个设备都可以关闭，可以只监听一个 MIDI 通道，也可以演奏通道机架中固定的一个通道，而不是所选的通道</td></tr><tr><td><code>刷新设备列表</code></td><td>重新查找设备</td></tr><tr><td><code>发送主同步</code></td><td>向输出设备发送带 Song Position Pointer 的 MIDI 时钟，或 MIDI Time Code。<code>偏移 (ms)</code> 让它更晚或更早发送</td></tr><tr><td><code>发送全部音符关闭</code></td><td>在初始化时和导出之后向设备发送全部音符关闭</td></tr><tr><td><code>外部时钟同步</code></td><td>LYNX SHARE 跟随所选输入的 MIDI 时钟：速度、开始、继续、停止和位置</td></tr><tr><td><code>力度</code></td><td>用于来自 MIDI 设备的音符：按演奏、轻、重或固定</td></tr><tr><td><code>表演模式通道</code></td><td>这个通道上的音符会在表演模式下启动播放列表片段</td></tr><tr><td><code>歌曲标记跳转</code></td><td>这个通道上的音符会让歌曲跳转到某个标记，而不是发声</td></tr><tr><td><code>拾取（接管模式）</code></td><td>控制器只有在到达参数当前值之后才会移动该参数</td></tr><tr><td>关联</td><td>先是此工程的控制器关联，然后是全局关联，带有 <code>移除关联</code> 和 <code>全部移除</code></td></tr></tbody></table></div>
 <h2 id="general">常规</h2>
@@ -19,7 +19,7 @@
 <p><code>选项 › 文件设置（搜索文件夹）...</code></p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td>缺失采样的搜索文件夹</td><td>缺失的文件窗口会自动在这些文件夹及其子文件夹中查找</td></tr><tr><td>浏览器文件夹</td><td>显示在浏览器的文件夹列表中，也会用来搜索缺失的采样</td></tr><tr><td>插件文件夹</td><td>由 <code>选项 › 扫描插件</code> 扫描其中的插件</td></tr></tbody></table></div>
 <h2 id="project">工程</h2>
-<figure><a class="shot" href="/assets/img/wiki/settings-project.webp"><img src="/assets/img/wiki/settings-project.webp" alt="工程页面：时间设置、律动与调音、时基和播放列表选项" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/settings-project.webp"><img src="/assets/img/wiki/settings-project.webp" alt="工程页面：时间设置、律动与调音、时基和播放列表选项" loading="lazy" width="680" height="620"></a></figure>
 <p><code>选项 › 工程设置（速度、拍号）...</code></p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>时间设置</code></td><td>时间划分（每小节的拍数、每拍的步数），或传统的拍号（分子和分母）</td></tr><tr><td><code>速度</code>、<code>每小节拍数</code></td><td>工程的速度，以及每小节的拍数</td></tr><tr><td><code>摇摆</code>、<code>主控音高</code></td><td>全局摇摆量，以及以音分计的主控音高</td></tr><tr><td><code>自动交叉淡化</code></td><td>轨道上重叠的音频片段会在重叠部分交叉淡化</td></tr><tr><td><code>合成轨交叉淡化</code></td><td>合成录音时使用的交叉淡化长度，以毫秒计</td></tr><tr><td><code>播放片段中被截断的音符</code></td><td>在样式片段开始之前就已开始的音符，会从片段的起点开始播放</td></tr><tr><td><code>切断组快速去咔嗒</code></td><td>切断组切断音符时使用更快的渐变</td></tr><tr><td><code>声像定律</code></td><td>圆形（中间 0 dB，声像所在一侧 +3 dB）或三角形（较响的一侧保持原电平）。用于混音台插入轨和采样器通道</td></tr></tbody></table></div>
 <h2 id="info">信息</h2>

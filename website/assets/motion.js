@@ -9,9 +9,9 @@ const html = document.documentElement, $$ = (s, r) => [...(r || document).queryS
 if (!html.classList.contains('mo')) return;
 
 /* what reveals, in document order; grids reveal child by child (staggered), everything else as one block */
-const GRIDS = '.shots,.whyrow,.frow,.cols,.media,.dlgrid,.policy';
+const GRIDS = '.shots,.whyrow,.frow,.cols,.media,.dlgrid,.policy,.fixes';
 const REVEAL = '.sec>.wrap:not(.split)>:not(' + GRIDS + ',script),.split>*,.shots>figure,.whyrow>*,.frow>*,.cols>div,.media>*,.dlos,.policy>div,' +
-  '.flow>li,.rel>header,.rel>div,.wcard,.faq section,.ctype,.cgroup>h3,.pc';
+  '.flow>li,.rel>header,.rel>div,.wcard,.faq section,.ctype,.cgroup>h3,.pc,.fx';
 const DUR = 450, STEP = 45, MAXSTEP = 7;
 
 function start(){

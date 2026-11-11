@@ -8,7 +8,7 @@
 <p>FL Studioのジェネレーターとエフェクトは読み込まれません。LYNX SHAREは保存された設定を読み、作り直したエンジンで再生します。各エンジンには品質レベルがあり、<code>Exact</code> (テストしたすべての状態で元のものとビット単位で一致) から <code>Placeholder</code> (設定は保持されるが、プラグインは無音か、オーディオをそのまま通すだけ) までの段階です。レベルの意味は<a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a>で説明しています。</p>
 <p><code>.flp</code> は、FL Studioがインストールされていなくても開けます。一部のエンジンは、波形、サンプル、インパルスを必要とし、実行時にお使いのFL Studioのインストールから読み込みます。</p>
 <h2 id="missing-samples">見つからないサンプル</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="見つからないファイルのウィンドウのサンプルタブ: 見つかったファイルは緑、見つからないものは琥珀色で、フォルダーを検索、場所を指定、スキップのボタンがある" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="見つからないファイルのウィンドウのサンプルタブ: 見つかったファイルは緑、見つからないものは琥珀色で、フォルダーを検索、場所を指定、スキップのボタンがある" loading="lazy" width="760" height="560"></a></figure>
 <p><code>サンプル</code> タブに、見つからなかったすべてのサンプルが、保存されていたパスとそれを使っているものとともに並びます。</p>
 <div class="tablewrap"><table><thead><tr><th>コマンド</th><th>働き</th></tr></thead><tbody><tr><td><code>フォルダーを検索...</code></td><td>フォルダーとそのサブフォルダーから、見つからないサンプルをすべて探す</td></tr><tr><td><code>場所を指定...</code></td><td>1つのサンプルの場所を尋ねる。同じフォルダーにあるほかのサンプルも、一緒に見つかる</td></tr><tr><td><code>スキップ</code></td><td>そのサンプルを外す。チャンネルは無音のままになる</td></tr></tbody></table></div>
 <p><code>適用</code> を押すと、見つかったファイルが使われます。</p>
@@ -20,7 +20,7 @@
 <p>切り替えは <code>オプション › 全般設定...</code> の <code>見つからないプラグインをLYNX SHAREの同等品で代替</code> で、初期設定ではオンです。オフにすると、見つからないエフェクトのスロットはミキサーから外れます。見つからないインストゥルメントの代替はありません。チャンネル名から選ばれたプリセットを持つ内蔵シンセになります。</p>
 <p>本物のプラグインを戻すには、インストールして <code>オプション › プラグインをスキャン</code> を選び、プロジェクトをもう一度開いてください。</p>
 <h2 id="midi-files">MIDIファイル</h2>
-<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="MIDIデータのインポートウィンドウ: トラック、チャンネル、チャンネルタイプ、オプション" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="MIDIデータのインポートウィンドウ: トラック、チャンネル、チャンネルタイプ、オプション" loading="lazy" width="550" height="373"></a></figure>
 <p><code>ファイル › 開く...</code> は、MIDIファイルから新しいプロジェクトを作ります。<code>ファイル › インポート › MIDIファイル...</code> は、先に <code>MIDIデータをインポート</code> ウィンドウを開き、取り込む内容を選べます。</p>
 <div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>インポートするトラックは？</code></td><td>すべてのトラック、または1つ</td></tr><tr><td><code>インポートするチャンネルは？</code></td><td>MIDIチャンネルをクリックすると、除外される。右クリックすると、そのチャンネルだけが残る</td></tr><tr><td><code>チャンネルタイプ</code></td><td><code>LYNX SHAREシンセ</code> または <code>MIDI Out</code></td></tr><tr><td><code>新規プロジェクトを開始</code></td><td>空のプロジェクトを始める。オフ: 開いているプロジェクトに追加する</td></tr><tr><td><code>トラックごとに1チャンネルを作成</code></td><td>オフ: MIDIチャンネルごとに1つのチャンネル</td></tr><tr><td><code>新しいチャンネルにミキサートラックを設定</code></td><td>新しいチャンネルを、連続したミキサーのインサートにルーティングする</td></tr><tr><td><code>拍子をインポート</code></td><td>ファイルの拍子が、プロジェクトの拍子になる</td></tr></tbody></table></div>
 <p><a href="/wiki/piano-roll/">ピアノロール</a>で <code>Ctrl+M</code> を押すと、MIDIファイルを現在のチャンネルに読み込みます。</p>

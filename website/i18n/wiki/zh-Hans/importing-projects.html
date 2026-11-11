@@ -8,7 +8,7 @@
 <p>FL Studio 的发生器和效果器不会被加载。LYNX SHARE 读取它们保存的设置，并在自己重建的引擎上播放。每个引擎都有一个质量等级，从 <code>Exact</code>（在所有测试过的状态下都与原版逐位一致）到 <code>Placeholder</code>（设置会保留，但插件静音或让音频直通）。各等级的含义见<a href="/wiki/coming-from-fl-studio/">从 FL Studio 转来</a>。</p>
 <p>没有安装 FL Studio 也能打开 <code>.flp</code>。有些引擎需要波形、采样或脉冲响应，它们会在运行时从你自己的 FL Studio 安装中读取。</p>
 <h2 id="missing-samples">缺失的采样</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="缺失的文件窗口的采样标签页：找到的文件为绿色，缺失的为琥珀色，带有 Search folder、Locate 和 Skip" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="缺失的文件窗口的采样标签页：找到的文件为绿色，缺失的为琥珀色，带有 Search folder、Locate 和 Skip" loading="lazy" width="760" height="560"></a></figure>
 <p><code>采样</code> 标签页列出每个未找到的采样，以及它保存的路径和使用它的对象。</p>
 <div class="tablewrap"><table><thead><tr><th>命令</th><th>作用</th></tr></thead><tbody><tr><td><code>搜索文件夹...</code></td><td>在文件夹及其子文件夹中搜索所有缺失的采样</td></tr><tr><td><code>定位...</code></td><td>询问某一个采样在哪里。在同一文件夹中找到的其他采样也会一并采用</td></tr><tr><td><code>跳过</code></td><td>略过该采样。它的通道保持静默</td></tr></tbody></table></div>
 <p><code>应用</code> 会使用已找到的文件。</p>
@@ -20,7 +20,7 @@
 <p>开关是 <code>选项 › 常规设置...</code> 中的 <code>用LYNX SHARE对应插件替代缺失的插件</code>，默认开启。关闭后，缺失效果器的插槽会从混音台中略去。缺失的乐器不做替代。它会变成一个内置合成器，预设按通道名称选定。</p>
 <p>要找回真正的插件，请先安装它，选择 <code>选项 › 扫描插件</code>，然后重新打开工程。</p>
 <h2 id="midi-files">MIDI 文件</h2>
-<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="导入 MIDI 数据窗口：轨道、通道、通道类型和选项" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="导入 MIDI 数据窗口：轨道、通道、通道类型和选项" loading="lazy" width="550" height="373"></a></figure>
 <p><code>文件 › 打开...</code> 会从 MIDI 文件创建新工程。<code>文件 › 导入 › MIDI文件...</code> 则先打开 <code>导入MIDI数据</code> 窗口，让你选择导入什么。</p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>要导入哪些轨道？</code></td><td>所有轨道，或其中一条</td></tr><tr><td><code>要导入哪些通道？</code></td><td>单击某个 MIDI 通道可将其略去。右键单击则只保留该通道</td></tr><tr><td><code>通道类型</code></td><td><code>LYNX SHARE合成器</code> 或 <code>MIDI Out</code></td></tr><tr><td><code>开始新工程</code></td><td>开始一个空白工程。关闭：添加到已打开的工程中</td></tr><tr><td><code>每个轨道创建一个通道</code></td><td>关闭：每个 MIDI 通道一个通道</td></tr><tr><td><code>为新通道设置混音轨道</code></td><td>把新通道路由到连续的混音插入轨</td></tr><tr><td><code>导入拍号</code></td><td>文件的拍号成为工程的拍号</td></tr></tbody></table></div>
 <p>在<a href="/wiki/piano-roll/">钢琴卷帘</a>中按 <code>Ctrl+M</code> 可把 MIDI 文件导入当前通道。</p>

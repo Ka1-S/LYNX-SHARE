@@ -1,4 +1,4 @@
-<figure><a class="shot" href="/assets/img/wiki/automation.webp"><img src="/assets/img/wiki/automation.webp" alt="여섯 마디에 걸쳐 올라가는 커브가 있는 오토메이션 에디터" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/automation.webp"><img src="/assets/img/wiki/automation.webp" alt="여섯 마디에 걸쳐 올라가는 커브가 있는 오토메이션 에디터" loading="lazy" width="760" height="300"></a></figure>
 <p>오토메이션 클립은 <a href="/wiki/playlist/">플레이리스트</a> 위의 커브로, 곡이 재생되는 동안 컨트롤 하나를 움직입니다. 채널의 볼륨, 믹서 페이더, 플러그인 파라미터, 템포 등이 대상입니다. 클립에는 전용 편집 창인 오토메이션 에디터가 있습니다.</p>
 <p>컨트롤을 움직이는 방법은 세 가지가 더 있습니다. 이벤트는 패턴 안에 저장된 값입니다. 링크는 MIDI 노브나 내부 컨트롤러가 컨트롤을 움직이게 합니다. 모듈레이터는 노브를 자기 값 주변에서 흔들어 줍니다.</p>
 <h2 id="automate-a-knob">노브 오토메이션하기</h2>
@@ -9,11 +9,11 @@
 <h2 id="the-automation-editor">오토메이션 에디터</h2>
 <div class="tablewrap"><table><thead><tr><th>명령</th><th>키</th><th>기능</th></tr></thead><tbody><tr><td>새 포인트</td><td>클릭 또는 우클릭 후 드래그</td><td>포인트를 추가하고, 버튼을 누르고 있는 동안 움직입니다</td></tr><tr><td>포인트 이동</td><td>드래그</td><td><code>Shift</code>는 시간을, <code>Ctrl</code>은 값을 고정하고, <code>Alt</code>는 스냅을 무시합니다</td></tr><tr><td>구간 휘기</td><td><code>Alt</code>+위/아래 드래그</td><td>마우스 아래 구간의 텐션을 바꿉니다</td></tr><tr><td>텐션 핸들</td><td>위/아래 드래그</td><td>구간을 휘게 합니다. <code>Ctrl</code>을 누르면 더 세밀하고, 우클릭하면 직선이 됩니다</td></tr><tr><td>커브 위의 포인트</td><td><code>Shift</code>+우클릭</td><td>선 위에 포인트를 추가합니다</td></tr><tr><td>포인트 메뉴</td><td>포인트 우클릭</td><td><code>값 입력...</code>, <code>값 복사</code>, <code>값 붙여넣기</code>, <code>포인트 삭제</code>, 그리고 전체의 크기 조절, 뒤집기, 직선화를 위한 <code>커브 전체</code></td></tr><tr><td>줌</td><td><code>Ctrl</code>+휠</td><td>보기를 확대/축소합니다</td></tr><tr><td>스크롤</td><td>가운데 버튼 드래그</td><td>보기를 옮깁니다</td></tr></tbody></table></div>
 <h2 id="lfo-mode">LFO 모드</h2>
-<figure><a class="shot" href="/assets/img/wiki/automation-lfo.webp"><img src="/assets/img/wiki/automation-lfo.webp" alt="삼각파와 SPD, TNS, SKEW, PW, AMNT 노브가 보이는 LFO 모드의 오토메이션 에디터" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/automation-lfo.webp"><img src="/assets/img/wiki/automation-lfo.webp" alt="삼각파와 SPD, TNS, SKEW, PW, AMNT 노브가 보이는 LFO 모드의 오토메이션 에디터" loading="lazy" width="760" height="346"></a></figure>
 <p>에디터 위쪽의 <code>LFO</code>를 체크합니다. 이제 파형이 클립의 값을 만들고, 그리는 포인트는 값 자체가 아니라 LFO의 진폭을 정합니다.</p>
 <div class="tablewrap"><table><thead><tr><th>설정</th><th>기능</th></tr></thead><tbody><tr><td><code>SPD</code></td><td>한 주기의 길이이며 단위는 박입니다</td></tr><tr><td><code>TNS</code></td><td>파형의 텐션입니다</td></tr><tr><td><code>SKEW</code></td><td>파형의 기울임입니다</td></tr><tr><td><code>PW</code></td><td>펄스 폭입니다</td></tr><tr><td><code>AMNT</code></td><td>LFO가 값을 움직이는 폭입니다</td></tr><tr><td><code>MUL</code></td><td>켜면 LFO가 엔벨로프 레벨에 곱해지고, 끄면 더해집니다</td></tr></tbody></table></div>
 <h2 id="events-in-a-pattern">패턴 안의 이벤트</h2>
-<figure><a class="shot" href="/assets/img/wiki/eventeditor.webp"><img src="/assets/img/wiki/eventeditor.webp" alt="볼륨 이벤트가 막대로 그려진 이벤트 에디터" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/eventeditor.webp"><img src="/assets/img/wiki/eventeditor.webp" alt="볼륨 이벤트가 막대로 그려진 이벤트 에디터" loading="lazy" width="980" height="400"></a></figure>
 <p>이벤트는 패턴에 속하며 그 패턴이 재생되는 곳마다 재생됩니다. 컨트롤을 우클릭하고 <code>패턴의 이벤트 편집</code>을 선택하면 그 컨트롤의 이벤트 에디터가 열립니다.</p>
 <ul><li><code>그리기</code>는 드래그하는 대로 값을 정하고, 우클릭 드래그는 지웁니다. <code>선</code>은 직선 램프를 그립니다. <code>선택</code>는 아래쪽 도구가 적용될 시간 범위를 표시합니다.</li><li><code>스냅</code>은 1/2 스텝에서 1마디까지 고를 수 있습니다.</li><li><code>스케일</code>, <code>오프셋</code>, <code>랜덤화</code>는 선택 영역 또는 패턴 전체의 이벤트를 바꿉니다.</li><li><code>LFO</code>는 1박에서 4마디 길이의 사인, 삼각, 사각파를 씁니다.</li><li><code>지우기</code>는 이벤트를 지웁니다.</li><li><code>오토메이션으로...</code>은 이벤트를 오토메이션 클립으로 바꾸고 패턴에서 제거합니다.</li><li><code>파일</code>은 이벤트를 <code>.fsc</code> 파일로 열고 저장하며, MIDI 파일도 가져옵니다.</li></ul>
 <p>같은 우클릭 메뉴의 <code>이 위치로 송 초기화</code>은 곡이 시작될 때마다 컨트롤이 돌아갈 값을 저장합니다.</p>

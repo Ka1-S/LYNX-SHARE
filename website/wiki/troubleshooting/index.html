@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="fdb89b1d";
+window.LYNX_LANG=lang;window.LYNX_V="d56f6a02";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -74,7 +74,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=fdb89b1d">
+<link rel="stylesheet" href="/assets/site.css?v=d56f6a02">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -125,14 +125,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h3 id="video-does-not-work-on-linux">Video does not work on Linux</h3>
 <p>Video tracks and <code>Export with video</code> need FFmpeg. LYNX SHARE says how to install it.</p>
 <h2 id="crash-reports">Crash reports</h2>
-<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="The crash report question shown at the next start, with Send, Show what will be sent and Don't send" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="The crash report question shown at the next start, with Send, Show what will be sent and Don't send" loading="lazy" width="640" height="244"></a></figure>
 <p>Crash reports are opt-in. After a crash or a freeze, the next start asks whether to send a report.</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>Show what will be sent</code></td><td>Shows the exact text</td></tr><tr><td><code>Report on GitHub instead</code></td><td>Opens GitHub's issue form, prefilled. You attach the files yourself</td></tr><tr><td><code>Open the folder with the report</code></td><td>Shows the report files on your computer</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>Off, only the extension of each file is sent</td></tr><tr><td><code>Always send without asking</code></td><td>Sends future reports without the question</td></tr></tbody></table></div>
 <p><code>Crash reports</code> in <code>Options › General settings...</code> sets <code>Ask</code> (the default), <code>Always send</code> or <code>Never send</code>.</p>
 <p>A report contains the LYNX SHARE version, the operating system, the CPU, the graphics cards and their drivers, the screen size, the audio driver and device, the crash or freeze file, the session's last 60 steps and the names and versions of the third-party plugins that were loaded.</p>
 <p>It does not contain audio, projects, samples, your computer's name or your user name. The server stores no IP address. Sent ids are listed in <code>crash-reports\sent.log</code> in the settings folder. To have a report deleted, open an issue with its id. The full text is in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">privacy policy</a>.</p>
 <h2 id="report-a-problem">Report a problem</h2>
-<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="The Report a problem window: a description box, an optional e-mail address and the Send button" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="The Report a problem window: a description box, an optional e-mail address and the Send button" loading="lazy" width="640" height="364"></a></figure>
 <ol><li>Choose <code>Help › Report a problem...</code>.</li><li>Describe what happened. The e-mail address is optional, for when you want an answer.</li><li>Leave <code>Attach the newest crash / freeze files and this session's steps</code> ticked if the problem was a crash.</li><li>Click <code>Show what will be sent</code> to check the text.</li><li>Click <code>Send</code>. Nothing is sent before that.</li></ol>
 <p>You can also open an issue at <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>.</p>
 <h2 id="good-to-know">Good to know</h2>
@@ -147,8 +147,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=fdb89b1d" defer></script>
-<script src="/assets/wiki.js?v=fdb89b1d" defer></script>
-<script src="/assets/motion.js?v=fdb89b1d" defer></script>
+<script src="/assets/site.js?v=d56f6a02" defer></script>
+<script src="/assets/wiki.js?v=d56f6a02" defer></script>
+<script src="/assets/motion.js?v=d56f6a02" defer></script>
 </body>
 </html>

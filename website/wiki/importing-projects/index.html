@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="fdb89b1d";
+window.LYNX_LANG=lang;window.LYNX_V="d56f6a02";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -74,7 +74,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=fdb89b1d">
+<link rel="stylesheet" href="/assets/site.css?v=d56f6a02">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -96,7 +96,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>FL Studio's generators and effects are not loaded. LYNX SHARE reads their saved settings and plays them on engines it recreated. Each engine has a quality level, from <code>Exact</code> (bit-identical to the original on every state tested) down to <code>Placeholder</code> (the settings are kept, but the plugin is silent or passes audio through). The levels are explained in <a href="/wiki/coming-from-fl-studio/">Coming from FL Studio</a>.</p>
 <p>Opening an <code>.flp</code> works without FL Studio installed. Some engines need waves, samples or impulses that are read from your own FL Studio installation at run time.</p>
 <h2 id="missing-samples">Missing samples</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="The Missing files window on its Samples tab: found files in green, missing ones in amber, with Search folder, Locate and Skip" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="The Missing files window on its Samples tab: found files in green, missing ones in amber, with Search folder, Locate and Skip" loading="lazy" width="760" height="560"></a></figure>
 <p>The <code>Samples</code> tab lists every sample that was not found, with its saved path and what uses it.</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>Search folder...</code></td><td>Searches a folder and its sub-folders for all missing samples</td></tr><tr><td><code>Locate...</code></td><td>Asks where one sample is. Others found in the same folder are picked up too</td></tr><tr><td><code>Skip</code></td><td>Leaves the sample out. Its channel stays silent</td></tr></tbody></table></div>
 <p><code>Apply</code> uses the files that were found.</p>
@@ -108,7 +108,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The switch is <code>Substitute missing plugins with LYNX SHARE equivalents</code> in <code>Options › General settings...</code>, on by default. With it off, the slot of a missing effect is left out of the mixer. A missing instrument is not substituted. It becomes a built-in synth with a preset chosen by the channel name.</p>
 <p>To get the real plugin back, install it, choose <code>Options › Scan for plugins</code>, then open the project again.</p>
 <h2 id="midi-files">MIDI files</h2>
-<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="The Import MIDI data window: tracks, channels, channel type and options" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="The Import MIDI data window: tracks, channels, channel type and options" loading="lazy" width="550" height="373"></a></figure>
 <p><code>File › Open...</code> makes a new project from a MIDI file. <code>File › Import › MIDI file...</code> opens the <code>Import MIDI data</code> window first, where you choose what to bring in.</p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Which tracks to import?</code></td><td>All tracks, or one</td></tr><tr><td><code>Which channels to import?</code></td><td>Click a MIDI channel to leave it out. Right-click keeps only that one</td></tr><tr><td><code>Channel type</code></td><td><code>LYNX SHARE synth</code> or <code>MIDI Out</code></td></tr><tr><td><code>Start new project</code></td><td>Starts a blank project. Off: adds to the open one</td></tr><tr><td><code>Create one channel per track</code></td><td>Off: one channel per MIDI channel</td></tr><tr><td><code>Set mixer tracks for new channels</code></td><td>Routes the new channels to consecutive mixer inserts</td></tr><tr><td><code>Import time signatures</code></td><td>The file's time signature becomes the project's</td></tr></tbody></table></div>
 <p><code>Ctrl+M</code> in the <a href="/wiki/piano-roll/">Piano roll</a> imports a MIDI file into the current channel.</p>
@@ -124,8 +124,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=fdb89b1d" defer></script>
-<script src="/assets/wiki.js?v=fdb89b1d" defer></script>
-<script src="/assets/motion.js?v=fdb89b1d" defer></script>
+<script src="/assets/site.js?v=d56f6a02" defer></script>
+<script src="/assets/wiki.js?v=d56f6a02" defer></script>
+<script src="/assets/motion.js?v=d56f6a02" defer></script>
 </body>
 </html>

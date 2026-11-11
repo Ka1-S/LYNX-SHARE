@@ -1,4 +1,4 @@
-<figure><a class="shot" href="/assets/img/wiki/automation.webp"><img src="/assets/img/wiki/automation.webp" alt="自動化編輯器，曲線在六小節內上升" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/automation.webp"><img src="/assets/img/wiki/automation.webp" alt="自動化編輯器，曲線在六小節內上升" loading="lazy" width="760" height="300"></a></figure>
 <p>自動化片段是<a href="/wiki/playlist/">播放清單</a>上的一條曲線，在歌曲播放時推動一個控制項：通道的音量、混音器的推桿、外掛參數、速度。片段有自己的編輯視窗，也就是自動化編輯器。</p>
 <p>還有三種方法可以推動控制項。事件是存放在樣式裡的數值。關聯讓 MIDI 旋鈕或內部控制器去驅動控制項。調變器則讓旋鈕在它自己的數值附近擺動。</p>
 <h2 id="automate-a-knob">自動化一個旋鈕</h2>
@@ -9,11 +9,11 @@
 <h2 id="the-automation-editor">自動化編輯器</h2>
 <div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td>新增點</td><td>點擊或按右鍵，然後拖曳</td><td>新增一個點，按住按鈕時可移動它</td></tr><tr><td>移動點</td><td>拖曳</td><td><code>Shift</code> 保持時間不變，<code>Ctrl</code> 保持數值不變，<code>Alt</code> 忽略貼齊</td></tr><tr><td>彎曲線段</td><td><code>Alt</code>+上下拖曳</td><td>改變滑鼠下方線段的張力</td></tr><tr><td>張力控點</td><td>上下拖曳</td><td>讓線段彎曲。<code>Ctrl</code> 更精細，按右鍵則變成直線</td></tr><tr><td>曲線上的點</td><td><code>Shift</code>+按右鍵</td><td>在線上新增一個點</td></tr><tr><td>點的選單</td><td>在點上按右鍵</td><td><code>輸入數值...</code>、<code>複製數值</code>、<code>貼上數值</code>、<code>刪除點</code>，以及 <code>整條曲線</code>，可縮放、翻轉或拉直整條曲線</td></tr><tr><td>縮放</td><td><code>Ctrl</code>+滾輪</td><td>縮放檢視</td></tr><tr><td>捲動</td><td>中鍵拖曳</td><td>移動檢視</td></tr></tbody></table></div>
 <h2 id="lfo-mode">LFO 模式</h2>
-<figure><a class="shot" href="/assets/img/wiki/automation-lfo.webp"><img src="/assets/img/wiki/automation-lfo.webp" alt="處於 LFO 模式的自動化編輯器，有三角波以及 SPD、TNS、SKEW、PW、AMNT 旋鈕" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/automation-lfo.webp"><img src="/assets/img/wiki/automation-lfo.webp" alt="處於 LFO 模式的自動化編輯器，有三角波以及 SPD、TNS、SKEW、PW、AMNT 旋鈕" loading="lazy" width="760" height="346"></a></figure>
 <p>勾選編輯器頂部的 <code>LFO</code>。此時由一個波形決定片段的數值，你畫的點則變成設定 LFO 的振幅，而不是數值本身。</p>
 <div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>SPD</code></td><td>一個週期的長度，以拍為單位</td></tr><tr><td><code>TNS</code></td><td>波形的張力</td></tr><tr><td><code>SKEW</code></td><td>波形的偏斜</td></tr><tr><td><code>PW</code></td><td>脈衝寬度</td></tr><tr><td><code>AMNT</code></td><td>LFO 讓數值移動的幅度</td></tr><tr><td><code>MUL</code></td><td>開啟：LFO 與波封電平相乘。關閉：相加</td></tr></tbody></table></div>
 <h2 id="events-in-a-pattern">樣式中的事件</h2>
-<figure><a class="shot" href="/assets/img/wiki/eventeditor.webp"><img src="/assets/img/wiki/eventeditor.webp" alt="事件編輯器，音量事件以長條顯示" loading="lazy"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/eventeditor.webp"><img src="/assets/img/wiki/eventeditor.webp" alt="事件編輯器，音量事件以長條顯示" loading="lazy" width="980" height="400"></a></figure>
 <p>事件屬於某個樣式，該樣式在哪裡播放，事件就在哪裡生效。在控制項上按右鍵並選擇 <code>編輯樣式中的事件</code>，即可為它開啟事件編輯器。</p>
 <ul><li><code>繪製</code> 在你拖曳時設定數值，按右鍵拖曳則是擦除。<code>直線</code> 畫出直線斜坡。<code>選取</code> 標出一段時間範圍，供底部的工具使用。</li><li><code>貼齊</code> 的範圍從 1/2 步到 1 小節。</li><li><code>音階</code>、<code>偏移</code> 和 <code>隨機化</code> 會改變所選範圍或整個樣式的事件。</li><li><code>LFO</code> 寫入長度從 1 拍到 4 小節的正弦波、三角波或方波。</li><li><code>清除</code> 移除事件。</li><li><code>轉為自動化...</code> 把事件轉成自動化片段，並從樣式中移除它們。</li><li><code>檔案</code> 以 <code>.fsc</code> 檔案開啟和儲存事件，也可以匯入 MIDI 檔案。</li></ul>
 <p>同一個右鍵選單中的 <code>以此位置初始化歌曲</code>，會儲存每次歌曲開始時控制項被重設成的數值。</p>

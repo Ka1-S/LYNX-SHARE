@@ -187,6 +187,20 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 </script>""" % (json.dumps(LANGS, ensure_ascii=False, separators=(",", ":")), version)
 
 
+SIZES = json.loads((SRC / "img-sizes.json").read_text(encoding="utf-8"))     # written by import-shots.py
+
+
+def sized(page):
+    """width and height on every picture of the site's own that lacks them: nothing is stretched, nothing jumps on load."""
+    def fix(m):
+        tag = m.group(0)
+        src = re.search(r'\ssrc="([^"?]+)', tag)
+        if " width=" in tag or not src or src.group(1) not in SIZES:
+            return tag
+        return '%s width="%d" height="%d">' % (tag[:-1], *SIZES[src.group(1)])
+    return re.sub(r"<img\b[^>]*>", fix, page)
+
+
 HERO_H1 = re.compile(r'(<h1 data-i18n-words="[^"]+">)(.*?)\s*<span class="grad">(.*?)</span></h1>', re.S)
 
 
@@ -328,11 +342,14 @@ def plugin_tags(p):
     return out
 
 
-def plugin_img(p, lazy=True):
+def plugin_img(p, lazy=True, card=False):
+    """width/height are the picture's own size, so it is never shown larger. Editors that 0.1.25 could also draw at
+    twice the size have <id>@2x.webp for dense screens; a card is small enough for the first file unless it is narrow."""
     if not p["dim"]:
         return '<span class="plate">%s</span>' % esc(p["name"])       # no picture of this editor: a name plate, not a fake
-    return '<img src="/assets/img/plugins/%s.webp" alt="%s" width="%d" height="%d"%s>' % (
-        p["id"], esc(p["name"]), p["dim"][0], p["dim"][1], ' loading="lazy"' if lazy else "")
+    src = "/assets/img/plugins/%s.webp" % p["id"]
+    dense = ' srcset="%s 1x, %s 2x"' % (src, src.replace(".webp", "@2x.webp")) if len(p["dim"]) > 2 and not (card and p["dim"][0] >= 720) else ""
+    return '<img src="%s"%s alt="%s" width="%d" height="%d"%s>' % (src, dense, esc(p["name"]), p["dim"][0], p["dim"][1], ' loading="lazy"' if lazy else "")
 
 
 def render_catalog(cat, version):
@@ -350,7 +367,7 @@ def render_catalog(cat, version):
             cards = []
             for p in mine:
                 href = "/wiki/built-in/%s/" % p["id"] if p.get("wiki") else ""
-                pic = plugin_img(p)
+                pic = plugin_img(p, card=True)
                 name = esc(p["name"])
                 cards.append('<article class="pc" id="p-%s">%s<div class="pb"><h4>%s</h4><p data-i18n="c.%s">%s</p><div class="tags">%s</div></div></article>' % (
                     p["id"], '<a class="pimg" href="%s" tabindex="-1" aria-hidden="true">%s</a>' % (href, pic) if href else '<div class="pimg">%s</div>' % pic,
@@ -456,7 +473,7 @@ def plugin_prose(p, cat, w):
     """The body of a plugin's page from its texts w (English, or a translation of them); returns (html, toc)."""
     parts = []
     if p["dim"]:
-        src = "/assets/img/plugins/%s.webp" % p["id"]
+        src = "/assets/img/plugins/%s%s.webp" % (p["id"], "@2x" if len(p["dim"]) > 2 else "")
         parts.append('<figure><a class="shot" href="%s">%s</a></figure>' % (src, plugin_img(p, lazy=False)))
     parts.append("<p>%s</p>" % inline(w["intro"]))
     toc = []
@@ -627,6 +644,7 @@ def main():
         ("/features/", "features", "fe.h1", "m.features.d", page("features"), ("/assets/features.js",), ""),
         ("/download/", "download", "dlp.h1", "m.download.d", page("download"), (), ""),
         ("/why/", "why", "why.h1", "m.why.d", page("why"), (), ""),
+        ("/fixes/", "fixes", "fix.h1", "m.fixes.d", page("fixes"), (), ""),
         ("/instruments-and-effects/", "cat", "cat.h1", "m.cat.d", render_catalog(cat, latest["version"].split("-")[0]), ("/assets/catalog.js",), "catalog"),
         ("/updates/", "updates", "up.h1", "m.updates.d", render_updates(rels), (), "updates"),
         ("/wiki/", "wiki", "wiki.h1", "m.wiki.d", render_wiki_index(index, cat, pages), ("/assets/wiki.js",), ""),
@@ -670,6 +688,7 @@ def main():
         files[(path.strip("/") + "/index.html").lstrip("/")] = frame(path, cur, tk, dk, body, version, scripts, part, home=path == "/",
                                                                      wt=" ".join(BODY_LANGS.get(path, ())) if path.startswith("/wiki/") else "")
 
+    files = {name: sized(text) if name.endswith(".html") else text for name, text in files.items()}
     stale = [str(f.relative_to(OUT)) for f in sorted((OUT / "i18n/wiki").glob("**/*.*")) if str(f.relative_to(OUT)) not in files]
     if not check:
         for name in stale:                         # bodies whose translation is gone or out of date
