@@ -204,6 +204,13 @@ public:
     // vfx::Prop (0 velocity 0..1 — the voice's volume relative to its note-on velocity is value / velocity at
     // note-on —, 1 pitch in cents from the key, 2 pan −1..1, 3 Mod X, 4 Mod Y). Ignored if unsupported.
     virtual void voiceProperty (int /*key*/, int /*prop*/, float /*value*/) noexcept {}
+    // Issue #108 (MPE, core/Mpe.h): a played note's own expression changing while it sounds — `prop` a vfx::Prop
+    // (pitch: the note's own cents, `baseCents` the channel's tuning on top; modX = timbre, modY = pressure, 0..1).
+    // Native engines take it as a voice property; a hosted plugin sends it on the note's member channel.
+    virtual void noteExpression (int key, int prop, float value, float baseCents) noexcept
+    {
+        voiceProperty (key, prop, prop == 1 /* vfx::Prop::pitch */ ? value + baseCents : value);
+    }
     // The same for a voice that arrived on MIDI port `port` (a Channel Rack VFX's output, round 165c): a Patcher passes
     // it to what that port reaches; hosted plugins cannot take it (MIDI has no per-voice properties).
     virtual void voicePropertyPort (int /*port*/, int /*key*/, int /*prop*/, float /*value*/, int /*midiChannel*/) noexcept {}

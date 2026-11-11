@@ -1178,6 +1178,14 @@ public:
             return;
         }
 
+        if (args.contains ("--mpetest"))
+        {
+            // LYNX.exe --mpetest "LYNX Test MPE.clap" report.txt (tools/testplugin/lynx_test_mpe.c, issue #108)
+            const auto i = args.indexOf ("--mpetest");
+            runMpeTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--editortest"))
         {
             // LYNX.exe --editortest plugin.vst3 report.txt ["name"]: opens the plugin's own editor in a window for a few
@@ -6052,6 +6060,112 @@ private:
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX.exe --mpetest "LYNX Test MPE.clap" report.txt (tools/testplugin/lynx_test_mpe.c, issue #108): a hosted CLAP
+    // instrument with the wrapper's MPE switch on gets each note on its own member channel, its fine pitch / Mod X /
+    // Mod Y as tuning / brightness / pressure note expressions before the note on, and a sounding note's expression
+    // on that note's channel alone. The plugin writes down what it received; no window, no audio device.
+    void runMpeTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        const auto log = juce::File (reportPath).getSiblingFile (juce::File (reportPath).getFileNameWithoutExtension() + "-plugin.txt");
+        log.deleteFile();
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_TEST_MPE_REPORT", log.getFullPathName().toRawUTF8());
+       #else
+        setenv ("LYNX_TEST_MPE_REPORT", log.getFullPathName().toRawUTF8(), 1);
+       #endif
+        juce::String report;
+        auto failures = 0;
+        {
+            lynx::AudioEngine engine (false);
+            auto& host = engine.getPluginHost();
+            report << "plugins_in_file=" << host.addPluginFile (juce::File (pluginPath)) << "\n";
+            std::optional<juce::PluginDescription> clap;
+            for (const auto& type : host.getKnownPlugins().getTypes())
+                if (type.pluginFormatName == "CLAP" && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName())
+                    clap = type;
+            lynx::PluginRef ref;
+            if (clap)
+            {
+                ref.id = clap->createIdentifierString().toStdString();
+                ref.name = clap->name.toStdString();
+            }
+            ref.mpe = true;
+            juce::String error;
+            auto instrument = clap ? host.makeInstrument (ref, 48000.0, &error) : nullptr;
+            report << "instrument_loaded=" << (instrument != nullptr ? "yes" : "no") << (error.isNotEmpty() ? " (" + error + ")" : juce::String()) << "\n";
+            if (instrument != nullptr)
+            {
+                std::vector<float> l (256), r (256);
+                auto block = [&] { instrument->render (l.data(), r.data(), 256, 1.0f, 1.0f); };
+                block(); // (the zone's setup)
+                instrument->setNextNoteFinePitch (30.0f);       // +30 cents
+                instrument->setNextNoteModulation (0.75f, 1.0f); // timbre 0.75, full pressure
+                instrument->noteOn (60, 0.8f);
+                instrument->noteOn (64, 0.5f);                   // a second note: its own channel, centre values
+                block();
+                instrument->noteExpression (60, (int) lynx::vfx::Prop::pitch, 200.0f, 0.0f);
+                instrument->noteExpression (64, (int) lynx::vfx::Prop::modX, 0.25f, 0.0f);
+                instrument->noteExpression (60, (int) lynx::vfx::Prop::modY, 0.75f, 0.0f);
+                block();
+                instrument->noteOff (60);
+                instrument->noteOff (64);
+                block();
+            }
+            else
+                ++failures;
+        } // (the plugin writes its log as it is destroyed)
+
+        struct Line
+        {
+            juce::String kind;
+            int a = 0, b = 0, c = 0, d = 0;
+        };
+        std::vector<Line> lines;
+        for (const auto& text : juce::StringArray::fromLines (log.loadFileAsString()))
+        {
+            const auto t = juce::StringArray::fromTokens (text, " ", "");
+            if (t.size() >= 3)
+                lines.push_back ({ t[0], t[1].getIntValue(), t[2].getIntValue(), t.size() > 3 ? t[3].getIntValue() : 0, t.size() > 4 ? t[4].getIntValue() : 0 });
+        }
+        report << "plugin_events=" << (int) lines.size() << "\n";
+        // the first line at or after `from` that matches (−1 = none); `value` within `tolerance` (thousandths)
+        auto find = [&lines] (const juce::String& kind, int a, int b, int value, int tolerance, int from = 0) {
+            for (auto i = (std::size_t) from; i < lines.size(); ++i)
+            {
+                const auto& x = lines[i];
+                const auto v = kind == "expr" ? x.d : x.c;
+                if (x.kind == kind && x.a == a && x.b == b && std::abs (v - value) <= tolerance)
+                    return (int) i;
+            }
+            return -1;
+        };
+        auto check = [&] (const char* what, bool ok) {
+            report << what << "=" << (ok ? "ok" : "FAILED") << "\n";
+            failures += ok ? 0 : 1;
+        };
+        // (CLAP expression ids: 2 tuning in semitones, 5 brightness, 6 pressure; channels 0-based: the first member = 1)
+        const auto on60 = find ("on", 1, 60, 800, 5), on64 = find ("on", 2, 64, 500, 5);
+        check ("zone_setup_sent", find ("midi", 176, 6, 15, 0) >= 0 && find ("midi", 177, 6, 48, 0) >= 0);
+        check ("notes_on_their_own_channels", on60 >= 0 && on64 > on60);
+        const auto tune = find ("expr", 2, 1, 300, 3), bright = find ("expr", 5, 1, 756, 4), press = find ("expr", 6, 1, 1000, 1);
+        check ("expression_before_the_note_on", tune >= 0 && bright >= 0 && press >= 0 && tune < on60 && bright < on60 && press < on60);
+        check ("second_note_starts_centred", find ("expr", 2, 2, 0, 1) >= 0 && find ("expr", 5, 2, 504, 4) >= 0 && find ("expr", 6, 2, 0, 1) >= 0);
+        const auto later = std::max (on60, on64) + 1;
+        check ("sounding_note_expression", later > 0 && find ("expr", 2, 1, 2000, 3, later) >= 0 && find ("expr", 5, 2, 252, 4, later) >= 0
+                                               && find ("expr", 6, 1, 504, 4, later) >= 0);
+        check ("other_note_untouched", later > 0 && find ("expr", 2, 2, 2000, 3, later) < 0 && find ("expr", 6, 2, 504, 4, later) < 0);
+        check ("notes_off_on_their_channels", find ("off", 1, 60, 0, 100000) >= 0 && find ("off", 2, 64, 0, 100000) >= 0);
+        auto expressionAsMidi = false; // (a CLAP-dialect plugin gets no raw bend / pressure / CC 74 on a member channel)
+        for (const auto& x : lines)
+            if (x.kind == "midi" && (x.a & 0x0f) != 0 && ((x.a & 0xf0) == 0xe0 || (x.a & 0xf0) == 0xd0 || ((x.a & 0xf0) == 0xb0 && x.b == 74)))
+                expressionAsMidi = true;
+        check ("no_duplicate_midi_expression", ! expressionAsMidi);
+        report << "--- plugin log ---\n" << log.loadFileAsString() << "result=" << (failures == 0 ? "OK" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
         quit();
     }
 

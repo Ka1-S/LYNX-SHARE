@@ -14,6 +14,7 @@
 #include "core/Multilink.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
+#include "core/Mpe.h"
 #include "core/RecordLoop.h"
 #include "core/StepEdit.h"
 #include "core/Preferences.h"
@@ -982,6 +983,10 @@ private:
     LiveEventQueue liveEvents;   // UI -> audio
     LiveEventQueue midiEvents;   // MIDI thread -> audio
     InputHeldNotes midiHeld;     // MIDI thread: what each held MIDI key started
+    // issue #108 (MIDI thread): the MPE controller's zone — its member channels' bend / CC 74 / pressure per note
+    // (one decoder: two MPE controllers played at once would share it)
+    mpe::Input mpeInput;
+    mpe::Zone mpeZone;           // the zone of the device's settings mpeInput was last set to
     PedalHold pedalHold;         // MIDI thread: FL's foot pedal hold per channel (round 187a)
     std::atomic<bool> footPedalNoteOff { true }; // FL's Settings › MIDI "Foot pedal controls note off" (on)
     std::atomic<std::uint64_t> heldKeyBits[16][2] {}; // keys held per MIDI channel on inputs / the typing piano (chord readout)

@@ -344,6 +344,8 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("bendRange", p.bendRange);
     if (p.modXAftertouch)
         o->setProperty ("modXAftertouch", true);
+    if (p.mpe) // issue #108
+        o->setProperty ("mpe", true);
     if (! p.allNotesOffOnStop)
         o->setProperty ("allNotesOffOnStop", false);
     if (! p.resetOnFlush)
@@ -423,6 +425,7 @@ PluginRef pluginFromVar (const juce::var& v)
     p.sendBendRange = (bool) v.getProperty ("sendBendRange", false);
     p.bendRange = juce::jlimit (1, 48, (int) v.getProperty ("bendRange", 12));
     p.modXAftertouch = (bool) v.getProperty ("modXAftertouch", false);
+    p.mpe = (bool) v.getProperty ("mpe", false);
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);

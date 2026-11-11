@@ -424,7 +424,12 @@ std::string MidiPrefs::toText() const
         out += "gamepad=1\n";
     // input=<enabled>|<midi channel>|<target>|<device name>
     for (const auto& i : inputs)
+    {
         out += "input=" + std::string (i.enabled ? "1" : "0") + "|" + std::to_string (i.midiChannel) + "|" + std::to_string (i.target) + "|" + i.name + "\n";
+        // inputmpe=<member channels>|<bend range>|<device name> (issue #108; its own line: older versions skip it)
+        if (i.mpe)
+            out += "inputmpe=" + std::to_string (i.mpeMembers) + "|" + std::to_string (i.mpeBendRange) + "|" + i.name + "\n";
+    }
     // controller=<controller type>|<device name> (round 190aw; only the devices whose type is not "detect")
     for (const auto& i : inputs)
         if (! i.controller.empty())
@@ -494,6 +499,18 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
                 continue;
             auto i = p.input (parts[1]);
             i.controller = trim (parts[0]);
+            p.setInput (i);
+        }
+        else if (key == "inputmpe") // (after the device's "input" line when it has one)
+        {
+            const auto parts = split (value, '|', 3);
+            if (parts.size() != 3 || parts[2].empty())
+                continue;
+            auto i = p.input (parts[2]);
+            i.name = parts[2];
+            i.mpe = true;
+            i.mpeMembers = std::clamp (toInt (trim (parts[0]), 15), 1, 15);
+            i.mpeBendRange = std::clamp (toInt (trim (parts[1]), 48), 1, 96);
             p.setInput (i);
         }
         else if (key == "output")

@@ -2300,7 +2300,48 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
     }
 
-    if (device.midiChannel != 0 && m.getChannel() != device.midiChannel)
+    // issue #108: an MPE controller (the device's MPE setting). Its member channels' pitch bend, CC 74 and pressure
+    // belong to the notes on them: a sounding note's expression goes to the channels its note on reached, a note on /
+    // off carries the note's own values (played, and recorded as the note's fine pitch, Mod X and Mod Y). Everything
+    // else (the master channel, other controllers) is handled as from any controller. No channel filter in this mode.
+    mpe::InEvent mpeEvents[mpe::Input::maxEvents];
+    const mpe::InEvent* mpeNote = nullptr;
+    if (device.mpe)
+    {
+        if (const mpe::Zone zone { true, device.mpeMembers, (float) device.mpeBendRange }; ! (zone == mpeZone))
+        {
+            mpeZone = zone;
+            mpeInput.setZone (zone);
+        }
+        const auto count = mpeInput.feed (m.getRawData(), m.getRawDataSize(), mpeEvents);
+        if (count == 0)
+            return; // (the zone's own configuration)
+        if (mpeEvents[0].type == mpe::InEvent::Type::expr)
+        {
+            for (int k = 0; k < count; ++k)
+            {
+                const auto& x = mpeEvents[k];
+                InputHeldNotes::Target to[InputHeldNotes::maxTargets];
+                const auto n = midiHeld.targetsOf (x.key, to);
+                for (int i = 0; i < n; ++i)
+                {
+                    NoteEvent e;
+                    e.type = NoteEvent::Type::voiceProp;
+                    e.expression = true;
+                    e.channel = to[i].channel;
+                    e.key = to[i].key;
+                    e.prop = (std::uint8_t) (x.expr == mpe::Expr::pitch ? vfx::Prop::pitch : x.expr == mpe::Expr::timbre ? vfx::Prop::modX : vfx::Prop::modY);
+                    e.velocity = x.expr == mpe::Expr::pressure ? mpe::modYOfPressure (x.value) : x.value;
+                    if (e.channel >= 0)
+                        midiEvents.push (e);
+                }
+            }
+            return;
+        }
+        if (mpeEvents[0].type != mpe::InEvent::Type::plain)
+            mpeNote = &mpeEvents[0];
+    }
+    else if (device.midiChannel != 0 && m.getChannel() != device.midiChannel)
         return;
 
     // the pitch wheel, the mod wheel and the other controllers play into the channels the notes go to (round 162,
@@ -2433,17 +2474,27 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
     const auto tick = recordTickFor (eventMs);
 
-    auto push = [this, taking, tick] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
+    auto push = [this, taking, tick, mpeNote] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
         NoteEvent e;
         e.type = noteOn ? NoteEvent::Type::on : NoteEvent::Type::off;
         e.channel = t.channel;
         e.key = t.key;
         e.velocity = velocity;
+        if (mpeNote != nullptr && noteOn) // issue #108: the note starts at its own bend, timbre and pressure
+        {
+            e.expression = true;
+            e.cents = mpeNote->cents;
+            e.modX = mpeNote->timbre;
+            e.modY = mpe::modYOfPressure (mpeNote->pressure);
+        }
         midiEvents.push (e);
         logPlayedNote (e.channel, e.key, e.velocity, noteOn, transport.playing.load() ? tick : -1.0, taking);
 
         // (round 170d: during the count-in too; the time is the device's, against the audio clock)
-        if (taking)
+        if (taking && mpeNote != nullptr) // (the "on": its bend and timbre; the "off": its peak pressure)
+            midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn, true, mpe::finePitchOfCents (mpeNote->cents), mpeNote->timbre,
+                                    mpe::modYOfPressure (mpeNote->pressure) });
+        else if (taking)
             midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
     };
 

@@ -22,6 +22,8 @@
 #include "core/PluginHold.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
+#include "core/Mpe.h"
+#include "core/Vfx.h"
 #include "core/ModuleWarmup.h"
 
 namespace lynx
@@ -70,9 +72,11 @@ struct HostedOptions
     bool releaseVelocity = true, sendBendRange = false, modXAftertouch = false, allNotesOffOnStop = true, resetOnFlush = true,
          sendLoopPosition = true;
     int bendRange = 12;
+    bool mpe = false; // issue #108: one member channel per note (core/Mpe.h)
     static HostedOptions of (const PluginRef& ref) noexcept
     {
-        return { ref.releaseVelocity, ref.sendBendRange, ref.modXAftertouch, ref.allNotesOffOnStop, ref.resetOnFlush, ref.sendLoopPosition, ref.bendRange };
+        return { ref.releaseVelocity, ref.sendBendRange, ref.modXAftertouch, ref.allNotesOffOnStop, ref.resetOnFlush, ref.sendLoopPosition, ref.bendRange,
+                 ref.mpe };
     }
 };
 
@@ -89,7 +93,9 @@ public:
     void noteOn (int key, float velocity) noexcept override;
     void noteOff (int key) noexcept override;
     void allNotesOff() noexcept override;
-    void setNextNoteModulation (float modX, float) noexcept override { nextModX = modX; }
+    void setNextNoteModulation (float modX, float modY) noexcept override { nextModX = modX, nextModY = modY; }
+    // issue #108 (MPE on): the note's bend / timbre / pressure on its member channel
+    void noteExpression (int key, int prop, float value, float baseCents) noexcept override;
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
     // issue #63: the note's own fine pitch, sent as FL's wrapper sends it (core/HostNotePitch.h)
     void setNextNoteFinePitch (float cents) noexcept override { nextFine = cents; }
@@ -168,7 +174,9 @@ private:
     HostedOptions options;
     std::atomic<bool> flVelocity { false };
     juce::uint8 midiVelocity (float velocity) const noexcept;
-    float nextModX = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    float nextModX = 0.5f, nextModY = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    mpe::Allocator mpeNotes;      // issue #108 (the wrapper's MPE switch): each note's member channel
+    void sendExpression (int channel, mpe::Expr expr, float value) noexcept; // on a member channel (0-based)
     hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
     hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes
     bool takesTuning = false;     // a VST3 plugin (its note ons carry the tuning)

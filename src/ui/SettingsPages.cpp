@@ -1295,11 +1295,29 @@ public:
         channel.addItem (tr ("Any MIDI channel"), 1);
         for (int c = 1; c <= 16; ++c)
             channel.addItem (tr ("MIDI channel {0}", { juce::String (c) }), c + 1);
-        channel.setSelectedId (p.midiChannel + 1, juce::dontSendNotification);
+        // issue #108 (a LYNX addition; FL has no MPE input): the device is an MPE controller — every channel is
+        // taken (channel 1 = master, the member channels from 2 up carry one note each with its bend, CC 74, pressure)
+        channel.addSeparator();
+        channel.addItem (tr ("MPE controller"), mpeItem);
+        channel.setTooltip (tr ("MPE controller: each note has its own MIDI channel; its pitch bend, timbre (CC 74) and pressure are played and recorded per note (fine pitch, Mod X, Mod Y)"));
+        channel.setSelectedId (p.mpe ? mpeItem : p.midiChannel + 1, juce::dontSendNotification);
         channel.onChange = [this] {
-            prefsNow.midiChannel = channel.getSelectedId() - 1;
+            prefsNow.mpe = channel.getSelectedId() == mpeItem;
+            if (! prefsNow.mpe)
+                prefsNow.midiChannel = channel.getSelectedId() - 1;
+            update();
+            resized();
+        };
+        for (int n = 15; n >= 1; --n)
+            zone.addItem (n == 1 ? tr ("Channel 2") : tr ("Channels 2-{0}", { juce::String (n + 1) }), n);
+        zone.setTooltip (tr ("MPE member channels (lower zone): the MIDI channels that carry one note each"));
+        zone.setSelectedId (juce::jlimit (1, 15, p.mpeMembers), juce::dontSendNotification);
+        zone.onChange = [this] {
+            prefsNow.mpeMembers = zone.getSelectedId();
             update();
         };
+        styleCombo (zone);
+        addChildComponent (zone);
 
         plays.addItem (tr ("Plays the selected channels"), 1);
         for (int i = 0; i < (int) channels.size(); ++i)
@@ -1327,6 +1345,12 @@ public:
         top.removeFromRight (8);
         channel.setBounds (top.removeFromRight (150));
         top.removeFromRight (8);
+        zone.setVisible (prefsNow.mpe);
+        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice; the channel box keeps its column)
+        {
+            zone.setBounds (top.removeFromRight (124));
+            top.removeFromRight (8);
+        }
         enabled.setBounds (top);
         r.removeFromTop (4);
         // the second line, as the output rows have: the controller type under the device's name
@@ -1348,6 +1372,7 @@ private:
     void update (bool notify = true)
     {
         channel.setEnabled (prefsNow.enabled);
+        zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
         type.setEnabled (prefsNow.enabled);
         if (notify && onChange)
@@ -1357,9 +1382,10 @@ private:
     prefs::MidiInputPrefs prefsNow;
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
-    juce::ComboBox channel, plays, type;
+    juce::ComboBox channel, plays, type, zone;
     juce::Label typeLabel, status;
     std::vector<std::string> typeIds; // [item id − 3] the profile's id
+    static constexpr int mpeItem = 100;
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
@@ -1622,7 +1648,7 @@ public:
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
-            sampleDevices = { "Mackie Control", "Akai MPD218" }; // (one with a built-in controller profile, one generic)
+            sampleDevices = { "Mackie Control", "Akai MPD218", sampleMpeDevice }; // (one with a built-in controller profile, one generic, one shown as an MPE controller, issue #108)
             sampleOutputs = { "Roland TR-8S", "Korg volca sample" };
             auto p = engine.getMidiPrefs();
             prefs::MidiOutputPrefs drums;
@@ -1785,7 +1811,9 @@ private:
 
         for (const auto& name : names)
         {
-            const auto settings = engine.getMidiPrefs().input (name.toStdString());
+            auto settings = engine.getMidiPrefs().input (name.toStdString());
+            if (! persistent && name == sampleMpeDevice) // (the snapshot's sample row for an MPE controller)
+                settings.mpe = true;
             const auto detected = controllers.library().detect (name.toStdString());
             types.detected = detected != nullptr ? juce::String::fromUTF8 (detected->name.c_str()) : juce::String();
             types.status = {};
@@ -1917,6 +1945,7 @@ private:
     bool loading = false;
     std::size_t channelCount = 0;
     juce::StringArray sampleDevices;
+    static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;
     std::vector<std::unique_ptr<MidiOutputRow>> outputRows;
     juce::StringArray sampleOutputs, clockInputs;

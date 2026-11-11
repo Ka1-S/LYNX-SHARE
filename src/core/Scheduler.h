@@ -58,6 +58,9 @@ struct NoteEvent
     // else the velocity is scaled
     float gain = 1.0f;
     std::uint8_t prop = 0;  // voiceProp: the vfx::Prop
+    // a live note from an MPE controller (issue #108, core/Mpe.h): its "on" brings its own `cents`, `modX` and `modY`
+    // (the live queue ignores them otherwise), and a live voiceProp is that note's expression changing as it sounds
+    bool expression = false;
     std::int8_t colour = 0; // the note's colour group 0…15 (FL's note colours: VFX Color Mapper, round 164b)
     // A VFX channel (round 164b): −1 = an ordinary note; −2 = one its processor takes (it goes nowhere else); N ≥ 0 =
     // what the processor sent on MIDI port N (only the routes on that port take it)
