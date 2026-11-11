@@ -14,6 +14,9 @@
 //     --set <i>=<v>            parameter i to the normalized value v
 //     --text <i>=<value>       parameter i to the value whose text (formatEffectParam) matches: a number = the
 //                              closest numeric text, otherwise the same text (case-insensitive)
+//     --songpos <samples>      the song position before each block (<samples> at the file's first sample, 120 BPM)
+//     --ticks <ppq> [mode]     also split blocks at song ticks (a host that cuts its buffers on a <ppq> grid; mode 0 floor,
+//                              1 round, 2 ceil of the tick's sample position)
 //     --settle <s>             silence processed before each file (default 0.5 s, after a reset)
 //     --list                   print the parameters (index, name, value, text) and exit
 //     --dump <file>            write the parameters ("index value" lines; LYNX --parityshot reads them)
@@ -197,7 +200,11 @@ int main (int argc, char** argv)
     auto kind = (EffectKind) kindIndex;
     auto slot = makeEffectSlot (kind);
     double rate = 0.0, settle = 0.5;
+    bool songPos = false;
+    double songOffset = 0.0; // samples
     int block = 512;
+    double tickPpq = 0.0;
+    int tickMode = 0;
     bool list = false;
     std::string dump;
     std::vector<std::string> files;
@@ -208,6 +215,10 @@ int main (int argc, char** argv)
             rate = std::atof (argv[++i]);
         else if (a == "--block" && i + 1 < argc)
             block = std::max (1, std::atoi (argv[++i]));
+        else if (a == "--songpos" && i + 1 < argc)
+            songPos = true, songOffset = std::atof (argv[++i]); // round 188i: the song position (from 0 at the file's first sample) before each block, as a host gives it
+        else if (a == "--ticks" && i + 2 < argc)
+            tickPpq = std::atof (argv[++i]), tickMode = std::atoi (argv[++i]);
         else if (a == "--settle" && i + 1 < argc)
             settle = std::atof (argv[++i]);
         else if (a == "--list")
@@ -301,10 +312,24 @@ int main (int argc, char** argv)
         out.rate = (int) sr;
         out.l = in.l;
         out.r = in.r;
-        for (std::size_t at = 0; at < out.l.size(); at += (std::size_t) block)
+        const double tickLen = tickPpq > 0.0 ? sr * 0.5 / tickPpq : 0.0; // 120 BPM
+        const auto tickAt = [&] (long long k) {
+            const double t = (double) k * tickLen - songOffset;
+            return (long long) (tickMode == 0 ? std::floor (t) : tickMode == 1 ? std::floor (t + 0.5) : std::ceil (t));
+        };
+        for (std::size_t at = 0, n = 0; at < out.l.size(); at += n)
         {
-            const int n = (int) std::min<std::size_t> ((std::size_t) block, out.l.size() - at);
-            fx->process (out.l.data() + at, out.r.data() + at, n, slot.params, 120.0);
+            n = std::min<std::size_t> ((std::size_t) block, out.l.size() - at);
+            if (tickLen > 0.0)
+            {
+                long long k = (long long) std::floor (((double) at + songOffset) / tickLen);
+                while (tickAt (k) <= (long long) at)
+                    ++k;
+                n = std::min<std::size_t> (n, (std::size_t) (tickAt (k) - (long long) at));
+            }
+            if (songPos)
+                fx->setSongPosition (((double) at + songOffset) / sr * 2.0 * (double) ppq); // 120 BPM: two beats a second
+            fx->process (out.l.data() + at, out.r.data() + at, (int) n, slot.params, 120.0);
         }
         bool finite = true;
         for (std::size_t n = 0; n < out.l.size(); ++n)
