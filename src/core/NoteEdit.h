@@ -118,6 +118,19 @@ std::int64_t snapNearest (double tick, const std::vector<std::int64_t>& candidat
 // whose width on screen is at least `minPixels`, i.e. the lines the editor draws ("Screen" grid).
 std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixels = 16.0);
 
+// The step of FL's "Line" and "Cell" snaps at a zoom (round 190ax; FL 2026 FLEngine FUN_00e59e90, which both modes
+// share: they differ in how a position is rounded, not in the step; docs/analise/REA_rodada190ax.md). With `min` =
+// minPixels truncated to whole pixels (FL: 10), the first of these that holds:
+//   a step is at least `min` wide                        -> one step
+//   two steps are (not in x/16 with an odd numerator)    -> two steps (half a beat in x/4)
+//   a beat is                                            -> one beat
+//   two beats are, and the numerator is even             -> two beats
+//   otherwise                                            -> one bar, doubled while narrower than `min` (up to 32 bars)
+// So it is never finer than a step, however far in the zoom goes. (FL's one exception, 1 tick at its maximum zoom of
+// 8 px per tick, is out of reach here: at 96 PPQ that is 3072 px per bar and LYNX's editors stop at 800.)
+// numerator / denominator: the time signature (a beat is 16 / denominator steps, a bar `numerator` beats).
+std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator = 4, double minPixels = 10.0);
+
 // "bar:step:tick" (bar and step from 1, tick from 0; 16 steps per 4/4 bar) <-> ticks.
 std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength = false); // lengths count bars and steps from 0
 bool parseTime (const std::string& text, int beatsPerBar, std::int64_t& ticks, bool isLength = false);
