@@ -92,6 +92,8 @@ CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp sr
 CORE="$CORE src/core/CrashReport.cpp"
 # in-app update check: versions, release list, flavours, checksums, release notes (round 166b)
 CORE="$CORE src/core/UpdateCheck.cpp"
+# the Browser's "Find similar samples" (round 190as)
+CORE="$CORE src/core/SampleSimilarity.cpp"
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
 CORE="$CORE src/core/Python.cpp src/core/VfxScript.cpp src/core/EdisonScript.cpp"
 # WavPack decoder (C)
