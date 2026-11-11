@@ -36,6 +36,7 @@
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/SimpleTracks.h"
+#include "core/QuickRender.h"
 #include "core/TempoDetect.h"
 #include "core/Comping.h"
 #include "core/ExportOptions.h"
@@ -3190,6 +3191,8 @@ int PlaylistComponent::clipAt (int x, int y, bool& onRightEdge, bool& onLeftEdge
         // the left edge only on clips wide enough to still be grabbed in the middle
         gesture::EdgeRules rules;
         rules.minimumForLeft = 24.0;
+        // FL's Edit › "Allow resizing from left" off (FUN_00e8e840): the left edge is part of the body, it moves the clip
+        rules.allowLeft = EditorGlobals::get().leftResizing;
 
         if (const auto zone = gesture::zoneAt (x, tickToX ((double) c.start), tickToX ((double) c.end()), rules); zone != gesture::Zone::outside)
         {
@@ -3309,6 +3312,15 @@ void PlaylistComponent::askToMakeClipsUnique (std::vector<int> placed, std::vect
     });
 }
 
+// FL's Edit › "Create new clips with manual fades" (EECreateNewClipsWithManualFades, off by default): a new audio clip's
+// fades start reset and flagged manual (FUN_010657a0, then FUN_01065830 / FUN_01065840 set bits 0 / 1 of its fade flags),
+// so its edges use its own fade handles instead of the channel's declicker. LYNX keeps FL's bits (flFadeFlags) for the
+// .flp export; its playback has no automatic edge declicker for clips, so they sound the same either way.
+static std::uint32_t newClipFadeFlags() noexcept
+{
+    return EditorGlobals::get().manualFades ? 3u : 0u;
+}
+
 Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
 {
     // what is chosen in the Picker: the current pattern, an audio clip or an automation clip
@@ -3325,6 +3337,7 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
         c.kind = ClipKind::audio;
         c.channel = brush.index;
         c.pattern = 0;
+        c.flFadeFlags = newClipFadeFlags();
 
         // audio length in ticks at the current BPM
         if (auto data = engine.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) brush.index].samplePath.c_str())))
@@ -4415,7 +4428,9 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::fadeOut:
         {
             const auto& clip = engine.getSong().playlist[(std::size_t) dragClip];
-            const auto tick = snapOn ? snap (xToTick (e.x) + gridTicks() / 2.0, true) : (std::int64_t) xToTick (e.x);
+            // FL's Edit › "Snap fade handles" (off by default, EESnapFadeHandles): off, the handles move freely
+            const auto snapFade = snapOn && EditorGlobals::get().snapFadeHandles;
+            const auto tick = snapFade ? snap (xToTick (e.x) + gridTicks() / 2.0, true) : (std::int64_t) xToTick (e.x);
             auto length = drag == Drag::fadeIn ? tick - clip.start : clip.end() - tick;
             length = juce::jlimit<std::int64_t> (0, clip.length, length);
             const auto in = drag == Drag::fadeIn;
@@ -4709,7 +4724,7 @@ void PlaylistComponent::postDragHint()
             hint.value = tr ("Gain: {0}", { gainText (clip->gain) });
             break;
         case Drag::fadeIn:
-        case Drag::fadeOut: hint.text = tr ("Setting the fade  [Alt] no snap"); break;
+        case Drag::fadeOut: hint.text = EditorGlobals::get().snapFadeHandles ? tr ("Setting the fade  [Alt] no snap") : tr ("Setting the fade"); break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
@@ -5033,6 +5048,30 @@ void PlaylistComponent::trimTimeSelection()
     sortClips();
 }
 
+void PlaylistComponent::selectAllWithTime()
+{
+    // FL's EESelAllAction (FUN_00eb1960): in the Playlist the time selection also covers the whole song, from 0 to the
+    // end of the last clip rounded up to a whole bar (FUN_00e43d30), then every clip is selected (FUN_00e5a850)
+    const auto& song = engine.getSong();
+    std::vector<int> all ((std::size_t) song.playlist.size());
+    std::int64_t end = 0;
+    for (std::size_t i = 0; i < all.size(); ++i)
+    {
+        all[i] = (int) i;
+        end = std::max (end, song.playlist[i].start + std::max<std::int64_t> (1, song.playlist[i].length));
+    }
+    if (end > 0)
+    {
+        const auto bar = song.barAt (end - 1);
+        engine.editSong ([to = bar.tick + bar.length] (Song& s) {
+            s.loopStart = 0;
+            s.loopEnd = to;
+            s.mode = PlayMode::song;
+        }, false);
+    }
+    setSelection (all);
+}
+
 void PlaylistComponent::shiftSelectedClips (int steps, int tracks)
 {
     // the selected clips, else all of them (FL's menu offers these with nothing selected: FL's usual "selected, else all",
@@ -5122,7 +5161,13 @@ void PlaylistComponent::dropOnTrackHeaderAs (const juce::StringArray& files, int
         const auto path = file.getFullPathName().toStdString();
         const auto name = file.getFileNameWithoutExtension().toStdString();
         auto done = false;
-        engine.editSong ([&] (Song& s) { done = trackmodes::dropOnHeader (s, track, path, name, length, how, lock); });
+        engine.editSong ([&] (Song& s) {
+            const auto before = s.playlist.size();
+            done = trackmodes::dropOnHeader (s, track, path, name, length, how, lock);
+            for (auto i = before; done && i < s.playlist.size(); ++i)
+                if (s.playlist[i].kind == ClipKind::audio)
+                    s.playlist[i].flFadeFlags |= newClipFadeFlags();
+        });
         if (done)
             tracks.push_back (track);
         else if (how != trackmodes::HeaderDrop::audioClips)
@@ -5146,6 +5191,9 @@ juce::PopupMenu PlaylistComponent::editMenu()
     auto key = [] (const char* id) { return shortcutText != nullptr ? shortcutText (id) : juce::String(); };
     const auto& song = engine.getSong();
     const auto any = ! selection.empty(), time = song.hasLoop();
+    const auto allAudio = any && std::all_of (selection.begin(), selection.end(), [&song] (int i) {
+        return i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio;
+    });
     juce::PopupMenu m;
     m.addItem (tr ("Cut") + "\tCtrl+X", any, false, [this] { copySelection(); deleteSelection(); });
     m.addItem (tr ("Copy") + "\tCtrl+C", any, false, [this] { copySelection(); });
@@ -5158,7 +5206,14 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Shift up") + key ("playlist.shiftUp"), [this] { runAction ("playlist.shiftUp"); });
     m.addItem (tr ("Shift down") + key ("playlist.shiftDown"), [this] { runAction ("playlist.shiftDown"); });
     m.addItem (tr ("Make unique") + key ("playlist.makeUnique"), any, false, [this] { runAction ("playlist.makeUnique"); });
+    // (FL 2026: on with audio clips selected, off when the selection also holds other clips)
+    m.addItem (tr ("Make unique as sample") + key ("playlist.makeUniqueAsSample"), allAudio, false, [this] { runAction ("playlist.makeUniqueAsSample"); });
     m.addSeparator();
+    {
+        auto& g = EditorGlobals::get();
+        m.addItem (tr ("Allow resizing from left") + key ("playlist.leftResizing"), true, g.leftResizing, [this] { runAction ("playlist.leftResizing"); });
+        m.addItem (tr ("Nudge clips with mouse wheel") + key ("playlist.wheelNudging"), true, g.wheelNudging, [this] { runAction ("playlist.wheelNudging"); });
+    }
     {
         auto& o = trackmodes::headerDropOptions();
         m.addItem (tr ("Dropping on track header locks to content"), true, o.lockToContent, [this] {
@@ -5201,6 +5256,10 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Reverse selected audio clips") + key ("playlist.reverseClips"), [this] { runAction ("playlist.reverseClips"); });
     m.addSeparator();
     m.addItem (tr ("Automatic crossfades (current project)"), true, song.autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    m.addItem (tr ("Create new clips with manual fades") + key ("playlist.manualFades"), true, EditorGlobals::get().manualFades,
+               [this] { runAction ("playlist.manualFades"); });
+    m.addItem (tr ("Snap fade handles") + key ("playlist.snapFadeHandles"), true, EditorGlobals::get().snapFadeHandles,
+               [this] { runAction ("playlist.snapFadeHandles"); });
     m.addItem (tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants, [this] { runAction ("playlist.createVariants"); });
     m.addItem (tr ("Select tracks when samples are dropped"), true, trackmodes::headerDropOptions().selectTracks, [] {
         trackmodes::headerDropOptions().selectTracks = ! trackmodes::headerDropOptions().selectTracks;
@@ -5216,12 +5275,7 @@ juce::PopupMenu PlaylistComponent::selectMenu()
     const auto& song = engine.getSong();
     juce::PopupMenu select;
     select.addItem (tr ("Deselect") + key ("playlist.deselect"), ! selection.empty() || song.hasLoop(), false, [this] { runAction ("playlist.deselect"); });
-    select.addItem (tr ("Select all") + "\tCtrl+A", [this] {
-        std::vector<int> all ((std::size_t) engine.getSong().playlist.size());
-        for (std::size_t i = 0; i < all.size(); ++i)
-            all[i] = (int) i;
-        setSelection (all);
-    });
+    select.addItem (tr ("Select all") + "\tCtrl+A", [this] { selectAllWithTime(); });
     select.addItem (tr ("Select by selected source") + key ("playlist.selectBySource"), [this] { runAction ("playlist.selectBySource"); });
     // (the counts are LYNX's own, round 153)
     const auto overlapping = clipops::overlappingClips (song), stacked = clipops::stackedClips (song), muted = clipops::mutedClips (song);
@@ -5236,6 +5290,8 @@ juce::PopupMenu PlaylistComponent::selectMenu()
                     [this] { runAction ("playlist.selectTimeAround"); });
     select.addItem (tr ("Select previous time") + key ("playlist.timePrevious"), song.hasLoop(), false, [this] { runAction ("playlist.timePrevious"); });
     select.addItem (tr ("Select next time") + key ("playlist.timeNext"), song.hasLoop(), false, [this] { runAction ("playlist.timeNext"); });
+    select.addSeparator();
+    select.addItem (tr ("Magic lasso") + key ("playlist.magicLasso"), true, EditorGlobals::get().magicLasso, [this] { runAction ("playlist.magicLasso"); });
     return select;
 }
 
@@ -6067,9 +6123,16 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             engine.editSong ([targets] (Song& s) { polish::makeClipsUnique (s, targets); });
         });
     else if (clip.kind == ClipKind::audio)
+    {
         menu.addItem (tr ("Make unique"), [this, targets] {
             engine.editSong ([targets] (Song& s) { clipops::makeAudioUnique (s, targets); });
         });
+        // FL's audio clip menu › Sample › Make unique as sample (round 189g)
+        menu.addItem (tr ("Make unique as sample"), [this, targets] {
+            setSelection (targets);
+            makeSelectionUniqueAsSample();
+        });
+    }
     else if (clip.kind == ClipKind::automation)
         menu.addItem (tr ("Make unique"), [this, index] {
             engine.editSong ([index] (Song& s) {
@@ -6623,6 +6686,18 @@ bool PlaylistComponent::runAction (const std::string& id)
     }
     else if (is ("playlist.selectBySource")) selectBySelectedSource();
     else if (is ("playlist.invertSelection")) setSelection (clipops::invertedSelection ((int) engine.getSong().playlist.size(), selection));
+    else if (is ("playlist.leftResizing") || is ("playlist.wheelNudging") || is ("playlist.manualFades") || is ("playlist.snapFadeHandles")
+             || is ("playlist.magicLasso"))
+    {
+        auto& g = EditorGlobals::get();
+        auto& flag = is ("playlist.leftResizing") ? g.leftResizing : is ("playlist.wheelNudging") ? g.wheelNudging
+                   : is ("playlist.manualFades")  ? g.manualFades   : is ("playlist.snapFadeHandles") ? g.snapFadeHandles : g.magicLasso;
+        flag = ! flag;
+        lassoPath.clear();
+        if (g.onOptionsChanged)
+            g.onOptionsChanged();
+    }
+    else if (is ("playlist.makeUniqueAsSample")) makeSelectionUniqueAsSample();
     else if (is ("playlist.purgeUnusedAudio"))
     {
         setSelection ({});
@@ -6918,6 +6993,84 @@ void PlaylistComponent::makeSelectionUnique()
         return;
     }
     run();
+}
+
+void PlaylistComponent::makeSelectionUniqueAsSample()
+{
+    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): the part of
+    // the sample each selected audio clip plays is saved as "<sample> - Part_<n>.wav" (an earlier " - Part_" suffix is
+    // dropped first), in the project's Samples folder, without a file dialog from this menu; a new audio clip channel
+    // copied from the old one plays the file and the clip now starts at the file's start. LYNX writes the file next to
+    // the source sample when the project has no data folder, and keeps the clip's own pitch, stretch and reverse.
+    const auto& song = engine.getSong();
+    struct Part
+    {
+        int clip;
+        std::string path, name;
+    };
+    std::vector<Part> parts;
+    const auto secondsPerTick = 60.0 / (juce::jmax (1.0, song.bpm) * ppq);
+    for (const auto i : selection)
+    {
+        if (i < 0 || i >= (int) song.playlist.size())
+            continue;
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
+            continue;
+        const juce::File source (juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].samplePath.c_str()));
+        const auto data = engine.getSampleLibrary().load (source.getFullPathName());
+        if (data == nullptr || data->frames() == 0)
+            continue;
+        const auto frames = (std::int64_t) data->frames();
+        const auto stretch = c.stretch > 0.0 ? c.stretch : 1.0;
+        const auto from = juce::jlimit<std::int64_t> (0, frames, (std::int64_t) std::floor (((double) c.offset + (double) c.offsetFraction) * secondsPerTick / stretch * data->sampleRate));
+        const auto to = juce::jlimit<std::int64_t> (from, frames, from + (std::int64_t) std::ceil ((double) c.length * secondsPerTick / stretch * data->sampleRate));
+        if (to <= from)
+            continue;
+
+        auto folder = song.dataFolder.empty() ? source.getParentDirectory() : juce::File (juce::String::fromUTF8 (song.dataFolder.c_str())).getChildFile ("Samples");
+        if (! folder.createDirectory().wasOk())
+            folder = source.getParentDirectory();
+        auto base = source.getFileNameWithoutExtension();
+        if (const auto at = base.lastIndexOf (" - Part_"); at > 0)
+            base = base.substring (0, at);
+        juce::File out;
+        for (int n = 1;; ++n)
+            if (out = folder.getChildFile (base + " - Part_" + juce::String (n) + ".wav"); ! out.exists())
+                break;
+
+        const auto channels = data->isStereo() ? 2 : 1;
+        juce::AudioBuffer<float> buffer (channels, (int) (to - from));
+        buffer.copyFrom (0, 0, data->leftData() + from, (int) (to - from));
+        if (channels == 2)
+            buffer.copyFrom (1, 0, data->rightData() + from, (int) (to - from));
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
+        std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 32, {}, 0) : nullptr);
+        if (writer == nullptr)
+            continue;
+        stream.release(); // (the writer owns it now)
+        if (! writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples()))
+            continue;
+        writer.reset();
+        parts.push_back ({ i, out.getFullPathName().toStdString(), out.getFileNameWithoutExtension().toStdString() });
+    }
+    if (parts.empty())
+        return;
+
+    engine.editSong ([parts] (Song& s) {
+        for (const auto& p : parts)
+        {
+            auto& clip = s.playlist[(std::size_t) p.clip];
+            auto copy = s.channels[(std::size_t) clip.channel];
+            copy.samplePath = p.path;
+            copy.name = quickrender::uniqueChannelName (s, p.name);
+            s.channels.push_back (std::move (copy));
+            clip.channel = (int) s.channels.size() - 1;
+            clip.offset = 0;
+            clip.offsetFraction = 0.0f;
+        }
+    });
 }
 
 void PlaylistComponent::lockAllTracks (bool lock)
@@ -7302,10 +7455,7 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
 
     if (cmd && letter == 'A')
     {
-        std::vector<int> all ((std::size_t) engine.getSong().playlist.size());
-        for (std::size_t i = 0; i < all.size(); ++i)
-            all[i] = (int) i;
-        setSelection (all);
+        selectAllWithTime();
         return true;
     }
 
@@ -7357,6 +7507,74 @@ void PlaylistComponent::refreshToolKeys (const std::function<juce::String (const
 void PlaylistComponent::mouseMove (const juce::MouseEvent& e)
 {
     updateHover (e.getPosition(), e.mods);
+    feedMagicLasso (e.getPosition(), false);
+}
+
+void PlaylistComponent::feedMagicLasso (juce::Point<int> p, bool buttonDown)
+{
+    if (! EditorGlobals::get().magicLasso)
+        return;
+    const auto grid = gridArea();
+    // (FL clamps the point into the clip area, FUN_00e6f840)
+    const auto at = grid.getConstrainedPoint (p);
+    const auto loop = lassoPath.move ({ (double) at.x, (double) at.y }, juce::Time::getMillisecondCounter(), buttonDown || ! grid.contains (p));
+    if (loop.empty())
+        return;
+
+    const auto& song = engine.getSong();
+    std::vector<int> enclosed;
+    std::vector<bool> enclosedSelected;
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto r = clipBounds (i);
+        if (! r.intersects (grid) || song.playlist[(std::size_t) i].gridSlot >= 0)
+            continue;
+        if (magiclasso::rectInsidePolygon (loop, magiclasso::innerRect ({ (double) r.getX(), (double) r.getY(), (double) r.getRight(), (double) r.getBottom() })))
+        {
+            enclosed.push_back (i);
+            enclosedSelected.push_back (std::find (selection.begin(), selection.end(), i) != selection.end());
+        }
+    }
+    const auto shift = juce::ModifierKeys::currentModifiers.isShiftDown();
+    switch (magiclasso::decide (enclosed, shift, (int) selection.size(), enclosedSelected))
+    {
+        case magiclasso::Result::select:
+        {
+            auto chosen = selection;
+            for (auto i : enclosed)
+                if (std::find (chosen.begin(), chosen.end(), i) == chosen.end())
+                    chosen.push_back (i);
+            setSelection (chosen);
+            lassoPath.clear();
+            break;
+        }
+        case magiclasso::Result::zoomToSelection:
+        {
+            std::int64_t from = std::numeric_limits<std::int64_t>::max(), to = 0;
+            for (auto i : selection)
+            {
+                from = std::min (from, song.playlist[(std::size_t) i].start);
+                to = std::max (to, song.playlist[(std::size_t) i].end());
+            }
+            if (to > from)
+                zoomToTicks ((double) from, (double) to);
+            // (FL 2026 also fits the used tracks into the view's height: shot g35)
+            auto last = -1;
+            for (const auto& c : song.playlist)
+                last = std::max (last, c.track);
+            if (last >= 0 && last + 1 < (int) trackTops.size() && trackTops[(std::size_t) last + 1] > 0)
+            {
+                setTrackZoom (trackZoom * (double) gridArea().getHeight() / (double) trackTops[(std::size_t) last + 1], tracksTop());
+                scrollY = 0;
+                updateScrollBars();
+                repaint();
+            }
+            lassoPath.clear();
+            break;
+        }
+        case magiclasso::Result::nothing:
+            break;
+    }
 }
 
 void PlaylistComponent::mouseExit (const juce::MouseEvent&)
@@ -7823,6 +8041,7 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
         clip.track = track;
         clip.start = start;
         clip.length = length;
+        clip.flFadeFlags = newClipFadeFlags();
         s.playlist.push_back (clip);
         trackmodes::followAudioTracks (s, { (int) s.playlist.size() - 1 }); // (a reused channel)
         s.mode = PlayMode::song;
@@ -7985,6 +8204,11 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         return;
     }
 
+    // FL's Edit › "Nudge clips with mouse wheel" (on by default; FUN_00e82270): Shift+wheel shifts the clips' content
+    if (shift && ! ctrl && ! alt && EditorGlobals::get().wheelNudging && gridArea().contains (e.getPosition()) && wheel.deltaY != 0.0f)
+        if (nudgeWithWheel (e.getPosition(), wheel.deltaY))
+            return;
+
     if (shift && alt) // nudge the selected clips by the grid
     {
         if (wheel.deltaY != 0.0f && ! selection.empty())
@@ -8031,6 +8255,31 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
     else
         glideBy (gesture::wheelScrollPixels (wheel.deltaX, wheel.isSmooth, 80.0) / pixelsPerTick,
                  gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 2.0 * defaultRowHeight()), wheel.isSmooth);
+}
+
+bool PlaylistComponent::nudgeWithWheel (juce::Point<int> p, float deltaY)
+{
+    // FL (FUN_00e82270, checked in FL 2026: "playlist shift clip" in the undo history): Shift+wheel shifts the CONTENT of
+    // the selected clips, or with none selected of the clip under the mouse, inside the clips' bounds: a notch is one
+    // pixel's worth of ticks at the current zoom (the PLForm's +0xb04, rounded), up = the content moves earlier. Over
+    // an empty part of the grid nothing happens and the wheel is still taken. One undo step per burst of the wheel.
+    const auto& song = engine.getSong();
+    std::vector<int> targets = selection;
+    if (targets.empty())
+    {
+        bool right = false, left = false;
+        if (const auto hit = clipAt (p.x, p.y, right, left); hit >= 0 && song.playlist[(std::size_t) hit].kind != ClipKind::automation)
+            targets = { hit };
+        else
+            return true;
+    }
+    const auto step = juce::jmax<std::int64_t> (1, (std::int64_t) std::llround (1.0 / pixelsPerTick));
+    const auto delta = (deltaY > 0 ? 1 : -1) * step;
+    const auto now = juce::Time::getMillisecondCounter();
+    const auto newBurst = now - lastWheelEdit > 700;
+    lastWheelEdit = now;
+    engine.editSong ([targets, delta] (Song& s) { clipops::shiftClipContent (s.playlist, targets, delta); }, newBurst);
+    return true;
 }
 
 void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
