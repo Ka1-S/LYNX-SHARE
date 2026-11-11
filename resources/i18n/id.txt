@@ -6114,6 +6114,8 @@ countries: id
 "Allow the plugin to handle keystrokes before the host does" = "Izinkan plugin menangani penekanan tombol sebelum host"
 "Disable typing keyboard priority by default" = "Nonaktifkan prioritas keyboard ketik secara bawaan"
 "Disable typing keyboard priority for all newly added plugins by default" = "Nonaktifkan prioritas keyboard ketik untuk semua plugin yang baru ditambahkan secara bawaan"
+"Auto select linked modules" = "Pilih modul tertaut secara otomatis"
+"Focusing plugin windows selects mixer tracks" = "Memfokuskan jendela plugin memilih trek mixer"
 "Mute / unmute" = "Bisukan / batal bisu"
 "Portamento / deselect" = "Portamento / batal pilih"
 "Shift+arrows" = "Shift+panah"
