@@ -208,6 +208,8 @@ APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIn
 APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLink.cpp src/engine/LiveSessions.cpp src/engine/MediaPack.cpp src/ui/LiveChat.cpp src/engine/LiveTest.cpp src/ui/LiveSessionUi.cpp)
 # round 190c: the device-change and short-export self-tests (issues #134, #138)
 APP_SOURCES+=(src/engine/DeviceChangeTest.cpp src/engine/ShortExportTest.cpp)
+# round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
+APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)

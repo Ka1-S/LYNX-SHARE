@@ -37,6 +37,8 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/Bridge32Test.h"
+#include "engine/ClapFormat.h"
+#include "engine/ClapTeardownTest.h"
 #include "engine/ProjectFile.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
@@ -1118,6 +1120,17 @@ public:
             return;
         }
 
+        if (args.contains ("--clapteardowntest"))
+        {
+            // LYNX.exe --clapteardowntest "LYNX Test Restart.clap" report.txt (round 190az, engine/ClapTeardownTest.cpp)
+            const auto i = args.indexOf ("--clapteardowntest");
+            lynx::runClapTeardownTest (args[i + 1].unquoted(), args[i + 2].unquoted(), [this] (int code) {
+                setApplicationReturnValue (code);
+                quit();
+            });
+            return;
+        }
+
         if (args.contains ("--editortest"))
         {
             // LYNX.exe --editortest plugin.vst3 report.txt ["name"]: opens the plugin's own editor in a window for a few
@@ -2174,6 +2187,8 @@ public:
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
         engine = nullptr;
+        // CLAP plugins whose instance another thread deleted while this one was busy: deactivated and destroyed now
+        lynx::ClapPluginFormat::finishPendingTeardowns();
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
         heartbeat.stopTimer();
         lynx::crashreporter::shutdown(); // (an upload in flight gets a moment, never long)
