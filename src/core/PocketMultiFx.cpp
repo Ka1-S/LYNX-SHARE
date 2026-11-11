@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "core/PocketGrid.h"
 #include "core/PocketTape.h"
 #include "core/Reeverb2.h"
 
@@ -67,6 +68,7 @@ public:
     {
         for (int t = 0; t < 10; ++t)
             resetSub (t);
+        grid.reset();
     }
     void setSongPosition (double ticks) noexcept override { songBeats = ticks / (double) ppq; }
 
@@ -77,41 +79,66 @@ public:
         if (right == nullptr)
             return;
         setParams (p);
-        // FLM tells its modules whether the input carries sound
-        bool active = false;
-        for (int i = 0; i < n && ! active; ++i)
-            active = left[i] != 0.0f || right[i] != 0.0f;
+        // FLM inside FL runs in chunks of one song tick (1/96 beat) cut on the song's tick grid: each chunk reads its
+        // own LFO value at its own song position (A/B, round 189h: the LFO settings went from 6 / 7 / 4 to 9 / 10 / 9)
+        // (core/PocketGrid.h; A/B, round 189h: the LFO settings went from 6 / 7 / 4 to 9 / 10 / 9)
+        const auto block = grid.begin (songBeats, bpm, fs, n);
+        // The effects run one after the other and each only hears the one before it, so each can take the whole block
+        // chunk by chunk before the next one starts (the same samples as chunk by chunk through all of them).
         for (int t = 1; t < 10; ++t)
         {
-            if (t == 8)
-                continue; // FLM's ring modulator: never selectable in MultiFX
-            auto& s = subs[(std::size_t) t];
-            const auto rate = t == delayType ? 2.0 * rateBeats : rateBeats;
-            if (songBeats >= 0.0)
+            if (! gateOpen (t))
+                continue; // a closed effect stays closed until a block runs it
+            if (t == reverbType)
             {
-                const auto ph = rate > 0.0 ? (double) (float) (songBeats * 4.0) * (0.25 / rate) : s.ph;
-                s.ph = frac (ph);
+                // no LFO and nothing tied to the song: one pass for the block (the grid adds only calls)
+                if (prepSub (t, -1.0, bpm, false))
+                    runSub (t, left, right, n, true);
+                continue;
             }
-            if (fs < 1.0 || bpm < 1.0)
-                continue;
-            const auto periodSec = (float) (rate * 60.0 / bpm);
-            s.inc = periodSec == 0.0f ? 0.0 : (double) (1.0f / (periodSec * (float) fs));
-            s.periodSec = periodSec;
-            if (! (! s.deselected || s.a > 0.0f || (t == delayType && s.count >= 0 && s.count <= 1.5 * fs)
-                   || (t == reverbType && s.count >= 0 && s.count <= 0.25 * fs)))
-                continue;
-            if (runSub (t, left, right, n, active))
-                active = true;
+            block.forEach ([&] (int at, int m, double beats, bool continuing) {
+                if (prepSub (t, beats, bpm, continuing) && gateOpen (t))
+                    runSub (t, left + at, right + at, m, true);
+            });
         }
     }
 
-private:
+    // FL tells a hosted FLM rack that its input always carries sound, so no effect skips silent chunks (A/B: the
+    // Flanger's tape keeps gliding through silence; skipping them as FLM's own tracks do put the bursts at -3.5 dB
+    // instead of -52.7 dB). An effect runs while it is chosen, fading or ringing out.
+    bool gateOpen (int t) const noexcept
+    {
+        if (t == 8)
+            return false; // FLM's ring modulator: never selectable in MultiFX
+        const auto& s = subs[(std::size_t) t];
+        return ! s.deselected || s.a > 0.0f || (t == delayType && s.count >= 0 && s.count <= 1.5 * fs)
+               || (t == reverbType && s.count >= 0 && s.count <= 0.25 * fs);
+    }
+    // a chunk's LFO: the phase from the song position (unless the chunk goes on from the last block), the step per sample
+    bool prepSub (int t, double beats, double bpm, bool continuing) noexcept
+    {
+        auto& s = subs[(std::size_t) t];
+        held = continuing;
+        const auto rate = t == delayType ? 2.0 * rateBeats : rateBeats;
+        if (beats >= 0.0 && ! continuing)
+        {
+            const auto ph = rate > 0.0 ? (double) (float) (beats * 4.0) * (0.25 / rate) : s.ph;
+            s.ph = frac (ph);
+        }
+        if (fs < 1.0 || bpm < 1.0)
+            return false;
+        const auto periodSec = (float) (rate * 60.0 / bpm);
+        s.inc = periodSec == 0.0f ? 0.0 : (double) (1.0f / (periodSec * (float) fs));
+        s.periodSec = periodSec;
+        return true;
+    }
+
     struct Sub
     {
         bool deselected = true;
         float a = 0.0f, target = 0.0f, w = 0.0f;
         double ph = 0.0, inc = 0.0;
-        float periodSec = 0.0f;
+        float periodSec = 0.0f, heldLfo = 0.0f;
         int count = 0;
         // per-kind state
         std::array<std::array<float, 4>, 2> x1 {}, x2 {}, y1 {}, y2 {}; // the filter cascade
@@ -144,11 +171,17 @@ private:
         }
         return (float) v * amount;
     }
-    // one value per block: the phase then moves on by the block
+    // one value per chunk: the phase then moves on by the chunk (the rest of a cut chunk keeps the value)
     float blockLfo (Sub& s, int n) noexcept
     {
+        if (held)
+        {
+            s.ph = frac (s.ph + (double) n * s.inc);
+            return s.heldLfo;
+        }
         const auto v = lfo (s);
         s.ph = frac (s.ph + (double) (n - 1) * s.inc);
+        s.heldLfo = v;
         return v;
     }
 
@@ -538,6 +571,8 @@ private:
     }
 
     double fs = 44100.0, songBeats = -1.0, rateBeats = 1.0;
+    bool held = false;
+    TickGrid grid;
     float x = 0.5f, y = 0.5f, amount = 0.0f;
     int shape = 0, lastKind = -1;
     bool started = false;
