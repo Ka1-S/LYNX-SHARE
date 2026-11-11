@@ -116,6 +116,14 @@ public:
     virtual void setSideInputActive (bool /*on*/) {}
     // Second side input (Vocodex carrier), same rules; only called when the slot has `sidechain2`.
     virtual void setSidechain2 (const float* /*left*/, const float* /*right*/) noexcept {}
+    // A hosted effect's Processing › Connections (round 189j, core/Song.h SlotConnections), after every rack build
+    // (UI thread, never the audio thread): which output pairs go into the insert, elsewhere (setExtraOutput's
+    // buffers) or nowhere.
+    virtual void setConnections (const SlotConnections& /*connections*/) {}
+    // Input 1 taken from another insert for the next process() (its Connections): that insert's audio, nullptr =
+    // silence; the slot's own input still reaches the effect as `left` / `right` (input 2 may take it). Not called =
+    // input 1 is the slot's own input.
+    virtual void setMainInput (const float* /*left*/, const float* /*right*/) noexcept {}
     // The notes held on every Channel Rack channel (`count` masks, by channel index) during the next process(); the
     // pointer stays valid until the next call. Effects that follow notes (LYNX Tune's MIDI targets) keep it.
     virtual void setHeldNotes (const NoteMask* /*channels*/, int /*count*/) noexcept {}

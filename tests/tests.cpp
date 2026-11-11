@@ -17406,6 +17406,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
 #include "MultiOut188dTests.inc"
+#include "FxConn189jTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
 #include "MidiTools190oTests.inc"

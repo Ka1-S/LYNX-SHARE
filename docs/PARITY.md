@@ -2272,7 +2272,12 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
 | Process inactive inputs and outputs | on: an output with its LED off still plays; an LED turned off turns it off | same | same |
 | .flp import / export of the mapping | records 0x1E / 0x1F / 0x20 and flag 0x8 | read and written | same |
-| Effects' Connections | inputs (sidechain index into [insert, inserts routed to it]) and outputs; Auto map inputs | same page; input 2's index drives the side input | partial: input 1 ≠ 0 and output indexes stored, not played |
+| Effects' Connections | inputs (sidechain index into [insert, inserts routed to it]) and outputs; Auto map inputs | same page; input 2's index drives the side input | same |
+| Effect input index (round 189j) | input k at index i plays entry i of [insert, inserts routed to it at any level, ascending], post-fader / pan / mute; 0 or past the list = the insert's own audio; input 1 so replaces the insert's audio | same, with the effect's Connections set (every FL-imported effect; LYNX's own once touched) | same |
+| Effect output index (round 189j) | output pairs at index 0 summed into the insert; index k = entry k of [insert, Master, inserts it routes to ascending] (past the end: the last), straight into that track, past the insert's fader | same (the first 8 pairs; with "Use fixed size buffers" output 2 only) | same |
+| Inactive effect input / output (round 189j) | silent when "Process inactive inputs and outputs" is off | same | same |
+| Effect with untouched Connections | input 2 gets the insert's own audio; every output pair summed into the insert | input 2 fed only by a picked side input (issue #109); output 1 only | differs (kept as before; decision for the user) |
+| .flp export of a picked side input (round 189j) | input 2's index | the SC picker's source written as input 2's index (an older index replaced) | same |
 
 ## Round a2m189b: Convert to MIDI (Ableton Live's Convert Melody / Harmony / Drums, LYNX extra)
 

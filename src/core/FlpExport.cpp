@@ -667,11 +667,13 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
                     words.insert (words.end(), { (std::uint32_t) route.offset, route.isActive (true) ? 1u : 0u, 0u });
                 return le32s (words);
             };
-            r.record (0x1E, le32s ({ (std::uint32_t) ins->size(), (std::uint32_t) outs->size(), 0, 0 }));
+            // (an effect whose inputs alone are mapped: its output as below, one default entry)
+            const auto outputs = outs->empty() && ! instrument ? std::vector<PluginOutputRoute> { { 0, 1 } } : *outs;
+            r.record (0x1E, le32s ({ (std::uint32_t) ins->size(), (std::uint32_t) outputs.size(), 0, 0 }));
             if (! ins->empty())
                 r.record (0x1F, list (*ins));
-            if (! outs->empty())
-                r.record (0x20, list (*outs));
+            if (! outputs.empty())
+                r.record (0x20, list (outputs));
         }
         else
         {
@@ -1188,6 +1190,32 @@ struct Converter
         }
     }
 
+    // A hosted effect's side input (slot.sidechain, picked with LYNX's "SC" picker or set by input 2's index) as FL's
+    // input 2 index (round 189j): its place in insert t's inputs list as written here — [t, then every insert routed
+    // to t, the level-0 sidechain routes included, ascending] (REA_rodada22 §1, core/MixerOps.h insertInputs). An
+    // index already there that names another insert is replaced: the slot's source is what LYNX plays. True when
+    // `inputs` changed.
+    bool withSideIndex (std::vector<PluginOutputRoute>& inputs, int t, int source) const
+    {
+        if (t <= 0 || source <= 0 || source == t || source >= (int) song.mixer.size())
+            return false;
+        auto k = 1;
+        for (int u = 1; u < source; ++u)
+            if (u != t && (song.routes (u, t) || feedsSideInput (u, t)))
+                ++k;
+        if (inputs.size() > 1 && inputs[1].offset == k && inputs[1].isActive (true))
+            return false;
+        if (inputs.size() < 2)
+            inputs.resize (2);
+        inputs[1] = { k, inputs[1].active == 0 ? (std::int8_t) -1 : inputs[1].active };
+        return true;
+    }
+    bool feedsSideInput (int source, int t) const
+    {
+        const auto& fx = song.mixer[(std::size_t) t].effects;
+        return std::any_of (fx.begin(), fx.end(), [source] (const EffectSlot& e) { return e.sidechain == source || e.sidechain2 == source; });
+    }
+
     // the inserts whose effects take insert `source` as a side-chain input (LYNX keeps the source, FL a level-0 route)
     std::vector<int> sidechainTargets (int source) const
     {
@@ -1587,10 +1615,19 @@ struct Converter
                 }
                 else if (fx.kind == EffectKind::plugin)
                 {
-                    if (const auto record = hosted (fx.plugin, false))
+                    if (auto record = hosted (fx.plugin, false))
                     {
                         slot.plugin = "Fruity Wrapper";
-                        slot.state = writeWrapper (*record, false, fx.plugin.foreign.format == ForeignPlugin::Format::none ? &fx.plugin : nullptr);
+                        // the side input picked with LYNX's "SC" picker is FL's input 2 index (round 189j)
+                        auto ref = fx.plugin;
+                        if (ref.foreign.format == ForeignPlugin::Format::none)
+                            withSideIndex (ref.inputs, t, fx.sidechain);
+                        else if (withSideIndex (record->inputRoutes, t, fx.sidechain) && ! record->hasRoutes)
+                        {
+                            record->hasRoutes = true;
+                            record->outputRoutes = { { 0, 1 } };
+                        }
+                        slot.state = writeWrapper (*record, false, ref.foreign.format == ForeignPlugin::Format::none ? &ref : nullptr);
                         slot.wrapperFlags = withFlDetached (slot.wrapperFlags, fx.plugin.detached); // (issue #116)
                         what = record->name + " (Fruity Wrapper)";
                     }

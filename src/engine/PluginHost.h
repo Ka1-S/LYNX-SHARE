@@ -234,6 +234,25 @@ public:
     bool canTakeSideInput() const noexcept { return sideBus; }
     void setSideInputActive (bool on) override;
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
+    // Processing › Connections (round 189j, core/Song.h SlotConnections [EXEC FL 2026]): with them set, every output
+    // pair at index 0 is summed into the insert, one at another index goes to its extra output (the renderer's tap
+    // for the track it names), an inactive one is silent; input 1 may come from another insert (setMainInput).
+    void setConnections (const SlotConnections& c) override;
+    void setMainInput (const float* left, const float* right) noexcept override
+    {
+        mainSet = true;
+        mainL = left;
+        mainR = right;
+    }
+    void setExtraOutput (int output, float* left, float* right) noexcept override
+    {
+        if (output >= 0 && output < maxPluginConnections)
+        {
+            extraL[(std::size_t) output] = left;
+            extraR[(std::size_t) output] = right;
+        }
+    }
+    const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
 
 private:
     void failed (std::uint32_t code) noexcept;
@@ -255,7 +274,17 @@ private:
     int sideChannel = -1, sideCount = 0;      // the side input bus in the process buffer (round 177b); -1 = none
     const float* sideL = nullptr;             // this block's sidechain (set before process(), cleared after it)
     const float* sideR = nullptr;
-    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place)
+    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place);
+                                              // routed, output pair 2 comes back there
+    // Connections (round 189j)
+    void routeOutputs (const float* const* ch, int numChannels, int at, int count, float* left, float* right, bool taps) noexcept;
+    std::vector<PluginOutputInfo> outs;       // the output pairs (pluginOutputs), fixed at construction
+    std::atomic<bool> routed { false };
+    std::array<std::atomic<int>, maxPluginConnections> outputMode {}; // −1 into the insert, −2 silent, ≥ 0 elsewhere
+    std::array<float*, maxPluginConnections> extraL {}, extraR {};
+    bool mainSet = false;                     // this block's input 1 from another insert (set before process())
+    const float* mainL = nullptr;
+    const float* mainR = nullptr;
 };
 
 // Round 177b: the channels of a plugin's second input bus (its sidechain input), 0 when it has none (or it is off).

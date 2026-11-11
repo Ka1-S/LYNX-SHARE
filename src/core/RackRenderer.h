@@ -198,6 +198,8 @@ struct RackState
     };
     std::vector<SendTap> sendTaps;
     std::vector<std::vector<int>> slotTap; // [track][slot · maxSlotSends + output]: index into sendTaps, or −1
+    // the hosted effects' Connections (round 189j): [track][slot], only for tracks with a routed one (else empty)
+    std::vector<std::vector<SlotConnections>> slotConnections;
     std::vector<std::vector<int>> mixerLayers;        // inserts with no dependencies among them, in order
     // "Allow threaded processing" off (PluginRef::threaded, REA round 134): those channels / inserts always run on the
     // calling (audio) thread, the others may go to the workers. Same layers as mixerLayers.
@@ -521,6 +523,7 @@ private:
     float* trackScratch (int track, int side) noexcept;
     void runEffects (const RackState& state, int track, int n) noexcept;
     void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
+    void connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
     void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
     double modSeconds = 0.0; // the free-running modulators' clock
