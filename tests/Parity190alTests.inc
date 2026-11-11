@@ -104,3 +104,32 @@ TEST (p190al_crest_two_way_bands_sum_to_the_input_and_the_classic_law_has_none)
     CHECK (dClassic < 1e-4);
     CHECK (dBands > 0.05); // 88 Hz sits on the low split: half a turn of phase
 }
+
+TEST (p190al_crest_vari_mu_slow_attack_starts_at_once)
+{
+    using namespace dyn108;
+    namespace c = lynx::dyn::crest;
+    // a −40 → −6 dBFS step at threshold −24, ratio 4, knee 0: at attack 100 ms the reference is 2.1 dB down after 15 ms
+    // and 4.8 dB after 30 ms, on its way to −7.8; the smoothed level alone did nothing for 45 ms and ended at −6.7.
+    // At attack 10 ms nothing changes (the smoothed level is the match there)
+    std::vector<float> x ((std::size_t) (2 * sr));
+    for (std::size_t i = 0; i < x.size(); ++i)
+        x[i] = (float) (std::pow (10.0, (i >= (std::size_t) (0.5 * sr) ? -6.0 : -40.0) / 20.0) * std::sin (2.0 * pi * 1000.0 * (double) i / sr));
+    auto p = p190v::defaults (lynx::EffectKind::crestCompressor);
+    p[c::style] = c::styleValue (c::Style::variMu);
+    p[c::threshold] = 0.6f;
+    p[c::ratio] = c::ratioValue (4.0);
+    p[c::knee] = 0.0f;
+    p[c::attack] = c::attackValue (100.0);
+    p[c::release] = c::releaseValue (200.0);
+    p[c::autoGain] = 0.0f;
+    const auto y = run (lynx::EffectKind::crestCompressor, p, x);
+    const auto gainAt = [&] (double ms) {
+        const auto i = (std::size_t) ((0.5 + ms * 0.001) * sr);
+        return rmsDb (y, i - 240, i + 240) - rmsDb (x, i - 240, i + 240);
+    };
+    std::printf ("  Vari-mu attack 100 ms: %.1f dB after 15 ms, %.1f after 30 ms, %.1f after 60 ms, %.1f settled (reference -2.1 / -4.8 / -7.0 / -7.8)\n",
+                 gainAt (15.0), gainAt (30.0), gainAt (60.0), gainAt (1400.0));
+    CHECK (gainAt (15.0) < -0.8 && gainAt (30.0) < -2.0);
+    CHECK (std::abs (gainAt (1400.0) + 7.8) < 0.8);
+}

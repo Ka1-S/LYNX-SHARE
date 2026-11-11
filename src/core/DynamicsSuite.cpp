@@ -927,6 +927,17 @@ private:
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
+        if (sd.curve == Curve::variMu)
+        {
+            // round 190al [EXEC] (the reference's −40 → −6 dBFS step at attack 100 ms): the reduction starts at once and
+            // closes in on its value like a smoothed gain (−2.1 / −4.8 / −6.3 / −7.0 dB after 15 / 30 / 45 / 60 ms, towards
+            // −7.8), where the smoothed level did nothing for 45 ms and settled 1 dB short. At 30 ms and under, the
+            // smoothed level is the better match (10 ms: step and stairs within 0.22 dB; the 30 ms captures get worse
+            // with any share of it). At 100 ms a share of 0.6 is the most that makes no capture worse (pink noise
+            // loses beyond it); in between, by the logarithm of the attack
+            constexpr double fromMs = 30.0, toMs = 100.0, share = 0.6;
+            c.gainBlend = share * std::clamp (std::log (std::max (att, 1e-3) / fromMs) / std::log (toMs / fromMs), 0.0, 1.0);
+        }
         c.holdSamples = (int) (holdMs (p[hold]) * 0.001 * rate);
         c.window = sd.windowMs > 0.0 ? std::clamp ((int) (sd.windowMs * 0.001 * rate), 1, peakWindow) : 0;
         return c;

@@ -2415,3 +2415,23 @@ were not part of the fit: through the engine their band gains land within 0.05 /
   → 1.7 % of one core at 48 kHz). Latency unchanged (0). The editor's curve is that of a 1 kHz tone, as before.
 - Open: the low band's law rests on the 100 Hz tone alone (it sits on the split); ratios under 2 and over 10 are
   extrapolated; auto gain as in round 190v.
+
+### Vari-mu at slow attacks (same round)
+
+On the reference's −40 → −6 dBFS step at attack 100 ms the reduction starts at once and closes in like a smoothed
+gain (−2.1 / −4.8 / −6.3 / −7.0 dB after 15 / 30 / 45 / 60 ms, towards −7.8); ours smoothed the level, did nothing
+for 45 ms and settled 1 dB short. Above an attack of 30 ms Vari-mu now smooths the gain in part (a share of 0.6 at
+100 ms, by the logarithm of the attack in between). The share is the most that made no capture worse: with the full
+share the 30 ms programme captures and the pink-noise stairs at 100 ms lost 0.2 … 0.3 dB.
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 61 | 0.67 | 0.67 | 0 | 6.26 | 6.26 | 0 / 61 / 0 |
+| 190k knee grid | 72 | 0.23 | 0.23 | 0 | 6.93 | 6.93 | 0 / 72 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 0.57 | 0.33 | 0 | 6.03 | 6.48 | 85 / 284 / 1 |
+| All | 507 | 0.55 | 0.38 | 0 | 6.19 | 6.52 | 85 / 421 / 1 |
+
+The 100 ms stairs go from 1.28 to about 0.55 dB. One file loses a score step (pink noise at threshold −48, ratio 2,
+attack 100 ms: gain error 0.10 → 0.14 dB, level +0.20 → −0.20 dB). CPU: unchanged up to 30 ms, 0.49 → 0.55 s for 72 s of
+audio at 100 ms. Attacks of 30 ms and under, the classic law and every other style are bit-identical. Open: the step
+is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
