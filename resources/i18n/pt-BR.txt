@@ -8645,3 +8645,13 @@ countries: br
 "to" = "até"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Adicionar marcador..."
+"Clone as region" = "Clonar como região"
+"Freeze all" = "Congelar tudo"
+"New region name" = "Nome da nova região"
+"Rename all..." = "Renomear tudo..."
+"Save sample as" = "Salvar amostra como"
+"Save sample as..." = "Salvar amostra como..."
+"Zoom on selection" = "Aproximar a seleção"

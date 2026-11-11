@@ -8562,3 +8562,13 @@ countries: nl be
 "to" = "tot"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Markering toevoegen..."
+"Clone as region" = "Klonen als regio"
+"Freeze all" = "Alles bevriezen"
+"New region name" = "Naam van nieuwe regio"
+"Rename all..." = "Alles hernoemen..."
+"Save sample as" = "Sample opslaan als"
+"Save sample as..." = "Sample opslaan als..."
+"Zoom on selection" = "Zoomen op selectie"

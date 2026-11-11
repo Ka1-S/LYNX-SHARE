@@ -8562,3 +8562,13 @@ countries: es mx ar co cl pe ve
 "to" = "a"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Añadir marcador..."
+"Clone as region" = "Clonar como región"
+"Freeze all" = "Congelar todo"
+"New region name" = "Nombre de la nueva región"
+"Rename all..." = "Renombrar todo..."
+"Save sample as" = "Guardar muestra como"
+"Save sample as..." = "Guardar muestra como..."
+"Zoom on selection" = "Acercar a la selección"

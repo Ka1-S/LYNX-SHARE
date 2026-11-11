@@ -8562,3 +8562,13 @@ countries: jp
 "to" = "から"
 "Deck A" = "デッキ A"
 "Deck B" = "デッキ B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "マーカーを追加..."
+"Clone as region" = "リージョンとして複製"
+"Freeze all" = "すべてフリーズ"
+"New region name" = "新しいリージョン名"
+"Rename all..." = "すべて名前変更..."
+"Save sample as" = "サンプルに名前を付けて保存"
+"Save sample as..." = "サンプルに名前を付けて保存..."
+"Zoom on selection" = "選択範囲にズーム"

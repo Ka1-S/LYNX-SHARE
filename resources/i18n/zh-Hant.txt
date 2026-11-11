@@ -8562,3 +8562,13 @@ countries: tw hk mo
 "to" = "至"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "新增標記..."
+"Clone as region" = "複製為區域"
+"Freeze all" = "全部凍結"
+"New region name" = "新區域名稱"
+"Rename all..." = "全部重新命名..."
+"Save sample as" = "取樣另存為"
+"Save sample as..." = "取樣另存為..."
+"Zoom on selection" = "縮放至選取範圍"

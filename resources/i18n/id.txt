@@ -8562,3 +8562,13 @@ countries: id
 "to" = "hingga"
 "Deck A" = "Deck A"
 "Deck B" = "Deck B"
+
+# --- Slicex editor stage 2 (round 190ac)
+"Add marker..." = "Tambah penanda..."
+"Clone as region" = "Klon sebagai region"
+"Freeze all" = "Bekukan semua"
+"New region name" = "Nama region baru"
+"Rename all..." = "Ganti nama semua..."
+"Save sample as" = "Simpan sampel sebagai"
+"Save sample as..." = "Simpan sampel sebagai..."
+"Zoom on selection" = "Zoom ke pilihan"

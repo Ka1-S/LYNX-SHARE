@@ -161,7 +161,7 @@ public:
 class IconButton final : public juce::Button
 {
 public:
-    enum Icon { loop, play, stop, file, flag, dual, arrow, keys };
+    enum Icon { loop, play, stop, file, flag, dual, arrow, keys, zoom };
     explicit IconButton (Icon i) : juce::Button ({}), icon (i) {}
 
     void paintButton (juce::Graphics& g, bool over, bool down) override
@@ -212,6 +212,10 @@ public:
             case keys:
                 for (int i = -1; i <= 1; ++i)
                     g.fillRect (juce::Rectangle<float> (u * 0.6f, u * 2.2f).withCentre ({ c.x + (float) i * u * 0.9f, c.y }));
+                break;
+            case zoom:
+                g.drawEllipse (c.x - u * 1.1f, c.y - u * 1.1f, u * 1.6f, u * 1.6f, 1.5f);
+                g.drawLine (c.x + u * 0.3f, c.y + u * 0.3f, c.x + u * 1.1f, c.y + u * 1.1f, 1.8f);
                 break;
         }
     }
@@ -565,7 +569,10 @@ private:
 };
 
 // ---------------------------------------------------------------------------------------------------------------
-// A deck's wave with its regions (FL's WAVEditor): click selects a region and plays it
+// A deck's wave with its regions (FL's WAVEditor). From the top: the zoom / scroll bar (FL's "Scroller above"), the
+// row of region tabs, the wave. Wheel zooms at the mouse (Shift + wheel scrolls); the bar's lit part is dragged to
+// scroll and by its edges to zoom; a tab is dragged to move the region's start, its right click opens the region's
+// menu; a click in the wave selects the region under it and plays it.
 class DeckView final : public juce::Component
 {
 public:
@@ -573,15 +580,55 @@ public:
     std::function<std::shared_ptr<const SampleData>()> sample;
     std::function<const std::vector<slicex::WavRegion>*()> regions;
     std::function<int()> selected; // the region shown in the region settings when it is on this deck, else −1
-    std::function<void (int)> select;
+    std::function<void (int, bool)> select; // (region, play it)
     std::function<void (int)> menu;
+    std::function<std::int64_t (int, std::int64_t)> snap;      // where a dragged start lands (region, frame)
+    std::function<void (int, std::int64_t)> moveStart;         // a tab was dropped
+    std::function<bool()> frozen;                              // FL's "Freeze all": the regions cannot be edited
+    std::function<void()> viewChanged;
+
+    // the frames shown: [viewStart, viewStart + viewLength); a length of 0 = the whole sample
+    double viewStart = 0.0, viewLength = 0.0;
+    std::int64_t cursor = -1; // the last frame clicked in the wave (where "Add marker" puts one)
+
+    void zoomFull()
+    {
+        viewStart = viewLength = 0.0;
+        changed();
+    }
+
+    void zoomBy (double factor, double anchorFrame = -1.0)
+    {
+        const auto total = frames();
+        if (total <= 0.0)
+            return;
+        const auto length = shownLength();
+        if (anchorFrame < 0.0)
+            anchorFrame = viewStart + length * 0.5;
+        const auto next = std::clamp (length * factor, std::min (total, 16.0), total);
+        setView (anchorFrame - (anchorFrame - viewStart) * next / length, next);
+    }
+
+    void zoomOn (double from, double to)
+    {
+        if (to > from)
+            setView (from, to - from);
+    }
+
+    // (before the view has its sample: kept as given, clamped when read)
+    void openAt (double start, double length)
+    {
+        viewStart = std::max (0.0, start);
+        viewLength = std::max (0.0, length);
+        repaint();
+    }
+    void scrollBy (double part) { setView (viewStart + shownLength() * part, shownLength()); }
 
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg0);
         const auto data = sample ? sample() : nullptr;
         const auto* list = regions ? regions() : nullptr;
-        const auto r = getLocalBounds().toFloat();
         g.setFont (theme::font (theme::type::caption));
         if (data == nullptr || data->frames() == 0)
         {
@@ -590,79 +637,337 @@ public:
                         getLocalBounds(), juce::Justification::centred);
             return;
         }
-        const auto frames = (double) data->frames();
+        const auto total = (double) data->frames();
+        const auto v0 = shownStart(), length = shownLength();
+        const auto bar = barArea(), tabs = tabArea(), wave = waveArea();
+
+        // the zoom / scroll bar: the whole sample small, the part shown lit
+        g.setColour (theme::colour::bg2);
+        g.fillRect (bar);
+        const auto thumb = thumbArea();
+        g.setColour (theme::colour::bg5);
+        g.fillRect (thumb);
+        g.setColour (deckColour (deck).withMultipliedSaturation (0.6f).withAlpha (0.8f));
+        drawWave (g, *data, bar.reduced (0.0f, 1.0f), 0.0, total);
+        g.setColour (theme::colour::borderStrong);
+        g.drawRect (thumb, 1.0f);
+
+        g.setColour (theme::colour::bg1);
+        g.fillRect (tabs);
         const auto sel = selected ? selected() : -1;
         if (list != nullptr && sel >= 0 && sel < (int) list->size())
         {
             const auto& s = (*list)[(std::size_t) sel];
-            const auto x0 = xOf ((double) s.start, frames), x1 = xOf ((double) s.end + 1.0, frames);
-            g.setColour (deckColour (deck).withAlpha (0.2f));
-            g.fillRect (juce::Rectangle<float> (x0, r.getY(), std::max (1.0f, x1 - x0), r.getHeight()));
-        }
-        // the wave: min / max per pixel column (both channels folded)
-        const auto* left = data->leftData();
-        const auto* right = data->isStereo() ? data->rightData() : nullptr;
-        g.setColour (deckColour (deck).brighter (0.15f));
-        const auto top = r.getY() + 13.0f, mid = (top + r.getBottom()) * 0.5f, half = (r.getBottom() - top) * 0.47f;
-        const auto step = std::max<std::int64_t> (1, (std::int64_t) (frames / (double) getWidth() / 64.0));
-        for (int x = 0; x < getWidth(); ++x)
-        {
-            const auto a = (std::int64_t) (frames * x / getWidth()), b = std::max (a + 1, (std::int64_t) (frames * (x + 1) / getWidth()));
-            float lo = 0.0f, hi = 0.0f;
-            for (auto i = a; i < b && i < (std::int64_t) frames; i += step)
+            const auto x0 = std::max (wave.getX(), xOf ((double) startOf (*list, sel))), x1 = std::min (wave.getRight(), xOf ((double) s.end + 1.0));
+            if (x1 > x0)
             {
-                lo = std::min (lo, right != nullptr ? std::min (left[i], right[i]) : left[i]);
-                hi = std::max (hi, right != nullptr ? std::max (left[i], right[i]) : left[i]);
+                g.setColour (deckColour (deck).withAlpha (0.2f));
+                g.fillRect (juce::Rectangle<float> (x0, tabs.getY(), std::max (1.0f, x1 - x0), wave.getBottom() - tabs.getY()));
             }
-            g.drawVerticalLine (x, mid - hi * half, mid - lo * half + 1.0f);
         }
-        // the regions: a line at each start with its name (and key)
+        g.setColour (deckColour (deck).brighter (0.15f));
+        drawWave (g, *data, wave, v0, length);
+        if (cursor >= 0 && (double) cursor >= v0 && (double) cursor < v0 + length)
+        {
+            g.setColour (theme::colour::textPrimary.withAlpha (0.55f));
+            g.drawVerticalLine ((int) xOf ((double) cursor), wave.getY(), wave.getBottom());
+        }
+        // the regions: a line at each start, its tab with the name (and its own key at the bottom)
         if (list != nullptr)
             for (std::size_t i = 0; i < list->size(); ++i)
             {
-                const auto x = xOf ((double) (*list)[i].start, frames);
-                const auto next = i + 1 < list->size() ? xOf ((double) (*list)[i + 1].start, frames) : r.getRight();
-                g.setColour ((int) i == sel ? theme::colour::textPrimary : theme::colour::textSecondary);
-                g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
-                const auto name = juce::String::fromUTF8 (slicex::regionName ((*list)[i], (int) i).c_str());
-                if (next - x > 14.0f)
-                    g.drawText (name, juce::Rectangle<float> (x + 3.0f, r.getY() + 1.0f, next - x - 4.0f, 12.0f), juce::Justification::centredLeft, false);
-                if ((*list)[i].key >= 0 && next - x > 14.0f) // a region with a trigger note of its own shows it
+                const auto x = xOf ((double) startOf (*list, (int) i));
+                auto next = wave.getRight();
+                for (std::size_t j = i + 1; j < list->size(); ++j)
+                    if ((int) j != dragging && (*list)[j].start > (*list)[i].start)
+                    {
+                        next = std::min (next, xOf ((double) (*list)[j].start));
+                        break;
+                    }
+                if (x < wave.getX() - 1.0f || x > wave.getRight())
                 {
-                    g.setColour (theme::colour::accentHover);
-                    g.drawText (keyName ((*list)[i].key), juce::Rectangle<float> (x + 3.0f, r.getBottom() - 13.0f, next - x - 4.0f, 12.0f), juce::Justification::centredLeft, false);
+                    if (next <= wave.getX() || x > wave.getRight())
+                        continue;
+                }
+                const auto lit = (int) i == sel || (int) i == dragging;
+                if (x >= wave.getX() - 1.0f)
+                {
+                    g.setColour (lit ? theme::colour::textPrimary : deckColour (deck).withMultipliedSaturation (0.8f));
+                    g.drawVerticalLine ((int) x, tabs.getY(), wave.getBottom());
+                    g.fillRect (juce::Rectangle<float> (x, tabs.getY(), tabWidth, tabs.getHeight() - 2.0f)); // the tab (the handle)
+                }
+                // a region that stops before the next one starts shows its end (FL's second tag)
+                if (! (*list)[i].marker && (int) i != dragging)
+                {
+                    const auto endX = xOf ((double) (*list)[i].end + 1.0);
+                    if (endX < next - 1.5f && endX > wave.getX() && endX <= wave.getRight())
+                    {
+                        g.setColour (deckColour (deck).withMultipliedSaturation (0.8f).withAlpha (0.7f));
+                        g.drawVerticalLine ((int) endX, tabs.getY(), wave.getBottom());
+                        g.fillRect (juce::Rectangle<float> (endX - tabWidth, tabs.getY(), tabWidth, tabs.getHeight() - 2.0f));
+                    }
+                }
+                const auto textX = std::max (x, wave.getX()) + tabWidth + 2.0f;
+                if (next - textX > 10.0f)
+                {
+                    g.setColour (lit ? theme::colour::textPrimary : theme::colour::textSecondary);
+                    const auto name = juce::String::fromUTF8 (slicex::regionName ((*list)[i], (int) i).c_str());
+                    g.drawText (name, juce::Rectangle<float> (textX, tabs.getY(), next - textX - 1.0f, tabs.getHeight()), juce::Justification::centredLeft, false);
+                    if ((*list)[i].key >= 0) // a region with a trigger note of its own shows it
+                    {
+                        g.setColour (theme::colour::accentHover);
+                        g.drawText (keyName ((*list)[i].key), juce::Rectangle<float> (textX, wave.getBottom() - 13.0f, next - textX - 1.0f, 12.0f), juce::Justification::centredLeft, false);
+                    }
                 }
             }
     }
 
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto p = e.position;
+        auto cursorType = juce::MouseCursor::NormalCursor;
+        if (barArea().contains (p))
+        {
+            const auto t = thumbArea();
+            if (std::abs (p.x - t.getX()) < edge || std::abs (p.x - t.getRight()) < edge)
+                cursorType = juce::MouseCursor::LeftRightResizeCursor;
+        }
+        else if (tabArea().contains (p) && tabAt (p.x) >= 0 && ! (frozen && frozen()))
+            cursorType = juce::MouseCursor::LeftRightResizeCursor;
+        setMouseCursor (cursorType);
+    }
+
     void mouseDown (const juce::MouseEvent& e) override
     {
-        const auto hit = regionAt (e.x);
+        mode = Mode::none;
+        dragging = -1;
+        if (frames() <= 0.0)
+            return;
+        const auto p = e.position;
+        if (barArea().contains (p))
+        {
+            if (e.mods.isPopupMenu())
+                return;
+            const auto t = thumbArea();
+            const auto frame = (double) p.x / (double) getWidth() * frames();
+            if (std::abs (p.x - t.getX()) < edge)
+                mode = Mode::zoomLeft;
+            else if (std::abs (p.x - t.getRight()) < edge)
+                mode = Mode::zoomRight;
+            else
+            {
+                if (! t.contains (p)) // outside the lit part: it jumps there
+                    setView (frame - shownLength() * 0.5, shownLength());
+                mode = Mode::scroll;
+                grab = frame - shownStart();
+            }
+            return;
+        }
+        if (tabArea().contains (p))
+        {
+            const auto tab = tabAt (p.x);
+            const auto hit = tab >= 0 ? tab : regionAt (p.x);
+            if (e.mods.isPopupMenu())
+            {
+                if (menu)
+                    menu (hit);
+                return;
+            }
+            if (select && hit >= 0)
+                select (hit, false);
+            if (tab >= 0 && ! (frozen && frozen()))
+            {
+                mode = Mode::tab;
+                dragging = tab;
+                dragTo = (*regions())[(std::size_t) tab].start;
+                moved = false;
+            }
+            return;
+        }
+        const auto hit = regionAt (p.x);
         if (e.mods.isPopupMenu())
         {
             if (menu)
                 menu (hit);
+            return;
         }
-        else if (select)
-            select (hit);
+        cursor = (std::int64_t) std::clamp (frameAt (p.x), 0.0, frames() - 1.0);
+        if (select)
+            select (hit, true);
+        repaint();
     }
 
-private:
-    float xOf (double frame, double frames) const { return (float) (frame / frames * (double) getWidth()); }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        const auto total = frames();
+        if (total <= 0.0)
+            return;
+        const auto barFrame = std::clamp ((double) e.position.x / (double) getWidth() * total, 0.0, total);
+        const auto v0 = shownStart(), v1 = v0 + shownLength();
+        if (mode == Mode::scroll)
+            setView (barFrame - grab, shownLength());
+        else if (mode == Mode::zoomLeft)
+            setView (std::min (barFrame, v1 - 16.0), v1 - std::min (barFrame, v1 - 16.0));
+        else if (mode == Mode::zoomRight)
+            setView (v0, std::max (16.0, barFrame - v0));
+        else if (mode == Mode::tab && dragging >= 0)
+        {
+            if (! moved && std::abs (e.getDistanceFromDragStartX()) < 3)
+                return;
+            moved = true;
+            auto frame = (std::int64_t) std::llround (std::clamp (frameAt (e.position.x), 0.0, total - 1.0));
+            if (snap)
+                frame = snap (dragging, frame);
+            dragTo = std::clamp<std::int64_t> (frame, 0, (std::int64_t) total - 1);
+            repaint();
+        }
+    }
 
-    int regionAt (int x) const
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        if (mode == Mode::tab && dragging >= 0 && moved && moveStart)
+        {
+            const auto index = dragging;
+            dragging = -1;
+            mode = Mode::none;
+            moveStart (index, dragTo);
+            return;
+        }
+        dragging = -1;
+        mode = Mode::none;
+        repaint();
+    }
+
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        if (barArea().contains (e.position))
+            zoomFull();
+    }
+
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (frames() <= 0.0 || w.deltaY == 0.0f)
+            return;
+        if (e.mods.isShiftDown())
+            scrollBy (w.deltaY > 0.0f ? -0.125 : 0.125);
+        else
+            zoomBy (w.deltaY > 0.0f ? 0.8 : 1.25, barArea().contains (e.position) ? -1.0 : frameAt (e.position.x));
+    }
+
+    // the frames shown, as [from, to)
+    std::pair<double, double> shown() const { return { shownStart(), shownStart() + shownLength() }; }
+
+private:
+    enum class Mode { none, scroll, zoomLeft, zoomRight, tab };
+    static constexpr float edge = 5.0f, tabWidth = 5.0f;
+
+    double frames() const
     {
         const auto data = sample ? sample() : nullptr;
+        return data != nullptr ? (double) data->frames() : 0.0;
+    }
+    double shownLength() const
+    {
+        const auto total = frames();
+        return viewLength > 0.0 && viewLength < total ? viewLength : total;
+    }
+    double shownStart() const { return std::clamp (viewStart, 0.0, std::max (0.0, frames() - shownLength())); }
+
+    void setView (double start, double length)
+    {
+        const auto total = frames();
+        length = std::clamp (length, std::min (total, 16.0), total);
+        viewLength = length >= total ? 0.0 : length;
+        viewStart = std::clamp (start, 0.0, std::max (0.0, total - length));
+        changed();
+    }
+
+    void changed()
+    {
+        repaint();
+        if (viewChanged)
+            viewChanged();
+    }
+
+    juce::Rectangle<float> barArea() const { return getLocalBounds().toFloat().removeFromTop (std::round (14.0f * scale)); }
+    juce::Rectangle<float> tabArea() const { return getLocalBounds().toFloat().withTrimmedTop (barArea().getHeight()).removeFromTop (std::round (12.0f * scale)); }
+    juce::Rectangle<float> waveArea() const { return getLocalBounds().toFloat().withTrimmedTop (barArea().getHeight() + tabArea().getHeight()); }
+    juce::Rectangle<float> thumbArea() const
+    {
+        const auto bar = barArea();
+        const auto total = std::max (1.0, frames());
+        const auto x0 = (float) (shownStart() / total) * bar.getWidth(), x1 = (float) ((shownStart() + shownLength()) / total) * bar.getWidth();
+        return { x0, bar.getY(), std::max (3.0f, x1 - x0), bar.getHeight() };
+    }
+
+    float xOf (double frame) const { return (float) ((frame - shownStart()) / shownLength() * (double) getWidth()); }
+    double frameAt (float x) const { return shownStart() + (double) x / (double) std::max (1, getWidth()) * shownLength(); }
+    // a region's start as drawn (the one being dragged follows the mouse)
+    std::int64_t startOf (const std::vector<slicex::WavRegion>& list, int i) const { return i == dragging && moved ? dragTo : list[(std::size_t) i].start; }
+
+    // min / max per pixel column (both channels folded) of the frames [from, from + length) across `area`
+    void drawWave (juce::Graphics& g, const SampleData& data, juce::Rectangle<float> area, double from, double length) const
+    {
+        const auto* left = data.leftData();
+        const auto* right = data.isStereo() ? data.rightData() : nullptr;
+        const auto total = (std::int64_t) data.frames();
+        const auto mid = area.getCentreY(), half = area.getHeight() * 0.47f;
+        const auto width = (int) area.getWidth();
+        const auto step = std::max<std::int64_t> (1, (std::int64_t) (length / (double) std::max (1, width) / 64.0));
+        float last = mid;
+        for (int x = 0; x < width; ++x)
+        {
+            const auto a = (std::int64_t) (from + length * x / width), b = std::max (a + 1, (std::int64_t) (from + length * (x + 1) / width));
+            float lo = 1.0f, hi = -1.0f;
+            for (auto i = std::max<std::int64_t> (0, a); i < b && i < total; i += step)
+            {
+                lo = std::min (lo, right != nullptr ? std::min (left[i], right[i]) : left[i]);
+                hi = std::max (hi, right != nullptr ? std::max (left[i], right[i]) : left[i]);
+            }
+            if (lo > hi)
+                continue;
+            // (zoomed in past a frame a column, the columns join up into a line)
+            const auto y0 = std::min (mid - hi * half, last), y1 = std::max (mid - lo * half, last);
+            g.drawVerticalLine ((int) area.getX() + x, y0, y1 + 1.0f);
+            last = mid - (hi + lo) * 0.5f * half;
+        }
+    }
+
+    // the region whose tab is at x (the last one that starts there), −1 = none
+    int tabAt (float x) const
+    {
         const auto* list = regions ? regions() : nullptr;
-        if (data == nullptr || list == nullptr || data->frames() == 0)
+        if (list == nullptr || frames() <= 0.0)
             return -1;
-        const auto frame = (std::int64_t) ((double) data->frames() * x / std::max (1, getWidth()));
+        int hit = -1;
+        for (std::size_t i = 0; i < list->size(); ++i)
+        {
+            const auto at = xOf ((double) (*list)[i].start);
+            if (x >= at - 2.0f && x <= at + tabWidth + 2.0f)
+                hit = (int) i;
+        }
+        return hit;
+    }
+
+    int regionAt (float x) const
+    {
+        const auto* list = regions ? regions() : nullptr;
+        if (list == nullptr || frames() <= 0.0)
+            return -1;
+        const auto frame = (std::int64_t) frameAt (x);
         int hit = -1;
         for (std::size_t i = 0; i < list->size(); ++i)
             if ((*list)[i].start <= frame)
                 hit = (int) i;
-        return hit;
+        // (between a region's end and the next start there is no region)
+        return hit >= 0 && frame > (*list)[(std::size_t) hit].end ? -1 : hit;
     }
+
+    Mode mode = Mode::none;
+    int dragging = -1;
+    std::int64_t dragTo = 0;
+    double grab = 0.0;
+    bool moved = false;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1017,6 +1322,7 @@ public:
         tool (stopButton, tr ("Stop"), [this] { engine.previewSample (nullptr); });
         tool (fileButton, tr ("File"), [this] { fileMenu(); }, true);
         tool (regionsButton, tr ("Regions"), [this] { regionsMenu(); }, true);
+        tool (zoomButton, tr ("Zoom"), [this] { zoomMenu(); }, true);
         tool (dualButton, tr ("Display single / dual deck"), [this] { edit ([on = dualButton.getToggleState()] (State& s) { s.setOptionByte (slicex::oDualDeck, on ? 1 : 0); }, false); });
         dualButton.setClickingTogglesState (true);
         deckSel.items = { "A", "B" };
@@ -1042,7 +1348,10 @@ public:
             v.sample = [this, d] { return samples[(std::size_t) d]; };
             v.regions = [this, d] { return &regions[(std::size_t) d]; };
             v.selected = [this, d] { return regionDeck() == d ? regionIndex() : -1; };
-            v.select = [this, d] (int i) { selectRegion (d, i, true); };
+            v.select = [this, d] (int i, bool play) { selectRegion (d, i, play); };
+            v.snap = [this, d] (int i, std::int64_t frame) { return snapStart (d, i, frame); };
+            v.moveStart = [this, d] (int i, std::int64_t frame) { moveRegionStart (d, i, frame); };
+            v.frozen = [this, d] { return frozen (d); };
             v.menu = [this, d] (int i) {
                 if (i >= 0)
                     selectRegion (d, i, false);
@@ -1225,6 +1534,7 @@ public:
         stopButton.setBounds (fl (67, 297, 29, 30));
         fileButton.setBounds (fl (160, 298, 24, 34));
         regionsButton.setBounds (fl (264, 298, 24, 34));
+        zoomButton.setBounds (fl (368, 298, 24, 34));
         dualButton.setBounds (fl (639, 339, 18, 21));
         deckSel.setBounds (fl (224, 341, 31, 18));
         rateLabel.setBounds (fl (5, 345, 64, 15));
@@ -1403,8 +1713,21 @@ private:
             const auto i = (std::size_t) k;
             samples[i] = paths[i].empty() ? nullptr : engine.getSampleLibrary().load (juce::String::fromUTF8 (paths[i].c_str()));
             regions[i].clear();
+            const auto fresh = samples[i].get() != viewOf[i];
+            viewOf[i] = samples[i].get();
             if (samples[i] == nullptr || samples[i]->frames() == 0)
                 continue;
+            // a sample new to this page opens at the range the state was saved with (FL keeps the deck's zoom in the
+            // project: start and end in beats); later edits leave the view alone
+            if (fresh)
+            {
+                const auto beats = state.decks[i].beats(), from = state.decks[i].beatStart(), to = state.decks[i].beatEnd();
+                const auto perBeat = beats > 0.0 ? (double) samples[i]->frames() / beats : 0.0;
+                if (perBeat > 0.0 && std::isfinite (from) && std::isfinite (to) && from >= 0.0 && to > from && (from > 0.0 || to < beats))
+                    deckView[i].openAt (from * perBeat, (to - from) * perBeat);
+                else
+                    deckView[i].openAt (0.0, 0.0);
+            }
             // as the instrument does: FL's regions of the state's own WAV, else the file's cue points
             std::int64_t frames = 0;
             if (! state.decks[i].wav.empty())
@@ -1615,9 +1938,9 @@ private:
         auto s = state;
         slicex::setDeckFile (s, deck, p, std::max (1, count));
         // the beat grid: the file's own beat count (its ACID chunk: "DL Breaker" has 8 beats in 8 s and FL shows 60BPM);
-        // a file without one is taken at the project's tempo
+        // a file without one gets FL's guess from its length (slicex::guessBeats)
         const auto seconds = (double) sample->frames() / (sample->sampleRate > 0.0 ? sample->sampleRate : 44100.0);
-        slicex::setDeckBeats (s, deck, 0.0, sample->acidBeats > 0.0f ? (double) sample->acidBeats : seconds * std::max (1.0, engine.getSong().bpm) / 60.0);
+        slicex::setDeckBeats (s, deck, 0.0, sample->acidBeats > 0.0f ? (double) sample->acidBeats : slicex::guessBeats (seconds));
         s.ui[0] = deck;
         s.ui[1] = deck << 16;
         const auto bytes = slicex::write (s);
@@ -1644,53 +1967,177 @@ private:
         });
     }
 
+    // FL's File menu of the deck (New, Load sample, Save sample as; see REA_rodada190ac for the entries left out)
     void fileMenu()
     {
+        const auto deck = currentDeck();
+        const auto has = samples[(std::size_t) deck] != nullptr;
         juce::PopupMenu m;
-        m.addItem (1, tr ("Load sample..."));
+        m.addItem (1, tr ("New"), has);
+        m.addItem (2, tr ("Load sample..."));
+        m.addItem (3, tr ("Save sample as..."), has && ! deckWav (deck).empty());
         juce::Component::SafePointer<SlicexEditor> self (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&fileButton), [self] (int r) {
-            if (self != nullptr && r == 1)
-                self->chooseSample (self->currentDeck());
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&fileButton), [self, deck] (int r) {
+            if (self == nullptr)
+                return;
+            if (r == 1)
+                self->clearDeck (deck);
+            else if (r == 2)
+                self->chooseSample (deck);
+            else if (r == 3)
+                self->saveSample (deck);
         });
     }
 
+    // FL's "New": the deck without a sample
+    void clearDeck (int deck)
+    {
+        auto s = state;
+        slicex::setDeckFile (s, deck, {}, 1);
+        s.ui[1] = deck << 16;
+        const auto bytes = slicex::write (s);
+        engine.editSong ([l = locate, bytes, deck] (Song& song) {
+            if (auto* d = l ? l (song) : nullptr)
+            {
+                d->pluginState = bytes;
+                if (deck == 0)
+                    d->samplePath.clear();
+                else
+                    slicex::setDeckBPath (*d, {});
+            }
+        }, true);
+        reload();
+    }
+
+    // FL's "Save sample as": the deck's WAV with its regions (names, lengths, keys)
+    void saveSample (int deck)
+    {
+        const auto name = nameLabel.getText().isNotEmpty() ? nameLabel.getText() : juce::String ("Slicex");
+        chooser = std::make_unique<juce::FileChooser> (tr ("Save sample as"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name + ".wav"), "*.wav");
+        juce::Component::SafePointer<SlicexEditor> self (this);
+        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [self, deck] (const juce::FileChooser& fc) {
+                                  if (self == nullptr || fc.getResult() == juce::File())
+                                      return;
+                                  const auto wav = self->deckWav (deck);
+                                  if (! wav.empty())
+                                      fc.getResult().withFileExtension ("wav").replaceWithData (wav.data(), wav.size());
+                              });
+    }
+
+    // FL's Regions menu of the deck (the entries LYNX has; REA_rodada190ac lists the rest)
     void regionsMenu()
     {
+        const auto deck = currentDeck();
+        const auto can = canSetKeys (deck) && ! frozen (deck);
+        const auto onDeck = regionDeck() == deck && regionIndex() < (int) regions[(std::size_t) deck].size();
         juce::PopupMenu m, cut;
+        m.addItem (1, tr ("Add marker..."), can);
+        m.addSeparator();
+        m.addItem (2, tr ("Delete"), can && onDeck);
+        m.addItem (3, tr ("Rename all..."), can);
         cut.addItem (100, tr ("None"));
         for (int i = 1; i <= 16; ++i)
             cut.addItem (100 + i, juce::String (i));
-        m.addSubMenu (tr ("Set all cut groups to..."), cut, ! state.decks[(std::size_t) currentDeck()].regions.empty());
+        m.addSubMenu (tr ("Set all cut groups to..."), cut, ! state.decks[(std::size_t) deck].regions.empty());
+        m.addSeparator();
+        m.addItem (4, tr ("Freeze all"), samples[(std::size_t) deck] != nullptr, frozen (deck));
         juce::Component::SafePointer<SlicexEditor> self (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&regionsButton), [self] (int r) {
-            if (self == nullptr || r < 100)
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&regionsButton), [self, deck] (int r) {
+            if (self == nullptr || r == 0)
                 return;
-            self->edit ([deck = self->currentDeck(), v = r - 100] (State& s) {
-                for (auto& rec : s.decks[(std::size_t) deck].regions)
-                    rec[slicex::rCutGroup] = v;
-            });
+            if (r == 1)
+                self->addMarker (deck, std::max<std::int64_t> (0, self->deckView[(std::size_t) deck].cursor)); // (FL: the selection's start, the sample's start without one)
+            else if (r == 2)
+                self->deleteRegion (deck, self->regionIndex());
+            else if (r == 3)
+                self->renameRegion (deck, 0, true);
+            else if (r == 4)
+                self->edit ([deck] (State& s) {
+                    auto& flag = s.decks[(std::size_t) deck].params[0x38];
+                    flag = flag != 0 ? 0 : 1;
+                });
+            else if (r >= 100)
+                self->edit ([deck, v = r - 100] (State& s) {
+                    for (auto& rec : s.decks[(std::size_t) deck].regions)
+                        rec[slicex::rCutGroup] = v;
+                });
         });
     }
 
-    // FL's "More region settings" (RgnMenuBtn; the same menu on a region of the wave). Stage 1: its "Trigger note" entry
+    // FL's Zoom menu of the deck
+    void zoomMenu()
+    {
+        const auto deck = currentDeck();
+        const auto has = samples[(std::size_t) deck] != nullptr;
+        const auto onDeck = regionDeck() == deck && regionIndex() < (int) regions[(std::size_t) deck].size();
+        juce::PopupMenu m;
+        m.addItem (1, tr ("Zoom in"), has);
+        m.addItem (2, tr ("Zoom out"), has);
+        m.addItem (3, tr ("Zoom out full"), has);
+        m.addItem (4, tr ("Zoom on selection"), has && onDeck);
+        juce::Component::SafePointer<SlicexEditor> self (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&zoomButton), [self, deck] (int r) {
+            if (self == nullptr || r == 0)
+                return;
+            auto& view = self->deckView[(std::size_t) deck];
+            if (r == 1)
+                view.zoomBy (0.5);
+            else if (r == 2)
+                view.zoomBy (2.0);
+            else if (r == 3)
+                view.zoomFull();
+            else
+                self->zoomOnRegion (deck, self->regionIndex());
+        });
+    }
+
+    void zoomOnRegion (int deck, int index)
+    {
+        const auto& list = regions[(std::size_t) deck];
+        if (index >= 0 && index < (int) list.size())
+            deckView[(std::size_t) deck].zoomOn ((double) list[(std::size_t) index].start, (double) list[(std::size_t) index].end + 1.0);
+    }
+
+    // FL's "More region settings" (RgnMenuBtn; the same menu on a region's tab in the wave)
     // `fromButton`: under the region settings' menu button; else at the mouse (a right click on the region in the wave)
     void regionMenu (bool fromButton)
     {
         const auto deck = regionDeck(), index = regionIndex();
         if (index >= (int) regions[(std::size_t) deck].size())
             return;
-        const auto own = regions[(std::size_t) deck][(std::size_t) index].key;
+        const auto& region = regions[(std::size_t) deck][(std::size_t) index];
+        const auto own = region.key;
+        const auto can = canSetKeys (deck) && ! frozen (deck);
         juce::PopupMenu m, keys;
         keys.addItem (1, tr ("Default"), true, own < 0);
         keys.addSeparator();
         for (int k = 0; k < 128; ++k)
             keys.addItem (1000 + k, keyName (k), true, own == k);
-        m.addSectionHeader (juce::String::fromUTF8 (slicex::regionName (regions[(std::size_t) deck][(std::size_t) index], index).c_str()));
+        m.addSectionHeader (juce::String::fromUTF8 (slicex::regionName (region, index).c_str()));
+        m.addItem (2, tr ("Delete"), can);
+        m.addItem (3, tr ("Clone as region"), can);
+        m.addItem (4, tr ("Turn into marker"), can && ! region.marker);
+        m.addSeparator();
+        m.addItem (5, tr ("Rename..."), can);
         m.addSubMenu (tr ("Trigger note"), keys, canSetKeys (deck));
+        m.addSeparator();
+        m.addItem (6, tr ("Zoom on"));
         juce::Component::SafePointer<SlicexEditor> self (this);
         m.showMenuAsync (fromButton ? juce::PopupMenu::Options().withTargetComponent (&regionMenuButton) : juce::PopupMenu::Options(), [self, deck, index] (int r) {
-            if (self != nullptr && r != 0)
+            if (self == nullptr || r == 0)
+                return;
+            if (r == 2)
+                self->deleteRegion (deck, index);
+            else if (r == 3)
+                self->cloneRegion (deck, index);
+            else if (r == 4)
+                self->turnIntoMarker (deck, index);
+            else if (r == 5)
+                self->renameRegion (deck, index, false);
+            else if (r == 6)
+                self->zoomOnRegion (deck, index);
+            else
                 self->setRegionKey (deck, index, r == 1 ? -1 : r - 1000);
         });
     }
@@ -1739,6 +2186,174 @@ private:
             s.decks[(std::size_t) deck].referenceOnly = 0;
         });
         reload();
+    }
+
+    bool frozen (int deck) const { return state.decks[(std::size_t) deck].params[0x38] != 0; }
+
+    // The deck's region list rewritten. The list lives in the deck's WAV (FL embeds an edited sample the same way);
+    // `from[i]` names the old region whose settings region i keeps (−1: a new region's defaults). The list is put in
+    // sample order here, as FL keeps it.
+    bool setRegions (int deck, std::vector<slicex::WavRegion> list, std::vector<int> from, int show)
+    {
+        if (samples[(std::size_t) deck] == nullptr || list.size() != from.size())
+            return false;
+        std::vector<std::size_t> order (list.size());
+        for (std::size_t i = 0; i < order.size(); ++i)
+            order[i] = i;
+        std::stable_sort (order.begin(), order.end(), [&list] (std::size_t a, std::size_t b) { return list[a].start < list[b].start; });
+        std::vector<slicex::WavRegion> sorted;
+        std::vector<slicex::RegionRecord> records;
+        const auto& old = state.decks[(std::size_t) deck].regions;
+        int shown = 0;
+        for (const auto i : order)
+        {
+            if ((int) i == show)
+                shown = (int) sorted.size();
+            sorted.push_back (list[i]);
+            records.push_back (from[i] >= 0 && from[i] < (int) old.size() ? old[(std::size_t) from[i]] : slicex::defaultRegion());
+        }
+        const auto wav = slicex::withRegions (deckWav (deck), sorted);
+        std::int64_t frames = 0;
+        if (wav.empty() || slicex::wavRegions (wav, frames).size() != sorted.size() || frames != (std::int64_t) samples[(std::size_t) deck]->frames())
+            return false;
+        if (records.empty())
+            records.push_back (slicex::defaultRegion()); // (a deck keeps one record)
+        edit ([deck, &wav, &records, shown] (State& s) {
+            auto& d = s.decks[(std::size_t) deck];
+            d.wav = wav;
+            d.referenceOnly = 0;
+            d.regions = records;
+            s.ui[1] = (deck << 16) | shown;
+        });
+        reload();
+        return true;
+    }
+
+    static std::vector<int> identity (std::size_t n)
+    {
+        std::vector<int> v (n);
+        for (std::size_t i = 0; i < n; ++i)
+            v[i] = (int) i;
+        return v;
+    }
+
+    void deleteRegion (int deck, int index)
+    {
+        auto list = regions[(std::size_t) deck];
+        if (index < 0 || index >= (int) list.size() || frozen (deck))
+            return;
+        auto from = identity (list.size());
+        list.erase (list.begin() + index);
+        from.erase (from.begin() + index);
+        setRegions (deck, std::move (list), std::move (from), std::max (0, index - 1));
+    }
+
+    // FL's "Clone as region": a second region over the same stretch, with the same settings
+    void cloneRegion (int deck, int index)
+    {
+        auto list = regions[(std::size_t) deck];
+        if (index < 0 || index >= (int) list.size() || frozen (deck))
+            return;
+        auto from = identity (list.size());
+        // (FL names it "<name> #2", keeps start, length and purpose; the key stays with the first)
+        auto copy = list[(std::size_t) index];
+        copy.name = slicex::regionName (copy, index) + " #2";
+        copy.marker = false;
+        copy.key = -1;
+        list.insert (list.begin() + index + 1, copy);
+        from.insert (from.begin() + index + 1, index);
+        setRegions (deck, std::move (list), std::move (from), index + 1);
+    }
+
+    void turnIntoMarker (int deck, int index)
+    {
+        auto list = regions[(std::size_t) deck];
+        if (index < 0 || index >= (int) list.size() || frozen (deck))
+            return;
+        list[(std::size_t) index].marker = true;
+        setRegions (deck, std::move (list), identity (regions[(std::size_t) deck].size()), index);
+    }
+
+    // FL's "Add marker": a marker at the place last clicked in the wave
+    void addMarker (int deck, std::int64_t frame)
+    {
+        auto list = regions[(std::size_t) deck];
+        if (samples[(std::size_t) deck] == nullptr || frame < 0 || frame >= (std::int64_t) samples[(std::size_t) deck]->frames() || frozen (deck))
+            return;
+        auto* box = new juce::AlertWindow (tr ("New region name"), {}, juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("name", {});
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<SlicexEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, deck, frame] (int result) {
+                                  if (self == nullptr || result != 1)
+                                      return;
+                                  auto list = self->regions[(std::size_t) deck];
+                                  auto from = identity (list.size());
+                                  slicex::WavRegion marker;
+                                  marker.start = frame;
+                                  marker.marker = true;
+                                  marker.name = box->getTextEditorContents ("name").trim().toStdString();
+                                  list.push_back (marker);
+                                  from.push_back (-1);
+                                  const auto show = (int) list.size() - 1;
+                                  self->setRegions (deck, std::move (list), std::move (from), show);
+                              }),
+                              true);
+    }
+
+    void moveRegionStart (int deck, int index, std::int64_t frame)
+    {
+        auto list = regions[(std::size_t) deck];
+        if (index < 0 || index >= (int) list.size() || frozen (deck) || list[(std::size_t) index].start == frame)
+            return;
+        auto& r = list[(std::size_t) index];
+        if (! r.marker)
+            frame = std::min (frame, r.end); // (a region keeps its end: FL moves the start tag alone)
+        r.start = frame;
+        setRegions (deck, std::move (list), identity (regions[(std::size_t) deck].size()), index);
+    }
+
+    // Where a dragged region start lands: where the mouse is. FL's Snap menu (grid, regions, zero-crossing…) acts on
+    // selections and envelope points; a region tag dragged with "Snap to grid" or "Snap to zero-crossing" on moved by
+    // the mouse's distance exactly (REA_rodada190ac §2). It stays before the region's own end.
+    std::int64_t snapStart (int deck, int index, std::int64_t frame) const
+    {
+        const auto& list = regions[(std::size_t) deck];
+        if (index >= 0 && index < (int) list.size() && ! list[(std::size_t) index].marker)
+            return std::min (frame, list[(std::size_t) index].end);
+        return frame;
+    }
+
+    // FL's "Rename..." (one region) and "Rename all..." (every region in turn, from `index` on)
+    void renameRegion (int deck, int index, bool all)
+    {
+        const auto& list = regions[(std::size_t) deck];
+        if (index < 0 || index >= (int) list.size() || frozen (deck))
+            return;
+        if (all)
+            selectRegion (deck, index, false);
+        auto* box = new juce::AlertWindow (tr ("Rename"), {}, juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("name", juce::String::fromUTF8 (slicex::regionName (list[(std::size_t) index], index).c_str()));
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<SlicexEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, deck, index, all] (int result) {
+                                  if (self == nullptr || result != 1)
+                                      return;
+                                  auto list = self->regions[(std::size_t) deck];
+                                  if (index >= (int) list.size())
+                                      return;
+                                  const auto name = box->getTextEditorContents ("name").trim().toStdString();
+                                  if (name != slicex::regionName (list[(std::size_t) index], index))
+                                  {
+                                      list[(std::size_t) index].name = name;
+                                      self->setRegions (deck, std::move (list), identity (self->regions[(std::size_t) deck].size()), index);
+                                  }
+                                  if (all && index + 1 < (int) self->regions[(std::size_t) deck].size())
+                                      self->renameRegion (deck, index + 1, true);
+                              }),
+                              true);
     }
 
     // FL's Options menu (MenuBtn): the settings
@@ -1818,9 +2433,10 @@ private:
     std::array<juce::Slider, 4> lfoKnob;
     std::array<juce::Label, 4> lfoKnobLabel;
     IconButton loopButton { IconButton::loop }, playButton { IconButton::play }, stopButton { IconButton::stop }, fileButton { IconButton::file },
-        regionsButton { IconButton::flag }, dualButton { IconButton::dual };
+        regionsButton { IconButton::flag }, zoomButton { IconButton::zoom }, dualButton { IconButton::dual };
     juce::Label rateLabel, tempoLabel, nameLabel, selLabel;
     std::array<DeckView, 2> deckView;
+    std::array<const void*, 2> viewOf { nullptr, nullptr }; // the sample each deck view last opened (reload)
     Keyboard keyboard;
     std::unique_ptr<juce::FileChooser> chooser;
 };
