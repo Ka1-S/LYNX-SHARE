@@ -91,7 +91,9 @@ private:
     // pitch share 0 (the chord's lowest note) … 1 (its highest) → the point on the display
     juce::Point<float> at (juce::Rectangle<float> area, double pitch) const
     {
-        const auto offset = (double) options.high + ((double) options.low - (double) options.high) * miditools::strumCurve (1.0 - pitch, options.tension);
+        // the core's own rule (round 190aa): each side's curve runs from the note that stays
+        const auto offset = (double) options.low * miditools::strumCurve (1.0 - pitch, options.tension)
+                          + (double) options.high * miditools::strumCurve (pitch, options.tension);
         return { area.getCentreX() + (float) offset * area.getWidth() * 0.5f, area.getBottom() - (float) pitch * area.getHeight() };
     }
     miditools::StrumOptions& options;
