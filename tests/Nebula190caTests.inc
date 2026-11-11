@@ -202,7 +202,8 @@ TEST (nebula190ca_classic_law_renders_what_it_did)
         for (int i = 0; i < fingerprintSize && i < (int) f.size(); ++i)
         {
             const auto want = classicFingerprint[which][i];
-            const auto ok = i < 2 * fingerprintWindows ? std::abs (f[(std::size_t) i] - want) <= 2e-4 * want + 1e-9 : std::abs (f[(std::size_t) i] - want) <= 2e-5;
+            // (g++ 15 and zig c++ 0.13 / 0.14 agree with the table to 4e-9; the margin is for other maths libraries)
+            const auto ok = i < 2 * fingerprintWindows ? std::abs (f[(std::size_t) i] - want) <= 1e-5 * want + 1e-9 : std::abs (f[(std::size_t) i] - want) <= 1e-5;
             off += ok ? 0 : 1;
             if (! ok)
                 std::printf ("  classic setting %d, value %d: %.9g, was %.9g\n", which, i, f[(std::size_t) i], want);
