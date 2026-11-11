@@ -67,6 +67,7 @@ public:
     // The Browser's options menu (the button beside the search box, the panel menu): filter, folders, search index.
     void addViewItems (juce::PopupMenu& menu);
     void showViewMenu();
+    juce::PopupMenu buildViewMenu(); // (what showViewMenu shows)
     // The Sample browser window opens / closes from here (the main window sets it): View › Sample browser.
     std::function<void()> onToggleSampleBrowser;
     // The Sample browser window's content: a drag container holding a Browser of role `samples`; `wire` connects

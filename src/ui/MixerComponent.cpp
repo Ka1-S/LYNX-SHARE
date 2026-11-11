@@ -2374,11 +2374,15 @@ void MixerStrips::addPreFaderItem (juce::PopupMenu& menu, int from, int t)
 
 void MixerStrips::showSendMenu (int t)
 {
+    if (selected <= 0 || selected == t)
+        return;
+    buildSendMenu (t).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu MixerStrips::buildSendMenu (int t)
+{
     const auto& song = engine.getSong();
     const auto from = selected;
-
-    if (from <= 0 || from == t)
-        return;
 
     const auto fromName = juce::String::fromUTF8 (song.mixer[(std::size_t) from].name.c_str());
     juce::PopupMenu menu;
@@ -2403,7 +2407,7 @@ void MixerStrips::showSendMenu (int t)
         menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
                       [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)

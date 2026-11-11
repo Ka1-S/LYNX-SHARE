@@ -1579,6 +1579,15 @@ public:
             return;
         }
 
+        if (args.contains ("--audioxshot"))
+        {
+            // LYNX.exe --audioxshot prefix (round 190aq): the pre-fader send, the "Low latency while recording" mark on a
+            // bypassed slot and the Browser's "Preview in time", drawn off-screen
+            runAudioXShot (args[args.indexOf ("--audioxshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--comp177shot"))
         {
             // LYNX.exe --comp177shot prefix project (round 177c): a project of loop takes in the maximised
@@ -10178,6 +10187,102 @@ private:
             offline.dispatchPendingMessages();
             savePng (ui.createComponentSnapshot (ui.getLocalBounds()), prefix + "-mixer-renamed.png");
             offline.getPluginHost().setPluginName (key, "");
+        }
+    }
+
+    void runAudioXShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        {
+            lynx::MainComponent ui (offline, false);
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            offline.dispatchPendingMessages();
+
+            // 1. sends: insert 1 feeds insert 3 pre-fader and insert 4 post-fader (FL's way)
+            offline.editSong ([] (lynx::Song& s) {
+                if (s.mixer.size() < 5)
+                    return;
+                s.mixer[1].name = "Vocal";
+                s.mixer[3].name = "Reverb";
+                s.mixer[4].name = "Delay";
+                s.setRoute (1, 3, true);
+                s.setRoute (1, 4, true);
+                s.setRouteLevel (1, 3, 0.6f);
+                s.setRouteLevel (1, 4, 0.4f);
+                s.setSendPre (1, 3, true);
+            });
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (3);
+            ui.getMixerForSnapshot().selectTrack (1);
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-send-pre.png");
+            auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+            saveMenus (juce::StringArray { "Send to Reverb (pre-fader)", "Send to Delay (post-fader)" },
+                       std::vector<juce::PopupMenu> { strips.buildSendMenu (3), strips.buildSendMenu (4) }, prefix + "-send-menu.png");
+
+            // 2. low latency while recording: the monitored track's look-ahead limiter is bypassed, the EQ stays
+            offline.editSong ([] (lynx::Song& s) {
+                s.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::parametricEq));
+                s.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::limiter));
+                s.mixer[1].inputChannel = 0;
+                s.mixer[1].monitor = lynx::InputMonitor::on;
+            });
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-lowlat-off.png");
+            auto options = offline.getRecordOptions();
+            options.lowLatencyRecording = true;
+            offline.setRecordOptions (options);
+            offline.dispatchPendingMessages();
+            ui.getMixerForSnapshot().selectTrack (1);
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-lowlat-on.png");
+            saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getRecordMenuForSnapshot() }, prefix + "-lowlat-menu.png");
+            juce::String report;
+            report << "latency_with_option=" << offline.getLatencySamples() << " bypassed_slots=" << offline.lowLatencyBypassedCount() << "\n";
+            options.lowLatencyRecording = false;
+            offline.setRecordOptions (options);
+            offline.dispatchPendingMessages();
+            report << "latency_without_option=" << offline.getLatencySamples() << "\n";
+
+            // 3. the Browser's "Preview in time": a 120 BPM loop previewed in a 140 BPM project
+            const auto dir = juce::File (prefix).getParentDirectory().getChildFile ("audiox-preview");
+            dir.createDirectory();
+            const auto wav = dir.getChildFile ("Drum loop 120 bpm.wav");
+            {
+                const int frames = 44100 * 4;
+                juce::AudioBuffer<float> audio (1, frames);
+                for (int i = 0; i < frames; ++i)
+                {
+                    const auto t = (double) (i % 22050) / 44100.0;
+                    audio.setSample (0, i, (float) (0.8 * std::exp (-t * 30.0) * std::sin (6.283185307179586 * (50.0 + 80.0 * std::exp (-t * 40.0)) * t)));
+                }
+                wav.deleteFile();
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 44100.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                }
+            }
+            offline.getTransport().bpm.store (140.0);
+            offline.setPreviewInTime (true);
+            ui.showDesktopForSnapshot (false);
+            offline.previewFile (wav);
+            offline.finishPreviewJobs();
+            ui.getBrowserForSnapshot().showPreviewForSnapshot (wav);
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-preview-in-time.png");
+            saveMenus (juce::StringArray { "Browser options" }, std::vector<juce::PopupMenu> { ui.getBrowserForSnapshot().buildViewMenu() }, prefix + "-preview-menu.png");
+            const auto& timing = offline.getPreviewTiming();
+            report << "preview file_bpm=" << timing.fileBpm << " project_bpm=" << timing.projectBpm << " ratio=" << timing.ratio
+                   << " prepare_ms=" << juce::String (offline.getLastPreviewPrepareMs(), 1) << "\n";
+            offline.previewFile ({});
+            offline.setPreviewInTime (false);
+            juce::File (prefix + "-report.txt").replaceWithText (report);
         }
     }
 

@@ -1,6 +1,11 @@
 // Round 190aq: three audio-path extras, each off by default — pre-fader sends, "Low latency while recording" and the
 // Browser's "Preview in time". Off, a song renders what it rendered before (the render-hash tests cover old projects).
 
+#include "core/AlsExport.h"
+#include "core/AlsImport.h"
+#include "core/FlpExport.h"
+#include "core/LowLatency.h"
+
 namespace audiox190aq
 {
 // channel 0 plays a DC of 0.25 on insert 1, which sends to insert 2; insert 2 goes to the Master

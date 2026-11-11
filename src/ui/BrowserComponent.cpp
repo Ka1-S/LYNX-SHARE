@@ -2948,6 +2948,11 @@ std::unique_ptr<juce::Component> BrowserComponent::makeFoldersPanelForSnapshot()
 
 void BrowserComponent::showViewMenu()
 {
+    buildViewMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&viewButton));
+}
+
+juce::PopupMenu BrowserComponent::buildViewMenu()
+{
     juce::PopupMenu menu;
     addViewItems (menu);
     juce::Component::SafePointer<BrowserComponent> safe (this);
@@ -2969,7 +2974,7 @@ void BrowserComponent::showViewMenu()
         menu.addItem (role == Role::samples ? tr ("Close the Sample browser") : tr ("Sample browser (separate window)"),
                       [safe] { if (safe != nullptr && safe->onToggleSampleBrowser != nullptr) safe->onToggleSampleBrowser(); });
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&viewButton));
+    return menu;
 }
 
 namespace
