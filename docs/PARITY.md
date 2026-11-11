@@ -2316,8 +2316,23 @@ one vocal setting, 6 → 5).
 Limits: values between the captured settings are interpolated, and a few fitted transfers are not monotonic (they
 are carried as measured); beyond the captured range the first-to-last trend continues. The second (A/B) slot of the
 FG-X 2 state is not read. The EQ modules have no translator: their fitted per-setting maps are not smooth enough to
-interpolate (a translation in physical units is needed). The FET compressors and X-Limit need the new laws of this
-round and get their translators once those are in.
+interpolate (a translation in physical units is needed).
+
+With the two new laws of this round in (the Compressor's `Classic law` and Apex's levelling stage), the same route
+covers five more plugins, each rendered from the C++ translator's own output on the captured states:
+
+| Missing plugin (kind) | Stand-in | Bank | Files | Before → after | Null | Level error | Up / same / down |
+|---|---|---|---|---|---|---|---|
+| Limiter with threshold (SSL X-Limit) | Apex Limiter | tp172c | 16 | 2.38 → 4.94 | −3.9 → −17.1 dB | 3.5 → 0.9 dB | 14 / 1 / 1 |
+| | | programme 182 | 20 | 3.05 → 5.65 | −7.5 → −21.5 dB | 2.5 → 0.5 dB | 19 / 1 / 0 |
+| FET compressor (VM FG-116) | Compressor | programme 182 | 25 | 3.08 → 4.80 | −8.8 → −15.8 dB | 2.8 → 1.5 dB | 19 / 6 / 0 |
+| FET compressor, modern revision | Compressor | programme 182 | 25 | 3.04 → 4.08 | −9.1 → −12.5 dB | 2.5 → 1.9 dB | 13 / 12 / 0 |
+| FET compressor, vintage revision | Compressor | programme 182 | 25 | 3.48 → 5.00 | −10.5 → −16.4 dB | 2.1 → 1.3 dB | 14 / 10 / 1 |
+| FET compressor, all-buttons style (VM The Monster) | Compressor | programme 182 | 25 | 3.28 → 4.28 | −8.4 → −13.2 dB | 2.1 → 1.2 dB | 15 / 9 / 1 |
+
+Three files went down by one step (a limiter burst setting, one vocal and one drum file). The FET compressors'
+ratio transfer is not monotonic between its four positions (carried as measured). The other names of the vintage
+compressor role (no captured state) still load the stand-in at its defaults.
 
 ## Round 177b: workflow extras beyond FL (FL's own way stays unchanged)
 
