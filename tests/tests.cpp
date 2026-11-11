@@ -17428,6 +17428,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MidiTools190aa2Tests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
+#include "PlugLevel190adTests.inc"
 #include "Undo190bTests.inc"
 #include "Bugs190cTests.inc"
 #include "Slicex190hTests.inc"

@@ -416,9 +416,18 @@ void PluginInstrument::setParameterFromUi (int index, float value)
     guardedUiParameter (*plugin, crashed, name, index, value);
 }
 
+// The MIDI velocity of a note on: LYNX's own law is JUCE's (127 v, rounded); a project with FL's levels sends it as
+// Fruity Wrapper does (core/HostNotePitch.h, round 190ad)
+juce::uint8 PluginInstrument::midiVelocity (float velocity) const noexcept
+{
+    if (flVelocity.load (std::memory_order_relaxed))
+        return (juce::uint8) hostpitch::flWrapperVelocity (velocity);
+    return juce::MidiMessage::floatValueToMidiByte (juce::jlimit (0.0f, 1.0f, velocity));
+}
+
 void PluginInstrument::noteOnMidi (int key, float velocity, int midiChannel) noexcept
 {
-    midi.addEvent (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), juce::jlimit (0.0f, 1.0f, velocity)), 0);
+    midi.addEvent (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), midiVelocity (velocity)), 0);
     hold (juce::jlimit (0, 15, midiChannel), key, true);
 }
 
@@ -490,7 +499,7 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
         glide.taken = true;
     }
     addBend (0);
-    midi.addEvent (juce::MidiMessage::noteOn (1, k, juce::jlimit (0.0f, 1.0f, velocity)), 0);
+    midi.addEvent (juce::MidiMessage::noteOn (1, k, midiVelocity (velocity)), 0);
     hold (0, k, true);
     // FL's "Send MOD X as polyphonic aftertouch": the note's Mod X right after its note on
     if (options.modXAftertouch)

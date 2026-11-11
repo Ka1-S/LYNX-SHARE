@@ -91,6 +91,8 @@ public:
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
     // issue #63: the note's own fine pitch, sent as FL's wrapper sends it (core/HostNotePitch.h)
     void setNextNoteFinePitch (float cents) noexcept override { nextFine = cents; }
+    // Song::flPluginLevels (round 190ad): note velocities go out as FL's wrapper sends them
+    void setFlWrapperVelocity (bool on) noexcept override { flVelocity.store (on, std::memory_order_relaxed); }
     void transportStopped() noexcept override;
     void panic() noexcept override;
     void transportReset() noexcept override { panic(); }
@@ -162,6 +164,8 @@ private:
     std::array<MidiOutNote, 256> midiOut {};
     int midiOutCount = 0;
     HostedOptions options;
+    std::atomic<bool> flVelocity { false };
+    juce::uint8 midiVelocity (float velocity) const noexcept;
     float nextModX = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
     hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
     hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes

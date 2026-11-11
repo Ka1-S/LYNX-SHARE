@@ -299,7 +299,11 @@ TEST (flpexport171e_song_round_trips_through_the_importer)
         for (std::size_t i = 0; i < song.channels.size(); ++i)
         {
             CHECK (back.channels[i].name == song.channels[i].name);
-            CHECK (fx171e::near (back.channels[i].volume, song.channels[i].volume, 0.001));
+            // (a hosted plugin under LYNX's own law is written at the knob that sounds the same in FL, round 190ad)
+            const auto wrapped = song.channels[i].instrument == InstrumentKind::plugin && ! song.flPluginLevels;
+            const auto volume = wrapped ? std::log (10.0 * channelGain (song.channels[i].volume) * 0.70710678 + 1.0) / std::log (11.0)
+                                        : (double) song.channels[i].volume;
+            CHECK (fx171e::near (back.channels[i].volume, volume, 0.001));
             CHECK (fx171e::near (back.channels[i].pan, song.channels[i].pan, 0.001));
             CHECK (back.channels[i].mixerTrack == song.channels[i].mixerTrack);
         }

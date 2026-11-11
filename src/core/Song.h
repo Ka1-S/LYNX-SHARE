@@ -2179,6 +2179,12 @@ struct Song
     // mixer's centre 0 dB, +3 dB on the side panned to), triangular = linear (the louder side stays at the level, the
     // other falls to 0). It sets the mixer inserts' pan (FLEngine FUN_0127b050) and the FL Sampler voices' pan.
     bool panTriangular = false;
+    // FL's levels for hosted plugins (round 190ad, REA_rodada190ad.md): Fruity Wrapper scales a plugin's output by the
+    // host's pan kernel of (channel pan, 2 × the channel volume curve), i.e. √2 (+3.01 dB) at the centre where LYNX's
+    // own channel law is 1, and sends a note's velocity as round(128 v) where LYNX sends round(127 v). On: this
+    // project's hosted plugin channels follow FL (set by the .flp import, saved as "pluginLevels": "fl"). Off: LYNX's
+    // own law, which every project saved before keeps (same sound as when it was made).
+    bool flPluginLevels = false;
     // FL's mixer menu › Plugin delay compensation (REA round 168j, .flp 0x1D / 0x27): "Automatic" off = the delay
     // compensation ignores the plugins' latencies (FL's planner FUN_010ff3b0 skips the generators' and the effects'
     // latencies; the tracks' manual latencies still apply); "Compensate automations" = automation of a mixer effect

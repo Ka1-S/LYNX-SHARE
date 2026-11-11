@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -107,4 +108,17 @@ private:
         --count;
     }
 };
+
+// Round 190ad: the MIDI velocity of a note on in a project with FL's levels (Song::flPluginLevels). Fruity Wrapper's
+// voice (0x879a00, REA_rodada190ad.md §2) sends Round(velocity · 128) (single precision product, ties to even),
+// clamped to 0…127: an FL note at velocity 100 (100 / 128) goes out as 100; LYNX's own law, JUCE's round(127 v), gives
+// 99. FL lets it reach 0; LYNX keeps a note on at 1 or more, as a velocity 0 note on is a note off on the wire (no
+// .flp note gets there: its lowest velocity byte is 1).
+inline int flWrapperVelocity (float velocity) noexcept
+{
+    if (! (velocity > 0.0f))
+        return 1;
+    const auto v = (int) std::nearbyint ((double) (std::min (velocity, 1.0f) * 128.0f));
+    return v < 1 ? 1 : (v > 127 ? 127 : v);
+}
 } // namespace lynx::hostpitch

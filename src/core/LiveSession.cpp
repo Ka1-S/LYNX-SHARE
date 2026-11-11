@@ -245,7 +245,7 @@ bool sameGlobals (const Song& a, const Song& b)
     return a.bpm == b.bpm && a.beatsPerBar == b.beatsPerBar && a.swing == b.swing && a.channelGroups == b.channelGroups && a.masterPitch == b.masterPitch
            && a.info == b.info && a.projectId == b.projectId && a.performanceMode == b.performanceMode && a.substitutesBypassed == b.substitutesBypassed
            && a.cleanMixer == b.cleanMixer && a.autoCrossfades == b.autoCrossfades && a.compCrossfadeMs == b.compCrossfadeMs && a.playTruncatedNotes == b.playTruncatedNotes
-           && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.autoPdc == b.autoPdc
+           && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.flPluginLevels == b.flPluginLevels && a.autoPdc == b.autoPdc
            && a.compensateAutomations == b.compensateAutomations && a.timeSignatureMode == b.timeSignatureMode && a.scaleHighlight == b.scaleHighlight
            && a.dataFolder == b.dataFolder && a.patternBlocksOn == b.patternBlocksOn;
 }
@@ -269,6 +269,7 @@ void copyGlobals (const Song& from, Song& to)
     to.playTruncatedNotes = from.playTruncatedNotes;
     to.fastDeclick = from.fastDeclick;
     to.panTriangular = from.panTriangular;
+    to.flPluginLevels = from.flPluginLevels;
     to.autoPdc = from.autoPdc;
     to.compensateAutomations = from.compensateAutomations;
     to.timeSignatureMode = from.timeSignatureMode;

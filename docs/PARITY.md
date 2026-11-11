@@ -2426,3 +2426,12 @@ bit-identically (no noise reduction).
 (The gain error is dominated by windows where one gate is open and the other closed.) Open: the reference seems to
 learn — with a 200 ms hold it stops reducing repeated bursts after about 3 s, a kick after a 0.2 s gap loses 7 dB, and
 at thresholds −25 / −10 its onsets are far deeper (−30 … −40 dB); none of that is modelled.
+
+## Round 190ad: hosted plugins of an FL project at FL's level
+FL's wrapper plays a VST / VST3 / CLAP instrument through the pan kernel of (channel pan, 2 × the channel volume
+curve): √2 × the curve at the centre (−2.2 dB at the default 78 %), where LYNX's own channel law gives the curve
+(−5.2 dB). A project imported from `.flp` now follows the wrapper (level, pan in steps of 1 / 64, the project's
+panning law, note velocity `Round (128 v)`): Surge XT renders within 0.05 dB of FL's at every volume and pan tested
+(`docs/analise/REA_rodada190ad.md`; before: 3.0 dB under). The project keeps this as `"pluginLevels": "fl"`. LYNX's
+own projects, saved or new, keep LYNX's law and sound as before; their `.flp` export writes the plugin channel's
+volume that sounds the same in FL. Open: whether new LYNX projects should take FL's level too.
