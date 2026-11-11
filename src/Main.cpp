@@ -11606,12 +11606,12 @@ private:
                             if (pa.getAlpha() < 200)
                                 continue;
                             ++solidPixels;
-                            auto near = [pa] (juce::Colour c) {
+                            auto alike = [pa] (juce::Colour c) {
                                 return std::abs ((int) c.getRed() - (int) pa.getRed()) + std::abs ((int) c.getGreen() - (int) pa.getGreen())
                                            + std::abs ((int) c.getBlue() - (int) pa.getBlue()) + std::abs ((int) c.getAlpha() - (int) pa.getAlpha()) < 12;
                             };
-                            same += near (b.getPixelAt (x, y)) ? 1 : 0;
-                            flippedSame += near (b.getPixelAt (fw - 1 - x, y)) ? 1 : 0;
+                            same += alike (b.getPixelAt (x, y)) ? 1 : 0;
+                            flippedSame += alike (b.getPixelAt (fw - 1 - x, y)) ? 1 : 0;
                         }
                     const auto flips = solidPixels > 500 && flippedSame >= solidPixels * 98 / 100 && same < solidPixels * 95 / 100;
                     sheetReport << "sheet_mirror_flips=" << (flips ? 1 : 0) << " (" << flippedSame << " of " << solidPixels << " solid pixels match flipped, " << same
