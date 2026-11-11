@@ -755,6 +755,11 @@ void BreathNoise::reset() noexcept
 
 float BreathNoise::process (float voice, float gain) noexcept
 {
+    // nothing non-finite (or absurdly large) may enter the bank: its states would carry it on
+    if (! (std::abs (voice) < 1.0e6f))
+        voice = 0.0f;
+    if (! (gain > 0.0f && gain < 1.0e6f))
+        gain = 0.0f;
     alignas (16) float v[lanes], nz[lanes];
     for (int b = 0; b < lanes; ++b)
     {
@@ -838,8 +843,9 @@ float BreathNoise::process (float voice, float gain) noexcept
     const auto voicePower = (sp[0] + sp[1]) + (sp[2] + sp[3]);
     const auto noisePower = gain * gain * ((sw[0] + sw[1]) + (sw[2] + sw[3]));
     if (noisePower > voicePower)
-        gain *= std::sqrt (voicePower / noisePower);
-    return gain * out;
+        gain *= std::sqrt (std::max (0.0f, voicePower) / noisePower);
+    const auto y = gain * out;
+    return std::isfinite (y) ? y : 0.0f; // (… nor leave it)
 }
 
 void BreathNoise::tidy() noexcept

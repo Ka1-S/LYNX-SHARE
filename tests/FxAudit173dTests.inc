@@ -190,6 +190,8 @@ void auditRange (int from, int to)
         third.only.clear();
         for (const auto& f : rep.broken)
         {
+            if (f.what == "NaN") // (round 190bb: say where)
+                std::printf ("  %s: NaN / inf with \"%s\" = %s (%g)\n", rep.name.c_str(), f.control.c_str(), f.text.c_str(), f.value);
             CHECK (f.what != "NaN");
             if (f.what != "NaN" && ! isAllowed (rep.name, f.control, f.what))
                 third.only.push_back (f.control);
