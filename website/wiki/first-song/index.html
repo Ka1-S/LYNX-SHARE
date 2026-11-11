@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="fa0c727b";
+window.LYNX_LANG=lang;window.LYNX_V="0a51b436";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -74,7 +74,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=fa0c727b">
+<link rel="stylesheet" href="/assets/site.css?v=0a51b436">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -98,7 +98,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="mix-it-and-add-an-effect">Mix it and add an effect</h2>
 <ol><li>Press <code>F9</code> to show the <a href="/wiki/mixer/">Mixer</a>. The five starting channels already play through inserts 1 to 5, and a channel added from the <code>+ add channel</code> menu takes a free insert. The number in the channel's route box in the Channel rack says which one.</li><li>To move channels to free inserts of their own, select them in the Channel rack and press <code>Ctrl+L</code>. Each insert takes the channel's name and colour.</li><li>Drag an insert's fader to set its level.</li><li>Click an insert to select it. The effects panel on the right shows its ten slots.</li><li>Click an empty slot and pick an effect. Click the slot's name to show or hide the effect's window. The slot's light bypasses the effect.</li></ol>
 <h2 id="export-the-song">Export the song</h2>
-<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" alt="The export window: range and tail on the left, format, bit depth and sample rate on the right, mix options below" loading="lazy" width="620" height="462"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" srcset="/assets/img/wiki/export.webp 1x, /assets/img/wiki/export@2x.webp 2x" alt="The export window: range and tail on the left, format, bit depth and sample rate on the right, mix options below" loading="lazy" width="620" height="502"></a></figure>
 <ol><li>Press <code>Ctrl+S</code> and save the project first.</li><li>Choose <code>File › Export › Wave file...</code>. For other formats the same menu has <code>MP3 file...</code>, <code>OGG file...</code> and <code>FLAC file...</code>.</li><li>Set <code>Range</code> to <code>Song (Playlist)</code>. The other choices are <code>Current pattern</code> and <code>Playlist selection</code>.</li><li>Leave the other options as they are.</li><li>Click <code>Export...</code>, choose the file name and wait for the render.</li></ol>
 <h2 id="what-each-key-did">What each key did</h2>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Channel rack</td><td><code>F6</code></td><td>Shows or hides the Channel rack</td></tr><tr><td>Next empty pattern</td><td><code>F4</code></td><td>Goes to the next empty pattern and names it</td></tr><tr><td>Piano roll</td><td><code>F7</code></td><td>Shows or hides the Piano roll</td></tr><tr><td>Playlist</td><td><code>F5</code></td><td>Shows or hides the Playlist</td></tr><tr><td>Pattern or Song mode</td><td><code>L</code></td><td>Switches what <code>Space</code> plays</td></tr><tr><td>Mixer</td><td><code>F9</code></td><td>Shows or hides the Mixer</td></tr><tr><td>Send to free inserts</td><td><code>Ctrl+L</code></td><td>Gives the selected channels their own Mixer inserts</td></tr><tr><td>Save</td><td><code>Ctrl+S</code></td><td>Saves the project as <code>.lynx</code></td></tr><tr><td>Export</td><td><code>Ctrl+R</code></td><td>Opens the export window with the last used format</td></tr></tbody></table></div>
@@ -114,8 +114,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=fa0c727b" defer></script>
-<script src="/assets/wiki.js?v=fa0c727b" defer></script>
-<script src="/assets/motion.js?v=fa0c727b" defer></script>
+<script src="/assets/site.js?v=0a51b436" defer></script>
+<script src="/assets/wiki.js?v=0a51b436" defer></script>
+<script src="/assets/motion.js?v=0a51b436" defer></script>
 </body>
 </html>

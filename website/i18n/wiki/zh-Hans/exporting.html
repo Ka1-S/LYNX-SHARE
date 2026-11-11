@@ -1,4 +1,4 @@
-<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" alt="选择了 WAV 的导出窗口：左侧是范围、尾音和文件，右侧是格式，下方是混音选项" loading="lazy" width="620" height="462"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" srcset="/assets/img/wiki/export.webp 1x, /assets/img/wiki/export@2x.webp 2x" alt="选择了 WAV 的导出窗口：左侧是范围、尾音和文件，右侧是格式，下方是混音选项" loading="lazy" width="620" height="502"></a></figure>
 <p>所有从 LYNX SHARE 输出的内容都通过 <code>文件 › 导出</code>。音频格式（WAV、MP3、OGG 和 FLAC）共用一个导出窗口。MIDI、FL Studio 工程、Ableton Live 套装和压缩工程在同一个菜单中各有自己的条目。</p>
 <h2 id="export-the-song-as-a-wav">把歌曲导出为 WAV</h2>
 <ol><li>选择 <code>文件 › 导出 › Wave文件...</code>。</li><li>让 <code>范围</code> 保持为 <code>歌曲（播放列表）</code>，<code>文件</code> 保持为 <code>一个文件（混音）</code>。</li><li>选择 <code>位深</code>：16 位、24 位或 32 位（浮点）。</li><li>把 <code>尾音</code> 设为 <code>保留余音</code>，这样混响和释音会在最后一小节之后继续响完。</li><li>点击 <code>导出...</code>，选择名称和文件夹，等待渲染完成。</li><li>完成后，LYNX SHARE 会报告文件保存在哪里，以及它的峰值电平。</li></ol>
@@ -12,7 +12,7 @@
 <h2 id="mix-options">混音选项</h2>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>标准化（峰值到0 dB）</code></td><td>整体提高或降低文件电平，使最响的峰值达到满刻度</td></tr><tr><td><code>主控效果</code></td><td>关：旁通主控插入轨的效果器</td></tr><tr><td><code>插槽效果</code></td><td>关：旁通其他插入轨的效果器</td></tr><tr><td><code>所有插件使用HQ</code></td><td>插件使用其渲染品质。关：导出使用播放品质</td></tr><tr><td><code>插件预热</code></td><td>导出开始前，第三方插件先处理一小段静音</td></tr><tr><td><code>禁用最大复音数</code></td><td>解除通道的复音数限制，这样不会有音符被截断</td></tr><tr><td><code>修剪延迟补偿产生的静音</code></td><td>去掉插件延迟补偿在开头加入的静音</td></tr><tr><td><code>速度信息</code>、<code>循环标记</code>、<code>播放列表标记</code></td><td>仅限 WAV：把速度、循环和播放列表的标记存入文件</td></tr><tr><td><code>完成后显示文件</code></td><td>在文件管理器中显示结果</td></tr></tbody></table></div>
 <h2 id="stems-and-tracks">分轨和轨道</h2>
-<figure><a class="shot" href="/assets/img/wiki/export-flac-stems.webp"><img src="/assets/img/wiki/export-flac-stems.webp" alt="导出窗口设为 FLAC，每个混音台插入轨一个文件，共九个文件" loading="lazy" width="620" height="462"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/export-flac-stems.webp"><img src="/assets/img/wiki/export-flac-stems.webp" srcset="/assets/img/wiki/export-flac-stems.webp 1x, /assets/img/wiki/export-flac-stems@2x.webp 2x" alt="导出窗口设为 FLAC，每个混音台插入轨一个文件，共九个文件" loading="lazy" width="620" height="502"></a></figure>
 <p><code>文件</code> 有三种分轨模式：</p>
 <ul><li><code>每个混音插入轨一个（分轨）</code>：每个有声音的插入轨一个文件。</li><li><code>每个通道一个（分轨）</code>：每个会发声的通道一个文件。</li><li><code>每个通道一个，仅乐器（不含发送和总线）</code>。</li></ul>
 <p>勾选 <code>同时导出完整混音</code>，可以在分轨之外同时得到完整混音。底部那一行会显示将写出多少个文件。</p>
