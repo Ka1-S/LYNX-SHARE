@@ -143,7 +143,7 @@ TEST (audiox190aq_pre_fader_send_model)
     s.setRoute (1, 3, true);
     s.setSendPre (1, 3, true);
     auto st = RackState::build (s, nullptr, 48000.0, [] (const std::string&) { return std::shared_ptr<const SampleData>(); });
-    CHECK (st->preTap.size() == 4 && st->preTap[1] == 0 && st->preTap[2] == -1 && st->sendTaps.size() == 1);
+    CHECK (st->preTap.size() == 5 && st->preTap[1] == 0 && st->preTap[2] == -1 && st->sendTaps.size() == 1);
     CHECK (st->mixerInputs[2].size() == 1 && st->mixerInputs[2][0].pre && st->mixerInputs[2][0].tap == 0);
     CHECK (st->mixerInputs[3].size() == 1 && st->mixerInputs[3][0].pre && st->mixerInputs[3][0].tap == 0);
     // the PDC plan has the same edges as with post-fader sends
@@ -179,7 +179,10 @@ TEST (audiox190aq_pre_fader_send_in_flp_and_als)
     const auto out = exportAls (s);
     CHECK (out.xml.find ("<SendPreBool Id=\"0\" Value=\"true\"") != std::string::npos);
     CHECK (exportAls (plain).xml.find ("<SendPreBool Id=\"0\" Value=\"true\"") == std::string::npos);
-    const auto back = importAls (out.bytes, als181c::options());
+    AlsImportOptions importOptions;
+    importOptions.common.projectFolder = "E:/sets";
+    importOptions.common.fileExists = [] (const std::string&) { return true; };
+    const auto back = importAls (out.bytes, importOptions);
     CHECK (back.has_value());
     if (back)
     {
@@ -239,7 +242,7 @@ inline lynx::Song lowLatencySong()
 {
     using namespace lynx;
     Song s;
-    s.mixer = Song::defaultMixer (5);
+    s.mixer = Song::defaultMixer (4); // the Master and inserts 1 to 4
     s.mixer[1].inputChannel = 0;
     s.mixer[1].recordSource = RecordSource::externalInput;
     s.mixer[1].effects.push_back (latentSlot ("lat100"));
