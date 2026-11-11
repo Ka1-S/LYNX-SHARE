@@ -56,6 +56,7 @@
 #include "core/FlSamplers.h"
 #include "core/Fpc.h"
 #include "core/FpcInstrument.h"
+#include "core/FpcEnvelope.h"
 #include "core/FlSynths.h"
 #include "core/Inflate.h"
 #include "core/WavPack.h"
