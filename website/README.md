@@ -92,6 +92,35 @@ over with `assets/img/logo.png`; see the note at the top of the script. The 0.1.
 (103 editors, and `assets/img/eq.webp` is a copy of one): at the 0.1.26 release, whose program draws the vector
 pepper itself, render them again and leave `R/logo-<version>.png` out so nothing is painted.
 
+## 0.1.26 release: pictures and catalogue still to do (texts are ready)
+
+The 0.1.26 texts are in the page sources; every picture is still from 0.1.25. No picture was added or changed for
+0.1.26, because pictures must come from the released build. At the release, from the 0.1.26 build:
+
+- **Windows and features** (bump `?v=0.1.25` to `?v=0.1.26` in `_src/pages/*.html` after replacing each file):
+  `assets/img/hero.webp`, `playlist.webp`, `rack.webp`, `pianoroll.webp`, `mixer.webp`, `synth.webp`, `eq.webp`,
+  `automation.webp`, `cliplaunch.webp` (now with the Clip View and Device View), and `assets/media/poster.jpg`.
+  `lynx-tour.mp4` and `demo.mp3` are from 0.1.23: re-render or keep the line that says so.
+- **Painted logos**: the 103 plugin editors in `assets/img/plugins/` whose header logo was painted over, and
+  `assets/img/eq.webp` (a copy of one). 0.1.26 draws the vector pepper itself: render them again with
+  `import-shots.py` and leave `R/logo-<version>.png` out so nothing is painted.
+- **Why LYNX pictures and captions**: the three captions that say "0.1.25" (`why.online.cap`, `why.work.cap`,
+  `why.crash.cap`) go with their pictures: change the text (and drop the key from the 14 language files) when the
+  picture is replaced. A shot of the Share plugins dialog and of the Simple workflow would fit the new paragraphs.
+- **New pictures the texts would carry** (none is referenced yet, so nothing is broken without them): Simple
+  workflow, Clip View with racks, Slicex and FPC editors, Freeze in the Channel rack, the loudness meter.
+- **Catalogue** (`_src/catalog.json`, 167 entries, all from 0.1.25): 0.1.26 adds Slicex, FPC, Strike Shaper, GMSynth
+  (FLM) and the Pocket effects (Distortion, Limiter, Limiter Classic, Leveller, Gate, Trance Delay, Tape Delay,
+  MultiFX, Autoduck, Chorus, Spacer, Stereoizer, Wow & Flutter, Phaser, Flanger, Tremolo, Waveshaper, Compressor,
+  Spreader). Each needs an entry (`desc`, `wiki`), its picture and 14 translations; Compressor (FET), Apex Limiter
+  (Levelling), LYNX Tune (Breathiness), Fruity Slicer (envelope page) and LYNX Dance (sprite sheets) need their
+  pictures and wiki tables refreshed.
+- **Wiki**: Simple layout, Layouts, File formats, Coming from Ableton Live and Coming from FL Studio are updated.
+  Still written for 0.1.25: Plugins (docked windows, Reload, Pin on top), Mixer, Playlist, Piano roll, MIDI
+  controllers (profiles, MPE), Online sessions (shared plugins), Recording, Settings (LYNX extras), Shortcuts (its
+  summary names 0.1.25) and Command line.
+- The Updates entry's `date` is 2026-11-11, the day it was written: set the release day.
+
 ## Other notes
 
 - **Wiki pages**: one markdown file each, with `title`, `summary` and `status` (`full` or `short`) in the front
