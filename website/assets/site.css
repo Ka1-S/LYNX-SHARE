@@ -335,3 +335,6 @@ footer .wrap{display:flex;gap:14px 20px;align-items:center;flex-wrap:wrap}
 footer .links2{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px 18px}
 footer a:hover{color:var(--text)}
 footer .legal{flex-basis:100%;font-size:12.5px;margin-top:8px}
+
+/* ?shot (headless screenshots): nothing in motion */
+html.shot *{transition:none!important}
