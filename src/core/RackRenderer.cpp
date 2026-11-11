@@ -176,6 +176,8 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
 
         if (factories.pluginInstruments && ! channel.plugin.id.empty())
             instrument = factories.pluginInstruments (channel.plugin, sampleRate);
+        if (instrument != nullptr)
+            instrument->configure (channel, bpm); // (its outputs' routes, wrapper Processing › Connections, round 188d)
 
         return instrument != nullptr ? instrument : std::make_shared<SilentInstrument>();
     }
