@@ -153,7 +153,7 @@ public:
     ScrollingPage()
     {
         viewport.setViewedComponent (&content, false);
-        viewport.setScrollBarsShown (true, false, false, true);
+        viewport.setScrollBarsShown (true, true); // (sideways only below the page's minimumWidth, round 190bj)
         viewport.setScrollBarThickness (10);
         addAndMakeVisible (viewport);
     }
