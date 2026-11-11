@@ -43,6 +43,7 @@ struct TeardownTest : std::enable_shared_from_this<TeardownTest>
     std::atomic<int> pendingAfterDrop { -1 };
     std::atomic<double> dropMs { 0.0 };
     int linesBefore = 0, deferredBefore = 0;
+    double loopSince = 0.0;
 
     void fail (const juce::String& why)
     {
@@ -153,7 +154,22 @@ struct TeardownTest : std::enable_shared_from_this<TeardownTest>
             ClapPluginFormat::finishPendingTeardowns(); // (what the application's shutdown calls)
             return endRound();
         }
-        juce::Timer::callAfterDelay (200, [self = shared_from_this()] { self->endRound(); }); // the loop runs it
+        loopSince = juce::Time::getMillisecondCounterHiRes();
+        waitForLoop();
+    }
+
+    // back in the message loop, which runs the queued teardown among whatever else piled up while it was blocked (a
+    // timer may well come first): it must be gone within 5 s
+    void waitForLoop()
+    {
+        const auto waited = juce::Time::getMillisecondCounterHiRes() - loopSince;
+        if (ClapPluginFormat::pendingTeardowns() != 0 && waited < 5000.0)
+        {
+            juce::Timer::callAfterDelay (10, [self = shared_from_this()] { self->waitForLoop(); });
+            return;
+        }
+        report << "torn_down_by_loop_after_ms=" << juce::String (waited, 0) << "\n";
+        endRound();
     }
 
     void waitForWorker()
