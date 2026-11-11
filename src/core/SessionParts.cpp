@@ -89,7 +89,7 @@ bool targetIsTheirs (const Song& song, const AutomationTarget& t, std::uint32_t 
 }
 } // namespace
 
-SessionParticipant* invite (Song& host, const std::string& hostName, const std::string& guestName, std::uint32_t colour, bool keepFull)
+SessionParticipant* invite (Song& host, const std::string& hostName, const std::string& guestName, std::uint32_t colour, bool keepFull, int maxRecords)
 {
     auto& session = host.session;
     if (session.find (session::hostTag) == nullptr)
@@ -109,7 +109,7 @@ SessionParticipant* invite (Song& host, const std::string& hostName, const std::
             p.keepFull = keepFull;
             return &p;
         }
-    if ((int) session.participants.size() >= session::maxParticipants)
+    if ((int) session.participants.size() >= std::max (maxRecords, session::maxParticipants))
         return nullptr;
 
     std::uint32_t tag = session::hostTag;

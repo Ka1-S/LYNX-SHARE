@@ -90,6 +90,9 @@ public:
     // than one block (so the next block's position is never passed: the playhead only moves forward). 0 when stopped.
     double playheadAdvanceTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
+    // An audio clip's own audio through its channel's instrument (core renderClipAudio), at the engine's sample rate, with
+    // the samples, stretches and plugins the rack uses (round 189l, Make unique as sample). UI thread.
+    ClipAudio renderClipAudio (std::size_t clipIndex);
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
@@ -133,6 +136,28 @@ public:
 
     // Copies the plugins' current state into the Song (before saving).
     void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
+    // Round 190ao (Bitwig's "Reload plug-in"): a hosted plugin of a channel (track < 0) or a mixer slot that is down:
+    // it crashed inside a call and was switched off, or its separate process died or stopped responding.
+    struct HostedSlot
+    {
+        int channel = -1, track = -1, slot = -1;
+        bool operator== (const HostedSlot& o) const noexcept { return channel == o.channel && track == o.track && slot == o.slot; }
+    };
+    bool hostedPluginDown (HostedSlot where) const;
+    // The plugins that are down (channels first); `named`: only the ones with that PluginRef name.
+    std::vector<HostedSlot> downHostedPlugins (const std::string& named = {}) const;
+    // Starts those plugins again, each from its last captured state (a running plugin's is captured now; one that is
+    // down keeps what the last save, backup or capture took), without reopening the project. Only ever on request:
+    // a plugin that goes down again stays down until this is called again. The song and the undo history are not
+    // changed (close the plugins' windows first: a window keeps the old instance alive). Returns how many run again.
+    // Plugins inside a Patcher are not covered.
+    int reloadHostedPlugins (const std::vector<HostedSlot>& which);
+    // Round 190ao (pain point 13): a short C5 on the channel that hosts `plugin`, a moment from now (a preset was just
+    // loaded into it; the preset menu's "Play a note when a preset loads"). Only while the song is stopped; a note
+    // still sounding from the last call ends first. False when nothing will play (an effect, a plugin outside the
+    // Channel rack, the song playing or recording). auditionState: 0 idle, 1 waiting to start, 2 sounding (tests).
+    bool auditionPreset (const juce::AudioPluginInstance& plugin);
+    int auditionState() const noexcept { return auditionChannel < 0 ? 0 : auditionSounding ? 2 : 1; }
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
     void stampWorkTime();
@@ -571,11 +596,26 @@ public:
     // the time the last refresh took (ms), for --perf style measurements
     double getAutomationDisplayMs() const noexcept { return automationDisplayCostMs; }
     void setSong (Song newSong); // new/opened project: clears the history
+    // "Open without third-party plugins" (round 190ap, core/PluginHold.h): the project opens with every hosted plugin
+    // switched off (none is created; each slot keeps its saved settings untouched, also through a save). The next
+    // project this engine opens the plain way (setSong, an import) ends the mode.
+    void setSongWithPluginsOff (Song newSong);
+    bool pluginsOff() const;                              // the mode is on and this engine's project is the one it is for
+    std::vector<pluginhold::Use> hostedPluginUses() const; // the song's hosted plugins, each marked off or on
+    // Switches the plugin `id` back on ("" = all of them, which ends the mode): its slots are created from the settings
+    // in the project. Returns how many slots were built again.
+    int switchPluginOn (const std::string& id);
+    bool channelPluginOff (int channel) const noexcept { return std::find (channelsOff.begin(), channelsOff.end(), channel) != channelsOff.end(); }
+    bool insertPluginOff (int track) const noexcept { return std::find (insertsOff.begin(), insertsOff.end(), track) != insertsOff.end(); }
 
     // Edits the song and publishes it to audio. `undoable` edits go into the history;
     // all edits made while the same mouse click is held down
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
+    // FL's General › "Detach all new plugins" (issue #116; a UI setting, off by default as in FL): the plugins an edit
+    // adds start Detached (detachNewPlugins in core/Song.h)
+    void setDetachNewPlugins (bool on) noexcept { detachNewPluginsOn = on; }
+    bool detachesNewPlugins() const noexcept { return detachNewPluginsOn; }
 
     // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32, PR #37): the live plugin
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
@@ -807,6 +847,7 @@ public:
     const PdcPlan& getPdcPlan() const noexcept { return lastPublishedShape.pdc; }
 
 private:
+    bool detachNewPluginsOn = false;
     void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
                                            int numInputChannels,
                                            float* const* outputChannelData,
@@ -860,6 +901,7 @@ private:
     double previewVolume = 1.0;
     double editorVolume = 1.0;
     void publishSong();
+    RackState::Factories rackFactories();
     void adoptPrepared (PreparedFlp& prepared); // the plugins of a prepared import found / substituted (message thread)
 
     std::unique_ptr<WorkerPool> workers; // extra renderer threads (before the graph, which uses them)
@@ -984,6 +1026,15 @@ private:
         int channel = 0;
     };
     std::vector<NoteLock> noteLocks;
+    // Round 190ao: each channel's own velocity setting for played notes (a hosted instrument's PluginRef::velocityMode,
+    // low byte, and fixedVelocity, high byte; 0 = follow the MIDI settings), rebuilt on every publish; guarded by
+    // midiPrefsLock too
+    std::vector<std::uint16_t> channelVelocity;
+    // round 190ao: the preset audition's note (message thread: auditionPreset and the timer)
+    int auditionChannel = -1;
+    bool auditionSounding = false;
+    double auditionAtMs = 0.0;
+    void updateAudition();
     void logPlayedNote (int channel, int key, float velocity, bool on, double tick = -1.0, bool recorded = false);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;
@@ -1147,6 +1198,9 @@ private:
         bool outOfDate = false;
     };
     std::vector<FreezeCheck> freezeChecks;             // [channel] (freezeOutOfDate)
+    std::vector<int> channelsOff, insertsOff;         // (channelPluginOff / insertPluginOff, round 190ap), as of the last publish
+    bool rebuildPlugins = false;                      // switchPluginOn's publish: the slots of rebuildPluginId ("" = all) are created anew
+    std::string rebuildPluginId;
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
     // audio thread let go of are freed from a message of their own, not inside the timer callback that collected them.
     // A plugin whose editor is open dies when its window goes (the window closes the editor first). Declared after the

@@ -1,6 +1,7 @@
 #include "ui/TouchKeyboard.h"
 #include "core/NoteNames.h"
 
+#include <array>
 #include <map>
 
 #include "core/HeldNotes.h"
@@ -45,6 +46,14 @@ public:
     ~Keys() override { notes.releaseAll(); }
 
     void setLive (bool on) { live = on; }
+    // Keys held on the typing piano or a MIDI input (AudioEngine::heldInputKeyBits, all channels): drawn pressed too.
+    void setHeldElsewhere (std::array<std::uint64_t, 2> bits)
+    {
+        if (bits == elsewhere)
+            return;
+        elsewhere = bits;
+        repaint();
+    }
     void releaseAll() { notes.releaseAll(); }
     bool holding() const { return ! notes.empty(); }
 
@@ -58,6 +67,11 @@ public:
     {
         g.fillAll (theme::colour::bg0);
         const auto top = layout.lowest, last = layout.highest();
+        // the keys held here, and those held elsewhere: the computer keys or a MIDI keyboard (round 190t)
+        auto pressed = shown;
+        for (int key = 0; key < 128; ++key)
+            if ((elsewhere[(std::size_t) (key >> 6)] >> (key & 63) & 1u) != 0)
+                pressed.emplace (key, 0.8f);
         auto draw = [&] (bool black) {
             for (int key = top; key <= last + 1 && key <= 127; ++key)
             {
@@ -67,23 +81,23 @@ public:
                 if (r.x + r.w > layout.width + 0.5f)
                     continue;
                 auto box = juce::Rectangle<float> (r.x, r.y, r.w, r.h);
-                const auto held = shown.find (key);
+                const auto held = pressed.find (key);
                 if (! black)
                 {
                     box = box.reduced (1.0f, 0.0f).withTrimmedBottom (1.0f);
-                    g.setColour (held != shown.end() ? theme::colour::keyWhite.interpolatedWith (theme::colour::accent, 0.35f + 0.5f * held->second)
+                    g.setColour (held != pressed.end() ? theme::colour::keyWhite.interpolatedWith (theme::colour::accent, 0.35f + 0.5f * held->second)
                                                      : theme::colour::keyWhite);
                     g.fillRoundedRectangle (box, 3.0f);
-                    if (labels && (key % 12 == 0 || held != shown.end()))
+                    if (labels && (key % 12 == 0 || held != pressed.end()))
                     {
-                        g.setColour (held != shown.end() ? theme::colour::onAccent : juce::Colour (0xff6b707a));
+                        g.setColour (held != pressed.end() ? theme::colour::onAccent : juce::Colour (0xff6b707a));
                         g.setFont (theme::font (theme::type::caption, key % 12 == 0));
                         g.drawText (keyName (key), box.withTrimmedBottom (6.0f).toNearestInt(), juce::Justification::centredBottom);
                     }
                 }
                 else
                 {
-                    g.setColour (held != shown.end() ? theme::colour::accent.withMultipliedBrightness (0.6f + 0.4f * held->second) : theme::colour::keyBlack);
+                    g.setColour (held != pressed.end() ? theme::colour::accent.withMultipliedBrightness (0.6f + 0.4f * held->second) : theme::colour::keyBlack);
                     g.fillRoundedRectangle (box.withTrimmedTop (-3.0f), 3.0f);
                     g.setColour (juce::Colours::white.withAlpha (0.07f));
                     g.fillRect (box.reduced (3.0f, 0.0f).withTrimmedTop (box.getHeight() - 6.0f));
@@ -150,6 +164,7 @@ private:
     HeldNotes notes;
     std::map<int, int> tagKeys;
     bool live = true;
+    std::array<std::uint64_t, 2> elsewhere {};
 };
 
 class TouchKeyboardPanel final : public juce::Component,
@@ -202,7 +217,7 @@ public:
         addAndMakeVisible (target);
 
         if (liveMode)
-            startTimerHz (10);
+            startTimerHz (30); // (fast enough for the held keys to light as they are played)
         timerCallback();
         setSize (820, 210);
         layoutKeys();
@@ -267,6 +282,14 @@ private:
 
     void timerCallback() override
     {
+        std::array<std::uint64_t, 2> held {};
+        for (int midi = 0; midi < 16; ++midi)
+        {
+            const auto bits = engine.heldInputKeyBits (midi);
+            held[0] |= bits[0];
+            held[1] |= bits[1];
+        }
+        keys.setHeldElsewhere (held);
         const auto channel = engine.getSelectedChannel();
         if (channel != lastChannel)
         {

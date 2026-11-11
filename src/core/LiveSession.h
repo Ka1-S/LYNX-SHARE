@@ -29,7 +29,11 @@
 namespace lynx::live
 {
 // 2 (round 169j): resume after a drop, chat, transport, permissions during the session, live stand-ins, FLAC media
-constexpr int protocolVersion = 2;
+// 3 (round 190ah): a guest whose LYNX SHARE restarted resumes as itself ("bye" with its token when it does not),
+//   "perms" after a replayed resume, media limits ("limit")
+// 3 (round 190ai): P5-A1 remote plugins — PluginRef::playedBy / values, the host's "shared" and "rbusy" messages
+// 4: both rounds' 3 together (each was a 3 of its own on its branch: one number above both, so neither ever meets this)
+constexpr int protocolVersion = 4;
 // how many commits the host keeps to replay to someone who reconnects (§1.5; older: a fresh snapshot)
 constexpr std::size_t replayLimit = 4096;
 
@@ -220,6 +224,17 @@ public:
     // the host epoch the confirmed state belongs to (Authority::epoch)
     std::uint64_t epoch = 0;
 
+    // A guest's own LYNX SHARE restarted (round 190ah): its journal holds base() at baseRevision() — the confirmed
+    // state the working song was last rebased on — and the working song. A replica made again from those, then
+    // restored(), resumes like one whose connection dropped: the host replays what it missed (or sends a snapshot),
+    // and what the working song has on top of the base is proposed again with that old base (the conflict check
+    // judges it as it would have the first time). `firstSeq`: above every seq the earlier run used, so an answer to
+    // one of its proposals is never taken for an answer to a new one.
+    const Song& base() const noexcept { return applied; }
+    std::uint64_t baseRevision() const noexcept { return appliedRev; }
+    std::uint32_t sequence() const noexcept { return seq; }
+    void restored (std::uint32_t firstSeq);
+
 private:
     Song state;          // C
     Song applied;        // the C the working song was last rebased on
@@ -240,6 +255,42 @@ private:
 // when it still is as the step left it; entities someone else changed since are kept and listed in `skipped`. Redo
 // is the same call with before and after swapped.
 Song selectiveRevert (const Song& current, const Song& before, const Song& after, std::vector<Key>* skipped = nullptr);
+
+// --- media limits (round 190ah, ONLINE_SESSIONS.md §8.4) ------------------------------------------------------------
+
+// What one guest may send into a session before the host is asked (the host can raise it, per guest), and what one
+// session may move through the relay in all (fixed: the relay's own limit per room is above it). Bytes as they
+// travel (a FLAC pack counts as its packed size).
+constexpr std::int64_t guestMediaBytes = (std::int64_t) 1 << 30;
+constexpr std::int64_t sessionMediaBytes = (std::int64_t) 8 << 30;
+
+// The host's count of the session's media (kept in its journal).
+struct MediaBudget
+{
+    enum class Verdict
+    {
+        ok,
+        guestLimit,  // that guest has sent its share: the host is asked whether to raise it
+        sessionLimit // the session as a whole is at its limit
+    };
+    std::int64_t guestLimit = guestMediaBytes, sessionLimit = sessionMediaBytes;
+    std::int64_t session = 0;                      // media bytes the host sent and received so far
+    std::map<std::uint32_t, std::int64_t> used;    // by guest: what the host received from them
+    std::map<std::uint32_t, std::int64_t> raised;  // by guest: their own limit, once the host raised it
+
+    std::int64_t limitOf (std::uint32_t tag) const;
+    std::int64_t usedBy (std::uint32_t tag) const;
+    // A file of `bytes` that guest `tag` starts sending to the host.
+    Verdict admit (std::uint32_t tag, std::int64_t bytes) const;
+    // A file of `bytes` the host is about to send (or pass on) to a guest.
+    Verdict admitOut (std::int64_t bytes) const;
+    void received (std::uint32_t tag, std::int64_t bytes);
+    void sent (std::int64_t bytes);
+    // The host said yes: that guest's limit doubles until `bytes` more fit (never above the session's).
+    void raise (std::uint32_t tag, std::int64_t bytes);
+};
+// "1.5 GB", "320 MB" (for the messages; binary units, the way file managers on Windows show them)
+std::string mediaSize (std::int64_t bytes);
 
 // --- session chat (round 169j) ----------------------------------------------------------------------------------------
 

@@ -604,6 +604,54 @@ ui::Hint ChordPanel::hintAt (juce::Point<int>)
     return { tr ("Detected chord"), {}, false, false };
 }
 
+void KeyPanel::setText (const juce::String& keyName)
+{
+    if (keyName != text)
+    {
+        text = keyName;
+        repaint();
+    }
+}
+
+void KeyPanel::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    auto area = getLocalBounds();
+    g.setColour (isMouseOver (true) ? colour::bg2 : colour::bg1);
+    g.fillRoundedRectangle (area.toFloat(), radius::md);
+    area.reduce (7, 3);
+    // the menu arrow on the right
+    const auto arrow = area.removeFromRight (9).toFloat();
+    juce::Path tri;
+    tri.addTriangle (arrow.getX(), arrow.getCentreY() - 2.0f, arrow.getRight(), arrow.getCentreY() - 2.0f, arrow.getCentreX(), arrow.getCentreY() + 3.0f);
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+    area.removeFromRight (3);
+    // "Key" over the name (no key: "none", dimmed)
+    const auto caption = area.removeFromTop (juce::jmax (12, area.getHeight() * 2 / 5));
+    g.setFont (font (type::caption));
+    g.drawText (tr ("Key"), caption, juce::Justification::bottomLeft, false);
+    const auto none = text.isEmpty();
+    g.setColour (none ? colour::textSecondary : colour::textPrimary);
+    auto nameFont = font (type::body, ! none).withHeight (juce::jmin (17.0f, (float) area.getHeight() * 0.8f));
+    const auto shown = none ? tr ("none") : text;
+    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (nameFont, shown) > (float) area.getWidth(); ++i)
+        nameFont = nameFont.withHeight (nameFont.getHeight() * 0.92f);
+    g.setFont (nameFont);
+    g.drawText (shown, area, juce::Justification::centredLeft, true);
+}
+
+void KeyPanel::mouseDown (const juce::MouseEvent& e)
+{
+    if ((e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) && onClick)
+        onClick();
+}
+
+ui::Hint KeyPanel::hintAt (juce::Point<int>)
+{
+    return { tr ("Project key: the scale the song is in. Click to choose it, or to guess it from the notes"), {}, false, false };
+}
+
 void ChordHint::setText (const juce::String& newText)
 {
     if (newText != text)
@@ -1153,6 +1201,7 @@ Icon EditOverlay::groupIcon (toolbarlayout::Group g)
         case Group::output: return Icon::listen;
         case Group::chord: return Icon::pianoRoll;
         case Group::multilink: return Icon::link;
+        case Group::key: return Icon::scaleSnap;
         case Group::count_: break;
     }
     return Icon::none;

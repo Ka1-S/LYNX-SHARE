@@ -156,14 +156,18 @@ public:
     // the highest |value| among the 4 interpolated points of this sample period
     double push (double x) noexcept
     {
+        // the history is kept twice, newest first, so the taps read one run of memory with no wrap test (round 190am:
+        // a third of the time; the same products added in the same order, so the result is bit-identical)
+        pos = pos == 0 ? tapsPerPhase - 1 : pos - 1;
         hist[(std::size_t) pos] = x;
-        pos = (pos + 1) % tapsPerPhase;
+        hist[(std::size_t) (pos + tapsPerPhase)] = x;
+        const double* newest = &hist[(std::size_t) pos];
         double m = 0.0;
         for (int ph = 0; ph < phases; ++ph)
         {
             double s = 0.0;
             for (int k = 0; k < tapsPerPhase; ++k)
-                s += h[(std::size_t) ph][(std::size_t) k] * hist[(std::size_t) ((pos - 1 - k + tapsPerPhase * 2) % tapsPerPhase)];
+                s += h[(std::size_t) ph][(std::size_t) k] * newest[k];
             m = std::max (m, std::abs (s));
         }
         return m;
@@ -171,7 +175,7 @@ public:
 
 private:
     std::array<std::array<double, tapsPerPhase>, phases> h {};
-    std::array<double, tapsPerPhase> hist {};
+    std::array<double, tapsPerPhase * 2> hist {};
     int pos = 0;
 };
 

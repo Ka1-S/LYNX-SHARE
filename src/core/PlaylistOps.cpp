@@ -1,4 +1,5 @@
 #include "core/PlaylistOps.h"
+#include "core/QuickRender.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -538,6 +539,24 @@ int armableInsert (const Song& song, int track)
     return t.mode == PlaylistTrackMode::audio && t.mixerTrack > 0 && t.mixerTrack < (int) song.mixer.size() ? t.mixerTrack : -1;
 }
 
+int meteredInsert (const Song& song, int track, const HeaderOptions& options)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return -1;
+    const auto& t = song.playlistTracks[(std::size_t) track];
+    if (t.mode == PlaylistTrackMode::audio)
+        return options.audioLevels ? armableInsert (song, track) : -1;
+    if (t.mode != PlaylistTrackMode::instrument || ! options.instrumentLevels)
+        return -1;
+    // the channel's own route (it may have moved since the track was made); the linked mixer track without a channel
+    if (t.channel >= 0 && t.channel < (int) song.channels.size())
+    {
+        const auto m = song.channels[(std::size_t) t.channel].mixerTrack;
+        return m >= 0 && m < (int) song.mixer.size() ? m : -1;
+    }
+    return t.mixerTrack >= 0 && t.mixerTrack < (int) song.mixer.size() ? t.mixerTrack : -1;
+}
+
 namespace
 {
 int audioMixerOf (const Song& song, int track)
@@ -629,6 +648,94 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
             }
     }
     return changed;
+}
+
+HeaderDropOptions& headerDropOptions() noexcept
+{
+    static HeaderDropOptions options;
+    return options;
+}
+
+bool dropOnHeader (Song& song, int track, const std::string& path, const std::string& name, std::int64_t lengthTicks, HeaderDrop how, bool lock)
+{
+    if (track < 0 || track >= 500 || how == HeaderDrop::ask || path.empty())
+        return false;
+    if (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode != PlaylistTrackMode::unassigned)
+        return false; // (FUN_00e71980: only an unassigned track takes a header drop)
+    const auto before = song; // (all or nothing)
+    auto fail = [&song, &before] {
+        song = before;
+        return false;
+    };
+
+    auto newChannel = [&song, &name, &path] (InstrumentKind kind) {
+        ChannelDef c;
+        c.name = quickrender::uniqueChannelName (song, name);
+        c.instrument = kind;
+        c.samplePath = path;
+        if (kind == InstrumentKind::audioClip)
+            c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
+        song.channels.push_back (c);
+        return (int) song.channels.size() - 1;
+    };
+    auto placeAudio = [&song, track, lengthTicks] (int channel) {
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = channel;
+        clip.track = track;
+        clip.start = 0;
+        clip.length = std::max<std::int64_t> (1, lengthTicks);
+        song.playlist.push_back (clip);
+        followAudioTracks (song, { (int) song.playlist.size() - 1 });
+    };
+
+    if (how == HeaderDrop::audioClips)
+    {
+        int channel = -1;
+        for (int c = 0; c < (int) song.channels.size(); ++c)
+            if (song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip && song.channels[(std::size_t) c].samplePath == path)
+                channel = c;
+        if (channel < 0)
+        {
+            channel = newChannel (InstrumentKind::audioClip);
+            song.channels[(std::size_t) channel].mixerTrack = song.claimFreeInsert();
+        }
+        auto* t = trackAt (song, track);
+        t->name = song.channels[(std::size_t) channel].name;
+        if (const auto colour = song.channels[(std::size_t) channel].colour; colour != 0)
+            t->colour = colour;
+        placeAudio (channel);
+    }
+    else if (how == HeaderDrop::audioTracks)
+    {
+        const auto channel = newChannel (InstrumentKind::audioClip);
+        auto* t = trackAt (song, track);
+        t->name = song.channels[(std::size_t) channel].name;
+        if (! makeAudioTrack (song, track))
+            return fail();
+        placeAudio (channel); // (routed to the track's mixer track by followAudioTracks)
+    }
+    else
+    {
+        const auto channel = newChannel (InstrumentKind::sampler);
+        trackAt (song, track)->name.clear(); // (named after its channel)
+        if (! makeInstrumentTrack (song, track, channel))
+            return fail();
+        const auto pattern = instrumentTrackPattern (song, track);
+        if (pattern < 0)
+            return fail();
+        Clip clip;
+        clip.kind = ClipKind::pattern;
+        clip.pattern = pattern;
+        clip.track = track;
+        clip.start = 0;
+        clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
+        song.playlist.push_back (clip);
+    }
+    if (lock)
+        trackAt (song, track)->lockedToContent = true;
+    song.mode = PlayMode::song;
+    return true;
 }
 
 } // namespace lynx::trackmodes

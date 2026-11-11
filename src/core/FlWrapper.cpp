@@ -126,7 +126,23 @@ bool parseFlWrapper (const std::vector<std::uint8_t>& blob, ForeignPlugin& out)
                     }
                 }
                 break;
-            default: break; // pins: LYNX does not need them
+            case 0x1F: // Processing › Connections, round 188d [DATA]: 12 bytes per input / output
+            case 0x20:
+            {
+                auto& list = id == 0x1F ? out.inputRoutes : out.outputRoutes;
+                list.clear();
+                for (std::size_t k = 0; k + 12 <= n && list.size() < 256; k += 12)
+                {
+                    std::int32_t offset = 0;
+                    std::uint32_t active = 1;
+                    std::memcpy (&offset, p + k, 4);
+                    std::memcpy (&active, p + k + 4, 4);
+                    list.push_back ({ std::clamp (offset, -999, 999), (std::int8_t) (active != 0 ? 1 : 0) });
+                }
+                out.hasRoutes = true;
+                break;
+            }
+            default: break; // 0x1E (the counts): the lists carry them
         }
     });
 
@@ -147,8 +163,20 @@ bool parseFlWrapper (const std::vector<std::uint8_t>& blob, ForeignPlugin& out)
 
 void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
 {
+    // Processing › Connections (round 188d): the inputs and outputs as FL routed them (a generator's outputs: mixer
+    // track offsets; an effect's: sidechain indexes)
+    if (w.hasRoutes)
+    {
+        ref.outputs = w.outputRoutes;
+        ref.inputs = w.inputRoutes;
+        trimOutputRoutes (ref.outputs);
+        trimOutputRoutes (ref.inputs);
+    }
     if (! w.hasWrapperOptions || (w.wrapperFlags & 0x400000u) != 0)
         return;
+    // "Process inactive inputs and outputs" (flag 0x8, round 188d [DATA: mo-a / mo-b saves])
+    if (w.wrapperVersion >= 10)
+        ref.processInactive = (w.wrapperFlags & 0x8u) != 0;
     ref.fixedBuffers = (w.wrapperFlags & 0x2u) != 0;
     ref.notifyRender = (w.wrapperFlags & 0x4u) != 0; // "Notify about rendering mode" (REA round 134)
     ref.maxSizeBuffers = ref.fixedBuffers && (w.fixedOptions & 0x1u) != 0;
@@ -369,6 +397,8 @@ const std::vector<WrapperOption>& wrapperOptions()
         { "Processing", "Allow threaded processing", "Allow the plugin to be multi-threaded (off: always on the audio thread)", &PluginRef::threaded, false, false },
         { "Processing", "Make bridged", "Load the plugin in a separate process (bridged)", &PluginRef::separateProcess, true, false },
         { "Processing", "Allow smart disable", "Allow smart disable for the plugin (off: it is always processed)", &PluginRef::allowSmartDisable, false, false },
+        // round 188d [EXEC]: on, an output whose LED is off still plays on its insert
+        { "Processing", "Process inactive inputs and outputs", "Process inputs and outputs marked as inactive", &PluginRef::processInactive, false, false },
         { "MIDI", "Send note release velocity", "Send release velocity in note off messages", &PluginRef::releaseVelocity, true, false },
         { "MIDI", "Send pitch bend range (semitones)", "Send a pitch bend range MIDI RPN", &PluginRef::sendBendRange, true, false },
         { "MIDI", "Send MOD X as polyphonic aftertouch", "Send each note's Modulation X as polyphonic aftertouch", &PluginRef::modXAftertouch, true, false },

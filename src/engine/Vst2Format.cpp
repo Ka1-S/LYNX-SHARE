@@ -64,7 +64,7 @@ enum : std::int32_t
     open = 0, close = 1, setProgram = 2, getProgram = 3, getProgramName = 5, getParamLabel = 6, getParamDisplay = 7,
     getParamName = 8, setSampleRate = 10, setBlockSize = 11, mainsChanged = 12, editGetRect = 13, editOpen = 14,
     editClose = 15, editIdle = 19, getChunk = 23, setChunk = 24, processEvents = 25, getProgramNameIndexed = 29,
-    getOutputProperties = 34, getPlugCategory = 35, getEffectName = 45, getVendorString = 47, getProductString = 48, getVendorVersion = 49,
+    getInputProperties = 33, getOutputProperties = 34, getPlugCategory = 35, getEffectName = 45, getVendorString = 47, getProductString = 48, getVendorVersion = 49,
     canDo = 51, getTailSize = 52, getVstVersion = 58, beginSetProgram = 67, endSetProgram = 68,
     shellGetNextPlugin = 70, startProcess = 71, stopProcess = 72
 };
@@ -539,24 +539,31 @@ private:
         BusesProperties buses;
         auto set = [] (int channels) { return channels >= 2 ? juce::AudioChannelSet::stereo() : juce::AudioChannelSet::mono(); };
         if (! instrument && e.numInputs > 0)
-            buses = buses.withInput ("Input", set (e.numInputs), true);
+        {
+            buses = buses.withInput (pinName (e, 0, true).first, set (e.numInputs), true);
+            // round 188d: the other inputs in stereo pairs (the second one is the side input LYNX feeds from the
+            // slot's sidechain, as FL's Connections index 1 does), named as the plugin names its pins
+            for (int ch = 2; ch < e.numInputs; ch += 2)
+                buses = buses.withInput (pinName (e, ch, true).first, set (e.numInputs - ch), true);
+        }
         if (e.numOutputs > 0)
-            buses = buses.withOutput (outputPin (e, 0).first, set (e.numOutputs), true);
+            buses = buses.withOutput (pinName (e, 0, false).first, set (e.numOutputs), true);
         // Issue #114: the other outputs, in stereo pairs (a last odd one mono), each a bus named as the plugin names
         // its pins (effGetOutputProperties) and on by default as it flags them, as FL's wrapper lists them in
         // Processing › Connections
         for (int ch = 2; ch < e.numOutputs; ch += 2)
         {
-            const auto [name, active] = outputPin (e, ch);
+            const auto [name, active] = pinName (e, ch, false);
             buses = buses.withOutput (name, set (e.numOutputs - ch), active);
         }
         return buses;
     }
 
-    // An output pin's label (VstPinProperties: char label[64] first), else "Output n" for its pair; and whether it is
-    // active (kVstPinIsActive; a plugin that does not answer: active)
-    static std::pair<juce::String, bool> outputPin (const abi::Effect& e, int channel)
+    // A pin's label (VstPinProperties: char label[64] first), else "Output n" / "Input n" for its pair; and whether it
+    // is active (kVstPinIsActive; a plugin that does not answer: active)
+    static std::pair<juce::String, bool> pinName (const abi::Effect& e, int channel, bool input)
     {
+        const auto fallback = juce::String (input ? "Input " : "Output ") + juce::String (channel / 2 + 1);
         struct Pin
         {
             char label[64];
@@ -564,13 +571,13 @@ private:
             char shortLabel[8], future[48];
         } pin {};
         auto& effect = const_cast<abi::Effect&> (e);
-        if (effect.dispatcher (&effect, abi::getOutputProperties, channel, 0, &pin, 0.0f) != 0)
+        if (effect.dispatcher (&effect, input ? abi::getInputProperties : abi::getOutputProperties, channel, 0, &pin, 0.0f) != 0)
         {
             pin.label[63] = 0;
             const auto text = juce::String::fromUTF8 (pin.label).trim();
-            return { text.isNotEmpty() ? text : "Output " + juce::String (channel / 2 + 1), (pin.flags & 1) != 0 };
+            return { text.isNotEmpty() ? text : fallback, (pin.flags & 1) != 0 };
         }
-        return { "Output " + juce::String (channel / 2 + 1), true };
+        return { fallback, true };
     }
 
     void updateTimeInfo (int)

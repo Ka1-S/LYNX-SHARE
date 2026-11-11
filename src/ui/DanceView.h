@@ -26,12 +26,22 @@ juce::Rectangle<float> reach (juce::Point<float> feet, float height);
 } // namespace dancer
 
 // Over the workspace: one dancer per visible dance channel. Only the dancers take the mouse.
+// Issue #116 slice 4 (round 188j): with docked plugin windows the panels and plugin editors are native child windows,
+// which hide anything the main window's components draw. There (Windows, macOS: nativechild::supportsFloaters) each
+// shown dancer gets a window of its own: a small transparent native child of the main window over its reach, kept in
+// front of the panels and docked plugins, whose transparent pixels let the clicks through to what is under it. None
+// exists without a shown dancer. Without a native main window (pictures), or with docking off, the stage draws them.
 class DanceStage final : public juce::Component,
                          private juce::Timer
 {
 public:
     explicit DanceStage (AudioEngine& engine);
     ~DanceStage() override;
+
+    // --plugwintest: the dancer's own window (nullptr: none, the stage draws it) and its body in stage coordinates
+    juce::Component* windowOf (int channel) const;
+    juce::Rectangle<int> bodyOf (int channel) const;
+    int windowCount() const;
 
     void paint (juce::Graphics& g) override;
     bool hitTest (int x, int y) override;
@@ -55,12 +65,18 @@ private:
         std::shared_ptr<Instrument> instrument;
         juce::Rectangle<float> bounds; // painted last
         bool drawn = false;
+        std::unique_ptr<juce::Component> window; // its own native window (see above), or nullptr
     };
+    class Window;
 
     void timerCallback() override;
     void scan();
     juce::Rectangle<float> boxOf (const Dancer& d) const;
-    Dancer* dancerAt (juce::Point<float> p);
+    Dancer* dancerAt (juce::Point<float> p, bool withWindows = false);
+    static juce::Rectangle<float> bodyBox (const Dancer& d);
+    bool windowed() const;                                // the dancers have windows of their own now
+    void syncWindow (Dancer& d, bool windows);            // made, placed, shown / hidden as the dancer is
+    void invalidate (Dancer& d, juce::Rectangle<float> r); // its window, or the stage's area r
     void showMenu (Dancer& d);
     void save (int channel, const dance::Settings& s);
 
@@ -70,6 +86,7 @@ private:
     bool wasPlaying = false;
     int scanCountdown = 0;
     int dragging = -1;
+    bool hadWindows = false;
     juce::Point<int> dragOffset;
 };
 

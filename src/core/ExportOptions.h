@@ -108,6 +108,10 @@ struct Options
     // that item only (not remembered); the target is remembered.
     bool master = false;
     double masterLufs = -14.0;
+    // Round 190ap (LYNX's own, off by default): "One file per marker section" — the song is cut at its Playlist
+    // markers and each section becomes a file named after its marker ("<name> - 02 Verse"); with stems, each section
+    // gets its stems. Song range only (markerSections).
+    bool sections = false;
 
     bool operator== (const Options&) const = default;
 };
@@ -188,6 +192,68 @@ Song makeChannelStemSong (const Song& song, int channel, bool dry = false);
 
 // "<base> - <number> <name><ext>" with characters that are illegal in file names replaced.
 std::string stemFileName (const std::string& base, int number, const std::string& name, const char* ext);
+
+// --- one file per marker section (round 190ap) ----------------------------------------------------------------------
+// A stretch of the song between two Playlist markers.
+struct Section
+{
+    std::string name;            // the marker's name ("Start" before the first marker; "Marker 3" for a nameless one)
+    std::int64_t start = 0, end = 0; // ticks
+    bool operator== (const Section&) const = default;
+};
+
+// The song's sections: the plain Playlist markers (not the actions, not the time signatures: the same ones that become
+// cue points) cut the arrangement from its start to its end. What lies before the first marker is the section "Start";
+// markers at the same place count once; an empty stretch and markers at or after the song's end give no section.
+// No marker: empty (there is nothing to split by).
+std::vector<Section> markerSections (const Song& song);
+
+// The song with `section` as its time selection, to be rendered with Range::selection (so the clips that cross its
+// edges are cut there, as for any selection).
+Song makeSectionSong (const Song& song, const Section& section);
+// `o` as each section is rendered with: the selection range, once (a section is not looped).
+Options sectionOptions (Options o);
+// Whether an export with `o` is split by sections: the option is on, the range is the song and it has markers.
+bool exportsSections (const Song& song, const Options& o);
+
+// "<base> - <NN> <name>" (no extension: the stems of a section add theirs): the number is the section's place, two
+// digits (three from 100 sections on) so the files sort in song order; illegal file name characters replaced.
+std::string sectionBaseName (const std::string& base, int number, int count, const std::string& name);
+
+// How many files an export writes with `o`: one per format, times the stems (and the full mix), times the sections.
+int fileCount (const Song& song, const Options& o, const std::vector<int>& onlyTracks = {});
+
+// --- export presets (round 190ap) -------------------------------------------------------------------------------------
+// The window's choices under a name ("Stems for mixing", "MP3 demo"), kept between sessions.
+struct Preset
+{
+    std::string name;
+    Options options;
+    bool operator== (const Preset&) const = default;
+};
+// A preset's name as it is kept: one line, no brackets at the ends, trimmed, at most 60 characters ("" = not a name).
+std::string cleanPresetName (const std::string& name);
+// The presets' file: "[name]" then the options' "key=value" lines, one block per preset, in the list's order.
+std::string presetsToText (const std::vector<Preset>& presets);
+std::vector<Preset> presetsFromText (const std::string& text);
+// `presets` with `preset` added, or replacing the one of the same name (compared without case); the list stays sorted
+// by name.
+std::vector<Preset> withPreset (std::vector<Preset> presets, Preset preset);
+std::vector<Preset> withoutPreset (std::vector<Preset> presets, const std::string& name);
+
+// "Same as last time": what the last export was made with and where it went (the full path of the file chosen then,
+// extension included). `file` empty = nothing was exported yet.
+struct LastExport
+{
+    Options options;
+    std::string file;
+    bool operator== (const LastExport&) const = default;
+};
+std::string lastExportToText (const LastExport& last);
+LastExport lastExportFromText (const std::string& text);
+// The file the same export writes for a project named `projectName` now: the last folder, the project's name, the
+// last format's extension ("" when there is no last export or no name).
+std::string sameAsLastFile (const LastExport& last, const std::string& projectName);
 
 // --- post-processing of the rendered audio --------------------------------------------------------------------------
 

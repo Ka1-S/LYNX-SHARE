@@ -71,4 +71,16 @@ private:
     void run (std::string url, std::string token, std::string userAgent);
     friend struct Impl;
 };
+
+// One small HTTP(S) request with the same system libcurl (round 190ah). Linux only: this build's JUCE has no TLS of
+// its own there (JUCE_USE_CURL=0) and its plain-HTTP POST is refused by the relay, so a Linux host could never open
+// a room. Windows and macOS keep the system's own HTTP through juce::URL (httpAvailable() is false there).
+struct HttpAnswer
+{
+    int status = 0;   // 0: no connection
+    std::string body;
+};
+bool httpAvailable();
+HttpAnswer http (const std::string& method, const std::string& url, const std::vector<std::string>& headers, const std::string& body,
+                 const std::string& userAgent, int timeoutSeconds);
 } // namespace lynx::livelink

@@ -144,31 +144,60 @@ class StemsThread final : public juce::ThreadWithProgressWindow
 public:
     StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {},
                  std::function<void (const std::vector<juce::File>&)> done = {})
-        : juce::ThreadWithProgressWindow (tr ("Exporting stems..."), true, true),
+        : juce::ThreadWithProgressWindow (exportopts::exportsSections (e.getSong(), o) && o.stems == exportopts::Stems::none ? tr ("Exporting sections...")
+                                                                                                                         : tr ("Exporting stems..."),
+                                          true, true),
           afterRender (std::move (done)),
           options (o),
           baseFile (std::move (base)),
           song (e.getSong())
     {
-        const auto ext = exportopts::extension (options.format);
-        const auto baseName = baseFile.getFileNameWithoutExtension().toStdString();
+        // round 190ap: "One file per marker section" — each section is rendered as a time selection of the song, alone
+        // ("<name> - 02 Verse.wav") or with its stems ("<name> - 02 Verse - 3 Bass.wav")
+        if (exportopts::exportsSections (song, options))
+        {
+            sectioned = true;
+            const auto ext = exportopts::extension (options.format);
+            const auto sections = exportopts::markerSections (song);
+            const auto each = exportopts::sectionOptions (options);
+            const auto baseName = baseFile.getFileNameWithoutExtension().toStdString();
+            for (std::size_t i = 0; i < sections.size(); ++i)
+            {
+                const auto name = exportopts::sectionBaseName (baseName, (int) i + 1, (int) sections.size(), sections[i].name);
+                const auto file = baseFile.getSiblingFile (juce::String::fromUTF8 (name.c_str()) + ext);
+                const auto part = exportopts::makeSectionSong (song, sections[i]);
+                if (each.stems == exportopts::Stems::none)
+                    items.push_back ({ juce::String::fromUTF8 (sections[i].name.c_str()), file, part, each });
+                else
+                    addItems (part, each, file, onlyTracks, juce::String::fromUTF8 (sections[i].name.c_str()) + ": ");
+            }
+            return;
+        }
+        addItems (song, options, baseFile, onlyTracks, {});
+    }
+
+    // the files of one render set: the full mix when asked, then one per channel or insert
+    void addItems (const Song& from, const exportopts::Options& o, const juce::File& base, const std::vector<int>& onlyTracks, const juce::String& prefix)
+    {
+        const auto ext = exportopts::extension (o.format);
+        const auto baseName = base.getFileNameWithoutExtension().toStdString();
         auto file = [&] (int number, const std::string& name) {
-            return baseFile.getSiblingFile (juce::String::fromUTF8 (exportopts::stemFileName (baseName, number, name, ext).c_str()));
+            return base.getSiblingFile (juce::String::fromUTF8 (exportopts::stemFileName (baseName, number, name, ext).c_str()));
         };
 
-        if (options.stemsIncludeMaster)
-            items.push_back ({ juce::String ("Master"), baseFile, song });
+        if (o.stemsIncludeMaster)
+            items.push_back ({ prefix + juce::String ("Master"), base, from, o });
 
-        if (options.stems == exportopts::Stems::channels || options.stems == exportopts::Stems::channelsDry)
-            for (auto c : exportopts::stemChannels (song, options.range))
-                items.push_back ({ juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), file (c + 1, song.channels[(std::size_t) c].name),
-                                   exportopts::makeChannelStemSong (song, c, options.stems == exportopts::Stems::channelsDry) });
+        if (o.stems == exportopts::Stems::channels || o.stems == exportopts::Stems::channelsDry)
+            for (auto c : exportopts::stemChannels (from, o.range))
+                items.push_back ({ prefix + juce::String::fromUTF8 (from.channels[(std::size_t) c].name.c_str()), file (c + 1, from.channels[(std::size_t) c].name),
+                                   exportopts::makeChannelStemSong (from, c, o.stems == exportopts::Stems::channelsDry), o });
         else
-            for (auto t : exportopts::stemTracks (song, onlyTracks))
-                items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()),
-                                   ! onlyTracks.empty() && recordToFile (song, t) != juce::File() ? recordToFile (song, t).withFileExtension (ext)
-                                                                                                  : file (t, song.mixer[(std::size_t) t].name),
-                                   makeBounceSong (song, t) });
+            for (auto t : exportopts::stemTracks (from, onlyTracks))
+                items.push_back ({ prefix + juce::String::fromUTF8 (from.mixer[(std::size_t) t].name.c_str()),
+                                   ! onlyTracks.empty() && recordToFile (from, t) != juce::File() ? recordToFile (from, t).withFileExtension (ext)
+                                                                                                  : file (t, from.mixer[(std::size_t) t].name),
+                                   makeBounceSong (from, t), o });
     }
 
     // FL's "Record <insert> to" file of an insert (round 167a): a track render writes there; none = File()
@@ -188,8 +217,8 @@ public:
             setStatusMessage (item.name);
 
             JobOnMessageThread slot (*this);
-            auto* job = slot.create ([&item, this] {
-                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+            auto* job = slot.create ([&item] {
+                auto j = std::make_unique<ExportJob> (item.song, item.options, item.file);
                 j->setExtraData (true);
                 return j;
             });
@@ -220,10 +249,12 @@ public:
         if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
         else if (! cancelled && written > 0)
-            ui::postHint ({ tr ("Stems exported") + ": " + tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }), {} },
+            ui::postHint ({ (sectioned ? tr ("Sections exported") : tr ("Stems exported")) + ": "
+                                + tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }),
+                            {} },
                           8000);
         else if (! cancelled)
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Stems exported"),
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, sectioned ? tr ("Sections exported") : tr ("Stems exported"),
                                                     tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }));
 
         juce::MessageManager::callAsync ([this] { delete this; });
@@ -235,7 +266,9 @@ private:
         juce::String name;
         juce::File file;
         Song song;
+        exportopts::Options options; // (a section is rendered as a selection of the song, round 190ap)
     };
+    bool sectioned = false;
     std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;
     juce::File baseFile;
@@ -249,6 +282,10 @@ juce::File exportSettingsFile()
 {
     return lynx::platform::settingsFile ("export-settings.txt");
 }
+
+// round 190ap: the named export presets, and what the last export was made with and where it went
+juce::File exportPresetsFile() { return lynx::platform::settingsFile ("export-presets.txt"); }
+juce::File exportLastFile() { return lynx::platform::settingsFile ("export-last.txt"); }
 
 // A row of buttons where exactly one is on (the output format).
 class Segmented final : public juce::Component
@@ -358,6 +395,16 @@ public:
             options = clipRenderOptions (clip->pattern);
             initialFormat = -1;
         }
+        // round 190ap: the plain Export window gets the presets row and "One file per marker section" (not the renders
+        // to an audio clip, a list of mixer tracks or the Master export)
+        additions = clip == nullptr && onlyTracks.empty();
+        if (! additions)
+            options.sections = false;
+        if (persistent && additions)
+        {
+            presets = exportopts::presetsFromText (exportPresetsFile().loadFileAsString().toStdString());
+            lastExport = exportopts::lastExportFromText (exportLastFile().loadFileAsString().toStdString());
+        }
         rememberedStems = options.stems;
         rememberedStemsMaster = options.stemsIncludeMaster;
         if (! onlyTracks.empty())
@@ -402,6 +449,28 @@ public:
         stemsMaster.setButtonText (tr ("Also the full mix"));
         stemsMaster.onClick = [this] { readControls(); };
         addAndMakeVisible (stemsMaster);
+        // round 190ap: the song cut at its Playlist markers, a file (or a set of stems) per section
+        sectionsToggle.setButtonText (tr ("One file per marker section"));
+        sectionsToggle.onClick = [this] { readControls(); };
+        addChildComponent (sectionsToggle);
+        sectionsToggle.setVisible (additions);
+        // round 190ap: named presets of these choices, and the last export again without the file dialog
+        settingsui::styleLabel (presetLabel, tr ("Preset"));
+        presetBox.setTextWhenNothingSelected (tr ("Choose a preset..."));
+        presetBox.setTextWhenNoChoicesAvailable (tr ("No presets yet"));
+        presetBox.setTooltip (tr ("Sets every choice of this window as it was when the preset was saved"));
+        presetBox.onChange = [this] { applyPreset(); };
+        savePresetButton.setTooltip (tr ("Keeps the choices of this window under a name"));
+        deletePresetButton.setTooltip (tr ("Removes the chosen preset"));
+        savePresetButton.onClick = [this] { savePreset(); };
+        deletePresetButton.onClick = [this] { deletePreset(); };
+        sameAsLastButton.onClick = [this] { exportSameAsLast(); };
+        for (auto* c : std::initializer_list<juce::Component*> { &presetLabel, &presetBox, &savePresetButton, &deletePresetButton, &sameAsLastButton })
+        {
+            addChildComponent (c);
+            c->setVisible (additions);
+        }
+        fillPresets ({});
         if (! onlyTracks.empty())
         {
             stemsBox.setEnabled (false);
@@ -532,7 +601,24 @@ public:
         writeControls();
         // round 167l: the height the content needs (a fixed 486 left an empty band above "Mix"): the taller column (the
         // right one with FLAC's two rows and, in some languages, "Also save" on its own line) plus the switches
-        setSize (620, 12 + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12);
+        setSize (620, wantedHeight());
+    }
+
+    // --versionsshot (round 190ap): the window's additions in use — two presets, one chosen, sections on, a last export
+    void setAdditionsForSnapshot()
+    {
+        exportopts::Options stems = options, demo = options;
+        stems.stems = exportopts::Stems::mixerTracks;
+        stems.range = exportopts::Range::song;
+        stems.sections = true;
+        demo.format = exportopts::Format::mp3;
+        presets = exportopts::withPreset (exportopts::withPreset ({}, { "Stems for mixing", stems }), { "MP3 demo", demo });
+        lastExport.options = demo;
+        lastExport.file = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("Exports").getChildFile ("Song.mp3").getFullPathName().toStdString();
+        snapshotLast = true;
+        options = stems;
+        fillPresets ("Stems for mixing");
+        writeControls();
     }
 
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
@@ -571,12 +657,31 @@ public:
         stemsBox.setVisible (false);
         stemsMaster.setVisible (false);
         realtimeToggle.setVisible (false);
+        // (the Master export keeps its own window: no presets row, no sections; round 190ap)
+        additions = false;
+        options.sections = false;
+        for (auto* c : std::initializer_list<juce::Component*> { &sectionsToggle, &presetLabel, &presetBox, &savePresetButton, &deletePresetButton, &sameAsLastButton })
+            c->setVisible (false);
         writeControls();
+        setSize (620, wantedHeight());
     }
 
     void resized() override
     {
         auto area = getLocalBounds().reduced (16, 12);
+        if (additions) // round 190ap: the presets row above the two columns
+        {
+            auto row = area.removeFromTop (26);
+            presetLabel.setBounds (row.removeFromLeft (theme::labelColumnWidth ({ &presetLabel }, 50, 110)));
+            sameAsLastButton.setBounds (row.removeFromRight (juce::jlimit (130, 200, sameAsLastButton.getBestWidthForHeight (26))));
+            row.removeFromRight (14);
+            deletePresetButton.setBounds (row.removeFromRight (72));
+            row.removeFromRight (6);
+            savePresetButton.setBounds (row.removeFromRight (72));
+            row.removeFromRight (8);
+            presetBox.setBounds (row);
+            area.removeFromTop (presetRowHeight - 26);
+        }
         auto buttons = area.removeFromBottom (32);
         cancelButton.setBounds (buttons.removeFromRight (96));
         buttons.removeFromRight (8);
@@ -650,6 +755,11 @@ public:
         else
             row (left, stemsLabel, stemsBox);
         stemsMaster.setBounds (left.removeFromTop (22).withTrimmedLeft (labelWidth));
+        if (sectionsToggle.isVisible())
+        {
+            left.removeFromTop (2);
+            sectionsToggle.setBounds (left.removeFromTop (22).withTrimmedLeft (labelWidth));
+        }
         if (! onlyTracks.empty())
         {
             left.removeFromTop (gap);
@@ -699,7 +809,10 @@ public:
         // a hairline between the two columns
         const auto x = 16 + (getWidth() - 32 - 24) / 2 + 12;
         g.setColour (theme::colour::border);
-        g.fillRect (x, 22, 1, juce::jmax (0, columnsBottom - 22 - 8));
+        const auto top = 22 + (additions ? presetRowHeight : 0);
+        g.fillRect (x, top, 1, juce::jmax (0, columnsBottom - top - 8));
+        if (additions) // (and one under the presets row)
+            g.fillRect (16, 12 + 26 + (presetRowHeight - 26) / 2, getWidth() - 32, 1);
     }
 
 private:
@@ -709,7 +822,7 @@ private:
     int columnsHeight()
     {
         constexpr int rowHeight = 26, gap = 7;
-        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
+        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (sectionsToggle.isVisible() ? 24 : 0) + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
         const auto columnWidth = (620 - 32 - 24) / 2;
         const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
         const auto ownLine = labelNeeds > (columnWidth - 4 * 54) * 11 / 10;
@@ -718,6 +831,138 @@ private:
         return juce::jmax (leftHeight, rightHeight);
     }
     int columnsBottom = 0;
+    static constexpr int presetRowHeight = 26 + 14;
+    int wantedHeight() { return 12 + (additions ? presetRowHeight : 0) + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12; }
+
+    // ---- round 190ap: presets and "same as last time" ------------------------------------------------------------
+    void fillPresets (const juce::String& select)
+    {
+        presetBox.clear (juce::dontSendNotification);
+        int id = 1, chosen = 0;
+        for (const auto& p : presets)
+        {
+            const auto name = juce::String::fromUTF8 (p.name.c_str());
+            presetBox.addItem (name, id);
+            if (name == select)
+                chosen = id;
+            ++id;
+        }
+        presetBox.setSelectedId (chosen, juce::dontSendNotification);
+        updatePresetButtons();
+    }
+
+    const exportopts::Preset* chosenPreset() const
+    {
+        const auto i = presetBox.getSelectedId() - 1;
+        return i >= 0 && i < (int) presets.size() ? &presets[(std::size_t) i] : nullptr;
+    }
+
+    // a preset's (or the last export's) choices as this window can take them now: the selection only when there is one
+    exportopts::Options fitted (exportopts::Options o) const
+    {
+        o.master = false;
+        if (o.range == exportopts::Range::selection && ! exportopts::hasSelection (engine.getSong()))
+            o.range = exportopts::Range::song;
+        return exportopts::clamped (o);
+    }
+
+    void applyPreset()
+    {
+        if (const auto* p = chosenPreset())
+        {
+            options = fitted (p->options);
+            realtime = false;
+            writeControls();
+        }
+        updatePresetButtons();
+    }
+
+    void updatePresetButtons()
+    {
+        deletePresetButton.setEnabled (chosenPreset() != nullptr);
+        const auto target = sameAsLastTarget();
+        sameAsLastButton.setEnabled (target != juce::File());
+        sameAsLastButton.setTooltip (target != juce::File()
+                                         ? tr ("Exports now with the choices of the last export, into the same folder, without asking for the file: {0}", { target.getFullPathName() })
+                                         : tr ("Exports again with the choices and the folder of the last export (nothing was exported yet)"));
+    }
+
+    void storePresets()
+    {
+        if (persistent)
+            exportPresetsFile().replaceWithText (juce::String::fromUTF8 (exportopts::presetsToText (presets).c_str()));
+    }
+
+    void savePreset()
+    {
+        readControls();
+        const auto* chosen = chosenPreset();
+        auto* w = new juce::AlertWindow (tr ("Save export preset"), tr ("A name for these export choices (an existing name is replaced)"), juce::MessageBoxIconType::NoIcon);
+        w->addTextEditor ("name", chosen != nullptr ? juce::String::fromUTF8 (chosen->name.c_str()) : juce::String());
+        w->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([w, safe = juce::Component::SafePointer<ExportPanel> (this)] (int result) {
+                                if (result != 1 || safe == nullptr)
+                                    return;
+                                const auto name = exportopts::cleanPresetName (w->getTextEditorContents ("name").toStdString());
+                                if (name.empty())
+                                    return;
+                                safe->presets = exportopts::withPreset (std::move (safe->presets), { name, safe->options });
+                                safe->storePresets();
+                                safe->fillPresets (juce::String::fromUTF8 (name.c_str()));
+                            }),
+                            true);
+    }
+
+    void deletePreset()
+    {
+        if (const auto* p = chosenPreset())
+        {
+            const auto name = p->name;
+            presets = exportopts::withoutPreset (std::move (presets), name);
+            storePresets();
+            fillPresets ({});
+        }
+    }
+
+    // where "Same as last time" writes: the last export's folder, this project's name, the last format
+    juce::File sameAsLastTarget() const
+    {
+        const auto path = exportopts::sameAsLastFile (lastExport, suggestedName.toStdString());
+        if (path.empty())
+            return {};
+        const juce::File file (juce::String::fromUTF8 (path.c_str()));
+        return snapshotLast || file.getParentDirectory().isDirectory() ? file : juce::File();
+    }
+
+    void exportSameAsLast()
+    {
+        const auto file = sameAsLastTarget();
+        if (file == juce::File())
+            return;
+        options = fitted (lastExport.options);
+        realtime = false;
+        writeControls();
+        presetBox.setSelectedId (0, juce::dontSendNotification);
+        // one file that is already there: ask once (the sets of stems and sections write beside it, as they did last time)
+        if (file.existsAsFile())
+        {
+            auto* w = new juce::AlertWindow (tr ("Same as last time"), tr ("{0} already exists. Replace it?", { file.getFullPathName() }), juce::MessageBoxIconType::QuestionIcon);
+            w->addButton (tr ("Replace"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+            w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            w->enterModalState (true, juce::ModalCallbackFunction::create ([file, safe = juce::Component::SafePointer<ExportPanel> (this)] (int result) {
+                                    if (result == 1 && safe != nullptr)
+                                    {
+                                        safe->rememberChoices();
+                                        safe->startExport (file);
+                                    }
+                                }),
+                                true);
+            return;
+        }
+        rememberChoices();
+        startExport (file);
+    }
 
     void close()
     {
@@ -756,6 +1001,7 @@ private:
             masterBox.setSelectedId (best, n);
         }
         stemsMaster.setToggleState (options.stemsIncludeMaster, n);
+        sectionsToggle.setToggleState (options.sections, n);
         formatButtons.setSelected ((int) options.format);
         depthBox.setSelectedItemIndex (options.format == Format::flac ? (options.flacBits == 16 ? 0 : 1) : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2), n);
         mp3Box.setSelectedItemIndex (indexOf (mp3Bitrates(), options.mp3Kbps), n);
@@ -796,6 +1042,7 @@ private:
         options.maxTailSeconds = tails[juce::jlimit (0, 3, tailLengthBox.getSelectedItemIndex())];
         options.stems = (Stems) juce::jmax (0, stemsBox.getSelectedItemIndex());
         options.stemsIncludeMaster = stemsMaster.getToggleState();
+        options.sections = additions && sectionsToggle.getToggleState();
         options.format = (Format) formatButtons.getSelected();
         if (options.format == previousFormat)
         {
@@ -837,6 +1084,9 @@ private:
             if (i != (int) previousFormat && alsoToggles[(std::size_t) i].getToggleState())
                 options.moreFormats |= 1u << i;
         options = clamped (options); // (the main format is not "more")
+        // (round 190ap: the preset's name stays only while the choices are still the preset's)
+        if (const auto* p = chosenPreset(); p != nullptr && ! (fitted (p->options) == options))
+            presetBox.setSelectedId (0, juce::dontSendNotification);
 
         if (options.format != previousFormat)
             writeControls(); // the bit depth list changes with the format
@@ -851,7 +1101,21 @@ private:
         depthBox.setItemEnabled (3, options.format == Format::wav);
         tailLengthBox.setEnabled (options.tail != TailMode::cut);
         stemsMaster.setEnabled (options.stems != Stems::none);
-        loopsBox.setEnabled (! realtime && clip == nullptr);
+        const auto& songNow = clip != nullptr ? clip->song : engine.getSong();
+        // round 190ap: split by the Playlist markers (the song range only; each section plays once)
+        const auto sectionList = additions ? markerSections (songNow) : std::vector<Section>();
+        const auto sectioned = additions && ! realtime && exportsSections (songNow, options);
+        sectionsToggle.setEnabled (additions && ! realtime && options.range == Range::song && ! sectionList.empty());
+        {
+            juce::StringArray names;
+            for (const auto& section : sectionList)
+                names.add (juce::String::fromUTF8 (section.name.c_str()));
+            sectionsToggle.setTooltip (sectionList.empty() ? tr ("The song is cut at its Playlist markers and each section becomes a file named after its marker. This song has no markers yet")
+                                                           : tr ("The song is cut at its Playlist markers and each section becomes a file named after its marker; with stems, each section gets its stems. Sections: {0}",
+                                                                 { names.joinIntoString (", ") }));
+        }
+        updatePresetButtons();
+        loopsBox.setEnabled (! realtime && clip == nullptr && ! sectioned);
         // a real-time bounce (round 165c): the device's rate, the song or the selection once, the Master's effects, the
         // playback quality, no stems — the controls it doesn't use are off
         for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &insertFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
@@ -901,7 +1165,10 @@ private:
             info << " " << tr ("(+ tail up to {0} s)", { juce::String ((int) options.maxTailSeconds) });
         if (options.format == Format::mp3 && mp3SampleRate (options.sampleRate) != options.sampleRate)
             info << "  ·  " << tr ("MP3 at {0} Hz", { juce::String ((int) mp3SampleRate (options.sampleRate)) });
-        if (options.stems == Stems::mixerTracks)
+        if (sectioned)
+            info << "  ·  " << tr ("{0} section(s)", { juce::String ((int) sectionList.size()) }) << "  ·  "
+                 << tr ("{0} file(s)", { juce::String (fileCount (song, options, onlyTracks)) });
+        else if (options.stems == Stems::mixerTracks)
             info << "  ·  " << tr ("{0} file(s)", { juce::String ((int) stemTracks (song, onlyTracks).size() + (options.stemsIncludeMaster ? 1 : 0)) });
         else if (options.stems == Stems::channels || options.stems == Stems::channelsDry)
             info << "  ·  " << tr ("{0} file(s)", { juce::String ((int) stemChannels (song, options.range).size() + (options.stemsIncludeMaster ? 1 : 0)) });
@@ -940,9 +1207,9 @@ private:
             mode->onRender (o);
     }
 
-    void chooseFile()
+    // the choices kept for the next time the window opens
+    void rememberChoices()
     {
-        readControls();
         if (persistent)
         {
             auto remembered = options; // (the locked stem choice of a track render is not remembered)
@@ -960,6 +1227,12 @@ private:
             }
             exportSettingsFile().replaceWithText (juce::String (exportopts::toText (remembered)));
         }
+    }
+
+    void chooseFile()
+    {
+        readControls();
+        rememberChoices();
 
         const auto o = options;
         const auto extension = juce::String (exportopts::extension (o.format));
@@ -991,10 +1264,8 @@ private:
                                                       : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
 
         chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (suggestedName + extension), "*" + extension);
-        auto& engineRef = engine;
-
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [this, o, extension, &engineRef, tracks = onlyTracks, realtime = realtime, after = afterRender] (const juce::FileChooser& fc) {
+                              [this, extension] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
 
                                   if (file == juce::File())
@@ -1002,37 +1273,51 @@ private:
 
                                   if (! file.hasFileExtension (extension))
                                       file = file.withFileExtension (extension);
-
-                                  lastFolder = file.getParentDirectory();
-                                  engineRef.capturePluginStates(); // the copy carries the current plugin state
-
-                                  if (realtime) // round 165c: through the device, in real time
-                                  {
-                                      auto job = std::make_unique<ExportJob> (engineRef, o, file);
-                                      job->setExtraData (true);
-                                      close(); // deletes this panel: no `this` after this point
-                                      auto* thread = new ExportThread (std::move (job), file, {}, tr ("Exporting in real time..."));
-                                      thread->reveal = o.showWhenDone;
-                                      thread->launchThread();
-                                      return;
-                                  }
-                                  if (o.stems != exportopts::Stems::none)
-                                  {
-                                      close();
-                                      (new StemsThread (engineRef, o, file, tracks, after))->launchThread();
-                                      return;
-                                  }
-
-                                  auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
-                                  job->setExtraData (true);
-                                  const auto withVideo = videoToggle.isVisible() && videoToggle.getToggleState() && o.range != exportopts::Range::pattern;
-                                  close(); // deletes this panel: no `this` after this point
-                                  auto* thread = new ExportThread (std::move (job), file);
-                                  thread->reveal = o.showWhenDone;
-                                  if (withVideo)
-                                      thread->then = [song = engineRef.getSong(), o, file] { writeVideoWithMix (song, o, file); };
-                                  thread->launchThread();
+                                  startExport (file);
                               });
+    }
+
+    // Renders to `file` with the window's choices (the file dialog's result, or "Same as last time"). Closes the window.
+    void startExport (juce::File file)
+    {
+        const auto o = options;
+        auto& engineRef = engine;
+        const auto tracks = onlyTracks;
+        const auto after = afterRender;
+        const auto inRealTime = realtime;
+        lastFolder = file.getParentDirectory();
+        // round 190ap: what "Same as last time" repeats (the plain Export window only)
+        if (persistent && additions)
+            exportLastFile().replaceWithText (juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));
+        engineRef.capturePluginStates(); // the copy carries the current plugin state
+
+        if (inRealTime) // round 165c: through the device, in real time
+        {
+            auto job = std::make_unique<ExportJob> (engineRef, o, file);
+            job->setExtraData (true);
+            close(); // deletes this panel: no `this` after this point
+            auto* thread = new ExportThread (std::move (job), file, {}, tr ("Exporting in real time..."));
+            thread->reveal = o.showWhenDone;
+            thread->launchThread();
+            return;
+        }
+        // (round 190ap: one file per marker section goes the same way as the stems: a list of renders)
+        if (o.stems != exportopts::Stems::none || exportopts::exportsSections (engineRef.getSong(), o))
+        {
+            close();
+            (new StemsThread (engineRef, o, file, tracks, after))->launchThread();
+            return;
+        }
+
+        auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
+        job->setExtraData (true);
+        const auto withVideo = videoToggle.isVisible() && videoToggle.getToggleState() && o.range != exportopts::Range::pattern;
+        close(); // deletes this panel: no `this` after this point
+        auto* thread = new ExportThread (std::move (job), file);
+        thread->reveal = o.showWhenDone;
+        if (withVideo)
+            thread->then = [song = engineRef.getSong(), o, file] { writeVideoWithMix (song, o, file); };
+        thread->launchThread();
     }
 
 public:
@@ -1058,6 +1343,15 @@ private:
     juce::Label rangeLabel, loopsLabel, tailLabel, tailLengthLabel, stemsLabel;
     juce::ComboBox rangeBox, loopsBox, tailBox, tailLengthBox, stemsBox;
     juce::ToggleButton stemsMaster;
+    // round 190ap: "One file per marker section", the presets row and "Same as last time"
+    bool additions = false;
+    juce::ToggleButton sectionsToggle;
+    juce::Label presetLabel;
+    juce::ComboBox presetBox;
+    juce::TextButton savePresetButton { tr ("Save...") }, deletePresetButton { tr ("Delete") }, sameAsLastButton { tr ("Same as last time") };
+    std::vector<exportopts::Preset> presets;
+    exportopts::LastExport lastExport;
+    bool snapshotLast = false; // --versionsshot: the last export's folder need not exist
     Segmented formatButtons { { "WAV", "MP3", "OGG", "FLAC" } };
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
     juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
@@ -1710,6 +2004,13 @@ std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int forma
 {
     auto panel = std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false);
     panel->setFormatForSnapshot (format);
+    return panel;
+}
+
+std::unique_ptr<juce::Component> makeExportPanelWithAdditions (AudioEngine& engine)
+{
+    auto panel = std::make_unique<ExportPanel> (engine, juce::File(), "Song", false, 0);
+    panel->setAdditionsForSnapshot();
     return panel;
 }
 

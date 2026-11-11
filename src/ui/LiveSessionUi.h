@@ -4,6 +4,7 @@
 // people of the session in the toolbar (engine/LiveSessions.h does the work).
 
 #include <functional>
+#include <memory>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -32,6 +33,10 @@ void leave (Context context);
 // At start-up (round 169j): the host's LYNX SHARE closed during a live session (a crash, the computer restarted):
 // offer to resume it from its journal (the guests are waiting and reconnect by themselves).
 void offerResume (Context context);
+// Round 190ah: the question a guest gets at start-up when LYNX SHARE closed while it was in someone's session, and the
+// host's question when a guest reached the limit for audio files (also drawn by --snapshot).
+std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostName, const juce::String& when);
+std::unique_ptr<juce::AlertWindow> makeMediaLimitDialog (const juce::String& name, juce::int64 used, juce::int64 limit);
 
 // The manager's questions and messages as windows and hints (the host's "let them in?", the end of the session).
 void attach (LiveSessionManager& live);

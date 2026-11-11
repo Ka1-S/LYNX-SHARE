@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "core/Instruments.h"
+#include "ui/NativeChild.h"
 #include "engine/AudioEngine.h"
 #include "ui/ChannelSettings.h"
 #include "ui/ColourPicker.h"
@@ -275,6 +276,119 @@ void saveSettings (AudioEngine& engine, int channel, const dance::Settings& s, b
 }
 } // namespace
 
+// A dancer's own window (issue #116 slice 4): a transparent native child of the main window over the dancer's reach.
+// It draws its dancer in the stage's coordinates and hands the mouse to the stage; only the body takes it.
+class DanceStage::Window final : public juce::Component
+{
+public:
+    Window (DanceStage& s, int c) : stage (s), channel (c)
+    {
+        setOpaque (false); // (per-pixel transparency: a layered child window on Windows)
+        setWantsKeyboardFocus (false);
+        setMouseClickGrabsKeyboardFocus (false);
+        setInterceptsMouseClicks (true, false);
+    }
+
+    ~Window() override { nativechild::removeFloater (*this); }
+
+    // its top-left in the stage
+    juce::Point<int> origin() const { return nativechild::boundsIn (*this, stage).getTopLeft(); }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto it = stage.dancers.find (channel);
+        if (it == stage.dancers.end() || ! it->second.now.visible)
+            return;
+        const auto& d = it->second;
+        g.setOrigin (-origin());
+        dancer::draw (g, { (float) d.now.x, (float) d.now.y }, baseHeight * d.now.scale, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+    }
+
+    bool hitTest (int x, int y) override
+    {
+        const auto it = stage.dancers.find (channel);
+        return it != stage.dancers.end() && it->second.now.visible && bodyBox (it->second).contains ((origin() + juce::Point<int> (x, y)).toFloat());
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override { stage.mouseDown (e.getEventRelativeTo (&stage)); }
+    void mouseDrag (const juce::MouseEvent& e) override { stage.mouseDrag (e.getEventRelativeTo (&stage)); }
+    void mouseUp (const juce::MouseEvent& e) override { stage.mouseUp (e.getEventRelativeTo (&stage)); }
+
+private:
+    DanceStage& stage;
+    const int channel;
+};
+
+bool DanceStage::windowed() const
+{
+    return nativechild::dockingEnabled() && nativechild::supportsFloaters() && getPeer() != nullptr && isVisible();
+}
+
+void DanceStage::syncWindow (Dancer& d, bool windows)
+{
+    const auto area = d.now.visible ? boxOf (d).getSmallestIntegerContainer().expanded (3).getIntersection (getLocalBounds()) : juce::Rectangle<int>();
+    if (! windows || area.isEmpty())
+    {
+        if (d.window != nullptr && ! windows)
+            d.window.reset();
+        else if (d.window != nullptr && d.window->isVisible())
+            d.window->setVisible (false);
+        return;
+    }
+    if (d.window == nullptr)
+    {
+        auto w = std::make_unique<Window> (*this, d.channel);
+        w->setBounds (area);
+        if (! nativechild::attach (*w, *this))
+            return; // (the stage draws it meanwhile)
+        nativechild::addFloater (*w);
+        nativechild::forwardUnusedKeys (*w);
+        w->setVisible (true);
+        d.window = std::move (w);
+        nativechild::raiseOverlays();
+        return;
+    }
+    auto& w = *d.window;
+    if (nativechild::boundsIn (w, *this) != area)
+    {
+        nativechild::place (w, *this, area);
+        w.repaint();
+    }
+    if (! w.isVisible())
+    {
+        w.setVisible (true);
+        nativechild::raiseOverlays();
+    }
+}
+
+void DanceStage::invalidate (Dancer& d, juce::Rectangle<float> r)
+{
+    if (d.window != nullptr && d.window->isVisible())
+        d.window->repaint();
+    else if (! r.isEmpty())
+        repaint (r.getSmallestIntegerContainer().expanded (3));
+}
+
+juce::Component* DanceStage::windowOf (int channel) const
+{
+    const auto it = dancers.find (channel);
+    return it == dancers.end() ? nullptr : it->second.window.get();
+}
+
+juce::Rectangle<int> DanceStage::bodyOf (int channel) const
+{
+    const auto it = dancers.find (channel);
+    return it == dancers.end() ? juce::Rectangle<int>() : bodyBox (it->second).toNearestInt();
+}
+
+int DanceStage::windowCount() const
+{
+    int n = 0;
+    for (const auto& [channel, d] : dancers)
+        n += d.window != nullptr ? 1 : 0;
+    return n;
+}
+
 DanceStage::DanceStage (AudioEngine& e) : engine (e)
 {
     setInterceptsMouseClicks (true, false);
@@ -362,6 +476,21 @@ void DanceStage::timerCallback()
         const auto want = dancers.empty() ? 2 : 30;
         if (getTimerInterval() != 1000 / want)
             startTimerHz (want);
+        const auto windows = windowed();
+        if (windows != hadWindows)
+        {
+            hadWindows = windows;
+            for (auto& [channel, d] : dancers)
+                syncWindow (d, windows);
+            repaint(); // (the stage draws the dancers without windows)
+        }
+        if (windows)
+        {
+            for (auto& [channel, d] : dancers)
+                if (d.window != nullptr)
+                    nativechild::refresh (*d.window, *this); // (the main window's native window made again)
+            nativechild::keepFloatersInFront();
+        }
     }
     if (dancers.empty())
         return;
@@ -414,9 +543,9 @@ void DanceStage::timerCallback()
         }
         const auto box = d.now.visible ? boxOf (d) : juce::Rectangle<float>();
         const auto dirty = box.isEmpty() ? d.bounds : d.bounds.isEmpty() ? box : d.bounds.getUnion (box);
-        if (! dirty.isEmpty())
-            repaint (dirty.getSmallestIntegerContainer().expanded (3));
         d.bounds = box;
+        syncWindow (d, hadWindows);
+        invalidate (d, dirty);
     }
 }
 
@@ -424,7 +553,7 @@ void DanceStage::paint (juce::Graphics& g)
 {
     for (auto& [channel, d] : dancers)
     {
-        if (! d.now.visible)
+        if (! d.now.visible || d.window != nullptr)
             continue;
         const auto h = baseHeight * d.now.scale;
         if (! g.clipRegionIntersects (boxOf (d).getSmallestIntegerContainer()))
@@ -433,17 +562,21 @@ void DanceStage::paint (juce::Graphics& g)
     }
 }
 
-DanceStage::Dancer* DanceStage::dancerAt (juce::Point<float> p)
+juce::Rectangle<float> DanceStage::bodyBox (const Dancer& d)
+{
+    // the body, not the whole reach
+    const auto h = baseHeight * d.now.scale;
+    return { (float) d.now.x - h * 0.22f, (float) d.now.y - h * 1.1f, h * 0.44f, h * 1.12f };
+}
+
+DanceStage::Dancer* DanceStage::dancerAt (juce::Point<float> p, bool withWindows)
 {
     for (auto it = dancers.rbegin(); it != dancers.rend(); ++it)
     {
         auto& d = it->second;
-        if (! d.now.visible)
+        if (! d.now.visible || (d.window != nullptr && ! withWindows))
             continue;
-        // the body, not the whole reach
-        const auto h = baseHeight * d.now.scale;
-        const auto body = juce::Rectangle<float> ((float) d.now.x - h * 0.22f, (float) d.now.y - h * 1.1f, h * 0.44f, h * 1.12f);
-        if (body.contains (p))
+        if (bodyBox (d).contains (p))
             return &d;
     }
     return nullptr;
@@ -451,12 +584,12 @@ DanceStage::Dancer* DanceStage::dancerAt (juce::Point<float> p)
 
 bool DanceStage::hitTest (int x, int y)
 {
-    return dancerAt ({ (float) x, (float) y }) != nullptr;
+    return dancerAt ({ (float) x, (float) y }) != nullptr; // (a dancer with a window of its own takes the mouse there)
 }
 
 void DanceStage::mouseDown (const juce::MouseEvent& e)
 {
-    auto* d = dancerAt (e.position);
+    auto* d = dancerAt (e.position, true);
     if (d == nullptr)
         return;
     if (e.mods.isPopupMenu())
@@ -478,7 +611,8 @@ void DanceStage::mouseDrag (const juce::MouseEvent& e)
     d.now.x = juce::jlimit (0, juce::jmax (0, getWidth()), e.x + dragOffset.x);
     d.now.y = juce::jlimit (20, juce::jmax (20, getHeight()), e.y + dragOffset.y);
     d.bounds = boxOf (d);
-    repaint (old.getUnion (d.bounds).getSmallestIntegerContainer().expanded (3));
+    syncWindow (d, hadWindows);
+    invalidate (d, old.getUnion (d.bounds));
 }
 
 void DanceStage::mouseUp (const juce::MouseEvent&)

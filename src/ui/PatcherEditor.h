@@ -15,6 +15,9 @@ std::unique_ptr<juce::Component> makeChannelEditor (AudioEngine& engine, int cha
 void openChannel (AudioEngine& engine, int channel);
 bool isChannelOpen (int channel);
 void closeChannel (int channel);
+// A node's own editor, as the Patcher opens it on a double-click (a plugin's window, a built-in node's editor); used by
+// the Rack view (round 183c) for the devices of a rack's chains
+void openNodeEditor (AudioEngine& engine, bool channel, int index, int slot, int node);
 // --patchershot: the Add plugin menu and the I/O nodes' menus (Events) of a Patcher, as images (round 162)
 void shootMenus (AudioEngine& engine, bool channel, int index, int slot, std::function<void (const juce::Image&, const juce::String&)> save);
 // --patchershot: every built-in node's editor (double-click / Open editor), as images by node index (round 165c)

@@ -145,6 +145,15 @@ void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::in
 // and everything after `to` (clips and markers) moves left.
 void deleteTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
 
+// Playlist › Edit › "Slice & insert space" (Ctrl+Alt+Ins; EESliceInsSpaceAction, Tag 0 → FUN_00eb35f0 / FUN_00e3b2b0,
+// round 189e): the clips crossing `at` are cut there first, then `length` ticks are inserted as insertTime does.
+void sliceInsertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length);
+
+// Playlist › Edit › "Trim selection" (EETrimSpaceAction → FUN_00eb35f0, its "trim space" branch, round 189e): the space
+// after `to` (to the end of the song) and then the space before `from` are deleted as deleteTime does, so only the time
+// selection is left, at the song start.
+void trimTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t from, std::int64_t to);
+
 // Indices of the clips that overlap [from, to).
 std::vector<int> clipsInTime (const std::vector<Clip>& clips, std::int64_t from, std::int64_t to);
 
@@ -308,4 +317,9 @@ int addPatternAutoMarker (Pattern& pattern, std::int64_t tick);
 void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar);
 // the pattern's signature at `tick`: its last signature marker at or before it, else beatsPerBar / 4
 std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar);
+// FL's Paint tool in the Piano roll (round 189o; FLEngine 2026 [DECOMP] FUN_00e5cd20: mode 0x11 "mono paint" when
+// Shift != General › "Monophonic painting in piano roll", PRPaintMode, off by default): with the option on, a plain
+// stroke paints monophonically and Shift paints chords / layers as before.
+inline bool monophonicPaint (bool shiftDown, bool monophonicOption) noexcept { return shiftDown != monophonicOption; }
+
 } // namespace lynx::noteedit

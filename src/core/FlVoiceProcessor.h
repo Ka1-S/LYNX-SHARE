@@ -211,6 +211,11 @@ struct Rec
     std::uint32_t lfoInc = 0, globalPhase = 0;
     const float* table = nullptr;
     Tension tens[3];
+    // FL Studio Mobile's build of the envelope (its 3x Osc voice, FUN_1807d9640; Settings::setMobile, build() leaves
+    // it alone): the predelay and the hold last one tick more (the counter has to pass the tick count) and the
+    // attack's position is not clamped to 1, so an attack whose float steps do not land on 1 overshoots by up to a
+    // step, holds above 1 and starts the decay from there (A/B inside FL, round 190ab)
+    bool mobile = false;
 
     void build (const std::int32_t* r, int ppq, double tempo) noexcept
     {
@@ -245,6 +250,12 @@ struct Settings
     // plugin hands the library its rate (FUN_005f8470: 3x Osc does, DX10 and Fruit Kick do not — 1 and 0.001 then); the
     // filter coefficients scale with the ratio (REA_rodada47 §2.3). build() leaves them alone.
     float rateRatio = 1.0f, rampLimit = 0.001f;
+
+    void setMobile (bool on) noexcept
+    {
+        for (auto& r : recs)
+            r.mobile = on;
+    }
 
     void setRate (double fs) noexcept
     {
@@ -338,18 +349,19 @@ struct Art
             switch (state)
             {
                 case 2:
-                    if (s.hold <= ++cnt)
+                    if (s.mobile ? s.hold < ++cnt : s.hold <= ++cnt)
                         state = 3;
                     break;
                 case 0:
-                    if (s.delay <= ++cnt)
+                    if (s.mobile ? s.delay < ++cnt : s.delay <= ++cnt)
                         state = 1;
                     break;
                 case 1:
                     pos = pos + s.att;
                     if (1.0f <= pos)
                     {
-                        pos = 1.0f;
+                        if (! s.mobile)
+                            pos = 1.0f;
                         if (s.hold < 1)
                             state = 3;
                         else

@@ -1,5 +1,7 @@
 #include "ui/QuickPick.h"
 
+#include "core/Rack.h"
+
 #include <algorithm>
 
 #include "core/ControlSurface.h"
@@ -74,6 +76,12 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     builtIn ("Fruity Video Player", "Fruity Video Player", 1, InstrumentKind::videoplayer,
              [] (ChannelDef& c) { c.pluginState = video::write (video::Settings {}); });
     builtIn ("Patcher", tr ("Patcher"), 2, InstrumentKind::patcher);
+    // round 183c: Live-style Instrument Rack (a Patcher in rack mode, core/Rack.h)
+    builtIn (TR_NOOP ("Instrument Rack"), tr ("Instrument Rack"), 2, InstrumentKind::patcher,
+             [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::instrument); });
+    // ...and a standalone MIDI Effect Rack: its chains' notes play its children (decision R1, like a Layer's)
+    builtIn (TR_NOOP ("MIDI Effect Rack"), tr ("MIDI Effect Rack"), 2, InstrumentKind::patcher,
+             [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::midiEffect); });
     add ("LYNX Soundfont", "LYNX Soundfont", tr ("built-in"), 0, 2, InstrumentKind::soundfont, [] { return std::optional<ChannelDef> (sf::makeChannel()); });
 
     // FL's own instrument engines (round 142)
@@ -128,6 +136,9 @@ std::vector<EffectEntry> effectEntries (AudioEngine& engine, bool withUnavailabl
             out.back().available = available;
             out.back().flPlugin = isFlEffect (kind);
         }
+    // round 183c: Live-style Audio Effect Rack (a Patcher in rack mode, core/Rack.h)
+    out.push_back ({ "lynx:fx:Audio Effect Rack", tr ("Audio Effect Rack"), tr ("built-in"), 0,
+                     [] { return std::optional<EffectSlot> (rack::makeRackSlot (RackDoc::Kind::audioEffect)); } });
 
     auto types = engine.getPluginHost().getKnownPlugins().getTypes();
     std::sort (types.begin(), types.end(), [] (const auto& a, const auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });
@@ -256,6 +267,8 @@ juce::String slotName (AudioEngine& engine, const EffectSlot& slot)
     const auto original = juce::String::fromUTF8 (projectcontents::effectSlotName (slot).c_str());
     if (slot.kind == EffectKind::plugin)
         return slot.plugin.id.empty() ? original : shownName (engine, slot.plugin.id, original);
+    if (slot.kind == EffectKind::patcher && slot.patcher.isRack()) // (round 183c: a rack: its name, else its kind's)
+        return slot.patcher.rack.front().name.empty() ? tr ("Audio Effect Rack") : juce::String::fromUTF8 (slot.patcher.rack.front().name.c_str());
     if (slot.isSubstitute() || original != juce::String (effectInfo (slot.kind).name)) // (a stand-in shows what it stands for)
         return original;
     return shownName (engine, std::string ("lynx:fx:") + effectInfo (slot.kind).name, original);

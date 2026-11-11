@@ -910,8 +910,20 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
 void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, float x, float y, float w, float h, bool ticked, bool enabled,
                                bool highlighted, bool)
 {
-    juce::ignoreUnused (component);
     const auto box = juce::Rectangle<float> (x, y, w, h).reduced (0.5f);
+
+    // one of several exclusive choices (opt-in, round 184a S17: the setup wizard's workflows): a round radio dot
+    if (component.getProperties()["lynxRadio"])
+    {
+        const auto circle = box.withSizeKeepingCentre (juce::jmin (box.getWidth(), box.getHeight()), juce::jmin (box.getWidth(), box.getHeight()));
+        g.setColour (bg0);
+        g.fillEllipse (circle);
+        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted) : (highlighted ? textSecondary : borderStrong));
+        g.drawEllipse (circle.reduced (0.5f), 1.2f);
+        if (ticked)
+            g.fillEllipse (circle.reduced (circle.getWidth() * 0.28f));
+        return;
+    }
 
     if (ticked)
         fillRounded (g, box, radius::sm, enabled ? (highlighted ? accentHover : accent) : accentMuted);

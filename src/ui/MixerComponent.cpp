@@ -4,12 +4,14 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 
 #include "core/Patcherize.h"
+#include "core/Rack.h"
 #include "core/FlpImport.h"
 #include "engine/FlStudio.h"
 #include "core/FlEffects.h"
@@ -40,6 +42,7 @@
 #include "ui/PluginWindow.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/LiveRemoteUi.h"
 #include "core/LynxTune.h"
 #include "core/VocalPitch.h"
 #include "ui/Icons.h"
@@ -254,8 +257,12 @@ void MixerStrips::layoutStrips()
     // insert shows; selecting another strip doesn't move the strips under the mouse)
     hidden.assign ((std::size_t) tracks + 1, false);
     if (showUsedOnly)
-        for (int t = 1; t < tracks; ++t)
-            hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    {
+        // round 190am: the selected inserts stay, and stay after the selection moves on (no strip jumps under the mouse)
+        revealed.insert (selected);
+        revealed.insert (selection.begin(), selection.end());
+        hidden = mixerops::hiddenUnusedInserts (song, revealed);
+    }
     // folded groups (round 177a): nothing is computed unless a group is folded
     foldShow.clear();
     tabOf.clear();
@@ -289,6 +296,7 @@ void MixerStrips::layoutStrips()
     dockGaps.clear();
     separatorLines.clear();
     vcaXs.clear();
+    loudnessX = hiddenX;
 
     int x = 4;
     bool any = false, afterMaster = false;
@@ -332,6 +340,11 @@ void MixerStrips::layoutStrips()
             }
             stripXs[(std::size_t) t] = x;
             x += stripWidthOf (t);
+            if (t == 0 && showLoudness) // the loudness panel: right of the Master, in its dock (round 190am)
+            {
+                loudnessX = x;
+                x += loudnessWidth;
+            }
             any = true;
             first = false;
             afterMaster = t == 0;
@@ -1228,12 +1241,19 @@ void MixerStrips::mouseMove (const juce::MouseEvent& e)
         setHover (vcaPartAt (i, e.getPosition()), vcaStrip (i));
         return;
     }
+    if (const auto over = showLoudness && loudnessResetArea().contains (e.getPosition()); over != loudnessResetHovered)
+    {
+        loudnessResetHovered = over;
+        repaint (loudnessResetArea().expanded (2));
+    }
     const auto t = trackAt (e.x);
     setHover (t >= 0 ? partAt (t, e.getPosition()) : Part::none, t);
 }
 
 void MixerStrips::mouseExit (const juce::MouseEvent&)
 {
+    if (std::exchange (loudnessResetHovered, false))
+        repaint (loudnessResetArea().expanded (2));
     setHover (Part::none, -1);
 }
 
@@ -1418,12 +1438,16 @@ void MixerStrips::paint (juce::Graphics& g)
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
+        // round 190ap: opened without third-party plugins, a plugin of this insert is still off (a grey power tag)
+        const auto pluginOff = ! standIn && engine.insertPluginOff (t);
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
-            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn ? 16 : 0), juce::Justification::centred, 1, 0.7f);
+            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn || pluginOff ? 16 : 0), juce::Justification::centred, 1, 0.7f);
             if (standIn)
                 drawStandInTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
+            else if (pluginOff)
+                ui::drawPluginOffTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
         }
         else
         {
@@ -1432,6 +1456,11 @@ void MixerStrips::paint (juce::Graphics& g)
             if (standIn)
             {
                 drawStandInTag (g, juce::Rectangle<float> (13.0f, 13.0f).withCentre ({ (float) column.getCentreX(), (float) column.getBottom() - 6.5f }));
+                column.removeFromBottom (16);
+            }
+            else if (pluginOff)
+            {
+                ui::drawPluginOffTag (g, juce::Rectangle<float> (13.0f, 13.0f).withCentre ({ (float) column.getCentreX(), (float) column.getBottom() - 6.5f }));
                 column.removeFromBottom (16);
             }
             juce::Graphics::ScopedSaveState state (g);
@@ -1648,8 +1677,16 @@ void MixerStrips::paint (juce::Graphics& g)
         }
     }
     if (pass == dockOf (0))
+    {
         for (int i = 0; i < (int) vcaXs.size(); ++i)
             paintVcaStrip (g, i);
+        if (showLoudness && g.clipRegionIntersects (loudnessArea().expanded (3)))
+        {
+            paintLoudnessPanel (g);
+            if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+                paintLoudnessValues (g);
+        }
+    }
     paintDividers (pass);
     }
 
@@ -1703,6 +1740,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         vcaMouseDown (e, i);
+        return;
+    }
+    if (showLoudness && loudnessArea().contains (e.getPosition())) // round 190am: Reset, or the panel's menu
+    {
+        if (flmods::popup (e.mods))
+            showLoudnessMenu();
+        else if (loudnessResetArea().contains (e.getPosition()))
+            resetLoudness();
         return;
     }
 
@@ -2225,6 +2270,7 @@ void MixerStrips::setSelection (std::vector<int> tracks, int primary)
     selection = tracks;
     const auto changed = primary != selected;
     selected = primary;
+    keepSelectionShown();
     repaint();
 
     if (changed && onSelectionChanged)
@@ -2427,6 +2473,20 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         return vcaHint (dragVca, p);
     if (const auto i = vcaAt (p.x); i >= 0 && dragPart == Part::none)
         return vcaHint (i, p);
+    if (showLoudness && dragPart == Part::none && loudnessArea().contains (p))
+    {
+        ui::Hint h;
+        h.hasMenu = true;
+        if (loudnessResetArea().contains (p))
+            h.text = tr ("Start the loudness measurement again");
+        else
+        {
+            h.text = tr ("Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)");
+            h.value = "S " + juce::String (formatLoudness (loudnessShown.shortTerm)) + "  I " + juce::String (formatLoudness (loudnessShown.integrated))
+                      + "  TP " + juce::String (formatLoudness (loudnessShown.truePeak));
+        }
+        return h;
+    }
     const auto active = dragPart == Part::pan || dragPart == Part::fader || dragPart == Part::stereo || dragPart == Part::send;
     const auto t = active ? dragTrack : trackAt (p.x);
     const auto& song = engine.getSong();
@@ -2501,6 +2561,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             h.hasMenu = true;
             if (engine.insertPlaysStandIn (t))
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
+            else if (engine.insertPluginOff (t)) // round 190ap
+                h.text = name + " - " + tr ("A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
             break;
         case Part::body:
         case Part::none:
@@ -2558,10 +2620,21 @@ void MixerStrips::mouseDoubleClick (const juce::MouseEvent& e)
     }
 }
 
+void MixerStrips::keepSelectionShown()
+{
+    if (! showUsedOnly)
+        return;
+    const auto wasHidden = std::any_of (selection.begin(), selection.end(), [this] (int t) { return revealed.count (t) == 0 && isHidden (t); })
+                           || (revealed.count (selected) == 0 && isHidden (selected));
+    if (wasHidden) // (selected from the Channel Rack, a menu or the keyboard: its strip comes back)
+        updateSize();
+}
+
 void MixerStrips::selectTrack (int track)
 {
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), track);
     selection = { selected };
+    keepSelectionShown();
     repaint();
 
     if (onSelectionChanged)
@@ -3603,6 +3676,12 @@ void MixerStrips::repaintAutomatedStrips()
     }
 }
 
+namespace
+{
+// issue #144: a silenced track's meter colours (FL draws them darker and greyer)
+juce::Colour silencedMeterColour (juce::Colour c) { return c.withMultipliedSaturation (0.55f).withMultipliedBrightness (0.62f); }
+} // namespace
+
 // The two thin level bars beside a vertical name (Wide layouts); empty when the layout has none
 juce::Rectangle<int> MixerStrips::nameBars (int t) const
 {
@@ -3627,9 +3706,170 @@ void MixerStrips::paintNameBars (juce::Graphics& g, int t) const
         const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
         if (h <= 0)
             continue;
-        g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+        const auto c = level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow;
+        g.setColour (isSilenced (t) ? silencedMeterColour (c) : c); // (issue #144: dimmed while silenced)
         g.fillRect (bar.withTop (bar.getBottom() - h));
     }
+}
+
+// Issue #144: a silenced track (its mute, a solo elsewhere, a muted VCA) keeps its meter, dimmed, as FL draws it
+bool MixerStrips::isSilenced (int t) const
+{
+    const auto& song = engine.getSong();
+    if (t < 0 || t >= (int) song.mixer.size())
+        return false;
+    if (song.mixer[(std::size_t) t].muted)
+        return true;
+    if (t == 0)
+        return false;
+    if (mixerops::vcaMuted (song, t))
+        return true;
+    if (std::none_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.solo; }))
+        return false;
+    const auto audible = song.soloAudible();
+    return (std::size_t) t < audible.size() && ! audible[(std::size_t) t];
+}
+
+// --- the loudness panel beside the Master (round 190am, LYNX's own; Mixer menu, off by default) -----------------------
+namespace
+{
+constexpr float loudnessBarTop = 0.0f, loudnessBarBottom = -42.0f; // LUFS at the bar's ends
+float loudnessBarPosition (float lufs) noexcept
+{
+    return juce::jlimit (0.0f, 1.0f, (lufs - loudnessBarBottom) / (loudnessBarTop - loudnessBarBottom));
+}
+constexpr int loudnessRowsTop = 24, loudnessRowHeight = 16;
+} // namespace
+
+void MixerStrips::setShowLoudness (bool on)
+{
+    showLoudness = on;
+    engine.getMeters().loudness.setEnabled (on); // (off: the audio thread measures nothing)
+    loudnessShown = {};
+    updateSize();
+    repaint();
+}
+
+void MixerStrips::resetLoudness()
+{
+    engine.getMeters().loudness.reset();
+    loudnessShown = {};
+    repaint (loudnessArea());
+}
+
+juce::Rectangle<int> MixerStrips::loudnessArea() const noexcept
+{
+    if (! showLoudness || loudnessX == hiddenX)
+        return {};
+    return { loudnessX + pinOffset (dockOf (0)), 2, loudnessWidth - spec().gap, laneTop() - 2 };
+}
+
+juce::Rectangle<int> MixerStrips::loudnessResetArea() const noexcept
+{
+    const auto area = loudnessArea();
+    if (area.isEmpty())
+        return {};
+    return { area.getX() + 4, rows().faderBottom + 3, area.getWidth() - 8, 15 };
+}
+
+juce::Rectangle<int> MixerStrips::loudnessBarArea() const noexcept
+{
+    const auto area = loudnessArea();
+    const auto r = rows();
+    return { area.getX() + 6, r.faderTop, 8, r.faderBottom - r.faderTop };
+}
+
+void MixerStrips::paintLoudnessPanel (juce::Graphics& g) const
+{
+    using namespace theme;
+    const auto area = loudnessArea();
+    theme::fillRoundRect (g, area.toFloat(), radius::md, colour::bg2);
+    g.setColour (colour::border);
+    g.drawRoundedRectangle (area.toFloat().reduced (0.5f), radius::md, 1.0f);
+
+    g.setColour (colour::textSecondary);
+    g.setFont (font (type::caption, true));
+    textcache::drawFittedText (g, "LUFS", juce::Rectangle<int> (area.getX(), 4, area.getWidth(), 13), juce::Justification::centred, 1, 0.7f);
+
+    // the captions of the three values (EBU R 128's letters; the hint bar spells them out)
+    g.setFont (font (9.0f, true));
+    const char* captions[] = { "S", "I", "TP" };
+    for (int i = 0; i < 3; ++i)
+        textcache::drawText (g, captions[i], juce::Rectangle<int> (area.getX() + 5, loudnessRowsTop + i * loudnessRowHeight, 14, loudnessRowHeight),
+                             juce::Justification::centredLeft, false);
+
+    // the short-term bar's well and scale (LUFS, 6 LU apart, as many as fit)
+    const auto bar = loudnessBarArea();
+    theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
+    g.setFont (font (9.0f));
+    const auto textHeight = 10.0f;
+    auto lastY = -100.0f;
+    for (int lufs = 0; lufs >= (int) loudnessBarBottom; lufs -= 6)
+    {
+        const auto y = (float) bar.getBottom() - loudnessBarPosition ((float) lufs) * (float) bar.getHeight();
+        if (y - lastY < textHeight + 1.0f)
+            continue;
+        lastY = y;
+        g.setColour (colour::textSecondary);
+        g.fillRect (juce::Rectangle<float> ((float) bar.getRight() + 1.0f, y - 0.5f, 3.0f, 1.0f));
+        const auto box = juce::Rectangle<float> ((float) bar.getRight() + 5.0f, y - textHeight * 0.5f, (float) (area.getRight() - bar.getRight()) - 9.0f, textHeight)
+                             .withY (juce::jlimit ((float) bar.getY(), (float) bar.getBottom() - textHeight, y - textHeight * 0.5f));
+        textcache::drawText (g, juce::String (lufs), box, juce::Justification::centredRight, false);
+    }
+
+    // Reset
+    const auto reset = loudnessResetArea().toFloat();
+    theme::fillRoundRect (g, reset, radius::sm, loudnessResetHovered ? colour::bg5 : colour::bg0);
+    g.setColour (loudnessResetHovered ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (type::caption));
+    textcache::drawFittedText (g, tr ("Reset"), reset.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
+}
+
+void MixerStrips::paintLoudnessValues (juce::Graphics& g) const
+{
+    using namespace theme;
+    const auto area = loudnessArea();
+    const auto& v = loudnessShown;
+    const float values[] = { v.shortTerm, v.integrated, v.truePeak };
+    g.setFont (font (type::small, true));
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto known = MasterLoudness::measured (values[i]);
+        // the true peak warns like the peak meters: amber from -1 dBTP, red above 0 dBTP
+        g.setColour (! known ? colour::textDisabled
+                             : i == 2 && values[i] > 0.0f ? colour::meterClip : i == 2 && values[i] > -1.0f ? colour::meterMid : colour::textPrimary);
+        textcache::drawFittedText (g, juce::String (formatLoudness (values[i])),
+                                   juce::Rectangle<int> (area.getX() + 18, loudnessRowsTop + i * loudnessRowHeight, area.getWidth() - 23, loudnessRowHeight),
+                                   juce::Justification::centredRight, 1, 0.7f);
+    }
+
+    const auto bar = loudnessBarArea();
+    if (MasterLoudness::measured (v.shortTerm))
+    {
+        const auto h = juce::roundToInt (loudnessBarPosition (v.shortTerm) * (float) bar.getHeight());
+        g.setColour (colour::meterLow);
+        g.fillRect (bar.withTop (bar.getBottom() - h).reduced (1, 0));
+    }
+    if (MasterLoudness::measured (v.integrated)) // the integrated loudness: a line across the bar
+    {
+        const auto y = (float) bar.getBottom() - loudnessBarPosition (v.integrated) * (float) bar.getHeight();
+        g.setColour (colour::textPrimary);
+        g.fillRect (juce::Rectangle<float> ((float) bar.getX() - 2.0f, y - 1.0f, (float) bar.getWidth() + 4.0f, 2.0f));
+    }
+}
+
+void MixerStrips::showLoudnessMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Reset"), [this] { resetLoudness(); });
+    menu.addSeparator();
+    menu.addItem (tr ("Loudness meter beside the Master (LYNX)"), true, true, [] {
+        if (mixeroptions::setShowLoudness)
+            mixeroptions::setShowLoudness (false);
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 // One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
@@ -3639,14 +3879,16 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     const auto index = (std::size_t) t * 2 + (std::size_t) ch;
     const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
     const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
+    const auto silenced = (h > 0 || meter.peak > 0.001f) && isSilenced (t);
+    const auto tone = [silenced] (juce::Colour c) { return silenced ? silencedMeterColour (c) : c; };
     if (h > 0)
     {
         const auto lit = bar.withTop (bar.getBottom() - h);
         // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
-        juce::ColourGradient gradient (colour::meterClip, 0.0f, (float) bar.getY(), colour::meterLow, 0.0f, (float) bar.getBottom(), false);
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
+        juce::ColourGradient gradient (tone (colour::meterClip), 0.0f, (float) bar.getY(), tone (colour::meterLow), 0.0f, (float) bar.getBottom(), false);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), tone (colour::meterClip)); // above 0 dB: clip zone
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), tone (colour::meterMid));
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), tone (colour::meterLow));
         g.setGradientFill (gradient);
         g.fillRect (lit);
     }
@@ -3654,7 +3896,7 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     if (meter.peak > 0.001f) // peak hold line
     {
         const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-        g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
+        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f)));
         g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
     }
 
@@ -3721,6 +3963,14 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
                     g.excludeClipRegion (r);
             paintVcaMeter (g, i);
         }
+    if (showLoudness && loudnessArea().intersects (clip))
+    {
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (0) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        paintLoudnessValues (g);
+    }
 }
 
 bool MixerStrips::liveFrame (double nowMs)
@@ -3769,11 +4019,16 @@ bool MixerStrips::liveFrame (double nowMs)
     // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
+    int woken = -1;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
         const auto before = m;
-        m.advance (meters.takePeak ((int) (i / 2), (int) (i % 2)), elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
+        m.advance (peak, elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
+        if (showUsedOnly && peak > 1.0e-4f && i >= 2 && revealed.count ((int) (i / 2)) == 0 && isHidden ((int) (i / 2)))
+            woken = (int) (i / 2);
         if (m.level != before.level || m.peak != before.peak)
             moving = true;
         if (! showing)
@@ -3827,11 +4082,31 @@ bool MixerStrips::liveFrame (double nowMs)
                 was = level;
             }
     }
+    // the loudness panel (round 190am; nothing while it is off): repainted when a shown number or the bar changes
+    if (showLoudness && showing)
+        if (const auto now = meters.loudness.read(); ! (now == loudnessShown))
+        {
+            const auto same = [] (float a, float b) { return formatLoudness (a) == formatLoudness (b); };
+            const auto changed = ! same (now.shortTerm, loudnessShown.shortTerm) || ! same (now.integrated, loudnessShown.integrated)
+                                 || ! same (now.truePeak, loudnessShown.truePeak);
+            loudnessShown = now;
+            if (changed)
+            {
+                const auto area = loudnessArea();
+                dirty = dirty.isEmpty() ? area : dirty.getUnion (area);
+            }
+        }
     if (! dirty.isEmpty())
     {
         meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
         repaint (dirty);
         meterRepaintOnly = false;
+    }
+    if (woken > 0) // (one per frame is enough: the next frame brings the next)
+    {
+        revealed.insert (woken);
+        updateSize();
+        repaint();
     }
     return moving;
 }
@@ -3953,6 +4228,39 @@ juce::Rectangle<int> EffectsPanel::armBounds() const
 juce::Rectangle<int> EffectsPanel::inputBoxBounds() const
 {
     return { 38, panelHeader + 2, getWidth() - 46, inputRowHeight - 8 };
+}
+
+void EffectsPanel::groupIntoRack (int slot, bool all)
+{
+    engine.capturePluginStates(); // (the plugins' current settings go with them)
+    const auto t = track;
+    const auto moved = all ? patcherize::slotsForAll (engine.getSong(), t) : std::vector<int> { slot };
+    // a hosted plugin's automated parameter: its value now (node k is moved slot k), so its macro starts there
+    auto values = [this, t, moved] (int node, int param) -> float {
+        if (node < 0 || node >= (int) moved.size())
+            return -1.0f;
+        if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (t, moved[(std::size_t) node]).get()); p != nullptr && ! p->hasCrashed())
+            if (auto& instance = p->getInstance(); param >= 0 && param < instance.getParameters().size())
+                return instance.getParameters()[param]->getValue();
+        return -1.0f;
+    };
+    auto trial = engine.getSong();
+    const auto at = patcherize::patcherizeSlots (trial, t, slot, all);
+    if (at < 0 || ! rack::fromPatcher (trial.mixer[(std::size_t) t].effects[(std::size_t) at].patcher, values))
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Group into Audio Effect Rack"),
+                                                tr ("These effects can't go into a rack (a side-chain, or more than 16 automated parameters)."));
+        return;
+    }
+    int placed = -1;
+    engine.editSong ([t, slot, all, values, &placed] (Song& song) {
+        placed = patcherize::patcherizeSlots (song, t, slot, all);
+        if (placed >= 0)
+            rack::fromPatcher (song.mixer[(std::size_t) t].effects[(std::size_t) placed].patcher, values);
+    });
+    if (placed >= 0)
+        selectedSlot = placed;
+    repaint();
 }
 
 void EffectsPanel::timerCallback()
@@ -4368,6 +4676,7 @@ namespace mixeroptions
 {
 std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
+std::function<void (bool)> setShowLoudness;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 
 namespace
@@ -4402,12 +4711,28 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
         if (on && withEq > 0) // nothing is lost: switching it off brings the EQ back as it was
             ui::postHint ({ tr ("Clean mixer: the EQ of {0} insert(s) is bypassed and hidden (kept in the project)", { juce::String ((int) withEq) }), {}, false, false }, 5000);
     });
+    // LYNX option (round 190y): the old cheap mute; FL keeps a muted insert's effects running (and showing its level)
+    menu.addItem (tr ("Muted inserts don't process (LYNX, saves CPU; this project)"), true, song.mutedInsertsSkip, [&engine] {
+        const auto on = ! engine.getSong().mutedInsertsSkip;
+        engine.editSong ([on] (Song& s) { s.mutedInsertsSkip = on; });
+        if (on)
+            ui::postHint ({ tr ("Muted inserts skip their effects: a Fruity Send or controller in one goes quiet, its meter stops, and its effects start fresh when unmuted (FL keeps them running)"), {}, false, false }, 6000);
+    });
     menu.addItem (tr ("Show only used inserts"), true, MixerStrips::showUsedOnly, [] {
         const auto on = ! MixerStrips::showUsedOnly;
         if (setShowUsedOnly)
             setShowUsedOnly (on);
         else
             MixerStrips::showUsedOnly = on;
+        notifyChanged();
+    });
+    // LYNX's own (round 190am; off = FL's mixer): the Master's loudness in LUFS and its true peak, beside the Master
+    menu.addItem (tr ("Loudness meter beside the Master (LYNX)"), true, MixerStrips::showLoudness, [] {
+        const auto on = ! MixerStrips::showLoudness;
+        if (setShowLoudness)
+            setShowLoudness (on);
+        else
+            MixerStrips::showLoudness = on;
         notifyChanged();
     });
     menu.addItem (tr ("Remove unused inserts at the end"), song.mixer.size() > 1 && ! song.insertInUse ((int) song.mixer.size() - 1), false, [&engine] {
@@ -5027,6 +5352,8 @@ void EffectsPanel::paint (juce::Graphics& g)
             // a LYNX substitute shows the plugin it stands in for, with a "LYNX" badge
             const auto substitute = slot.isSubstitute();
             auto name = quickpick::slotName (engine, slot); // (a plugin renamed in the Plugin database: its new name, round 165c)
+            if (slot.look != 0) // part of a Master look (round 189k, the Simple workflow's Finish dock)
+                name << " " << tr ("(look)");
             if (slot.sidechain > 0 && slot.sidechain < (int) engine.getSong().mixer.size())
                 name << juce::String::fromUTF8 (" \xe2\x86\x90 ") << juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) slot.sidechain].name.c_str());
             auto text = textArea;
@@ -6230,24 +6557,45 @@ juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
 
 void EffectsPanel::openPluginWindow (int slot)
 {
+    // Online Sessions P5-A1: an effect the session's host plays on this insert opens its parameter editor
+    if (liveui::showHostedEditor ({ { live::Kind::insert, (std::uint64_t) juce::jmax (0, track), 0 }, slot }))
+        return;
     auto effect = engine.getEffect (track, slot);
 
     if (auto* plugin = dynamic_cast<PluginEffect*> (effect.get()))
     {
-        if (plugin->hasCrashed()) // (not called again: its window would call into it)
+        // round 190ao: crashed inside a call (not called again: its window would call into it), or its separate process
+        // died: "Reload" starts it again without reopening the project
+        const AudioEngine::HostedSlot where { -1, track, slot };
+        auto reopen = [safe = juce::Component::SafePointer<EffectsPanel> (this), where] {
+            if (safe == nullptr || safe->track != where.track)
+                return;
+            if (safe->engine.hostedPluginDown (where))
+                PluginWindows::reload (safe->engine, { where });
+            if (! safe->engine.hostedPluginDown (where))
+                safe->openPluginWindow (where.slot);
+        };
+        if (engine.hostedPluginDown (where))
         {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
-                                                    tr ("This plugin crashed and was switched off. Save the project and open it again to reload it."));
+            PluginWindows::promptReload (engine, where, [safe = juce::Component::SafePointer<EffectsPanel> (this), where] {
+                if (safe != nullptr && safe->track == where.track)
+                    safe->openPluginWindow (where.slot);
+            });
             return;
         }
         const auto& s = engine.getSong().mixer[(std::size_t) track].effects[(std::size_t) slot];
-        PluginWindows::open (effect, plugin->getInstance(), quickpick::slotName (engine, s), // (its Plugin database name, round 165c)
-                            
-                             { &engine, [t = track, slot] (Song& song) -> PluginRef* {
-                                  if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
-                                      return nullptr;
-                                  return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
-                              }, false, track, slot });
+        PluginWindows::WrapperContext context { &engine, [t = track, slot] (Song& song) -> PluginRef* {
+                                                    if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
+                                                        return nullptr;
+                                                    return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
+                                                }, false, track, slot, {}, {} };
+        context.reload = reopen;
+        context.down = [weak = std::weak_ptr<Effect> (effect)] {
+            const auto held = weak.lock();
+            auto* p = dynamic_cast<PluginEffect*> (held.get());
+            return p != nullptr && p->hasCrashed();
+        };
+        PluginWindows::open (effect, plugin->getInstance(), quickpick::slotName (engine, s), std::move (context)); // (its Plugin database name, round 165c)
         return;
     }
 
@@ -6476,6 +6824,9 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Move down"), [move] { move (1); });
     if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
     {
+        // round 190ao: only while the plugin is down (it crashed, or its separate process died)
+        if (engine.hostedPluginDown ({ -1, track, slot }))
+            menu.addItem (tr ("Reload crashed plugin"), [this, t = track, slot] { PluginWindows::reload (engine, { { -1, t, slot } }); });
         auto* live = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
         menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, (*slots())[(std::size_t) slot].plugin, live != nullptr ? &live->getInstance() : nullptr,
                                                                 [t = track, slot] (Song& song) -> PluginRef* {
@@ -6510,6 +6861,24 @@ void EffectsPanel::showSlotMenu (int slot)
             selectedSlot = placed;
         repaint();
     });
+    // round 183c: Live's Group (Ctrl+G): the effect (or the whole chain) into a new Audio Effect Rack, same sound; the
+    // automation of the moved effects' parameters drives the rack's macros
+    menu.addItem (tr ("Group into Audio Effect Rack"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] { groupIntoRack (slot, false); });
+    menu.addItem (tr ("Group all into Audio Effect Rack"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] { groupIntoRack (slot, true); });
+    // Live's Ungroup: a one-chain Audio Effect Rack's devices back into the slots
+    if (const auto* list = slots(); list != nullptr && slot < (int) list->size() && rack::isRack ((*list)[(std::size_t) slot]))
+    {
+        const auto* r = rack::rackOf ((*list)[(std::size_t) slot].patcher);
+        const auto canUngroup = r != nullptr && r->kind == RackDoc::Kind::audioEffect && r->chains.size() == 1;
+        menu.addItem (tr ("Ungroup"), canUngroup, false, [this, slot] {
+            engine.capturePluginStates();
+            int placed = -1;
+            engine.editSong ([t = track, slot, &placed] (Song& song) { placed = rack::ungroupSlot (song, t, slot); });
+            if (placed >= 0)
+                selectedSlot = placed;
+            repaint();
+        });
+    }
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 

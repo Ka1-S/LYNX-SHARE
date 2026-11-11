@@ -108,6 +108,11 @@ async def relay(s: aiohttp.ClientSession) -> None:
     async with s.get(f"{RELAY_HTTP}/health") as r:
         h = await r.json()
         check(r.status == 200 and h.get("service") == "lynx-relay", f"relay /health {r.status} {h}")
+        limits = h.get("limits", {})
+        check(limits.get("frame", 0) >= 1024 * 1024 and limits.get("roomBytes", 0) > 8 * 1024 ** 3
+              and limits.get("clientBytesDay", 0) >= limits.get("roomBytes", 0) and 1 <= limits.get("roomsPerClient", 0) <= 20
+              and limits.get("roomHours", 0) >= 24 and limits.get("idleHours", 0) >= 1,
+              f"relay limits (round 190ah) {limits}")
     async with s.post(f"{RELAY_HTTP}/v1/rooms") as r:
         room = await r.json()
         check(r.status == 201 and room["maxPeers"] == 4, f"room created ({r.status})")
@@ -150,6 +155,13 @@ async def relay(s: aiohttp.ClientSession) -> None:
     await peers[1].send_bytes(bytes([0]) + big)
     got = [await next_binary(p) for p in (peers[0], peers[2], peers[3])]
     check(all(g == bytes([2]) + big for g in got), "peer 2 broadcast 512 KB to the 3 others")
+    # control (text) messages are small: a long one is refused and the connection goes on
+    await peers[3].send_json({"type": "x" * 5000})
+    while True:
+        m = await peers[3].receive_json(timeout=5)
+        if m["type"] == "error":
+            break
+    check("too long" in m["error"], f"an over-long control message is refused ({m['error']})")
     await peers[3].send_json({"type": "ping", "t": 7})
     while True:
         m = await peers[3].receive_json(timeout=5)
@@ -177,6 +189,41 @@ async def relay(s: aiohttp.ClientSession) -> None:
                         headers={"Authorization": f"Bearer {room2['hostToken']}"}) as r:
         check(r.status == 204, f"room 2 closed ({r.status})")
     await ws2.close()
+
+    # a frame over the size limit (1 MiB) closes only the connection that sent it; nothing of it is relayed
+    async with s.post(f"{RELAY_HTTP}/v1/rooms") as r:
+        room3 = await r.json()
+        check(r.status == 201, f"room 3 created ({r.status})")
+    url3 = f"{RELAY}/v1/rooms/{room3['room']}/ws"
+    auth3 = {"Authorization": f"Bearer {room3['token']}"}
+    a = await s.ws_connect(url3, headers=auth3, protocols=("lynx-relay.v1",), max_msg_size=8 * 1024 * 1024)
+    b = await s.ws_connect(url3, headers=auth3, protocols=("lynx-relay.v1",), max_msg_size=8 * 1024 * 1024)
+    await a.receive_json(timeout=5)
+    await b.receive_json(timeout=5)
+    await a.send_bytes(bytes([0]) + os.urandom(1024 * 1024 + 4096))
+    closed, leaked = False, False
+    for _ in range(20):
+        m = await a.receive(timeout=5)
+        if m.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING, aiohttp.WSMsgType.ERROR):
+            closed = True
+            break
+    for _ in range(5):
+        try:
+            m = await b.receive(timeout=1)
+        except asyncio.TimeoutError:
+            break
+        if m.type == aiohttp.WSMsgType.BINARY:
+            leaked = True
+        if m.type == aiohttp.WSMsgType.TEXT and '"leave"' in m.data:
+            break
+    check(closed and not leaked, f"a frame over 1 MiB closes its sender ({closed}) and is not relayed ({not leaked})")
+    await b.send_bytes(bytes([2]) + b"still here")
+    check(await next_binary(b) == bytes([2]) + b"still here", "the other peer's connection goes on")
+    await a.close()
+    await b.close()
+    async with s.delete(f"{RELAY_HTTP}/v1/rooms/{room3['room']}",
+                        headers={"Authorization": f"Bearer {room3['hostToken']}"}) as r:
+        check(r.status == 204, f"room 3 closed ({r.status})")
 
     async with s.delete(f"{RELAY_HTTP}/v1/rooms/{room['room']}") as r:
         check(r.status == 401, f"close without host token refused ({r.status})")

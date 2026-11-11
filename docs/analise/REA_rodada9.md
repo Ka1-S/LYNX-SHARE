@@ -187,6 +187,27 @@ was not isolated **[HYP: the default is off — the pads sound as a *one-shot* o
 
 ---
 
+### 1.8 The editor form (round 190q) **[DATA: form resource of `FPC_x64.dll`]**
+
+The plugin's Delphi form `TSYNTHEDITORFORM` (client 790 × 367) gives every control's position, range, hint and menu
+(read with a DFM outline script; nothing of the resource is in the repo). LYNX's editor (`src/ui/FpcEditor.cpp`) uses
+these positions, drawn 1.25 × larger.
+
+| Area | Controls (left, top, width × height) |
+|---|---|
+| Title strip (y 0…33) | `TitleBevel` "FPC" (−1, 1, 128 × 32); `KbBtn` (125, 7, 22 × 22) "Toggle view: single bank, two banks, pad settings"; MIDI loop bar: open (546, 10), previous (578, 10), next (750, 10), options (765, 10) |
+| Pad strip (y 33…66) | previous pad (8, 41, 15 × 17), `CurrentPadBtn` "Pad 1/16" (23, 41, 78 × 17), next pad (101, 41), options (116, 41); pad name (202, 43, 90 × 15); volume wheel (301, 37, 24 × 24; 0…127), pan (335, 37; −128…128), tune (375, 37; −128…128); mute (415, 40, 19 × 18), solo (447, 40), "Scale volume with velocity" (479, 40); note label (594, 44, 42 × 13); "Cut which group?" (648, 42, 19 × 14; −1…99), "Cut by which group?" (702, 42), "Pad output offset" (754, 42, 26 × 14; −99…103) |
+| Pads | 16 buttons 60 × 56: columns at x 14 / 81 / 148 / 215, rows at y 274 (pads 1–4) / 209 / 144 / 79 (pads 13–16); bank selector (14, 334, 261 × 19) |
+| Layer bar (y 73) | CREATE (299, 73, 54 × 19), DELETE (357, 73), layer up / down (417, 73 / 82, 13 × 10), SPREAD EVEN (440, 74, 79 × 18), "Lock layers" (522, 74, 19 × 18), "Test pad range" (547, 74, 213 × 18), "Trigger overlapping layers randomly" (762, 74, 19 × 18) |
+| Layer list | scroll box (300, 99, 479 × 118); one row per layer, 465 × 29: select button (3, 3, 21 × 22), volume (37, 2, 24 × 24; 0…127, default 100), pan (72, 2), tune (107, 2), waveform (140, 4, 101 × 20), "Active range" slider (247, 2, 215 × 24); splitter (300, 217, 479 × 9) |
+| Sample | waveform (301, 220, 190 × 117) "Left click to preview / Middle click to edit"; load (303, 343), name (322, 341, 147 × 17), "Reverse sample" (473, 342, 17 × 14) |
+| Envelope | editor (495, 220, 269 × 137); VOLUME (766, 220, 13 × 67) and PAN (766, 288, 13 × 68) tabs |
+
+Menus: the random button's — Cycle (mode 3), Random (0), Random (avoid previous) (1), Cycle backward (2, hidden);
+the note label's — Last hit, Learn, Map notes for entire bank, Show GM note names; the sample's — Load..., Edit, Edit
+in new window, Show in browser, Select region. The third pad switch is "Scale volume with velocity" = pad flag bit 2
+(§1.3 had it as not decoded; name from the form, its effect on the sound not measured yet).
+
 ## 2. DirectWave (57 channels) **[DECOMP+STR+DATA]**
 
 ### 2.1 Layout of `0xD5`

@@ -4,15 +4,19 @@
 #include "platform/Package.h"
 
 #include "core/LayoutStyle.h"
+#include "core/LynxExtras.h"
+#include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/LinuxRealtime.h"
 #include "ui/AutomationUi.h"
+#include "ui/DetailView.h"
 #include "ui/Dialogs.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
 
@@ -109,9 +113,9 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
-                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes,
-                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
+                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
 
@@ -273,6 +277,10 @@ public:
                 [this] (bool on) { options.keepEditorsOpen = on; });
         toggle (firstChannel, tr ("Select first channel with notes when the pattern changes"), options.selectFirstChannelWithNotes,
                 [this] (bool on) { options.selectFirstChannelWithNotes = on; });
+        // FL's General › Miscellaneous (round 189o): the Paint tool is monophonic without Shift
+        toggle (monoPaint, tr ("Monophonic painting in piano roll"), options.monophonicPainting,
+                [this] (bool on) { options.monophonicPainting = on; });
+        monoPaint.setTooltip (tr ("On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round"));
         // FL's next Miscellaneous box, DisablePlugFocusDefaultBox (off; round 187a, issue #96)
         toggle (noTypingPriority, tr ("Disable typing keyboard priority by default"), options.disableTypingPriority,
                 [this] (bool on) { options.disableTypingPriority = on; });
@@ -289,6 +297,10 @@ public:
                 [this] (bool on) { options.stretchedClipsLoop = on; });
         clipsLoop.setTooltip (tr ("On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio"));
         // FL's Options › General › Miscellaneous (round 177b): where "Create automation clip" puts the clip
+        // FL's General › Miscellaneous › "Detach all new plugins" (issue #116): plugin windows dock in the desktop by default
+        toggle (detachNew, tr ("Detach all new plugins"), options.detachNewPlugins, [this] (bool on) { options.detachNewPlugins = on; });
+        detachNew.setTooltip (tr ("On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, "
+                                  "behind a panel you click. Each plugin's window menu › Detached changes it for that plugin"));
         toggle (autoClipsAtPlayback, tr ("Create automation clips at the playback position"), options.autoClipsAtPlayback,
                 [this] (bool on) { options.autoClipsAtPlayback = on; });
         autoClipsAtPlayback.setTooltip (tr ("On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song"));
@@ -351,6 +363,21 @@ public:
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        // FL's General › Miscellaneous (round 189o): at most 25 plugin editors open, the oldest closes; FL warns before
+        // turning it off (FUN_013559c0) and keeps it on with No
+        toggle (limitEditors, tr ("Limit the number of open plugin editors"), options.limitEditors, [this] (bool on) {
+            options.limitEditors = on;
+            if (on)
+                return;
+            juce::AlertWindow::showOkCancelBox (
+                juce::MessageBoxIconType::WarningIcon, tr ("Warning"),
+                tr ("It is recommended to keep this setting turned on for performance reasons. Are you sure you want to turn it off?"),
+                tr ("Yes"), tr ("No"), this, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer (this)] (int result) {
+                    if (safe != nullptr && result == 0)
+                        safe->limitEditors.setToggleState (true, juce::sendNotification);
+                }));
+        });
+        limitEditors.setTooltip (tr ("Limit the number of open plugin editor windows to 25"));
         // FL's "Manage messages" (round 186c): which questions are asked; a ticked "Remember my choice" unticks its message
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
@@ -441,7 +468,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &autoSelectLinked, &noTypingPriority, &hoverValues })
+        for (auto* t : { &typingPiano, &keepEditors, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -472,6 +499,7 @@ private:
         sandboxNote.setBounds (r.full (16).translated (0, -3));
         substitutes.setBounds (r.full (24));
         substitutesNote.setBounds (r.full (16).translated (0, -3));
+        limitEditors.setBounds (r.full (24));
         {
             auto row = r.full();
             managePlugins.setBounds (row.removeFromLeft (180));
@@ -501,6 +529,16 @@ private:
         styleToggle (t, text);
         t.setToggleState (value, juce::dontSendNotification);
         t.onClick = [this, &t, set = std::move (set)] { change ([&] { set (t.getToggleState()); }); };
+    }
+
+    // the LYNX extras page switches this one too (round 190am): the copy kept here follows when the page comes back
+    void visibilityChanged() override
+    {
+        if (isVisible() && hooks.getGeneral)
+        {
+            options.hoverValues = hooks.getGeneral().hoverValues;
+            hoverValues.setToggleState (options.hoverValues, juce::dontSendNotification);
+        }
     }
 
     static void selectNearest (juce::ComboBox& box, int value)
@@ -596,7 +634,7 @@ private:
     juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, hoverValues, alternateUndo, sandbox, substitutes, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
     juce::Label messagesNote;
@@ -1611,6 +1649,13 @@ private:
             hooks.midiChanged();
     }
 
+    // the LYNX extras page switches the game controller too (round 190am)
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            gamepadToggle.setToggleState (engine.getMidiPrefs().gamepad, juce::dontSendNotification);
+    }
+
     void load()
     {
         const juce::ScopedValueSetter<bool> guard (loading, true);
@@ -1786,7 +1831,210 @@ private:
     juce::Label gamepadNote;
     juce::ListBox links;
 };
+
+// ================================================================================================================
+// LYNX extras (round 190am)
+// ================================================================================================================
+class ExtrasPage final : public ScrollingPage
+{
+public:
+    ExtrasPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
+    {
+        styleNote (intro, tr ("LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio "
+                              "until you switch one on. Each switch is the same setting as in the place its line names."));
+        intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (intro);
+        std::string_view section;
+        for (const auto& item : extras::items)
+        {
+            if (item.section != section)
+            {
+                section = item.section;
+                titles.push_back (std::make_unique<SectionTitle> (tr (std::string (item.section).c_str())));
+                add (*titles.back());
+            }
+            auto& row = *rows.emplace_back (std::make_unique<Row>());
+            row.id = std::string (item.id);
+            row.title = titles.back().get();
+            styleToggle (row.toggle, tr (std::string (item.title).c_str()));
+            row.toggle.setComponentID (juce::String (row.id)); // (--snapshot and tests find a switch by its id)
+            row.toggle.onClick = [this, &row] {
+                setLynxExtra (engine, hooks, row.id, row.toggle.getToggleState(), persistent);
+                refresh(); // (what the app really did, e.g. an action that was refused)
+            };
+            styleNote (row.note, tr (std::string (item.note).c_str()));
+            add (row.toggle);
+            add (row.note);
+        }
+        refresh();
+    }
+
+    // another page or a menu may have switched one meanwhile
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            refresh();
+    }
+
+    int layout (int width) override
+    {
+        Rows r (width);
+        const auto noteFont = theme::font (theme::type::small);
+        const auto linesOf = [&noteFont] (const juce::Label& label, int w) {
+            juce::AttributedString text (label.getText());
+            text.setFont (noteFont);
+            juce::TextLayout fitted;
+            fitted.createLayout (text, (float) juce::jmax (40, w - 8));
+            return juce::jmax (1, fitted.getNumLines());
+        };
+        intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
+        const SectionTitle* title = nullptr;
+        for (auto& row : rows)
+        {
+            if (row->title != title)
+            {
+                r.section (*row->title, title == nullptr);
+                title = row->title;
+            }
+            row->toggle.setBounds (r.full (24));
+            const auto noteWidth = r.area.getWidth() - noteIndent;
+            const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
+            row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
+        }
+        return r.bottom();
+    }
+
+private:
+    struct Row
+    {
+        std::string id;
+        SectionTitle* title = nullptr;
+        juce::ToggleButton toggle;
+        juce::Label note;
+    };
+
+    void refresh()
+    {
+        for (auto& row : rows)
+            row->toggle.setToggleState (lynxExtraOn (engine, hooks, row->id), juce::dontSendNotification);
+    }
+
+    static constexpr int noteIndent = 27; // under the caption, past the check box
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    bool persistent;
+    juce::Label intro;
+    std::vector<std::unique_ptr<SectionTitle>> titles;
+    std::vector<std::unique_ptr<Row>> rows;
+};
 } // namespace
+
+bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
+{
+    if (id == "mixer.loudness") return MixerStrips::showLoudness;
+    if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
+    if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
+    if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
+    if (id == "playlist.automationLanes") return autolanes::shown();
+    if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
+    if (id == "detail.windowKey") return DetailView::extraWindowKey;
+    if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
+    return false;
+}
+
+void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id, bool on, bool persistent)
+{
+    if (lynxExtraOn (engine, hooks, id) == on)
+        return;
+    const auto saved = [] { // the main window writes ui-options.txt
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    };
+    // a view option with an action: the action is what its menu item runs (it also refreshes the editor and saves)
+    const auto toggledBy = [&hooks] (const char* action) { return hooks.runAction && hooks.runAction (action); };
+
+    if (id == "mixer.loudness")
+    {
+        if (mixeroptions::setShowLoudness)
+            mixeroptions::setShowLoudness (on);
+        else
+            MixerStrips::showLoudness = on;
+        saved();
+    }
+    else if (id == "mixer.usedOnly")
+    {
+        if (mixeroptions::setShowUsedOnly)
+            mixeroptions::setShowUsedOnly (on);
+        else
+            MixerStrips::showUsedOnly = on;
+        saved();
+    }
+    else if (id == "mixer.keepLostLinks")
+    {
+        MixerStrips::keepLostLinks = on;
+        saved();
+    }
+    else if (id == "mixer.followPlaylist")
+    {
+        MixerStrips::followPlaylist = on;
+        if (on)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        saved();
+    }
+    else if (id == "playlist.automationLanes")
+    {
+        if (! toggledBy ("playlist.automationLanes"))
+        {
+            autolanes::setShown (on);
+            saved();
+        }
+    }
+    else if (id == "pianoRoll.songBarsRuler")
+    {
+        if (! toggledBy ("pianoRoll.songBarsRuler"))
+        {
+            PianoRollComponent::songBarsRuler = on;
+            saved();
+        }
+    }
+    else if (id == "general.hoverValues")
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.hoverValues = on;
+            hooks.setGeneral (options);
+        }
+    }
+    else if (id == "record.lastLoopPassPlays")
+    {
+        auto options = engine.getRecordOptions();
+        options.lastLoopPassPlays = on;
+        engine.setRecordOptions (options);
+        saved();
+    }
+    else if (id == "detail.windowKey" || id == "detail.selectInMixer")
+    {
+        (id == "detail.windowKey" ? DetailView::extraWindowKey : DetailView::extraSelectInMixer) = on;
+        saved();
+    }
+    else if (id == "midi.gamepad")
+    {
+        auto prefs = engine.getMidiPrefs();
+        prefs.gamepad = on;
+        engine.setMidiPrefs (prefs, persistent);
+        if (hooks.midiChanged)
+            hooks.midiChanged();
+    }
+}
+
+std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
+{
+    return std::make_unique<ExtrasPage> (engine, hooks, persistent);
+}
 
 std::unique_ptr<juce::Component> makeGeneralPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
 {

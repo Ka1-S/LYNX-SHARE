@@ -54,6 +54,10 @@ public:
     // Every drop target (Channel Rack, Playlist, Audio editor...) asks this, so they all take what the Browser lists.
     static bool isSampleFile (const juce::File& file);
 
+    // The file's first `seconds` mixed to mono, read straight from the file: nothing is cached or kept (round 190as:
+    // the Browser's "Find similar samples" analyses whole folders with it). False when the file can't be read.
+    bool readMono (const juce::File& file, double seconds, std::vector<float>& mono, double& sampleRate);
+
 private:
     std::unique_ptr<juce::AudioFormatReader> createReader (const juce::File& file);
     std::shared_ptr<const SampleData> loadStreamed (const juce::File& file, juce::AudioFormatReader& reader);

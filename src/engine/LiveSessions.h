@@ -8,7 +8,8 @@
 // sealed frame] for the ones over 512 KiB. A sealed frame's plain text is ['J'][JSON] / ['Z'][gzip JSON] / ['M'][media
 // chunk]. The JSON messages: hello / welcome / deny / snapshot / propose / commit / people / presence / want / bye /
 // end / resync; round 169j adds seek / host / back / resume / resumed (reconnect, §1.5), perms, chat, transport, need /
-// needs (live stand-ins) and 'F' frames (a medium as a lossless FLAC pack, engine/MediaPack.h). Sample paths travel as "lynx-media:<sha256>/<name>"; a received change may only point at this
+// needs (live stand-ins) and 'F' frames (a medium as a lossless FLAC pack, engine/MediaPack.h); round 190ai adds
+// shared / rbusy (P5-A1 remote plugins, engine/LiveRemotePlugins.cpp). Sample paths travel as "lynx-media:<sha256>/<name>"; a received change may only point at this
 // session's media folder (sessionpack::confine), and media are only sent when the sender's own song uses them.
 
 #include <deque>
@@ -26,7 +27,13 @@
 
 #include "core/LiveCrypto.h"
 #include "core/LiveSession.h"
+#include "core/RemotePlugins.h"
 #include "engine/LiveLink.h"
+
+namespace juce
+{
+class AudioPluginInstance;
+}
 
 namespace lynx
 {
@@ -63,6 +70,11 @@ public:
         // host: the journal a restarted LYNX SHARE resumes the session from (default: the profile's
         // "Live session/journal.json"; tests: their own)
         juce::File journal;
+        // guest (round 190ah): the journal a restarted LYNX SHARE comes back into the session from, as the same guest
+        // (default: the profile's "Live session/guest.json")
+        juce::File guestJournal;
+        // host: what one guest may send before the host is asked, and what the session may move in all (§8.4)
+        juce::int64 guestMediaLimit = live::guestMediaBytes, sessionMediaLimit = live::sessionMediaBytes;
         int reconnectForMs = 15 * 60 * 1000;  // how long a dropped computer keeps trying (and guests wait for the host)
         int standInDelayMs = 2000;            // live stand-ins render this long after the part's last change
         bool inlineWork = false;              // command-line runs without a message loop: stand-ins render in pump()
@@ -82,6 +94,18 @@ public:
     static juce::File defaultJournal();
     static std::optional<JournalInfo> readJournal (const juce::File& journal);
     static void discardJournal (const juce::File& journal, const juce::String& relay); // (and closes its room)
+
+    // A guest's journal (round 190ah): the session this LYNX SHARE was in when it closed or crashed.
+    struct GuestJournalInfo
+    {
+        juce::String name, hostName;
+        juce::Time saved;
+        std::uint64_t revision = 0;
+    };
+    static juce::File defaultGuestJournal();
+    static std::optional<GuestJournalInfo> readGuestJournal (const juce::File& journal);
+    // Not going back: the journal goes, and the host is told (in the background) that this guest's place is free.
+    static void discardGuestJournal (const juce::File& journal, const juce::String& relay);
 
     struct Person
     {
@@ -114,6 +138,10 @@ public:
     // The host's LYNX SHARE restarted: the session goes on from its journal (`onResumed` gets the song first); the
     // guests, waiting, reconnect by themselves.
     bool resumeHost (const juce::File& journal, const Options& options);
+    // A guest's LYNX SHARE restarted (round 190ah): it goes back into the session as the same guest — same tag, area,
+    // colour and permissions, no new question to the host — with the project as it had it (`onRejoined` gets that
+    // song first); what it had changed and the host never confirmed is proposed again.
+    bool resumeGuest (const juce::File& journal, const Options& options);
 
     // Session chat (round 169j): to everyone in the session.
     void sendChat (const juce::String& text);
@@ -127,6 +155,41 @@ public:
     void setPermissions (std::uint32_t tag, live::Permissions permissions, bool keepFull);
     live::Permissions myPermissions() const noexcept { return myPerms; }
     int standInsRendering() const noexcept { return rendering ? 1 : 0; }
+    // the host's count of the session's audio files against its limits (round 190ah)
+    const live::MediaBudget& mediaBudget() const noexcept { return budget; }
+    // What the session's confirmed song is, as a hash every computer in it computes the same way (sample paths as
+    // their content hashes): two computers that print the same digest at the same revision hold the same song.
+    juce::String digest();
+
+    // --- P5-A1, remote plugins (round 190ai; core/RemotePlugins.h, engine/LiveRemotePlugins.cpp) ---------------------
+    // The host shares one of its plugins with the session (opt-in per plugin, off by default, gone when the session
+    // ends) or stops sharing it: guests who may edit get its name and parameter list, nothing else. false + `error`
+    // when it cannot be loaded here.
+    bool sharePlugin (const std::string& pluginId, bool on, juce::String* error = nullptr);
+    // The host: what it shares. A guest: what the host shares with them (empty for "listen only").
+    const std::vector<remoteplug::Shared>& sharedPlugins() const noexcept { return shared; }
+    bool mayUseSharedPlugins() const noexcept { return ! host && state == State::live && ! myPerms.listener && ! shared.empty(); }
+    // What a guest puts on a channel / an insert slot of their own to use a shared plugin.
+    PluginRef sharedPluginRef (const remoteplug::Shared& plugin) const { return remoteplug::makeRef (plugin, session::hostTag); }
+    // The host: who uses a plugin it plays for the session ("Rui: Channel 3").
+    juce::StringArray sharedPluginUsers (const std::string& pluginId) const;
+    // The name of the participant whose computer plays this plugin (empty: this one, or everyone their own).
+    juce::String playedByName (const PluginRef& ref) const;
+    enum class HostedState
+    {
+        none,       // not a plugin played by someone else's computer
+        noNotes,    // nothing to render yet
+        updating,   // the host is rendering it (or about to): the last render plays meanwhile
+        upToDate,
+        hostAway,   // the host's connection dropped: the last render plays
+        notShared   // the host stopped sharing the plugin: the last render plays
+    };
+    HostedState hostedState (const remoteplug::Place& place) const;
+    // The host: the parameter values of its running hosted plugins go into the song (what the host changed in the
+    // plugin's own window reaches the guests as values, never as a state). Also done when such a window closes.
+    void captureHostedValues();
+    // (the UI's: whether a plugin's own editor window is open — its values are captured when it closes)
+    std::function<bool (juce::AudioPluginInstance&)> hostedEditorOpen;
 
     // tests: the connection drops as if the network went away (the manager reconnects by itself); abandon() stops
     // everything without a word to anyone, keeping the journal (what a crash of LYNX SHARE does)
@@ -140,6 +203,7 @@ public:
     juce::String getStatus() const { return status; } // one line for the presence bar / dialogs
     std::vector<Person> getPeople() const;
     int waitingChanges() const;  // commits held while this computer records
+    int pendingEdits() const;    // this computer's edits the host has not answered yet
     int mediaDownloading() const noexcept { return (int) wanted.size(); }
     std::uint32_t myTag() const noexcept { return me; }
 
@@ -153,6 +217,19 @@ public:
     // The host resumed from its journal: the caller opens this song (default: engine.setSong).
     std::function<void (Song song)> onResumed;
     std::function<void (const ChatLine& line)> onChat; // a chat line arrived (or was sent)
+    // A guest came back from its journal: the caller makes this song the open project (default: engine.setSong).
+    std::function<void (Song song)> onRejoined;
+    // The host: a media limit was reached (round 190ah). `session` false: guest `name` has sent `used` and the next
+    // file does not fit their `limit` — answer (true) raises it and fetches what was held back; unset or (false): the
+    // files stay with the guest. `session` true: the whole session is at its limit (answer is empty: nothing to ask).
+    struct MediaLimit
+    {
+        bool session = false;
+        juce::String name;
+        juce::int64 used = 0, limit = 0;
+        std::function<void (bool raise)> answer;
+    };
+    std::function<void (const MediaLimit&)> onMediaLimit;
 
     // tests / scripted runs: a message to every guest (as the host) is counted here
     struct Stats
@@ -162,6 +239,8 @@ public:
         int reconnects = 0, replayed = 0, resumedBySnapshot = 0, standInsRendered = 0, packedSent = 0, followed = 0;
         juce::int64 packedSaved = 0; // bytes FLAC saved on the media sent
         int hashedOffThread = 0;
+        int mediaRefused = 0, rejoined = 0;
+        int hostedRendered = 0, valueEditsRefused = 0; // P5-A1: parts rendered for their owners, proposals over the rate limit
     };
     Stats getStats() const noexcept { return stats; }
     // Does what the timer does (network events, local edits, presence, media): command-line runs without a message
@@ -190,6 +269,7 @@ private:
         bool keepFull = false;
         std::set<live::Key> need;     // parts it cannot play
         bool lostRev = false;         // it saw commits this host lost (a restart from an older journal)
+        juce::int64 awaySinceMs = 0;  // when its connection dropped (the longest away gives its place up first)
     };
     struct Want
     {
@@ -357,5 +437,42 @@ private:
     void writeJournal (bool now);
     juce::var permsToVar (const live::Permissions& p, bool keepFull) const;
     void verifyArrived (const juce::String& sha);
+    // 190ah
+    struct Refused
+    {
+        std::uint32_t tag = 0;
+        juce::String name;
+        juce::int64 size = 0;
+    };
+    live::MediaBudget budget;                   // host
+    std::map<juce::String, Refused> refused;    // host: sha -> a guest's file held back by their limit
+    std::set<std::uint32_t> limitAsked;         // host: guests whose limit question is open or was answered "no"
+    bool sessionLimitTold = false;
+    juce::File guestJournalFile;
+    std::uint64_t journalSig = 0;
+    bool rejoining = false, primed = true, fetchMissing = false, quitting = false, resumeHeld = false;
+    std::map<std::uint32_t, juce::int64> limitAnsweredMs; // host: when a guest's limit question was last answered "no"
+    void writeGuestJournal (bool now);
+    void refuse (const juce::String& sha, bool sessionWide);
+    void tellSessionLimit();
+    void onLimit (const juce::var& m);
+    void fetchMissingMedia();
+    int peerOf (std::uint32_t tag) const;
+    // P5-A1 (engine/LiveRemotePlugins.cpp)
+    std::vector<remoteplug::Shared> shared;     // host: what it shares; guest: what the host shares
+    std::set<live::Key> hostedBusy;             // the parts being rendered for their owners (guests: as the host says)
+    remoteplug::Limiter valueLimiter;           // host: parameter edits per guest
+    std::map<remoteplug::Place, std::vector<std::pair<int, float>>> pushedValues; // host: the values its running instances have
+    std::map<remoteplug::Place, bool> hostedOpen; // host: hosted plugins whose own window was open at the last look
+    juce::int64 lastHostedMs = 0;
+    mutable std::map<remoteplug::Place, std::pair<std::uint64_t, HostedState>> hostedStateCache;
+    void sendShared (int to);                   // host: the list to one guest (0: to every guest)
+    bool handleRemotePlugins (int from, const juce::String& type, const juce::var& m); // guest: shared / rbusy
+    void hostedTick();                          // both: the session tag; host: values onto the instances, capture
+    void addHostedRenders (std::vector<live::Key>& keys); // host: other people's parts it renders
+    void setHostedBusy (std::set<live::Key> keys);
+    bool admitHosted (std::uint32_t tag, live::Proposal& proposal); // host: clean a guest's proposal; false = over the limit
+    void endHosted (bool wasHost);              // the session is over
+    void captureHostedValuesAt (const remoteplug::Place& place);
 };
 } // namespace lynx

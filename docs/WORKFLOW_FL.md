@@ -261,6 +261,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | R27 | Time markers in the roll (Alt+T named, Ctrl+T auto); per-pattern time signature (Shift+Alt+T) | [DOC][sc-pr] [DOC][pr] |
 | R28 | MIDI file import/export from the roll (Ctrl+M / Shift+Ctrl+M) | [DOC][sc-pr] |
 | R29 | Play button in the roll: right-click returns to the last start / roll start | [DOC][pr] |
+| R30 | Piano roll scripts: Tools › Scripts lists Python `.pyscript` files (factory, user, downloaded); a script edits the notes and markers through `flpianoroll`, with an automatic form and live preview; Run last script again Ctrl+Alt+Y | [DOC] Piano roll script reference, manual pianoroll_scripting_api; REA_rodada190as-pyscript.md |
 
 ### 2.5 Playlist (P)
 
@@ -271,7 +272,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | P3 | **Clip source selector**: left-click on empty track space places the current source; right-click (or Ctrl+F8) opens the project picker with hover preview | [DOC][pl] [DOC][pl-pp] |
 | P4 | Picker panel (Alt+P): every pattern/audio/automation source; rename, colour, select unused, sort, preview | [DOC][pl-picker] |
 | P5 | Clip edges: Shift+drag the start/end edge to trim without moving content; left-edge resize option; slip moves content inside a fixed clip; ripple resizes while the content at the other end slips | [DOC][pl] [DOC][pl-work] |
-| P6 | Move by left-drag; Shift+drag copies the selection; Ctrl+drag box selects; Shift+arrows move the selection in time / across tracks | [DOC][pl-work] [DOC][sc-pl] |
+| P6 | Move by left-drag; Shift+drag copies the selection; Ctrl+drag box selects; Shift+Left/Right move the selection (all clips when nothing is selected) by one snap unit, Shift+Up/Down by one track; Alt+Left/Right (also with Shift) nudge it by one pixel's worth of ticks, ignoring snap; one undo step per key press | [DOC][pl-work] [DOC][sc-pl]; Alt nudge, undo and limits: FLEngine 2026 `FUN_00e51730` / `FUN_00e52360` + FL 2026 live check (round 190ag) |
 | P7 | Wheel nudge (CONFLICT: Shift+Alt+wheel by default, Shift+wheel with an option) | [DOC][pl] [DOC][sc-pl] |
 | P8 | Clip menu: preview, select source, channel settings, rename, colour, **make unique** (also Shift+V+drag), select all similar, delete, chop (grid-based; for audio by bar/beat, also shuffled) | [DOC][pl-clipmenu] |
 | P9 | Audio clip menu extras: volume/pan automation for the clip, crossfades, time-stretch tools, "make unique as sample" (copies the file) | [DOC][pl-clipmenu] |
@@ -339,6 +340,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | B8 | Current-project tab: history, patterns, automatable controls (right-click → automation / link) | [DOC][br] |
 | B9 | Quick plugin picker (F8): generators on one side, effects on the other; type to filter; double-click loads into a new channel or the selected insert | [DOC][br-picker] |
 | B10 | Docks left/right; can detach; Backspace/Shift+Backspace navigate back/forward | [DOC][br] |
+| B11 | Sounds tab (FL Cloud, online): a sound's menu › **Find similar samples** lists sounds of the online library with a similar tone and rhythm; Loop Starter's channel menu has the same query. Nothing local is analysed | [DOC][br] `REA_rodada190as.md` §1 |
 
 ### 2.9 Plugin windows (W)
 
@@ -378,7 +380,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 
 | ID | LYNX | Where / note |
 |---|---|---|
-| G1 | **Done** | F5 Playlist, F6 Channel Rack, F7 Piano Roll, F9 Mixer, Alt+F8 Browser **toggle and focus** floating panels (`ui/Workspace.*`, `core/Workspace.cpp` `Layout::toggle`). **F8 opens the quick-add palette** (`ui/QuickAddPalette.*`, P2). Keys checked on [DOC][sc] |
+| G1 | **Done** | F5 Playlist, F6 Channel Rack, F7 Piano Roll, F9 Mixer, Alt+F8 Browser **toggle and focus** floating panels (`ui/Workspace.*`, `core/Workspace.cpp` `Layout::toggle`). **F8 opens the Plugin picker** (`ui/PluginPickerView.*`, round 171c); the quick-add palette (`ui/QuickAddPalette.*`, P2) has no default key since then: `Edit › Quick-add palette...`, or a right-click on the toolbar's plugin-picker button. Keys checked on [DOC][sc] |
 | G2 | No | No F12 family; Esc only deselects inside the editors |
 | G3 | **Done** (shell + P2) | Workspace desktop: panels move by their title strip, resize by their edges, overlap, maximise (button or double-click on the title) and **detach** into a native window and back. Snapping to other panels and the edges (`workspace::snap`); Alt while dragging turns it off, as on [DOC][iface]. **Detached windows snap too** (to the screen, the main window and each other; `SnapConstrainer` in `ui/Workspace.cpp`). Plugin, settings and automation windows stay native windows |
 | G4 | **Done** | View → Reset layout, Save layout as…, Load layout (`%APPDATA%\LYNX\layouts\*.txt`), Bring back off-screen panels. The current layout is saved in the user settings (`workspace.txt`), not the project |
@@ -467,6 +469,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | R27 | No | Markers exist only on the Playlist ruler |
 | R28 | Yes | MIDI menu import/export (`:1163-1209`) |
 | R29 | No | — |
+| R30 | Yes | Round 190as: `core/PianoRollScript.h` (LYNX's own `flpianoroll` on the embedded Python), Tools › Scripts with LYNX's scripts, My scripts and FL's folders; FL's shipped scripts run unmodified. Sandbox and time limit are LYNX additions |
 
 **Playlist**
 
@@ -477,8 +480,8 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | P3 | Partial | Picker panel selects the source; click on empty space places it (`:844-882, 1604-1739`). No source menu, no hover preview |
 | P4 | Partial | Picker lists patterns / audio / automation (`:1604-1739`); no right-click actions |
 | P5 | Partial | Fade handles fixed. Left-edge trim moves start and offset together; Shift on an edge trims; Slip tool or Alt+Shift+drag slips the content. **Ripple resize** (ripple mode). No stretch |
-| P6 | Partial | Drag, group move, Shift+drag copy, Ctrl+box. No Shift+arrow moves |
-| P7 | Yes | Shift+Alt+wheel nudges the selected clips by the grid (one undo step per burst); the Shift+wheel variant is not offered (Shift+wheel scrolls) |
+| P6 | **Done** | Drag, group move, Shift+drag copy, Ctrl+box. **Shift+Left/Right** move the selected clips (all clips when none is selected) by one snap step ((none) = one tick), **Shift+Up/Down** by one track, **Alt+Left/Right** (or Alt+Shift) by a fine step without snap (one pixel's worth of ticks at the current zoom), as in FL (issue #147). The selection stops as a whole at the song start and at the first / last track (no wrap); clips landing on occupied space overlap, as after a drag; each key press is one undo step; the view follows the leading edge of the moved clips. In a text field or an open menu the arrows keep their normal function. Also in Playlist menu › Edit (`clipops::shiftClipsInTime` / `shiftClipsTrack`, `PlaylistComponent::moveClips`) |
+| P7 | Yes | Shift+Alt+wheel nudges the selected clips by the grid (one undo step per burst; the same move as the Shift+arrow keys, P6). Shift+wheel with Edit › "Nudge clips with mouse wheel" on shifts the clips' content, as FL 2026 does (round 189g) |
 | P8 | Partial | Split, **mute/unmute, chop to grid**, make unique, select all of this pattern, open in rack, **open in Piano Roll**, delete. Missing: per-clip colour and name (no model field yet) |
 | P9 | Partial | Clip volume, normalise, remove fades. No clip automation, crossfades, reverse |
 | P10 | **Done** | Double-click a pattern clip opens the **Piano Roll when the pattern has piano-roll notes, else the Channel Rack** (`hasPianoRollNotes`); Options → "Double-click on a pattern clip opens" sets it; **Alt+double-click opens the other one**; automation clips open their editor |
@@ -540,8 +543,9 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | B6 | **Done** | **Search box (Ctrl+F)** under the folder list: searches the current folder and below in the background (up to 500 results), words AND-ed, OR, NOT / -word, "exact phrase", * and ? wildcards (`core/SearchQuery`); Esc clears. No F2/F3 stepping |
 | B7 | Partial | Root-folder combo (`BrowserComponent.cpp:80-91`); no tabs, user folders, tags or favourites |
 | B8 | No | — |
-| B9 | **Done** | **Quick-add palette (F8)**: instruments (built-in and scanned plugins) and effects side by side, filtered as you type, Enter/double-click adds an instrument as a new channel or an effect into the selected insert; opened from the Mixer it starts on the effects |
+| B9 | **Done** | **Quick-add palette** (`Edit › Quick-add palette...`, or right-click the toolbar's plugin-picker button; F8 opens the Plugin picker since round 171c): instruments (built-in and scanned plugins) and effects side by side, filtered as you type, Enter/double-click adds an instrument as a new channel or an effect into the selected insert; opened from the Mixer it starts on the effects |
 | B10 | Partial | Fixed left panel (detachable as a workspace panel); **user folders through "Add folder…" in the folder list** (kept in `browser-folders.txt`). No back/forward |
+| B11 | **Done** (LYNX's own, local) | Right-click an audio file › **Find similar samples**: the Browser lists the samples of its own folders that sound most alike, most similar first, with a percentage (`core/SampleSimilarity.*`: 49 numbers per file for tone, shape, rhythm and pitch classes; index `browser-similar.idx`, at most 150,000 files; one lowest-priority worker that waits while LYNX plays; nothing is analysed before the first use). FL's search is FL Cloud's and can't rank local files; no FL Cloud in LYNX |
 
 **Plugin windows**
 
@@ -706,9 +710,9 @@ search stepping, instrument drops on mixer inserts, record filters for automatio
   - User folders.
   - **Status:** Done (effect presets drop on the effects panel, generators on a strip or its effect slots). Plain Up/Down
     preview, Shift+Up/Down load into the selected channel (checked on [DOC][br]).
-- **Quick-add palette (B9).** A searchable plugin list (F8 in LYNX) with instruments and effects. Double-click
+- **Quick-add palette (B9).** A searchable plugin list with instruments and effects. Double-click
   adds it to a new channel or to the selected insert, depending on which panel is focused.
-  - **Status:** Done (F8 and the toolbar's plugin-picker icon; the Browser moved to Alt+F8).
+  - **Status:** Done (`Edit › Quick-add palette...` and a right-click on the toolbar's plugin-picker icon; F8 opens the Plugin picker since round 171c; the Browser moved to Alt+F8).
 - **History panel (G13).** A list of undo steps with names (the action labels already passed to `editSong`).
   Clicking a step jumps there. Keep conventional undo (Ctrl+Z back, Ctrl+Y/Ctrl+Shift+Z forward). FL's
   toggle-style undo is deliberately *not* copied.

@@ -283,3 +283,43 @@ TEST (issue138_an_export_waits_for_a_soundfont_that_is_still_loading)
     std::error_code ignored;
     std::filesystem::remove (path, ignored);
 }
+
+// Round 190ba: the same without the Export window's "HQ for all plugins" (the render-quality flag stays off then, and
+// the wait above never ran: the export of a font that was still loading dropped its first notes again).
+TEST (issue138_an_export_without_hq_waits_for_a_soundfont_too)
+{
+    const auto path = (std::filesystem::temp_directory_path() / ("lynx-iss190ba-font-" + std::to_string ((long long) std::chrono::steady_clock::now().time_since_epoch().count()) + ".sf2")).string();
+    {
+        std::vector<lynx::sf::TestPreset> presets;
+        for (int p = 0; p < 64; ++p)
+            presets.push_back ({ "Preset " + std::to_string (p), 0, p });
+        const auto bytes = lynx::sf::makeTestFont (presets, 4);
+        std::ofstream out (path, std::ios::binary);
+        out.write ((const char*) bytes.data(), (std::streamsize) bytes.size());
+    }
+    auto channel = lynx::sf::makeChannel();
+    channel.samplePath = path;
+
+    lynx::setOfflineRendering (false);
+    CHECK (! lynx::renderInProgress()); // (off unless a render runs)
+    auto instrument = lynx::sf::makeInstrument (lynx::sf::FontLibrary::instance().get (path)); // the load starts
+    instrument->prepare (44100.0);
+    instrument->configure (channel, 120.0);
+    lynx::setRenderInProgress (true); // the render begins, "HQ for all plugins" off: setOfflineRendering (false)
+    instrument->noteOn (48, 0.8f);
+    std::vector<float> l (512, 0.0f), r (512, 0.0f);
+    float peak = 0.0f;
+    for (int block = 0; block < 8; ++block)
+    {
+        std::fill (l.begin(), l.end(), 0.0f);
+        std::fill (r.begin(), r.end(), 0.0f);
+        instrument->render (l.data(), r.data(), 512, 1.0f, 1.0f);
+        for (const auto v : l)
+            peak = std::max (peak, std::abs (v));
+    }
+    lynx::setRenderInProgress (false);
+    CHECK (peak > 0.01f);
+    instrument.reset();
+    std::error_code ignored;
+    std::filesystem::remove (path, ignored);
+}

@@ -27,6 +27,20 @@ namespace vfx
 {
 class Processor;
 }
+
+// Gains a sampler's voices take from outside, per sample (round 190z: FPC's pad envelopes, layer pan and FPC's choke,
+// which FL steps on the voice's own tick grid). `voice` is the sampler's voice slot (0…15). Audio thread, no
+// allocation, no lock.
+class VoiceShaper
+{
+public:
+    virtual ~VoiceShaper() = default;
+    virtual void voiceStarted (int voice) noexcept = 0;  // a note started in the slot (a stolen slot starts again)
+    virtual void voiceReleased (int voice) noexcept = 0; // its note ended
+    // the left / right gain of the voice's next sample; false: the voice is over (it stops before this sample)
+    virtual bool voiceGains (int voice, float& left, float& right) noexcept = 0;
+};
+
 class Instrument
 {
 public:
@@ -46,6 +60,8 @@ public:
     virtual void setFastDeclick (bool /*fast*/) noexcept {}
     // the project's panning law (Song::panTriangular, FL's Options › Project › Panning law; REA round 167j §1)
     virtual void setPanTriangular (bool /*triangular*/) noexcept {}
+    // Song::flPluginLevels (round 190ad): a hosted plugin sends its notes' velocities as FL's wrapper does
+    virtual void setFlWrapperVelocity (bool /*on*/) noexcept {}
     // A note on a given MIDI channel (0…15), from a MIDI Out channel routed to this one's MIDI input port. Only
     // hosted plugins see the channel; the others play it as a plain note.
     virtual void noteOnMidi (int key, float velocity, int /*midiChannel*/) noexcept { noteOn (key, velocity); }
@@ -82,6 +98,12 @@ public:
     // allocates its per-voice pitch shifters (keys transpose it without changing its length, like FL's Stretch modes).
     virtual void prepareKeyShift (double /*sampleRate*/) {}
 
+    // The channel's pan (−1..1) and linear volume behind the gains of the next render() calls. Audio thread, before
+    // every chunk. For an instrument that pans its parts around the channel's pan (FPC's pads, round 190q).
+    virtual void setChannelLevels (float /*pan*/, float /*volume*/) noexcept {}
+    // The sampler's voices take their gains from `shaper` too (null = none; the shaper outlives the instrument's use
+    // of it). Before the first note. Other instruments ignore it.
+    virtual void setVoiceShaper (VoiceShaper* /*shaper*/) noexcept {}
     // Adds (does not overwrite) n samples into left/right, with the gains already applied.
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.
@@ -97,6 +119,10 @@ public:
     // sounding voice can follow a Mono channel's notes (slideTo). Engines that do neither: the rack retriggers instead.
     virtual bool followsChannelPorta() const noexcept { return false; }
     virtual bool followsSlides() const noexcept { return followsChannelPorta(); }
+    // Round 190w (FL 2026's playback locator in the channel settings' sample display, What's New 21138): where the
+    // newest sounding voice reads, as a fraction 0..1 of its played region in play order (a reversed voice from the
+    // region's end); -1 when no voice sounds. Any thread. Only LYNX's Sampler reports it.
+    virtual float playPosition() const noexcept { return -1.0f; }
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
     // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
     // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"
@@ -104,7 +130,7 @@ public:
     // the next audio clip's stretch (FL 2026's clip stretch, round 167l): its audio lasts that many times longer
     virtual void setNextClipStretch (float /*stretch*/) noexcept {}
     virtual void setClipShift (bool) {}
-    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0,
+    virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint16_t /*shape*/ = 0,
                                   float /*inTension*/ = 0.0f, float /*outTension*/ = 0.0f) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
@@ -236,6 +262,11 @@ struct SampleData
 // prepare()/configure(), so set it before preparing the graph for the render and clear it afterwards.
 void setOfflineRendering (bool on) noexcept;
 bool offlineRendering() noexcept;
+// An export is rendering, at whatever quality (issue #138): setOfflineRendering() is only on with the Export window's
+// "HQ for all plugins", so an instrument that must wait for data another thread is still loading (LYNX Soundfont's
+// font) asks this instead. Set for the whole of an offline render; never while playing live.
+void setRenderInProgress (bool on) noexcept;
+bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;
