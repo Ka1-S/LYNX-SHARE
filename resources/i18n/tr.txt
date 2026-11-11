@@ -8926,3 +8926,6 @@ countries: tr
 "Can't freeze {0}" = "{0} dondurulamaz"
 "Some selected channels can't be frozen" = "Seçili kanalların bazıları dondurulamaz"
 "The other selected channels are frozen." = "Diğer seçili kanallar donduruluyor."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."

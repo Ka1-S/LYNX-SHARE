@@ -8926,3 +8926,6 @@ countries: nl be
 "Can't freeze {0}" = "{0} kan niet worden bevroren"
 "Some selected channels can't be frozen" = "Sommige geselecteerde kanalen kunnen niet worden bevroren"
 "The other selected channels are frozen." = "De andere geselecteerde kanalen worden bevroren."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (de laatste rij van het blad) wordt getoond zolang de danser met de muis wordt vastgehouden."

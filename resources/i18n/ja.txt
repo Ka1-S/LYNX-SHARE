@@ -8926,3 +8926,6 @@ countries: jp
 "Can't freeze {0}" = "{0} はフリーズできません"
 "Some selected channels can't be frozen" = "選択したチャンネルの一部はフリーズできません"
 "The other selected channels are frozen." = "選択したほかのチャンネルはフリーズされます。"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"

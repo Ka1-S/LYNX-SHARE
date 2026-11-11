@@ -8926,3 +8926,6 @@ countries: id
 "Can't freeze {0}" = "{0} tidak dapat dibekukan"
 "Some selected channels can't be frozen" = "Beberapa channel terpilih tidak dapat dibekukan"
 "The other selected channels are frozen." = "Channel terpilih lainnya dibekukan."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (baris terakhir lembar) ditampilkan saat penari ditahan dengan mouse."

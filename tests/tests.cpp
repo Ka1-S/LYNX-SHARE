@@ -17493,3 +17493,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "QaFix190bjTests.inc"
 #include "Fl190bfTests.inc"
 #include "ShotScale190biTests.inc"
+#include "QaFix190bjATests.inc"

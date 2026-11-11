@@ -8926,3 +8926,6 @@ countries: ru by kz
 "Can't freeze {0}" = "Нельзя заморозить {0}"
 "Some selected channels can't be frozen" = "Некоторые выбранные каналы нельзя заморозить"
 "The other selected channels are frozen." = "Остальные выбранные каналы замораживаются."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (последняя строка листа) показывается, пока танцора держат мышью."

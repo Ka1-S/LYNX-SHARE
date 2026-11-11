@@ -8926,3 +8926,6 @@ countries: es mx ar co cl pe ve
 "Can't freeze {0}" = "No se puede congelar {0}"
 "Some selected channels can't be frozen" = "Algunos canales seleccionados no se pueden congelar"
 "The other selected channels are frozen." = "Los demás canales seleccionados se congelan."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (la última fila de la hoja) se muestra mientras el bailarín se sujeta con el ratón."

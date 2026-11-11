@@ -8926,3 +8926,6 @@ countries: tw hk mo
 "Can't freeze {0}" = "無法凍結 {0}"
 "Some selected channels can't be frozen" = "部分所選通道無法凍結"
 "The other selected channels are frozen." = "其他所選通道將被凍結。"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表單的最後一列）在用滑鼠按住舞者時顯示。"

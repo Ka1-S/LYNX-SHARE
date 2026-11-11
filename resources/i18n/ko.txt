@@ -8926,3 +8926,6 @@ countries: kr
 "Can't freeze {0}" = "{0}은(는) 프리즈할 수 없습니다"
 "Some selected channels can't be frozen" = "선택한 채널 중 일부는 프리즈할 수 없습니다"
 "The other selected channels are frozen." = "선택한 나머지 채널은 프리즈됩니다."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}(시트의 마지막 행)은 댄서를 마우스로 잡고 있는 동안 표시됩니다."
