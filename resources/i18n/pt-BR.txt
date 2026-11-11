@@ -9033,3 +9033,6 @@ countries: br
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelamento: segura o nível em um limiar abaixo do teto com ataque lento, o teto segura o resto (desligado por padrão)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Limiar do nivelamento: o nível mantido abaixo do teto (Off: sem nivelamento)"
 "Levelling attack: how much of a transient passes before the level is held" = "Ataque do nivelamento: quanto de um transiente passa antes de o nível ser segurado"
+# --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
+"Pocket SuperSaw" = "Pocket SuperSaw"
+"Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — o motor do LYNX para o SuperSaw do FL Studio Mobile"

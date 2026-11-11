@@ -8918,3 +8918,6 @@ countries: jp
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "レベリング: 遅いアタックでシーリングより下のスレッショルドにレベルを保ち、残りはシーリングが抑えます（既定ではオフ）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "レベリングのスレッショルド: シーリングより下に保つレベル（Off: レベリングなし）"
 "Levelling attack: how much of a transient passes before the level is held" = "レベリングのアタック: レベルが保たれる前にトランジェントがどれだけ通るか"
+# --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
+"Pocket SuperSaw" = "Pocket SuperSaw"
+"Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — FL Studio Mobile の SuperSaw 用の LYNX エンジン"

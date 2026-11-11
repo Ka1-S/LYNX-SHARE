@@ -208,6 +208,7 @@ APP_SOURCES+=(src/ui/HintBar.cpp src/ui/Toolbar.cpp)
 APP_SOURCES+=(src/core/ThreeOsc.cpp)
 # FL Studio Mobile's GMSynth (round 190ab)
 APP_SOURCES+=(src/core/GmsMobile.cpp)
+APP_SOURCES+=(src/core/PocketSuperSaw.cpp)
 # onboarding: FL Studio integration (plugin database, sample relocation), background scan, setup wizard
 APP_SOURCES+=(src/core/FlPluginDb.cpp src/engine/FlStudio.cpp src/ui/SetupWizard.cpp)
 APP_SOURCES+=(src/core/PluginCatalog.cpp src/ui/PluginPicker.cpp)

@@ -109,6 +109,7 @@ add_library(lynx_core STATIC
     src/core/Harmor.cpp
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
+    src/core/PocketSuperSaw.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp

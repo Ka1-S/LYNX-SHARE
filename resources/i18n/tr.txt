@@ -8918,3 +8918,6 @@ countries: tr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Seviyeleme: seviyeyi yavaş bir atakla tavanın altındaki bir eşikte tutar, gerisini tavan yakalar (varsayılan olarak kapalı)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Seviyeleme eşiği: tavanın altında tutulan seviye (Off: seviyeleme yok)"
 "Levelling attack: how much of a transient passes before the level is held" = "Seviyeleme atağı: seviye tutulmadan önce bir geçicinin ne kadarının geçtiği"
+# --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
+"Pocket SuperSaw" = "Pocket SuperSaw"
+"Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — FL Studio Mobile'ın SuperSaw'ı için LYNX motoru"

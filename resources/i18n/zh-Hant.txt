@@ -8918,3 +8918,6 @@ countries: tw hk mo
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "電平平衡：以較慢的起音把電平保持在上限以下的臨界值，其餘由上限攔住（預設關閉）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "電平平衡臨界值：保持在上限以下的電平（Off：不做電平平衡）"
 "Levelling attack: how much of a transient passes before the level is held" = "電平平衡起音：電平被保持之前有多少瞬態通過"
+# --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
+"Pocket SuperSaw" = "Pocket SuperSaw"
+"Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — 用於 FL Studio Mobile 的 SuperSaw 的 LYNX 引擎"

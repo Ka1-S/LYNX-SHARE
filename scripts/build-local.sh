@@ -43,6 +43,8 @@ CORE="$CORE src/core/Speech.cpp src/core/SpeechRules.cpp"
 CORE="$CORE src/core/ThreeOsc.cpp"
 # FL Studio Mobile's GMSynth (round 190ab)
 CORE="$CORE src/core/GmsMobile.cpp"
+# Pocket SuperSaw: FL Studio Mobile's SuperSaw (round 190by)
+CORE="$CORE src/core/PocketSuperSaw.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)
 CORE="$CORE src/core/FlPluginDb.cpp"
 # missing files of an opened project: search and relocation (round 81)

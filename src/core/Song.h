@@ -152,8 +152,10 @@ enum class InstrumentKind : std::uint8_t
                    // the sample in samplePath; the sampler's voices play the slices
     slicex,        // FL's Slicex (rounds 190h / 190l, core/SlicexInstrument.h): FL's state in pluginState, deck A's sample in
                    // samplePath, deck B's in zones[0].path
-    fpc            // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
+    fpc,           // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
                    // layers in `zones` (one per layer with a sample, in the state's order; only `path` is used)
+    pocketSuperSaw // Pocket SuperSaw (round 190by, core/PocketSuperSaw.h): FL Studio Mobile's SuperSaw module; its 59
+                   // values 0…1 in modelParams (FLM's parameter k + 1 at index k)
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
