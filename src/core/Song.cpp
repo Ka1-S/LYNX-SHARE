@@ -1525,7 +1525,8 @@ bool PatcherDoc::operator== (const PatcherDoc& o) const
 {
     return nodes == o.nodes && wires == o.wires && published == o.published && inputX == o.inputX && inputY == o.inputY && outputX == o.outputX && outputY == o.outputY
            && outputTracks == o.outputTracks && surface == o.surface && surfaceX == o.surfaceX && surfaceY == o.surfaceY
-           && fromMidiPorts == o.fromMidiPorts && toMidiPorts == o.toMidiPorts && fromNotesHidden == o.fromNotesHidden;
+           && fromMidiPorts == o.fromMidiPorts && toMidiPorts == o.toMidiPorts && fromNotesHidden == o.fromNotesHidden
+           && rack == o.rack && zones == o.zones;
 }
 
 bool PatchNode::BusHead::operator== (const BusHead& o) const { return bus == o.bus && head == o.head && gain == o.gain; }

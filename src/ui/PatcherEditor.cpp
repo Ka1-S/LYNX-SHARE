@@ -5,6 +5,9 @@
 #include "ui/FruitySlicerEditor.h"
 #include "ui/SlicexEditor.h"
 #include "ui/PatcherEditor.h"
+
+#include "core/Rack.h"
+#include "ui/RackEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "core/ControlSurface.h"
@@ -2459,9 +2462,19 @@ std::unique_ptr<juce::Component> makeChannelEditor (AudioEngine& engine, int cha
     return std::make_unique<PatcherEditor> (engine, Target { true, channel, 0 });
 }
 
+void openNodeEditor (AudioEngine& engine, bool channel, int index, int slot, int node)
+{
+    PatcherEditor editor (engine, Target { channel, index, slot }); // (its node editors keep only the target and the engine)
+    editor.openNodeEditorForShot (node);
+}
+
 void openSlot (AudioEngine& engine, int track, int slot)
 {
     const auto& song = engine.getSong();
+    // a Patcher in rack mode (round 183c) opens as a rack
+    if (track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size()
+        && rack::isRack (song.mixer[(std::size_t) track].effects[(std::size_t) slot]))
+        return RackWindows::openSlot (engine, track, slot);
     const auto name = track >= 0 && track < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) track].name.c_str()) : juce::String();
     open (engine, { false, track, slot }, tr ("Patcher") + (name.isNotEmpty() ? " - " + name : juce::String()));
 }
@@ -2469,17 +2482,20 @@ void openSlot (AudioEngine& engine, int track, int slot)
 void openChannel (AudioEngine& engine, int channel)
 {
     const auto& song = engine.getSong();
+    if (channel >= 0 && channel < (int) song.channels.size() && rack::isRack (song.channels[(std::size_t) channel])) // (round 183c)
+        return RackWindows::openChannel (engine, channel);
     const auto name = channel >= 0 && channel < (int) song.channels.size() ? juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str())
                                                                             : juce::String();
     open (engine, { true, channel, 0 }, tr ("Patcher") + (name.isNotEmpty() ? " - " + name : juce::String()));
 }
 
-bool isChannelOpen (int channel) { return findToolWindow (Target { true, channel, 0 }.key()) != nullptr; }
+bool isChannelOpen (int channel) { return findToolWindow (Target { true, channel, 0 }.key()) != nullptr || RackWindows::isChannelOpen (channel); }
 
 void closeChannel (int channel)
 {
     if (auto* w = findToolWindow (Target { true, channel, 0 }.key()))
         delete w;
+    RackWindows::closeChannel (channel);
 }
 
 void shootMenus (AudioEngine& engine, bool channel, int index, int slot, std::function<void (const juce::Image&, const juce::String&)> save)

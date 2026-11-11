@@ -1812,7 +1812,7 @@ void addPatcherParameterItems (juce::PopupMenu& menu, AudioEngine& engine, const
     for (int k = 0; k < (int) doc.published.size(); ++k)
     {
         const auto& p = doc.published[(std::size_t) k];
-        if (p.node < 0)
+        if (p.node < 0 && p.node != patchSurface) // (a rack's macros and selector are Surface controls, round 183c)
             continue;
         auto target = base;
         target.param = k;

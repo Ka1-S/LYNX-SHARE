@@ -406,6 +406,7 @@ public:
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
+    void groupIntoRack (int slot, bool all); // round 183c: Live's Group, the slot (or the chain) into an Audio Effect Rack
     void selectSlot (int slot)
     {
         selectedSlot = slot;

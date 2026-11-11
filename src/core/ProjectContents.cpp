@@ -34,6 +34,8 @@ std::string effectSlotName (const EffectSlot& slot)
         return substituteOriginalName (slot);
     if (isSoundgoodizerApprox (slot)) // (approximated without FL's preset files)
         return "Soundgoodizer";
+    if (slot.kind == EffectKind::patcher && slot.patcher.isRack()) // (round 183c)
+        return "Audio Effect Rack";
     return effectInfo (slot.kind).name;
 }
 

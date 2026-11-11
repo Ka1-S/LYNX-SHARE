@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include "core/Effects.h"
+#include "core/Rack.h"
 #include "core/FruityBasicFx.h"
 #include "core/PluginSubstitutes.h"
 #include "core/ProjectSafety.h"
@@ -255,6 +256,7 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketWaveshaper: return "pocketWaveshaper";
         case EffectKind::pocketCompressor: return "pocketCompressor";
         case EffectKind::pocketSpreader: return "pocketSpreader";
+        case EffectKind::rackMixer: return "rackMixer";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -446,6 +448,208 @@ FlOrigin flOriginFromVar (const juce::var& v)
     return origin;
 }
 
+
+// A Patcher in rack mode (round 183c, core/Rack.h): the RackDoc. The Patcher's nodes (the rack's devices and chain
+// mixers) and its compiled cables are saved as usual, so older versions open it as a plain Patcher; on load the cables
+// are built again from the RackDoc. A plain Patcher writes nothing here (its file is unchanged).
+juce::var rackToVar (const RackDoc& r)
+{
+    auto o = std::make_unique<juce::DynamicObject>();
+    auto ints = [] (std::initializer_list<int> list) {
+        juce::Array<juce::var> a;
+        for (const auto x : list)
+            a.add (x);
+        return a;
+    };
+    auto zone = [&] (const RackZone& z) { return ints ({ z.lo, z.hi, z.fadeLo, z.fadeHi }); };
+    o->setProperty ("kind", (int) r.kind);
+    if (! r.name.empty())
+        o->setProperty ("name", str (r.name));
+    juce::Array<juce::var> chains;
+    for (const auto& c : r.chains)
+    {
+        auto v = std::make_unique<juce::DynamicObject>();
+        v->setProperty ("name", str (c.name));
+        if (c.colour >= 0)
+            v->setProperty ("colour", c.colour);
+        v->setProperty ("active", c.active);
+        if (c.solo)
+            v->setProperty ("solo", true);
+        v->setProperty ("volume", (double) c.volume);
+        v->setProperty ("pan", (double) c.pan);
+        v->setProperty ("key", zone (c.key));
+        v->setProperty ("velocity", zone (c.velocity));
+        v->setProperty ("select", zone (c.select));
+        juce::Array<juce::var> nodes;
+        for (const auto n : c.nodes)
+            nodes.add (n);
+        v->setProperty ("nodes", nodes);
+        v->setProperty ("mixer", c.mixer);
+        if (c.gate >= 0)
+            v->setProperty ("gate", c.gate);
+        chains.add (juce::var (v.release()));
+    }
+    o->setProperty ("chains", chains);
+    juce::Array<juce::var> macros;
+    for (const auto& m : r.macros)
+    {
+        auto v = std::make_unique<juce::DynamicObject>();
+        if (! m.name.empty())
+            v->setProperty ("name", str (m.name));
+        if (m.colour >= 0)
+            v->setProperty ("colour", m.colour);
+        v->setProperty ("value", (double) m.value);
+        if (m.defaultValue >= 0.0f)
+            v->setProperty ("default", (double) m.defaultValue);
+        if (m.excludeFromRandom)
+            v->setProperty ("noRandom", true);
+        if (m.excludeFromVariations)
+            v->setProperty ("noVariations", true);
+        juce::Array<juce::var> maps; // [target, node, chain, param, min, max]
+        for (const auto& x : m.mappings)
+            maps.add (juce::Array<juce::var> { (int) x.target, x.node, x.chain, x.param, (double) x.min, (double) x.max });
+        if (! maps.isEmpty())
+            v->setProperty ("maps", maps);
+        macros.add (juce::var (v.release()));
+    }
+    o->setProperty ("macros", macros);
+    o->setProperty ("shown", r.shownMacros);
+    o->setProperty ("selector", (double) r.selector);
+    if (r.selectorFiltersCtrl)
+        o->setProperty ("selectorFiltersCtrl", true);
+    juce::Array<juce::var> variations;
+    for (const auto& x : r.variations)
+    {
+        auto v = std::make_unique<juce::DynamicObject>();
+        v->setProperty ("name", str (x.name));
+        juce::Array<juce::var> values; // −1 = no value for that macro
+        for (int k = 0; k < rackMacroCount; ++k)
+            values.add (x.has[(std::size_t) k] ? (double) x.values[(std::size_t) k] : -1.0);
+        v->setProperty ("values", values);
+        variations.add (juce::var (v.release()));
+    }
+    if (! variations.isEmpty())
+        o->setProperty ("variations", variations);
+    o->setProperty ("selectedVariation", r.selectedVariation);
+    if (r.morphOn || r.morphA >= 0 || r.morphB >= 0 || r.morph != 0.0f || r.glideMs != 0.0f)
+        o->setProperty ("morph", juce::Array<juce::var> { r.morphOn, r.morphA, r.morphB, (double) r.morph, (double) r.glideMs });
+    if (! r.children.empty())
+    {
+        juce::Array<juce::var> children;
+        for (const auto c : r.children)
+            children.add (c);
+        o->setProperty ("children", children);
+    }
+    o->setProperty ("view", juce::Array<juce::var> { r.showMacros, r.showChains, r.showDevices, r.showVariations, r.zoneEditor, r.selectedChain, r.autoSelect });
+    return juce::var (o.release());
+}
+
+RackDoc rackFromVar (const juce::var& v, int nodeCount)
+{
+    RackDoc r;
+    r.kind = (RackDoc::Kind) juce::jlimit (0, 2, (int) v.getProperty ("kind", 0));
+    r.name = v.getProperty ("name", "").toString().toStdString();
+    const auto node = [nodeCount] (const juce::var& x) { const auto n = (int) x; return n >= 0 && n < nodeCount ? n : -1; };
+    const auto zone = [] (const juce::var& a, RackZone fallback) {
+        if (! a.isArray() || a.size() != 4)
+            return fallback;
+        RackZone z;
+        z.lo = juce::jlimit (0, 127, (int) a[0]);
+        z.hi = juce::jlimit (z.lo, 127, (int) a[1]);
+        z.fadeLo = juce::jlimit (z.lo, z.hi, (int) a[2]);
+        z.fadeHi = juce::jlimit (z.fadeLo, z.hi, (int) a[3]);
+        return z;
+    };
+    if (auto* chains = v["chains"].getArray())
+        for (const auto& c : *chains)
+        {
+            RackChain chain;
+            chain.name = c.getProperty ("name", "").toString().toStdString();
+            chain.colour = (int) c.getProperty ("colour", -1);
+            chain.active = (bool) c.getProperty ("active", true);
+            chain.solo = (bool) c.getProperty ("solo", false);
+            chain.volume = juce::jlimit (0.0f, 2.0f, (float) (double) c.getProperty ("volume", 1.0));
+            chain.pan = juce::jlimit (-1.0f, 1.0f, (float) (double) c.getProperty ("pan", 0.0));
+            chain.key = zone (c["key"], RackZone {});
+            chain.velocity = zone (c["velocity"], RackZone { 1, 127, 1, 127 });
+            chain.select = zone (c["select"], RackZone { 0, 0, 0, 0 });
+            if (auto* nodes = c["nodes"].getArray())
+                for (const auto& n : *nodes)
+                    if (const auto k = node (n); k >= 0)
+                        chain.nodes.push_back (k);
+            chain.mixer = node (c.getProperty ("mixer", -1));
+            chain.gate = node (c.getProperty ("gate", -1));
+            r.chains.push_back (std::move (chain));
+        }
+    if (auto* macros = v["macros"].getArray())
+        for (int k = 0; k < juce::jmin (rackMacroCount, macros->size()); ++k)
+        {
+            const auto& m = (*macros)[k];
+            auto& macro = r.macros[(std::size_t) k];
+            macro.name = m.getProperty ("name", "").toString().toStdString();
+            macro.colour = (int) m.getProperty ("colour", -1);
+            macro.value = juce::jlimit (0.0f, 127.0f, (float) (double) m.getProperty ("value", 0.0));
+            macro.defaultValue = juce::jlimit (-1.0f, 127.0f, (float) (double) m.getProperty ("default", -1.0));
+            macro.excludeFromRandom = (bool) m.getProperty ("noRandom", false);
+            macro.excludeFromVariations = (bool) m.getProperty ("noVariations", false);
+            if (auto* maps = m["maps"].getArray())
+                for (const auto& x : *maps)
+                    if (x.isArray() && x.size() >= 6)
+                    {
+                        RackMapping mapping;
+                        mapping.target = (RackMapping::Target) juce::jlimit (0, 3, (int) x[0]);
+                        mapping.node = node (x[1]);
+                        mapping.chain = juce::jlimit (-1, (int) r.chains.size() - 1, (int) x[2]);
+                        mapping.param = juce::jmax (0, (int) x[3]);
+                        mapping.min = juce::jlimit (0.0f, 1.0f, (float) (double) x[4]);
+                        mapping.max = juce::jlimit (0.0f, 1.0f, (float) (double) x[5]);
+                        if (mapping.target != RackMapping::Target::param || mapping.node >= 0)
+                            macro.mappings.push_back (mapping);
+                    }
+        }
+    r.shownMacros = juce::jlimit (1, rackMacroCount, (int) v.getProperty ("shown", 8));
+    r.selector = juce::jlimit (0.0f, 127.0f, (float) (double) v.getProperty ("selector", 0.0));
+    r.selectorFiltersCtrl = (bool) v.getProperty ("selectorFiltersCtrl", false);
+    if (auto* variations = v["variations"].getArray())
+        for (const auto& x : *variations)
+        {
+            RackVariation variation;
+            variation.name = x.getProperty ("name", "").toString().toStdString();
+            if (auto* values = x["values"].getArray())
+                for (int k = 0; k < juce::jmin (rackMacroCount, values->size()); ++k)
+                {
+                    const auto value = (float) (double) (*values)[k];
+                    variation.has[(std::size_t) k] = value >= 0.0f;
+                    variation.values[(std::size_t) k] = value >= 0.0f ? juce::jlimit (0.0f, 127.0f, value) : -1.0f;
+                }
+            r.variations.push_back (std::move (variation));
+        }
+    const auto variationIndex = [&r] (const juce::var& x) { const auto k = (int) x; return k >= 0 && k < (int) r.variations.size() ? k : -1; };
+    r.selectedVariation = variationIndex (v.getProperty ("selectedVariation", -1));
+    if (const auto& m = v["morph"]; m.isArray() && m.size() >= 5)
+    {
+        r.morphOn = (bool) m[0];
+        r.morphA = variationIndex (m[1]);
+        r.morphB = variationIndex (m[2]);
+        r.morph = juce::jlimit (0.0f, 1.0f, (float) (double) m[3]);
+        r.glideMs = juce::jlimit (0.0f, 60000.0f, (float) (double) m[4]);
+    }
+    if (auto* children = v["children"].getArray())
+        for (const auto& c : *children)
+            r.children.push_back (juce::jlimit (0, 4095, (int) c));
+    if (const auto& view = v["view"]; view.isArray() && view.size() >= 7)
+    {
+        r.showMacros = (bool) view[0];
+        r.showChains = (bool) view[1];
+        r.showDevices = (bool) view[2];
+        r.showVariations = (bool) view[3];
+        r.zoneEditor = juce::jlimit (-1, 2, (int) view[4]);
+        r.selectedChain = juce::jlimit (0, juce::jmax (0, (int) r.chains.size() - 1), (int) view[5]);
+        r.autoSelect = (bool) view[6];
+    }
+    return r;
+}
+
 // FL's Patcher graph (REA_rodada141): nodes (an effect or a channel each, nested Patchers too), cables, the host
 // nodes' places and the extra outputs' inserts
 juce::var patcherToVar (const PatcherDoc& doc)
@@ -554,6 +758,8 @@ juce::var patcherToVar (const PatcherDoc& doc)
         o->setProperty ("surface", controls);
         o->setProperty ("surfaceAt", juce::Array<juce::var> { doc.surfaceX, doc.surfaceY });
     }
+    if (doc.isRack()) // (round 183c)
+        o->setProperty ("rack", rackToVar (doc.rack.front()));
     return juce::var (o.release());
 }
 
@@ -680,6 +886,11 @@ PatcherDoc patcherFromVar (const juce::var& v, const Song& song)
     }
     // a Surface cable whose control is gone
     std::erase_if (doc.wires, [&doc] (const PatchWire& w) { return w.from == patchSurface && w.fromPort >= doc.surfaceOutputs(); });
+    if (v.hasProperty ("rack")) // rack mode (round 183c): its cables, Surface and published parameters come from the RackDoc
+    {
+        doc.rack.push_back (rackFromVar (v["rack"], (int) doc.nodes.size()));
+        rack::compile (doc);
+    }
     return doc;
 }
 
@@ -1023,7 +1234,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::rackMixer })
         if (id == effectId (k))
             return k;
 

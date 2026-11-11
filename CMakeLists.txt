@@ -189,6 +189,7 @@ add_library(lynx_core STATIC
     src/core/LynxVerbs.cpp
     src/core/FlPatcher.cpp
     src/core/Patcher.cpp
+    src/core/Rack.cpp
     src/core/Vfx.cpp
     src/core/VfxSequencer.cpp
     src/core/ThreeOsc.cpp
@@ -455,6 +456,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginSkin.cpp
         src/ui/PluginEditors.cpp
         src/ui/PatcherEditor.cpp
+        src/ui/RackEditor.cpp
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp

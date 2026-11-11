@@ -11,6 +11,8 @@
 #include "core/LoadTrace.h"
 #include "core/ProjectSafety.h"
 #include "core/Patcher.h"
+#include "core/Rack.h"
+#include "ui/RackEditor.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -1387,6 +1389,59 @@ public:
             });
             std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
             setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--jsonroundtrip"))
+        {
+            // LYNX.exe --jsonroundtrip <folder>: round 183c's finding — a project saved, loaded and saved again: both texts
+            // (a.json, b.json) and the first lines that differ (diff.txt) for the default song, with and without a Patcher
+            const auto i = args.indexOf ("--jsonroundtrip");
+            const juce::File out (args[i + 1].unquoted());
+            out.createDirectory();
+            juce::String report;
+            auto check = [&] (const lynx::Song& song, const juce::String& name) {
+                const auto a = lynx::ProjectFile::toJson (song);
+                juce::String error;
+                const auto back = lynx::ProjectFile::fromJson (a, error);
+                const auto b = back ? lynx::ProjectFile::toJson (*back) : juce::String ("(not loaded: " + error + ")");
+                out.getChildFile (name + "-a.json").replaceWithText (a);
+                out.getChildFile (name + "-b.json").replaceWithText (b);
+                juce::StringArray la, lb;
+                la.addLines (a);
+                lb.addLines (b);
+                report << name << ": " << (a == b ? "stable" : "DIFFERS") << " (" << la.size() << " / " << lb.size() << " lines)\n";
+                int shown = 0;
+                for (int k = 0; k < juce::jmax (la.size(), lb.size()) && shown < 12; ++k)
+                    if (la[k] != lb[k])
+                    {
+                        report << "  line " << (k + 1) << "\n    a: " << la[k].trim().substring (0, 200) << "\n    b: " << lb[k].trim().substring (0, 200) << "\n";
+                        ++shown;
+                    }
+            };
+            auto song = lynx::Song::makeDefault();
+            check (song, "default");
+            song.mixer.resize (3);
+            song.mixer[1].effects = { lynx::makeEffectSlot (lynx::EffectKind::patcher) };
+            check (song, "patcher");
+            song.mixer[1].effects = { lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect) };
+            check (song, "rack");
+            out.getChildFile ("diff.txt").replaceWithText (report);
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--rackshot"))
+        {
+            // LYNX.exe --rackshot <folder>: round 183c's Rack view drawn off-screen (no window), for the LYNX | Live pairs:
+            // rack-deviceview.png (an Audio Effect Rack laid out as in Live's reference shot), rack-mapmode.png (Map mode
+            // with the mapping list), rack-instrument.png (an Instrument Rack with its key zones)
+            const auto i = args.indexOf ("--rackshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto set = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runRackShots (juce::File (args[i + 1].unquoted()), set) ? 0 : 1);
             quit();
             return;
         }
@@ -3182,6 +3237,99 @@ private:
                         && back->channels.back().patcher.wires == ch.patcher.wires;
         }
 
+        // Round 183c, Racks: (1) a plain Patcher's stored JSON loads and saves back byte for byte and never holds a
+        // "rack" key (FL's Patcher is untouched); (2) an Audio Effect Rack slot and an Instrument Rack channel survive save /
+        // load with their chains, zones, macros, mappings, variations and compiled cables
+        juce::String rackResult = "OK";
+        {
+            lynx::MixerTrack plain;
+            plain.name = "Plain Patcher";
+            auto fx = lynx::makeEffectSlot (lynx::EffectKind::patcher);
+            lynx::PatchNode a, b;
+            a.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            a.label = "A";
+            a.x = 120.5f;
+            b.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            b.effect.enabled = false;
+            fx.patcher.nodes = { a, b };
+            lynx::PatchWire w1, w2, w3, wc;
+            w1.to = 0;
+            w2.from = 0, w2.to = 1, w2.gain = 0.5f;
+            w3.from = 1;
+            wc.kind = lynx::PatchWire::Kind::control, wc.from = 0, wc.to = 1, wc.toPort = 0, wc.curve = { 0.0f, 0.25f, 1.0f };
+            fx.patcher.wires = { w1, w2, w3, wc };
+            lynx::SurfaceControl knob;
+            knob.name = "Drive";
+            knob.value = 0.25f;
+            fx.patcher.surface = { knob };
+            lynx::PatchParam pp;
+            pp.node = 0, pp.param = 1, pp.name = "Balance";
+            fx.patcher.published = { pp };
+            plain.effects = { fx };
+            const auto first = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (plain), true);
+            const auto again = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (lynx::ProjectFile::mixerTrackFromVar (juce::JSON::parse (first))), true);
+            if (first != again || first.contains ("\"rack\"") || first.contains ("rackMixer"))
+                rackResult = "ERROR plain Patcher changed";
+
+            auto song = lynx::Song::makeDefault();
+            song.mixer.resize (3);
+            auto rackSlot = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
+            auto& doc = rackSlot.patcher;
+            lynx::PatchNode u;
+            u.effect = lynx::makeEffectSlot (lynx::EffectKind::utility);
+            const auto n0 = lynx::rack::addDevice (doc, 0, u);
+            lynx::rack::addChain (doc, "Wet");
+            lynx::rack::addDevice (doc, 1, u);
+            doc.rack[0].chains[1].select = { 10, 90, 30, 70 };
+            lynx::rack::setChainPan (doc, 1, -0.5f);
+            lynx::RackMapping m;
+            m.node = n0, m.param = 0, m.min = 0.2f, m.max = 0.9f;
+            lynx::rack::map (doc, 0, m);
+            lynx::RackMapping v;
+            v.target = lynx::RackMapping::Target::chainVolume, v.chain = 1, v.min = 0.0f, v.max = lynx::rack::unityVolume;
+            lynx::rack::map (doc, 1, v);
+            lynx::rack::setMacro (doc, 0, 64.0f);
+            lynx::rack::storeVariation (doc);
+            lynx::rack::setMacro (doc, 0, 100.0f);
+            lynx::rack::storeVariation (doc);
+            doc.rack[0].morphOn = true, doc.rack[0].morphA = 0, doc.rack[0].morphB = 1;
+            lynx::rack::setMorph (doc, 0.5f);
+            lynx::rack::compile (doc);
+            song.mixer[1].effects = { rackSlot };
+            lynx::ChannelDef inst;
+            inst.name = "Instrument Rack";
+            inst.instrument = lynx::InstrumentKind::patcher;
+            inst.patcher = lynx::rack::makeRack (lynx::RackDoc::Kind::instrument);
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            synth.channel.name = "Synth";
+            lynx::rack::addDevice (inst.patcher, 0, synth);
+            inst.patcher.rack[0].chains[0].velocity = { 1, 127, 64, 127 };
+            lynx::rack::compile (inst.patcher);
+            song.channels.push_back (inst);
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            // (the devices' parameters are stored to 4 decimals: the documents are compared as stored, the rack exactly)
+            const auto loaded = back && back->mixer.size() >= 2 && back->mixer[1].effects.size() == 1;
+            const auto& got = loaded ? back->mixer[1].effects[0].patcher : doc;
+            if (! loaded)
+                rackResult = "ERROR rack slot not loaded";
+            else if (got.rack != doc.rack)
+                rackResult = "ERROR rack model";
+            else if (got.wires != doc.wires)
+                rackResult = "ERROR rack cables";
+            else if (got.nodes.size() != doc.nodes.size())
+                rackResult = "ERROR rack devices";
+            else if (back->channels.back().patcher.rack != inst.patcher.rack || back->channels.back().patcher.wires != inst.patcher.wires
+                     || back->channels.back().patcher.zones != inst.patcher.zones || back->channels.back().patcher.nodes.size() != inst.patcher.nodes.size())
+                rackResult = "ERROR instrument rack";
+            // the slot's insert as stored, once more: the same text (the stored form is stable)
+            else if (const auto once = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (back->mixer[1]), true);
+                     once != juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (lynx::ProjectFile::mixerTrackFromVar (juce::JSON::parse (once))), true))
+                rackResult = "ERROR rack stored form not stable";
+        }
+
         // FL engines in a native project (round 142, issue #5): every engine this PC can make survives save / load and
         // the instruments play through the rack
         juce::String nativesResult = "OK";
@@ -3460,7 +3608,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -3481,6 +3629,7 @@ private:
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
+               << "racks=" << rackResult << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
@@ -8798,6 +8947,158 @@ private:
         juce::PNGImageFormat png;
         if (auto stream = file.createOutputStream())
             png.writeImageToStream (image, *stream);
+    }
+
+    bool runRackShots (const juce::File& out, const juce::String& liveSet = {})
+    {
+        out.createDirectory();
+        lynx::AudioEngine offline (false);
+        auto save = [&] (juce::Component& c, const juce::String& name) {
+            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+            {
+                juce::Graphics g (image);
+                g.fillAll (lynx::theme::panel);
+                c.paintEntireComponent (g, false);
+            }
+            const auto f = out.getChildFile (name);
+            f.deleteFile();
+            juce::PNGImageFormat png;
+            if (auto stream = f.createOutputStream())
+                return png.writeImageToStream (image, *stream);
+            return false;
+        };
+        auto song = lynx::Song::makeDefault();
+        song.mixer.resize (3);
+        song.mixer[1].name = "Vocal Main";
+        // an Audio Effect Rack shaped like Live's reference (REA_rodada183c §8): two chains with chain-select zones and fades,
+        // four named macros (one on a chain's volume, one on two parameters), two variations, every view open
+        auto slot = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
+        auto& doc = slot.patcher;
+        doc.rack[0].chains[0].name = "Vocoder";
+        lynx::PatchNode vocoder, eq, verb;
+        vocoder.effect = lynx::makeEffectSlot (lynx::EffectKind::vocodex);
+        eq.effect = lynx::makeEffectSlot (lynx::EffectKind::parametricEq);
+        verb.effect = lynx::makeEffectSlot (lynx::EffectKind::reeverb2);
+        const auto nVoc = lynx::rack::addDevice (doc, 0, vocoder);
+        const auto nEq = lynx::rack::addDevice (doc, 0, eq);
+        lynx::rack::addChain (doc, "dry bypass");
+        lynx::rack::addDevice (doc, 1, verb);
+        doc.rack[0].chains[0].select = { 0, 79, 0, 63 };
+        doc.rack[0].chains[1].select = { 32, 127, 48, 127 };
+        lynx::rack::setChainVolume (doc, 0, 0.33f);
+        lynx::rack::setChainVolume (doc, 1, 0.5f);
+        const char* names[] { "Sibilance", "Intensity", "Formant Shift", "Bright Level" };
+        for (int m = 0; m < 4; ++m)
+            doc.rack[0].macros[(std::size_t) m].name = names[m];
+        lynx::RackMapping vol;
+        vol.target = lynx::RackMapping::Target::chainVolume, vol.chain = 0, vol.min = 0.0f, vol.max = lynx::rack::unityVolume;
+        lynx::rack::map (doc, 0, vol);
+        lynx::RackMapping a, b, c, d;
+        a.node = nVoc, a.param = 0;
+        b.node = nVoc, b.param = 1, b.min = 0.2f, b.max = 0.8f;
+        c.node = nEq, c.param = 0, c.min = 0.3f, c.max = 0.9f;
+        d.node = nEq, d.param = 1;
+        lynx::rack::map (doc, 1, a);
+        lynx::rack::map (doc, 2, b);
+        lynx::rack::map (doc, 3, c);
+        lynx::rack::map (doc, 3, d);
+        lynx::rack::setMacro (doc, 0, 60.0f);
+        lynx::rack::setMacro (doc, 1, 40.0f);
+        lynx::rack::setMacro (doc, 2, 70.0f);
+        lynx::rack::setMacro (doc, 3, 86.0f);
+        lynx::rack::storeVariation (doc);
+        lynx::rack::renameVariation (doc, 0, "Verse");
+        lynx::rack::setMacro (doc, 3, 120.0f);
+        lynx::rack::storeVariation (doc);
+        lynx::rack::renameVariation (doc, 1, "Drop");
+        lynx::rack::launchVariation (doc, 0);
+        auto& r = doc.rack[0];
+        r.showMacros = r.showChains = r.showDevices = r.showVariations = true;
+        r.zoneEditor = 2;
+        r.selectedChain = 0;
+        lynx::rack::setSelector (doc, 56.0f);
+        lynx::rack::compile (doc);
+        song.mixer[1].effects = { slot };
+        // an Instrument Rack: three chains split over the keyboard
+        lynx::ChannelDef inst;
+        inst.name = "Keys Rack";
+        inst.instrument = lynx::InstrumentKind::patcher;
+        inst.patcher = lynx::rack::makeRack (lynx::RackDoc::Kind::instrument);
+        for (int k = 0; k < 3; ++k)
+        {
+            if (k > 0)
+                lynx::rack::addChain (inst.patcher);
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            synth.channel.name = "Synth";
+            lynx::rack::addDevice (inst.patcher, k, synth);
+        }
+        inst.patcher.rack[0].chains[0].key = { 0, 52, 0, 47 };
+        inst.patcher.rack[0].chains[1].key = { 48, 76, 53, 71 };
+        inst.patcher.rack[0].chains[2].key = { 72, 127, 77, 127 };
+        inst.patcher.rack[0].chains[0].name = "Low";
+        inst.patcher.rack[0].chains[1].name = "Mid";
+        inst.patcher.rack[0].chains[2].name = "High";
+        inst.patcher.rack[0].showChains = inst.patcher.rack[0].showDevices = true;
+        inst.patcher.rack[0].zoneEditor = 0;
+        lynx::rack::compile (inst.patcher);
+        song.channels.push_back (inst);
+        const auto channel = (int) song.channels.size() - 1;
+        offline.setSong (std::move (song));
+        offline.dispatchPendingMessages();
+
+        bool ok = true;
+        // [set.als]: a Live set's racks as LYNX imports them, the one with the most chains drawn with its title bar (the
+        // like-for-like pair with Live's own picture of that set)
+        if (liveSet.isNotEmpty())
+        {
+            juce::MemoryBlock bytes;
+            juce::File (liveSet).loadFileAsData (bytes);
+            const std::vector<std::uint8_t> data ((const std::uint8_t*) bytes.getData(), (const std::uint8_t*) bytes.getData() + bytes.getSize());
+            lynx::AlsImportOptions o;
+            o.common.projectFolder = juce::File (liveSet).getParentDirectory().getFullPathName().toStdString();
+            std::string error;
+            if (auto imported = lynx::importAls (data, o, &error))
+            {
+                int bestTrack = -1, bestSlot = -1;
+                std::size_t most = 0;
+                for (int t = 0; t < (int) imported->mixer.size(); ++t)
+                    for (int s = 0; s < (int) imported->mixer[(std::size_t) t].effects.size(); ++s)
+                        if (const auto& fx = imported->mixer[(std::size_t) t].effects[(std::size_t) s]; lynx::rack::isRack (fx) && fx.patcher.rack[0].chains.size() > most)
+                            most = fx.patcher.rack[0].chains.size(), bestTrack = t, bestSlot = s;
+                if (bestTrack >= 0)
+                {
+                    offline.setSong (std::move (*imported));
+                    offline.dispatchPendingMessages();
+                    auto view = lynx::RackWindows::makeSlotView (offline, bestTrack, bestSlot, true);
+                    view->setSize (view->preferredWidth (228), 228);
+                    ok = save (*view, "rack-live-import.png") && ok;
+                    view->setMapMode (true);
+                    view->setSize (view->preferredWidth (228), 228);
+                    ok = save (*view, "rack-live-import-map.png") && ok;
+                    return ok;
+                }
+            }
+            return false;
+        }
+        {
+            auto view = lynx::RackWindows::makeSlotView (offline, 1, 0, false);
+            view->setSize (view->preferredWidth (206), 206);
+            ok = save (*view, "rack-deviceview.png") && ok;
+        }
+        {
+            auto view = lynx::RackWindows::makeSlotView (offline, 1, 0, true);
+            view->setMapMode (true);
+            view->setSize (view->preferredWidth (228), 228);
+            ok = save (*view, "rack-mapmode.png") && ok;
+        }
+        {
+            auto view = lynx::RackWindows::makeChannelView (offline, channel, true);
+            view->setSize (view->preferredWidth (228), 228);
+            ok = save (*view, "rack-instrument.png") && ok;
+        }
+        return ok;
     }
 
     void runEq166fShots (const juce::String& folder)
