@@ -98,7 +98,8 @@ private:
             return;
         last = now;
         const auto drive = now[0];
-        const auto c = std::clamp (now[1] * now[1] * now[1] * now[1], 0.0f, 1.0f);
+        const auto sq = now[1] * now[1]; // FLM squares twice: (v²)² (its rounding sets where the holds fall)
+        const auto c = std::clamp (sq * sq, 0.0f, 1.0f);
         crush = c * 256.0f + 1.0f;
         gain = std::pow (10.0f, now[2] * 24.0f * 0.05f - 1.2f);
         kind = distortionKind (now[4]);

@@ -11,6 +11,7 @@
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/FlWrapper.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
 #include "core/TimeStretch.h"
@@ -581,6 +582,7 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
             set (0x800u, ref->sendLoopPosition);
             set (0x20000u, ref->modXAftertouch);
             set (0x02000000u, ! ref->resetOnFlush);
+            set (0x01000000u, ref->hostKeysFirst);
             fixed = (ref->maxSizeBuffers ? 1u : 0u) | (ref->hostMaxBuffer ? 2u : 0u);
             flags2 = (ref->allNotesOffOnStop ? 0u : 0x1000u) | (ref->allowHostKeys ? 0x800u : 0u);
         }
@@ -798,6 +800,9 @@ struct Converter
         // FL keeps a Smart disabled generator from running through silence, so it changes the phase of what it plays
         // (Thief without FL's own flags: xcorr 0.891, same spectrum; round 180d)
         c.wrapperFlags = def.flWrapperFlags;
+        // a hosted plugin's window: FL's "Detached" is flag 0x4 of the same record (issue #116, REA_rodada190i.md)
+        if (def.instrument == InstrumentKind::plugin || def.plugin.foreign.format != ForeignPlugin::Format::none)
+            c.wrapperFlags = withFlDetached (def.flWrapperFlags >= 0 ? def.flWrapperFlags : 0x150, def.plugin.detached);
         c.enabled = ! def.muted;
         c.soloLock = def.soloLock;
         c.ghostShown = ! def.ghostHidden;
@@ -1510,6 +1515,7 @@ struct Converter
                     {
                         slot.plugin = "Fruity Wrapper";
                         slot.state = writeWrapper (*record, false, fx.plugin.foreign.format == ForeignPlugin::Format::none ? &fx.plugin : nullptr);
+                        slot.wrapperFlags = withFlDetached (slot.wrapperFlags, fx.plugin.detached); // (issue #116)
                         what = record->name + " (Fruity Wrapper)";
                     }
                 }

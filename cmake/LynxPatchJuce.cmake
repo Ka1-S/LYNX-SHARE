@@ -82,6 +82,12 @@
 #    Wrapper 0x84d0e0 / 0x879a00, REA_rodada188g). JUCE builds note ons from MIDI (tuning 0); MidiEventList now asks
 #    LYNX's hook for each note on's tuning while LYNX has set a context on the thread (engine/Vst3NoteTuning.h). Needs
 #    fix 14 (it goes into its note numbering).
+# 19. Every platform, juce_graphics/fonts/juce_SimpleShapedText.cpp (issue #142, round 190d): text shaped with a font
+#    that has no typeface gets no glyphs. For a line break that is "unsafe" (every one is, with no glyphs) JUCE 8.0.4
+#    shapes the text up to the break again and walks back from the end of those glyphs to skip trailing spaces with
+#    `while (--it != glyphs.begin())`: on an empty vector that starts before its beginning and never stops (SIGSEGV
+#    at LYNX+0xf94c7a in 0.1.25, at start-up on NixOS, where JUCE's own font list had no monospaced family). No
+#    glyphs: nothing to walk over. LYNX also gives every font a typeface now (ui/Theme.cpp getTypefaceForFont).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -189,6 +195,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("clip to an empty path" "LYNX patch (issue #11): clipping to an empty path"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL|"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL||NL|    // LYNX patch (issue #11): clipping to an empty path leaves nothing (Quartz would ignore it)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|    {|NL|        CGContextClipToRect (context.get(), CGRectZero);|NL|        lastClipRect.reset();|NL|        return;|NL|    }|NL|")
+    elseif(file MATCHES "juce_SimpleShapedText.cpp$")
+        lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
+            "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
+            "                        auto it = glyphs.cend();|NL||NL|                        // LYNX patch (issue #142): no glyphs (a font without a typeface), nothing to walk back over|NL|                        if (glyphs.empty())|NL|                            return it;|NL||NL|                        while (--it != glyphs.begin())")
     elseif(file MATCHES "juce_Messaging_windows.cpp$")
         lynx_juce_fix("dispatch hook" "LYNX patch (issue #32): the message dispatch hook"
             "CheckEventBlockedByModalComps isEventBlockedByModalComps = nullptr;"
@@ -231,6 +241,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/fonts/juce_SimpleShapedText.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)

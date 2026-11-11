@@ -36,7 +36,11 @@ public:
     void publish (std::unique_ptr<const T> next)
     {
         collectGarbage();
-        delete incoming.exchange (next.release(), std::memory_order_acq_rel); // an unread one is simply swapped
+        // an unread one is simply swapped. It goes the way the returned ones go (issue #134): with no audio callback
+        // running (the device closed or changing) every publish replaces an unread snapshot, and freeing it here freed
+        // its hosted plugins inside whatever called publish (the engine's timer: issue #36's crash)
+        if (const auto* unread = incoming.exchange (next.release(), std::memory_order_acq_rel))
+            release (unread);
     }
 
     // UI
@@ -44,12 +48,7 @@ public:
     {
         for (auto& slot : retired)
             if (const auto* old = slot.exchange (nullptr, std::memory_order_acq_rel))
-            {
-                if (dispose)
-                    dispose (old);
-                else
-                    delete old;
-            }
+                release (old);
     }
 
     // UI: set, the objects the audio thread returned go here instead of being deleted at once (the owner frees them
@@ -92,6 +91,14 @@ public:
     }
 
 private:
+    void release (const T* old)
+    {
+        if (dispose)
+            dispose (old);
+        else
+            delete old;
+    }
+
     std::atomic<const T*> incoming { nullptr };
     std::array<std::atomic<const T*>, 8> retired {};
     const T* active = nullptr; // only the audio thread touches it

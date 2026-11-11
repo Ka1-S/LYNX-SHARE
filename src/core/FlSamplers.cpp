@@ -408,7 +408,7 @@ std::optional<SlicedSample> fruitySlicer (const std::vector<std::uint8_t>& d)
     return result;
 }
 
-std::optional<SlicedSample> slicex (const std::vector<std::uint8_t>& d)
+std::optional<SlicedSample> slicexSample (const std::vector<std::uint8_t>& d)
 {
     Stream in { d };
     const auto version = in.read<std::uint32_t>();
