@@ -1761,6 +1761,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
     // tracks sit indented on a block in their header's colour; members of a folded group are thin rows
     {
         const uitrace::Scope traceHeaders ("Playlist headers", false);
+        updateMeterColumn(); // round 190w (a --snapshot paints before any frame step)
         const auto headers = juce::Rectangle<int> (0, tracksTop(), headerWidth, grid.getHeight());
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (headers)) // (not repainted, e.g. the playhead's strip: nothing to draw; round 174e)
@@ -1811,9 +1812,39 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     plate = plate.interpolatedWith (tame (juce::Colour (trackColour)), muted ? 0.22f : (groupHead ? 0.62f : 0.5f));
                 if (hovered)
                     plate = plate.interpolatedWith (colour::bg5, 0.6f);
-                const auto plateArea = juce::Rectangle<float> (left, (float) y + 1.0f, (float) headerWidth - 2.0f - left, (float) trackHeight - 3.0f);
+                const auto plateArea = juce::Rectangle<float> (left, (float) y + 1.0f, (float) (headerWidth - meterColumn) - 2.0f - left, (float) trackHeight - 3.0f);
                 g.setColour (plate);
                 g.fillRoundedRectangle (plateArea, radius::sm);
+
+                // round 190w: FL's track header level (View › Show levels on audio / instrument tracks): a stereo peak
+                // meter in a column right of the plate, the mixer track's level with its hold line, as FL 2026 draws it
+                if (const auto insert = meteredInsertOf (t); insert >= 0 && meterColumn > 0)
+                {
+                    const auto well = juce::Rectangle<int> (headerWidth - meterColumn, y + 2, meterColumn - 2, trackHeight - 5);
+                    g.setColour (colour::bg1);
+                    g.fillRect (well);
+                    const auto found = headerLevels.find (insert);
+                    for (int side = 0; side < 2; ++side)
+                    {
+                        const auto bar = juce::Rectangle<int> (well.getX() + 1 + side * (well.getWidth() / 2), well.getY() + 1,
+                                                               well.getWidth() / 2 - 1, well.getHeight() - 2);
+                        if (found == headerLevels.end())
+                            continue;
+                        const auto& m = found->second[(std::size_t) side];
+                        auto position = [] (float gain) { // the Mixer's scale: -60..+6 dB
+                            return juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (gain, -60.0f) + 60.0f) / 66.0f);
+                        };
+                        const auto h = (int) (position (m.level) * (float) bar.getHeight());
+                        g.setColour (colour::meterLow); // (FL's header meter stays green at every level)
+                        g.fillRect (bar.withTop (bar.getBottom() - h));
+                        if (m.peak > 0.001f) // the hold line
+                        {
+                            const auto py = bar.getBottom() - (int) (position (m.peak) * (float) bar.getHeight());
+                            g.setColour (colour::meterLow);
+                            g.fillRect (bar.getX(), juce::jmax (bar.getY(), py - 1), bar.getWidth(), 1);
+                        }
+                    }
+                }
 
                 if (isTrackSelected (t)) // the selected tracks (FL marks them next to the LED)
                 {
@@ -5443,8 +5474,8 @@ juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
     if (simpleHeaders) // the M button, in the first row (round 184a)
-        return { headerWidth - 28, trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
-    return { headerWidth - 17, trackToY (track) + h / 2 - 6, 12, 12 };
+        return { headerWidth - 28 - meterColumn, trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
+    return { headerWidth - 17 - meterColumn, trackToY (track) + h / 2 - 6, 12, 12 };
 }
 
 int PlaylistComponent::simpleInsert (int track) const
@@ -5547,7 +5578,8 @@ juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
 
 juce::Rectangle<int> PlaylistComponent::trackArm (int track) const
 {
-    if (trackmodes::armableInsert (engine.getSong(), track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
+    // FL's View › "Show controls on audio tracks" (round 190w) hides them all
+    if (! showAudioTrackControls || trackmodes::armableInsert (engine.getSong(), track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
 
     if (simpleHeaders && simpletracks::kindOf (engine.getSong(), track) == simpletracks::Kind::drums)
@@ -8567,6 +8599,10 @@ bool PlaylistComponent::liveFrame (double nowMs)
                 repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
     }
+    // round 190w: the track headers' level meters
+    if (stepHeaderMeters (nowMs))
+        live = true;
+
     // round 177d: a recording in progress grows on its tracks (its rows, from where it starts to the playhead; 30 Hz)
     if (engine.isLiveRecording() && isShowing())
     {
@@ -8593,6 +8629,89 @@ bool PlaylistComponent::liveFrame (double nowMs)
         liveArea = {};
     }
     return playing || moved || live;
+}
+
+// Round 190w: FL 2026's track header levels (Playlist menu › View › Track headers [DFM] EEShowAudioTrackMetersAction
+// Checked=true, EEShowInstrumentTrackMetersAction unchecked; [SHOT] flgap190w/shots/fl p1-p3, b4, c4: a stereo peak
+// meter with hold lines in a narrow column right of the header, on every row height).
+int PlaylistComponent::meteredInsertOf (int track) const
+{
+    trackmodes::HeaderOptions o;
+    o.audioControls = showAudioTrackControls;
+    o.audioLevels = showAudioTrackLevels;
+    o.instrumentLevels = showInstrumentTrackLevels;
+    if (noteedit::isFoldedAway (engine.getSong(), track))
+        return -1;
+    return trackmodes::meteredInsert (engine.getSong(), track, o);
+}
+
+bool PlaylistComponent::updateMeterColumn()
+{
+    auto any = false;
+    if (showAudioTrackLevels || showInstrumentTrackLevels)
+        for (int t = 0, n = (int) engine.getSong().playlistTracks.size(); t < n && ! any; ++t)
+            any = meteredInsertOf (t) >= 0;
+    const auto width = any ? 9 : 0;
+    if (width == meterColumn)
+        return false;
+    meterColumn = width;
+    if (! any)
+        headerLevels.clear();
+    return true;
+}
+
+bool PlaylistComponent::stepHeaderMeters (double nowMs)
+{
+    if (updateMeterColumn())
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+    if (meterColumn == 0 || ! isShowing())
+    {
+        headerMeterMs = -1.0;
+        return false;
+    }
+    const auto elapsed = headerMeterMs < 0.0 ? 1000.0 / 60.0 : juce::jlimit (0.0, 1000.0, nowMs - headerMeterMs);
+    headerMeterMs = nowMs;
+
+    auto& bank = engine.getMeters();
+    const auto grid = gridArea();
+    auto moving = false;
+    std::map<int, std::array<meters::PeakHold, 2>> next;
+    juce::Rectangle<int> dirty;
+    for (int t = 0, n = numTracks(); t < n; ++t)
+    {
+        const auto insert = meteredInsertOf (t);
+        if (insert < 0)
+            continue;
+        if (next.find (insert) == next.end())
+        {
+            auto levels = headerLevels.count (insert) > 0 ? headerLevels[insert] : std::array<meters::PeakHold, 2> {};
+            for (int side = 0; side < 2; ++side)
+                levels[(std::size_t) side].advance (bank.takeViewPeak (insert, side), elapsed);
+            moving = moving || levels[0].level > 0.0f || levels[1].level > 0.0f || levels[0].peak > 0.0f || levels[1].peak > 0.0f;
+            next[insert] = levels;
+        }
+        const auto y = trackToY (t), h = heightOf (t);
+        if (y + h >= grid.getY() && y <= grid.getBottom())
+        {
+            const auto& before = headerLevels.count (insert) > 0 ? headerLevels[insert] : std::array<meters::PeakHold, 2> {};
+            const auto& after = next[insert];
+            if (before[0].level != after[0].level || before[1].level != after[1].level || before[0].peak != after[0].peak
+                || before[1].peak != after[1].peak)
+                dirty = dirty.getUnion (juce::Rectangle<int> (headerWidth - meterColumn, y, meterColumn, h));
+        }
+    }
+    headerLevels = std::move (next);
+    if (! dirty.isEmpty())
+        repaint (dirty.getIntersection (juce::Rectangle<int> (0, tracksTop(), headerWidth, getHeight() - tracksTop())));
+    return moving;
+}
+
+void PlaylistComponent::headerOptionsChanged()
+{
+    updateMeterColumn();
+    repaint();
+    if (onViewOptionChanged)
+        onViewOptionChanged();
 }
 
 // Round 177d: the recording in progress, live (MusicTech's FL 2025 review: recorded MIDI is not shown in the Playlist

@@ -539,6 +539,24 @@ int armableInsert (const Song& song, int track)
     return t.mode == PlaylistTrackMode::audio && t.mixerTrack > 0 && t.mixerTrack < (int) song.mixer.size() ? t.mixerTrack : -1;
 }
 
+int meteredInsert (const Song& song, int track, const HeaderOptions& options)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return -1;
+    const auto& t = song.playlistTracks[(std::size_t) track];
+    if (t.mode == PlaylistTrackMode::audio)
+        return options.audioLevels ? armableInsert (song, track) : -1;
+    if (t.mode != PlaylistTrackMode::instrument || ! options.instrumentLevels)
+        return -1;
+    // the channel's own route (it may have moved since the track was made); the linked mixer track without a channel
+    if (t.channel >= 0 && t.channel < (int) song.channels.size())
+    {
+        const auto m = song.channels[(std::size_t) t.channel].mixerTrack;
+        return m >= 0 && m < (int) song.mixer.size() ? m : -1;
+    }
+    return t.mixerTrack >= 0 && t.mixerTrack < (int) song.mixer.size() ? t.mixerTrack : -1;
+}
+
 namespace
 {
 int audioMixerOf (const Song& song, int track)
