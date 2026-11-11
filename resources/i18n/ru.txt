@@ -8651,3 +8651,8 @@ countries: ru by kz
 "Up & Down" = "Вверх и вниз"
 "UpDown" = "ВверхВниз"
 "Vel." = "Вел."
+"Add interval" = "Доб. интервал"
+"Interval size" = "Размер интервала"
+"Adds to every note a note this many semitones away" = "Добавляет к каждой ноте ноту на столько полутонов"
+"Pitch range: drag up or down to transpose the notes" = "Диапазон высот: перетащите вверх или вниз, чтобы транспонировать ноты"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Цвет клипа. Щелчок: отключить или включить клип. Правый щелчок: изменить цвет"

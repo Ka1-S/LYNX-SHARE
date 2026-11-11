@@ -8651,3 +8651,8 @@ countries: pl
 "Up & Down" = "W górę i w dół"
 "UpDown" = "GóraDół"
 "Vel." = "Vel."
+"Add interval" = "Dodaj interwał"
+"Interval size" = "Rozmiar interwału"
+"Adds to every note a note this many semitones away" = "Dodaje do każdej nuty nutę oddaloną o tyle półtonów"
+"Pitch range: drag up or down to transpose the notes" = "Zakres wysokości: przeciągnij w górę lub w dół, aby transponować nuty"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Kolor klipu. Kliknięcie: dezaktywuje lub aktywuje klip. Prawy klik: zmienia kolor"

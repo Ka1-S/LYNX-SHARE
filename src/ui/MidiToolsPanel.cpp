@@ -7,6 +7,7 @@
 #include "core/ProjectKey.h"
 #include "ui/ControllerKnob.h"
 #include "ui/I18n.h"
+#include "ui/NumBox.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -43,64 +44,7 @@ juce::String percent1 (double v) { return juce::String (v * 100.0, 1) + " %"; } 
 juce::String percent0 (double v) { return juce::String (juce::roundToInt (v * 100.0)) + " %"; }
 juce::String whole (double v) { return juce::String (juce::roundToInt (v)); }
 
-// A number field dragged up and down (Live's value boxes): Ctrl = fine, wheel, double-click / Alt-click = default.
-class NumBox final : public juce::Component
-{
-public:
-    NumBox (ui::ValueSpec s, std::function<double()> get, std::function<void (double)> set)
-        : spec (std::move (s)), getter (std::move (get)), setter (std::move (set))
-    {
-        setRepaintsOnMouseActivity (true);
-        ui::setHint (*this, spec.name, true, false);
-    }
-    void paint (juce::Graphics& g) override
-    {
-        g.setColour (colour::bg0);
-        g.fillRect (getLocalBounds());
-        g.setColour (isMouseOverOrDragging() ? colour::accent : colour::borderStrong);
-        g.drawRect (getLocalBounds());
-        g.setColour (isEnabled() ? colour::textPrimary : colour::textDisabled);
-        g.setFont (font (type::caption));
-        g.drawText (spec.text (getter()), getLocalBounds().reduced (2, 0), juce::Justification::centred);
-    }
-    void mouseDown (const juce::MouseEvent& e) override
-    {
-        if (ui::isResetClick (e))
-        {
-            setter (spec.defaultValue);
-            repaint();
-            return;
-        }
-        drag.begin (e, getter());
-    }
-    void mouseDrag (const juce::MouseEvent& e) override
-    {
-        if (! drag.isActive())
-            return;
-        setter (drag.update (e, spec));
-        repaint();
-    }
-    void mouseUp (const juce::MouseEvent&) override { drag.end(); }
-    void mouseDoubleClick (const juce::MouseEvent&) override
-    {
-        setter (spec.defaultValue);
-        repaint();
-    }
-    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
-    {
-        if (const auto v = ui::wheelValue (getter(), e, wheel, spec))
-        {
-            setter (*v);
-            repaint();
-        }
-    }
-
-private:
-    ui::ValueSpec spec;
-    std::function<double()> getter;
-    std::function<void (double)> setter;
-    ui::ValueDrag drag;
-};
+using ui::NumBox;
 
 // Strum's display: the chord's notes bottom (low) to top (high) against the time they move by, bent by the tension
 // (miditools::strumCurve, the curve Live draws); the two handles are Low and High, dragged sideways.

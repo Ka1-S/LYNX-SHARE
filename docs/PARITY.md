@@ -2322,6 +2322,15 @@ FL Studio Mobile plugin is the open sound check.
 | Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
 | Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
 
+## Round 190s: the MIDI Tools panel and Clip View pieces (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Transform panel: Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum; Auto apply, Transform | tool dialogs with preview / Accept (unchanged) | Clip View › Transform | ✅ `ui/MidiToolsPanel`: the Clip View's fourth panel (Clip-launch workflow) and Piano roll › Tools › MIDI Tools…; Live's controls and defaults (`docs/analise/REA_rodada190s.md`) |
+| Time Warp, Velocity Shaper, Glissando / LFO (MPE), the Generate section | — | Transform / Generate | ❌ not built |
+| Clip colour / activator square, pitch range (drag to transpose), Add interval | clip menu; transpose keys | Clip View title bar, Pitch & Time | ✅ Clip View column (Clip-launch workflow) |
+| Set Length + grid, Humanize amount, Scale / Highlight Scale buttons in the editor header | — | Pitch & Time, editor header | ❌ open (GAPMAP-0126 D5, D13) |
+
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on

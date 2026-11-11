@@ -8651,3 +8651,8 @@ countries: kr
 "Up & Down" = "상승 및 하강"
 "UpDown" = "상승하강"
 "Vel." = "벨."
+"Add interval" = "음정 추가"
+"Interval size" = "음정 크기"
+"Adds to every note a note this many semitones away" = "각 노트에 이 반음 수만큼 떨어진 노트를 추가합니다"
+"Pitch range: drag up or down to transpose the notes" = "음높이 범위: 위나 아래로 드래그하여 노트를 이조합니다"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "클립 색상. 클릭: 클립 비활성화 또는 활성화. 오른쪽 클릭: 색상 변경"

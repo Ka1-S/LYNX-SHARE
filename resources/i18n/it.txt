@@ -8651,3 +8651,8 @@ countries: it ch sm
 "Up & Down" = "Su e giù"
 "UpDown" = "SuGiù"
 "Vel." = "Vel."
+"Add interval" = "Aggiungi intervallo"
+"Interval size" = "Ampiezza intervallo"
+"Adds to every note a note this many semitones away" = "Aggiunge a ogni nota un'altra nota a questo numero di semitoni"
+"Pitch range: drag up or down to transpose the notes" = "Estensione: trascina su o giù per trasporre le note"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Il colore della clip. Clic: disattiva o attiva la clip. Clic destro: cambia il colore"

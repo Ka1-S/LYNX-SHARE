@@ -8734,3 +8734,8 @@ countries: br
 "Up & Down" = "Sobe e desce"
 "UpDown" = "Sobe-desce"
 "Vel." = "Vel."
+"Add interval" = "Adic. intervalo"
+"Interval size" = "Tamanho do intervalo"
+"Adds to every note a note this many semitones away" = "Adiciona a cada nota outra nota a esta quantidade de semitons"
+"Pitch range: drag up or down to transpose the notes" = "Faixa de alturas: arraste para cima ou para baixo para transpor as notas"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "A cor do clipe. Clique: desativa ou ativa o clipe. Clique direito: muda a cor"

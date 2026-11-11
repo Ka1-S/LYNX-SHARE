@@ -8651,3 +8651,8 @@ countries: tr
 "Up & Down" = "Yukarı ve aşağı"
 "UpDown" = "YukarıAşağı"
 "Vel." = "Vel."
+"Add interval" = "Aralık ekle"
+"Interval size" = "Aralık boyutu"
+"Adds to every note a note this many semitones away" = "Her notaya bu kadar yarım ton uzaklıkta bir nota ekler"
+"Pitch range: drag up or down to transpose the notes" = "Perde aralığı: notaları aktarmak için yukarı veya aşağı sürükleyin"
+"The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour" = "Klibin rengi. Tıklama: klibi devre dışı bırakır veya etkinleştirir. Sağ tık: rengini değiştirir"
