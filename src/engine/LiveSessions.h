@@ -8,7 +8,8 @@
 // sealed frame] for the ones over 512 KiB. A sealed frame's plain text is ['J'][JSON] / ['Z'][gzip JSON] / ['M'][media
 // chunk]. The JSON messages: hello / welcome / deny / snapshot / propose / commit / people / presence / want / bye /
 // end / resync; round 169j adds seek / host / back / resume / resumed (reconnect, §1.5), perms, chat, transport, need /
-// needs (live stand-ins) and 'F' frames (a medium as a lossless FLAC pack, engine/MediaPack.h). Sample paths travel as "lynx-media:<sha256>/<name>"; a received change may only point at this
+// needs (live stand-ins) and 'F' frames (a medium as a lossless FLAC pack, engine/MediaPack.h); round 190ai adds
+// shared / rbusy (P5-A1 remote plugins, engine/LiveRemotePlugins.cpp). Sample paths travel as "lynx-media:<sha256>/<name>"; a received change may only point at this
 // session's media folder (sessionpack::confine), and media are only sent when the sender's own song uses them.
 
 #include <deque>
@@ -26,7 +27,13 @@
 
 #include "core/LiveCrypto.h"
 #include "core/LiveSession.h"
+#include "core/RemotePlugins.h"
 #include "engine/LiveLink.h"
+
+namespace juce
+{
+class AudioPluginInstance;
+}
 
 namespace lynx
 {
@@ -154,6 +161,36 @@ public:
     // their content hashes): two computers that print the same digest at the same revision hold the same song.
     juce::String digest();
 
+    // --- P5-A1, remote plugins (round 190ai; core/RemotePlugins.h, engine/LiveRemotePlugins.cpp) ---------------------
+    // The host shares one of its plugins with the session (opt-in per plugin, off by default, gone when the session
+    // ends) or stops sharing it: guests who may edit get its name and parameter list, nothing else. false + `error`
+    // when it cannot be loaded here.
+    bool sharePlugin (const std::string& pluginId, bool on, juce::String* error = nullptr);
+    // The host: what it shares. A guest: what the host shares with them (empty for "listen only").
+    const std::vector<remoteplug::Shared>& sharedPlugins() const noexcept { return shared; }
+    bool mayUseSharedPlugins() const noexcept { return ! host && state == State::live && ! myPerms.listener && ! shared.empty(); }
+    // What a guest puts on a channel / an insert slot of their own to use a shared plugin.
+    PluginRef sharedPluginRef (const remoteplug::Shared& plugin) const { return remoteplug::makeRef (plugin, session::hostTag); }
+    // The host: who uses a plugin it plays for the session ("Rui: Channel 3").
+    juce::StringArray sharedPluginUsers (const std::string& pluginId) const;
+    // The name of the participant whose computer plays this plugin (empty: this one, or everyone their own).
+    juce::String playedByName (const PluginRef& ref) const;
+    enum class HostedState
+    {
+        none,       // not a plugin played by someone else's computer
+        noNotes,    // nothing to render yet
+        updating,   // the host is rendering it (or about to): the last render plays meanwhile
+        upToDate,
+        hostAway,   // the host's connection dropped: the last render plays
+        notShared   // the host stopped sharing the plugin: the last render plays
+    };
+    HostedState hostedState (const remoteplug::Place& place) const;
+    // The host: the parameter values of its running hosted plugins go into the song (what the host changed in the
+    // plugin's own window reaches the guests as values, never as a state). Also done when such a window closes.
+    void captureHostedValues();
+    // (the UI's: whether a plugin's own editor window is open — its values are captured when it closes)
+    std::function<bool (juce::AudioPluginInstance&)> hostedEditorOpen;
+
     // tests: the connection drops as if the network went away (the manager reconnects by itself); abandon() stops
     // everything without a word to anyone, keeping the journal (what a crash of LYNX SHARE does)
     void dropConnection();
@@ -203,6 +240,7 @@ public:
         juce::int64 packedSaved = 0; // bytes FLAC saved on the media sent
         int hashedOffThread = 0;
         int mediaRefused = 0, rejoined = 0;
+        int hostedRendered = 0, valueEditsRefused = 0; // P5-A1: parts rendered for their owners, proposals over the rate limit
     };
     Stats getStats() const noexcept { return stats; }
     // Does what the timer does (network events, local edits, presence, media): command-line runs without a message
@@ -420,5 +458,21 @@ private:
     void onLimit (const juce::var& m);
     void fetchMissingMedia();
     int peerOf (std::uint32_t tag) const;
+    // P5-A1 (engine/LiveRemotePlugins.cpp)
+    std::vector<remoteplug::Shared> shared;     // host: what it shares; guest: what the host shares
+    std::set<live::Key> hostedBusy;             // the parts being rendered for their owners (guests: as the host says)
+    remoteplug::Limiter valueLimiter;           // host: parameter edits per guest
+    std::map<remoteplug::Place, std::vector<std::pair<int, float>>> pushedValues; // host: the values its running instances have
+    std::map<remoteplug::Place, bool> hostedOpen; // host: hosted plugins whose own window was open at the last look
+    juce::int64 lastHostedMs = 0;
+    mutable std::map<remoteplug::Place, std::pair<std::uint64_t, HostedState>> hostedStateCache;
+    void sendShared (int to);                   // host: the list to one guest (0: to every guest)
+    bool handleRemotePlugins (int from, const juce::String& type, const juce::var& m); // guest: shared / rbusy
+    void hostedTick();                          // both: the session tag; host: values onto the instances, capture
+    void addHostedRenders (std::vector<live::Key>& keys); // host: other people's parts it renders
+    void setHostedBusy (std::set<live::Key> keys);
+    bool admitHosted (std::uint32_t tag, live::Proposal& proposal); // host: clean a guest's proposal; false = over the limit
+    void endHosted (bool wasHost);              // the session is over
+    void captureHostedValuesAt (const remoteplug::Place& place);
 };
 } // namespace lynx

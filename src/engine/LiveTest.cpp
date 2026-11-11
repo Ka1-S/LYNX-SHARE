@@ -13,6 +13,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/LiveSessions.h"
 #include "engine/MediaPack.h"
+#include "engine/PluginHost.h"
 #include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 
@@ -288,7 +289,28 @@ juce::String selfTest (const Song* rich)
         tmp.deleteRecursively();
     }
 
-    const bool ok = unstable.isEmpty() && diverged.isEmpty() && editsOk && cryptoOk && packOk;
+    // P5-A1 (round 190ai): a plugin played by the host and its parameter values go through the wire form unchanged
+    bool hostedOk = false;
+    {
+        Song a = Song::makeDefault(), b = a;
+        ChannelDef c;
+        c.name = "Hosted";
+        c.instrument = InstrumentKind::plugin;
+        c.plugin.id = "VST3-Somebody-1";
+        c.plugin.name = "Somebody";
+        c.plugin.playedBy = session::hostTag;
+        c.plugin.values = { { 0, 0.1f }, { 7, 1.0f / 3.0f }, { 1023, 1.0f } };
+        b.channels.push_back (c);
+        uids::normalize (a);
+        uids::normalize (b);
+        const auto wire = LiveSessionManager::roundTrip (live::diff (a, b));
+        Song got = a;
+        live::apply (got, wire);
+        hostedOk = ! got.channels.empty() && got.channels.back().plugin == b.channels.back().plugin && got.channels.back().plugin.playedBy == session::hostTag
+                   && got.channels.back().plugin.values.size() == 3;
+    }
+
+    const bool ok = unstable.isEmpty() && diverged.isEmpty() && editsOk && cryptoOk && packOk && hostedOk;
     juce::String out = ok ? "OK" : "ERROR";
     out << " (" << (int) live::keysOf (song).size() << " entities, " << lost.size() << " not kept by the format";
     if (! lost.isEmpty())
@@ -302,6 +324,7 @@ juce::String selfTest (const Song* rich)
     if (! cryptoOk)
         out << "; keys wrong";
     out << "; flac packs " << packReport.trim() << (packOk ? "" : " WRONG");
+    out << "; hosted plugin " << (hostedOk ? "ok" : "WRONG");
     return out + ")";
 }
 
@@ -785,6 +808,200 @@ int run (const juce::StringArray& args)
         }
     }
 
+    // P5-A1, remote plugins (round 190ai): the HOST shares the plugin; Rui, who has no plugins, puts it on a channel of
+    // his own; the host's computer renders his part and he hears the render; he turns a parameter; the state never
+    // crosses; edits are rate-limited; un-sharing leaves the last stems
+    std::uint64_t ruiRemoteUid = 0;
+    if (pluginFile.isEmpty())
+        line ("skip remote plugins (no --plugin <file.vst3>)");
+    else
+    {
+        auto& plugins = host.engine->getPluginHost();
+        plugins.addPluginFile (juce::File (pluginFile));
+        juce::PluginDescription instrument;
+        bool found = false;
+        for (const auto& type : plugins.getKnownPlugins().getTypes())
+            if (type.isInstrument && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginFile).getFileName())
+                instrument = type, found = true;
+        const auto id = instrument.createIdentifierString().toStdString();
+        juce::String why;
+        check (rui.live->sharedPlugins().empty() && ! rui.live->mayUseSharedPlugins(), "nothing is shared until the host shares it");
+        check (! rui.live->sharePlugin (id, true), "a guest cannot share plugins");
+        const bool sharedOk = found && host.live->sharePlugin (id, true, &why);
+        if (check (sharedOk && host.live->sharedPlugins().size() == 1,
+                   "the host shares " + instrument.name + " with the session (" + juce::String (sharedOk ? (int) host.live->sharedPlugins().front().params.size() : 0)
+                       + " parameters) " + why))
+        {
+            const auto described = host.live->sharedPlugins().front();
+            const bool told = pumpUntil ([&] { return rui.live->sharedPlugins().size() == 1 && ana.live->sharedPlugins().size() == 1; }, 15000);
+            check (told && rui.live->sharedPlugins().front() == described && rui.live->mayUseSharedPlugins(),
+                   "Rui and Ana got its name and parameter list (" + (described.params.empty() ? juce::String ("none") : str (described.params.front().name) + ", ...") + ")");
+            // Rui uses it: a channel of his own, played by the host, and a riff
+            const auto t = juce::Time::getMillisecondCounterHiRes();
+            rui.engine->editSong ([&] (Song& s) {
+                ChannelDef c;
+                c.name = "Rui remote";
+                c.instrument = InstrumentKind::plugin;
+                c.plugin = rui.live->sharedPluginRef (rui.live->sharedPlugins().front());
+                const auto* me = s.session.find (s.session.me);
+                c.mixerTrack = me != nullptr ? me->insertFirst : 0;
+                s.channels.push_back (c);
+                Pattern p;
+                p.name = "Rui remote riff";
+                for (int n = 0; n < 4; ++n)
+                    p.notes.push_back ({ (std::int64_t) n * ppq, ppq / 2, (int) s.channels.size() - 1, 57 + 2 * n, 0.9f });
+                s.patterns.push_back (p);
+            });
+            auto place = [&] (Peer& p) {
+                const auto c = channelIndex (p.engine->getSong(), "Rui remote");
+                return remoteplug::Place { { live::Kind::channel, c >= 0 ? p.engine->getSong().channels[(std::size_t) c].uid : 0, 0 }, -1 };
+            };
+            auto refOf = [&] (Peer& p) -> PluginRef {
+                const auto* r = remoteplug::refAt (p.engine->getSong(), place (p));
+                return r != nullptr ? *r : PluginRef();
+            };
+            // the stems of the channel on a computer: their files' hashes ("" when one is missing) and their source hashes
+            auto stemsOf = [&] (Peer& p, bool sources) -> juce::String {
+                const auto& song = p.engine->getSong();
+                const auto c = channelIndex (song, "Rui remote");
+                if (c < 0 || song.channels[(std::size_t) c].standIns.empty())
+                    return {};
+                juce::String all;
+                for (const auto& st : song.channels[(std::size_t) c].standIns)
+                {
+                    const juce::File f (str (st.path));
+                    if (! f.existsAsFile())
+                        return {};
+                    all << (sources ? str (st.sourceHash) : sessionpack::hashFile (f)) << ";";
+                }
+                return all;
+            };
+            auto peakOf = [&] (Peer& p) {
+                const auto& song = p.engine->getSong();
+                const auto c = channelIndex (song, "Rui remote");
+                float peak = 0.0f;
+                if (c >= 0)
+                    for (const auto& st : song.channels[(std::size_t) c].standIns)
+                    {
+                        juce::WavAudioFormat wav;
+                        std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (juce::File (str (st.path)).createInputStream().release(), true));
+                        if (reader == nullptr)
+                            continue;
+                        juce::AudioBuffer<float> b ((int) reader->numChannels, (int) reader->lengthInSamples);
+                        reader->read (&b, 0, b.getNumSamples(), 0, true, true);
+                        peak = std::max (peak, b.getMagnitude (0, b.getNumSamples()));
+                    }
+                return peak;
+            };
+            using HS = LiveSessionManager::HostedState;
+            bool sawUpdating = false;
+            const bool arrived = pumpUntil ([&] {
+                sawUpdating = sawUpdating || rui.live->hostedState (place (rui)) == HS::updating;
+                return stemsOf (rui, false).isNotEmpty() && converged ({ &ana, &rui }) && rui.live->hostedState (place (rui)) == HS::upToDate;
+            }, 90000);
+            ruiRemoteUid = place (rui).part.a;
+            const auto first = stemsOf (rui, true);
+            check (arrived && stemsOf (rui, false) == stemsOf (host, false) && host.live->getStats().hostedRendered >= 1 && rui.live->getStats().standInsRendered == 0,
+                   "the host rendered Rui's part with its plugin (" + juce::String (host.live->getStats().hostedRendered) + " part(s)); Rui has the stems in "
+                       + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms");
+            explain ({ &ana, &rui });
+            check (sawUpdating && rui.live->hostedState (place (rui)) == HS::upToDate, "Rui's editor said \"updating...\" while the host rendered, then \"up to date\"");
+            check (peakOf (rui) > 0.001f, "the render Rui plays is the plugin's sound (peak " + juce::String (peakOf (rui), 3) + ")");
+            check (refOf (rui).playedBy == session::hostTag && refOf (host).playedBy == session::hostTag && refOf (rui).state.empty() && refOf (host).state.empty()
+                       && refOf (ana).state.empty(),
+                   "the channel says \"played by " + rui.live->playedByName (refOf (rui)) + "\" and carries no plugin state on any computer");
+            check (host.live->sharedPluginUsers (id).size() == 1, "the host sees who uses it: " + host.live->sharedPluginUsers (id).joinIntoString (", "));
+            // (the host itself plays the part live with its own instance)
+            auto hostValue = [&] (int index) {
+                const auto c = channelIndex (host.engine->getSong(), "Rui remote");
+                auto instrument = host.engine->getChannelInstrument (c);
+                auto* p = dynamic_cast<PluginInstrument*> (instrument.get());
+                return p != nullptr && index < p->getInstance().getParameters().size() ? p->getInstance().getParameters()[index]->getValue() : -1.0f;
+            };
+            // Rui turns a parameter: a value on his channel; the host applies it and renders again
+            if (! described.params.empty())
+            {
+                const auto& param = described.params.front();
+                const auto value = param.def < 0.5f ? 0.9f : 0.1f;
+                const auto rendered = host.live->getStats().hostedRendered;
+                const auto t2 = juce::Time::getMillisecondCounterHiRes();
+                rui.engine->editSong ([&] (Song& s) {
+                    if (auto* r = remoteplug::refAt (s, place (rui)))
+                        remoteplug::setValue (*r, param.index, value);
+                }, false);
+                const bool again = pumpUntil ([&] {
+                    const auto now = stemsOf (rui, true);
+                    return now.isNotEmpty() && now != first && converged ({ &ana, &rui }) && rui.live->hostedState (place (rui)) == HS::upToDate;
+                }, 90000);
+                check (again && host.live->getStats().hostedRendered > rendered && remoteplug::valueOf (refOf (host), param.index, -1.0f) == value,
+                       "Rui set \"" + str (param.name) + "\" to " + juce::String (value) + ": the host rendered again and the new stems reached him in "
+                           + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t2)) + " ms");
+                check (std::abs (hostValue (param.index) - value) < 0.26f, "the host's running plugin has the value (" + juce::String (hostValue (param.index), 3) + ")");
+                // the host changes it in the plugin's own window: its values reach Rui (never a state)
+                {
+                    const auto c = channelIndex (host.engine->getSong(), "Rui remote");
+                    auto instrument = host.engine->getChannelInstrument (c);
+                    if (auto* p = dynamic_cast<PluginInstrument*> (instrument.get()))
+                        p->setParameterFromUi (param.index, param.def < 0.5f ? 0.6f : 0.4f);
+                    settle (300);
+                    host.live->captureHostedValues();
+                    const auto want = hostValue (param.index);
+                    const bool reached = pumpUntil ([&] { return converged ({ &ana, &rui }) && std::abs (remoteplug::valueOf (refOf (rui), param.index, param.def) - want) < 0.003f; }, 20000);
+                    check (reached && refOf (rui).state.empty() && std::abs (want - value) > 0.05f,
+                           "the host changed it on its side (" + juce::String (want, 3) + "): Rui's editor shows the host's value, still no state");
+                }
+            }
+            // a guest's computer that sends a state for the host's plugin anyway: dropped by the host
+            rui.engine->editSong ([&] (Song& s) {
+                if (auto* r = remoteplug::refAt (s, place (rui)))
+                    r->state = "QUJDRA==";
+            }, false);
+            settle (1500);
+            const bool clean = pumpUntil ([&] { return converged ({ &ana, &rui }) && refOf (rui).state.empty(); }, 15000);
+            check (clean && refOf (host).state.empty() && refOf (ana).state.empty(), "a state sent by a guest for the host's plugin is dropped (nobody has it)");
+            // too many parameter changes at once: refused
+            {
+                const auto before = refOf (rui).values.size();
+                rui.hints.clear();
+                rui.engine->editSong ([&] (Song& s) {
+                    if (auto* r = remoteplug::refAt (s, place (rui)))
+                        for (int i = 0; i < 400; ++i)
+                            remoteplug::setValue (*r, 100 + i, 0.5f);
+                }, false);
+                const bool refused = pumpUntil ([&] { return host.live->getStats().valueEditsRefused >= 1 && converged ({ &ana, &rui }) && refOf (rui).values.size() == before; }, 15000);
+                check (refused && refOf (host).values.size() == before && rui.hints.joinIntoString ("|").contains ("Too many"),
+                       "400 parameter changes in one go were refused by the host (rate limit): " + rui.hints.joinIntoString (" | ").substring (0, 120));
+            }
+            // "listen only" guests are not offered shared plugins
+            host.live->setPermissions (anaTag, [] { live::Permissions p; p.listener = true; return p; }(), false);
+            const bool hidden = pumpUntil ([&] { return ana.live->sharedPlugins().empty(); }, 10000);
+            host.live->setPermissions (anaTag, {}, false);
+            const bool shown = pumpUntil ([&] { return ana.live->sharedPlugins().size() == 1; }, 10000);
+            check (hidden && shown, "a \"listen only\" guest gets no shared plugins; an editor again does");
+            // the host stops sharing: Rui's editor says so, his notes change, the last stems stay as they are
+            pumpUntil ([&] { return converged ({ &ana, &rui }) && rui.live->hostedState (place (rui)) == HS::upToDate && host.live->standInsRendering() == 0; }, 90000);
+            const auto kept = stemsOf (rui, false);
+            const auto renderedBefore = host.live->getStats().hostedRendered;
+            host.live->sharePlugin (id, false);
+            const bool gone = pumpUntil ([&] { return rui.live->sharedPlugins().empty() && rui.live->hostedState (place (rui)) == HS::notShared; }, 10000);
+            rui.engine->editSong ([&] (Song& s) {
+                const auto p = patternIndex (s, "Rui remote riff");
+                if (p >= 0)
+                    s.patterns[(std::size_t) p].notes.front().key = 45;
+            });
+            pumpUntil ([&] { return converged ({ &ana, &rui }); }, 15000);
+            settle (2500);
+            check (gone && ! rui.live->mayUseSharedPlugins() && stemsOf (rui, false) == kept && host.live->getStats().hostedRendered == renderedBefore,
+                   "the host stopped sharing: Rui is told, his last stems keep playing and nothing new is rendered");
+            // shared again: the part is rendered with the notes as they are now
+            host.live->sharePlugin (id, true);
+            const bool backAgain = pumpUntil ([&] { return stemsOf (rui, false).isNotEmpty() && stemsOf (rui, false) != kept && converged ({ &ana, &rui })
+                                                           && rui.live->hostedState (place (rui)) == HS::upToDate; }, 90000);
+            check (backAgain, "shared again: the host rendered Rui's changed notes");
+            explain ({ &ana, &rui });
+        }
+    }
+
     // the host's LYNX SHARE "crashes" and restarts: it resumes from its journal, the guests come back by themselves
     {
         pumpUntil ([] { return false; }, 2600); // (the journal is written at most every 2 s)
@@ -983,6 +1200,18 @@ int run (const juce::StringArray& args)
             pumpUntil ([&] { return ! lia.live->isActive(); }, 10000);
         }
         host.live->onMediaLimit = nullptr;
+    }
+    if (ruiRemoteUid != 0)
+    {
+        // what the guest keeps follows the keep policy: his own part, with the audio stand-ins only
+        const auto* kept = remoteplug::refAt (rui.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
+        const auto c = channelIndex (rui.engine->getSong(), "Rui remote");
+        const auto* hostRef = remoteplug::refAt (host.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
+        check (kept != nullptr && c >= 0 && ! rui.engine->getSong().channels[(std::size_t) c].standIns.empty() && kept->playedBy == 0 && kept->state.empty()
+                   && kept->values.empty(),
+               "Rui keeps his channel with the audio stand-ins only (no plugin state, no values)");
+        check (hostRef != nullptr && hostRef->playedBy == 0 && hostRef->values.empty() && ! hostRef->state.empty(),
+               "the host's project keeps the plugin as it sounded (its real state, " + juce::String (hostRef != nullptr ? (int) hostRef->state.size() : 0) + " bytes)");
     }
     line ("     host: " + juce::String (stats.sent) + " frames sent (" + juce::String (stats.bytesSent / 1024) + " KiB), " + juce::String (stats.received) + " received, "
           + juce::String (stats.commits) + " commits, " + juce::String (stats.rejected) + " refused, " + juce::String (stats.mediaSent) + " media sent");

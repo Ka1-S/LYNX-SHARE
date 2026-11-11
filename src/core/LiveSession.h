@@ -31,7 +31,9 @@ namespace lynx::live
 // 2 (round 169j): resume after a drop, chat, transport, permissions during the session, live stand-ins, FLAC media
 // 3 (round 190ah): a guest whose LYNX SHARE restarted resumes as itself ("bye" with its token when it does not),
 //   "perms" after a replayed resume, media limits ("limit")
-constexpr int protocolVersion = 3;
+// 3 (round 190ai): P5-A1 remote plugins — PluginRef::playedBy / values, the host's "shared" and "rbusy" messages
+// 4: both rounds' 3 together (each was a 3 of its own on its branch: one number above both, so neither ever meets this)
+constexpr int protocolVersion = 4;
 // how many commits the host keeps to replay to someone who reconnects (§1.5; older: a fresh snapshot)
 constexpr std::size_t replayLimit = 4096;
 

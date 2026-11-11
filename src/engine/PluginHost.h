@@ -18,6 +18,7 @@
 #include "core/FlPluginDb.h"
 #include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
+#include "core/RemotePlugins.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
 #include "core/ModuleWarmup.h"
@@ -47,6 +48,17 @@ struct PluginCrash
 };
 int pluginCrashCount() noexcept;
 std::vector<PluginCrash> pluginCrashes();
+
+// A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
+// one per output bus (bus 0 = the main output); a plugin with one bus of more than two channels (a bridged plugin)
+// in stereo pairs. `channel` = its first channel in the plugin's buffer.
+struct PluginOutputInfo
+{
+    juce::String name;
+    int channel = 0, channels = 2;
+    bool activeByDefault = true; // what the plugin declares (VST3 bus kDefaultActive, VST2 pin kVstPinIsActive)
+};
+std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& plugin);
 
 // FL's wrapper options a hosted plugin follows while it runs (REA round 151; PluginRef has them, saved per plugin)
 struct HostedOptions
@@ -113,7 +125,27 @@ public:
     bool followsChannelPorta() const noexcept override { return true; }
     int sentPitchBend() const noexcept { return sentBend; } // the last 14-bit bend sent (8192 = centre), for the tests
 
+    // FL's wrapper Processing › Connections (round 188d, issue #114): each output of the plugin plays on the channel's
+    // insert + its offset (offset 0: the channel's own audio), an inactive one is silent; the channel's volume and
+    // pan apply to all of them, as FL [EXEC]. configure() takes the routes (UI thread; the audio thread reads atomics).
+    const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
+    void configure (const ChannelDef& channel, double bpm) noexcept override;
+    void beginChunk (int n) noexcept override;
+    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_relaxed) ? (int) outs.size() : 0; }
+    int auxOutputTrack (int k) const noexcept override;
+    const float* auxOutputData (int k, int side) const noexcept override;
+
 private:
+    void mixOutputs (const float* const* channels, int numChannels, int at, int count, float gl, float gr, float* left, float* right) noexcept;
+    std::vector<PluginOutputInfo> outs;
+    std::unique_ptr<std::atomic<int>[]> routeOffset;   // [output]
+    std::unique_ptr<std::atomic<bool>[]> routeActive;  // [output]
+    std::atomic<int> channelTrack { 0 };
+    std::atomic<bool> anyAux { false };                // an output plays somewhere else than the channel's insert
+    static constexpr int auxCapacity = 16384;
+    std::vector<std::array<std::vector<float>, 2>> aux; // [output] this chunk's audio for its insert
+    int auxCursor = 0, chunkBase = 0;
+
     void failed (std::uint32_t code) noexcept;
     void addBend (int offset) noexcept;         // the bend the pitch asks for now, if it changed
     void bendBlock (juce::MidiBuffer& into, int base, int count) noexcept; // advances a slide over `count` samples
@@ -343,6 +375,24 @@ public:
         bool instrument = false;
     };
     std::optional<Identity> portableIdentity (const PluginRef& ref) const;
+
+    // Online Sessions P5-A1 (round 190ai, core/RemotePlugins.h). In a live session this computer is participant
+    // `tag` (0: no session): a plugin reference played by another participant is never loaded here, even when the
+    // same plugin is installed — it counts as not installed and its stand-ins play.
+    void setSessionTag (std::uint32_t tag) noexcept { sessionTag.store (tag, std::memory_order_relaxed); }
+    bool playedElsewhere (const PluginRef& ref) const noexcept
+    {
+        const auto me = sessionTag.load (std::memory_order_relaxed);
+        return me != 0 && ref.playedBy != 0 && ref.playedBy != me;
+    }
+    // What a host tells its guests about a plugin it shares: the name, the vendor and the parameter list of a fresh
+    // instance (created and released here; message thread). nullopt: not installed or it did not load (`error`).
+    std::optional<remoteplug::Shared> describeForSharing (const std::string& id, juce::String* error = nullptr);
+    // A hosted plugin's parameter values (PluginRef::values) put on a running instance (indices the plugin does not
+    // have are ignored), and read back: every automatable parameter that is not at its default.
+    static void applyValues (juce::AudioPluginInstance& plugin, const std::vector<std::pair<int, float>>& values);
+    // (`fresh`: the plugin as it was described for sharing — a value counts when it differs from a fresh instance's)
+    static std::vector<std::pair<int, float>> readValues (juce::AudioPluginInstance& plugin, const remoteplug::Shared* fresh = nullptr);
     // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
     // role (another format: its state may not carry over).
     std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);
@@ -423,6 +473,7 @@ public:
 
 private:
     std::unique_ptr<juce::AudioPluginInstance> instantiate (const PluginRef& ref, double sampleRate, juce::String* error);
+    std::unique_ptr<juce::AudioPluginInstance> instantiateOnce (const PluginRef& ref, double sampleRate, juce::String* error); // (preloaded or new)
     std::unique_ptr<juce::AudioPluginInstance> createInstance (const PluginRef& ref, double sampleRate, juce::String* error);
     static std::string preloadKey (const PluginRef& ref, double sampleRate);
     struct Preloaded
@@ -446,6 +497,7 @@ private:
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
+    std::atomic<std::uint32_t> sessionTag { 0 };
     bool persistent = true;
 
     std::mutex scanLock, saveLock, flDbLock;

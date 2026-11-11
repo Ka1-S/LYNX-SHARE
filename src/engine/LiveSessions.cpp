@@ -587,6 +587,7 @@ void LiveSessionManager::end (const juce::String& text, bool keepPart)
     }
     if (! host && (wasLive || state == State::waitingHost || state == State::reconnecting) && replica && keepPart)
         engine.editSong ([] (Song& s) { s = parts::keepOnlyPart (s); }, false);
+    endHosted (host); // P5-A1: nothing is played for anyone any more
     engine.setSessionHistory (false);
     if (host && ! abandoned && journalFile != juce::File())
         journalFile.deleteFile(); // (ended on purpose: nothing to resume)
@@ -773,6 +774,7 @@ void LiveSessionManager::pump()
             followHost();
         updateNeeds();
         maybeRenderStandIns();
+        hostedTick();
     }
     if (host && ! pendingSnapshots.empty() && state == State::live)
     {
@@ -1102,6 +1104,8 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
                                                : tr ("The host did not let you in.");
         return end (why, replica != nullptr && ! keepFull);
     }
+    if (handleRemotePlugins (from, t, m)) // P5-A1: what the host shares, what it is rendering
+        return;
     if (t == "snapshot")
         onSnapshot (m);
     else if (t == "commit")
@@ -1370,6 +1374,7 @@ void LiveSessionManager::sendSnapshot (int to, bool resumed)
     }
     set (m, "chat", lines);
     sendJson (to, m);
+    sendShared (to); // P5-A1: the plugins the host shares
     if (haveHostTransport || engine.getTransport().playing.load())
         lastTransportMs = 0; // (the newcomer gets the transport at the next presence tick)
 }
@@ -1382,6 +1387,18 @@ void LiveSessionManager::onPropose (int from, const juce::var& m)
     p.baseRev = (std::uint64_t) (juce::int64) m["base"];
     p.patch = patchFromVar (m["patch"]);
     detokenize (p.patch.carrier, from);
+    // P5-A1: hosted plugins carry no state from a guest, and their parameter edits are rate-limited
+    if (! admitHosted (peer.tag, p))
+    {
+        live::Commit refused;
+        refused.rev = authority->revision();
+        refused.origin = peer.tag;
+        refused.seq = p.seq;
+        refused.rejected = p.patch.keys();
+        refused.reason = "rate";
+        stats.rejected += (int) refused.rejected.size();
+        return broadcastCommit (refused);
+    }
     const auto c = authority->propose (peer.tag, p);
     stats.rejected += (int) c.rejected.size();
     broadcastCommit (c);
@@ -1483,6 +1500,7 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
     if (! song)
         return end (tr ("The project could not be read ({0}).", { error }), false);
     me = (std::uint32_t) (int) m["tag"];
+    engine.getPluginHost().setSessionTag (me); // (P5-A1: plugins the host plays are never loaded here)
     keepFull = (bool) m["keepFull"];
     editEverything = (bool) m["editEverything"];
     myPerms = {};
@@ -1585,6 +1603,8 @@ void LiveSessionManager::applyUpdate (const live::Replica::Update& u)
         const auto owner = live::ownerOf (u.rejected.front(), song);
         if (u.reason == "conflict")
             onHint (tr ("{0} was changed by someone else at the same time: their change was kept", { what }));
+        else if (u.reason == "rate")
+            onHint (tr ("Too many parameter changes at once: the last ones were undone"));
         else if (owner != 0 && owner != me)
             onHint (tr ("{0} belongs to {1}: your change was undone", { what, nameOf (owner) }));
         else
@@ -2428,6 +2448,7 @@ void LiveSessionManager::onResume (int from, const juce::var& m)
     }
     sendPeople (true);
     broadcastNeeds();
+    sendShared (from);
     journalDirty = true;
     lastTransportMs = 0;
     if (onHint)
@@ -2858,6 +2879,7 @@ bool LiveSessionManager::resumeGuest (const juce::File& file, const Options& o)
         options.name = j["name"].toString();
     host = false;
     me = (std::uint32_t) (int) j["tag"];
+    engine.getPluginHost().setSessionTag (me); // (P5-A1: plugins the host plays are not loaded here, also after a restart)
     peers.clear();
     away.clear();
     people.clear();
@@ -3095,6 +3117,7 @@ void LiveSessionManager::setPermissions (std::uint32_t tag, live::Permissions p,
         auto m = permsToVar (p, full);
         set (m, "t", "perms");
         sendJson (relay, m);
+        sendShared (relay); // (P5-A1: "listen only" guests get no shared plugins)
     }
     journalDirty = true;
     sendPeople (true);
@@ -3151,7 +3174,8 @@ void LiveSessionManager::maybeRenderStandIns()
     if (engine.getTransport().playing.load() || engine.isRecording() || now - lastLocalChangeMs < options.standInDelayMs)
         return;
     const auto& song = engine.getSong();
-    const auto keys = live::toRender (song, allNeed, me, [this] (const PluginRef& r) { return missingHere (r); });
+    auto keys = live::toRender (song, allNeed, me, [this] (const PluginRef& r) { return missingHere (r); });
+    addHostedRenders (keys); // P5-A1: the host also renders the guests' parts that use a plugin it shares
     std::vector<sessionpack::RenderItem> items;
     std::vector<std::pair<live::Key, std::string>> sigs;
     for (const auto& k : keys)
@@ -3203,6 +3227,12 @@ void LiveSessionManager::maybeRenderStandIns()
     if (items.empty())
         return;
     rendering = true;
+    {
+        std::set<live::Key> busy;
+        for (const auto& [k, sig] : sigs)
+            busy.insert (k);
+        setHostedBusy (std::move (busy)); // (the owners of those parts see "updating...")
+    }
     const auto folder = host ? sessionpack::standInFolder (options.projectFile, song).getChildFile ("Live session")
                              : mediaFolder.getChildFile ("Stand-ins");
     const auto by = host ? hostName() : (options.name.isNotEmpty() ? options.name : juce::String ("Guest"));
@@ -3224,6 +3254,9 @@ void LiveSessionManager::maybeRenderStandIns()
             rendering = false;
             if (! isActive())
                 return;
+            if (ok)
+                stats.hostedRendered += (int) hostedBusy.size();
+            setHostedBusy ({});
             for (const auto& [f, sha] : hashed)
                 if (sha.isNotEmpty())
                     hashCache[f.getFullPathName()] = { f.getSize(), f.getLastModificationTime().toMilliseconds(), sha };

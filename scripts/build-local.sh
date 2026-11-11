@@ -49,6 +49,8 @@ CORE="$CORE src/core/ProjectSafety.cpp"
 CORE="$CORE src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp"
 # Online Sessions P2: live sessions — entity replication, authority, replicas, invite code + encryption (round 169b)
 CORE="$CORE src/core/LiveSession.cpp src/core/LiveCrypto.cpp"
+# Online Sessions P5-A1: remote plugins (round 190ai)
+CORE="$CORE src/core/RemotePlugins.cpp"
 # LYNX substitutes for missing third-party plugins (round 98)
 CORE="$CORE src/core/PluginSubstitutes.cpp"
 # settings pages, plugin manager and shortcut manager logic (round 82)

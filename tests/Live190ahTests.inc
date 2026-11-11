@@ -343,5 +343,5 @@ TEST (live190ah_more_participant_records_than_people_online)
     for (int i = 0; i < 20; ++i)
         parts::invite (song, "Host", "Guest " + std::to_string (i), 0, false, 16);
     CHECK (song.session.participants.size() == 16);
-    CHECK (live::protocolVersion == 3);
+    CHECK (live::protocolVersion == 4);
 }

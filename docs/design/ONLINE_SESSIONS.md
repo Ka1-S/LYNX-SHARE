@@ -329,6 +329,8 @@ For every part that needs a plugin a peer does not have (same plugin and same ve
   that reads files from the local FL installation (e.g. BooBass's DLL tables checked by `sha256Hex`): it is treated
   like a plugin ("needs FL Studio's data"), and FL's binaries are never transferred.
 
+*A plugin only the host has, used by a guest (round 190ai): see "P5-A1 as built" in §9.*
+
 ### 4.3 Plugin states
 
 Third-party states are **opaque blobs** (`PluginRef::state`, `ForeignPlugin::state`): stored, hashed, forwarded,
@@ -758,7 +760,8 @@ presence, the resume question).
 
 ### P2, third slice (round 190ah): a guest restarts as itself, media limits, relay limits, checked over the internet
 
-Protocol 3 (`live::protocolVersion`; a `resume` from another protocol is answered `deny version`). Code:
+Protocol 3 on its branch, **4** once merged with round 190ai's remote plugins (each round had made its own 3;
+`live::protocolVersion`; a `resume` from another protocol is answered `deny version`). Code:
 `core/LiveSession` (`Replica::restored`, `MediaBudget`, `mediaSize`), `engine/LiveSessions` (guest journal, limits,
 participant records), `engine/LiveLink` (`livelink::http`), `ui/LiveSessionUi` (the two new dialogs),
 `engine/LiveTest` (`--livetest`, `--livepeer`), `server/app/lynx_relay.py` (relay limits).
@@ -809,6 +812,13 @@ participant records), `engine/LiveLink` (`livelink::http`), `ui/LiveSessionUi` (
     stopped upload that were still on their way are ignored when the host asks for the file again.
   - At the session limit nothing more is sent or fetched; everyone is told once (`limit`), edits, chat and
     transport go on, and the message points to *Send project...* for a big project.
+- **Remote plugins (round 190ai) under these limits.** The stems the host renders for a guest's part travel as
+  ordinary media from the host (`serve`), so they count against the session's 8 GB and stop with everything else at
+  the session limit; a guest sends no audio for a hosted plugin, only notes and parameter values, which are ordinary
+  proposals (rate-limited by 190ai's `valueLimiter`, one frame each, far below the relay's 1 MiB per frame) and
+  count against the relay's bytes per room and per client. A guest that restarts gets the host's shared list again
+  with its `resume`, and sets its session tag before its song is opened, so a plugin the host plays is not loaded on
+  the guest's computer after a restart either.
 - **Relay limits (so the VPS cannot be filled or used as a free tunnel).** In `server/app/lynx_relay.py`, all by
   environment (`server/env.example`): 12 GiB relayed per room in all, 32 GiB per client address per 24 h, 8 open
   rooms per client address (besides 10 new rooms per hour and 200 rooms in all), a room lives 72 h at most and is
@@ -870,6 +880,97 @@ four, and guests must be able to tell a legitimate new host from anyone who mere
 | Limits in the UI | 0.5 round | The two limits are options in code; no setting yet (the host can only raise per guest when asked). |
 | A song that points at an insert past the mixer's end | 0.5 round | The app never makes one (`Song::claimFreeInsert` grows the mixer), but a patch that did would leave the host with fewer mixer tracks than a guest who joins later (the project loader grows the mixer, the patch path does not). Found by `--livetest` when two guests were let in in the other order. The host should normalise a proposal the way the loader does. |
 | A guest journal on a second computer | — | By design the journal is per profile: going back in works on the computer that was in the session. |
+
+### P5-A1 as built (round 190ai): remote plugins — a guest uses a plugin only the host has
+
+Study: `REMOTE_PLUGINS.md` on `wip/remoteplug173c` (round 173c). The user's decisions (2026-11-05): start with A1; stay
+on the free relay; sharing is opt-in **per plugin** by the host, with a licence notice, only during the session; the
+state / presets of a shared plugin stay on the host; a guest sends notes and parameter values, never anything that
+reaches the host's files; "listen only" guests cannot use shared plugins. Protocol 3 on its branch, 4 merged with round 190ah (`live::protocolVersion`). User-facing
+steps: [USER_GUIDE.md](../USER_GUIDE.md#live-sessions-use-a-plugin-only-the-host-has).
+
+**It is not real-time playing.** The guest edits; the host's computer renders the part with its plugin (the live
+stand-in machinery of round 169j: 2 s after the last change, in the background, never while the host plays or
+records); the stems travel as media and the guest hears them. Playing the host's plugin live is A2 / after direct links.
+
+- **Data** (`core/Song.h`, `PluginRef`): `playedBy` — the participant whose computer plays the plugin (0: everyone
+  their own copy) — and `values`, (parameter index, value 0..1) pairs sorted by index. A hosted reference has the
+  **host's** plugin id (so it resolves on the host without any matching), no state, and its sound is the plugin's
+  default state plus `values`. Both are saved with the song (`"playedBy"`, `"values": [i, v, i, v…]`) so the journal
+  and the wire carry them; both are cleared when the session ends.
+- **Code**: `core/RemotePlugins` (the pure rules: `Shared` / `Param`, `clean`, `setValue` / `cleanValues`,
+  `sanitize`, `valueEdits`, `Limiter`, `Outbox`, `toRender`, `uses`, `endSession`), `engine/LiveRemotePlugins.cpp`
+  (the manager's part: sharing, the two messages, the host's running instances, the states the editor shows),
+  `engine/PluginHost` (`describeForSharing`, `applyValues` / `readValues`, `setSessionTag` / `playedElsewhere`),
+  `ui/LiveRemoteUi` (the host's list, the guest's menus and parameter editor).
+- **The host shares** (*File › Online session › Share plugins with guests...*): a list of the host's plugins with a
+  tick each, off by default, under the licence notice (below). Ticking one loads a fresh instance once to read its
+  parameter list (name, unit, the plugin's texts for 0 and 1, the value a fresh instance has, steps and the step names of a stepped
+  parameter up to 32 steps; at most 1024 parameters, JUCE's "MIDI CC" ones left out), then `shared {plugins}` goes to
+  every guest who may edit ("listen only" guests get an empty list). At most 32 plugins at once. The list shows who
+  uses each one ("Used by Rui: Glass Keys"). It is not written to the journal: a host that restarts shares nothing
+  until it ticks again — sharing really ends with the session.
+- **The guest uses one**: the plugin menus (Channel Rack *Add › Plugin*, a mixer slot's *Plugin*) start with **On
+  {host}'s computer**, each entry marked *played by {host}*. Choosing one is an ordinary edit of the guest's own
+  channel / slot (`remoteplug::makeRef`), so the session's permissions apply unchanged (§2.2: own area only, unless
+  the host allowed more; a listener's edits are refused). No new guest → host message exists.
+- **Who renders**: the guest's computer cannot play the part (`PluginHost::isInstalled` is false for a reference
+  played by someone else — also when the same plugin is installed there, `playedElsewhere` — so it is never loaded on a
+  guest), so it is in its `need` list as for any missing plugin. Round 169j's rule is "the *owner* of a part renders
+  it"; `remoteplug::toRender` adds: the participant a part's plugin is **played by** renders it for its owner, while
+  that plugin is shared and every plugin of the part is installed there. The renderer is a property of the part,
+  not of "the host" (hand-over, later, needs no change here). The host itself plays the part live with its own
+  instance, like any channel.
+- **Values**: the guest's editor writes `values` on its own channel entity through `remoteplug::Outbox` — slider moves
+  are collected and written at most every 200 ms, never as undo steps; a write the session undid is written again (up
+  to 5 times): the host's stems land on the *same* channel entity, so a value in flight at that moment is refused as a
+  conflict (§1.3) — found by `remote190ai_a_tweak_survives_the_stems_landing`. The host puts the values on its
+  running instance (`hostedTick`, 4 times a second, only what changed) and every new instance gets them after its
+  state (`PluginHost::instantiate`), so the render engines get them too; the source hash covers them (they are in the
+  channel's JSON), so a changed value renders again like a changed note.
+- **The host is the authority**: what the host changes in the plugin's own window is read back when that window
+  closes (`captureHostedValues`: every automatable parameter that differs from a fresh instance's; a value within 0.002 of
+  the song's keeps the song's) and reaches the guests as values — the guest's sliders move. `AudioEngine::
+  capturePluginStates` skips hosted references: no state is ever put in the song for them during a session.
+- **The state never leaves the host**: a hosted reference has no state on the host either; whatever a guest's
+  computer sends is cleaned first (`remoteplug::sanitize` in `onPropose`): `playedBy` can only be the host, the state
+  and any `.flp` record are dropped, values are clamped to 0..1, one per index, at most 1024. Parameter edits are
+  **rate-limited** per guest (`remoteplug::Limiter`: 40 value changes a second, 120 at once): a proposal over the limit is
+  refused whole (`reason: rate`, "Too many parameter changes at once") and undone on the guest. Values of a plugin
+  that is not shared are not applied.
+- **"Updating..."**: every computer computes the same source hash from the same wire state, so the guest's editor
+  knows a pattern stem is stale the moment the guest changes something (`hostedState`: *Add notes to hear it* /
+  *Updating...* / *Up to date*); the host also says which parts it is rendering for their owners (`rbusy {keys}`), which
+  covers timeline stems (inserts, parts with song-level automation), whose hash depends on each computer's own
+  sample paths. *{host} is away: the last render plays* while the host's connection is down; *No longer shared: the
+  last render plays* after the host un-ticks the plugin (sliders off; nothing new is rendered; ticking it again
+  renders the part as it is now).
+- **The end** (`endHosted`): a guest keeps what the keep policy says — their own part, or a full copy — with the
+  **audio stand-ins only**: `playedBy` and `values` are cleared, there never was a state. On the host the marker is
+  cleared, the plugins' real states are captured into the song (the project is complete and sounds as it did), then
+  the values are cleared.
+- **Licence notice** (host's list, always in view): "Guests can put the plugins you tick on their own channels and
+  inserts. The plugin stays on this computer and runs under your licence: guests send notes and knob values, and hear
+  the result as audio for this song. LYNX SHARE never sends the plugin, its files, its presets or its licence. **Some
+  plugin licences don't allow other people to operate the plugin, even remotely. Check the licence of each plugin
+  before you share it: you are responsible for how your plugins are used.** Nothing is shared until you tick it, and
+  sharing stops when the session ends." The guest's editor says: "These sounds come from {host}'s plugin under
+  {host}'s licence. Use them for this song; don't redistribute the audio as samples."
+- **Tests**: `tests/Remote190aiTests.inc` (bounds of values and of what arrives; a guest uses the host's plugin and
+  the host renders it, channel and insert; the state never crosses and only the host plays; the session's
+  permissions; the rate limit; a tweak survives the stems landing; the end leaves the stems only). `--selftest`
+  `live_session=` adds "hosted plugin ok" (the two fields through the wire form). `LYNX --livetest report.txt --plugin
+  file.vst3` adds, over the real relay: nothing shared before the host shares; a guest cannot share; the parameter
+  list reaches the guests; the host renders the guest's part and the guest's editor goes "updating" → "up to date";
+  the render is the plugin's sound; no state on any computer; a parameter change renders again and is on the host's
+  running plugin; the host's own change comes back as values; a state sent by a guest is dropped; 400 changes at once
+  are refused; "listen only" gets no list; un-sharing leaves the last stems; sharing again renders; what both sides
+  keep at the end. `LYNX --remoteshot prefix` writes pictures of the two panels with sample data.
+- **Not in A1 (open)**: playing live / a remote MIDI keyboard (A2); the plugin's own window for the guest (phase B:
+  pixels); hosted plugins inside a Patcher; the non-parameter state of a shared plugin (a sample or wavetable loaded
+  in its window, an internal preset browser) — only what its automatable parameters express crosses, by design of
+  "values, never a state"; choosing a program / preset by index; a per-guest cap on hosted instances and the host's
+  CPU meter for them; undo for a parameter change; the shared list surviving a host restart.
 
 ### 9.1 What is free and what might cost money
 
