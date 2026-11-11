@@ -11,7 +11,7 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 |---|---|---|
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
 | `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
-| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, MiniSynth, Transistor Bass, 3x Osc; other instruments play a built-in synth for now |
+| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, automation, the effects (as Pocket effects), MiniSynth, Transistor Bass, 3x Osc and GMSynth; other instruments play a built-in synth for now |
 | `.mid` | any app | opened as a project |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
@@ -21,9 +21,10 @@ To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip w
 (.als)...** (Live 12 or Live 11, with the samples collected). Each export shows what did not go over: LYNX-only
 instruments and effects are rendered to audio or replaced in an `.flp`, and are not converted yet in an `.als`.
 
-**Layout style** (Settings, or View › Layout style): **Pattern workflow** (FL Studio-style, the default) or
-**Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist). Switching moves panels only;
-the project stays the same.
+**Layout style** (Settings, or View › Layout style): **Pattern workflow** (FL Studio-style, the default),
+**Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist, with a Clip View and a Device
+View) or **Simple workflow** (one window with the tracks and the timeline, for a first song; the setup wizard offers
+all three). Switching moves panels only; the project stays the same.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 
