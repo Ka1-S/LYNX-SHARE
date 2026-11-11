@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/KeyMap.h"
 #include "core/PianoRollScript.h"
 
 namespace prscript190
@@ -487,4 +488,14 @@ TEST (prscript190_fl_scripts_run_unmodified)
         ran += prscript190::done (r);
     }
     std::printf ("  FL Studio's own Piano roll scripts run unmodified: %d of 5\n", ran);
+}
+
+TEST (prscript190_run_last_script_key)
+{
+    // FL's key for Tools > Scripts > Run last script again (live capture): Ctrl+Alt+Y in the Piano roll
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.find ({ 'Y', ctrl | alt }, Context::pianoRoll, false) == "pianoRoll.runLastScript");
+    CHECK (map.find ({ 'Y', alt }, Context::pianoRoll, false) == "pianoRoll.flip");
+    CHECK (map.conflicts().empty());
 }
