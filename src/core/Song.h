@@ -1818,8 +1818,37 @@ struct MidiLink
     int cc = 0;       // 0..127
     int channel = -1; // MIDI channel 0..15, -1 = any
     AutomationTarget target;
+    // FL's "Remote control settings" (form TMIDIInputForm; round 190bt, docs/analise/REA_rodada190bt.md):
+    int port = -1;        // the input device's port number (Settings > MIDI), -1 = none; a link follows the devices
+                          // with exactly its port
+    std::string formula;  // mapping formula over `Input` (core/LinkFormula.h); "" = 1:1
+    bool smooth = false;  // "Smoothing" on
+    int smoothing = 469;  // the smoothing slider, -1024..1024 (FL's default 469: 3 poles, about 200 ms)
+    bool omni = false;    // "Omni": the link moves this control of the selected channel / mixer track
+
+    MidiLink() = default;
+    MidiLink (int controller, int midiChannel, AutomationTarget control) : cc (controller), channel (midiChannel), target (control) {}
+
+    // Has the link anything a plain learned link lacks?
+    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || omni; }
     bool operator== (const MidiLink&) const = default;
 };
+
+// The same hardware control (FL compares port, channel and controller number as one id).
+inline bool sameController (const MidiLink& a, const MidiLink& b) noexcept
+{
+    return a.port == b.port && a.channel == b.channel && a.cc == b.cc;
+}
+// "Omni" exists for a channel's controls (the selected channel) and a mixer slot's controls (the selected track).
+bool linkOmniAvailable (AutomationTargetKind kind) noexcept;
+// What an Omni link moves now: the same control on the selected channel / mixer track.
+AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int selectedMixerTrack) noexcept;
+// The other links (of other controls) that use the controller of `link`: FL's "conflicting assignments".
+int countLinkConflicts (const std::vector<MidiLink>& links, const MidiLink& link);
+// "Accept" of the Remote control settings window: the control's links become `edited` (entries without a controller,
+// cc < 0, are dropped: accepting a link with no controller removes it); with `removeConflicts`, the links of other
+// controls that use one of these controllers go. Returns how many conflicting links were removed.
+int setTargetLinks (std::vector<MidiLink>& links, const AutomationTarget& target, std::vector<MidiLink> edited, bool removeConflicts);
 
 // The links a controller move follows: the project's, then the global ones (settings, every project) whose target
 // and controller the project does not link itself (REA round 146: a project link overrides a global one).

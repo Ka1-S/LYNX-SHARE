@@ -76,6 +76,7 @@
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
+#include "ui/RemoteControl.h"
 #include "ui/ChannelSettings.h"
 #include "core/ClipLauncher.h"
 #include "ui/ClipGridComponent.h"
@@ -343,6 +344,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         juce::PopupMenu menu;
         menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (false); });
         menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (true); });
+        addMultilinkControlsItems (menu, engine);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
     };
 
@@ -720,6 +722,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         [this] { return mixer.getSelectedTrack(); },
         [this] (int track) { mixer.selectTrack (track); } });
     engine.setControllerSurface (controllerBridge.get());
+    // "Omni" links of mixer-slot controls follow the selected mixer track (round 190bt)
+    engine.selectedMixerTrackForLinks = [this] { return mixer.getSelectedTrack(); };
     setTypingPiano (typingPiano);
     refreshRecordOptionButtons();
     refreshToolbar();
@@ -865,6 +869,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     engine.setControllerSurface (nullptr); // (the controllers get their closing messages)
+    engine.selectedMixerTrackForLinks = nullptr;
+    closeRemoteControlSettings();
     gamepadInput.reset();
     if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
         detailView->releaseEditor();
@@ -4556,6 +4562,10 @@ void MainComponent::TempoDisplay::showMenu()
     menu.addSectionHeader (tr ("Tempo") + ": " + juce::String (bpm, 3) + " BPM");
     menu.addItem (tr ("Type value..."), [this, bpm] { ui::typeValue (*this, spec(), bpm, [this] (double v) { setBpm (v); }); });
     menu.addItem (tr ("Tempo tapper..."), [this] { showTap(); });
+    // FL's tempo menu (WheelMenu N80BPM...N160BPM; round 190bt): the fixed tempos 80 to 160 BPM
+    // (flat items after the tapper and before "Half", as FL's menu resource orders them)
+    for (int t = 80; t <= 160; t += 10)
+        menu.addItem (juce::String (t) + " BPM", [this, t] { setBpm ((double) t); });
     menu.addItem (tr ("Half ({0} BPM)", { juce::String (controls::halfTempo (bpm), 2) }), [this, bpm] { setBpm (controls::halfTempo (bpm)); });
     menu.addItem (tr ("Double ({0} BPM)", { juce::String (controls::doubleTempo (bpm), 2) }), [this, bpm] { setBpm (controls::doubleTempo (bpm)); });
     menu.addItem (tr ("Reset ({0})", { "130 BPM" }), [this] { setBpm (130.0); });

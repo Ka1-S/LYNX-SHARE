@@ -11,6 +11,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/LinkFormula.h"
 #include "core/Multilink.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
@@ -585,10 +586,28 @@ public:
     void setMultilink (bool on);
     bool isMultilinkOn() const noexcept { return multilink.has_value(); }
     int multilinkQueued() const noexcept { return multilink ? (int) multilink->targets.size() : 0; }
+    // the controls queued so far, in the order they were moved (round 190bt: "Link to controllers...")
+    std::vector<AutomationTarget> multilinkTargets() const { return multilink ? multilink->targets : std::vector<AutomationTarget>(); }
     // the switch's menu: "Link to controller" (false) / "Override global links" (true): no more controls are queued,
     // the controllers moved next link to the queued ones (as project links / as global links)
     void multilinkToControllers (bool global);
     void removeGlobalLink (const AutomationTarget& target);
+    // FL's "Remote control settings" / "Global link settings" windows (round 190bt). setTargetLinks: the control's
+    // project links become `links` (one undo step; core setTargetLinks). setGlobalLink: the control's global link
+    // becomes `link` (none: it is removed).
+    void setTargetLinks (const AutomationTarget& target, std::vector<MidiLink> links, bool removeConflicts);
+    void setGlobalLink (const AutomationTarget& target, const std::optional<MidiLink>& link);
+    // The controller message that arrived last (the windows' "Auto detect"); `serial` grows with every message.
+    struct ControllerSeen
+    {
+        int port = -1, channel = 0, cc = -1, value = 0;
+        std::uint64_t serial = 0;
+    };
+    ControllerSeen lastControllerSeen() const noexcept { return controllerSeen; }
+    // A controller message as if a device had sent it (tests, --snapshot). Message thread.
+    void injectControllerForTest (int cc, int channel, int value, int port = -1);
+    // "Omni" links follow the mixer's selected track: the mixer reports it here (-1 = unknown).
+    std::function<int()> selectedMixerTrackForLinks;
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
     std::vector<MidiLink> getGlobalLinks() const;
 
@@ -1022,12 +1041,25 @@ private:
     struct ControllerEvent
     {
         int cc = 0, channel = 0, value = 0;
+        int port = -1; // the input device's port number (Settings > MIDI; round 190bt), -1 = none
     };
     SpscQueue<ControllerEvent, 1024> controllerQueue; // MIDI thread -> UI (controllers)
     // the CCs a MIDI link (project or global) uses: they move their parameter and are not also played into the
     // selected channel's instrument (round 162); written by applyControllers, read by the MIDI thread
     std::array<std::atomic<std::uint64_t>, 2> linkedCcs {};
     AutomationTarget learning;
+    ControllerSeen controllerSeen;
+    // round 190bt: a link's compiled mapping formula, and the smoothing filters of the links being moved
+    std::map<std::string, linkformula::Formula> linkFormulas;
+    struct LinkSmoothing
+    {
+        MidiLink link;
+        float target = 0.0f;
+        linkformula::Smoother filter;
+    };
+    std::vector<LinkSmoothing> linkSmoothing;
+    double linkSmoothingClock = 0.0;
+    void stepLinkSmoothing (std::vector<std::pair<AutomationTarget, float>>& changes);
     std::optional<MultilinkSession> multilink;
     bool learningGlobal = false;
     bool controllerLearnTick = false; // a MIDI learn was waiting at this tick's applyControllers (round 190aw)

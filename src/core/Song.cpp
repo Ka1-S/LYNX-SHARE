@@ -424,12 +424,72 @@ std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, con
     for (const auto& g : global)
     {
         const auto overridden = std::any_of (project.begin(), project.end(), [&] (const MidiLink& p) {
-            return p.target == g.target || (p.cc == g.cc && (p.channel < 0 || g.channel < 0 || p.channel == g.channel));
+            return p.target == g.target || (p.cc == g.cc && p.port == g.port && (p.channel < 0 || g.channel < 0 || p.channel == g.channel));
         });
         if (! overridden && g.target.kind != AutomationTargetKind::none)
             out.push_back (g);
     }
     return out;
+}
+
+bool linkOmniAvailable (AutomationTargetKind kind) noexcept
+{
+    return kind == AutomationTargetKind::channelVolume || kind == AutomationTargetKind::channelPan || kind == AutomationTargetKind::channelParam
+        || kind == AutomationTargetKind::effectParam || kind == AutomationTargetKind::effectMix;
+}
+
+AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int selectedMixerTrack) noexcept
+{
+    auto t = link.target;
+    if (! link.omni || ! linkOmniAvailable (t.kind))
+        return t;
+    const auto channelControl = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                                || t.kind == AutomationTargetKind::channelParam;
+    const auto index = channelControl ? selectedChannel : selectedMixerTrack;
+    if (index >= 0)
+        t.index = index;
+    return t;
+}
+
+int countLinkConflicts (const std::vector<MidiLink>& links, const MidiLink& link)
+{
+    if (link.cc < 0)
+        return 0;
+    return (int) std::count_if (links.begin(), links.end(), [&] (const MidiLink& l) { return ! (l.target == link.target) && sameController (l, link); });
+}
+
+int setTargetLinks (std::vector<MidiLink>& links, const AutomationTarget& target, std::vector<MidiLink> edited, bool removeConflicts)
+{
+    edited.erase (std::remove_if (edited.begin(), edited.end(), [] (const MidiLink& l) { return l.cc < 0; }), edited.end());
+    for (auto& l : edited)
+        l.target = target;
+    int removed = 0;
+    if (removeConflicts)
+    {
+        const auto before = links.size();
+        links.erase (std::remove_if (links.begin(), links.end(),
+                                     [&] (const MidiLink& l) {
+                                         return ! (l.target == target)
+                                             && std::any_of (edited.begin(), edited.end(), [&] (const MidiLink& e) { return sameController (l, e); });
+                                     }),
+                     links.end());
+        removed = (int) (before - links.size());
+    }
+    // the control's links keep the place of its first one
+    const auto first = std::find_if (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == target; });
+    const auto at = (std::size_t) (first - links.begin());
+    std::vector<MidiLink> out;
+    for (std::size_t i = 0; i < links.size(); ++i)
+    {
+        if (i == at)
+            out.insert (out.end(), edited.begin(), edited.end());
+        if (! (links[i].target == target))
+            out.push_back (links[i]);
+    }
+    if (at >= links.size())
+        out.insert (out.end(), edited.begin(), edited.end());
+    links = std::move (out);
+    return removed;
 }
 
 int Song::findInitialValue (const AutomationTarget& target) const noexcept

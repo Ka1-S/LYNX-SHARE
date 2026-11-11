@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
+#include "ui/RemoteControl.h"
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
 
@@ -1700,10 +1701,14 @@ void addAutomationItem (juce::PopupMenu& menu, AudioEngine& engine, const Automa
     menu.addItem (tr ("Link to MIDI controller (move a knob on the controller)"), [&engine, target] {
         engine.learnMidiController (target);
     });
+    // FL's "Link to controller..." (round 190bt): the Remote control settings window, where the link is seen and
+    // edited (port, channel, controller, formula, smoothing); the item above stays the one-step way
+    menu.addItem (tr ("Link to controller..."), [&engine, target] { openRemoteControlSettings (engine, { target }, false); });
     // FL's "Override global link..." (form "Global link settings"): a link for every project, kept in the settings
     menu.addItem (tr ("Override global link... (for all projects: move a knob on the controller)"), [&engine, target] {
         engine.learnGlobalLink (target);
     });
+    menu.addItem (tr ("Override global link..."), [&engine, target] { openRemoteControlSettings (engine, { target }, true); });
 
     if (target.kind != AutomationTargetKind::tempo)
         addControllerLinkItems (menu, engine, target);

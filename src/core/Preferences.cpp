@@ -429,6 +429,9 @@ std::string MidiPrefs::toText() const
         // inputmpe=<member channels>|<bend range>|<device name> (issue #108; its own line: older versions skip it)
         if (i.mpe)
             out += "inputmpe=" + std::to_string (i.mpeMembers) + "|" + std::to_string (i.mpeBendRange) + "|" + i.name + "\n";
+        // inputport=<port>|<device name> (round 190bt; its own line: older versions skip it)
+        if (i.port >= 0)
+            out += "inputport=" + std::to_string (i.port) + "|" + i.name + "\n";
     }
     // controller=<controller type>|<device name> (round 190aw; only the devices whose type is not "detect")
     for (const auto& i : inputs)
@@ -442,9 +445,20 @@ std::string MidiPrefs::toText() const
     if (! clockInput.empty() || clockOffsetMs != 0)
         out += "clockin=" + std::to_string (clockOffsetMs) + "|" + clockInput + "\n";
     // link=<cc>|<channel>|<target kind>|<index>|<slot>|<param>
+    // linkset=<port>|<smoothing on>|<smoothing slider>|<formula> (round 190bt): the settings of the "link" line just
+    // above it, written only when the link has any (older versions skip the line and keep the plain link)
     for (const auto& l : globalLinks)
+    {
         out += "link=" + std::to_string (l.cc) + "|" + std::to_string (l.channel) + "|" + std::to_string (l.kind) + "|" + std::to_string (l.index)
                + "|" + std::to_string (l.slot) + "|" + std::to_string (l.param) + "\n";
+        if (l.hasSettings())
+        {
+            auto formula = l.formula;
+            std::replace (formula.begin(), formula.end(), '\n', ' ');
+            std::replace (formula.begin(), formula.end(), '\r', ' ');
+            out += "linkset=" + std::to_string (l.port) + "|" + (l.smooth ? "1" : "0") + "|" + std::to_string (l.smoothing) + "|" + formula + "\n";
+        }
+    }
     return out;
 }
 
@@ -453,6 +467,7 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
     MidiPrefs p;
     std::istringstream in (text);
     std::string line;
+    bool lastLinkKept = false; // (a "linkset" line belongs to the link line before it)
 
     while (std::getline (in, line))
     {
@@ -513,6 +528,27 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             i.mpeBendRange = std::clamp (toInt (trim (parts[1]), 48), 1, 96);
             p.setInput (i);
         }
+        else if (key == "inputport")
+        {
+            const auto parts = split (value, '|', 2);
+            if (parts.size() != 2 || parts[1].empty())
+                continue;
+            auto i = p.input (parts[1]);
+            i.name = parts[1];
+            i.port = std::clamp (toInt (trim (parts[0]), -1), -1, 255);
+            p.setInput (i);
+        }
+        else if (key == "linkset") // (the settings of the link read just before)
+        {
+            const auto parts = split (value, '|', 4);
+            if (parts.size() != 4 || ! lastLinkKept)
+                continue;
+            auto& l = p.globalLinks.back();
+            l.port = std::clamp (toInt (trim (parts[0]), -1), -1, 255);
+            l.smooth = trim (parts[1]) == "1";
+            l.smoothing = std::clamp (toInt (trim (parts[2]), 469), -1024, 1024);
+            l.formula = trim (parts[3]);
+        }
         else if (key == "output")
         {
             const auto parts = split (value, '|', 5);
@@ -546,7 +582,8 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             l.index = toInt (trim (parts[3]), 0);
             l.slot = toInt (trim (parts[4]), 0);
             l.param = toInt (trim (parts[5]), 0);
-            if (l.kind > 0 && l.kind <= 8) // AutomationTargetKind::channelVolume ... effectMix
+            lastLinkKept = l.kind > 0 && l.kind <= 8; // AutomationTargetKind::channelVolume ... effectMix
+            if (lastLinkKept)
                 p.globalLinks.push_back (l);
         }
     }
