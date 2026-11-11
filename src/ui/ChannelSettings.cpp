@@ -530,7 +530,7 @@ public:
         fruityDance = def.instrument == InstrumentKind::fruitydance;
         // round 168q: the engines that run FL's own files say so when this computer lacks them
         engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
-                          || (transistorBass && ! transistorBassDllUsable (def.samplePath))
+                          || (transistorBass && ! transistorBassIsFlm (def) && ! transistorBassDllUsable (def.samplePath)) // (FLM's build needs no file)
                           || (sawer && sawerReadTable (def.samplePath).empty());
         sytrus = def.instrument == InstrumentKind::sytrus;
         // DrumSynth Live: the patch on the key selected in FL's editor (raw FL values)

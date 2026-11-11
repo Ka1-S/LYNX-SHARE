@@ -11,6 +11,7 @@
 #include "core/DirectWave.h"
 #include "core/FlmEffects.h"
 #include "core/MiniSynth.h"
+#include "core/TransistorBass.h"
 #include "core/MissingFiles.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
@@ -360,6 +361,23 @@ bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// FLM's Transistor Bass → LYNX's Transistor Bass engine in FLM's build (F4, round 190u): the module is the desktop
+// plugin's "V1 legacy" engine at 1× oversampling inside its own note layer, with 13 knobs. The state is a desktop one
+// holding the equivalent patch (core/TransistorBass.h: transistorBassFlmState); the channel needs no file of an FL
+// installation.
+bool transistorBassState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    auto state = transistorBassFlmState (m.params);
+    if (state.empty() || ! transistorBassStateUsable (state))
+        return false;
+    c.instrument = InstrumentKind::transistorbass;
+    c.modelParams = { 1.0f }; // FLM's module around the engine (core/TransistorBass.h)
+    c.pluginState = std::move (state);
+    c.samplePath.clear();
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: Transistor Bass");
+    return true;
+}
+
 // The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
 // generator → the built-in synth, listed in the report until its engine is mapped, F4).
 ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
@@ -397,6 +415,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
     if (gen->type == flm::module::dwSampler && directWaveProgram (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::miniSynth && miniSynthState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::transistorBass && transistorBassState (ctx, *gen, c))
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;

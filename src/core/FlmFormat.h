@@ -40,8 +40,8 @@ struct Event
     std::uint32_t tick = 0;  // inside the clip, ticksPerBeat per beat
     double length = 0.0;     // beats
     int key = 0;             // MIDI key, kit sample index on drum lanes; < 0 on automation lanes
-    std::uint8_t velocity = 200; // byte 14 (INFERRED: velocity 0…255)
-    std::uint8_t pan = 127;      // byte 15 (INFERRED: 127 = centre)
+    std::uint8_t velocity = 200; // byte 14: the module's note-on velocity = byte / 255 (PROVEN-REA, round 190u)
+    std::uint8_t pan = 127;      // byte 15: pan = byte / 255 (PROVEN-REA; not imported yet)
     std::uint16_t value = 0x7FFF; // bytes 16–17: automation value 0…65535 (notes: INFERRED fine pitch, 0x7FFF = centre)
     std::uint8_t extra0 = 0, extra1 = 0; // bytes 18–19
 };
