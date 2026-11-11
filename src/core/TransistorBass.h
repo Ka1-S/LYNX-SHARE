@@ -40,6 +40,21 @@ bool transistorBassDllUsable (const std::string& path);
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument();
 
+// FL Studio Mobile's "Transistor Bass" module is the "V1 legacy" engine at 1× oversampling inside its own note layer
+// (REA spec of round 190n: monophonic stack of 16 keys, a note over a held one slides, releasing the top key slides
+// back to the one below, velocity ≥ 99/127 is an accent and has no level effect, balance pan, no sequencer, delay or
+// reverb, and none of the installation's data). A channel imported from a .flm asks for it with modelParams = { 1 }
+// (saved with the project).
+bool transistorBassIsFlm (const ChannelDef& channel) noexcept;
+// A state as the desktop plugin saves it (engine stream version 5, sequencer off, every program the given patch of
+// parameters 0…41), with the oversampling field (1, 2 or 4) and the engine (0 = "V1 legacy").
+std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling = 4, int engine = 0);
+// The state for FLM's module from its 14 parameters (PRMS, 0 = Enable): the equivalent desktop patch, oversampling 1.
+// Empty when there are fewer than 14 values.
+std::vector<std::uint8_t> transistorBassFlmState (const std::vector<float>& flmParams);
+// the oversampling field of a usable state (0 otherwise)
+int transistorBassOversampling (const std::vector<std::uint8_t>& state);
+
 // The designed page (round 168q): parameter `index` (0…41) of the edit program's working patch — its byte offset
 // in a usable state (−1 otherwise) — and the program's sequence for the sequence display.
 int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index);
@@ -95,6 +110,10 @@ struct RefOptions
 {
     double tempo = 0.0; // ProcessEvent 0 (≤ 0: never sent)
     int block = 512;    // host block (split at every event)
+    bool flm = false;   // FL Studio Mobile's module: RefNote::initVol is the note's velocity 0…1, no DLL needed
+    int flmPreroll = 0; // flm: samples the engine runs before the first note
+    int flmTail = -1;   // flm: samples the engine runs after the last note-off (−1: a quarter second)
+    int flmPanBlock = 0; // flm: samples per process call of FLM for the note-pan smoothing (0: 512)
 };
 
 // Renders `notes` from `state` with the recorded cycles of the DLL at `dll`. Interleaved stereo (2·length); empty if

@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#include "core/PreviewTempo.h"
+#include "engine/Transport.h"
+
 namespace lynx
 {
 PreviewPlayer::PreviewPlayer()
@@ -20,12 +23,13 @@ void PreviewPlayer::play (std::shared_ptr<const SampleData> sample, bool loop, f
         pendingLoop = loop;
         pendingGain = newGain;
         pendingBrowser = false;
+        pendingOnBeat = false;
         pendingEditor = forEditor;
         hasPending = true;
     }
 }
 
-void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float newGain)
+void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float newGain, bool onBeat)
 {
     std::shared_ptr<const SampleData> old;
     {
@@ -35,6 +39,7 @@ void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float
         pendingLoop = false;
         pendingGain = newGain;
         pendingBrowser = true;
+        pendingOnBeat = onBeat;
         pendingEditor = false;
         hasPending = true;
     }
@@ -56,7 +61,31 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
             gain = pendingGain;
             browser = pendingBrowser;
             editor = pendingEditor;
+            waitingForBeat = pendingOnBeat;
             position = 0.0;
+        }
+    }
+
+    // "Preview in time" (round 190aq): while the transport plays, the sample starts where the next beat is heard —
+    // inside this block, or it keeps waiting; a stopped transport (or none) starts it at once
+    int startAt = 0;
+    if (waitingForBeat)
+    {
+        const auto* t = transport;
+        if (t == nullptr || current == nullptr || ! t->playing.load (std::memory_order_relaxed))
+            waitingForBeat = false;
+        else
+        {
+            const auto wait = previewtempo::samplesToNextBeat (t->positionTicks.load (std::memory_order_relaxed), t->ticksPerSample(),
+                                                               syncLatency.load (std::memory_order_relaxed));
+            if (wait >= (double) buffer.getNumSamples())
+            {
+                playPosition.store (0.0, std::memory_order_relaxed); // (about to play: the Browser shows it as playing)
+                return;
+            }
+            startAt = juce::jlimit (0, buffer.getNumSamples() - 1, (int) std::lround (wait));
+            waitingForBeat = false;
+            beatStartCount.fetch_add (1, std::memory_order_relaxed);
         }
     }
 
@@ -79,7 +108,7 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
     kernel.setSpeed (rate);
     const auto half = (std::int64_t) kernel.halfWidth;
     const auto lastFrame = (std::int64_t) last;
-    for (int i = 0; i < buffer.getNumSamples() && position < last; ++i)
+    for (int i = startAt; i < buffer.getNumSamples() && position < last; ++i)
     {
         const auto whole = flrs::wholeFrames (position);
         const auto frac = position - (double) whole;

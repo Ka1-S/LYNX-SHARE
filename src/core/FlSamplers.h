@@ -10,11 +10,22 @@
 #include <vector>
 
 #include "core/FlpImport.h"
+#include "core/Fpc.h"
 
 namespace lynx
 {
 // FPC pads that have a sample (paths still with FL's variables, e.g. %FLStudioData%).
 std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& state);
+
+// An FPC channel (InstrumentKind::fpc, round 190q): the kit is its FL state in ChannelDef::pluginState, and
+// ChannelDef::zones holds the file of each layer that has a sample, in the state's order ("" = not found; only `path`
+// is used). The state keeps FL's own paths (with its variables), so it goes back to FL as it came.
+// The layers' paths as the state has them, one per entry of `zones`.
+std::vector<std::string> fpcLayerPaths (const fpc::Kit& kit);
+// Puts `kit` on the channel: its state, and each layer's file as `locate` finds it (none: the state's paths).
+void setFpcKit (ChannelDef& channel, const fpc::Kit& kit, const std::function<std::string (const std::string&)>& locate);
+// The pads the channel plays, on its files: not muted, with a file; with a pad soloed, only the soloed ones.
+std::vector<DrumPad> fpcChannelPads (const ChannelDef& channel);
 
 // DirectWave program: the zones (paths with FL's variables) and the amplitude envelope of the
 // first zone.

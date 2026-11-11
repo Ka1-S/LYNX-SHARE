@@ -18,6 +18,10 @@ namespace lynx::search
 struct SearchResult;
 struct FolderMatches;
 }
+namespace lynx::similarity
+{
+struct Result;
+}
 
 namespace lynx
 {
@@ -67,6 +71,7 @@ public:
     // The Browser's options menu (the button beside the search box, the panel menu): filter, folders, search index.
     void addViewItems (juce::PopupMenu& menu);
     void showViewMenu();
+    juce::PopupMenu buildViewMenu(); // (what showViewMenu shows)
     // The Sample browser window opens / closes from here (the main window sets it): View › Sample browser.
     std::function<void()> onToggleSampleBrowser;
     // The Sample browser window's content: a drag container holding a Browser of role `samples`; `wire` connects
@@ -97,6 +102,7 @@ public:
     // The sample preview volume slider on the preview strip (0..125%, engine.setPreviewVolume): follows the engine.
     void refreshPreviewVolume();
     void refreshRoots() { rebuildRoots(); } // (after Tools › Clipboard saved a file; round 181b)
+    void pluginDatabaseChanged() { rebuildTree(); } // (the Plugin database folder was changed in the file manager; round 190ba)
     void stopPreview(); // the strip's Play / Stop toggle beside it
     // F2 on a Plugin database entry: rename it (FL's renamed plugins, issue #11); false when no plugin is selected
     bool renameSelectedPlugin();
@@ -105,6 +111,11 @@ public:
     // state in words ("12,345 files in 678 folders, checked 14:03").
     void refreshSearchIndex (bool rebuild);
     juce::String searchIndexStatus() const;
+    // "Find similar samples" (round 190as, core/SampleSimilarity.h): the samples of this Browser's folders that sound
+    // most like `file`, most similar first, in the results list (the search box says "Similar to <name>"; Esc or
+    // another search leaves it). The first use starts the background analysis of the folders.
+    void findSimilar (const juce::File& file);
+    void findSimilarForSnapshot (const juce::File& file, const juce::File& folder); // --snapshot: waits for the answer
     // The search box has the keyboard: it gives it back to the main window (a click elsewhere, Esc, Enter).
     void leaveSearchBox();
     bool isTypingInSearch() const;
@@ -200,10 +211,20 @@ private:
     void runSearch (bool quiet = false); // quiet: the index changed, the results are replaced without "Searching..."
     void searchAnswered (const search::SearchResult& result, const juce::String& query, const juce::Array<juce::File>& scope);
     void indexStatusChanged();
+    void runSimilar (bool quiet);
+    void similarAnswered (const similarity::Result& result);
+    void similarStatusChanged();
+    juce::String similarLabel() const; // the search box's text while similar samples are listed
+    juce::Array<juce::File> similarScope() const;
     juce::String statusLine; // under the search box: indexing progress / what the search found
     void showNote (const juce::String& text); // a short note there (files copied in), gone after a few seconds
     juce::Rectangle<int> statusArea;
     void rebuildRoots();
+public:
+    // Where a file dialog for samples should start (round 190t, the Simple workflow's Sampler tile): FL's sample packs
+    // when FL Studio is installed, else the first folder the user added, else the Music folder. May not exist.
+    juce::File firstSampleFolder() const;
+private:
     void rebuildTree();
     static juce::File userFoldersFile();
     static juce::File starredFile();
@@ -250,6 +271,12 @@ private:
     std::shared_ptr<SearchShared> searcher;
     std::uint64_t searchId = 0;
     bool searchPartial = false;
+    struct SimilarShared; // the process's similarity worker (core/SampleSimilarity), shared by every Browser
+    std::shared_ptr<SimilarShared> similar;
+    juce::File similarTo; // the sample whose similar ones are listed (none: an ordinary search)
+    std::uint64_t similarId = 0;
+    bool similarPartial = false;
+    juce::uint32 similarAskedAt = 0;
     juce::TextEditor searchBox;
     class FocusWatcher; // a click outside the search box takes the keyboard back from it
     std::unique_ptr<FocusWatcher> focusWatcher;

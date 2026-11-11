@@ -4,11 +4,33 @@
 #include <cmath>
 #include <limits>
 
+#if (defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64)) && ! defined(LYNX_BREATH_SCALAR)
+ #include "core/Simd.h" // (x86 SSE, or NEON through sse2neon)
+ #define LYNX_BREATH_SIMD 1
+#else
+ #define LYNX_BREATH_SIMD 0
+#endif
+
 namespace lynx::vocal
 {
 namespace
 {
 constexpr double pi = 3.14159265358979323846;
+
+#if LYNX_BREATH_SIMD
+// The exactly rounded square root of four floats. Not _mm_sqrt_ps on ARM64: with SSE2NEON_PRECISE_SQRT (core/Simd.h)
+// sse2neon builds it from the reciprocal-square-root estimate and two Newton steps, which is not exactly rounded and
+// returns inf / NaN for inputs in the denormal range (a band's power while the voice has next to nothing there) —
+// round 190bb, a NaN in LYNX Tune's output on macOS arm64 only.
+inline __m128 exactSqrt (__m128 x) noexcept
+{
+ #if defined(__aarch64__) || defined(_M_ARM64)
+    return vreinterpretq_m128_f32 (vsqrtq_f32 (vreinterpretq_f32_m128 (x)));
+ #else
+    return _mm_sqrt_ps (x);
+ #endif
+}
+#endif
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -688,6 +710,170 @@ void Psola::process (const float* x, float* y, int channels) noexcept
                 y[c] *= g;
         }
         ws = 0.0f;
+    }
+}
+// ---------------------------------------------------------------------------------------------------------------------
+// Breath noise (round 190bb)
+
+void BreathNoise::prepare (double sampleRate) noexcept
+{
+    static_assert (sections == 4, "the white-noise power below is |H|^(2 * sections)");
+    static_assert (lanes >= maxBands && lanes % 4 == 0);
+    const auto fs = std::clamp (sampleRate > 0.0 ? sampleRate : 44100.0, 8000.0, 192000.0);
+    count = 0;
+    for (int b = 0; b < lanes; ++b)
+        b0[b] = a1[b] = a2[b] = scale[b] = weight2[b] = 0.0f;
+    constexpr double q = 1.875; // per section; four in a row are a third of an octave wide at −3 dB
+    for (int b = 0; b < maxBands; ++b)
+    {
+        const auto fc = 250.0 * std::exp2 ((double) b / 3.0);
+        if (fc > 0.42 * fs)
+            break;
+        // RBJ band-pass, 0 dB at the centre
+        const auto w0 = 2.0 * pi * fc / fs, alpha = std::sin (w0) / (2.0 * q), a0 = 1.0 + alpha;
+        b0[b] = (float) (alpha / a0);
+        a1[b] = (float) (-2.0 * std::cos (w0) / a0);
+        a2[b] = (float) ((1.0 - alpha) / a0);
+        centre[(std::size_t) b] = fc;
+        weight[(std::size_t) b] = std::pow (10.0, std::clamp (6.0 * std::log2 (fc / 2000.0), -18.0, 12.0) / 20.0);
+        // the power a unit-variance white noise keeps through the four sections: the mean of |H|^8 over 0 … Nyquist
+        const double B0 = b0[b], A1 = a1[b], A2 = a2[b];
+        double sum = 0.0;
+        constexpr int points = 4096;
+        for (int k = 0; k < points; ++k)
+        {
+            const auto w = pi * ((double) k + 0.5) / (double) points;
+            const auto c1 = std::cos (w), s1 = std::sin (w), c2 = std::cos (2.0 * w), s2 = std::sin (2.0 * w);
+            const auto nr = B0 * (1.0 - c2), ni = B0 * s2;               // b0 (1 − z^−2)
+            const auto dr = 1.0 + A1 * c1 + A2 * c2, di = -A1 * s1 - A2 * s2;
+            const auto h2 = (nr * nr + ni * ni) / (dr * dr + di * di);
+            sum += h2 * h2 * h2 * h2;
+        }
+        // (the generator below is uniform in −1 … 1: variance 1/3)
+        scale[b] = (float) (weight[(std::size_t) b] / std::sqrt (std::max (1e-30, sum / (double) points / 3.0)));
+        weight2[b] = (float) (weight[(std::size_t) b] * weight[(std::size_t) b]);
+        count = b + 1;
+    }
+    follow = (float) (1.0 - std::exp (-1.0 / (0.0015 * fs)));
+    reset();
+}
+
+void BreathNoise::reset() noexcept
+{
+    for (int k = 0; k < sections; ++k)
+        for (int b = 0; b < lanes; ++b)
+            v1[k][b] = v2[k][b] = n1[k][b] = n2[k][b] = 0.0f;
+    for (auto& p : power)
+        p = 0.0f;
+    rng = 0x9E3779B9u;
+}
+
+float BreathNoise::process (float voice, float gain) noexcept
+{
+    // nothing non-finite (or absurdly large) may enter the bank: its states would carry it on
+    if (! (std::abs (voice) < 1.0e6f))
+        voice = 0.0f;
+    if (! (gain > 0.0f && gain < 1.0e6f))
+        gain = 0.0f;
+    alignas (16) float v[lanes], nz[lanes];
+    for (int b = 0; b < lanes; ++b)
+    {
+        v[b] = voice;
+        nz[b] = 0.0f;
+    }
+    for (int b = 0; b < count; ++b) // an independent white noise per band
+    {
+        rng ^= rng << 13;
+        rng ^= rng >> 17;
+        rng ^= rng << 5;
+        nz[b] = (float) ((double) rng / 2147483647.5 - 1.0);
+    }
+#if LYNX_BREATH_SIMD
+    // four bands at a time (element-wise mul / add / sqrt only: the same samples as the plain loops below)
+    const auto fol = _mm_set1_ps (follow), zero = _mm_setzero_ps();
+    auto sumP = zero, sumW = zero;
+    for (int b = 0; b < lanes; b += 4)
+    {
+        const auto B0 = _mm_load_ps (b0 + b), A1 = _mm_load_ps (a1 + b), A2 = _mm_load_ps (a2 + b);
+        auto x = _mm_load_ps (v + b), w = _mm_load_ps (nz + b);
+        for (int k = 0; k < sections; ++k)
+        {
+            auto bx = _mm_mul_ps (B0, x);
+            auto y = _mm_add_ps (bx, _mm_load_ps (v1[k] + b));
+            _mm_store_ps (v1[k] + b, _mm_add_ps (_mm_mul_ps (_mm_sub_ps (zero, A1), y), _mm_load_ps (v2[k] + b)));
+            _mm_store_ps (v2[k] + b, _mm_sub_ps (_mm_sub_ps (zero, bx), _mm_mul_ps (A2, y)));
+            x = y;
+            bx = _mm_mul_ps (B0, w);
+            y = _mm_add_ps (bx, _mm_load_ps (n1[k] + b));
+            _mm_store_ps (n1[k] + b, _mm_add_ps (_mm_mul_ps (_mm_sub_ps (zero, A1), y), _mm_load_ps (n2[k] + b)));
+            _mm_store_ps (n2[k] + b, _mm_sub_ps (_mm_sub_ps (zero, bx), _mm_mul_ps (A2, y)));
+            w = y;
+        }
+        auto pw = _mm_load_ps (power + b);
+        pw = _mm_add_ps (pw, _mm_mul_ps (fol, _mm_sub_ps (_mm_mul_ps (x, x), pw)));
+        _mm_store_ps (power + b, pw);
+        sumP = _mm_add_ps (sumP, pw);
+        sumW = _mm_add_ps (sumW, _mm_mul_ps (_mm_load_ps (weight2 + b), pw));
+        _mm_store_ps (nz + b, _mm_mul_ps (w, _mm_mul_ps (_mm_load_ps (scale + b), exactSqrt (_mm_max_ps (zero, pw)))));
+    }
+    alignas (16) float sp[4], sw[4];
+    _mm_store_ps (sp, sumP);
+    _mm_store_ps (sw, sumW);
+#else
+    float sp[4] {}, sw[4] {};
+    for (int k = 0; k < sections; ++k)
+    {
+        auto* z1 = v1[k];
+        auto* z2 = v2[k];
+        for (int b = 0; b < lanes; ++b)
+        {
+            const auto bx = b0[b] * v[b], y = bx + z1[b];
+            z1[b] = (0.0f - a1[b]) * y + z2[b];
+            z2[b] = (0.0f - bx) - a2[b] * y;
+            v[b] = y;
+        }
+        z1 = n1[k];
+        z2 = n2[k];
+        for (int b = 0; b < lanes; ++b)
+        {
+            const auto bx = b0[b] * nz[b], y = bx + z1[b];
+            z1[b] = (0.0f - a1[b]) * y + z2[b];
+            z2[b] = (0.0f - bx) - a2[b] * y;
+            nz[b] = y;
+        }
+    }
+    for (int b = 0; b < lanes; ++b)
+    {
+        power[b] += follow * (v[b] * v[b] - power[b]);
+        nz[b] *= scale[b] * std::sqrt (std::max (0.0f, power[b]));
+        sp[b & 3] += power[b];
+        sw[b & 3] += weight2[b] * power[b];
+    }
+#endif
+    float out = 0.0f;
+    for (int b = 0; b < count; ++b)
+        out += nz[b];
+    // never louder than the voice: where the tilt would lift the noise over the voice's own power (a bright sound taken
+    // for a voiced one: cymbals in a mix, a voiced fricative) the whole noise is turned down to it
+    const auto voicePower = (sp[0] + sp[1]) + (sp[2] + sp[3]);
+    const auto noisePower = gain * gain * ((sw[0] + sw[1]) + (sw[2] + sw[3]));
+    if (noisePower > voicePower)
+        gain *= std::sqrt (std::max (0.0f, voicePower) / noisePower);
+    const auto y = gain * out;
+    return std::isfinite (y) ? y : 0.0f; // (… nor leave it)
+}
+
+void BreathNoise::tidy() noexcept
+{
+    auto flush = [] (float& x) { if (! (std::abs (x) > 1e-25f)) x = 0.0f; };
+    for (int b = 0; b < lanes; ++b)
+    {
+        for (int k = 0; k < sections; ++k)
+        {
+            flush (v1[k][b]);
+            flush (v2[k][b]);
+        }
+        flush (power[b]);
     }
 }
 } // namespace lynx::vocal

@@ -353,19 +353,89 @@ struct TwoWayLaw
 {
     double base, up, down, lowCorner, highCorner, width;
 };
-TwoWayLaw twoWayLaw (double thr, double r, double knee, double attMs) noexcept
+//
+// round 190al [EXEC] (the same grid's 100 Hz and 8 kHz stairs and its pink-noise stairs): the reference's two-way works
+// in three bands. Pink noise comes out with one gain under about 90 Hz, another up to 2.5 kHz and a third above (up
+// to 4 dB apart), the steps between them following a fourth-order Linkwitz-Riley split (2.5 kHz: within 0.02 of the
+// transition), and its phase turns 360 degrees around 88 Hz and again around 2.5 kHz (measured −57 / −145 / −205 /
+// −257 degrees at 30 / 70 / 100 / 140 Hz and −480 / −534 / −587 at 1.8 / 2.5 / 3.5 kHz: two such splits in series).
+// Each band has the law above with its own constants: the 1 kHz stairs are the mid band's (the table of round 190v);
+// the high band's were fitted on the 8 kHz stairs (162 curves, 0.20 dB rms: its downward part starts 5.3 dB lower
+// and is steeper, 0.48 / 0.71 / 0.83); the low band's on the 100 Hz stairs, a tone that sits in both the low
+// (−8.5 dB) and the mid band (−4.1 dB).
+struct TwoWayBand
 {
+    double lowCorner, highCorner, up2, up4, up10, upTop, down2, down4, down10, downTop, base2, base4, base10, baseTop,
+           baseThr, baseAtt, width0, widthKnee;
+};
+constexpr int twoWayBandCount = 3; // mid, low, high
+constexpr double twoWayLowHz = 88.0, twoWayHighHz = 2500.0;
+constexpr TwoWayBand twoWayBands[twoWayBandCount] {
+    { -7.2144, 3.0058, 0.2458, 0.3632, 0.5006, 0.5935, 0.2497, 0.6238, 0.8442, 0.9853, -0.0066, -0.0137, -0.0487, -0.0617, 0.1750, 0.1680, 0.0, 1.0112 }, // mid
+    { -6.7508, 0.4605, 0.2400, 0.3538, 0.4901, 0.5810, 0.2523, 0.6282, 0.8564, 0.9994, 0.0595, 0.0678, 0.0614, 0.0778, 0.1724, 0.1717, 1.8325, 0.9783 }, // low
+    { -6.9355, -1.6324, 0.2469, 0.3653, 0.5069, 0.6009, 0.5046, 0.7605, 0.9150, 1.0000, -0.0417, -0.0635, -0.1086, -0.1377, 0.1671, 0.1755, 0.0, 1.0077 }, // high
+};
+TwoWayLaw twoWayLaw (double thr, double r, double knee, double attMs, int band = 0) noexcept
+{
+    const auto& b = twoWayBands[band];
     const auto s = 1.0 - 1.0 / r;
     TwoWayLaw w;
-    w.up = overSlope (s, 0.2400, 0.3538, 0.4901, 0.581);
-    w.down = overSlope (s, 0.2502, 0.6043, 0.8046, 0.939);
-    w.base = overSlope (s, 0.2329, 0.4537, 0.7586, 0.962)
-             - s * (0.1724 + 0.1717 * std::log10 (1.0 + std::max (0.0, attMs))) * (std::max (thr, -36.0) + 36.0);
-    w.lowCorner = thr - 6.3128;
-    w.highCorner = thr + 2.96;
-    w.width = std::sqrt (2.8694 * 2.8694 + 1.0195 * 1.0195 * knee * knee);
+    w.up = overSlope (s, b.up2, b.up4, b.up10, b.upTop);
+    w.down = overSlope (s, b.down2, b.down4, b.down10, b.downTop);
+    w.base = overSlope (s, b.base2, b.base4, b.base10, b.baseTop)
+             - s * (b.baseThr + b.baseAtt * std::log10 (1.0 + std::max (0.0, attMs))) * (std::max (thr, -36.0) + 36.0);
+    w.lowCorner = thr + b.lowCorner;
+    w.highCorner = thr + b.highCorner;
+    w.width = std::sqrt (b.width0 * b.width0 + b.widthKnee * b.widthKnee * knee * knee);
     return w;
 }
+
+// the three bands of a signal: fourth-order Linkwitz-Riley splits at 88 Hz and 2.5 kHz (their sum is the input
+// through the two splits' all-pass phase, as the reference's output is)
+struct TwoWaySplit
+{
+    Biquad lowLp[2], lowHp[2], highLp[2], highHp[2], lowAp;
+    void set (double sr) noexcept
+    {
+        constexpr double q = 0.7071067811865476, pi = 3.141592653589793;
+        for (int k = 0; k < 2; ++k)
+        {
+            lowLp[k].filter (sr, 0, twoWayLowHz, q);
+            lowHp[k].filter (sr, 1, twoWayLowHz, q);
+            highLp[k].filter (sr, 0, twoWayHighHz, q);
+            highHp[k].filter (sr, 1, twoWayHighHz, q);
+        }
+        const auto w = 2.0 * pi * std::min (twoWayHighHz, sr * 0.45) / sr, cw = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        lowAp.set (1.0 - alpha, -2.0 * cw, 1.0 + alpha, 1.0 + alpha, -2.0 * cw, 1.0 - alpha);
+    }
+    void reset() noexcept
+    {
+        for (auto* set : { lowLp, lowHp, highLp, highHp })
+            for (int k = 0; k < 2; ++k)
+                set[k].reset();
+        lowAp.reset();
+    }
+    // a block of both channels → band[0] mid, band[1] low, band[2] high (each band[b][channel] holds n samples)
+    template <typename Bands>
+    void process (const float* l, const float* r, int n, Bands& band) noexcept
+    {
+        const auto copy = [n] (const float* a, const float* b, auto& to) {
+            std::copy (a, a + n, to[0].data());
+            std::copy (b, b + n, to[1].data());
+        };
+        copy (l, r, band[1]);
+        for (auto* f : { &lowLp[0], &lowLp[1], &lowAp })
+            f->processBlock (band[1][0].data(), band[1][1].data(), n);
+        copy (l, r, band[2]);
+        for (auto* f : { &lowHp[0], &lowHp[1] })
+            f->processBlock (band[2][0].data(), band[2][1].data(), n);
+        copy (band[2][0].data(), band[2][1].data(), band[0]);
+        for (auto* f : { &highLp[0], &highLp[1] })
+            f->processBlock (band[0][0].data(), band[0][1].data(), n);
+        for (auto* f : { &highHp[0], &highHp[1] })
+            f->processBlock (band[2][0].data(), band[2][1].data(), n);
+    }
+};
 // the lift is measured down to 48 dB under its corner; below that it holds, and it never starts on silence (under
 // −90 dBFS: the original's first hit after digital silence comes out turned down, never lifted — round tp172b3)
 constexpr double twoWayLiftSpanDb = 48.0;
@@ -597,6 +667,15 @@ double staticGainDb (const EffectParams& p, double inputDb)
         // to 3.9 dB as the attack nears the release (0.5 dB at 10 / 200 ms, 2 dB at 100 / 200 ms, measured)
         const auto rho = att * def.attackScale / std::max (0.5, releaseMs (p[release]) * def.releaseScale);
         inputDb -= std::min (3.9, 4.0 * std::pow (rho, 0.55));
+        // round 190al: the curve of a 1 kHz tone, as the reference was measured: the mid band's law, plus the little
+        // of the tone that the 2.5 kHz split sends to the high band (2.5 %, lifted there by the upward part)
+        const auto rng = std::max (0.01, rangeDb (p[range]));
+        const auto band = [&] (int b, double amplitude) {
+            const auto law = twoWayLaw (thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]), att, b);
+            const auto g = std::clamp (twoWayGain (law, inputDb + 20.0 * std::log10 (amplitude)), -rng, std::min (rng, upwardCapDb));
+            return amplitude * dbToGain (g);
+        };
+        return 20.0 * std::log10 (band (0, 0.97504) + band (2, 0.02496));
     }
     return curveGain (def, inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
                       std::max (0.01, rangeDb (p[range])), att);
@@ -647,6 +726,9 @@ public:
     {
         for (auto& d : gainDelay)
             d.assign ((std::size_t) gainCapacity, 1.0f);
+        for (auto& b : bandGainDelay)
+            for (auto& d : b)
+                d.fill (1.0f);
         if (initial != nullptr)
         {
             // kept for prepare(), which configures again at the real rate: the latency stays the slot's (issue #113)
@@ -659,6 +741,8 @@ public:
     {
         sr = rate;
         dc.set (sr);
+        splitAudio.set (sr);
+        splitSide.set (sr);
         latencyMs = -1.0; // re-apply the delays
         configure (lastParams);
         reset();
@@ -684,6 +768,15 @@ public:
         for (auto& pk : peaks)
             pk.fill (0.0f);
         dc.reset();
+        splitAudio.reset();
+        splitSide.reset();
+        for (auto& b : bandDet)
+            for (auto& d : b)
+                d = {};
+        for (auto& b : bandGainDelay)
+            for (auto& d : b)
+                d.fill (1.0f);
+        bandGainPos = {};
     }
 
     int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
@@ -834,6 +927,17 @@ private:
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
+        if (sd.curve == Curve::variMu)
+        {
+            // round 190al [EXEC] (the reference's −40 → −6 dBFS step at attack 100 ms): the reduction starts at once and
+            // closes in on its value like a smoothed gain (−2.1 / −4.8 / −6.3 / −7.0 dB after 15 / 30 / 45 / 60 ms, towards
+            // −7.8), where the smoothed level did nothing for 45 ms and settled 1 dB short. At 30 ms and under, the
+            // smoothed level is the better match (10 ms: step and stairs within 0.22 dB; the 30 ms captures get worse
+            // with any share of it). At 100 ms a share of 0.6 is the most that makes no capture worse (pink noise
+            // loses beyond it); in between, by the logarithm of the attack
+            constexpr double fromMs = 30.0, toMs = 100.0, share = 0.6;
+            c.gainBlend = share * std::clamp (std::log (std::max (att, 1e-3) / fromMs) / std::log (toMs / fromMs), 0.0, 1.0);
+        }
         c.holdSamples = (int) (holdMs (p[hold]) * 0.001 * rate);
         c.window = sd.windowMs > 0.0 ? std::clamp ((int) (sd.windowMs * 0.001 * rate), 1, peakWindow) : 0;
         return c;
@@ -842,7 +946,7 @@ private:
     // one detector step: the level → the gain (dB) the compressor applies now
     double detect (int c, double level, const Ctx& x) noexcept
     {
-        auto& d = det[(std::size_t) c];
+        auto& d = detCur[c];
         if (x.window > 0) // the peak of the last `window` samples
         {
             auto& ring = peaks[(std::size_t) c];
@@ -919,10 +1023,15 @@ private:
     }
 
     // the gains of a run of side-chain samples (per channel, or linked), through the look-ahead's gain delay
-    double gains (const float* a, const float* b, int count, double link, int lag, const Ctx& x, float* outL, float* outR) noexcept
+    // (band > 0: round 190al's low / high band of the two-way style, with their own detectors and gain delays)
+    double gains (const float* a, const float* b, int count, double link, int lag, const Ctx& x, float* outL, float* outR,
+                  int band = 0) noexcept
     {
         double maxGr = 0.0;
         const bool both = link >= 0.999;
+        detCur = band == 0 ? det.data() : bandDet[(std::size_t) (band - 1)].data();
+        const auto capacity = band == 0 ? gainCapacity : bandGainCapacity;
+        auto& pos = band == 0 ? gainPos : bandGainPos[(std::size_t) (band - 1)];
         for (int i = 0; i < count; ++i)
         {
             const auto la = std::abs (a[i]), lb = std::abs (b[i]);
@@ -941,13 +1050,14 @@ private:
             }
             for (int c = 0; c < 2; ++c)
             {
-                auto& line = gainDelay[(std::size_t) c];
-                line[(std::size_t) gainPos] = g[c];
-                const auto rd = (gainPos - lag + gainCapacity) % gainCapacity;
-                (c == 0 ? outL : outR)[i] = line[(std::size_t) rd];
+                auto* line = band == 0 ? gainDelay[(std::size_t) c].data() : bandGainDelay[(std::size_t) (band - 1)][(std::size_t) c].data();
+                line[pos] = g[c];
+                const auto rd = (pos - lag + capacity) % capacity;
+                (c == 0 ? outL : outR)[i] = line[rd];
             }
-            gainPos = (gainPos + 1) % gainCapacity;
+            pos = (pos + 1) % capacity;
         }
+        detCur = det.data();
         return maxGr;
     }
 
@@ -1074,7 +1184,48 @@ private:
         }
         const auto detLink = ms ? 0.0 : link; // mid / side: each detector on its own channel
         double maxGr = 0.0;
-        if (factor == 1)
+        if (defOf (p).curve == Curve::twoWay)
+        {
+            // round 190al: the measured two-way law works in three bands (at the base rate; with oversampling on, the
+            // summed bands go through the oversampler for the character stage and the same latency)
+            auto x = context (p, sr);
+            const auto att = attackMs (p[attack]);
+            const auto bandLag = std::clamp ((int) std::lround ((latencyMs - la) * 0.001 * sr), 0, bandGainCapacity - 1);
+            // (the detector's signal is the audio itself unless a side-chain option or the look-ahead sets them apart:
+            // then one split serves both)
+            const bool own = ! std::equal (sideL.begin(), sideL.begin() + n, wl.begin()) || ! std::equal (sideR.begin(), sideR.begin() + n, wr.begin());
+            if (own)
+                splitSide.process (sideL.data(), sideR.data(), n, bandSide);
+            splitAudio.process (wl.data(), wr.data(), n, bandAudio);
+            const auto& side = own ? bandSide : bandAudio;
+            std::fill (wl.begin(), wl.begin() + n, 0.0f);
+            std::fill (wr.begin(), wr.begin() + n, 0.0f);
+            for (int b = 0; b < twoWayBandCount; ++b)
+            {
+                x.twoWay = twoWayLaw (x.thr, x.rat, x.kn, att, b);
+                maxGr = std::max (maxGr, gains (side[(std::size_t) b][0].data(), side[(std::size_t) b][1].data(), n, detLink, bandLag, x,
+                                                gl.data(), gr.data(), b));
+                if (ms)
+                    routeMs (mode, gl.data(), gr.data(), n);
+                for (int i = 0; i < n; ++i)
+                {
+                    wl[(std::size_t) i] += bandAudio[(std::size_t) b][0][(std::size_t) i] * gl[(std::size_t) i];
+                    wr[(std::size_t) i] += bandAudio[(std::size_t) b][1][(std::size_t) i] * gr[(std::size_t) i];
+                }
+            }
+            if (factor == 1)
+                for (int i = 0; i < n; ++i)
+                {
+                    wl[(std::size_t) i] = stage (wl[(std::size_t) i], makeup, ch, pre, drv);
+                    wr[(std::size_t) i] = stage (wr[(std::size_t) i], makeup, ch, pre, drv);
+                }
+            else
+                for (int c = 0; c < 2; ++c)
+                    os[(std::size_t) c].process (c == 0 ? wl.data() : wr.data(), n, [&] (float v) noexcept {
+                        return stage (v, makeup, ch, pre, drv);
+                    });
+        }
+        else if (factor == 1)
         {
             maxGr = gains (sideL.data(), sideR.data(), n, detLink, lag, context (p, sr), gl.data(), gr.data());
             if (ms)
@@ -1204,6 +1355,14 @@ private:
     bool scEqOn = false;
     std::array<Detector, 2> det {};
     std::array<std::array<float, peakWindow>, 2> peaks {};
+    // round 190al: the two-way style's low and high bands (the mid band uses the detectors and gain delay above)
+    static constexpr int bandGainCapacity = 8192; // the look-ahead at the base rate (20 ms at 192 kHz), with room
+    Detector* detCur = det.data();
+    std::array<std::array<Detector, 2>, 2> bandDet {};
+    std::array<std::array<std::array<float, bandGainCapacity>, 2>, 2> bandGainDelay {};
+    std::array<int, 2> bandGainPos {};
+    TwoWaySplit splitAudio, splitSide;
+    std::array<std::array<std::array<float, maxBlock>, 2>, twoWayBandCount> bandSide {}, bandAudio {};
     DcBlock dc;
     const float* scL = nullptr;
     const float* scR = nullptr;

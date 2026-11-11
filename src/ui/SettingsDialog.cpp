@@ -632,7 +632,7 @@ public:
         // FL's order: device pages first, then the app, then the project
         const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::audio, tr ("Audio") },     { SettingsPage::midi, tr ("MIDI") },
                                                                 { SettingsPage::general, tr ("General") }, { SettingsPage::theme, tr ("Theme") },
-                                                                { SettingsPage::files, tr ("Files") },
+                                                                { SettingsPage::files, tr ("Files") },     { SettingsPage::extras, tr ("LYNX extras") },
                                                                 { SettingsPage::project, tr ("Project") }, { SettingsPage::info, tr ("Info") } };
         for (const auto& [p, name] : order)
         {
@@ -646,6 +646,7 @@ public:
                 case SettingsPage::files: content = new FilesPage (engine, persistent, hooks.browserFoldersChanged, hooks.managePlugins); break;
                 case SettingsPage::project: content = new ProjectPage (engine, hooks); break;
                 case SettingsPage::info: content = new InfoPage (engine); break;
+                case SettingsPage::extras: content = makeExtrasPage (engine, hooks, persistent).release(); break;
             }
             tabs.addTab (name, theme::colour::bg2, content, true);
             pages.push_back (p);

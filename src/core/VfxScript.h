@@ -109,6 +109,9 @@ std::unique_ptr<Processor> makeProcessor (const std::vector<std::uint8_t>& flSta
 
 // Real time (the audio device runs) or offline (export, tests: the processor waits for every answer). Default offline.
 void setRealtime (bool on) noexcept;
+// Tests only: while held, the Python thread takes no jobs, so an answer cannot arrive inside the real-time budget however
+// the machine is scheduled; releasing wakes it and the waiting jobs are served.
+void holdScriptThread (bool hold) noexcept;
 // An export's tail (round 167e): the song has ended, so the scripts see the transport stopped (context.isPlaying is
 // False), as in FL, whose renders stop the song at its end (Tutorial 3's pulse, synced arpeggios: no new notes in
 // the remainder). Set by the export for the blocks after the music; off otherwise.

@@ -1,7 +1,10 @@
 #include "ui/SetupWizard.h"
 
+#include <array>
+
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/LayoutStyle.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
 #include "ui/FileChoosers.h"
@@ -42,10 +45,13 @@ class SetupWizard final : public juce::Component,
                           private juce::Timer
 {
 public:
-    SetupWizard (AudioEngine& e, std::function<void (const juce::String&)> language, std::function<void()> close)
+    SetupWizard (AudioEngine& e, std::function<void (const juce::String&)> language, std::function<void()> close, int style = 0,
+                 std::function<void (int)> styleChosen = {})
         : engine (e),
           onLanguage (std::move (language)),
           onClose (std::move (close)),
+          onLayoutStyle (std::move (styleChosen)),
+          initialStyle (juce::jlimit (0, layoutstyle::count - 1, style)),
           devices (e.getDeviceManager(), 0, 0, 2, 2, false, false, true, true)
     {
         auto& host = engine.getPluginHost();
@@ -60,8 +66,34 @@ public:
         intro.setMinimumHorizontalScale (1.0f);
         for (auto* c : std::initializer_list<juce::Component*> { &title, &intro, &languageLabel, &languageBox, &audioLabel, &devices, &flLabel,
                                                                  &flStatus, &foldersLabel, &folders, &addFolder, &removeFolder, &resetFolders,
-                                                                 &scanNow, &progressBar, &scanStatus, &scanAtStart })
+                                                                 &scanNow, &progressBar, &scanStatus, &scanAtStart, &workflowLabel })
             body.addAndMakeVisible (c);
+        // round 184a S17: the three layout styles, the current one (Pattern workflow on a first start) selected
+        for (int i = 0; i < layoutstyle::count; ++i)
+        {
+            auto& choice = styleChoices[(std::size_t) i];
+            choice.setRadioGroupId (184017);
+            choice.getProperties().set ("lynxRadio", true); // drawn as a radio dot (Theme.cpp drawTickBox)
+            choice.setToggleState (i == initialStyle, juce::dontSendNotification);
+            body.addAndMakeVisible (choice);
+            auto& note = styleNotes[(std::size_t) i];
+            // the Settings page's explanation starts with the style's name ("Simple workflow: one window..."); here the
+            // name is the button just above it, so the line keeps only what follows the colon
+            auto text = note.getText();
+            for (const auto* colon : { ":", "\xef\xbc\x9a" }) // (an ASCII or a full-width colon, as the translations use)
+                if (const auto at = text.indexOf (juce::String::fromUTF8 (colon)); at > 0 && at < 40)
+                {
+                    text = text.substring (at + juce::String::fromUTF8 (colon).length()).trim();
+                    text = text.substring (0, 1).toUpperCase() + text.substring (1);
+                    break;
+                }
+            note.setText (text, juce::dontSendNotification);
+            note.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            note.setJustificationType (juce::Justification::topLeft);
+            note.setMinimumHorizontalScale (1.0f);
+            note.setBorderSize (juce::BorderSize<int> (0, 26, 0, 0)); // under the name, past the radio dot
+            body.addAndMakeVisible (note);
+        }
         // the Linux AppImage (round 161): an applications-menu entry and the .lynx file type, on by default
         body.addChildComponent (menuEntry);
         menuEntry.setVisible (runningAsAppImage());
@@ -241,6 +273,15 @@ private:
         languageBox.setBounds (row.removeFromLeft (juce::jmin (220, row.getWidth())));
         r.removeFromTop (10);
 
+        workflowLabel.setBounds (r.removeFromTop (24));
+        for (int i = 0; i < layoutstyle::count; ++i)
+        {
+            styleChoices[(std::size_t) i].setBounds (r.removeFromTop (22));
+            styleNotes[(std::size_t) i].setBounds (r.removeFromTop (textHeight (styleNotes[(std::size_t) i], w, 18)));
+            r.removeFromTop (2);
+        }
+        r.removeFromTop (8);
+
         audioLabel.setBounds (r.removeFromTop (24));
         devices.setBounds (r.getX(), r.getY(), w, 200); // its resized() sets its own height
         r.removeFromTop (juce::jmax (0, devices.getHeight() - 18)); // it ends with an empty row of its own
@@ -322,9 +363,20 @@ private:
         setBackgroundScanAtStart (scanAtStart.getToggleState());
     }
 
+    // The style chosen in the Workflow list (0 Pattern, 1 Clip-launch, 2 Simple).
+    int chosenStyle() const
+    {
+        for (int i = 0; i < layoutstyle::count; ++i)
+            if (styleChoices[(std::size_t) i].getToggleState())
+                return i;
+        return initialStyle;
+    }
+
     void finishSetup()
     {
         saveFolders();
+        if (const auto style = chosenStyle(); style != initialStyle && onLayoutStyle) // (before close() deletes this)
+            onLayoutStyle (style);
         markSetupWizardDone();
         if (runningAsAppImage())
             setAppImageMenuEntry (menuEntry.getToggleState());
@@ -362,11 +414,22 @@ private:
     AudioEngine& engine;
     std::function<void (const juce::String&)> onLanguage;
     std::function<void()> onClose;
+    std::function<void (int)> onLayoutStyle;
+    int initialStyle = 0;
 
     juce::Component body; // the scrolling content
     juce::Viewport viewport;
     bool layingOut = false;
     juce::Label title, intro, flStatus, scanStatus;
+    SectionLabel workflowLabel { tr ("Workflow") };
+    std::array<juce::ToggleButton, layoutstyle::count> styleChoices { juce::ToggleButton (tr ("Pattern workflow (default)")),
+                                                                      juce::ToggleButton (tr ("Clip-launch workflow")),
+                                                                      juce::ToggleButton (tr ("Simple workflow")) };
+    std::array<juce::Label, layoutstyle::count> styleNotes {
+        juce::Label ({}, tr ("Pattern workflow: channel rack, patterns and a Playlist.")),
+        juce::Label ({}, tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.")),
+        juce::Label ({}, tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."))
+    };
     SectionLabel languageLabel { tr ("Language") }, audioLabel { tr ("Audio output") }, flLabel { "FL Studio" },
         foldersLabel { tr ("Plugin folders ({0})", { platform::pluginFormatNames() }) };
     juce::ComboBox languageBox;
@@ -388,8 +451,9 @@ private:
 class WizardOverlay final : public juce::Component
 {
 public:
-    WizardOverlay (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage, std::function<void()> close)
-        : wizard (engine, std::move (onLanguage), std::move (close))
+    WizardOverlay (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage, std::function<void()> close, int style,
+                   std::function<void (int)> onStyle)
+        : wizard (engine, std::move (onLanguage), std::move (close), style, std::move (onStyle))
     {
         setWantsKeyboardFocus (true);
         wizard.onIdealHeightChanged = [this] { resized(); };
@@ -443,15 +507,15 @@ private:
 } // namespace
 
 std::unique_ptr<juce::Component> makeSetupWizardContent (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage,
-                                                         std::function<void()> onClose)
+                                                         std::function<void()> onClose, int layoutStyle, std::function<void (int)> onLayoutStyle)
 {
-    return std::make_unique<SetupWizard> (engine, std::move (onLanguage), std::move (onClose));
+    return std::make_unique<SetupWizard> (engine, std::move (onLanguage), std::move (onClose), layoutStyle, std::move (onLayoutStyle));
 }
 
 std::unique_ptr<juce::Component> makeSetupWizardOverlay (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage,
-                                                         std::function<void()> onClose)
+                                                         std::function<void()> onClose, int layoutStyle, std::function<void (int)> onLayoutStyle)
 {
-    return std::make_unique<WizardOverlay> (engine, std::move (onLanguage), std::move (onClose));
+    return std::make_unique<WizardOverlay> (engine, std::move (onLanguage), std::move (onClose), layoutStyle, std::move (onLayoutStyle));
 }
 
 bool setupWizardDone()

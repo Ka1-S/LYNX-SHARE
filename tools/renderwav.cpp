@@ -288,7 +288,7 @@ int main (int argc, char** argv)
 
     for (std::size_t i = 0; i < song.channels.size(); ++i)
     {
-        static const char* kinds[] = { "kick", "snare", "hat", "clap", "synth", "sampler", "audio clip", "plugin", "controller", "sakura", "drumpad", "boobass", "drumsynth", "harmless", "sytrus", "harmor", "gms", "morphine", "ogun", "minisynth", "dx10", "kepler", "poizone", "fruit kick", "bassdrum", "toxic", "threeosc", "autogun", "transistor bass", "simsynth", "wasp", "plucked", "beepmap", "sawer", "granulizer" };
+        static const char* kinds[] = { "kick", "snare", "hat", "clap", "synth", "sampler", "audio clip", "plugin", "controller", "sakura", "drumpad", "boobass", "drumsynth", "harmless", "sytrus", "harmor", "gms", "morphine", "ogun", "minisynth", "dx10", "kepler", "poizone", "fruit kick", "bassdrum", "toxic", "threeosc", "autogun", "transistor bass", "simsynth", "wasp", "plucked", "beepmap", "sawer", "flkeys", "granulizer", "drumaxx", "slayer", "fruity dance", "directwave", "midi out", "patcher", "soundfont", "layer", "dashboard", "voltage", "vfx", "video player", "kepler exo", "wavetraveller", "fruity slicer", "slicex" };
         const auto k = (std::size_t) song.channels[i].instrument;
         std::printf ("  %2zu %-28s -> %s\n", i, song.channels[i].name.c_str(), k < std::size (kinds) ? kinds[k] : "?");
     }

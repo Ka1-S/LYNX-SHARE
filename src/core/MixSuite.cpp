@@ -3530,6 +3530,7 @@ private:
         c.mix = std::clamp ((double) p[classicMix], 0.0, 1.0);
         c.outputDb = emberclassic::outputDb (p[classicOutput]);
         c.measuredPunish = on (p[classicLaw]);
+        c.hotCoupling = on (p[classicHot]);
         if (! classicOn || ! (c == classicSet))
         {
             if (! classicOn)
@@ -3751,7 +3752,9 @@ const EffectInfo& emberInfo()
                                      { "Mod 4 source", 0.0f }, { "Mod 4 target", 0.0f }, { "Mod 4 amount", 0.5f },
                                      { "Effect law", 1.0f },
                                      // round 165 (Decapitator: Auto, the Classic law)
-                                     { "Classic auto", 1.0f }, { "Classic law", 1.0f } } };
+                                     { "Classic auto", 1.0f }, { "Classic law", 1.0f },
+                                     // round 190ar (the Classic voicing's high-drive coupling; old projects load it off)
+                                     { "Classic hot law", 1.0f } } };
     return info;
 }
 
@@ -4120,6 +4123,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case effectLaw: return on (v) ? "measured" : "static";
             case classicAuto: return onOff (v);
             case classicLaw: return on (v) ? "measured" : "round 136";
+            case classicHot: return on (v) ? "measured" : "round 187";
             case band2Style: case band3Style: case band4Style: case band5Style: case band6Style:
             {
                 static const char* names[] = { "tube", "tape", "transistor", "fuzz" };

@@ -1,7 +1,10 @@
 #include "core/RackRenderer.h"
+#include "core/Rack.h"
 #include "core/MixerOps.h"
 
+#include "core/FpcInstrument.h"
 #include "core/FruitySlicer.h"
+#include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
@@ -23,6 +26,8 @@
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
 #include "core/Patcher.h"
+
+#include <optional>
 #include "core/LoadTrace.h"
 #include "core/DynamicsSuite.h"
 #include "core/MixSuite.h"
@@ -61,7 +66,20 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
            && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
            && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
-           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition
+           && a.mpe == b.mpe;
+}
+
+// A hosted plugin's settings live in its running instance: the song only holds what was saved, and the instance is
+// given that once, when it is created. So the running instance stays with its own channel / slot whatever the song
+// says (an edit, an undo back to an older save: the instance tag is the same), but a channel / slot that merely sits
+// where another one was (another project opened over this one, a session joined, a channel replaced) keeps the
+// plugin running there only when it was saved with the same settings. Without this, a project opened over one with
+// the same plugin in the same place played, and then saved, the first project's settings (round 190az).
+template <typename T>
+bool sameHostedPlugin (const T& before, const T& now) noexcept
+{
+    return before.instance.id == now.instance.id || before.plugin.state == now.plugin.state;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
@@ -214,6 +232,31 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     if (kind == InstrumentKind::soundfont)
     {
         std::shared_ptr<Instrument> instrument = sf::makeInstrument (channel.samplePath.empty() ? nullptr : sf::FontLibrary::instance().get (channel.samplePath));
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
+        return instrument;
+    }
+
+    // Slicex (round 190l): FL's engine on the two decks' samples (deck A = the channel's sample, deck B = its one zone)
+    if (kind == InstrumentKind::slicex)
+    {
+        std::shared_ptr<const SampleData> a, b;
+        if (samples && ! channel.samplePath.empty())
+            a = samples (channel.samplePath);
+        if (samples && ! slicex::deckBPath (channel).empty())
+            b = samples (slicex::deckBPath (channel));
+        std::shared_ptr<Instrument> instrument = makeSlicexInstrument (std::move (a), std::move (b));
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
+        instrument->settleNew();
+        return instrument;
+    }
+
+    // FPC (round 190q): a zoned sampler per pad, as the channel-per-pad import builds them (no settleNew(), like those)
+    if (kind == InstrumentKind::fpc)
+    {
+        const loadtrace::Scope timing ("rack_zoned");
+        std::shared_ptr<Instrument> instrument = makeFpcInstrument (channel, samples);
         instrument->prepare (sampleRate);
         instrument->configure (channel, bpm);
         return instrument;
@@ -380,6 +423,21 @@ bool hostsPlugins (const PatcherDoc& doc) noexcept
     return false;
 }
 
+// round 190ap: a plugin the build must create anew (RackState::Factories::rebuildPlugin), alone or inside a Patcher
+bool rebuilds (const RackState::Factories& factories, const PluginRef& ref) { return factories.rebuildPlugin && factories.rebuildPlugin (ref); }
+bool rebuildsInside (const RackState::Factories& factories, const PatcherDoc& doc)
+{
+    if (! factories.rebuildPlugin)
+        return false;
+    for (const auto& n : doc.nodes)
+        if (n.generator ? (n.channel.instrument == InstrumentKind::plugin && rebuilds (factories, n.channel.plugin))
+                              || (n.channel.instrument == InstrumentKind::patcher && rebuildsInside (factories, n.channel.patcher))
+                        : (n.effect.kind == EffectKind::plugin && rebuilds (factories, n.effect.plugin))
+                              || (n.effect.kind == EffectKind::patcher && rebuildsInside (factories, n.effect.patcher)))
+            return true;
+    return false;
+}
+
 // What a Patcher builds its nodes with: the same builders as the rack's channels and slots
 patcher::Factories patcherFactories (double sampleRate, double bpm, const RackState::Factories& factories)
 {
@@ -492,6 +550,86 @@ std::vector<long> matchByInstance (const std::vector<T>& now, const std::vector<
 
 } // namespace
 
+ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampleRate, const RackState::Factories& factories)
+{
+    ClipAudio out;
+    out.sampleRate = sampleRate;
+    if (clipIndex >= song.playlist.size())
+        return out;
+    const auto& clip = song.playlist[clipIndex];
+    if (clip.kind != ClipKind::audio || clip.length <= 0 || clip.channel < 0 || clip.channel >= (int) song.channels.size())
+        return out;
+    const auto channel = (std::size_t) clip.channel;
+    const auto& def = song.channels[channel];
+    if (def.instrument != InstrumentKind::audioClip && def.instrument != InstrumentKind::sampler)
+        return out;
+    auto instrument = buildInstrument (def, sampleRate, song.bpm, factories);
+    if (instrument == nullptr)
+        return out;
+    if (clipShiftWanted (song, channel))
+    {
+        instrument->setClipShift (true);
+        instrument->prepareKeyShift (sampleRate);
+    }
+
+    // the note the Scheduler plays for the clip (Scheduler.cpp, audio clips), without its gain, pan, fades and declick
+    // (fadeShape bits 5 / 6: no declicker at either edge)
+    const auto secondsPerTick = 60.0 / (std::max (song.bpm, 1.0) * ppq);
+    const auto key = audioClipKey (clipIndex);
+    if (clip.pitch != 0.0f)
+        instrument->setNextClipPitch (clip.pitch);
+    if (clip.stretch != 1.0)
+        instrument->setNextClipStretch ((float) clip.stretch);
+    instrument->setNextClipFades (0.0f, (float) ((double) clip.length * secondsPerTick), 0.0f, 0.0f,
+                                  (std::uint16_t) ((clip.reversed ? 4 : 0) | 32 | 64), 0.0f, 0.0f);
+    instrument->noteOnAt (key, 1.0f, std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick));
+
+    const auto frames = (std::size_t) std::ceil ((double) clip.length * secondsPerTick * sampleRate);
+    out.left.assign (frames, 0.0f);
+    out.right.assign (frames, 0.0f);
+    constexpr std::size_t block = 512;
+    for (std::size_t at = 0; at < frames; at += block)
+        instrument->render (out.left.data() + at, out.right.data() + at, (int) std::min (block, frames - at), 1.0f, 1.0f);
+    instrument->noteOff (key);
+
+    // an audio clip voice plays its file at unity at FL's default channel volume (Instruments.cpp audioClipUnity):
+    // undo that so the file holds the clip's audio as it is
+    if (def.instrument == InstrumentKind::audioClip)
+    {
+        const auto unity = channelGain (audioClipUnityVolume);
+        for (std::size_t i = 0; i < frames; ++i)
+        {
+            out.left[i] *= unity;
+            out.right[i] *= unity;
+        }
+    }
+    return out;
+}
+
+// Round 190ao: the build keeps a hosted plugin's instance while the slot's plugin id is the same; an id no plugin has
+// makes it build that one again.
+namespace
+{
+constexpr const char* forgottenPluginId = "\x01reload";
+}
+
+bool forgetHostedPlugin (RackState& shape, int channel)
+{
+    if (channel < 0 || channel >= (int) shape.song.channels.size() || shape.song.channels[(std::size_t) channel].instrument != InstrumentKind::plugin)
+        return false;
+    shape.song.channels[(std::size_t) channel].plugin.id = forgottenPluginId;
+    return true;
+}
+
+bool forgetHostedPlugin (RackState& shape, int track, int slot)
+{
+    if (track < 0 || track >= (int) shape.song.mixer.size() || slot < 0 || slot >= (int) shape.song.mixer[(std::size_t) track].effects.size()
+        || shape.song.mixer[(std::size_t) track].effects[(std::size_t) slot].kind != EffectKind::plugin)
+        return false;
+    shape.song.mixer[(std::size_t) track].effects[(std::size_t) slot].plugin.id = forgottenPluginId;
+    return true;
+}
+
 std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const RackState* previous,
                                                    double sampleRate,
@@ -532,8 +670,14 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             && (kind != InstrumentKind::fruityslicer
                 || (previous->song.channels[p].samplePath == channel.samplePath
                     && previous->song.channels[p].pluginState == channel.pluginState))
+            && (kind != InstrumentKind::slicex // (its state is taken live; its samples are the instrument's)
+                || (previous->song.channels[p].samplePath == channel.samplePath && previous->song.channels[p].zones == channel.zones
+                    && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
+            && (kind != InstrumentKind::fpc // (the kit and its files: a new instrument)
+                || (previous->song.channels[p].zones == channel.zones && previous->song.channels[p].pluginState == channel.pluginState
+                    && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
                 || (previous->song.channels[p].zones == channel.zones && previous->song.channels[p].modelParams == channel.modelParams
                     && previous->song.channels[p].pluginState == channel.pluginState && previous->sampleRate == sampleRate))
@@ -558,7 +702,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
-                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin))))
+                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin)
+                    && sameHostedPlugin (previous->song.channels[p], channel))))
         {
             state->instruments.push_back (previous->instruments[p]);
             state->instruments.back()->configure (channel, song.bpm);
@@ -570,7 +715,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             const auto* old = previous != nullptr && p < previous->instruments.size() ? previous->instruments[p].get() : nullptr;
             if (old != nullptr && previous->song.channels[p].instrument == kind && previous->sampleRate == sampleRate
-                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher)
+                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher) && ! rebuildsInside (factories, channel.patcher)
                 // a node's latency moved since its delay compensation was planned: build it again (issue #113)
                 && (patcher::graphOf (previous->instruments[p].get()) == nullptr
                     || ! patcher::graphOf (previous->instruments[p].get())->latencyStale (&channel.patcher)))
@@ -579,7 +724,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 state->instruments.back()->configure (channel, song.bpm);
                 continue;
             }
-            const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher) ? nullptr : old;
+            const auto* kept = (old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher)) || rebuildsInside (factories, channel.patcher)
+                                   ? nullptr
+                                   : old;
             state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept));
             state->instruments.back()->configure (channel, song.bpm);
             continue;
@@ -599,6 +746,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         {
             instrument->setFastDeclick (song.fastDeclick);
             instrument->setPanTriangular (song.panTriangular);
+            instrument->setFlWrapperVelocity (song.flPluginLevels);
         }
     prepareKeyShifts (keyShiftLater, sampleRate);
 
@@ -666,7 +814,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
-                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin)))
+                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)
+                        && sameHostedPlugin (previous->song.mixer[pt].effects[pi], slots[i])))
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
@@ -682,13 +831,15 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                                       ? previous->effects[pt][pi].get()
                                       : nullptr;
                 if (old != nullptr && previous->sampleRate == sampleRate
-                    && patcher::sameStructure (previous->song.mixer[pt].effects[pi].patcher, slots[i].patcher)
+                    && patcher::sameStructure (previous->song.mixer[pt].effects[pi].patcher, slots[i].patcher) && ! rebuildsInside (factories, slots[i].patcher)
                     && patcher::acceptValues (previous->effects[pt][pi].get(), slots[i]))
                 {
                     state->effects[t].push_back (previous->effects[pt][pi]);
                     continue;
                 }
-                const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher) ? nullptr : old;
+                const auto* kept = (old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher)) || rebuildsInside (factories, slots[i].patcher)
+                                       ? nullptr
+                                       : old;
                 std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept);
                 effect->prepare (sampleRate);
                 state->effects[t].push_back (std::move (effect));
@@ -706,7 +857,11 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             if (song.mixer[t].effects[i].kind == EffectKind::plugin && state->effects[t][i] != nullptr)
             {
                 const auto source = song.mixer[t].effects[i].sidechain;
-                state->effects[t][i]->setSideInputActive (source >= 0 && source != (int) t && source < (int) song.mixer.size());
+                // (round 189j: with its Connections set, input 2 is fed unless inactive — its own input by default)
+                const auto connections = lynx::slotConnections (song, (int) t, song.mixer[t].effects[i]);
+                state->effects[t][i]->setConnections (connections);
+                state->effects[t][i]->setSideInputActive ((source >= 0 && source != (int) t && source < (int) song.mixer.size())
+                                                          || (connections.routed && connections.sideSource != -2));
             }
 
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
@@ -733,6 +888,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     state->buildAutomationTables();
     {
         const loadtrace::Scope timing ("pdc");
+        state->lowLatencyTracks = factories.lowLatencyTracks; // (round 190aq; empty in exports)
         state->buildPdc (previous);
     }
     state->buildMixerGraph();
@@ -775,7 +931,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             case InstrumentKind::simsynth: case InstrumentKind::plucked: case InstrumentKind::beepmap:
             case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
             case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
-            case InstrumentKind::wavetraveller:
+            case InstrumentKind::wavetraveller: case InstrumentKind::slicex:
+            case InstrumentKind::fpc: // (its pads have their own cut groups, inside)
             case InstrumentKind::plugin:
                 return false;
             default:
@@ -826,15 +983,37 @@ void RackState::buildMixerGraph()
     mixerInputs.assign ((std::size_t) tracks, {});
     sendTaps.clear();
     slotTap.assign ((std::size_t) tracks, {});
+    preTap.assign ((std::size_t) tracks, -1);
     std::vector<int> depth ((std::size_t) tracks, 0);
+
+    // the hosted effects' Connections (round 189j): an input 1 taken from another insert orders it like a sidechain
+    slotConnections.assign ((std::size_t) tracks, {});
+    for (int t = 1; t < tracks; ++t)
+    {
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            if (auto c = lynx::slotConnections (song, t, effects[i]); c.routed)
+            {
+                slotConnections[(std::size_t) t].resize (effects.size());
+                slotConnections[(std::size_t) t][i] = c;
+            }
+    }
+    auto sourceOf = [this, tracks] (int t, std::size_t i, bool side) {
+        const auto& list = slotConnections[(std::size_t) t];
+        const auto source = i < list.size() ? (side ? list[i].sideSource : list[i].mainSource) : -1;
+        return source > 0 && source < tracks && source != t ? source : -1;
+    };
 
     // who listens to each track via sidechain (the source goes in an earlier layer)
     std::vector<std::vector<int>> sidechainListeners ((std::size_t) tracks);
     for (int t = 1; t < tracks; ++t)
-        for (const auto& fx : song.mixer[(std::size_t) t].effects)
-            for (const auto source : { fx.sidechain, fx.sidechain2 })
+    {
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            for (const auto source : { effects[i].sidechain, effects[i].sidechain2, sourceOf (t, i, false), sourceOf (t, i, true) })
                 if (source > 0 && source < tracks && source != t)
                     sidechainListeners[(std::size_t) source].push_back (t);
+    }
 
     for (auto t : mixerOrder) // sources before destinations: the depth is already computed
     {
@@ -862,7 +1041,18 @@ void RackState::buildMixerGraph()
             // (a send at 0 is left out, unless an automation brings it up)
             if (send.target > 0 && send.target < tracks && send.target != t && (send.level > 0.0f || automation >= 0))
             {
-                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, -1, automation });
+                // a pre-fader send (round 190aq) pulls the insert's pre-fader tap, made on its first such send
+                auto tap = -1;
+                if (send.pre)
+                {
+                    if (preTap[(std::size_t) t] < 0 && (int) sendTaps.size() < maxSendTaps)
+                    {
+                        preTap[(std::size_t) t] = (int) sendTaps.size();
+                        sendTaps.push_back ({ t, -1, 0 });
+                    }
+                    tap = preTap[(std::size_t) t];
+                }
+                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, tap, automation, tap >= 0 });
                 depth[(std::size_t) send.target] = std::max (depth[(std::size_t) send.target], depth[(std::size_t) t] + 1);
             }
         }
@@ -976,8 +1166,11 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
         for (const auto& in : mixerInputs[(std::size_t) t])
             if (in.source > 0 && in.source < tracks && in.source != t)
                 edge (in.source, t);
-        for (const auto& fx : song.mixer[(std::size_t) t].effects)
-            for (const auto source : { fx.sidechain, fx.sidechain2 })
+        const auto& effects = song.mixer[(std::size_t) t].effects;
+        const auto& connections = slotConnections[(std::size_t) t];
+        for (std::size_t i = 0; i < effects.size(); ++i)
+            for (const auto source : { effects[i].sidechain, effects[i].sidechain2, i < connections.size() ? connections[i].mainSource : -1,
+                                       i < connections.size() ? connections[i].sideSource : -1 })
                 if (source > 0 && source < tracks && source != t)
                     edge (source, t);
     }
@@ -1023,6 +1216,11 @@ std::vector<int> RackState::currentLatencies() const
     for (std::size_t t = 0; t < effects.size(); ++t)
         for (std::size_t s = 0; s < effects[t].size(); ++s)
         {
+            if (lowlatency::bypassed (lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
+            {
+                out.push_back (0);
+                continue;
+            }
             const auto reported = effects[t][s]->latencySamples();
             const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
             out.push_back (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported);
@@ -1033,6 +1231,39 @@ std::vector<int> RackState::currentLatencies() const
 
 void RackState::buildPdc (const RackState* previous)
 {
+    // "Low latency while recording" (round 190aq): on the engine's live inserts, the active slots with a latency are
+    // bypassed; the plan below is made without them
+    lowLatencySlots.clear();
+    lowLatencySaved.clear();
+    if (! lowLatencyTracks.empty())
+    {
+        const auto all = currentLatencies(); // (no slot bypassed yet: the real latencies)
+        std::vector<lowlatency::SlotMask> masks (effects.size(), 0);
+        std::vector<std::vector<int>> saved (effects.size());
+        auto next = all.begin() + (std::ptrdiff_t) instruments.size();
+        auto any = false;
+        for (std::size_t t = 0; t < effects.size(); ++t)
+        {
+            saved[t].assign (effects[t].size(), 0);
+            for (std::size_t s = 0; s < effects[t].size(); ++s)
+            {
+                const auto latency = *next++;
+                if (t < lowLatencyTracks.size() && lowLatencyTracks[t] != 0 && s < 16 && latency > 0 && t < song.mixer.size()
+                    && s < song.mixer[t].effects.size() && song.slotActive (song.mixer[t].effects[s]))
+                {
+                    masks[t] = (lowlatency::SlotMask) (masks[t] | (1u << s));
+                    saved[t][s] = latency;
+                    any = true;
+                }
+            }
+        }
+        if (any)
+        {
+            lowLatencySlots = std::move (masks);
+            lowLatencySaved = std::move (saved);
+        }
+    }
+
     latencies = currentLatencies();
 
     std::vector<int> channelLatency (latencies.begin(), latencies.begin() + (std::ptrdiff_t) instruments.size());
@@ -1200,6 +1431,13 @@ void RackState::buildMidiRoutes()
         // MIDI Out on MIDI channel 1 would send them (or on the channel of a MIDI Out node on the way, round 162)
         if (song.channels[c].instrument == InstrumentKind::patcher)
         {
+            // a standalone MIDI Effect Rack (round 183c, decision R1): what its chains play goes to its children only
+            if (const auto* rk = rack::rackOf (song.channels[c].patcher); rk != nullptr && rk->kind == RackDoc::Kind::midiEffect)
+            {
+                if (! rk->children.empty() && ! patcher::vfxHostPorts (song.channels[c].patcher).empty())
+                    portEventChannels.push_back ((int) c);
+                continue;
+            }
             for (const auto& r : patcher::midiOutputsOf (song.channels[c].patcher, 0))
                 send (c, r.port, std::max (0, r.midiChannel), 0);
             // its VFX nodes' outputs cabled to "To LYNX" MIDI ports (round 165c): what they play goes out there
@@ -1677,6 +1915,27 @@ void panGains (float pan, float gain, float& left, float& right) noexcept
     right = gain * std::sin (angle) * 1.41421356f;
 }
 
+// A hosted plugin channel in a project with FL's levels (Song::flPluginLevels, REA_rodada190ad.md): Fruity Wrapper's
+// output gains are the host's ComputeLRVol of (the channel's pan, 2 × its volume curve) — FL's pan kernel (circular
+// cos/sin, or the project's triangular law: the louder side keeps v/√2, the other falls linearly), so the centre is
+// √2 × the curve and the side panned to 2 ×. The wrapper gets the pan as an integer, −64…64 (FL's renders: a channel
+// pan of 1.5 / 64 and 2.5 / 64 play as 1 / 64 and 2 / 64, 0.4 / 64 as the centre), so the pan moves in steps of 1 / 64.
+void flWrapperGains (float pan, float gain, bool triangular, float& left, float& right) noexcept
+{
+    const auto p = std::trunc (std::clamp (pan, -1.0f, 1.0f) * 64.0f) / 64.0f;
+    const auto vol = gain * 2.0f;
+    if (triangular)
+    {
+        const auto v = vol * 0.70710677f;
+        if (std::signbit (p))
+            left = v, right = (p + 1.0f) * v;
+        else
+            right = v, left = (1.0f - p) * v;
+    }
+    else
+        flvp::panLaw (p, vol, left, right);
+}
+
 float peakOf (const float* data, int n) noexcept
 {
     float peak = 0.0f;
@@ -1830,9 +2089,12 @@ void RackRenderer::resetUnitTimes() noexcept
 
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
+    lastPreGain.fill (std::numeric_limits<float>::quiet_NaN());
+    lowLatencySkipped.assign ((std::size_t) maxMixerTracks * maxEffectSlots, 0);
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
+    lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -2245,7 +2507,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     const auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], knobVolume) : knobVolume);
     const auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (knobPan + 1.0f) * 0.5f) * 2.0f - 1.0f : knobPan;
     float gl = 0.0f, gr = 0.0f;
-    panGains (pan, volume, gl, gr);
+    if (c.instrument == InstrumentKind::plugin && state.song.flPluginLevels)
+        flWrapperGains (pan, volume, state.song.panTriangular, gl, gr);
+    else
+        panGains (pan, volume, gl, gr);
 
     auto* l = channelBuffer (i, 0);
     auto* r = channelBuffer (i, 1);
@@ -2255,6 +2520,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
+    instrument.setChannelLevels (pan, volume); // (FPC's pads pan around the channel's pan, round 190q)
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
     // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)
@@ -2565,6 +2831,26 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
     }
 }
 
+void RackRenderer::connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept
+{
+    // a hosted effect's Connections (round 189j [EXEC FL 2026]): input 1 from the insert its index picks (processed
+    // earlier, like a sidechain source; silent when it is), input 2 the slot's own input when no source feeds it
+    auto sounding = [&] (int source) {
+        return source > 0 && source != track && source < (int) state.song.mixer.size() && (std::size_t) source < trackActive.size()
+               && trackActive[(std::size_t) source] != 0;
+    };
+    if (c.mainSource == -2)
+        effect.setMainInput (nullptr, nullptr);
+    else if (c.mainSource > 0)
+        effect.setMainInput (sounding (c.mainSource) ? trackBuffer (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackBuffer (c.mainSource, 1) : nullptr);
+    if (c.sideSource == -1)
+        effect.setSidechain (l, r);
+    else if (c.sideSource == -2)
+        effect.setSidechain (nullptr, nullptr);
+    else // (its index, when no side input source is picked: setSidechain fed the slot's own one, if any)
+        effect.setSidechain (sounding (c.sideSource) ? trackBuffer (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackBuffer (c.sideSource, 1) : nullptr);
+}
+
 void RackRenderer::runEffects (const RackState& state, int track, int n) noexcept
 {
     if (track >= (int) state.effects.size())
@@ -2609,16 +2895,40 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             continue;
         }
 
+        // "Low latency while recording" (round 190aq): a latency-adding slot on a live insert's path is skipped; when
+        // it comes back it starts from a reset state
+        if (const auto at = (std::size_t) track * maxEffectSlots + i; at < lowLatencySkipped.size())
+        {
+            if (lowlatency::bypassed (state.lowLatencySlots, track, (int) i))
+            {
+                lowLatencySkipped[at] = 1;
+                if (hasLiveMeters (slots[i].kind))
+                    clearMeters();
+                continue;
+            }
+            if (lowLatencySkipped[at] != 0)
+            {
+                lowLatencySkipped[at] = 0;
+                effects[i]->reset();
+            }
+        }
+
         // smart disable (like FL): an effect with silent input and output is skipped (plugins
         // after 4 s; built-ins after 1 s, which is well beyond their tail)
         const auto key = (std::size_t) track * maxEffectSlots + i;
         const auto isPlugin = slots[i].kind == EffectKind::plugin;
+        const auto* connections = isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
+                                      && state.slotConnections[(std::size_t) track][i].routed
+                                      ? &state.slotConnections[(std::size_t) track][i]
+                                      : nullptr; // (round 189j: a hosted effect's routed Connections)
         const auto hold = (int) (sampleRate * (isPlugin || slots[i].kind == EffectKind::patcher ? 4.0 : 1.0)); // (a Patcher may hold plugins)
 
         // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
         // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
         // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
+        // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
         if (key < smartDisable.size() && slots[i].smartDisable && ! (isPlugin && ! slots[i].plugin.allowSmartDisable)
+            && ! (connections != nullptr && connections->mainSource > 0)
             && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
             && slots[i].kind != EffectKind::newtime
             && slots[i].kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
@@ -2695,7 +3005,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
         // (processed later)
         if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
-            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo)
+            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo || connections != nullptr)
         {
             for (int o = 0; o < maxSlotSends; ++o)
             {
@@ -2749,6 +3059,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
+            if (connections != nullptr)
+                connect (state, *connections, *effects[i], track, l, r);
             timed (key, [&] { effects[i]->process (l, r, n, params, bpm); });
         }
         else
@@ -2757,6 +3069,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
+            if (connections != nullptr)
+                connect (state, *connections, *effects[i], track, l, r);
             const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
             timed (key, [&] { effects[i]->process (l, r, n, shown, bpm); });
         }
@@ -3000,6 +3314,18 @@ void RackRenderer::process (const RackState* state,
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
 
+            if (e.type == NoteEvent::Type::voiceProp) // issue #108: a played MPE note's bend / timbre / pressure
+            {
+                auto base = instrument.wheelCents();
+                if ((std::size_t) e.channel < state->song.channels.size())
+                {
+                    const auto& c = state->song.channels[(std::size_t) e.channel];
+                    base += c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f);
+                }
+                instrument.noteExpression (e.key, e.prop, e.velocity, base);
+                continue;
+            }
+
             auto& held = heldNotes[(std::size_t) std::min (e.channel, maxChannels - 1)];
             const auto bit = std::uint64_t { 1 } << (e.key & 63);
             const auto inRange = e.key >= 0 && e.key < 128;
@@ -3051,7 +3377,9 @@ void RackRenderer::process (const RackState* state,
                 const auto& c = def[(std::size_t) e.channel];
                 // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
                 // #9: the fine tune did nothing to the keys played live)
-                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents();
+                // (issue #108: an MPE note starts at its own bend, with its timbre and pressure as Mod X / Mod Y)
+                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents()
+                                   + (e.expression ? e.cents : 0.0f);
                 // FL's channel Mono / Porta (round 168l), as for the song's notes
                 const auto mode = polyMode (c, instrument);
                 const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps));
@@ -3073,6 +3401,11 @@ void RackRenderer::process (const RackState* state,
                 if (const auto from = on.glide ? on.glideFrom : 0.0f; cents != 0.0f || from != 0.0f)
                     instrument.setNextNoteExpression (0.0f, cents + from, false);
                 HostSlide::pendingGlide() = { on.glide ? on.glideFrom : 0.0f, on.glide ? glideSamples : 0.0f, false };
+                if (e.expression)
+                {
+                    instrument.setNextNoteModulation (e.modX, e.modY);
+                    instrument.setNextNoteFinePitch (e.cents);
+                }
                 instrument.noteOn (e.key, e.velocity);
                 HostSlide::pendingGlide() = {};
             }
@@ -3631,6 +3964,23 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                 e.release = p.release;
                 e.colour = (std::int8_t) (p.channel & 15);
                 e.port = (std::int16_t) p.port;
+                // a standalone MIDI Effect Rack (round 183c): its children play the notes, as a Layer's do
+                if (const auto* rk = (std::size_t) c < state.song.channels.size() ? rack::rackOf (state.song.channels[(std::size_t) c].patcher) : nullptr;
+                    rk != nullptr && rk->kind == RackDoc::Kind::midiEffect)
+                {
+                    for (const auto child : rk->children)
+                        if (const auto* childRack = child >= 0 && child < (int) state.song.channels.size() ? rack::rackOf (state.song.channels[(std::size_t) child].patcher) : nullptr;
+                            child >= 0 && child < (int) state.song.channels.size() && child != c
+                            && (childRack == nullptr || childRack->kind != RackDoc::Kind::midiEffect)) // (no MIDI rack to MIDI rack loops)
+                        {
+                            auto toChild = e;
+                            toChild.channel = child;
+                            toChild.port = -1;
+                            events.add (toChild);
+                            added = true;
+                        }
+                    continue;
+                }
                 events.add (e);
                 added = true;
             }
@@ -3819,6 +4169,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         meters->rollingLog.push (RollingAudioLog::Position::postEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
 
     MixerMatrix target; // without a mixer: unity
+    std::optional<MixerMatrix> mutedLevel; // issue #144: a muted Master's meter shows its level without the mute (FL)
 
     if (! song.mixer.empty())
     {
@@ -3827,8 +4178,24 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, 0, master.pan);
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], fader) : fader;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
-        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f }
-                              : mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        const auto level = mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : level;
+        if (master.muted && meters != nullptr && ! song.mutedInsertsSkip)
+            mutedLevel = level;
+    }
+
+    if (mutedLevel) // (read before the buffers are scaled; nothing is written)
+    {
+        const auto& m = *mutedLevel;
+        const auto* a = trackBuffer (0, 0);
+        const auto* b = trackBuffer (0, 1);
+        float pl = 0.0f, pr = 0.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            pl = std::max (pl, std::abs (m.ll * a[i] + m.rl * b[i]));
+            pr = std::max (pr, std::abs (m.rr * b[i] + m.lr * a[i]));
+        }
+        meters->accumulate (0, pl, pr);
     }
 
     lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);
@@ -3838,6 +4205,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         meters->accumulate (0, peakOf (left, numSamples), peakOf (right, numSamples));
         meters->capture.push (0, left, right, numSamples);
         meters->logTap.push (0, left, right, numSamples);
+        meters->loudness.push (left, right, numSamples, sampleRate); // (round 190am: one atomic load while it is off)
         if (chunkPlaying)
             meters->bounceTap.push (0, left, right, numSamples);
     }
@@ -4109,7 +4477,7 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         const auto active = tap >= 0 ? tapActive[(std::size_t) tap] : trackActive[(std::size_t) in.source];
         const auto& delays = state.sendDelays[(std::size_t) in.source];
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
-        if (pdcBypassNow && tap < 0 && state.bypassWhenIdle[(std::size_t) in.source] != 0)
+        if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
             delay = nullptr; // FL's "When recording or not playing": no compensation now
         auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackBuffer (in.source, 0);
         auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackBuffer (in.source, 1);
@@ -4142,7 +4510,62 @@ bool isSilentBlock (const float* l, const float* r, int n) noexcept
             return false;
     return true;
 }
+
+// Issue #144: a silenced insert (its mute, a solo elsewhere, a muted VCA) still shows its level, as in FL. Its effects
+// run for that only when nothing else can hear them: no slot reaches outside the insert (hardware I/O, controllers that
+// move other controls, sends into other inserts are cut below), so what comes out of LYNX stays the same.
+bool canMeterSilenced (const MixerTrack& track) noexcept
+{
+    for (const auto& slot : track.effects)
+        switch (slot.kind)
+        {
+            case EffectKind::hardwareInsert:
+            case EffectKind::formulaController:
+            case EffectKind::xyController:
+            case EffectKind::xyzController:
+            case EffectKind::controlSurface:
+            case EffectKind::peakController:
+                return false;
+            case EffectKind::patcher:
+                if (patcher::usesHardwareIo (slot.patcher))
+                    return false;
+                break;
+            default:
+                break;
+        }
+    return true;
+}
 } // namespace
+
+// Issue #144 (FL: a muted insert's meter keeps moving): the silenced insert's effects, EQ and fader without the mute,
+// into its meter. The insert stays inactive, so its routes (Master, sends) carry nothing. `cutEffectSends` (projects
+// from before round 190y): the sends its effects make (Fruity Send, Patcher, Transmitter...) are cut again and only
+// effects that stay inside the insert run (canMeterSilenced). Without it (Song::muteRunsEffects, FL): they are heard.
+void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept
+{
+    const auto& track = state.song.mixer[(std::size_t) t];
+    auto* l = trackBuffer (t, 0);
+    auto* r = trackBuffer (t, 1);
+    auto& last = lastMeterGain[(std::size_t) t];
+    if (meters == nullptr && track.effects.empty()) // (nothing to run, nobody looks)
+        return;
+    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
+    {
+        last = level;
+        return;
+    }
+
+    runEffects (state, t, n);
+    if (cutEffectSends && (std::size_t) t < state.slotTap.size())
+        for (const auto tap : state.slotTap[(std::size_t) t])
+            if (tap >= 0 && tap < RackState::maxSendTaps)
+                tapActive[(std::size_t) tap] = 0;
+    applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
+    if (meters == nullptr)
+        return;
+    last = applyMatrix (l, r, l, r, n, std::isnan (last.ll) ? level : last, level);
+    meters->accumulate (t, peakOf (l, n), peakOf (r, n));
+}
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
 {
@@ -4157,12 +4580,18 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     };
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
+    // issue #144: a silenced insert keeps its meter (FL): metered without being heard, while the meters are on
+    // (the LYNX option "Muted inserts don't process": the old cheap way, no effects, no meter)
+    const auto skip = silent && state.song.mutedInsertsSkip;
+    const auto meterSilenced = ! skip && silent && meters != nullptr && canMeterSilenced (track);
+    // FL (round 190y renders): a muted insert keeps running its effects, live and in exports; only its routes are cut
+    const auto runSilenced = ! skip && silent && state.song.muteRunsEffects;
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
     MixerMatrix level { 0.0f, 0.0f, 0.0f, 0.0f }; // the same without the mute (the "Post level and panning" tap)
 
-    if (! silent || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
+    if (! silent || meterSilenced || runSilenced || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
         const auto fader = liveLevel (state, &LiveLevels::mixerVolume, t, track.volume);
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, t, track.pan);
@@ -4196,12 +4625,26 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     auto* l = trackBuffer (t, 0);
     auto* r = trackBuffer (t, 1);
 
-    if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
+    // pre-fader sends (round 190aq): the insert's signal before its fader goes to its tap, with the mute as a ramp
+    const auto preTap = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1;
+    auto& lastPre = lastPreGain[(std::size_t) t];
+    const auto preTarget = silent ? 0.0f : 1.0f;
+    const auto preFading = preTap >= 0 && ! std::isnan (lastPre) && lastPre > 0.0f; // (still heard: its mute ramps out)
+
+    if (silent && from == zero && taps == 0 && ! preFading) // (a muted insert being recorded still runs its effects for the take)
     {
+        if (runSilenced)
+            runSilencedTrack (state, t, n, level, meters, false);
+        else if (meterSilenced)
+            runSilencedTrack (state, t, n, level, meters, true);
+        else
+            lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
     }
+    lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
 
     tap (RecordSource::externalAndMixer, l, r);
 
@@ -4213,6 +4656,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
         last = target;
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return;
@@ -4230,6 +4674,26 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
             lastLevel = applyMatrix (l, r, dest.first, dest.second, n, fromLevel, level);
         }
+    if (preTap >= 0 && preTap < RackState::maxSendTaps)
+    {
+        auto g = std::isnan (lastPre) ? preTarget : lastPre;
+        if (g > 0.0f || preTarget > 0.0f)
+        {
+            auto* pl = tapBuffer (preTap, 0);
+            auto* pr = tapBuffer (preTap, 1);
+            constexpr float step = 0.001f; // (the fader ramp's step, applyMatrix)
+            for (int i = 0; i < n; ++i)
+            {
+                g = preTarget > g ? std::min (preTarget, g + step) : std::max (preTarget, g - step);
+                pl[i] = l[i] * g;
+                pr[i] = r[i] * g;
+            }
+            tapActive[(std::size_t) preTap] = 1;
+        }
+        lastPre = g;
+    }
+    else
+        lastPre = preTarget;
     last = applyMatrix (l, r, l, r, n, from, target);
     tap (RecordSource::postTrack, l, r);
 

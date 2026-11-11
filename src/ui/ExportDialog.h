@@ -51,5 +51,7 @@ void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectNa
 // Panel only (for --snapshot mode; `format`: 0 WAV, 1 MP3, 2 OGG, 3 FLAC with loop/stem options set). Nothing is saved.
 std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int format = 0);
 // The panel of showExportDialogForTracks (for --snapshot).
+// The panel with round 190ap's additions in use (--versionsshot): two presets, one chosen, "One file per marker section" on.
+std::unique_ptr<juce::Component> makeExportPanelWithAdditions (AudioEngine& engine);
 std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, const std::vector<int>& tracks);
 } // namespace lynx

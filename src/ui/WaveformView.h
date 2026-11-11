@@ -111,8 +111,20 @@ public:
     void setReversed (bool reversed);
     void setCaption (const juce::String& text); // drawn top-left (empty: file name and length)
     void setEmptyText (const juce::String& text);
+    // Round 190w (FL 2026, What's New 20921 / 21138; [SHOT] flgap190w): the Sampler's start offset (a fraction of the
+    // region, in play order): the region before it is dimmed and a "Start" marker stands at it (none at 0); and the
+    // playback locator (the same fraction, -1 = none): a line with a short fading trail behind it.
+    void setStartOffset (float fractionOfRegion);
+    void setLocator (float fractionOfRegion);
+    float getLocator() const noexcept { return locator; }
+    std::function<void()> onClick; // a click on the display (the Sampler previews the sample from its start offset)
 
     void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent&) override
+    {
+        if (onClick != nullptr)
+            onClick();
+    }
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { repaint(); }
@@ -121,5 +133,9 @@ private:
     WaveformCache::Source source;
     float regionStart = 0.0f, regionEnd = 1.0f;
     bool reversed = false;
+    float startOffset = 0.0f, locator = -1.0f;
+    static constexpr int locatorTrail = 20; // px of the fading trail behind the locator (FL's)
+    float regionX (float fraction) const; // the x of a play-order fraction of the region
+    juce::Rectangle<int> locatorArea (float fraction) const;
 };
 } // namespace lynx::ui

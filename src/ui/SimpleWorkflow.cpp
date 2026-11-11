@@ -7,6 +7,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
+#include "ui/FinishDock.h"
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/QuickPick.h"
@@ -219,7 +220,12 @@ public:
         close.onClick = [this] { owner.closeByHand(); };
 
         voice.onClick = [this] { owner.addAudio (Kind::voice); };
-        instrument.onClick = [this] { owner.chooseInstrument (instrument); };
+        // one click gives a sound to play at once (LYNX's own synth); "More..." lists every instrument, plugin and Soundfont
+        instrument.onClick = [this] { owner.addDefaultInstrument(); };
+        instrument.rightReserve = 104;
+        moreInstruments.setButtonText (tr ("More..."));
+        moreInstruments.onClick = [this] { owner.chooseInstrument (moreInstruments); };
+        instrument.addAndMakeVisible (moreInstruments);
         drums.onClick = [this] { showStarterPage(); };
         sampler.onClick = [this] { owner.chooseSample(); };
         guitar.onClick = [this] { owner.addAudio (bassButton.getToggleState() ? Kind::bass : Kind::guitar); };
@@ -250,13 +256,7 @@ public:
         back.onClick = [this] { showTilesPage(); };
         useTempo.setButtonText (tr ("Use the suggested tempo"));
         useTempo.setToggleState (true, juce::dontSendNotification);
-        addDrums.setButtonText (tr ("Add drums"));
-        addDrums.onClick = [this] {
-            const auto picked = std::find_if (genreButtons.begin(), genreButtons.end(), [] (const auto& b) { return b->getToggleState(); });
-            const auto index = picked == genreButtons.end() ? 0 : (int) (picked - genreButtons.begin());
-            owner.addDrums (index == 0 ? std::string() : genreIds[(std::size_t) index], index != 0, useTempo.getToggleState());
-        };
-        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo, &addDrums })
+        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             addChildComponent (*c);
     }
 
@@ -272,16 +272,17 @@ public:
                 {
                     genreIds.push_back (genre->id);
                     genreButtons.push_back (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (genre->label.c_str()) + "  "
-                                                                                + tr ("{0} BPM", { juce::String (juce::roundToInt (genre->defaultTempo)) })));
+                                                                                + tr ("{0} BPM", { juce::String (loopstarter::suggestedTempo (*genre)) })));
                 }
-            for (auto& b : genreButtons)
+            // one click on a starter adds it (round 190t): nothing to pick first, nothing to confirm
+            for (std::size_t i = 0; i < genreButtons.size(); ++i)
             {
-                b->setClickingTogglesState (true);
-                b->setRadioGroupId (2184);
-                addChildComponent (*b);
+                genreButtons[i]->onClick = [this, i] { owner.addDrums (genreIds[i], i != 0, useTempo.getToggleState()); };
+                addChildComponent (*genreButtons[i]);
             }
-            genreButtons[genreButtons.size() > 1 ? 1 : 0]->setToggleState (true, juce::dontSendNotification);
         }
+        // the starter's tempo is for a project that has nothing yet: with tracks in it the tempo stays, unless asked
+        useTempo.setToggleState (simpletracks::isEmptySong (owner.engine.getSong()), juce::dontSendNotification);
         starterPage = true;
         updatePage();
     }
@@ -330,6 +331,7 @@ public:
             b.setBounds (r);
         };
         pair (voice, instrument);
+        moreInstruments.setBounds (instrument.getLocalBounds().removeFromRight (instrument.rightReserve).reduced (8, 0).withSizeKeepingCentre (instrument.rightReserve - 16, 28));
         pair (drums, sampler);
         auto g = row();
         guitar.setBounds (g);
@@ -338,12 +340,10 @@ public:
         guitarButton.setBounds (sw.removeFromLeft (sw.getWidth() / 2));
         bassButton.setBounds (sw);
 
-        // the starter-beat page: genres in three columns, the tempo switch and Add
+        // the starter-beat page: the tempo switch, then the starters in three columns (a click adds one)
         auto s = card().reduced (20, 14).withTrimmedTop (50);
-        auto bottom = s.removeFromBottom (34);
-        addDrums.setBounds (bottom.removeFromRight (140));
-        useTempo.setBounds (bottom.removeFromLeft (bottom.getWidth() - 10));
-        s.removeFromBottom (10);
+        useTempo.setBounds (s.removeFromTop (28));
+        s.removeFromTop (10);
         const auto columns = 3, buttonH = 32;
         const auto w = (s.getWidth() - (columns - 1) * gap) / columns;
         for (int i = 0; i < (int) genreButtons.size(); ++i)
@@ -381,7 +381,7 @@ private:
     {
         for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
             c->setVisible (! starterPage);
-        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo, &addDrums })
+        for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             c->setVisible (starterPage);
         for (auto& b : genreButtons)
             b->setVisible (starterPage);
@@ -391,7 +391,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, addDrums, guitarButton, bassButton;
+    juce::TextButton close, back, guitarButton, bassButton, moreInstruments;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -415,13 +415,97 @@ public:
 };
 } // namespace
 
+// the Playlist title bar's tools: "+ Add track" and "Finish" side by side
+class SimpleTitleTools final : public juce::Component,
+                               private juce::Timer
+{
+public:
+    SimpleTitleTools (juce::Component& a, juce::Component& b, std::function<juce::String()> statusText) : add (a), finish (b), text (std::move (statusText))
+    {
+        addAndMakeVisible (add);
+        addAndMakeVisible (finish);
+        // round 190t: LYNX backs the work up by itself; a beginner should see it ("Backed up 2 min ago")
+        status.setFont (theme::font (theme::type::small));
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        status.setJustificationType (juce::Justification::centredLeft);
+        status.setMinimumHorizontalScale (0.8f);
+        status.setInterceptsMouseClicks (false, false);
+        addAndMakeVisible (status);
+        refresh();
+        startTimer (2000);
+    }
+    static constexpr int statusWidth = 150;
+    static constexpr int width = 110 + 6 + 80 + 10 + statusWidth;
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        add.setBounds (r.removeFromLeft (110));
+        r.removeFromLeft (6);
+        finish.setBounds (r.removeFromLeft (80));
+        r.removeFromLeft (10);
+        status.setBounds (r);
+    }
+    void showForSnapshot (const juce::String& fixed)
+    {
+        stopTimer();
+        text = [fixed] { return fixed; };
+        refresh();
+    }
+    void refresh()
+    {
+        const auto now = text ? text() : juce::String();
+        if (now != status.getText())
+            status.setText (now, juce::dontSendNotification);
+    }
+
+private:
+    void timerCallback() override { refresh(); }
+
+    juce::Component& add;
+    juce::Component& finish;
+    std::function<juce::String()> text;
+    juce::Label status;
+};
+
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
 {
     instances.fetch_add (1, std::memory_order_relaxed);
     auto button = std::make_unique<AddTrackButton>();
     button->onClick = [this] { showChooser(); };
     addButton = std::move (button);
+    auto finish = std::make_unique<juce::TextButton> (tr ("Finish"));
+    finish->setTooltip (tr ("Master looks: give the whole song a finished sound"));
+    finish->setClickingTogglesState (false);
+    finish->onClick = [this] {
+        if (isFinishShowing())
+            hideFinish();
+        else
+            showFinish();
+    };
+    finishButton = std::move (finish);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, host.saveStatus);
 }
+
+void SimpleWorkflow::showFinish()
+{
+    if (finishDock == nullptr)
+        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps });
+    static_cast<FinishDock&> (*finishDock).refresh();
+    if (host.setSideDock)
+        host.setSideDock (finishDock.get(), FinishDock::width);
+    if (auto* b = dynamic_cast<juce::Button*> (finishButton.get()))
+        b->setToggleState (true, juce::dontSendNotification);
+}
+
+void SimpleWorkflow::hideFinish()
+{
+    if (isFinishShowing() && host.setSideDock)
+        host.setSideDock (nullptr, 0);
+    if (auto* b = dynamic_cast<juce::Button*> (finishButton.get()))
+        b->setToggleState (false, juce::dontSendNotification);
+}
+
+bool SimpleWorkflow::isFinishShowing() const noexcept { return finishDock != nullptr && finishDock->getParentComponent() != nullptr; }
 
 SimpleWorkflow::~SimpleWorkflow()
 {
@@ -433,7 +517,7 @@ void SimpleWorkflow::entered()
 {
     active = true;
     if (host.setTitleAccessory)
-        host.setTitleAccessory (addButton.get(), 110);
+        host.setTitleAccessory (titleTools.get(), SimpleTitleTools::width);
     songChanged();
 }
 
@@ -441,6 +525,7 @@ void SimpleWorkflow::left()
 {
     active = false;
     hideChooser();
+    hideFinish();
     if (host.setTitleAccessory)
         host.setTitleAccessory (nullptr, 0);
 }
@@ -449,6 +534,9 @@ void SimpleWorkflow::songChanged()
 {
     if (! active)
         return;
+    if (isFinishShowing())
+        static_cast<FinishDock&> (*finishDock).refresh();
+    static_cast<SimpleTitleTools&> (*titleTools).refresh();
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {
@@ -497,6 +585,18 @@ void SimpleWorkflow::showStarterPageForSnapshot()
     chooser->showStarterPage();
 }
 
+void SimpleWorkflow::clickStarterForSnapshot (int index)
+{
+    showStarterPageForSnapshot();
+    if (index >= 0 && index < (int) chooser->genreButtons.size() && chooser->genreButtons[(std::size_t) index]->onClick)
+        chooser->genreButtons[(std::size_t) index]->onClick();
+}
+
+void SimpleWorkflow::setStatusForSnapshot (const juce::String& text)
+{
+    static_cast<SimpleTitleTools&> (*titleTools).showForSnapshot (text);
+}
+
 bool SimpleWorkflow::add (simpletracks::Request request)
 {
     // tried on a copy first, so a refused track leaves no undo step behind
@@ -533,6 +633,19 @@ void SimpleWorkflow::addAudio (Kind kind)
     add (std::move (q));
 }
 
+void SimpleWorkflow::addDefaultInstrument()
+{
+    // LYNX's own synth (what an imported MIDI track plays too), ready for the computer keys and the on-screen keyboard
+    ChannelDef synth;
+    synth.instrument = InstrumentKind::synth;
+    simpletracks::Request q;
+    q.kind = Kind::instrument;
+    q.name = trackNameFor (q.kind);
+    q.channel = std::move (synth);
+    if (add (std::move (q)) && host.showKeys)
+        host.showKeys();
+}
+
 void SimpleWorkflow::chooseInstrument (juce::Component& tile)
 {
     // the Channel Rack's own generator list (the same instruments, plugins and Soundfonts)
@@ -544,7 +657,8 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
             q.kind = c.instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
             q.name = trackNameFor (q.kind);
             q.channel = std::move (c);
-            add (std::move (q));
+            if (add (std::move (q)) && host.showKeys)
+                host.showKeys();
         },
         [this] { chooseSample(); }, nullptr, chooser.get());
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (&tile), {});
@@ -552,12 +666,16 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
 
 void SimpleWorkflow::chooseSample()
 {
-    fileChooser = ui::makeFileChooser (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
+    // the dialog opens where there are samples to choose from (round 190t): the Browser's sample folder the first time,
+    // then the folder the last sample came from
+    const auto start = sampleFolder.isDirectory() ? sampleFolder : host.sampleFolder ? host.sampleFolder() : juce::File();
+    fileChooser = ui::makeFileChooser (tr ("Choose sample"), start, engine.getSampleLibrary().wildcard());
     ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                        [this] (const juce::FileChooser& fc) {
                            const auto file = fc.getResult();
                            if (! file.existsAsFile())
                                return;
+                           sampleFolder = file.getParentDirectory();
                            if (engine.getSampleLibrary().load (file.getFullPathName()) == nullptr)
                            {
                                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
@@ -641,6 +759,9 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         q.name = file.getFileNameWithoutExtension().toStdString();
         q.audioFile = file.getFullPathName().toStdString();
         q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        // a loop made for a tempo (ACID beats, or a tempo in its name that makes whole bars) keeps time: it lasts its
+        // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
+        q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar);
         q.start = start;
         add (std::move (q));
     }
@@ -669,10 +790,12 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
         pattern.lengthTicks = 16 * ticksPerStep;
     }
     q.pattern = std::move (pattern);
+    q.fillBars = 4; // the beat loops for four bars: long enough to play along and build on (round 190t)
     if (q.kit.empty())
         return;
     if (useTempo && steps)
-        q.bpm = plan.bpm; // (in the same undo step as the track)
+        q.bpm = loopstarter::suggestedTempo (sources, id); // the number on the starter's button, not the plan's random
+                                                           // one: the beat is in steps, so it follows (same undo step)
     add (std::move (q));
 }
 } // namespace lynx

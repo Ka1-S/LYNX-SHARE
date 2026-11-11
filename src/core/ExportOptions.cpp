@@ -1,6 +1,7 @@
 #include "core/ExportOptions.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -280,7 +281,8 @@ std::string toText (const Options& o)
       << "saveTempo=" << (o.saveTempo ? 1 : 0) << "\n"
       << "loopMarkers=" << (o.loopMarkers ? 1 : 0) << "\n"
       << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n"
-      << "masterLufs=" << o.masterLufs << "\n";
+      << "masterLufs=" << o.masterLufs << "\n"
+      << "sections=" << (o.sections ? 1 : 0) << "\n";
     return s.str();
 }
 
@@ -317,6 +319,7 @@ Options fromText (const std::string& text)
     o.loopMarkers = toInt (kv, "loopMarkers", d.loopMarkers ? 1 : 0) != 0;
     o.playlistMarkers = toInt (kv, "playlistMarkers", d.playlistMarkers ? 1 : 0) != 0;
     o.masterLufs = toDouble (kv, "masterLufs", d.masterLufs);
+    o.sections = toInt (kv, "sections", d.sections ? 1 : 0) != 0;
     return clamped (o);
 }
 
@@ -516,6 +519,238 @@ std::string stemFileName (const std::string& base, int number, const std::string
     while (! clean.empty() && (clean.back() == ' ' || clean.back() == '.'))
         clean.pop_back();
     return base + " - " + std::to_string (number) + (clean.empty() ? "" : " " + clean) + ext;
+}
+
+// --- one file per marker section (round 190ap) ----------------------------------------------------------------------
+namespace
+{
+std::string legalName (const std::string& name)
+{
+    std::string clean;
+    for (auto ch : name)
+        clean += std::string ("<>:\"/\\|?*").find (ch) != std::string::npos || (unsigned char) ch < 32 ? '_' : ch;
+    while (! clean.empty() && (clean.back() == ' ' || clean.back() == '.'))
+        clean.pop_back();
+    const auto first = clean.find_first_not_of (' ');
+    return first == std::string::npos ? std::string() : clean.substr (first);
+}
+
+std::string lowerAscii (std::string s)
+{
+    for (auto& c : s)
+        c = (char) std::tolower ((unsigned char) c);
+    return s;
+}
+} // namespace
+
+std::vector<Section> markerSections (const Song& song)
+{
+    std::vector<Section> out;
+    const auto end = song.songLength();
+    if (end <= 0)
+        return out;
+    // the plain markers inside the song, in order, one per place (the first of several at one tick names it)
+    std::vector<std::pair<std::int64_t, std::string>> cuts;
+    int index = 0;
+    for (const auto& m : song.markers())
+    {
+        ++index;
+        if (m.action != Marker::none || m.isSignature() || m.tick < 0 || m.tick >= end)
+            continue;
+        cuts.push_back ({ m.tick, m.name.empty() ? "Marker " + std::to_string (index) : m.name });
+    }
+    std::stable_sort (cuts.begin(), cuts.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+    cuts.erase (std::unique (cuts.begin(), cuts.end(), [] (const auto& a, const auto& b) { return a.first == b.first; }), cuts.end());
+    if (cuts.empty())
+        return out;
+    if (cuts.front().first > 0)
+        out.push_back ({ "Start", 0, cuts.front().first });
+    for (std::size_t i = 0; i < cuts.size(); ++i)
+        out.push_back ({ cuts[i].second, cuts[i].first, i + 1 < cuts.size() ? cuts[i + 1].first : end });
+    return out;
+}
+
+Song makeSectionSong (const Song& song, const Section& section)
+{
+    auto copy = song;
+    copy.loopStart = section.start;
+    copy.loopEnd = section.end;
+    return copy;
+}
+
+Options sectionOptions (Options o)
+{
+    o.range = Range::selection;
+    o.loops = 1;
+    o.sections = false;
+    return o;
+}
+
+bool exportsSections (const Song& song, const Options& o)
+{
+    return o.sections && o.range == Range::song && ! o.master && ! markerSections (song).empty();
+}
+
+std::string sectionBaseName (const std::string& base, int number, int count, const std::string& name)
+{
+    char digits[16];
+    std::snprintf (digits, sizeof (digits), count >= 100 ? "%03d" : "%02d", number);
+    const auto clean = legalName (name);
+    return base + " - " + digits + (clean.empty() ? "" : " " + clean);
+}
+
+int fileCount (const Song& song, const Options& o, const std::vector<int>& onlyTracks)
+{
+    const auto perRender = (int) formatsOf (o).size();
+    const auto parts = [&] (const Song& s, const Options& with) {
+        if (with.stems == Stems::none)
+            return 1;
+        const auto stems = with.stems == Stems::mixerTracks ? (int) stemTracks (s, onlyTracks).size() : (int) stemChannels (s, with.range).size();
+        return stems + (with.stemsIncludeMaster ? 1 : 0);
+    };
+    if (! exportsSections (song, o))
+        return parts (song, o) * perRender;
+    int files = 0;
+    for (const auto& section : markerSections (song))
+        files += parts (makeSectionSong (song, section), sectionOptions (o));
+    return files * perRender;
+}
+
+// --- export presets (round 190ap) -------------------------------------------------------------------------------------
+std::string cleanPresetName (const std::string& name)
+{
+    std::string s;
+    for (const auto c : name)
+        s += (c == '\t' || c == '\n' || c == '\r') ? ' ' : c;
+    const auto trim = [] (std::string& t) {
+        const auto first = t.find_first_not_of (' ');
+        t = first == std::string::npos ? std::string() : t.substr (first, t.find_last_not_of (' ') - first + 1);
+    };
+    trim (s);
+    // ("[x]" is a block's header in the file)
+    while (! s.empty() && s.front() == '[')
+        s.erase (s.begin());
+    while (! s.empty() && s.back() == ']')
+        s.pop_back();
+    trim (s);
+    if (s.size() > 60)
+    {
+        auto cut = (std::size_t) 60;
+        while (cut > 0 && ((unsigned char) s[cut] & 0xC0) == 0x80)
+            --cut;
+        s = s.substr (0, cut);
+        trim (s);
+    }
+    return s;
+}
+
+std::string presetsToText (const std::vector<Preset>& presets)
+{
+    std::string text;
+    for (const auto& p : presets)
+        if (const auto name = cleanPresetName (p.name); ! name.empty())
+            text += "[" + name + "]\n" + toText (p.options) + "\n";
+    return text;
+}
+
+std::vector<Preset> presetsFromText (const std::string& text)
+{
+    std::vector<Preset> out;
+    std::string name, block;
+    const auto flush = [&] {
+        if (! name.empty())
+            out = withPreset (std::move (out), { name, fromText (block) });
+        name.clear();
+        block.clear();
+    };
+    std::size_t at = 0;
+    while (at <= text.size())
+    {
+        auto end = text.find ('\n', at);
+        if (end == std::string::npos)
+            end = text.size();
+        auto line = text.substr (at, end - at);
+        at = end + 1;
+        if (! line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.size() >= 2 && line.front() == '[' && line.back() == ']')
+        {
+            flush();
+            name = cleanPresetName (line.substr (1, line.size() - 2));
+        }
+        else if (! name.empty())
+            block += line + "\n";
+    }
+    flush();
+    return out;
+}
+
+std::vector<Preset> withPreset (std::vector<Preset> presets, Preset preset)
+{
+    preset.name = cleanPresetName (preset.name);
+    if (preset.name.empty())
+        return presets;
+    // (a preset is a set of choices for any project: the one-off parts of an export do not belong to it)
+    preset.options.master = false;
+    preset.options = clamped (preset.options);
+    presets = withoutPreset (std::move (presets), preset.name);
+    presets.push_back (std::move (preset));
+    std::stable_sort (presets.begin(), presets.end(), [] (const Preset& a, const Preset& b) {
+        const auto la = lowerAscii (a.name), lb = lowerAscii (b.name);
+        return la != lb ? la < lb : a.name < b.name;
+    });
+    return presets;
+}
+
+std::vector<Preset> withoutPreset (std::vector<Preset> presets, const std::string& name)
+{
+    const auto wanted = lowerAscii (cleanPresetName (name));
+    presets.erase (std::remove_if (presets.begin(), presets.end(), [&] (const Preset& p) { return lowerAscii (p.name) == wanted; }), presets.end());
+    return presets;
+}
+
+std::string lastExportToText (const LastExport& last)
+{
+    std::string file;
+    for (const auto c : last.file)
+        file += (c == '\n' || c == '\r') ? ' ' : c;
+    return "file=" + file + "\n" + toText (last.options);
+}
+
+LastExport lastExportFromText (const std::string& text)
+{
+    LastExport last;
+    // (the path is read by hand: it may hold "=" and anything else)
+    std::size_t at = 0;
+    while (at < text.size())
+    {
+        auto end = text.find ('\n', at);
+        if (end == std::string::npos)
+            end = text.size();
+        auto line = text.substr (at, end - at);
+        at = end + 1;
+        if (! line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.compare (0, 5, "file=") == 0)
+        {
+            last.file = line.substr (5);
+            break;
+        }
+    }
+    last.options = fromText (text);
+    last.options.master = false;
+    return last;
+}
+
+std::string sameAsLastFile (const LastExport& last, const std::string& projectName)
+{
+    const auto name = legalName (projectName);
+    if (last.file.empty() || name.empty())
+        return {};
+    const auto slash = last.file.find_last_of ("/\\");
+    if (slash == std::string::npos)
+        return {};
+    return last.file.substr (0, slash + 1) + name + extension (last.options.format);
 }
 
 void applyTail (std::vector<float>& left, std::vector<float>& right, std::int64_t loopFrames, TailMode mode)

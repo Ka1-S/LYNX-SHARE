@@ -1,4 +1,5 @@
 #include "core/Patcher.h"
+#include "core/Rack.h"
 #include "core/ControlSurface.h"
 #include "core/VfxScript.h"
 #include "core/XyController.h"
@@ -80,7 +81,9 @@ bool sameInstrumentSetup (const ChannelDef& a, const ChannelDef& b)
         case InstrumentKind::wavetraveller:
         case InstrumentKind::soundfont: return a.samplePath == b.samplePath;
         case InstrumentKind::fruityslicer: return a.samplePath == b.samplePath && a.pluginState == b.pluginState;
+        case InstrumentKind::slicex: return a.samplePath == b.samplePath && a.zones == b.zones; // (the state is taken live)
         case InstrumentKind::directwave: return a.zones == b.zones && a.modelParams == b.modelParams && a.pluginState == b.pluginState;
+        case InstrumentKind::fpc: return a.zones == b.zones && a.pluginState == b.pluginState;
         case InstrumentKind::dashboard: // (its outputs are structure)
             return std::equal (a.patcher.surface.begin(), a.patcher.surface.end(), b.patcher.surface.begin(), b.patcher.surface.end(),
                                [] (const SurfaceControl& x, const SurfaceControl& y) { return x.kind == y.kind; });
@@ -202,10 +205,10 @@ bool sameStructure (const PatcherDoc& a, const PatcherDoc& b)
         const auto& x = a.wires[i];
         const auto& y = b.wires[i];
         if (x.kind != y.kind || x.from != y.from || x.fromPort != y.fromPort || x.to != y.to || x.toPort != y.toPort || x.curve != y.curve
-            || (x.kind != PatchWire::Kind::audio && x.enabled != y.enabled))
+            || (x.kind != PatchWire::Kind::audio && x.enabled != y.enabled) || x.zone != y.zone)
             return false;
     }
-    return true;
+    return a.zones == b.zones; // (rack chains' note filters, round 183c)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -349,7 +352,8 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
         else
         {
             node->setup = src.effect;
-            node->plugin = src.effect.kind == EffectKind::plugin;
+            // (a nested rack takes its macros as published parameters through setParameter, round 183c)
+            node->plugin = src.effect.kind == EffectKind::plugin || (src.effect.kind == EffectKind::patcher && src.effect.patcher.isRack());
             const auto* nested = reuse != nullptr ? graphOf (reuse->effect.get()) : nullptr;
             if (nested != nullptr && nested->latencyStale (&src.effect.patcher))
             {
@@ -466,6 +470,9 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
 
     // MIDI (round 162): what each "From LYNX SHARE" pin reaches, through MIDI Out nodes (they set the MIDI channel); VFX
     // nodes (round 164b) take the voices into their processors and send theirs on from their voice outputs
+    zoneStates.resize (doc.zones.size());
+    for (std::size_t z = 0; z < doc.zones.size(); ++z)
+        zoneStates[z].zone = doc.zones[z];
     pinTargets.assign ((std::size_t) patchMidiPortPin (patchMidiPorts), {});
     for (int pin = 0; pin < (int) pinTargets.size(); ++pin)
         pinTargets[(std::size_t) pin] = midiTargetsOf (doc, patchFromHost, pin);
@@ -859,7 +866,8 @@ std::vector<Graph::MidiTarget> Graph::midiTargetsOf (const PatcherDoc& doc, int 
             if (target.channel.instrument == InstrumentKind::midiOut)
                 todo.emplace_back (w.to, 0, midictl::parseMidiOut (target.channel.pluginState).channel);
             else
-                targets.push_back ({ w.to, channel, target.channel.instrument == InstrumentKind::vfx, target.channel.instrument == InstrumentKind::layer });
+                targets.push_back ({ w.to, channel, target.channel.instrument == InstrumentKind::vfx, target.channel.instrument == InstrumentKind::layer,
+                                     source == from && w.zone >= 0 && w.zone < (int) doc.zones.size() ? w.zone : -1 });
         }
     }
     return targets;
@@ -921,11 +929,40 @@ void Graph::forLayeredTargets (const std::vector<MidiTarget>& targets, int type,
     }
 }
 
-void Graph::deliver (int pin, bool on, int key, float velocity, int midiChannel) noexcept
+bool Graph::zoneGate (int zone, bool on, int key, int midiChannel, float& velocity) noexcept
+{
+    if (zone < 0 || zone >= (int) zoneStates.size())
+        return true;
+    auto& s = zoneStates[(std::size_t) zone];
+    const auto k = (std::size_t) std::clamp (key, 0, 127);
+    const auto bit = (std::uint16_t) (1u << (midiChannel < 0 ? 0 : (midiChannel & 15)));
+    if (! on)
+    {
+        if ((s.held[k] & bit) == 0)
+            return false;
+        s.held[k] = (std::uint16_t) (s.held[k] & ~bit);
+        return true;
+    }
+    const auto& surface = active->surface;
+    const auto selector = s.zone.selector >= 0 && s.zone.selector < (int) surface.size()
+                              ? rack::zoneSelector (s.zone, surface[(std::size_t) s.zone.selector])
+                              : 0.0f;
+    const auto v = rack::zoneVelocity (s.zone, (int) k, velocity, selector);
+    if (v <= 0.0f)
+        return false;
+    velocity = v;
+    s.held[k] = (std::uint16_t) (s.held[k] | bit);
+    return true;
+}
+
+void Graph::deliver (int pin, bool on, int key, float velocityIn, int midiChannel) noexcept
 {
     if (pin < 0 || pin >= (int) pinTargets.size())
         return;
     forLayeredTargets (pinTargets[(std::size_t) pin], on ? 1 : 0, key, [&] (const MidiTarget& t, int k, float gain, float pan, float cents, bool viaLayer) {
+        auto velocity = velocityIn;
+        if (t.zone >= 0 && ! zoneGate (t.zone, on, k, midiChannel, velocity))
+            return;
         if (t.vfx)
         {
             // into the VFX node's processor at the next piece's start, with the note's properties
@@ -1001,9 +1038,12 @@ void Graph::queueNoteOffPort (int port, int key, int midiChannel, int offset) no
         queueTimed (patchMidiPortPin (port), key, 0.0f, midiChannel, offset);
 }
 
-void Graph::routeNote (const std::vector<MidiTarget>& targets, int sourceNode, bool on, int key, float velocity, int midiChannel, int offset) noexcept
+void Graph::routeNote (const std::vector<MidiTarget>& targets, int sourceNode, bool on, int key, float velocityIn, int midiChannel, int offset) noexcept
 {
     forLayeredTargets (targets, on ? 1 : 0, key, [&] (const MidiTarget& t, int k, float gain, float pan, float cents, bool) {
+        auto velocity = velocityIn;
+        if (t.zone >= 0 && ! zoneGate (t.zone, on, k, midiChannel, velocity))
+            return;
         const auto channel = t.midiChannel >= 0 ? t.midiChannel : midiChannel;
         vfx::Event e;
         e.type = on ? vfx::Event::Type::on : vfx::Event::Type::off;
@@ -1109,6 +1149,8 @@ void Graph::allNotesOff() noexcept
     for (auto& n : nodes)
         if (n->instrument != nullptr)
             n->instrument->allNotesOff();
+    for (auto& z : zoneStates) // (round 183c: nothing is held through a rack chain's zones any more)
+        z.held.fill (0);
 }
 
 void Graph::cut() noexcept
@@ -1157,7 +1199,12 @@ bool Graph::hasInstruments() const noexcept
 
 bool Graph::instrumentsIdle() const noexcept
 {
-    // (a VFX node that holds voices or plays on its own — a sequencer — keeps the graph running)
+    // (a VFX node that holds voices or plays on its own — a sequencer — keeps the graph running; so do notes still on
+    // their way: queued, waiting at a VFX node for the next piece, or played to the host and not yet taken (round 183c: a
+    // MIDI Effect Rack's chains are VFX nodes only, and a note reaches them one piece after it came in))
+    if (timedCount > 0 || hostEventCount > 0
+        || std::any_of (vfxQueues.begin(), vfxQueues.end(), [] (const auto& q) { return q != nullptr && q->in.size() > 0; }))
+        return false;
     return std::all_of (nodes.begin(), nodes.end(), [] (const auto& n) {
         return (n->instrument == nullptr || n->instrument->idle()) && (n->vfx == nullptr || ! n->vfx->busy());
     });
@@ -1170,6 +1217,11 @@ void Graph::setPublished (int k, float v) noexcept
     if (k < 0 || k >= (int) published.size())
         return;
     const auto& p = published[(std::size_t) k];
+    if (p.node == patchSurface && p.param >= 0) // a rack's macro / selector (round 183c): the Surface control, at the next block
+    {
+        publishedValues[(std::size_t) k] = std::clamp (mapControl (p.curve, v), 0.0f, 1.0f);
+        return;
+    }
     if (p.node < 0 || p.node >= (int) nodes.size() || p.param < 0)
         return;
     const auto value = mapControl (p.curve, v);
@@ -1217,7 +1269,15 @@ void Graph::processPiece (const float* inL, const float* inR, const float* scL, 
     auto& values = *active;
     for (std::size_t k = 0; k < publishedValues.size(); ++k)
         if (! std::isnan (publishedValues[k]))
-            values.nodes[(std::size_t) published[k].node].params[(std::size_t) published[k].param] = publishedValues[k];
+        {
+            if (published[k].node == patchSurface) // (round 183c)
+            {
+                if ((std::size_t) published[k].param < values.surface.size())
+                    values.surface[(std::size_t) published[k].param] = publishedValues[k];
+            }
+            else
+                values.nodes[(std::size_t) published[k].node].params[(std::size_t) published[k].param] = publishedValues[k];
+        }
 
     // control cables: the source's latest output moves the target's parameter (one block of lag, as the mixer's links)
     for (auto& c : controls)

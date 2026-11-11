@@ -1136,6 +1136,7 @@ void VideoLanesView::extractAudio (int track, int clipIndex)
                 ChannelDef ch;
                 ch.name = chName;
                 ch.instrument = InstrumentKind::audioClip;
+                ch.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
                 ch.samplePath = path;
                 ch.mixerTrack = song2.claimFreeInsert();
                 song2.channels.push_back (ch);

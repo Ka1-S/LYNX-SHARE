@@ -1033,6 +1033,32 @@ struct Voice
 };
 } // namespace
 
+// The program's delay, chorus and reverb keep sounding after the last voice has ended (in FL the plugin runs them in
+// every block). The channel may rest only once their output has stayed under the floor for kTailFrames, longer than
+// the delay line (65 536 frames) plus the chorus lines, so the gap between two echoes never ends it (round 190aj: FL's
+// renders of the Stage Grand, Strings and Choir programs, whose reverb LYNX cut with the last voice).
+// The floor is -200 dB plus what the delay and the chorus make of their own dither for ever (up to 3.3e-10 per
+// sample into a loop with feedback f: at most 3.3e-10 / (1 - f)); a feedback of 1 never rests, as in FL.
+constexpr std::int64_t kTailFrames = 131072;
+constexpr float kTailFloor = 1.0e-10f, kTailDither = 5.0e-10f;
+
+// the level under which the effects' output counts as silence; negative: never (a loop that does not decay)
+inline float tailFloor (const Program& p)
+{
+    float floor = kTailFloor;
+    if (p.delayOn)
+    {
+        if (p.delay[1] >= 0.999f) return -1.0f;
+        floor += kTailDither / (1.0f - std::max (0.0f, p.delay[1]));
+    }
+    if (p.chorusOn)
+    {
+        if (p.chorus[3] >= 0.999f) return -1.0f;
+        floor += kTailDither / (1.0f - std::max (0.0f, p.chorus[3]));
+    }
+    return floor;
+}
+
 struct Engine::Impl
 {
     std::uint32_t& randState;
@@ -1053,6 +1079,8 @@ struct Engine::Impl
     std::uint64_t heldId[128] {};
     float heldFinal[128][3] {};
     int altLast[100];
+    // (round 190aj) frames since the program effects' output last rose above kTailFloor with no voice playing
+    std::int64_t tailQuiet = kTailFrames;
 
     void releaseVoice (Voice& v, bool force)
     {
@@ -1849,6 +1877,7 @@ void Engine::reset()
     std::fill (std::begin (d->altLast), std::end (d->altLast), -1);
     std::fill (std::begin (d->heldVel), std::end (d->heldVel), 0);
     std::fill (std::begin (d->heldId), std::end (d->heldId), 0);
+    d->tailQuiet = kTailFrames;
 }
 
 bool Engine::active() const
@@ -1857,6 +1886,11 @@ bool Engine::active() const
         if (v.playing())
             return true;
     return false;
+}
+
+bool Engine::ringing() const
+{
+    return (d->prog.delayOn || d->prog.chorusOn || d->prog.reverbOn) && d->tailQuiet < kTailFrames;
 }
 
 void Engine::noteOn (std::uint64_t id, int key, double velocity, double finalVol, double finalPan, double cents)
@@ -1930,9 +1964,13 @@ void Engine::render (float* out, int n)
         }
         for (auto& b : I.bus)
             std::fill (b, b + m, 0.0f);
+        bool voiced = false;
         for (auto& v : I.voices)
             if (v.amp.state > 0 || v.start)
+            {
+                voiced = true;
                 I.renderVoice (v, m, blockRate, lfoScale, blockTempo);
+            }
         if (I.prog.delayOn) I.delayFx.run (I.prog, I.sr, I.bpm, m, I.bus, randState);
         if (I.prog.chorusOn) I.chorusFx.run (I.prog, I.sr, m, I.bus, randState);
         if (I.prog.reverbOn) I.reverbFx.run (I.prog, I.sr, m, I.bus);
@@ -1955,6 +1993,16 @@ void Engine::render (float* out, int n)
                 I.bus[0][i] = sinfCrt (s * I.bus[0][i]) * g;
                 I.bus[1][i] = sinfCrt (s * I.bus[1][i]) * g;
             }
+        }
+        if (voiced)
+            I.tailQuiet = 0;
+        else if (I.tailQuiet < kTailFrames) // the effects ring on: the loudest sample of this block
+        {
+            float peak = 0.0f;
+            for (int i = 0; i < m; ++i)
+                peak = std::max (peak, std::max (std::fabs (I.bus[0][i]), std::fabs (I.bus[1][i])));
+            const float floor = tailFloor (I.prog);
+            I.tailQuiet = floor < 0.0f || peak > floor ? 0 : I.tailQuiet + m;
         }
         for (int i = 0; i < m; ++i)
         {
@@ -2217,7 +2265,7 @@ public:
         notes.clear();
     }
 
-    bool idle() const noexcept override { return ! engine.active(); }
+    bool idle() const noexcept override { return ! engine.active() && ! engine.ringing(); } // (round 190aj: the effects' tail)
 
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {

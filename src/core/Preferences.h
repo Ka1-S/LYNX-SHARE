@@ -140,12 +140,33 @@ enum class VelocityCurve
 };
 float mapVelocity (float velocity, VelocityCurve curve) noexcept; // 0..1 -> 0..1 (0 stays 0: a note-off)
 
+// Round 190ao (pain point 12; LYNX's own: FL's wrapper has no velocity setting, its MIDI group is the ports, release
+// velocity, pitch bend range, MOD X aftertouch and All Notes Off [DATA Fruity Wrapper DFM, REA round 149 C7]): a hosted
+// instrument's own answer to the notes played into it from MIDI devices (PluginRef::velocityMode / fixedVelocity).
+// Mode 0 follows the MIDI settings' curve (the default: nothing changes); 1…4 is the plugin's own curve
+// (VelocityCurve + 1), where Fixed plays every note at `fixedVelocity` (1…127), not at full velocity.
+constexpr int pluginVelocityFollow = 0;
+constexpr int pluginVelocityFixed = (int) VelocityCurve::fixed + 1;
+constexpr int defaultFixedVelocity = 100; // (FL's default note velocity, 100 of 127)
+constexpr int clampPluginVelocityMode (int mode) noexcept { return mode < 0 || mode > pluginVelocityFixed ? pluginVelocityFollow : mode; }
+constexpr int clampFixedVelocity (int velocity) noexcept { return velocity < 1 ? 1 : velocity > 127 ? 127 : velocity; }
+float mapPluginVelocity (float velocity, int mode, int fixedVelocity, VelocityCurve global) noexcept; // (0 stays 0)
+
 struct MidiInputPrefs
 {
     std::string name;     // the device name (as the system shows it)
     bool enabled = true;  // new devices are on
     int midiChannel = 0;  // 0 = any (omni), 1..16 = only that channel
     int target = -1;      // -1 = the selected channels of the Channel Rack, else that Channel Rack channel (0-based)
+    // "Controller type" (round 190aw, core/ControllerProfile.h): "" = detect a profile by the port name,
+    // "generic" = a generic controller (no profile), else a profile's id
+    std::string controller;
+    // MPE (issue #108, core/Mpe.h; a LYNX addition): the device is an MPE controller — lower zone, master channel 1,
+    // `mpeMembers` member channels from 2 up, per-note pitch bend over `mpeBendRange` semitones. The MIDI channel
+    // filter above does not apply then.
+    bool mpe = false;
+    int mpeMembers = 15;
+    int mpeBendRange = 48;
 
     bool operator== (const MidiInputPrefs&) const = default;
 };

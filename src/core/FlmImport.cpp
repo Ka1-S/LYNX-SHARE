@@ -10,7 +10,10 @@
 
 #include "core/DirectWave.h"
 #include "core/FlmEffects.h"
+#include "core/GmsMobile.h"
 #include "core/MiniSynth.h"
+#include "core/TransistorBass.h"
+#include "core/ThreeOsc.h"
 #include "core/MissingFiles.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
@@ -66,6 +69,7 @@ struct Ctx
     Song song;
     std::map<std::string, int> audioChannels; // resolved path | pitch | insert → audioClip channel
     std::set<std::string> missingSeen;
+    int stepsPerBeat = 4; // TDIV's second byte (the song's +0xa9): the grid's steps per beat, and 384 / it = the modules' tick rate
 
     explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -197,22 +201,59 @@ float flmGain (float v) noexcept
     return (float) std::pow (10.0, 3.3 * std::pow ((double) v, 0.6) - 3.0);
 }
 
+// FLM's 3x Osc against LYNX's 3x Osc at the same velocity (A/B inside FL, round 190u): the level is the same
+// (0.00 dB on the default patch) and FLM sounds one octave below the desktop plugin (key 60 with coarse 0 = 261.6 Hz,
+// the desktop's 523.3 Hz), so the channel's pitch carries −12 semitones
+constexpr double threeOscFlmLevel = 1.0;
+constexpr float threeOscFlmPitch = -12.0f;
+
 float velocityOf (const flm::Event& e) noexcept { return std::clamp ((float) e.velocity / 255.0f, 0.0f, 1.0f); }
 
+// A note's pan: FLM plays byte / 255 (0 = left, 1 = right); 127 is the centre every editor writes (they read the byte
+// as byte / 254) and stays the centre here (FLM's own 127 / 255 leaves the right side 0.03 dB down)
+float panOf (const flm::Event& e) noexcept
+{
+    return e.pan == 127 ? 0.0f : std::clamp ((2.0f * (float) e.pan - 255.0f) / 255.0f, -1.0f, 1.0f);
+}
+
 // The pattern holding one content of a note or drum lane: `channelFor(key)` is the channel and key a note plays on
-// (channel < 0 = dropped).
+// (channel < 0 = dropped). The note bytes beyond the velocity, as FLM's clip compiler (0x18075d6b0) and song scheduler
+// (0x180770330) play them (PROVEN-REA, rounds 190u / 190ab):
+// - pan (byte 15) on every note;
+// - drum lanes: the pitch (bytes 16–17, p = u16 / 65534) plays the pad at 2^(2p − 1) of its speed, one octave either
+//   way: here the key and fine pitch of the sampler's note;
+// - repeat (byte 18, n > 0): n more note-ons of the same key, velocity and pan at i / (n + 1) of the note's 1/16 step
+//   (W = 1/4 + swing / 8 beats on even steps, 1/4 − swing / 8 on odd ones; swing = the lane's own, 0 on note lanes in
+//   every file seen). FLM sends one note-off, at the note's end: the extra notes end there too;
+// - slide (byte 19, note lanes only: a drum lane plays it as a hit): no note-on; the held note (the highest plain note
+//   sounding at the slide's start) glides to the slide's key over the slide's length — LYNX's slide note. A slide
+//   with no held note plays nothing in FLM and is dropped. Not converted: FLM also glides the velocity and the pan.
 template <typename ChannelFor>
-int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, ChannelFor channelFor)
+int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool drums, double swing, ChannelFor channelFor)
 {
     Pattern p;
     p.name = name;
     const auto lengthBeats = clip.loopLength > 1e-9 ? clip.loopLength : clip.timelineLength();
     p.lengthTicks = std::max<std::int64_t> (1, ticksOf (lengthBeats));
+    const auto held = [&clip] (const flm::Event& s) {
+        for (const auto& o : clip.events)
+            if (o.slide == 0 && o.key >= 0 && o.length > 0.0 && o.tick <= s.tick
+                && (double) s.tick < (double) o.tick + o.length * flm::ticksPerBeat)
+                return true;
+        return false;
+    };
+    int repeats = 0, slides = 0, orphans = 0, pans = 0, pitches = 0;
     for (const auto& e : clip.events)
     {
         const auto [channel, key] = channelFor (e.key);
         if (channel < 0)
             continue;
+        const auto slide = ! drums && e.slide != 0;
+        if (slide && ! held (e))
+        {
+            ++orphans;
+            continue;
+        }
         Note n;
         n.channel = channel;
         n.key = std::clamp (key, 0, 127);
@@ -221,10 +262,51 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, Channe
             continue;
         n.length = std::clamp<std::int64_t> (ticksOf (e.length), 1, p.lengthTicks - n.start);
         n.velocity = velocityOf (e);
+        n.pan = panOf (e);
+        pans += n.pan != 0.0f ? 1 : 0;
+        n.slide = slide;
+        slides += slide ? 1 : 0;
+        if (drums && e.value != 0x7FFF)
+        {
+            const auto semitones = 12.0 * (2.0 * std::min ((double) e.value / 65534.0, 1.0) - 1.0);
+            const auto whole = std::round (semitones);
+            n.key = std::clamp (n.key + (int) whole, 0, 127);
+            n.finePitch = (float) (100.0 * (semitones - whole));
+            ++pitches;
+        }
         p.notes.push_back (n);
+        if (e.repeat > 0 && ! slide)
+        {
+            const auto startBeats = (double) e.tick / flm::ticksPerBeat;
+            const auto odd = ((int) (startBeats * 4.0) & 1) != 0;
+            const auto step = odd ? 0.25 - swing * 0.125 : 0.25 + swing * 0.125;
+            const auto end = n.start + n.length;
+            for (int i = 1; i <= e.repeat; ++i)
+            {
+                // (FLM's own arithmetic: the fraction and the offset in float, the tick truncated)
+                const auto tick = (int) ((double) ((float) ((double) ((float) i / (float) (e.repeat + 1)) * step) * 128.0f) + startBeats * 128.0);
+                auto hit = n;
+                hit.start = ticksOf ((double) tick / flm::ticksPerBeat);
+                if (hit.start <= n.start || hit.start >= p.lengthTicks)
+                    continue;
+                hit.length = drums ? std::clamp<std::int64_t> (n.length, 1, p.lengthTicks - hit.start) : std::max<std::int64_t> (1, end - hit.start);
+                p.notes.push_back (hit);
+                ++repeats;
+            }
+        }
     }
     p.sortNotes();
     ctx.song.patterns.push_back (std::move (p));
+    const auto count = [&ctx] (int n, const char* what) {
+        if (n > 0 && ctx.report != nullptr)
+            ctx.report->converted[what] += n;
+    };
+    count (pans, "FL Studio Mobile: note pan");
+    count (pitches, "FL Studio Mobile: drum note pitch");
+    count (repeats, "FL Studio Mobile: note repeat (extra hits)");
+    count (slides, "FL Studio Mobile: slide note");
+    if (orphans > 0 && ctx.report != nullptr)
+        ctx.report->unsupported["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] += orphans;
     return (int) ctx.song.patterns.size() - 1;
 }
 
@@ -360,6 +442,218 @@ bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// FLM's Transistor Bass → LYNX's Transistor Bass engine in FLM's build (F4, round 190u): the module is the desktop
+// plugin's "V1 legacy" engine at 1× oversampling inside its own note layer, with 13 knobs. The state is a desktop one
+// holding the equivalent patch (core/TransistorBass.h: transistorBassFlmState); the channel needs no file of an FL
+// installation.
+bool transistorBassState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    auto state = transistorBassFlmState (m.params);
+    if (state.empty() || ! transistorBassStateUsable (state))
+        return false;
+    c.instrument = InstrumentKind::transistorbass;
+    c.modelParams = { 1.0f }; // FLM's module around the engine (core/TransistorBass.h)
+    c.pluginState = std::move (state);
+    c.samplePath.clear();
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: Transistor Bass");
+    return true;
+}
+
+// FLM's GMSynth → the "GMSynth (FLM)" engine (F4, round 190ab; core/GmsMobile.h): the module's 75 parameters as they
+// are plus its CSTM chunk (the two waves, bend range, mod wheel). The engine reads FLM's own data files at run time —
+// the waves' spectra and the filter table, in FL's copy of FLM's resources — so without them the channel stays on
+// the built-in synth and is listed as not converted. Effect kinds the engine doesn't render yet are listed too.
+bool gmSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    namespace gm = gmsmobile;
+    const auto& o = ctx.options.common;
+    if (m.params.size() < (std::size_t) gm::paramCount || ! o.fileExists || ctx.options.resourceRoot.empty())
+        return false;
+    gm::Patch patch;
+    for (int i = 0; i < gm::paramCount; ++i)
+        patch.P[(std::size_t) i] = std::isfinite (m.params[(std::size_t) i]) ? m.params[(std::size_t) i] : 0.0f;
+    if (m.custom.size() >= 20)
+    {
+        std::int32_t a, b;
+        std::memcpy (&a, m.custom.data(), 4);
+        std::memcpy (&b, m.custom.data() + 4, 4);
+        std::memcpy (&patch.bendRange, m.custom.data() + 8, 4);
+        std::memcpy (&patch.mwAmount, m.custom.data() + 12, 4);
+        std::memcpy (&patch.mwDest, m.custom.data() + 16, 4);
+        patch.waveA = a;
+        patch.waveB = b;
+    }
+    const auto& root = ctx.options.resourceRoot;
+    const auto waveA = gm::waveFileName (patch.waveA), waveB = gm::waveFileName (patch.waveB);
+    if (waveA.empty() || waveB.empty() || ! o.fileExists (joinPath (root, "FilterTable_Ctf_Res.data"))
+        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveA + ".spectra"))
+        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveB + ".spectra")))
+        return false;
+    auto state = gm::writeState (patch);
+    if (! gm::readState (state))
+        return false;
+    c.instrument = InstrumentKind::gms;
+    c.modelParams = { 1.0f }; // FL Studio Mobile's module, not the desktop GMS (core/GmsMobile.h)
+    c.pluginState = std::move (state);
+    c.samplePath = root;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: GMSynth");
+    for (int slot = 0; slot < 3; ++slot)
+    {
+        const auto base = (std::size_t) (gm::param::fxBase + gm::param::fxStride * slot);
+        const auto kind = gm::fxKindOf (patch.P[base + gm::param::fxKind]);
+        if (patch.P[base + gm::param::fxEnable] != 0.0f && ! gm::fx::implemented (kind))
+            ctx.note (&FlpImportReport::partialEffects, std::string ("FL Studio Mobile: GMSynth effect ") + gm::fx::name (kind) + " (not rendered)");
+    }
+    return true;
+}
+
+// FLM's 3x Osc → LYNX's 3x Osc engine and FL's channel settings (F4, round 190u). FLM's module is the desktop
+// plugin plus the channel's voice processor, echo delay, arpeggiator, polyphony and tracking as 148 parameters 0…1,
+// and it carries its own converter from the desktop's raw values (REA spec of round 190n), so every parameter goes
+// back to the raw value FL keeps and from there to the field the .flp import fills. The state is version 14
+// (core/ThreeOsc.h: 21 parameters, invert × 3, AM, HQ, the 364-byte channel snapshot).
+bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    if (m.params.size() < 146) // (146…148, Free Run, have no desktop twin)
+        return false;
+    const auto v = [&m] (std::size_t k) { return k < m.params.size() && std::isfinite (m.params[k]) ? std::clamp ((double) m.params[k], 0.0, 1.0) : 0.0; };
+    const auto rnd = [] (double x) { return (std::int32_t) std::lround (x); };
+    std::vector<std::uint8_t> state (460, 0);
+    const auto put = [&state] (std::size_t at, std::int32_t x) { std::memcpy (state.data() + at, &x, 4); };
+    put (0, 14);
+    for (std::size_t k = 0; k < 3; ++k)
+    {
+        const auto at = 4 + 4 * 7 * k;
+        put (at, rnd (128.0 * (v (19 + k) - 0.5)));      // pan
+        put (at + 4, rnd (6.0 * v (1 + k)));             // shape
+        put (at + 8, rnd (48.0 * (v (13 + k) - 0.5)));   // coarse
+        put (at + 12, rnd (200.0 * (v (16 + k) - 0.5))); // fine
+        put (at + 16, rnd (128.0 * (v (7 + k) - 0.5)));  // stereo phase
+        put (at + 20, rnd (100.0 * (v (10 + k) - 0.5))); // stereo detune
+        state[0x58 + k] = v (4 + k) > 0.5 ? 1 : 0;       // invert
+    }
+    put (4 + 4 * 6, rnd (128.0 * v (22)));  // mix 2
+    put (4 + 4 * 13, rnd (128.0 * v (23))); // mix 3
+    put (4 + 4 * 20, rnd (64.0 * v (26)));  // phase randomness
+    state[0x5b] = v (24) > 0.5 ? 1 : 0;     // osc 3 AM
+    state[0x5c] = v (25) > 0.5 ? 1 : 0;     // HQ
+
+    // the channel snapshot: five records (pan, volume, Mod X = cutoff, Mod Y = resonance, pitch) of 17 values. FLM's
+    // times are T(v) = round((e^(6.908755·v) − 1)·B) ticks, the desktop's law on raw / 65536; a raw below 101 is 0.
+    // The module's ticks: 384 / X per beat, X = the song's steps per beat (TDIV's second byte, 4 in every file seen):
+    // 96 per beat (PROVEN-REA: the byte the module reads is the one the song loader fills from TDIV; A/B inside FL,
+    // round 190ab: the volume envelope of setting E1 fits 230-sample ticks = PPQ 96 at 120 BPM, not PPQ 128)
+    const auto ppq = (int) std::lround (384.0 / (double) std::clamp (ctx.stepsPerBeat, 1, 32));
+    const auto time = [&] (std::size_t k) { return std::clamp (rnd (65536.0 * v (k)), 0, 65536); };
+    for (std::size_t j = 0; j < 5; ++j)
+    {
+        std::int32_t r[17] = { j == 1 ? 4 : 0, 0, 100, 20000, 20000, 30000, 50, 20000, 0, 100, 20000, 0, 32950, 0, 0, 0, j == 1 ? -101 : 0 };
+        // the LFO
+        if (v (27 + j) > 0.5)
+            r[0] |= 0x20; // global phase
+        if (v (32 + j) > 0.5)
+            r[0] |= 2;    // tempo
+        r[13] = rnd (2.0 * v (37 + j));
+        r[9] = time (42 + j);
+        r[10] = time (47 + j);
+        r[11] = rnd ((j == 0 ? 128.0 : j == 4 ? 4800.0 : 256.0) * (v (52 + j) - 0.5));
+        r[12] = time (57 + j);
+        if (j >= 1) // the envelope (FLM has none on the pan)
+        {
+            const auto e = j - 1;
+            const auto tempo = v (66 + e) > 0.5;
+            r[1] = v (62 + e) > 0.5 ? 1 : 0;
+            if (tempo)
+                r[0] |= 1;
+            r[2] = time (70 + e);
+            r[3] = time (74 + e);
+            // an attack of no tick starts the envelope at its top: the desktop's attack raw 100
+            if (std::lround ((std::exp (6.908755 * v (74 + e)) - 1.0) * 49.152 / (double) std::clamp (ctx.stepsPerBeat, 1, 32) * (tempo ? 1.0 : ctx.song.bpm / 120.0)) == 0)
+                r[3] = 100;
+            r[4] = time (82 + e);
+            r[5] = time (86 + e);
+            r[6] = rnd (128.0 * v (94 + e));
+            r[7] = time (98 + e);
+            // the amount in the record's unit, as the LFO's: Mod X / Mod Y 256, the pitch 4800 = ±2400 cents (A/B inside
+            // FL, round 190ab, setting P1: 0.56 starts 288 cents up)
+            r[8] = e == 0 ? 0 : rnd ((j == 4 ? 4800.0 : 256.0) * (v (106 + e) - 0.5));
+            r[14] = rnd (256.0 * (v (78 + e) - 0.5));
+            r[15] = rnd (256.0 * (v (90 + e) - 0.5));
+            r[16] = rnd (256.0 * (v (102 + e) - 0.5));
+        }
+        std::memcpy (state.data() + 0x60 + 0x44 * j, r, sizeof (r));
+    }
+    // the filter: cutoff and resonance with FLM's offsets (2v − 1) folded in
+    put (0x60 + 0x15c, std::clamp (rnd (256.0 * (v (111) + 2.0 * v (115) - 1.0)), 0, 256));
+    put (0x60 + 0x160, std::clamp (rnd (256.0 * (v (112) + 2.0 * v (116) - 1.0)), 0, 256));
+    put (0x60 + 0x168, std::clamp (rnd (7.0 * v (110)), 0, 7));
+    if (! threeOscStateUsable (state))
+        return false;
+
+    c.instrument = InstrumentKind::threeosc;
+    c.pluginState = std::move (state);
+    c.samplePath.clear();
+    // the level: linear in the velocity, FLM's Volume multiplier (×2v) and volume-envelope amount (×2(v − ½))
+    const auto gain = 2.0 * v (114) * std::clamp (2.0 * (v (106) - 0.5), 0.0, 1.0);
+    c.modelParams = { (float) ppq, 1.0f, (float) (threeOscFlmLevel * gain) };
+    c.sampler.pitch = threeOscFlmPitch;
+    c.pan = (float) std::clamp (2.0 * v (113) - 1.0, -1.0, 1.0);
+    c.maxPolyphony = std::clamp (rnd (99.0 * v (117)), 0, 99);
+
+    // FL's time knobs: n = round((27^(r / 1024) − 1)·48/26) steps of 1/192 beat
+    const auto knobBeats = [] (int r) { return std::max (1.0, std::round ((std::pow (27.0, r / 1024.0) - 1.0) * 48.0 / 26.0)) / 192.0; };
+    auto& misc = c.misc;
+    misc.mono = v (120) > 0.5;
+    misc.porta = c.synth.porta = c.sampler.porta = v (119) > 0.5;
+    misc.portaBeats = c.synth.portaBeats = c.sampler.portaBeats = (float) knobBeats ((int) (1660.0 * v (118)));
+    misc.gateBeats = v (129) >= 1.0 ? 0.0f : (float) knobBeats ((int) (997.0 * v (129) + 450.0));
+    misc.key.mid = std::clamp (rnd (120.0 - 120.0 * v (121)), 0, 131);
+    // (not clamped at ±1: A/B inside FL, round 190ab, setting V1 — 0.8 pans 2.4 / 48 a key, hard right 20 keys up)
+    misc.key.pan = (float) (8.0 * (v (122) - 0.5));
+    misc.key.modX = (float) (2.0 * (v (123) - 0.5));
+    misc.key.modY = (float) (2.0 * (v (124) - 0.5));
+    misc.velocity.mid = std::clamp (rnd (120.0 * v (125)), 0, 128);
+    misc.velocity.pan = (float) std::clamp (8.0 * (v (126) - 0.5), -1.0, 1.0);
+    misc.velocity.modX = (float) (2.0 * (v (127) - 0.5));
+    misc.velocity.modY = (float) (2.0 * (v (128) - 0.5));
+    misc.echo.echoes = std::clamp (rnd (9.0 * v (130) + 1.0), 1, 10);
+    misc.echo.feedback = (float) (2.0 * v (131));
+    misc.echo.timeBeats = (float) std::clamp (2.0 * v (132), 1.0 / 192.0, 16.0);
+    // (A/B inside FL, round 190ab, setting G1: 0.6 pans each echo 0.8 further — twice the 4v − 2 of FLM's converter)
+    misc.echo.pan = (float) std::clamp (8.0 * v (133) - 4.0, -1.0, 1.0);
+    misc.echo.pitch = (float) (2400.0 * (v (134) - 0.5));
+    misc.echo.modX = (float) (2.0 * v (135) - 1.0);
+    misc.echo.modY = (float) (2.0 * v (136) - 1.0);
+    misc.echo.pingPong = v (137) != 0.0;
+    misc.echo.fat = v (138) != 0.0;
+
+    static constexpr int directions[] = { 0, 1, 2, 3, 5, 4 }; // FL's 4 = sticky, 5 = random
+    bool partial = false;
+    if (const auto direction = std::clamp (rnd (5.0 * v (139)), 0, 5); direction > 0)
+    {
+        auto& a = c.arp;
+        a.direction = directions[direction];
+        a.range = std::clamp (rnd (6.0 * v (142)), 1, 4);
+        a.stepBeats = (float) std::clamp (knobBeats ((int) (997.0 * v (140) + 450.0)), 1.0 / 192.0, 4.0);
+        a.gate = (float) std::clamp (v (141), 0.05, 1.0);
+        a.octaveRepeat = std::clamp (rnd (5.0 * v (143) + 1.0), 1, 6);
+        a.slide = v (144) > 0.5;
+        // FLM's chord list: "Auto", "Auto (sustain)", "(none)", then 88 chords (the default 1 / 90 is "Auto (sustain)")
+        const auto chord = rnd (90.0 * v (145) - 2.0);
+        a.chordSustain = chord != -2;
+        if (chord == 0)
+            a.chord = { 0 };
+        partial = chord > 0 || v (140) >= 1.0 || rnd (6.0 * v (142)) == 0 || rnd (6.0 * v (142)) > 4; // a named chord, Hold, ranges LYNX lacks
+    }
+    for (std::size_t k = 0; k < 3; ++k)
+        partial = partial || rnd (6.0 * v (1 + k)) == 6 || v (146 + k) > 0.5; // a custom shape (its file is not read), Free Run
+    partial = partial || 2.0 * v (114) * threeOscFlmLevel > 4.0;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: 3x Osc");
+    if (partial)
+        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: 3x Osc (custom shape, Free Run, arpeggiator chord, Hold or range not converted)");
+    return true;
+}
+
 // The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
 // generator → the built-in synth, listed in the report until its engine is mapped, F4).
 ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
@@ -397,6 +691,12 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
     if (gen->type == flm::module::dwSampler && directWaveProgram (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::miniSynth && miniSynthState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::transistorBass && transistorBassState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::threeOsc && threeOscState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::gmSynth && gmSynthState (ctx, *gen, c))
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;
@@ -613,17 +913,13 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     song.arrangements = { Arrangement { "Arrangement", {}, 0, 0, {} } };
     song.info.title = project.title;
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
-    if (project.denominator == 4)
-        song.beatsPerBar = std::clamp (project.numerator, 1, 32);
-    else
-    {
-        Marker m;
-        m.tick = 0;
-        m.numerator = project.numerator;
-        m.denominator = project.denominator;
-        m.action = Marker::timeSignature;
-        song.addMarker (m);
-    }
+    // TDIV: beats per bar and the grid's steps per beat (FLM_FORMAT §TDIV, round 190ab: the second byte is not a note
+    // value; LYNX's own grid stays at four steps per beat)
+    ctx.stepsPerBeat = project.denominator;
+    song.beatsPerBar = std::clamp (project.numerator, 1, 32);
+    // FLM pans by balance — the rack's pan (RPRM [1]) and a drum pad's note pan (gain w·min(1, 2(1 − p)) left,
+    // w·min(1, 2p) right): the louder side keeps its level, the other falls linearly. That is FL's triangular law
+    song.panTriangular = true;
 
     // channels in FLM's display order (the master first), each with its rack
     std::vector<std::size_t> order (project.channels.size());
@@ -859,7 +1155,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     if (kind == flm::LaneKind::drums)
                     {
                         const auto kit = kitIndex();
-                        pattern = addPattern (ctx, clip, pname, [&] (int key) -> std::pair<int, int> {
+                        pattern = addPattern (ctx, clip, pname, true, std::clamp (lane.swing, 0.0, 1.0), [&] (int key) -> std::pair<int, int> {
                             if (key < 0 || key >= (int) kit.size())
                             {
                                 ++dropped;
@@ -871,7 +1167,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     else
                     {
                         const auto channel = instrumentIndex();
-                        pattern = addPattern (ctx, clip, pname, [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
+                        pattern = addPattern (ctx, clip, pname, false, std::clamp (lane.swing, 0.0, 1.0),
+                                              [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
                     }
                     it = patternOf.emplace (clip.contentId, pattern).first;
                 }

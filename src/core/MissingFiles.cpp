@@ -50,7 +50,7 @@ std::string channelUser (const ChannelDef& c)
 bool usesChannelSample (InstrumentKind kind)
 {
     return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
-           || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer
+           || kind == InstrumentKind::wavetraveller || kind == InstrumentKind::fruityslicer || kind == InstrumentKind::slicex
            || kind == InstrumentKind::threeosc || kind == InstrumentKind::soundfont;
 }
 

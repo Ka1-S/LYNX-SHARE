@@ -1,0 +1,21 @@
+# Korg nanoKONTROL2 in one of its Mackie Control modes. docs/CONTROLLERS.md explains the format.
+#
+# Sources (maker documents only): "nanoKONTROL2 Owner's Manual" and "nanoKONTROL2 MIDI Implementation" (Korg),
+# https://www.korg.com/us/support/download/manual/0/159/1912/ and .../0/159/2710/ : the unit starts in a DAW mode when
+# it is connected while SET MARKER and a transport button are held: REW (Cubase), FF (Digital Performer), STOP (Live)
+# and REC (SONAR) are Mackie Control modes, in which the sliders send pitch bend and the buttons notes. (PLAY is the
+# HUI mode for Pro Tools, CYCLE the plain CC mode: not for this profile.) Korg's documents do not list the Mackie
+# messages of each control; this profile is the plain Mackie Control map (resources/controllers/mackie-control.lynxctl).
+#
+# Not detected automatically: the port name is the same in every mode, and in the CC mode (the factory setting) the
+# knobs and buttons mean something else. Choose this type by hand in Settings > MIDI after starting the unit in a
+# Mackie Control mode. In the CC mode, leave it a generic controller and link its controls by hand: Korg publishes no
+# list of the factory CC numbers, so there is no profile for that mode.
+
+[device]
+extends = mackie-control
+name = Korg nanoKONTROL2 (Mackie Control mode)
+maker = Korg
+source = nanoKONTROL2 Owner's Manual (Korg), "DAW modes", https://www.korg.com/us/support/download/manual/0/159/1912/
+source = nanoKONTROL2 MIDI Implementation, Rev 1.00 (Korg), https://www.korg.com/us/support/download/manual/0/159/2710/
+group = nanokontrol2

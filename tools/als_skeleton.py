@@ -10,16 +10,17 @@ usage: tools/als_skeleton.py --live12 <folder of decompressed Live 12 sets> --pr
        warpref.als (Live-saved plugin probes)> --live11 <a Live 11 set .als> [--live11-extra <more Live 11 sets>]
        [--out src/core/AlsSkeleton.h]
        round 175a used --live11 XRJAM.als (11.0.12) --live11-extra abletoolz 11.0.12.als (GroupTrack, AudioClip, VST3)
-       WithPlugins.als (11.3.3, Locator); all public sets, kept local.
+       WithPlugins.als (11.3.3, Locator); all public sets, kept local. Round 183c added the rack kinds (the Live 12 demo
+       and template sets, gainprobe's plugin parameter) with the same arguments.
 """
 import argparse, copy, gzip, os, re, xml.etree.ElementTree as ET, zlib
 
 # containers whose children are items (emptied); "Notes" only inside a KeyTrack (MidiClip/Notes holds KeyTracks)
 LISTS = {'Tracks', 'Scenes', 'SendsPre', 'Events', 'KeyTracks', 'WarpMarkers', 'Devices', 'Envelopes', 'ClipSlotList', 'Sends',
          'Grooves', 'ParameterList', 'AutomationLanes', 'EventLists', 'NoteProbabilityGroups', 'Locators', 'TakeLanes',
-         'MarkerList', 'ExpressionGrid'}
+         'MarkerList', 'ExpressionGrid', 'Branches', 'ReturnBranches', 'MacroSnapshots'}
 USER_VALUES = {'EffectiveName', 'UserName', 'Annotation', 'MemorizedFirstClipName', 'Name', 'Path', 'RelativePath',
-               'OriginalFileRef', 'BrowserContentPath', 'BranchDeviceId', 'PlugName'}
+               'OriginalFileRef', 'BrowserContentPath', 'BranchDeviceId', 'PlugName', 'SnapshotName', 'ParameterName'}
 BLOBS = {'ProcessorState', 'ControllerState', 'Buffer', 'Data'}
 
 
@@ -42,6 +43,15 @@ def strip(e, top=True, scale=False):
         e.set('Value', '')
     if e.tag in ('LivePackName', 'LivePackId') and 'Value' in e.attrib:
         e.set('Value', '')
+    # a rack's macro names, info texts and stored values are the preset's, not format (round 183c): Live's defaults
+    if e.tag.startswith('MacroDisplayNames.') and 'Value' in e.attrib:
+        e.set('Value', 'Macro ' + str(int(e.tag.split('.')[1]) + 1))
+    if (e.tag.startswith('MacroAnnotations.') or e.tag == 'Annotation') and 'Value' in e.attrib:
+        e.set('Value', '')
+    if e.tag.startswith('MacroValues.') and 'Value' in e.attrib:
+        e.set('Value', '-1')
+    if e.tag.startswith('MacroHasValue.') and 'Value' in e.attrib:
+        e.set('Value', 'false')
     if e.tag == 'ViewData' and 'Value' in e.attrib:
         e.set('Value', '{}')
     if e.tag == 'MidiInputRouting':  # the sample's own MIDI device → Live's default "all inputs"
@@ -53,6 +63,10 @@ def strip(e, top=True, scale=False):
     # ("Non-unique list ids" otherwise) [LIVE]. Pointee/target ids are renumbered by the export anyway.
     if 'Id' in e.attrib and top:
         e.set('Id', '0')
+    # a macro mapping onto an outer rack (KeyMidi on channel 16 [DATA]) is the export's to write (round 183c)
+    for c in list(e):
+        if c.tag == 'KeyMidi' and c.find('Channel') is not None and c.find('Channel').get('Value') == '16' and not top:
+            e.remove(c)
     if e.text is not None and not e.text.strip():
         e.text = None
     e.tail = None
@@ -110,7 +124,47 @@ def kinds12(a):
         'TrackSendHolder': find(base, './/Sends/TrackSendHolder'), 'Locator': find(demo, './/Locators/Locators/Locator'),
         'AutomationEnvelope': find(beat, './/AutomationEnvelope'),
         'PluginDeviceVst3': find(gain, './/PluginDevice'), 'PluginDeviceVst2': find(vst2, './/PluginDevice'),
+        # racks (round 183c): the rack devices, a chain of each kind, a macro variation, a macro mapping, a plugin parameter
+        **rack_kinds([demo, x('Guitar_Recording.xml'), x('Quick_Start_Song.xml')], gain),
     }
+
+
+RACK_KINDS = {'AudioEffectGroupDevice': './/AudioEffectGroupDevice', 'AudioEffectBranch': './/AudioEffectBranch',
+              'InstrumentGroupDevice': './/InstrumentGroupDevice', 'InstrumentBranch': './/InstrumentBranch',
+              'MidiEffectGroupDevice': './/MidiEffectGroupDevice', 'MidiEffectBranch': './/MidiEffectBranch',
+              'MacroSnapshot': './/MacroSnapshot'}
+
+
+def mapping_key(roots):
+    """A KeyMidi that maps a parameter onto a macro (channel 16) [DATA], as a kind of its own"""
+    for r in roots:
+        for k in r.iter('KeyMidi'):
+            c = k.find('Channel')
+            if c is not None and c.get('Value') == '16':
+                return copy.deepcopy(k)
+    return None
+
+
+def rack_kinds(roots, plugin_probe, required=True):
+    out = {}
+    for k, path in RACK_KINDS.items():
+        e = next((r.find(path) for r in roots if r.find(path) is not None), None)
+        if e is None:
+            if required:
+                raise SystemExit(f'missing {path}')
+            continue
+        out[k] = copy.deepcopy(e)
+    key = mapping_key(roots)
+    if key is not None:
+        out['MacroKeyMidi'] = key
+    elif required:
+        raise SystemExit('missing a macro KeyMidi')
+    p = plugin_probe.find('.//PluginFloatParameter') if plugin_probe is not None else None
+    if p is not None:
+        out['PluginFloatParameter'] = copy.deepcopy(p)
+    elif required:
+        raise SystemExit('missing PluginFloatParameter')
+    return out
 
 
 def kinds11(a, k12):
@@ -140,6 +194,14 @@ def kinds11(a, k12):
         else:
             print(f'Live 11: {k} downgraded from Live 12 (no Live 11 sample has one)')
             out[k] = to11(copy.deepcopy(k12[k]))
+    # racks (round 183c): from the Live 11 sets that hold them, else downgraded from Live 12
+    found = rack_kinds([r] + extra, next((x for x in [r] + extra if x.find('.//PluginFloatParameter') is not None), None), required=False)
+    for k in list(RACK_KINDS) + ['MacroKeyMidi', 'PluginFloatParameter']:
+        if k in found:
+            out[k] = found[k]
+        else:
+            print(f'Live 11: {k} downgraded from Live 12 (no Live 11 sample has one)')
+            out[k] = to11(copy.deepcopy(k12[k]))
     return out
 
 
@@ -154,7 +216,7 @@ def main():
     k12 = kinds12(a)
     k11 = kinds11(a, k12)
     lines = ['#pragma once', '',
-             '// Generated by tools/als_skeleton.py (round 175a): the element skeletons of Live 12 and Live 11 sets that the .als',
+             '// Generated by tools/als_skeleton.py (rounds 175a, 183c): the element skeletons of Live 12 and Live 11 sets that the .als',
              '// export fills in (member names and default values in Live\'s order; lists empty; no song content). One zlib',
              '// stream per version: <Skeletons><Kind name="MidiTrack">…</Kind>…</Skeletons>. Do not edit by hand.', '',
              '#include <cstddef>', '#include <cstdint>', '', 'namespace lynx::alsskeleton', '{']

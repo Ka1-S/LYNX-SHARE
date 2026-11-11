@@ -12,7 +12,11 @@
 #endif
 
 #include "core/CrashReport.h"
+#include "core/EditorLimit.h"
+#include "core/PinOnTop.h"
+#include "core/Preferences.h"
 #include "core/FlWrapper.h"
+#include "core/MixerOps.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
@@ -21,6 +25,7 @@
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/NativeChild.h"
+#include "ui/LiveRemoteUi.h"
 #include "ui/PluginHeader.h"
 #include "ui/Workspace.h"
 #include "platform/Paths.h"
@@ -41,18 +46,22 @@ namespace
 void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (Song&)>& find, juce::AudioPluginInstance* instance,
                           bool PluginRef::*option, bool recreates);
 
-// FL's wrapper Processing › Connections, the outputs column of a generator (round 188d, issue #114; FL 2026's page
-// [UI fl188d a31, b23], Fruity Wrapper FUN_0078df00 / FUN_00794c70 [DECOMP]): one row per plugin output with its LED
-// (active), "n. name" and the mixer track offset wheel ("---" = 0, the channel's own insert; wheel or vertical drag,
-// double-click types a value). Inactive rows are drawn dimmed.
+// FL's wrapper Processing › Connections, one column (round 188d, issue #114; FL 2026's page [UI fl188d a31, b23, k65],
+// Fruity Wrapper FUN_0078df00 / FUN_00794c70 [DECOMP]): one row per plugin output (or input) with its LED (active),
+// "n. name" and the value wheel ("---" = 0; wheel or vertical drag, double-click types a value) — a generator's
+// output: the mixer track offset from the channel's insert; an effect's input / output: the sidechain index. The
+// outputs column has the LED left and the wheel right; the inputs column is its mirror. Inactive rows are dimmed.
 class ConnectionRows final : public juce::Component, public juce::TooltipClient
 {
 public:
     static constexpr int rowHeight = 27;
-    std::vector<PluginOutputInfo> outputs;
+    bool inputSide = false;  // the inputs column (an effect's)
+    bool generator = true;   // a generator's outputs (mixer track offsets) or an effect's rows (sidechain indexes)
+    std::vector<PluginOutputInfo> outputs; // (the rows: outputs, or the inputs of the inputs column)
     std::function<PluginOutputRoute (int)> route;
     std::function<void (int, bool)> setActive;
     std::function<void (int, int)> setOffset;
+    std::function<bool()> processInactive; // "Process inactive inputs and outputs": an inactive row is not dimmed
 
     int preferredHeight() const { return (int) outputs.size() * rowHeight + 4; }
 
@@ -63,6 +72,7 @@ public:
         {
             const auto r = route ? route (k) : PluginOutputRoute {};
             const auto active = on (k);
+            const auto plays = active || (processInactive && processInactive()); // (FL [UI fl188d k29])
             const auto rowArea = rowBounds (k);
             // LED: the accent when active (FL's orange LED), hollow grey when not
             const auto led = ledBounds (k).toFloat();
@@ -75,12 +85,13 @@ public:
                 g.setColour (colour::textSecondary.withAlpha (0.7f));
                 g.drawEllipse (led.expanded (2.0f), 1.0f);
             }
-            auto text = rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
-            g.setColour (active ? colour::textPrimary : colour::textDisabled);
+            auto text = inputSide ? rowArea.withTrimmedLeft (wheelWidth + 8).withTrimmedRight (24)
+                                  : rowArea.withTrimmedLeft (ledBounds (k).getRight() - rowArea.getX() + 6).withTrimmedRight (wheelWidth + 10);
+            g.setColour (plays ? colour::textPrimary : colour::textDisabled);
             g.setFont (font (type::body));
             g.drawFittedText (juce::String (k + 1) + ". " + label (k), text, juce::Justification::centredLeft, 1);
             const auto box = wheelBounds (k).toFloat();
-            g.setColour (drawDigitDisplay (g, box, (hot == k && hotPart == Part::wheel) || dragRow == k, ! active, true));
+            g.setColour (drawDigitDisplay (g, box, (hot == k && hotPart == Part::wheel) || dragRow == k, ! plays, true));
             g.setFont (font (type::body, true));
             g.drawText (r.offset == 0 ? juce::String ("---") : juce::String (r.offset),
                         box.withTrimmedRight ((float) digitMarksWidth + 2.0f).toNearestInt(), juce::Justification::centredRight, false);
@@ -94,9 +105,13 @@ public:
             return {};
         const auto n = juce::String (k + 1);
         if (hotPart == Part::led)
+        {
+            if (inputSide)
+                return on (k) ? tr ("Deactivate input {0}", { n }) : tr ("Activate input {0}", { n });
             return on (k) ? tr ("Deactivate output {0}", { n }) : tr ("Activate output {0}", { n });
+        }
         if (hotPart == Part::wheel)
-            return tr ("Mixer track offset for output {0}", { n });
+            return wheelHint (k);
         return {};
     }
 
@@ -155,7 +170,7 @@ public:
         if (hot < 0 || hotPart != Part::wheel || ! route)
             return;
         const auto k = hot;
-        auto* window = new juce::AlertWindow (tr ("Mixer track offset for output {0}", { juce::String (k + 1) }), {}, juce::MessageBoxIconType::NoIcon);
+        auto* window = new juce::AlertWindow (wheelHint (k), {}, juce::MessageBoxIconType::NoIcon);
         window->addTextEditor ("value", juce::String (route (k).offset));
         window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
@@ -173,18 +188,28 @@ private:
     int hot = -1, dragRow = -1, dragStart = 0;
     Part hotPart = Part::none;
 
+    juce::String wheelHint (int k) const
+    {
+        const auto n = juce::String (k + 1);
+        if (generator)
+            return tr ("Mixer track offset for output {0}", { n });
+        return inputSide ? tr ("Sidechain index for input {0}", { n }) : tr ("Sidechain index for output {0}", { n });
+    }
     juce::String label (int k) const
     {
         const auto& name = outputs[(std::size_t) k].name;
-        return name.isNotEmpty() ? name : tr ("Output {0}", { juce::String (k + 1) });
+        return name.isNotEmpty() ? name : (inputSide ? tr ("Input {0}", { juce::String (k + 1) }) : tr ("Output {0}", { juce::String (k + 1) }));
     }
-    // the outputs column: the right half (FL's inputs column, left, is for effects)
-    juce::Rectangle<int> rowBounds (int k) const
+    // the column fills this component (the page places the inputs column left, the outputs column right)
+    juce::Rectangle<int> rowBounds (int k) const { return { 4, 2 + k * rowHeight, juce::jmax (0, getWidth() - 8), rowHeight }; }
+    juce::Rectangle<int> ledBounds (int k) const
     {
-        return { getWidth() / 2 - 20, 2 + k * rowHeight, getWidth() - (getWidth() / 2 - 20) - 4, rowHeight };
+        return (inputSide ? rowBounds (k).removeFromRight (14) : rowBounds (k).removeFromLeft (14)).withSizeKeepingCentre (12, 12);
     }
-    juce::Rectangle<int> ledBounds (int k) const { return rowBounds (k).removeFromLeft (14).withSizeKeepingCentre (12, 12); }
-    juce::Rectangle<int> wheelBounds (int k) const { return rowBounds (k).removeFromRight (wheelWidth).reduced (0, 3); }
+    juce::Rectangle<int> wheelBounds (int k) const
+    {
+        return (inputSide ? rowBounds (k).removeFromLeft (wheelWidth) : rowBounds (k).removeFromRight (wheelWidth)).reduced (0, 3);
+    }
 
     void track (juce::Point<int> p)
     {
@@ -250,8 +275,9 @@ public:
         return channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].mixerTrack : -1;
     }
 
-    WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
-        : engine (e), find (std::move (f)), plugin (p)
+    WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel, int track = -1,
+                         int slot = -1)
+        : engine (e), find (std::move (f)), plugin (p), instrumentChannel (channel), mixerTrack (track), mixerSlot (slot)
     {
         const char* tabNames[] = { TR_NOOP ("Settings"), TR_NOOP ("Processing"), TR_NOOP ("Troubleshooting") };
         for (int t = 0; t < 3; ++t)
@@ -300,6 +326,32 @@ public:
             });
         };
         addChildComponent (bendRange);
+        // round 190ao (pain point 12; LYNX's own, FL's wrapper has no velocity setting): how notes played into this
+        // instrument from MIDI devices reach it. The first item follows Settings › MIDI › Velocity (the default)
+        velocityMode.addItem (tr ("Follow the MIDI settings"), 1);
+        velocityMode.addItem (tr ("As played"), 2);
+        velocityMode.addItem (tr ("Soft (light playing sounds louder)"), 3);
+        velocityMode.addItem (tr ("Hard (needs harder playing)"), 4);
+        velocityMode.addItem (tr ("Fixed"), 5);
+        velocityMode.setTooltip (tr ("Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, "
+                                     "or this plugin's own curve or fixed velocity"));
+        velocityMode.onChange = [this] {
+            engine.editSong ([fn = find, mode = velocityMode.getSelectedId() - 1] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && mode >= 0)
+                    ref->velocityMode = prefs::clampPluginVelocityMode (mode);
+            });
+        };
+        addChildComponent (velocityMode);
+        for (int v = 1; v <= 127; ++v)
+            fixedVelocity.addItem (juce::String (v), v);
+        fixedVelocity.setTooltip (tr ("The velocity every played note gets (1 to 127)"));
+        fixedVelocity.onChange = [this] {
+            engine.editSong ([fn = find, v = fixedVelocity.getSelectedId()] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && v > 0)
+                    ref->fixedVelocity = prefs::clampFixedVelocity (v);
+            });
+        };
+        addChildComponent (fixedVelocity);
         inPort.setTooltip (tr ("MIDI input port number"));
         inPort.onChange = [this] { setPort (inPort.getSelectedId() - 2, false); };
         // FL's Output port: the notes the plugin sends out play the plugins on that input port (instruments in the
@@ -335,7 +387,35 @@ public:
         addChildComponent (bitSize);
         // Processing › Connections (round 188d): a generator's outputs, each to the insert its offset from the
         // channel's says. FL's header: Reset, Auto map outputs, the outputs glyph and Refresh at the right [UI fl188d].
-        connections = channel && plugin.getTotalNumOutputChannels() > 0;
+        // An effect on an insert (FL [UI fl188d k65]): its inputs column too, each input's sidechain index into the
+        // insert's inputs list (core/MixerOps.h insertInputs); input 2 is the side input LYNX feeds from the slot's
+        // sidechain, which the index sets. Header: inputs glyph, Auto map inputs, Reset, Auto map outputs, outputs glyph.
+        effectSlot = ! channel && mixerTrack > 0 && mixerSlot >= 0;
+        connections = (channel && plugin.getTotalNumOutputChannels() > 0) || (effectSlot && plugin.getBusCount (true) > 0);
+        outputRows.generator = channel;
+        inputRows.inputSide = true;
+        inputRows.generator = false;
+        inputRows.outputs = effectSlot ? pluginInputs (plugin) : std::vector<PluginOutputInfo> {};
+        inputRows.route = [this] (int k) { return inputRoute (k); };
+        inputRows.setActive = [this] (int k, bool on) {
+            editInputs ([k, on] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on ? -1 : 0); });
+        };
+        inputRows.setOffset = [this] (int k, int v) {
+            editInputs ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = juce::jmax (0, v); });
+        };
+        inputRows.processInactive = outputRows.processInactive = [this] {
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            return ref != nullptr && ref->processInactive;
+        };
+        columns.addAndMakeVisible (inputRows);
+        columns.addAndMakeVisible (outputRows);
+        autoMapIn.setButtonText (tr ("Auto map inputs"));
+        autoMapIn.setTooltip (tr ("Assign all inputs incrementally"));
+        // (FL's handler is the outputs' one, FUN_0078aea0 with Tag 0)
+        autoMapIn.onClick = [this] {
+            editInputs ([n = (int) inputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { autoMapOutputs (r, n); });
+        };
+        addChildComponent (autoMapIn);
         outputRows.outputs = pluginOutputs (plugin);
         outputRows.route = [this] (int k) {
             auto* ref = find (const_cast<Song&> (engine.getSong()));
@@ -344,10 +424,11 @@ public:
         outputRows.setActive = [this] (int k, bool on) {
             // (stored as the plugin's own default when it is one: −1)
             const auto declared = outputRows.outputs[(std::size_t) k].activeByDefault;
-            editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); });
+            editRoutes ([k, on, declared] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].active = (std::int8_t) (on == declared ? -1 : on ? 1 : 0); },
+                        ! on); // FL [EXEC fl188d a38, b23, k19]: turning an LED off turns "Process inactive inputs and outputs" off
         };
         outputRows.setOffset = [this] (int k, int v) { editRoutes ([k, v] (std::vector<PluginOutputRoute>& r) { r[(std::size_t) k].offset = v; }); };
-        connectionsView.setViewedComponent (&outputRows, false);
+        connectionsView.setViewedComponent (&columns, false);
         connectionsView.setScrollBarsShown (true, false);
         connectionsView.setScrollBarThickness (8);
         addChildComponent (connectionsView);
@@ -356,6 +437,8 @@ public:
         // FL's Reset [EXEC]: every offset back to 0 ("---"); the LEDs stay as they are
         resetIo.onClick = [this] {
             editRoutes ([n = (int) outputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { resetOutputOffsets (r, n); });
+            if (effectSlot)
+                editInputs ([n = (int) inputRows.outputs.size()] (std::vector<PluginOutputRoute>& r) { resetOutputOffsets (r, n); });
         };
         addChildComponent (resetIo);
         autoMap.setButtonText (tr ("Auto map outputs"));
@@ -380,6 +463,8 @@ public:
         refreshIo.setTooltip (tr ("Refresh inputs and outputs (after a change in the plugin)"));
         refreshIo.onClick = [this] {
             outputRows.outputs = pluginOutputs (plugin);
+            if (effectSlot)
+                inputRows.outputs = pluginInputs (plugin);
             resized();
         };
         addChildComponent (refreshIo);
@@ -395,7 +480,8 @@ public:
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
-    int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
+    // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
+    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + (instrumentChannel ? rowHeight : 0); }
     void selectTab (int t) { showTab (juce::jlimit (0, 2, t)); }
 
     void paint (juce::Graphics& g) override
@@ -414,6 +500,22 @@ public:
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption, true));
             g.drawText (caps (title), area.withHeight (headerHeight).reduced (10, 0), juce::Justification::centredLeft);
+        }
+        if (tab == 1 && connections && ! inputsGlyph.isEmpty()) // FL's inputs glyph: an arrow entering a box
+        {
+            const auto b = inputsGlyph.toFloat().withSizeKeepingCentre (14.0f, 12.0f);
+            juce::Path p;
+            p.addRoundedRectangle (b.getRight() - b.getWidth() * 0.55f, b.getY(), b.getWidth() * 0.55f, b.getHeight(), 2.0f);
+            g.setColour (colour::textSecondary);
+            g.strokePath (p, juce::PathStrokeType (1.4f));
+            juce::Path arrow;
+            arrow.startNewSubPath (b.getX(), b.getCentreY());
+            arrow.lineTo (b.getX() + b.getWidth() * 0.62f, b.getCentreY());
+            g.strokePath (arrow, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path head;
+            const auto tip = b.getX() + b.getWidth() * 0.66f;
+            head.addTriangle (tip + 1.0f, b.getCentreY(), tip - 4.0f, b.getCentreY() - 4.0f, tip - 4.0f, b.getCentreY() + 4.0f);
+            g.fillPath (head);
         }
         if (tab == 1 && connections && ! outputsGlyph.isEmpty()) // FL's outputs glyph: an arrow leaving a box
         {
@@ -487,7 +589,7 @@ public:
             int midiRows = 0;
             for (const auto& o : wrapperOptions())
                 midiRows += juce::String (o.section) == "MIDI" ? 1 : 0;
-            auto midi = group (area, headerHeight + (1 + midiRows) * rowHeight + 8, tr ("MIDI"));
+            auto midi = group (area, headerHeight + (1 + midiRows + (instrumentChannel ? 1 : 0)) * rowHeight + 8, tr ("MIDI"));
             auto line = midi.removeFromTop (rowHeight);
             label (line.removeFromLeft (80), tr ("Input port"));
             show (inPort, line.removeFromLeft (70).reduced (0, 2));
@@ -504,6 +606,14 @@ public:
                         show (bendRange, row.removeFromRight (70).reduced (0, 2));
                     show (*toggles[(int) i], row);
                 }
+            if (instrumentChannel) // LYNX's own per-plugin velocity, under FL's MIDI options (round 190ao)
+            {
+                auto row = midi.removeFromTop (rowHeight);
+                label (row.removeFromLeft (80), tr ("Velocity"));
+                show (velocityMode, row.removeFromLeft (250).reduced (0, 2));
+                row.removeFromLeft (8);
+                show (fixedVelocity, row.removeFromLeft (70).reduced (0, 2));
+            }
             if (bridge32Supported())
             {
                 auto options = group (area, headerHeight + rowHeight + 8, tr ("Options"));
@@ -522,7 +632,7 @@ public:
             for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
                 if (section == wrapperOptions()[i].section && ! hiddenOption (i))
                     show (*toggles[(int) i], box.removeFromTop (rowHeight).withTrimmedLeft (wrapperOptions()[i].needsFixed ? 22 : 0));
-            outputsGlyph = {};
+            outputsGlyph = inputsGlyph = {};
             if (tab == 1 && connections)
             {
                 // the group's header line carries the buttons (FL: Reset, Auto map outputs, the glyph; Refresh at
@@ -531,16 +641,32 @@ public:
                 groups.push_back ({ r, tr ("Connections") });
                 auto header = r.removeFromTop (headerHeight + 6).reduced (10, 3);
                 show (refreshIo, header.removeFromRight (26).reduced (4, 3));
-                header.removeFromRight (juce::jmax (0, header.getWidth() / 2 - 150));
+                header.removeFromRight (effectSlot ? 6 : juce::jmax (0, header.getWidth() / 2 - 150));
+                header.removeFromLeft (100); // (the group's caption)
                 outputsGlyph = header.removeFromRight (22);
                 header.removeFromRight (4);
-                show (autoMap, header.removeFromRight (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16)));
+                show (autoMap, header.removeFromRight (effectSlot ? juce::jmin (112, header.getWidth())
+                                                                  : juce::jmin (juce::jmax (110, autoMap.getBestWidthForHeight (header.getHeight()) + 16), header.getWidth())));
                 header.removeFromRight (4);
-                show (resetIo, header.removeFromRight (juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
+                show (resetIo, header.removeFromRight (effectSlot ? 56 : juce::jmax (56, resetIo.getBestWidthForHeight (header.getHeight()) + 16)));
+                if (effectSlot)
+                {
+                    header.removeFromRight (4);
+                    show (autoMapIn, header.removeFromRight (juce::jmin (juce::jmax (110, autoMapIn.getBestWidthForHeight (header.getHeight()) + 16), juce::jmax (0, header.getWidth() - 26))));
+                    header.removeFromRight (4);
+                    inputsGlyph = header.removeFromRight (22);
+                }
                 auto list = r.reduced (4, 4);
                 show (connectionsView, list);
-                outputRows.setSize (list.getWidth() - (outputRows.preferredHeight() > list.getHeight() ? 10 : 0), juce::jmax (list.getHeight(), outputRows.preferredHeight()));
+                const auto rows = juce::jmax (outputRows.preferredHeight(), inputRows.preferredHeight());
+                columns.setSize (list.getWidth() - (rows > list.getHeight() ? 10 : 0), juce::jmax (list.getHeight(), rows));
+                // FL: inputs in the left half, outputs from just left of the middle to the right edge
+                const auto split = columns.getWidth() / 2 - 20;
+                inputRows.setBounds (0, 0, juce::jmax (0, split - 30), columns.getHeight());
+                outputRows.setBounds (split, 0, columns.getWidth() - split, columns.getHeight());
+                inputRows.setVisible (effectSlot);
                 outputRows.repaint();
+                inputRows.repaint();
             }
             if (tab == 2)
             {
@@ -631,17 +757,57 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
+    // An effect's input k as the page shows it: the stored route; input 2 without a stored index shows the slot's
+    // sidechain source (picked with LYNX's "SC" picker) as its index in the insert's inputs list
+    PluginOutputRoute inputRoute (int k) const
+    {
+        const auto& song = engine.getSong();
+        auto* ref = find (const_cast<Song&> (song));
+        auto route = ref != nullptr && k < (int) ref->inputs.size() ? ref->inputs[(std::size_t) k] : PluginOutputRoute {};
+        if (k == 1 && route.offset == 0 && mixerTrack < (int) song.mixer.size() && mixerSlot < (int) song.mixer[(std::size_t) mixerTrack].effects.size())
+            if (const auto source = song.mixer[(std::size_t) mixerTrack].effects[(std::size_t) mixerSlot].sidechain; source > 0)
+                route.offset = mixerops::sidechainIndexOf (song, mixerTrack, source);
+        return route;
+    }
+
+    // One edit of an effect's inputs; input 2's index then sets the slot's sidechain source (FL's index → the insert
+    // it picks; 0 or inactive: none)
+    void editInputs (std::function<void (std::vector<PluginOutputRoute>&)> change)
+    {
+        const auto count = inputRows.outputs.size();
+        std::vector<PluginOutputRoute> shown;
+        for (int k = 0; k < (int) count; ++k)
+            shown.push_back (inputRoute (k));
+        engine.editSong ([fn = find, count, shown, change = std::move (change), t = mixerTrack, s = mixerSlot] (Song& song) {
+            auto* ref = fn (song);
+            if (ref == nullptr || count == 0)
+                return;
+            ref->inputs = shown;
+            change (ref->inputs);
+            if (count > 1 && t > 0 && t < (int) song.mixer.size() && s >= 0 && s < (int) song.mixer[(std::size_t) t].effects.size())
+            {
+                const auto& side = ref->inputs[1];
+                const auto source = side.isActive (true) ? mixerops::sidechainIndexSource (song, t, side.offset) : -1;
+                song.mixer[(std::size_t) t].effects[(std::size_t) s].sidechain = source > 0 && source != t ? source : -1;
+            }
+            trimOutputRoutes (ref->inputs);
+        });
+        inputRows.repaint();
+    }
+
     // Processing › Connections: one edit of the outputs' routes (as many entries as the plugin has outputs)
-    void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change)
+    void editRoutes (std::function<void (std::vector<PluginOutputRoute>&)> change, bool stopProcessingInactive = false)
     {
         const auto count = outputRows.outputs.size();
-        engine.editSong ([fn = find, count, change = std::move (change)] (Song& song) {
+        engine.editSong ([fn = find, count, change = std::move (change), stopProcessingInactive] (Song& song) {
             if (auto* ref = fn (song); ref != nullptr && count > 0)
             {
                 if (ref->outputs.size() < count)
                     ref->outputs.resize (count);
                 change (ref->outputs);
                 trimOutputRoutes (ref->outputs);
+                if (stopProcessingInactive)
+                    ref->processInactive = false;
             }
         });
         outputRows.repaint();
@@ -667,7 +833,11 @@ private:
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
         outPort.setSelectedId (ref->midiOutPort + 2, juce::dontSendNotification);
+        velocityMode.setSelectedId (prefs::clampPluginVelocityMode (ref->velocityMode) + 1, juce::dontSendNotification);
+        fixedVelocity.setSelectedId (prefs::clampFixedVelocity (ref->fixedVelocity), juce::dontSendNotification);
+        fixedVelocity.setEnabled (ref->velocityMode == prefs::pluginVelocityFixed);
         outputRows.repaint();
+        inputRows.repaint();
         const auto reported = plugin.getLatencySamples();
         const auto text = ref->latencyOverrideMs >= 0.0f
                               ? tr ("{0} ms (set by hand)", { juce::String (ref->latencyOverrideMs, 2) })
@@ -688,13 +858,18 @@ private:
     juce::AudioPluginInstance& plugin;
     juce::OwnedArray<juce::TextButton> tabs;
     juce::OwnedArray<juce::ToggleButton> toggles;
-    juce::ComboBox inPort, outPort, bendRange, bitSize;
+    juce::ComboBox inPort, outPort, bendRange, bitSize, velocityMode, fixedVelocity;
     juce::TextButton latency, locate;
+    const bool instrumentChannel; // a Channel rack instrument: the MIDI group has LYNX's Velocity row
     // Processing › Connections (round 188d)
     bool connections = false;
-    ConnectionRows outputRows;
+    int mixerTrack = -1, mixerSlot = -1; // an effect's insert and slot (−1: a channel's generator)
+    bool effectSlot = false;
+    ConnectionRows inputRows, outputRows;
+    juce::Component columns; // the two columns side by side, in the viewport
     juce::Viewport connectionsView;
-    juce::TextButton resetIo, autoMap;
+    juce::TextButton resetIo, autoMap, autoMapIn;
+    juce::Rectangle<int> inputsGlyph;
     juce::ShapeButton refreshIo { "refresh", {}, {}, {} };
     juce::Rectangle<int> outputsGlyph;
     int tab = 0;
@@ -731,6 +906,83 @@ public:
     }
 };
 
+// Round 190ao (pain point 11, LYNX's own; FL has no pin): "Pin on top" at the right end of the wrapper header of a
+// detached plugin window. A pushpin: upright and in the accent colour while the window is pinned, tilted and dim when not.
+class PinButton final : public juce::Button
+{
+public:
+    PinButton() : juce::Button ("Pin on top") { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.5f);
+        if (over || down)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.drawRoundedRectangle (r, 4.0f, 1.2f);
+        }
+        const auto on = getToggleState() && isEnabled();
+        juce::Path pin; // in a 16 x 16 box: cap, body, flange, needle
+        pin.addRoundedRectangle (5.0f, 1.5f, 6.0f, 2.0f, 1.0f);
+        pin.addRectangle (6.0f, 3.5f, 4.0f, 5.0f);
+        pin.addRoundedRectangle (3.5f, 8.5f, 9.0f, 2.0f, 1.0f);
+        pin.addRectangle (7.4f, 10.5f, 1.2f, 4.5f);
+        const auto side = juce::jmin (r.getWidth(), r.getHeight()) * 0.78f;
+        auto place = juce::AffineTransform::translation (-8.0f, -8.0f);
+        if (! on)
+            place = place.rotated (juce::MathConstants<float>::pi * 0.25f);
+        place = place.scaled (side / 16.0f).translated (r.getCentreX(), r.getCentreY());
+        g.setColour (! isEnabled() ? theme::colour::textDisabled : on ? theme::colour::accent : theme::colour::textSecondary);
+        g.fillPath (pin, place);
+    }
+};
+
+// Round 190ao: what a plugin window shows in place of the editor when its plugin went down (Bitwig turns the plugin's
+// panel into a notice with "Reload plug-in"). Nothing reloads by itself: a plugin that crashes again shows this again.
+class CrashNotice final : public juce::Component
+{
+public:
+    CrashNotice()
+    {
+        reload.setButtonText (tr ("Reload"));
+        reload.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        reload.onClick = [this] {
+            if (onReload)
+                onReload();
+        };
+        addAndMakeVisible (reload);
+    }
+
+    void setPluginName (const juce::String& name)
+    {
+        title = tr ("{0} crashed and was switched off.", { name });
+        repaint();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg1);
+        auto r = getLocalBounds().reduced (16, 12);
+        r.removeFromBottom (40);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        g.drawFittedText (title, r.removeFromTop (r.getHeight() / 2), juce::Justification::centredBottom, 2);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::body));
+        g.drawFittedText (tr ("Reload starts it again with the settings from the last save or backup."), r.withTrimmedTop (4),
+                          juce::Justification::centredTop, 3);
+    }
+
+    void resized() override { reload.setBounds (getLocalBounds().reduced (16, 12).removeFromBottom (28).withSizeKeepingCentre (140, 28)); }
+
+    std::function<void()> onReload;
+
+private:
+    juce::String title;
+    juce::TextButton reload;
+};
+
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
 class WrappedEditor final : public juce::Component
 {
@@ -738,7 +990,7 @@ public:
     WrappedEditor (juce::AudioProcessorEditor* e, AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
                    bool channel, int scTrack = -1, int scSlot = -1)
         : engineRef (engine), sideTrack (scTrack), sideSlot (scSlot),
-          editor (e), page (engine, std::move (find), plugin, channel), presets (plugin, [&engine] { engine.markModified(); })
+          editor (e), page (engine, std::move (find), plugin, channel, scTrack, scSlot), presets (plugin, [&engine] { engine.markModified(); })
     {
         // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
         // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
@@ -752,6 +1004,12 @@ public:
             refreshSidechain();
         }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
+        // round 190ao: the preset menu's "Play a note when a preset loads" (instruments of the Channel rack)
+        if (channel)
+            presets.onLoaded = [&engine, &plugin] {
+                if (pluginpresetui::auditionOnLoad())
+                    engine.auditionPreset (plugin);
+            };
         // FL's Typing keyboard priority, left of the presets (issue #96 slice 2). A plugin in another process has its
         // own keyboard (FL: bridged plugins always take it), so there it stays greyed.
         addAndMakeVisible (keyboardPriority);
@@ -761,6 +1019,12 @@ public:
             refreshKeyboardPriority();
         };
         refreshKeyboardPriority();
+        // round 190ao: "Pin on top" (the host turns it on when it is a detached window: setPin)
+        addChildComponent (pin);
+        pin.onClick = [this] {
+            if (onPin)
+                onPin (! pin.getToggleState());
+        };
         for (auto* b : { &pluginTab, &settingsTab })
         {
             b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
@@ -772,6 +1036,8 @@ public:
         settingsTab.onClick = [this] { show (true); };
         addAndMakeVisible (editor.get());
         addChildComponent (page);
+        addChildComponent (notice);
+        notice.setPluginName (plugin.getName());
         pluginTab.setToggleState (true, juce::dontSendNotification);
         fitEditor();
     }
@@ -784,6 +1050,31 @@ public:
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
     void showPage (bool showSettings) { show (showSettings); }
+    void openPresetMenu() { presets.openMenu(); } // (tests / shots)
+
+    // round 190ao: the pin of a detached window. `available` false: shown greyed (a plugin in a separate process: its
+    // editor is a window of that process)
+    void setPin (std::function<void (bool)> set, bool available)
+    {
+        onPin = std::move (set);
+        pin.setVisible (onPin != nullptr);
+        pin.setEnabled (available);
+        pin.setTooltip (available ? tr ("Pin on top: keep this window above LYNX SHARE's other windows")
+                                  : tr ("Pin on top is not available for a plugin in a separate process"));
+        resized();
+    }
+    void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
+
+    // round 190ao: the plugin went down (the window's timer): the notice with "Reload" takes the editor's place
+    void setDown (bool isDown, std::function<void()> reload)
+    {
+        if (isDown == down)
+            return;
+        down = isDown;
+        notice.onReload = std::move (reload);
+        show (settings);
+    }
+    bool isDown() const noexcept { return down; }
     void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
 
     void refreshKeyboardPriority()
@@ -832,6 +1123,11 @@ public:
         header.removeFromLeft (4);
         settingsTab.setBounds (header.removeFromLeft (130));
         header.removeFromLeft (8);
+        if (pin.isVisible())
+        {
+            pin.setBounds (header.removeFromRight (26));
+            header.removeFromRight (4);
+        }
         if (sidechain.isVisible())
         {
             sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
@@ -841,7 +1137,8 @@ public:
         header.removeFromLeft (4);
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
-        if (editor != nullptr && ! settings)
+        notice.setBounds (area);
+        if (editor != nullptr && ! settings && ! down)
         {
             const juce::ScopedValueSetter<bool> guard (laying, true);
             if (editor->isResizable())
@@ -853,7 +1150,7 @@ public:
 
     void childBoundsChanged (juce::Component* child) override
     {
-        if (child == editor.get() && ! laying && ! settings)
+        if (child == editor.get() && ! laying && ! settings && ! down)
             fitEditor();
     }
 
@@ -863,10 +1160,14 @@ private:
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
     KeyboardPriorityButton keyboardPriority;
+    PinButton pin;
+    std::function<void (bool)> onPin;
 
     void fitEditor()
     {
-        if (editor != nullptr)
+        if (down) // (the notice: at least a readable size, the editor's when that is larger)
+            setSize (juce::jmax (minWidth, getWidth()), juce::jmax (150 + headerHeight, getHeight()));
+        else if (editor != nullptr)
             setSize (juce::jmax (minWidth, editor->getWidth()), editor->getHeight() + headerHeight);
     }
 
@@ -876,14 +1177,15 @@ private:
         pluginTab.setToggleState (! settings, juce::dontSendNotification);
         settingsTab.setToggleState (settings, juce::dontSendNotification);
         page.setVisible (settings);
+        notice.setVisible (down && ! settings);
         if (editor != nullptr)
         {
-            editor->setVisible (! settings);
+            editor->setVisible (! settings && ! down);
             // A plugin editor embedded as a native child window (VST3 / LV2 through JUCE's XEmbedComponent and CLAP /
             // VST2 through NativeEmbed on Linux) is not unmapped when its component is hidden: it stayed over the
             // Wrapper settings page and made it unreachable (issue #8). Moving it outside the window clips it away on
             // every platform; resized() puts it back.
-            if (settings)
+            if (settings || down)
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
@@ -909,9 +1211,10 @@ private:
 
     std::unique_ptr<juce::AudioProcessorEditor> editor;
     WrapperSettingsPage page;
+    CrashNotice notice;
     pluginpresetui::PresetBar presets;
     juce::TextButton pluginTab { tr ("Plugin") }, settingsTab { juce::String::fromUTF8 ("\xe2\x9a\x99 ") + tr ("Wrapper settings") };
-    bool settings = false, laying = false;
+    bool settings = false, laying = false, down = false;
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -938,7 +1241,7 @@ bool opensDetached (const juce::AudioPluginInstance& plugin, const PluginWindows
     return false;
 }
 
-void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached);
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, bool store = true);
 
 // What a plugin editor's host does, whether it is a window of its own (detached) or a frame docked in the desktop: it
 // keeps the plugin alive while it is open, makes the editor (with FL's wrapper header when there is an engine) and
@@ -970,8 +1273,12 @@ public:
         if (c.engine != nullptr && c.find) // FL's wrapper header and settings page (round 146a)
         {
             auto* wrapped = new WrappedEditor (editor, *c.engine, c.find, plugin, c.channel, c.track, c.slot);
-            if (canDock (plugin)) // FL's plugin menu ends with "Detached" (issue #116)
-                wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) { addDetachedItem (menu); });
+            // FL's plugin menu ends with "Detached" (issue #116); a detached window then has LYNX's "Pin on top"
+            wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) {
+                if (canDock (this->plugin))
+                    addDetachedItem (menu);
+                addPinItem (menu);
+            });
             content.reset (wrapped);
         }
         else
@@ -984,6 +1291,10 @@ public:
     virtual bool hostActive() = 0;
     virtual void bringToFront() = 0;
     virtual bool hostMinimised() { return false; }
+    // round 190ao: "Pin on top" (a detached window only)
+    virtual bool pinnedOnTop() const { return false; }
+    virtual void setPinnedOnTop (bool) {}
+    virtual void addPinItem (juce::PopupMenu&) {}
     void* nativeHandle() { return hostComponent().getWindowHandle(); }
 
     juce::AudioPluginInstance* key() const noexcept { return &plugin; }
@@ -1002,6 +1313,10 @@ public:
     std::shared_ptr<void> keepAlive() const { return owner; }
     const juce::String& hostTitle() const noexcept { return title; }
     const PluginWindows::WrapperContext& getContext() const noexcept { return context; }
+
+    // tests / shots: the periodic check now (the crash notice follows the plugin), and the window's content
+    void pollNow() { timerCallback(); }
+    juce::Component* contentForShot() const noexcept { return shownContent; }
 
     void addDetachedItem (juce::PopupMenu& menu)
     {
@@ -1022,6 +1337,7 @@ protected:
 
     void stopHost()
     {
+        editorlimit::forget (&plugin);
         crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
         stopTimer();
         plugin.removeListener (this);
@@ -1066,6 +1382,9 @@ private:
         {
             wrapped->refreshSidechain();
             wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
+            // round 190ao: the plugin went down while its window is open: the notice with "Reload" (only on request)
+            if (context.reload && ! wrapped->isDown() && (isSandboxedPluginDead (plugin) || (context.down && context.down())))
+                wrapped->setDown (true, [reload = context.reload] { juce::MessageManager::callAsync (reload); });
         }
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
@@ -1097,6 +1416,7 @@ private:
 };
 
 void closeHostOf (const juce::AudioPluginInstance* plugin);
+void pinnedWindowsChanged();
 
 // FL's "Detached": the editor in a top-level window of its own, kept above the main window (LYNX's only kind so far).
 class PluginWindow final : public juce::DocumentWindow, public EditorHost
@@ -1117,6 +1437,50 @@ public:
         setVisible (true);
         keepAboveMainWindow (*this);
         startHost();
+        // round 190ao: LYNX's "Pin on top", remembered with the plugin in the project
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+        {
+            wrapped->setPin ([this] (bool on) { setPinned (on, true); }, pinnable());
+            const auto& c = getContext();
+            const auto* ref = c.engine != nullptr && c.find ? c.find (const_cast<Song&> (c.engine->getSong())) : nullptr;
+            if (ref != nullptr && ref->pinned && pinnable())
+                setPinned (true, false);
+        }
+    }
+
+    // A plugin in a separate process shows its editor in a window of that process: LYNX can't keep that one in front.
+    bool pinnable() const { return ! isSandboxedPlugin (*key()); }
+    bool pinnedOnTop() const override { return pinned; }
+    void setPinnedOnTop (bool on) override { setPinned (on, true); }
+
+    void setPinned (bool on, bool save)
+    {
+        pinned = on && pinnable();
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+            wrapped->showPinned (pinned);
+        if (const auto& c = getContext(); save && c.engine != nullptr && c.find)
+        {
+            c.engine->editSong ([find = c.find, on = pinned] (Song& song) {
+                if (auto* ref = find (song))
+                    ref->pinned = on;
+            }, false);
+            c.engine->markModified();
+        }
+       #if JUCE_LINUX || JUCE_BSD
+        // X11 has no owner windows and JUCE can only raise a window there by activating it, which would take the
+        // keyboard from the window being used: the window manager's "always on top" instead
+        setAlwaysOnTop (pinned);
+       #else
+        pinnedWindowsChanged();
+       #endif
+    }
+
+    void addPinItem (juce::PopupMenu& menu) override
+    {
+        menu.addItem (tr ("Pin on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
+            if (safe != nullptr)
+                safe->setPinned (! safe->pinned, true);
+        });
     }
 
     // round 157a: the window that holds a third-party editor draws LYNX's few pixels with GDI, not Direct2D (JUCE 8's
@@ -1164,9 +1528,13 @@ public:
         if (isActiveWindow())
         {
             lastUsed() = key();
+            editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
             focusLinked();
         }
     }
+
+private:
+    bool pinned = false;
 };
 
 // FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
@@ -1218,6 +1586,7 @@ public:
         useClassicRendering();
         setVisible (true);
         toFront (false);
+        nativechild::raiseOverlays();
         startHost();
     }
 
@@ -1257,14 +1626,18 @@ public:
         if (minimised)
             setMinimisedFrame (false);
         toFront (true);
+        nativechild::raiseOverlays();
         lastUsed() = key();
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
     }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
         toFront (false);
+        nativechild::raiseOverlays();
         lastUsed() = key();
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
         if (e.eventComponent != this)
             return;
@@ -1427,6 +1800,59 @@ void closeHostOf (const juce::AudioPluginInstance* plugin)
     juce::MessageManager::callAsync ([plugin] { windows().erase (const_cast<juce::AudioPluginInstance*> (plugin)); });
 }
 
+// Round 190ao, "Pin on top": pinned plugin windows stay above LYNX's other secondary windows. Like them they are owned by
+// the main window (WindowOwner: above LYNX, not above other programs); when another of those windows is brought in
+// front of a pinned one, the pinned one is put back in front without being activated, so the keyboard stays where it
+// is. Checked a few times a second while a window is pinned. Not while a dialog is open (it must stay reachable) or
+// while LYNX is in the background.
+void raisePinnedWindows()
+{
+    if (juce::Component::getNumCurrentlyModalComponents() > 0 || ! juce::Process::isForegroundProcess())
+        return;
+    auto& desktop = juce::Desktop::getInstance();
+    std::vector<juce::Component*> order; // back to front
+    std::vector<bool> pinned;
+    for (int i = 0; i < desktop.getNumComponents(); ++i)
+    {
+        auto* c = desktop.getComponent (i);
+        if (dynamic_cast<juce::TopLevelWindow*> (c) == nullptr || ! c->isVisible() || c->isAlwaysOnTop() || ! isOwnedByMainWindow (*c))
+            continue;
+        if (auto* window = dynamic_cast<juce::ResizableWindow*> (c); window != nullptr && window->isMinimised())
+            continue;
+        auto isPinned = false;
+        for (const auto& [plugin, host] : windows())
+            isPinned = isPinned || (&host->hostComponent() == c && host->pinnedOnTop());
+        order.push_back (c);
+        pinned.push_back (isPinned);
+    }
+    for (const auto i : pinontop::toRaise (pinned))
+        order[(std::size_t) i]->toFront (false);
+}
+
+class PinKeeper final : public juce::Timer
+{
+public:
+    void timerCallback() override
+    {
+        auto any = false;
+        for (const auto& [plugin, host] : windows())
+            any = any || host->pinnedOnTop();
+        if (! any)
+        {
+            stopTimer();
+            return;
+        }
+        raisePinnedWindows();
+    }
+};
+
+void pinnedWindowsChanged()
+{
+    static auto* keeper = new PinKeeper(); // (never destroyed: a static Timer must not outlive the message manager)
+    if (! keeper->isTimerRunning())
+        keeper->startTimerHz (8);
+}
+
 std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title,
                                       PluginWindows::WrapperContext context)
 {
@@ -1437,7 +1863,7 @@ std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPl
 
 // Issue #116: FL's plugin menu › Detached. The editor closes and opens again in the other host (never re-parented:
 // some editors break when their native view changes parent); the choice is saved with the plugin in the project.
-void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached)
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, bool store)
 {
     auto& open = windows();
     auto it = open.find (&plugin);
@@ -1447,7 +1873,7 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached)
     const auto title = it->second->hostTitle();
     const auto context = it->second->getContext();
     open.erase (it);
-    if (context.engine != nullptr && context.find)
+    if (store && context.engine != nullptr && context.find)
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
                 ref->detached = detached;
@@ -1657,6 +2083,24 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
     return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
 }
 
+bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    if (it == windows().end() || it->second->contentForShot() == nullptr)
+        return false;
+    it->second->pollNow();
+    auto* content = it->second->contentForShot();
+    auto* wrapped = dynamic_cast<WrappedEditor*> (content);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (true);
+    const auto image = content->createComponentSnapshot (content->getLocalBounds(), true, 1.0f);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
@@ -1664,11 +2108,17 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     if (auto it = open.find (&plugin); it != open.end())
     {
         it->second->bringToFront();
+        editorlimit::touch (&plugin);
         return;
     }
 
     installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
+    // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
+    editorlimit::opened (&plugin, [k = &plugin] {
+        editorlimit::forget (k);
+        closeHostOf (k); // (closes after this callback)
+    });
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
 }
@@ -1683,6 +2133,16 @@ void setDetached (juce::AudioPluginInstance& plugin, bool detached)
     setDetachedAndReopen (plugin, detached);
 }
 
+void setAllDetached (AudioEngine& engine, bool detached)
+{
+    // FL's Tools › Macros › "Switch all plugin editors to" (round 190i): the flag of every hosted plugin in one edit,
+    // then each open editor that is in the other host opens again where it belongs now (those that can't dock stay)
+    engine.editSong ([detached] (Song& song) { setAllPluginsDetached (song, detached); });
+    for (auto* plugin : openPlugins())
+        if (plugin != nullptr && canDock (*plugin) && isDocked (*plugin) == detached)
+            setDetachedAndReopen (*plugin, detached, false);
+}
+
 bool isDocked (const juce::AudioPluginInstance& plugin)
 {
     const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
@@ -1693,6 +2153,27 @@ void* hostWindowHandle (const juce::AudioPluginInstance& plugin)
 {
     const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
     return it != windows().end() ? it->second->nativeHandle() : nullptr;
+}
+
+bool showPresetMenu (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    auto* wrapped = it != windows().end() ? dynamic_cast<WrappedEditor*> (it->second->contentForShot()) : nullptr;
+    if (wrapped != nullptr)
+        wrapped->openPresetMenu();
+    return wrapped != nullptr;
+}
+
+bool isPinnedOnTop (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    return it != windows().end() && it->second->pinnedOnTop();
+}
+
+void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned)
+{
+    if (const auto it = windows().find (&plugin); it != windows().end())
+        it->second->setPinnedOnTop (pinned);
 }
 
 void closeAll()
@@ -1726,6 +2207,90 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 void close (const juce::AudioPluginInstance& plugin)
 {
     windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+}
+
+namespace
+{
+juce::AudioPluginInstance* instanceAt (AudioEngine& engine, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+    {
+        auto* p = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (where.channel).get());
+        return p != nullptr ? &p->getInstance() : nullptr;
+    }
+    auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (where.track, where.slot).get());
+    return p != nullptr ? &p->getInstance() : nullptr;
+}
+
+const PluginRef* refAt (const Song& song, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+        return where.channel >= 0 && where.channel < (int) song.channels.size() ? &song.channels[(std::size_t) where.channel].plugin : nullptr;
+    if (where.track >= (int) song.mixer.size() || where.slot < 0 || where.slot >= (int) song.mixer[(std::size_t) where.track].effects.size())
+        return nullptr;
+    return &song.mixer[(std::size_t) where.track].effects[(std::size_t) where.slot].plugin;
+}
+} // namespace
+
+int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& which)
+{
+    juce::StringArray names;
+    for (const auto& w : which)
+    {
+        if (auto* instance = instanceAt (engine, w)) // (a window keeps the old instance alive)
+            close (*instance);
+        if (const auto* ref = refAt (engine.getSong(), w))
+            names.add (juce::String::fromUTF8 (ref->name.c_str()));
+    }
+    const auto running = engine.reloadHostedPlugins (which);
+    if (running < (int) which.size())
+    {
+        juce::StringArray failed;
+        for (std::size_t i = 0; i < which.size(); ++i)
+            if (instanceAt (engine, which[i]) == nullptr || engine.hostedPluginDown (which[i]))
+                failed.addIfNotAlreadyThere (names[(int) i]);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
+                                                tr ("{0} could not be started again.", { failed.joinIntoString (", ") }));
+    }
+    return running;
+}
+
+void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen)
+{
+    const auto* ref = refAt (engine.getSong(), where);
+    auto* instance = instanceAt (engine, where);
+    if (ref == nullptr || instance == nullptr)
+        return;
+    const auto name = juce::String::fromUTF8 (ref->name.c_str());
+    // a plugin that ran inside LYNX can come back in a process of its own, where its next crash can't reach LYNX
+    const auto offerSeparate = ! isSandboxedPlugin (*instance) && ! pluginSandboxEnabled() && ! ref->separateProcess && ! pluginAlwaysSeparate (name);
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage (tr ("{0} crashed and was switched off.", { name }) + "\n\n"
+                                     + tr ("Reload starts it again with the settings from the last save or backup."))
+                       .withButton (tr ("Reload"));
+    if (offerSeparate)
+        options = options.withButton (tr ("Reload in a separate process"));
+    options = options.withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [&engine, where, offerSeparate, reopen = std::move (reopen)] (int result) {
+        // (JUCE: the first button is 1, the last one 0)
+        if (result == 2 && offerSeparate)
+        {
+            // FL's "Make bridged" for this plugin: the changed option makes it again, from the state captured last
+            if (auto* p = instanceAt (engine, where))
+                close (*p);
+            engine.capturePluginStates();
+            engine.editSong ([where] (Song& song) {
+                if (auto* r = const_cast<PluginRef*> (refAt (song, where)))
+                    r->separateProcess = true;
+            });
+            if (reopen && instanceAt (engine, where) != nullptr && ! engine.hostedPluginDown (where))
+                reopen();
+        }
+        else if (result == 1 && reload (engine, { where }) == 1 && reopen)
+            reopen();
+    });
 }
 
 int editorCrashCount()
@@ -1763,9 +2328,9 @@ void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (S
 } // namespace
 
 juce::Image wrapperSettingsSnapshot (AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
-                                     bool channel, int tab, float scale)
+                                     bool channel, int tab, float scale, int track, int slot)
 {
-    WrapperSettingsPage page (engine, std::move (find), plugin, channel);
+    WrapperSettingsPage page (engine, std::move (find), plugin, channel, track, slot);
     page.setSize (520, page.preferredHeight());
     page.selectTab (tab);
     return page.createComponentSnapshot (page.getLocalBounds(), true, scale);
@@ -1853,6 +2418,9 @@ void addPluginItems (juce::PopupMenu& menu, AudioEngine& engine, bool instrument
     // FL's way (round 151): the favourites right here, every other plugin in the picker ("More plugins...", FL's
     // list of every generator / effect with its categories, search and favourite stars). The old menu listed all
     // of them: hundreds of items in four columns on a PC with many plugins.
+    // Online Sessions P5-A1 (round 190ai): a guest of a live session gets the plugins the host shares first, under
+    // "On {host}'s computer", each marked "played by {host}"
+    liveui::addSharedPluginItems (menu, instruments, onChosen);
     auto types = engine.getPluginHost().getKnownPlugins().getTypes();
     std::sort (types.begin(), types.end(), [] (const auto& a, const auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });
     const auto& favourites = engine.getPluginHost().favourites();

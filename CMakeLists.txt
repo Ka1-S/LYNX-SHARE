@@ -73,12 +73,14 @@ add_library(lynx_core STATIC
     src/core/FlPluginDb.cpp
     src/core/MissingFiles.cpp
     src/core/PluginCatalog.cpp
+    src/core/PluginDbFolder.cpp
     src/core/ProjectSafety.cpp
     src/core/SessionIds.cpp
     src/core/SessionParts.cpp
     src/core/StandIns.cpp
     src/core/LiveSession.cpp
     src/core/LiveCrypto.cpp
+    src/core/RemotePlugins.cpp
     src/core/PluginSubstitutes.cpp
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
@@ -86,6 +88,8 @@ add_library(lynx_core STATIC
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
     src/core/GamepadMap.cpp
+    src/core/ControllerProfile.cpp
+    src/core/ControllerSession.cpp
     src/core/ExportBundle.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
@@ -93,6 +97,8 @@ add_library(lynx_core STATIC
     src/core/Effector.cpp
     src/core/FlSamplers.cpp
     src/core/Fpc.cpp
+    src/core/FpcInstrument.cpp
+    src/core/FpcEnvelope.cpp
     src/core/FlSynths.cpp
     src/core/FlSytrus.cpp
     src/core/FlGenerators.cpp
@@ -101,6 +107,7 @@ add_library(lynx_core STATIC
     src/core/Harmless.cpp
     src/core/Harmor.cpp
     src/core/Gms.cpp
+    src/core/GmsMobile.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -113,6 +120,7 @@ add_library(lynx_core STATIC
     src/core/FruitySlicer.cpp
     src/core/Slicex.cpp
     src/core/SlicexEngine.cpp
+    src/core/SlicexInstrument.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -185,6 +193,7 @@ add_library(lynx_core STATIC
     src/core/LynxVerbs.cpp
     src/core/FlPatcher.cpp
     src/core/Patcher.cpp
+    src/core/Rack.cpp
     src/core/Vfx.cpp
     src/core/VfxSequencer.cpp
     src/core/ThreeOsc.cpp
@@ -196,6 +205,7 @@ add_library(lynx_core STATIC
     src/core/FacetEq.cpp
     src/core/ApexLimiter.cpp
     src/core/Mastering.cpp
+    src/core/MasterLooks.cpp
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
@@ -292,12 +302,17 @@ target_sources(lynx_core PRIVATE
 # in-app update check: versions, release list, build flavours, checksums, release notes (round 166b)
 target_sources(lynx_core PRIVATE
     src/core/UpdateCheck.cpp)
+# the Browser's "Find similar samples" (round 190as)
+target_sources(lynx_core PRIVATE
+    src/core/SampleSimilarity.cpp)
 
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
 target_sources(lynx_core PRIVATE
     src/core/Python.cpp
     src/core/VfxScript.cpp
-    src/core/EdisonScript.cpp)
+    src/core/EdisonScript.cpp
+    src/core/ScriptDialog.cpp
+    src/core/PianoRollScript.cpp)
 
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
@@ -414,11 +429,14 @@ if(LYNX_BUILD_APP)
         src/engine/ShortExportTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
+        src/engine/LiveRemotePlugins.cpp
+        src/ui/LiveRemoteUi.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
         src/engine/SandboxWorker.cpp
         src/engine/Bridge32Test.cpp
+        src/engine/ClapTeardownTest.cpp
         src/engine/Exporter.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp
@@ -430,6 +448,7 @@ if(LYNX_BUILD_APP)
         src/engine/MidiFileIo.cpp
         src/engine/AudioLogger.cpp
         src/engine/MidiSyncIo.cpp
+        src/engine/ControllerIo.cpp
         src/engine/PreviewPlayer.cpp
         src/ui/MainComponent.cpp
         src/ui/ChannelRackComponent.cpp
@@ -450,11 +469,13 @@ if(LYNX_BUILD_APP)
         src/ui/PluginSkin.cpp
         src/ui/PluginEditors.cpp
         src/ui/PatcherEditor.cpp
+        src/ui/RackEditor.cpp
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
         src/ui/GamepadInput.cpp
+        src/ui/ControllerBridge.cpp
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
@@ -470,8 +491,10 @@ if(LYNX_BUILD_APP)
         src/ui/VideoTracks.cpp
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
+        src/ui/FpcEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
+        src/ui/SlicexEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp
@@ -509,6 +532,7 @@ if(LYNX_BUILD_APP)
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
+        src/ui/PianoRollScripts.cpp
         src/ui/MidiClipboard.cpp
         src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
@@ -519,7 +543,10 @@ if(LYNX_BUILD_APP)
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
+        src/ui/FinishDock.cpp
         src/ui/HistoryPanel.cpp
+        src/ui/VersionsPanel.cpp
+        src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
         src/ui/SettingsPages.cpp
@@ -530,6 +557,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginMonitorWindow.cpp
         src/ui/ClipGridComponent.cpp
         src/ui/DetailView.cpp
+        src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp

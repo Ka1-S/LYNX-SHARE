@@ -18,8 +18,12 @@
 #include "core/FlPluginDb.h"
 #include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
+#include "core/RemotePlugins.h"
+#include "core/PluginHold.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
+#include "core/Mpe.h"
+#include "core/Vfx.h"
 #include "core/ModuleWarmup.h"
 
 namespace lynx
@@ -58,6 +62,9 @@ struct PluginOutputInfo
     bool activeByDefault = true; // what the plugin declares (VST3 bus kDefaultActive, VST2 pin kVstPinIsActive)
 };
 std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& plugin);
+// The same for the inputs (an effect's: input 1 = its main input, input 2 = the side input), every bus listed whether
+// enabled or not (LYNX turns a side bus on only while it is fed)
+std::vector<PluginOutputInfo> pluginInputs (const juce::AudioPluginInstance& plugin);
 
 // FL's wrapper options a hosted plugin follows while it runs (REA round 151; PluginRef has them, saved per plugin)
 struct HostedOptions
@@ -65,9 +72,11 @@ struct HostedOptions
     bool releaseVelocity = true, sendBendRange = false, modXAftertouch = false, allNotesOffOnStop = true, resetOnFlush = true,
          sendLoopPosition = true;
     int bendRange = 12;
+    bool mpe = false; // issue #108: one member channel per note (core/Mpe.h)
     static HostedOptions of (const PluginRef& ref) noexcept
     {
-        return { ref.releaseVelocity, ref.sendBendRange, ref.modXAftertouch, ref.allNotesOffOnStop, ref.resetOnFlush, ref.sendLoopPosition, ref.bendRange };
+        return { ref.releaseVelocity, ref.sendBendRange, ref.modXAftertouch, ref.allNotesOffOnStop, ref.resetOnFlush, ref.sendLoopPosition, ref.bendRange,
+                 ref.mpe };
     }
 };
 
@@ -84,10 +93,14 @@ public:
     void noteOn (int key, float velocity) noexcept override;
     void noteOff (int key) noexcept override;
     void allNotesOff() noexcept override;
-    void setNextNoteModulation (float modX, float) noexcept override { nextModX = modX; }
+    void setNextNoteModulation (float modX, float modY) noexcept override { nextModX = modX, nextModY = modY; }
+    // issue #108 (MPE on): the note's bend / timbre / pressure on its member channel
+    void noteExpression (int key, int prop, float value, float baseCents) noexcept override;
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
     // issue #63: the note's own fine pitch, sent as FL's wrapper sends it (core/HostNotePitch.h)
     void setNextNoteFinePitch (float cents) noexcept override { nextFine = cents; }
+    // Song::flPluginLevels (round 190ad): note velocities go out as FL's wrapper sends them
+    void setFlWrapperVelocity (bool on) noexcept override { flVelocity.store (on, std::memory_order_relaxed); }
     void transportStopped() noexcept override;
     void panic() noexcept override;
     void transportReset() noexcept override { panic(); }
@@ -159,7 +172,11 @@ private:
     std::array<MidiOutNote, 256> midiOut {};
     int midiOutCount = 0;
     HostedOptions options;
-    float nextModX = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    std::atomic<bool> flVelocity { false };
+    juce::uint8 midiVelocity (float velocity) const noexcept;
+    float nextModX = 0.5f, nextModY = 0.5f, nextRelease = 0.5f, nextFine = 0.0f;
+    mpe::Allocator mpeNotes;      // issue #108 (the wrapper's MPE switch): each note's member channel
+    void sendExpression (int channel, mpe::Expr expr, float value) noexcept; // on a member channel (0-based)
     hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
     hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes
     bool takesTuning = false;     // a VST3 plugin (its note ons carry the tuning)
@@ -231,6 +248,25 @@ public:
     bool canTakeSideInput() const noexcept { return sideBus; }
     void setSideInputActive (bool on) override;
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
+    // Processing › Connections (round 189j, core/Song.h SlotConnections [EXEC FL 2026]): with them set, every output
+    // pair at index 0 is summed into the insert, one at another index goes to its extra output (the renderer's tap
+    // for the track it names), an inactive one is silent; input 1 may come from another insert (setMainInput).
+    void setConnections (const SlotConnections& c) override;
+    void setMainInput (const float* left, const float* right) noexcept override
+    {
+        mainSet = true;
+        mainL = left;
+        mainR = right;
+    }
+    void setExtraOutput (int output, float* left, float* right) noexcept override
+    {
+        if (output >= 0 && output < maxPluginConnections)
+        {
+            extraL[(std::size_t) output] = left;
+            extraR[(std::size_t) output] = right;
+        }
+    }
+    const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
 
 private:
     void failed (std::uint32_t code) noexcept;
@@ -252,7 +288,17 @@ private:
     int sideChannel = -1, sideCount = 0;      // the side input bus in the process buffer (round 177b); -1 = none
     const float* sideL = nullptr;             // this block's sidechain (set before process(), cleared after it)
     const float* sideR = nullptr;
-    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place)
+    std::vector<float> sideScratch;           // fixed blocks: the sidechain copied (FixedBlock writes its io in place);
+                                              // routed, output pair 2 comes back there
+    // Connections (round 189j)
+    void routeOutputs (const float* const* ch, int numChannels, int at, int count, float* left, float* right, bool taps) noexcept;
+    std::vector<PluginOutputInfo> outs;       // the output pairs (pluginOutputs), fixed at construction
+    std::atomic<bool> routed { false };
+    std::array<std::atomic<int>, maxPluginConnections> outputMode {}; // −1 into the insert, −2 silent, ≥ 0 elsewhere
+    std::array<float*, maxPluginConnections> extraL {}, extraR {};
+    bool mainSet = false;                     // this block's input 1 from another insert (set before process())
+    const float* mainL = nullptr;
+    const float* mainR = nullptr;
 };
 
 // Round 177b: the channels of a plugin's second input bus (its sidechain input), 0 when it has none (or it is off).
@@ -335,8 +381,16 @@ public:
 
     // The user's Plugin database folders (round 166f, issue #16; core/PluginCatalog.h): the slot / channel menus
     // list the plugins of each folder under its heading. Saved in %APPDATA%\LYNX\plugin-folders.txt. UI thread.
+    // Since round 190ba (issue #104) the folders, the places and the names live in the Plugin database folder on disk
+    // (core/PluginDbFolder.h, Documents/LYNX/Plugin database): a change made here (setDatabaseFolders, setPluginName)
+    // is written to that folder by `onDatabaseEdited` (set by the UI, which knows the plugins), and what the folder
+    // says is taken in with adoptDatabase. The settings keep a copy (plugin-database.txt, plugin-names.txt); until
+    // 0.1.25 the folders were saved in plugin-folders.txt, the file of the scan folders, and each wrote over the other.
     const plugincatalog::Folders& databaseFolders() const noexcept { return userFolders; }
     void setDatabaseFolders (const plugincatalog::Folders& folders);
+    void adoptDatabase (const plugincatalog::Folders& folders, const std::map<std::string, std::string>& names);
+    std::function<void()> onDatabaseEdited;
+    bool isPersistent() const noexcept { return persistent; }
 
     // How many scan child processes this host has started (--lv2scantest).
     int scanChildrenStarted() const noexcept { return scanChildren; }
@@ -374,6 +428,24 @@ public:
         bool instrument = false;
     };
     std::optional<Identity> portableIdentity (const PluginRef& ref) const;
+
+    // Online Sessions P5-A1 (round 190ai, core/RemotePlugins.h). In a live session this computer is participant
+    // `tag` (0: no session): a plugin reference played by another participant is never loaded here, even when the
+    // same plugin is installed — it counts as not installed and its stand-ins play.
+    void setSessionTag (std::uint32_t tag) noexcept { sessionTag.store (tag, std::memory_order_relaxed); }
+    bool playedElsewhere (const PluginRef& ref) const noexcept
+    {
+        const auto me = sessionTag.load (std::memory_order_relaxed);
+        return me != 0 && ref.playedBy != 0 && ref.playedBy != me;
+    }
+    // What a host tells its guests about a plugin it shares: the name, the vendor and the parameter list of a fresh
+    // instance (created and released here; message thread). nullopt: not installed or it did not load (`error`).
+    std::optional<remoteplug::Shared> describeForSharing (const std::string& id, juce::String* error = nullptr);
+    // A hosted plugin's parameter values (PluginRef::values) put on a running instance (indices the plugin does not
+    // have are ignored), and read back: every automatable parameter that is not at its default.
+    static void applyValues (juce::AudioPluginInstance& plugin, const std::vector<std::pair<int, float>>& values);
+    // (`fresh`: the plugin as it was described for sharing — a value counts when it differs from a fresh instance's)
+    static std::vector<std::pair<int, float>> readValues (juce::AudioPluginInstance& plugin, const remoteplug::Shared* fresh = nullptr);
     // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
     // role (another format: its state may not carry over).
     std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);
@@ -454,6 +526,7 @@ public:
 
 private:
     std::unique_ptr<juce::AudioPluginInstance> instantiate (const PluginRef& ref, double sampleRate, juce::String* error);
+    std::unique_ptr<juce::AudioPluginInstance> instantiateOnce (const PluginRef& ref, double sampleRate, juce::String* error); // (preloaded or new)
     std::unique_ptr<juce::AudioPluginInstance> createInstance (const PluginRef& ref, double sampleRate, juce::String* error);
     static std::string preloadKey (const PluginRef& ref, double sampleRate);
     struct Preloaded
@@ -477,6 +550,7 @@ private:
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
+    std::atomic<std::uint32_t> sessionTag { 0 };
     bool persistent = true;
 
     std::mutex scanLock, saveLock, flDbLock;
@@ -501,6 +575,17 @@ private:
     mutable std::mutex stateLock;
     ScanState state;
 };
+
+// "Open without third-party plugins" (round 190ap, core/PluginHold.h): this session's switched-off plugins. While it is
+// on, no hosted plugin that is off is created by any PluginHost of this process (the project's engine, an export's
+// engine, a thumbnail's): createInstance answers "switched off" before it touches the plugin's file, nothing is
+// preloaded or started ahead, and no substitute takes a slot's place. Any thread.
+bool pluginsHeld();                              // the mode is on
+bool pluginHeld (const std::string& id);         // this plugin is off now
+pluginhold::State pluginHoldState();             // a copy, for the lists
+void holdPlugins();                              // all off
+void releasePlugin (const std::string& id);      // this one back on (the caller rebuilds its slots)
+void endPluginHold();                            // the mode off: everything loads again
 
 // Settings → "Substitute missing plugins with LYNX equivalents" (default on; %APPDATA%\LYNX\substitutes.txt).
 bool pluginSubstitutesEnabled();

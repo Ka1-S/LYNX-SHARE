@@ -11,7 +11,9 @@
  * stop_processing run on the audio thread and activate / deactivate on the main thread, and aborts the process
  * when they don't ("Host called the method clap_plugin.stop_processing() on wrong thread!"). Deactivate while
  * processing and start / stop out of order are counted (misordered). The last activation's rate and block size
- * are reported (last_rate, last_block).
+ * are reported (last_rate, last_block). destroy must come on the main thread too (round 190az,
+ * LYNX.exe --clapteardowntest "LYNX Test Restart.clap" report.txt): the checks ask the host it was created with, so
+ * that host must still answer when the plugin is torn down after the host's own instance object.
  */
 #include <clap/clap.h>
 #include <stdatomic.h>
@@ -88,6 +90,9 @@ static bool p_init (const clap_plugin_t* p)
 static void p_destroy (const clap_plugin_t* p)
 {
     Restart* r = self (p);
+    if (! on_thread (r, 1))
+        atomic_fetch_add (&r->wrongThread, 1);
+    must_be_on (r, 1, "destroy"); /* (round 190az: [main-thread & !active], also when the host's instance is long gone) */
     if (atomic_load (&r->processing) != 0 || atomic_load (&r->active) != 0)
         atomic_fetch_add (&r->misordered, 1); /* destroyed while active or processing */
     const char* path = getenv ("LYNX_TEST_RESTART_REPORT");

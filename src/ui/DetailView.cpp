@@ -12,18 +12,25 @@
 #include "core/FlEffects.h"
 #include "core/MeterBallistics.h"
 #include "core/NoteEdit.h"
+#include "core/NoteNames.h"
 #include "core/NoteTools.h"
 #include "core/PlaylistOps.h"
+#include "core/ProjectKey.h"
 #include "core/NativeEngines.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
+#include "ui/ColourPicker.h"
 #include "ui/EditorTools.h"
 #include "ui/EventEditor.h"
 #include "ui/FlMods.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/MidiToolsPanel.h"
 #include "ui/MixerComponent.h"
+#include "ui/NumBox.h"
+#include "ui/PianoRollComponent.h"
+#include "ui/PlaylistComponent.h"
 #include "ui/PluginThumbs.h"
 #include "ui/QuickPick.h"
 #include "ui/Theme.h"
@@ -533,7 +540,7 @@ private:
             });
             if (c.custom != nullptr)
                 c.knobs.clear();
-            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height) : instrumentWidth;
+            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height, x) : instrumentWidth;
             c.bounds = { x, top, w, height };
             x += w + gap;
             cards.push_back (std::move (c));
@@ -558,7 +565,7 @@ private:
                 c.knobs.clear();
             const auto columns = ((int) c.knobs.size() + 1) / 2;
             const auto w = c.folded                ? foldedWidth
-                           : c.custom != nullptr      ? customWidth (*c.custom, height)
+                           : c.custom != nullptr      ? customWidth (*c.custom, height, x)
                            : fx.kind == EffectKind::plugin ? pluginWidth
                                                            : std::max (136, 16 + columns * knobColumn);
             c.bounds = { x, top, w, height };
@@ -611,7 +618,14 @@ private:
         }
         return entry.card.get();
     }
-    static int customWidth (const DetailCard& card, int height) { return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6)); }
+    int customWidth (DetailCard& card, int height, int x) const
+    {
+        // (x: the card's left with the scroll applied; the room is measured with the chain at its start, so the width
+        // doesn't change while it scrolls)
+        const auto area = chainArea();
+        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - gap);
+        return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6));
+    }
     void placeCustomCards()
     {
         std::set<DetailCard*> shown;
@@ -1160,13 +1174,144 @@ private:
 // ---------------------------------------------------------------------------------------------------------------------
 // Slice 2b: the Clip page's left column, the reference's Clip / Launch / Notes panels [SHOT d08, m3-live-clipview2] over
 // LYNX's existing model: the grid clip's offset and length, its slot's loop and launch settings, and the pattern's
-// notes through the Piano roll's own note tools. No new model: Signature is the project's, Scale waits for the project
-// key (round 184a's core/ProjectKey.h), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
+// notes through the Piano roll's own note tools. No new model: Signature is the project's, Scale is the project key
+// (core/ProjectKey.h; round 190o), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
+// The clip's colour and activator in one square, as the reference's clip title bar [LIVE 12.4 Clip View] (round 190s,
+// GAPMAP-0126 D15): filled = the clip plays, hollow = deactivated. Click switches it; right-click picks the colour.
+class ClipChip final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    ClipChip() { setRepaintsOnMouseActivity (true); }
+    void set (juce::Colour c, bool on)
+    {
+        if (c != fill || on != active)
+        {
+            fill = c;
+            active = on;
+            repaint();
+        }
+    }
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (2.0f);
+        g.setColour (fill);
+        if (active)
+            g.fillRect (r);
+        else
+            g.drawRect (r, 2.0f);
+        g.setColour (isMouseOver() ? colour::textPrimary : colour::borderStrong);
+        g.drawRect (r, 1.0f);
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! contains (e.getPosition()))
+            return;
+        if (e.mods.isPopupMenu())
+        {
+            if (onColourMenu != nullptr)
+                onColourMenu();
+        }
+        else if (onToggle != nullptr)
+            onToggle();
+    }
+    std::function<void()> onToggle, onColourMenu;
+
+private:
+    juce::Colour fill { colour::bg5 };
+    bool active = true;
+};
+
 class ClipColumn final : public juce::Component, private juce::ChangeListener
 {
 public:
-    explicit ClipColumn (AudioEngine& e) : engine (e)
+    explicit ClipColumn (AudioEngine& e)
+        : engine (e),
+          tools (e, [this] { return toolTarget(); },
+                 [this] (const std::vector<int>& indices) {
+                     if (auto* roll = editorOf != nullptr ? editorOf() : nullptr)
+                         roll->selectMidiToolResult (indices);
+                 })
     {
+        // Live's Transform section [LIVE 12.4 Clip View] (round 190s): the fourth panel, foldable as Live's sections are
+        addChildComponent (tools);
+        foldTools.setConnectedEdges (0);
+        foldTools.setTooltip (tr ("Transform: show or hide the MIDI Tools"));
+        foldTools.onClick = [this] {
+            toolsFolded = ! toolsFolded;
+            load();
+            if (auto* parent = getParentComponent())
+                parent->resized();
+        };
+        addChildComponent (foldTools);
+
+        // round 190s (GAPMAP-0126 D15, D6, D4): the clip's colour / activator square, the notes' pitch range (drag it
+        // to transpose) and Add interval with its size
+        chip.setTooltip (tr ("The clip's colour. Click: deactivate or activate the clip. Right-click: change its colour"));
+        chip.onToggle = [this] { editClip ([] (Clip& c, ClipGridSlot&) { c.muted = ! c.muted; }); };
+        chip.onColourMenu = [this] {
+            const auto* c = clip();
+            const auto& song = engine.getSong();
+            if (c == nullptr || c->gridSlot < 0 || c->gridSlot >= (int) song.clipGrid->slots.size())
+                return;
+            const juce::Component::SafePointer<ClipColumn> safe (this);
+            ui::colourMenu (song.clipGrid->slots[(std::size_t) c->gridSlot].colour,
+                            [safe] (std::uint32_t colour) {
+                                if (safe != nullptr)
+                                    safe->editClip ([colour] (Clip&, ClipGridSlot& slot) { slot.colour = colour; });
+                            },
+                            chip.getScreenBounds())
+                .showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&chip));
+        };
+        addAndMakeVisible (chip);
+        {
+            ui::ValueSpec range;
+            range.name = tr ("Pitch range: drag up or down to transpose the notes");
+            range.minimum = -96.0;
+            range.maximum = 96.0;
+            range.interval = 1.0;
+            range.pixelsForRange = 192.0 * 6.0; // 6 px per semitone
+            range.toText = [this] (double) { return rangeText; };
+            pitchRange = std::make_unique<ui::NumBox> (range, [this] { return (double) transposed; }, [this] (double v) {
+                const auto by = juce::roundToInt (v) - transposed;
+                if (by == 0)
+                    return;
+                transposed += by;
+                notes ([by] (Pattern& p, const std::vector<int>& all, const Song&) {
+                    for (auto i : all)
+                        p.notes[(std::size_t) i].key = std::clamp (p.notes[(std::size_t) i].key + by, 0, 131);
+                });
+            });
+            addAndMakeVisible (*pitchRange);
+            ui::ValueSpec size;
+            size.name = tr ("Interval size");
+            size.minimum = -24.0;
+            size.maximum = 24.0;
+            size.interval = 1.0;
+            size.defaultValue = 0.0;
+            size.pixelsForRange = 48.0 * 6.0;
+            size.toText = [] (double v) { return juce::String (juce::roundToInt (v)) + " st"; };
+            intervalSize = std::make_unique<ui::NumBox> (size, [this] { return (double) interval; }, [this] (double v) { interval = juce::roundToInt (v); });
+            addAndMakeVisible (*intervalSize);
+        }
+        addInterval.setButtonText (tr ("Add interval"));
+        addInterval.setTooltip (tr ("Adds to every note a note this many semitones away"));
+        addInterval.setConnectedEdges (0);
+        addInterval.onClick = [this] {
+            if (interval == 0)
+                return;
+            notes ([by = interval] (Pattern& p, const std::vector<int>& all, const Song&) {
+                std::vector<Note> added;
+                for (auto i : all)
+                {
+                    auto n = p.notes[(std::size_t) i];
+                    n.key += by;
+                    if (n.key >= 0 && n.key <= 131)
+                        added.push_back (n);
+                }
+                p.notes.insert (p.notes.end(), added.begin(), added.end());
+            });
+        };
+        addAndMakeVisible (addInterval);
         for (auto* t : { &clipTitle, &launchTitle, &notesTitle })
         {
             t->setFont (font (type::small, true));
@@ -1179,7 +1324,7 @@ public:
         const std::pair<juce::Label*, const char*> labels[] = { { &nameLabel, TR_NOOP ("Name") }, { &startLabel, TR_NOOP ("Start") },
                                                                  { &endLabel, TR_NOOP ("End") }, { &lengthLabel, TR_NOOP ("Length") },
                                                                  { &signatureLabel, TR_NOOP ("Signature") }, { &modeLabel, TR_NOOP ("Launch mode") },
-                                                                 { &quantLabel, TR_NOOP ("Launch quantisation") } };
+                                                                 { &quantLabel, TR_NOOP ("Launch quantisation") }, { &scaleLabel, TR_NOOP ("Scale") } };
         for (const auto& [l, text] : labels)
         {
             l->setText (tr (text), juce::dontSendNotification);
@@ -1251,16 +1396,78 @@ public:
                 notetools::randomise (p, all, o);
             });
         };
+        // Live's Stretch ×2 and /2 and Fit to Scale [LIVE 12.4 Clip View, Pitch & Time] (round 190o)
+        timesTwo.setButtonText (juce::String::fromUTF8 ("\xc3\x97" "2"));
+        divideTwo.setButtonText (juce::String::fromUTF8 ("\xc3\xb7" "2"));
+        fitScale.setButtonText (tr ("Fit to scale"));
+        timesTwo.setTooltip (tr ("Twice as slow: doubles every note's start and length"));
+        divideTwo.setTooltip (tr ("Twice as fast: halves every note's start and length"));
+        fitScale.setTooltip (tr ("Moves every note of the clip onto the project's key"));
+        for (auto* b : { &timesTwo, &divideTwo, &fitScale })
+        {
+            b->setConnectedEdges (0);
+            addAndMakeVisible (*b);
+        }
+        const auto stretch = [this] (bool twice) {
+            notes ([twice] (Pattern& p, const std::vector<int>& all, const Song&) {
+                for (auto i : all)
+                {
+                    auto& n = p.notes[(std::size_t) i];
+                    n.start = twice ? n.start * 2 : n.start / 2;
+                    n.length = std::max<std::int64_t> (1, twice ? n.length * 2 : n.length / 2);
+                }
+                if (p.lengthTicks > 0)
+                    p.lengthTicks = std::max<std::int64_t> (1, twice ? p.lengthTicks * 2 : p.lengthTicks / 2);
+            });
+        };
+        timesTwo.onClick = [stretch] { stretch (true); };
+        divideTwo.onClick = [stretch] { stretch (false); };
+        fitScale.onClick = [this] {
+            notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) {
+                if (const auto key = projectkey::get (song); key && projectkey::lynxScale (*key) > 0)
+                    notetools::snapNotesToScale (p, all, key->root, projectkey::lynxScale (*key));
+            });
+        };
+
+        // the Clip panel's Scale row: the project key (Live keeps a scale per clip; LYNX SHARE has one per project)
+        scaleRoot.addItem (tr ("None"), 1);
+        for (int root = 0; root < 12; ++root)
+            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 2);
+        for (auto index : projectkey::commonFirst())
+            scaleName.addItem (tr (notetools::flReferenceScales()[(std::size_t) index].name), index + 1);
+        for (auto* c : { &scaleRoot, &scaleName })
+        {
+            c->setTooltip (tr ("The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)"));
+            addAndMakeVisible (*c);
+            c->onChange = [this] {
+                std::optional<projectkey::Key> key;
+                if (scaleRoot.getSelectedId() >= 2)
+                    key = projectkey::Key { scaleRoot.getSelectedId() - 2, std::max (0, scaleName.getSelectedId() - 1) };
+                if (key && scaleName.getSelectedId() == 0) // first key of a project: Major
+                    key->flScale = projectkey::commonFirst().front();
+                engine.editSong ([key] (Song& song) { projectkey::set (song, key); });
+            };
+        }
         engine.addChangeListener (this);
     }
     ~ClipColumn() override { engine.removeChangeListener (this); }
 
     // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
     static constexpr int clipPanel = 164, launchPanel = 136, notesPanel = 172, gap = 8;
-    int preferredWidth() const { return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap : 0); }
+    static constexpr int foldedTools = 20;
+    int preferredWidth() const
+    {
+        return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+    }
+    // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
+    std::function<PianoRollComponent*()> editorOf;
+    MidiToolsPanel& midiTools() noexcept { return tools; }
+    static inline bool toolsFolded = false; // UI only, not saved
 
     void setSlot (int t, int s)
     {
+        if (t != track || s != scene)
+            transposed = 0; // (the pitch range's drag counts from this clip as it is)
         track = t;
         scene = s;
         load();
@@ -1277,8 +1484,18 @@ public:
     {
         auto r = getLocalBounds().reduced (gap, 4).withTrimmedRight (1);
         const auto take = [] (juce::Rectangle<int>& area, int h) { auto x = area.removeFromTop (h); area.removeFromTop (3); return x; };
+        if (hasNotes)
+        {
+            // Transform: the whole height at the right; folded, only its button
+            auto t = r.removeFromRight (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth);
+            r.removeFromRight (gap);
+            foldTools.setBounds (t.getRight() - 18, t.getY(), 18, 16);
+            tools.setBounds (t);
+        }
         clipTitle.setBounds (take (r, 16));
         auto top = take (r, 20);
+        chip.setBounds (top.removeFromLeft (20));
+        top.removeFromLeft (6);
         nameLabel.setBounds (top.removeFromLeft (44));
         name.setBounds (top);
         r.removeFromTop (2);
@@ -1297,6 +1514,8 @@ public:
         loop.setBounds (take (c, 20));
         halves (take (c, 14), lengthLabel, signatureLabel);
         halves (take (c, 20), length, signature);
+        scaleLabel.setBounds (take (c, 14));
+        halves (take (c, 20), scaleRoot, scaleName);
 
         // Launch: mode, quantisation, legato
         auto l = r.removeFromLeft (launchPanel);
@@ -1311,10 +1530,24 @@ public:
         // Notes: the note tools, two columns
         auto n = r.removeFromLeft (notesPanel);
         notesTitle.setBounds (take (n, 14));
-        const juce::TextButton* order[] = { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize };
+        // six rows of two (round 190s): the pitch range | Invert; Reverse | Make legato; Humanize | Quantize; x2 /2 |
+        // Fit to scale; the interval size | Add interval; Duplicate | Randomize velocity (the wider one)
         const auto w = (n.getWidth() - 4) / 2;
-        for (int i = 0; i < 7; ++i)
-            const_cast<juce::TextButton*> (order[i])->setBounds (n.getX() + (i % 2) * (w + 4), n.getY() + (i / 2) * 24, i == 6 ? n.getWidth() : w, 21);
+        const auto cell = [&n, w] (int row, int col) { return juce::Rectangle<int> (n.getX() + col * (w + 4), n.getY() + row * 22, w, 19); };
+        pitchRange->setBounds (cell (0, 0));
+        invert.setBounds (cell (0, 1));
+        reverse.setBounds (cell (1, 0));
+        makeLegato.setBounds (cell (1, 1));
+        humanize.setBounds (cell (2, 0));
+        quantize.setBounds (cell (2, 1));
+        const auto small = (w - 4) / 2;
+        timesTwo.setBounds (cell (3, 0).withWidth (small));
+        divideTwo.setBounds (cell (3, 0).withTrimmedLeft (small + 4));
+        fitScale.setBounds (cell (3, 1));
+        intervalSize->setBounds (cell (4, 0));
+        addInterval.setBounds (cell (4, 1));
+        duplicate.setBounds (cell (5, 0).withWidth (60));
+        randomize.setBounds (cell (5, 0).withTrimmedLeft (64).withRight (n.getRight()));
     }
 
 private:
@@ -1359,8 +1592,35 @@ private:
                 parent->resized();
         for (auto* b : { &notesTitle })
             b->setVisible (pattern);
-        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize })
+        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval })
             b->setVisible (pattern);
+        pitchRange->setVisible (pattern);
+        intervalSize->setVisible (pattern);
+        // the notes' lowest and highest pitch, as the reference's "C3 - C4" [LIVE 12.4 Pitch & Time]
+        juce::String newRange;
+        if (pattern && c->pattern >= 0 && c->pattern < (int) song.patterns.size() && ! song.patterns[(std::size_t) c->pattern].notes.empty())
+        {
+            const auto& all = song.patterns[(std::size_t) c->pattern].notes;
+            const auto [lo, hi] = std::minmax_element (all.begin(), all.end(), [] (const Note& a, const Note& b) { return a.key < b.key; });
+            newRange = juce::String (notenames::keyName (lo->key)) + " - " + juce::String (notenames::keyName (hi->key));
+        }
+        if (newRange != rangeText)
+        {
+            rangeText = newRange;
+            pitchRange->repaint();
+        }
+        auto fill = slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
+                    : c->kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c->pattern));
+        chip.set (fill, ! c->muted);
+        const auto key = projectkey::get (song);
+        scaleRoot.setSelectedId (key ? key->root + 2 : 1, n);
+        scaleName.setSelectedId (key ? key->flScale + 1 : 0, n);
+        scaleName.setEnabled (key.has_value());
+        tools.setVisible (pattern && ! toolsFolded);
+        foldTools.setVisible (pattern);
+        foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
+        foldTools.toFront (false);
+        fitScale.setEnabled (key && projectkey::lynxScale (*key) > 0);
     }
 
     // the clip's own fields (one undo step)
@@ -1394,6 +1654,20 @@ private:
         load();
     }
 
+    // the grid clip of the slot and its settings (one undo step)
+    void editClip (std::function<void (Clip&, ClipGridSlot&)> fn)
+    {
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc, fn] (Song& song) {
+            if (! song.clipGrid)
+                return;
+            for (auto& c : song.clipGrid->clips)
+                if (c.track == t && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
+                    && song.clipGrid->slots[(std::size_t) c.gridSlot].scene == sc)
+                    fn (c, song.clipGrid->slots[(std::size_t) c.gridSlot]);
+        });
+    }
+
     void editSlot (std::function<void (ClipGridSlot&)> fn)
     {
         const int t = track, sc = scene;
@@ -1422,14 +1696,47 @@ private:
         });
     }
 
+    // what the MIDI Tools change: the docked Piano roll's selection (or all its channel's notes) while it shows this
+    // clip's pattern; otherwise every note of the pattern
+    MidiToolsPanel::Target toolTarget() const
+    {
+        MidiToolsPanel::Target t;
+        const auto* c = clip();
+        const auto& song = engine.getSong();
+        if (c == nullptr || c->kind != ClipKind::pattern || c->pattern < 0 || c->pattern >= (int) song.patterns.size())
+            return t;
+        t.pattern = c->pattern;
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr; roll != nullptr && song.currentPattern == c->pattern)
+        {
+            t.indices = roll->midiToolNotes (t.selected);
+            t.grid = roll->midiToolGrid();
+        }
+        else
+        {
+            t.indices.resize (song.patterns[(std::size_t) c->pattern].notes.size());
+            for (int i = 0; i < (int) t.indices.size(); ++i)
+                t.indices[(std::size_t) i] = i;
+        }
+        return t;
+    }
+
     AudioEngine& engine;
     int track = -1, scene = -1;
     bool hasNotes = true;
+    MidiToolsPanel tools;
+    juce::TextButton foldTools;
+    ClipChip chip;
+    std::unique_ptr<ui::NumBox> pitchRange, intervalSize;
+    juce::TextButton addInterval;
+    juce::String rangeText;
+    int transposed = 0, interval = 0;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, length;
     juce::ToggleButton loop, legato;
     juce::ComboBox mode, quant;
-    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize;
+    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
+    juce::Label scaleLabel;
+    juce::ComboBox scaleRoot, scaleName; // the project key (round 190o; Live: the clip's Scale)
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1440,6 +1747,7 @@ public:
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
+        column.editorOf = [this] { return dynamic_cast<PianoRollComponent*> (editor); };
         for (auto* b : { &notesTab, &envelopesTab })
         {
             addChildComponent (*b);
@@ -1480,6 +1788,7 @@ public:
         column.setSlot (t, s);
         update();
     }
+    MidiToolsPanel& midiTools() noexcept { return column.midiTools(); }
     void editorTakenBack()
     {
         if (editor != nullptr)
@@ -1852,6 +2161,7 @@ void DetailView::mouseUp (const juce::MouseEvent&)
     resizing = false;
 }
 
+MidiToolsPanel& DetailView::midiToolsForSnapshot() { return clipPage->midiTools(); }
 int DetailView::cardCountForCheck() const { return chain->cardCount(); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }

@@ -1145,6 +1145,21 @@ inline bool keepInContext (const std::string& name)
     return false;
 }
 
+// The number of parameters a kind had when the last survey recorded its "rand:k" contexts (tests/FxAudit173dKnown.inc).
+// A random context draws one value per control in the controls' order, so a control added later — in the middle of
+// the editor, or before the parameters the editor doesn't show — would hand every control after it the next one's
+// draw and the recorded contexts would mean other settings (round 190bb: LYNX Tune's Breathiness made "B dir" →
+// rand:3 dead). Parameters from this index on draw after all the others. Regenerate the known keys and drop the
+// entry after a new survey.
+inline int surveyedParamCount (EffectKind kind)
+{
+    switch (kind)
+    {
+        case EffectKind::lynxTune: return 95; // round 190bb: + Breathiness (95)
+        default: return 1 << 30;
+    }
+}
+
 // the context a prerequisite key describes (see audit), nullopt = not usable here; `why` = its description
 inline std::optional<EffectSlot> prerequisite (const std::string& key, const EffectSlot& ctx, const std::vector<Control>& controls,
                                                const Control& c, RunOptions& ro, std::string& why)
@@ -1224,13 +1239,15 @@ inline std::optional<EffectSlot> prerequisite (const std::string& key, const Eff
             return (float) ((seed >> 8) & 0xffffff) / 16777216.0f;
         };
         auto rc = ctx;
-        for (const auto& o : controls)
-        {
-            if (o.param == c.param || keepInContext (o.name))
-                continue;
-            const auto v = o.type == Type::continuous ? rnd() : o.values[(std::size_t) std::min ((int) o.values.size() - 1, (int) (rnd() * (float) o.values.size()))];
-            setValue (rc, o.param, v);
-        }
+        const auto surveyed = surveyedParamCount (ctx.kind);
+        for (const bool late : { false, true }) // (the parameters added since the survey draw last)
+            for (const auto& o : controls)
+            {
+                if (o.param == c.param || keepInContext (o.name) || (o.param >= surveyed) != late)
+                    continue;
+                const auto v = o.type == Type::continuous ? rnd() : o.values[(std::size_t) std::min ((int) o.values.size() - 1, (int) (rnd() * (float) o.values.size()))];
+                setValue (rc, o.param, v);
+            }
         why = "a combination of other settings (random context " + key.substr (5) + ")";
         return rc;
     }

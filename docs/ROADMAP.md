@@ -108,6 +108,11 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [x] Optional Clip-launch workflow layout style beside the default Pattern workflow (round 181a)
 - [ ] Live-style Detail View for clips, racks and note chance (0.1.26, in progress)
 - [ ] Simple workflow layout style for beginners (0.1.26, in progress)
+- [x] Racks (round 183c, `docs/analise/REA_rodada183c.md`): Audio Effect and Instrument Racks as a Patcher in rack mode,
+      with chains, key / velocity / chain-select zones (Live's measured fade laws), chain volume / pan / solo, 16 macros
+      with Map mode, variations, Randomize; LYNX's optional variation morph and launch glide; .als import / export
+- [ ] Standalone MIDI Effect Rack playing its child channels (decision R1: the engine routing is still open)
+- [ ] VST3 parameter mappings in .als racks (Live stores plain units and parameter ids)
 
 ## Phase 8: FL Studio Mobile import (round 182c)
 - [x] `.flm` reader: tempo, time signature, arrangement (note, drum and audio lanes), samples, drum kits (`docs/analise/FLM_FORMAT.md`)

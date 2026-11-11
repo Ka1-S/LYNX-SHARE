@@ -48,12 +48,15 @@
 #include "core/ProjectContents.h"
 #include "core/FlPatcher.h"
 #include "core/Patcher.h"
+#include "core/Rack.h"
 #include "core/Layer.h"
 #include "core/XyController.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
 #include "core/FlSamplers.h"
 #include "core/Fpc.h"
+#include "core/FpcInstrument.h"
+#include "core/FpcEnvelope.h"
 #include "core/FlSynths.h"
 #include "core/Inflate.h"
 #include "core/WavPack.h"
@@ -66,8 +69,10 @@
 #include "core/EventEdit.h"
 #include "core/Preferences.h"
 #include "core/MidiSync.h"
+#include "core/ControllerSession.h"
 #include "core/History.h"
 #include "core/Gms.h"
+#include "core/GmsMobile.h"
 #include "core/PoiZone.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
@@ -130,6 +135,7 @@
 #include "core/DelphiMath.h"
 #include "core/LiveEventQueue.h"
 #include "core/RackRenderer.h"
+#include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
 #include "core/Patcherize.h"
@@ -148,7 +154,9 @@
 #include "core/FixedBlock.h"
 #include "core/ParametricEqLinear.h"
 #include "core/Song.h"
+#include "core/Slicex.h"
 #include "core/NoteEdit.h"
+#include "core/ScaleSnap.h"
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
@@ -1463,19 +1471,29 @@ TEST (flp_real_files)
                         harmlessCompLoaded += c.modelParams.size() > (std::size_t) lynx::harmlessCompIndex + 1000 ? 1 : 0;
                     }
                     flKeysChannels += c.zones.size() == 30 && c.zones.front().path.find ("CHANGPIANO") != std::string::npos ? 1 : 0;
+                    // a Slicex channel is its own instrument since round 190l (no sampler slices): its regions are the
+                    // region records of its decks, counted here so the bar below still means "sliced channels import"
+                    std::size_t slicexRegions = 0;
+                    if (c.instrument == lynx::InstrumentKind::slicex)
+                        if (const auto state = lynx::slicex::parse (c.pluginState))
+                            for (const auto& deck : state->decks)
+                                slicexRegions += deck.empty() ? 0 : deck.regions.size();
+                    if (c.sampler.slices.size() >= 4 || slicexRegions >= 4)
+                        ++slicedChannels;
                     if (c.sampler.slices.size() >= 4)
                     {
-                        ++slicedChannels;
                         CHECK (std::is_sorted (c.sampler.slices.begin(), c.sampler.slices.end()));
                         CHECK (c.sampler.slices.back() < 1.0f);
                     }
                     dwExact += c.instrument == lynx::InstrumentKind::directwave ? 1 : 0;
-                    if (! c.zones.empty() && c.name.find (" - ") == std::string::npos)
+                    if (! c.zones.empty() && c.name.find (" - ") == std::string::npos && c.instrument != lynx::InstrumentKind::fpc)
                     {
                         ++dwChannels;
                         dwZones += (int) c.zones.size();
                     }
                     padChannels += c.name.find (" - ") != std::string::npos && c.instrument == lynx::InstrumentKind::sampler ? 1 : 0;
+                    if (c.instrument == lynx::InstrumentKind::fpc) // (round 190q: a kit on one channel; its pads that play)
+                        padChannels += (int) lynx::fpcChannelPads (c).size();
                 }
                 fpcKits += hasFpc;
                 // Maximus / Soundgoodizer become the exact engine (REA_rodada40); Vocodex carries SG.dat (and its
@@ -1558,7 +1576,8 @@ TEST (flp_real_files)
                     for (const auto& n : pat.notes)
                     {
                         CHECK (n.channel >= 0 && n.channel < (int) full.channels.size());
-                        padNotes += full.channels[(std::size_t) n.channel].name.find (" - ") != std::string::npos ? 1 : 0;
+                        padNotes += full.channels[(std::size_t) n.channel].name.find (" - ") != std::string::npos
+                                    || full.channels[(std::size_t) n.channel].instrument == lynx::InstrumentKind::fpc ? 1 : 0;
                     }
             }
 
@@ -16396,6 +16415,7 @@ TEST (level_audit_demo_imports_round89)
 #include "UiLook90Tests.inc"
 #include "UiFl104Tests.inc"
 #include "DialogsTests84.inc"
+#include "DockTests188.inc"
 #include "SubstituteTests.inc"
 #include "MixSuiteTests96.inc"
 #include "PanelsTests105.inc"
@@ -17202,6 +17222,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rack165Tests.inc"  // (round 165f-rack; likewise)
 #include "Visual164Tests.inc"
 #include "Visual165Tests.inc"
+#include "Dance190baTests.inc"
 #include "Patcher164fTests.inc"
 #include "Markers165Tests.inc"
 #include "PerfMode165Tests.inc"
@@ -17244,14 +17265,17 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Round166eTests.inc"
 #include "Issue15Tests.inc"
 #include "Issue14bugsTests.inc"
+#include "Mute190yTests.inc"
 #include "Left167Tests.inc"
 #include "Wheel173dTests.inc"
 #include "PoiZoneWheels173dTests.inc"
 #include "Tune166cTests.inc"
+#include "TuneBreath190bbTests.inc"
 #include "Update166bTests.inc"
 #include "Emphasis167fTests.inc"
 #include "Dvs167Tests.inc"
 #include "EdisonScript167Tests.inc"
+#include "PianoRollScript190Tests.inc"
 #include "Deverb167Tests.inc"
 #include "Score167Tests.inc"
 #include "Ntt167Tests.inc"
@@ -17262,6 +17286,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Session168aTests.inc"
 #include "Live169bTests.inc"
 #include "Live169jTests.inc"
+#include "Live190ahTests.inc"
+#include "Remote190aiTests.inc"
 #include "StemSplitTests.inc"
 #include "AudioToMidi189bTests.inc"
 #include "Zoom167tTests.inc"
@@ -17347,6 +17373,9 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Comp177Tests.inc"
 #include "AlsImport175aTests.inc"
 #include "FlmImport182cTests.inc"
+#include "FlmEngines190uTests.inc"
+#include "FlmNotes190abTests.inc"
+#include "FlmGmsynth190abTests.inc"
 #include "FlmImport187dTests.inc"
 #include "FlmImport188fTests.inc"
 #include "FlmImport188hTests.inc"
@@ -17364,6 +17393,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"
 #include "Fpc190mTests.inc"
+#include "Fpc190qTests.inc"
+#include "Fpc190zTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
@@ -17388,6 +17419,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue97Tests.inc"
 #include "SimpleTracks184aTests.inc"
 #include "SimpleChooser184aTests.inc"
+#include "FlStateWrite184aTests.inc"
+#include "MasterLooks189kTests.inc"
 #include "LayoutStyle184aTests.inc"
 #include "Rack116Tests.inc"
 #include "Issue116DetachedTests.inc"
@@ -17395,17 +17428,62 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ProjectKey184aTests.inc"
 #include "KeyGuess184aTests.inc"
 #include "Render186bTests.inc"
+#include "Playlist189eTests.inc"
+#include "Playlist189gTests.inc"
+#include "Playlist189iTests.inc"
+#include "Playlist189lTests.inc"
+#include "Playlist189nTests.inc"
+#include "PlaylistKeys190agTests.inc"
+#include "Rack183cTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
 #include "MultiOut188dTests.inc"
+#include "FxConn189jTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
 #include "MidiTools190oTests.inc"
+#include "MidiTools190sTests.inc"
+#include "MidiTools190aaTests.inc"
+#include "MidiTools190aa2Tests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
+#include "PlugLevel190adTests.inc"
 #include "Undo190bTests.inc"
+#include "TrackMeters190wTests.inc"
+#include "Locator190wTests.inc"
 #include "Bugs190cTests.inc"
-#include "Slicex190hTests.inc"
 #include "Parity190vTests.inc"
 #include "Parity190arApexTests.inc"
+#include "Slicex190lTests.inc"
+#include "Parity190alTests.inc"
+#include "Slicex190hTests.inc"
+#include "AudioX190aqTests.inc"
 #include "Surge190xTests.inc"
+#include "Issue114Tests.inc"
+#include "Slicex190rTests.inc"
+#include "Slicex190acTests.inc"
+#include "Slicex190ajTests.inc"
+#include "ScaleSnap190anTests.inc"
+#include "TruePeak190amTests.inc"
+#include "Loudness190amTests.inc"
+#include "UsedOnly190amTests.inc"
+#include "Extras190amTests.inc"
+#include "Reload190aoTests.inc"
+#include "Pin190aoTests.inc"
+#include "Velocity190aoTests.inc"
+#include "Audition190aoTests.inc"
+#include "Versions190apTests.inc"
+#include "core/PluginHold.h"
+#include "PluginsOff190apTests.inc"
+#include "ExportSections190apTests.inc"
+#include "DirectWave190ajTests.inc"
+#include "Similar190asTests.inc"
+#include "Controller190awTests.inc"
+#include "ControllerProfiles190awTests.inc"
+#include "Bugs190axInsert6Tests.inc"
+#include "Snap190axTests.inc"
+#include "PluginState190azTests.inc"
+#include "Parity190arTests.inc"
+#include "Mpe190bbTests.inc"
+#include "Mpe190bbLiveTests.inc"
+#include "PluginDb190baTests.inc"

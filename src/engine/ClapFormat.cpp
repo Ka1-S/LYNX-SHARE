@@ -13,6 +13,7 @@
 
 #include <clap/clap.h>
 
+#include "core/Mpe.h"
 #include "platform/NativeEmbed.h"
 #include "platform/Paths.h"
 
@@ -241,6 +242,154 @@ private:
 // --- plugin UI window ----------------------------------------------------------------
 class ClapEditor;
 
+// --- what outlives the instance ---------------------------------------------------------
+// CLAP's threading rules (issue #46): deactivate and destroy belong on the main thread, stop_processing on an audio
+// thread, and a strict plugin (u-he's) aborts the whole process when a host breaks them. A ClapInstance can be
+// deleted on any thread (an export's thread drops the last reference to its rack), and the message thread may be
+// busy or blocked just then, for as long as it likes: it may even be waiting for that very thread. So what the plugin
+// needs until it is destroyed lives here, not in the instance: the plugin, its module, the clap_host_t it was created
+// with (the plugin may call it from deactivate / destroy) and the processing handshake. The instance's destructor
+// hands this block to the message thread and waits a moment for it; when the message thread does not answer, the
+// instance goes anyway and the plugin is deactivated and destroyed whenever the message thread is free again, or by
+// finishPendingTeardowns() when the application closes. Nothing here is ever called on another thread instead.
+class ClapInstance;
+
+struct ClapLife
+{
+    const clap_plugin_t* plugin = nullptr;
+    std::shared_ptr<ClapModule> module; // (released after destroy, on the message thread: the DLL's deinit too)
+    clap_host_t host {};
+    std::atomic<ClapInstance*> owner { nullptr }; // nullptr once the instance is gone
+    std::atomic<bool> active { false };            // (atomic: prepareToPlay reads it on the export's thread)
+    std::atomic<std::thread::id> audioThread {};
+    // gate: held by the block in progress, or by the main thread while it (de)activates (holdProcessing);
+    // processing: start_processing succeeded and stop_processing was not called yet
+    std::atomic<bool> restartPending { false }, gate { false }, stopRequest { false }, processing { false };
+    std::atomic<juce::uint32> lastBlockMs { 0 };
+    juce::WaitableEvent tornDown { true };
+
+    static bool isMessageThread()
+    {
+        auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+        return mm == nullptr || mm->isThisTheMessageThread();
+    }
+
+    // CLAP's threading rules (issue #46: u-he plugins abort when they are broken): activate / deactivate on the main
+    // thread, start_processing / stop_processing on the audio thread, and never deactivate while processing. Main
+    // thread side: holds every block off (they output silence), has the audio thread call stop_processing at its next
+    // block when blocks are flowing, and waits for the block in progress to end. When no block comes (playback
+    // stopped, the export finished, the plugin is being deleted), the audio thread is idle: a short-lived thread then
+    // stands in for it (thread_check reports it as the audio thread while it calls stop_processing). Returns false,
+    // still holding the blocks off, when a block never ends (the plugin crashed inside process).
+    bool holdProcessing()
+    {
+        restartPending.store (true);
+        if (processing.load())
+        {
+            const auto now = juce::Time::getMillisecondCounter();
+            // blocks are flowing (on another thread: an offline render on this one is over): the next one stops it
+            if (now - lastBlockMs.load() < 250 && audioThread.load() != std::this_thread::get_id())
+            {
+                stopRequest.store (true);
+                while (processing.load() && juce::Time::getMillisecondCounter() - now < 500)
+                    std::this_thread::yield();
+            }
+        }
+
+        const auto start = juce::Time::getMillisecondCounter();
+        while (gate.exchange (true))
+        {
+            if (juce::Time::getMillisecondCounter() - start > 2000)
+            {
+                stopRequest.store (false);
+                return false;
+            }
+            std::this_thread::yield();
+        }
+        stopRequest.store (false);
+
+        if (processing.load()) // no block came: stop it from a stand-in audio thread
+        {
+            const auto previous = audioThread.load();
+            std::thread standIn ([this] {
+                audioThread.store (std::this_thread::get_id());
+                plugin->stop_processing (plugin);
+            });
+            standIn.join();
+            audioThread.store (previous);
+            processing.store (false);
+        }
+        return true;
+    }
+
+    // The message thread: stop_processing (by the stand-in audio thread), deactivate, destroy, then the module.
+    // (A plugin stuck inside process is not deactivated, as before: it is left alone.)
+    void tearDown()
+    {
+        if (plugin != nullptr)
+        {
+            if (active.load() && holdProcessing())
+                plugin->deactivate (plugin);
+            active.store (false);
+            plugin->destroy (plugin);
+            plugin = nullptr;
+        }
+        module = nullptr;
+        tornDown.signal();
+    }
+
+    // --- the teardowns waiting for the message thread --------------------------------------
+    struct Pending
+    {
+        std::mutex lock;
+        std::vector<std::shared_ptr<ClapLife>> list;
+        std::atomic<int> waitMs { 10000 };
+        std::atomic<int> deferred { 0 }; // how many the instance's destructor did not see finished (diagnostics, tests)
+    };
+    static Pending& pending()
+    {
+        static auto* p = new Pending(); // (never destroyed: a teardown may be queued while the process ends)
+        return *p;
+    }
+
+    // Runs every queued teardown; on the message thread only (anywhere else it does nothing).
+    static void drain()
+    {
+        if (! isMessageThread())
+            return;
+        for (;;)
+        {
+            std::vector<std::shared_ptr<ClapLife>> now;
+            {
+                const std::lock_guard<std::mutex> l (pending().lock);
+                now.swap (pending().list);
+            }
+            if (now.empty())
+                return;
+            for (auto& life : now)
+                life->tearDown();
+        }
+    }
+
+    // The end of an instance, on whatever thread deletes it.
+    static void finish (std::shared_ptr<ClapLife> life)
+    {
+        life->owner.store (nullptr);
+        if (isMessageThread())
+        {
+            life->tearDown();
+            return;
+        }
+        {
+            const std::lock_guard<std::mutex> l (pending().lock);
+            pending().list.push_back (life);
+        }
+        // (not posted: the message loop has ended, the application is closing and finishPendingTeardowns() runs it)
+        if (! juce::MessageManager::callAsync ([] { drain(); }) || ! life->tornDown.wait (pending().waitMs.load()))
+            ++pending().deferred;
+    }
+};
+
 // --- instance ------------------------------------------------------------------------
 class ClapInstance final : public juce::AudioPluginInstance
 {
@@ -248,14 +397,17 @@ public:
     ClapInstance (std::shared_ptr<ClapModule> m, const clap_plugin_t* p, const juce::PluginDescription& d)
         : AudioPluginInstance (busesFor (d)),
           plugin (p),
-          module (std::move (m)),
           description (d)
     {
+        life->module = std::move (m);
+        life->owner.store (this);
+        life->host = makeHost();
     }
 
     // Second phase (needs `this` ready as host_data): init + extensions + parameters.
     bool initialise()
     {
+        life->plugin = plugin;
         if (! plugin->init (plugin))
             return false;
 
@@ -313,75 +465,15 @@ public:
        #endif
 
         // (stop_processing on an audio thread, never here: issue #46; a plugin stuck inside process is left alone).
-        // Deleted on another thread: deactivate and destroy go to the message thread, which this waits for (done
-        // here only when the message thread does not answer in 10 s: it is blocked, and the plugin can't wait).
-        auto teardown = [this] {
-            if (active && holdProcessing())
-                plugin->deactivate (plugin);
-            if (plugin != nullptr)
-                plugin->destroy (plugin);
-        };
-        if (isMessageThread())
-            teardown();
-        else if (auto call = MainCall::post (teardown); ! call->waitOrCancel (10000))
-            teardown();
+        // Deleted on another thread: deactivate and destroy go to the message thread, which this waits a moment for;
+        // they are never done here instead (see ClapLife).
+        life->plugin = plugin;
+        ClapLife::finish (std::move (life));
     }
 
-    // A call made on the message thread for another thread, which waits for it (CLAP: activate / deactivate on the
-    // main thread, issue #46).
-    struct MainCall
-    {
-        std::mutex lock;
-        bool started = false, cancelled = false;
-        juce::WaitableEvent done;
-        std::function<void()> fn;
+    static bool isMessageThread() { return ClapLife::isMessageThread(); }
 
-        static std::shared_ptr<MainCall> post (std::function<void()> fn)
-        {
-            auto call = std::make_shared<MainCall>();
-            call->fn = std::move (fn);
-            if (! juce::MessageManager::callAsync ([call] { call->run(); }))
-                call->run(); // (no message loop any more: here)
-            return call;
-        }
-
-        void run()
-        {
-            {
-                const std::lock_guard<std::mutex> l (lock);
-                if (cancelled)
-                    return;
-                started = true;
-            }
-            fn();
-            done.signal();
-        }
-
-        // true when it ran within timeoutMs, or was running then (waited for); false when it was cancelled unrun
-        bool waitOrCancel (int timeoutMs)
-        {
-            if (done.wait (timeoutMs))
-                return true;
-            {
-                const std::lock_guard<std::mutex> l (lock);
-                if (! started)
-                {
-                    cancelled = true;
-                    return false;
-                }
-            }
-            done.wait (-1);
-            return true;
-        }
-    };
-
-    static bool isMessageThread()
-    {
-        auto* mm = juce::MessageManager::getInstanceWithoutCreating();
-        return mm == nullptr || mm->isThisTheMessageThread();
-    }
-
-    static const clap_host_t* hostFor (ClapInstance* self) { return &self->host; }
+    static const clap_host_t* hostFor (ClapInstance* self) { return &self->life->host; }
 
     // --- AudioProcessor -------------------------------------------------------------
     const juce::String getName() const override { return description.name; }
@@ -400,7 +492,9 @@ public:
 
     // Runs fn here on the message thread; from another thread (an export at another rate or block size) on the
     // message thread, waiting up to 5 s for it. A message thread that doesn't answer in time is busy: fn then runs
-    // when it gets there; until then the plugin keeps its current activation.
+    // when it gets there; until then the plugin keeps its current activation. With no message loop any more (the
+    // application is closing) fn does not run at all: activate / deactivate are never called on another thread
+    // (issue #46), and the teardown deactivates the plugin on the message thread.
     void onMessageThreadFor (std::function<void()> fn)
     {
         if (isMessageThread())
@@ -408,10 +502,13 @@ public:
             fn();
             return;
         }
-        MainCall::post ([alive = alive, fn = std::move (fn)] {
-            if (*alive)
-                fn();
-        })->done.wait (5000);
+        auto done = std::make_shared<juce::WaitableEvent>();
+        if (juce::MessageManager::callAsync ([alive = alive, fn = std::move (fn), done] {
+                if (*alive)
+                    fn();
+                done->signal();
+            }))
+            done->wait (5000);
     }
 
     // deactivates (when active) and activates the plugin again
@@ -451,53 +548,7 @@ public:
         });
     }
 
-    // CLAP's threading rules (issue #46: u-he plugins abort when they are broken): activate / deactivate on the main
-    // thread, start_processing / stop_processing on the audio thread, and never deactivate while processing. Main
-    // thread side: holds every block off (they output silence), has the audio thread call stop_processing at its next
-    // block when blocks are flowing, and waits for the block in progress to end. When no block comes (playback
-    // stopped, the export finished, the plugin is being deleted), the audio thread is idle: a short-lived thread then
-    // stands in for it (thread_check reports it as the audio thread while it calls stop_processing). Returns false,
-    // still holding the blocks off, when a block never ends (the plugin crashed inside process).
-    bool holdProcessing()
-    {
-        restartPending.store (true);
-        if (processing.load())
-        {
-            const auto now = juce::Time::getMillisecondCounter();
-            // blocks are flowing (on another thread: an offline render on this one is over): the next one stops it
-            if (now - lastBlockMs.load() < 250 && audioThread.load() != std::this_thread::get_id())
-            {
-                stopRequest.store (true);
-                while (processing.load() && juce::Time::getMillisecondCounter() - now < 500)
-                    std::this_thread::yield();
-            }
-        }
-
-        const auto start = juce::Time::getMillisecondCounter();
-        while (gate.exchange (true))
-        {
-            if (juce::Time::getMillisecondCounter() - start > 2000)
-            {
-                stopRequest.store (false);
-                return false;
-            }
-            std::this_thread::yield();
-        }
-        stopRequest.store (false);
-
-        if (processing.load()) // no block came: stop it from a stand-in audio thread
-        {
-            const auto previous = audioThread.load();
-            std::thread standIn ([this] {
-                audioThread.store (std::this_thread::get_id());
-                plugin->stop_processing (plugin);
-            });
-            standIn.join();
-            audioThread.store (previous);
-            processing.store (false);
-        }
-        return true;
-    }
+    bool holdProcessing() { return life->holdProcessing(); } // (the handshake itself: ClapLife)
 
     void releaseProcessing()
     {
@@ -735,6 +786,15 @@ private:
         return audioPorts->get (plugin, 0, input, &info) ? juce::jmin (16, (int) info.channel_count) : fallback;
     }
 
+public:
+    // issue #108: see setClapNoteExpressions (engine/ClapFormat.h)
+    bool setNoteExpressions (float bendRange) noexcept
+    {
+        expressionRange.store (midiDialect ? 0.0f : juce::jmax (0.0f, bendRange), std::memory_order_relaxed);
+        return ! midiDialect;
+    }
+
+private:
     void addMidi (const juce::MidiMessage& m, uint32_t time)
     {
         const auto channel = (int16_t) juce::jlimit (0, 15, m.getChannel() - 1);
@@ -770,6 +830,22 @@ private:
             return;
         }
 
+        // issue #108: a member channel's bend / CC 74 / pressure as a note expression for the notes on that channel
+        const auto range = expressionRange.load (std::memory_order_relaxed);
+        if (mpe::NoteExpression x; ! midiDialect && range > 0.0f && mpe::toNoteExpression (m.getRawData(), m.getRawDataSize(), range, x))
+        {
+            auto e = makeEvent<clap_event_note_expression_t> (CLAP_EVENT_NOTE_EXPRESSION, time);
+            e.expression_id = x.expr == mpe::Expr::pitch ? CLAP_NOTE_EXPRESSION_TUNING
+                              : x.expr == mpe::Expr::timbre ? CLAP_NOTE_EXPRESSION_BRIGHTNESS : CLAP_NOTE_EXPRESSION_PRESSURE;
+            e.note_id = -1;
+            e.port_index = 0;
+            e.channel = (int16_t) x.channel;
+            e.key = -1;
+            e.value = x.value;
+            events.add (e);
+            return;
+        }
+
         if (m.getRawDataSize() <= 3)
         {
             auto e = makeEvent<clap_event_midi_t> (CLAP_EVENT_MIDI, time);
@@ -780,7 +856,10 @@ private:
     }
 
     // --- the host as seen by the plugin -----------------------------------------------------
-    static ClapInstance* from (const clap_host_t* h) { return static_cast<ClapInstance*> (h->host_data); }
+    // host_data is the ClapLife: the plugin may call its host until it is destroyed, which can be after the instance
+    // is gone (from: nullptr then; what needs no instance, the extension tables and thread_check, keeps answering)
+    static ClapLife* lifeOf (const clap_host_t* h) { return static_cast<ClapLife*> (h->host_data); }
+    static ClapInstance* from (const clap_host_t* h) { return lifeOf (h)->owner.load(); }
 
     void onMainThread (std::function<void()> fn)
     {
@@ -794,29 +873,30 @@ private:
     {
         clap_host_t h {};
         h.clap_version = CLAP_VERSION;
-        h.host_data = this;
+        h.host_data = life.get();
         h.name = "LYNX";
         h.vendor = "LYNX";
         h.url = "";
         h.version = JUCE_APPLICATION_VERSION_STRING;
-        h.get_extension = [] (const clap_host_t* hh, const char* id) -> const void* {
-            auto* self = from (hh);
-
-            if (std::strcmp (id, CLAP_EXT_LOG) == 0) return &self->hostLog;
-            if (std::strcmp (id, CLAP_EXT_THREAD_CHECK) == 0) return &self->hostThreadCheck;
-            if (std::strcmp (id, CLAP_EXT_PARAMS) == 0) return &self->hostParams;
-            if (std::strcmp (id, CLAP_EXT_STATE) == 0) return &self->hostState;
-            if (std::strcmp (id, CLAP_EXT_LATENCY) == 0) return &self->hostLatency;
-            if (std::strcmp (id, CLAP_EXT_GUI) == 0) return &self->hostGui;
-            if (std::strcmp (id, CLAP_EXT_TIMER_SUPPORT) == 0) return &self->hostTimers;
+        // (the tables belong to no instance: a plugin keeps the pointers it got for as long as it lives)
+        h.get_extension = [] (const clap_host_t*, const char* id) -> const void* {
+            if (std::strcmp (id, CLAP_EXT_LOG) == 0) return &hostLog();
+            if (std::strcmp (id, CLAP_EXT_THREAD_CHECK) == 0) return &hostThreadCheck();
+            if (std::strcmp (id, CLAP_EXT_PARAMS) == 0) return &hostParams();
+            if (std::strcmp (id, CLAP_EXT_STATE) == 0) return &hostState();
+            if (std::strcmp (id, CLAP_EXT_LATENCY) == 0) return &hostLatency();
+            if (std::strcmp (id, CLAP_EXT_GUI) == 0) return &hostGui();
+            if (std::strcmp (id, CLAP_EXT_TIMER_SUPPORT) == 0) return &hostTimers();
            #if JUCE_LINUX || JUCE_BSD
-            if (std::strcmp (id, CLAP_EXT_POSIX_FD_SUPPORT) == 0) return &self->hostFds;
+            if (std::strcmp (id, CLAP_EXT_POSIX_FD_SUPPORT) == 0) return &hostFds();
            #endif
             return nullptr;
         };
         h.request_restart = [] (const clap_host_t* hh) {
             // restart on the UI thread with the same settings (new latency, ports...)
             auto* self = from (hh);
+            if (self == nullptr)
+                return;
             self->onMainThread ([self] {
                 // the rack calls processBlock directly (no callback lock), so suspendProcessing alone would not
                 // stop it: reactivate holds new blocks off, has the audio thread stop processing and waits for the
@@ -827,29 +907,26 @@ private:
         };
         h.request_process = [] (const clap_host_t*) {};
         h.request_callback = [] (const clap_host_t* hh) {
-            auto* self = from (hh);
-            self->onMainThread ([self] { self->plugin->on_main_thread (self->plugin); });
+            if (auto* self = from (hh))
+                self->onMainThread ([self] { self->plugin->on_main_thread (self->plugin); });
         };
         return h;
     }
 
-    std::shared_ptr<ClapModule> module;
     juce::PluginDescription description;
     std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>> (true);
+    std::shared_ptr<ClapLife> life = std::make_shared<ClapLife>(); // (the host the plugin sees: outlives this)
 
-public:
-    clap_host_t host = makeHost();
-
-private:
     const clap_plugin_params_t* params = nullptr;
     const clap_plugin_state_t* state = nullptr;
     const clap_plugin_latency_t* latency = nullptr;
     const clap_plugin_audio_ports_t* audioPorts = nullptr;
     bool midiDialect = false;
+    std::atomic<float> expressionRange { 0.0f }; // issue #108: > 0 = member channels' MPE data go out as note expressions
     bool initialised = false;
 
-    std::atomic<bool> active { false }; // (atomic: prepareToPlay reads them on the export's thread)
-    std::atomic<double> activeRate { 0.0 };
+    std::atomic<bool>& active = life->active;
+    std::atomic<double> activeRate { 0.0 }; // (atomic: prepareToPlay reads them on the export's thread)
     std::atomic<int> maxBlock { 0 };
     int inputChannels = 0, outputChannels = 2;
     int64_t steadyTime = 0;
@@ -858,23 +935,41 @@ private:
     ParamQueue pendingParams;
     std::unordered_map<clap_id, ClapParameter*> byId;
     std::array<bool, 16 * 128> heldNotes {};
-    std::atomic<std::thread::id> audioThread {};
-    // gate: held by the block in progress, or by the main thread while it (de)activates (holdProcessing);
-    // processing: start_processing succeeded and stop_processing was not called yet
-    std::atomic<bool> restartPending { false }, gate { false }, stopRequest { false }, processing { false };
-    std::atomic<juce::uint32> lastBlockMs { 0 };
+    // the processing handshake (ClapLife: the teardown needs it after this instance)
+    std::atomic<std::thread::id>& audioThread = life->audioThread;
+    std::atomic<bool>& restartPending = life->restartPending;
+    std::atomic<bool>& gate = life->gate;
+    std::atomic<bool>& stopRequest = life->stopRequest;
+    std::atomic<bool>& processing = life->processing;
+    std::atomic<juce::uint32>& lastBlockMs = life->lastBlockMs;
 
-    clap_host_log_t hostLog { [] (const clap_host_t*, clap_log_severity, const char* msg) { juce::ignoreUnused (msg); DBG ("CLAP: " << msg); } };
-    clap_host_thread_check_t hostThreadCheck {
-        [] (const clap_host_t*) { return juce::MessageManager::existsAndIsCurrentThread(); },
-        [] (const clap_host_t* hh) { return from (hh)->audioThread.load() == std::this_thread::get_id(); }
-    };
-    clap_host_params_t hostParams {
-        [] (const clap_host_t*, clap_param_rescan_flags) {},
-        [] (const clap_host_t*, clap_id, clap_param_clear_flags) {},
-        [] (const clap_host_t*) {}
-    };
-    clap_host_state_t hostState { [] (const clap_host_t*) {} };
+    static const clap_host_log_t& hostLog()
+    {
+        static const clap_host_log_t e { [] (const clap_host_t*, clap_log_severity, const char* msg) { juce::ignoreUnused (msg); DBG ("CLAP: " << msg); } };
+        return e;
+    }
+    static const clap_host_thread_check_t& hostThreadCheck()
+    {
+        static const clap_host_thread_check_t e {
+            [] (const clap_host_t*) { return juce::MessageManager::existsAndIsCurrentThread(); },
+            [] (const clap_host_t* hh) { return lifeOf (hh)->audioThread.load() == std::this_thread::get_id(); }
+        };
+        return e;
+    }
+    static const clap_host_params_t& hostParams()
+    {
+        static const clap_host_params_t e {
+            [] (const clap_host_t*, clap_param_rescan_flags) {},
+            [] (const clap_host_t*, clap_id, clap_param_clear_flags) {},
+            [] (const clap_host_t*) {}
+        };
+        return e;
+    }
+    static const clap_host_state_t& hostState()
+    {
+        static const clap_host_state_t e { [] (const clap_host_t*) {} };
+        return e;
+    }
     // timer-support: plugin GUIs (on Linux above all) repaint and poll from host timers, on the main thread
     struct PluginTimer final : juce::Timer
     {
@@ -889,22 +984,27 @@ private:
     };
     std::map<clap_id, std::unique_ptr<PluginTimer>> timers;
     clap_id nextTimer = 1;
-    clap_host_timer_support_t hostTimers {
-        [] (const clap_host_t* hh, uint32_t periodMs, clap_id* timerId) {
-            auto* self = from (hh);
-            if (timerId == nullptr || ! juce::MessageManager::existsAndIsCurrentThread())
-                return false;
-            const auto id = self->nextTimer++;
-            auto timer = std::make_unique<PluginTimer> (*self, id);
-            timer->startTimer ((int) juce::jlimit<uint32_t> (1, 10000, periodMs));
-            self->timers[id] = std::move (timer);
-            *timerId = id;
-            return true;
-        },
-        [] (const clap_host_t* hh, clap_id timerId) {
-            return from (hh)->timers.erase (timerId) > 0;
-        }
-    };
+    static const clap_host_timer_support_t& hostTimers()
+    {
+        static const clap_host_timer_support_t e {
+            [] (const clap_host_t* hh, uint32_t periodMs, clap_id* timerId) {
+                auto* self = from (hh);
+                if (self == nullptr || timerId == nullptr || ! juce::MessageManager::existsAndIsCurrentThread())
+                    return false;
+                const auto id = self->nextTimer++;
+                auto timer = std::make_unique<PluginTimer> (*self, id);
+                timer->startTimer ((int) juce::jlimit<uint32_t> (1, 10000, periodMs));
+                self->timers[id] = std::move (timer);
+                *timerId = id;
+                return true;
+            },
+            [] (const clap_host_t* hh, clap_id timerId) {
+                auto* self = from (hh); // (gone: its timers went with it)
+                return self != nullptr && self->timers.erase (timerId) > 0;
+            }
+        };
+        return e;
+    }
    #if JUCE_LINUX || JUCE_BSD
     // posix-fd-support: X11/Wayland plugin GUIs watch their own sockets through the host's event loop
     std::vector<int> fds;
@@ -915,6 +1015,8 @@ private:
     }
     static bool watchFd (ClapInstance* self, int fd, clap_posix_fd_flags_t flags)
     {
+        if (self == nullptr)
+            return false;
         juce::LinuxEventLoop::unregisterFdCallback (fd);
         juce::LinuxEventLoop::registerFdCallback (fd, [self, flags] (int f) {
             if (const auto* ext = static_cast<const clap_plugin_posix_fd_support_t*> (self->plugin->get_extension (self->plugin, CLAP_EXT_POSIX_FD_SUPPORT)))
@@ -924,45 +1026,63 @@ private:
             self->fds.push_back (fd);
         return true;
     }
-    clap_host_posix_fd_support_t hostFds {
-        [] (const clap_host_t* hh, int fd, clap_posix_fd_flags_t flags) { return watchFd (from (hh), fd, flags); },
-        [] (const clap_host_t* hh, int fd, clap_posix_fd_flags_t flags) { return watchFd (from (hh), fd, flags); },
-        [] (const clap_host_t* hh, int fd) {
-            auto* self = from (hh);
-            juce::LinuxEventLoop::unregisterFdCallback (fd);
-            const auto it = std::find (self->fds.begin(), self->fds.end(), fd);
-            if (it == self->fds.end())
-                return false;
-            self->fds.erase (it);
-            return true;
-        }
-    };
+    static const clap_host_posix_fd_support_t& hostFds()
+    {
+        static const clap_host_posix_fd_support_t e {
+            [] (const clap_host_t* hh, int fd, clap_posix_fd_flags_t flags) { return watchFd (from (hh), fd, flags); },
+            [] (const clap_host_t* hh, int fd, clap_posix_fd_flags_t flags) { return watchFd (from (hh), fd, flags); },
+            [] (const clap_host_t* hh, int fd) {
+                auto* self = from (hh);
+                if (self == nullptr) // (gone: its descriptors were unregistered with it)
+                    return false;
+                juce::LinuxEventLoop::unregisterFdCallback (fd);
+                const auto it = std::find (self->fds.begin(), self->fds.end(), fd);
+                if (it == self->fds.end())
+                    return false;
+                self->fds.erase (it);
+                return true;
+            }
+        };
+        return e;
+    }
    #endif
 
-    clap_host_latency_t hostLatency { [] (const clap_host_t* hh) {
-        auto* self = from (hh);
-        self->onMainThread ([self] {
-            if (self->latency != nullptr && self->active)
-                self->setLatencySamples ((int) self->latency->get (self->plugin));
-        });
-    } };
-    clap_host_gui_t hostGui {
-        [] (const clap_host_t*) {},
-        [] (const clap_host_t* hh, uint32_t w, uint32_t h) {
+    static const clap_host_latency_t& hostLatency()
+    {
+        static const clap_host_latency_t e { [] (const clap_host_t* hh) {
             auto* self = from (hh);
-            self->onMainThread ([self, w, h] {
-                if (auto* e = self->editor.getComponent())
-                {
-                    const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
-                    e->setSize (juce::roundToInt (w / scale), juce::roundToInt (h / scale));
-                }
+            if (self == nullptr)
+                return;
+            self->onMainThread ([self] {
+                if (self->latency != nullptr && self->active)
+                    self->setLatencySamples ((int) self->latency->get (self->plugin));
             });
-            return true;
-        },
-        [] (const clap_host_t*) { return false; },
-        [] (const clap_host_t*) { return false; },
-        [] (const clap_host_t*, bool) {}
-    };
+        } };
+        return e;
+    }
+    static const clap_host_gui_t& hostGui()
+    {
+        static const clap_host_gui_t e {
+            [] (const clap_host_t*) {},
+            [] (const clap_host_t* hh, uint32_t w, uint32_t h) {
+                auto* self = from (hh);
+                if (self == nullptr)
+                    return false;
+                self->onMainThread ([self, w, h] {
+                    if (auto* e = self->editor.getComponent())
+                    {
+                        const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
+                        e->setSize (juce::roundToInt (w / scale), juce::roundToInt (h / scale));
+                    }
+                });
+                return true;
+            },
+            [] (const clap_host_t*) { return false; },
+            [] (const clap_host_t*) { return false; },
+            [] (const clap_host_t*, bool) {}
+        };
+        return e;
+    }
 };
 
 void ClapParameter::setValue (float v)
@@ -1166,6 +1286,21 @@ void ClapPluginFormat::createPluginInstance (const juce::PluginDescription& d, d
     callback (nullptr, juce::String::fromUTF8 ("plugin not found in file ") + d.fileOrIdentifier);
 }
 
+// (a format goes with its plugin host: when that is on the message thread, nothing stays queued behind it)
+ClapPluginFormat::~ClapPluginFormat() { finishPendingTeardowns(); }
+
+void ClapPluginFormat::finishPendingTeardowns() { ClapLife::drain(); }
+
+int ClapPluginFormat::pendingTeardowns()
+{
+    const std::lock_guard<std::mutex> l (ClapLife::pending().lock);
+    return (int) ClapLife::pending().list.size();
+}
+
+int ClapPluginFormat::deferredTeardowns() { return ClapLife::pending().deferred.load(); }
+
+void ClapPluginFormat::setTeardownWaitMs (int ms) { ClapLife::pending().waitMs.store (juce::jmax (0, ms)); }
+
 void addPluginFormats (juce::AudioPluginFormatManager& manager)
 {
     manager.addDefaultFormats();
@@ -1185,5 +1320,11 @@ std::string clapPluginId (const juce::PluginDescription& description)
         if (const auto* d = module->factory->get_plugin_descriptor (module->factory, i); d != nullptr && d->id != nullptr && idHash (d->id) == description.uniqueId)
             return d->id;
     return {};
+}
+bool setClapNoteExpressions (juce::AudioPluginInstance& plugin, float bendRange)
+{
+    if (auto* clap = dynamic_cast<ClapInstance*> (&plugin))
+        return clap->setNoteExpressions (bendRange);
+    return false;
 }
 } // namespace lynx

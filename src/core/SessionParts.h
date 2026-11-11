@@ -20,7 +20,10 @@ namespace lynx::parts
 // Adds (or finds, by name) the guest a project is sent to: a new tag, his reserved inserts and rows after whatever the
 // project uses and the other guests' ranges, his colour and whether he may keep a full copy. The host's own record
 // (tag 1, `hostName`) is created first if missing. nullptr when the session is full (session::maxParticipants).
-SessionParticipant* invite (Song& host, const std::string& hostName, const std::string& guestName, std::uint32_t colour, bool keepFull);
+// `maxRecords`: how many participants the song may know in all. Live sessions (round 190ah) allow more records than
+// people online at once (session::maxParticipants), so someone new can join after someone else left for good.
+SessionParticipant* invite (Song& host, const std::string& hostName, const std::string& guestName, std::uint32_t colour, bool keepFull,
+                            int maxRecords = session::maxParticipants);
 
 // The copy of the host's project the guest gets: the same song, edited as `guestTag` from now on.
 Song guestCopy (const Song& host, std::uint32_t guestTag);

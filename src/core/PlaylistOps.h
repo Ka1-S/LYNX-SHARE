@@ -134,6 +134,20 @@ std::string describe (const Song& song, int track);
 // source", "Recording / Monitoring" and "Arm/disarm recording" buttons that act on its linked mixer track; unassigned and
 // instrument tracks have none). -1 when `track` is not an audio track linked to an existing insert.
 int armableInsert (const Song& song, int track);
+// FL 2026's Playlist menu › View › Track headers (round 190w; [DFM] EEShowAudioTrackControlsAction Checked=true,
+// EEShowAudioTrackMetersAction Checked=true, EEShowInstrumentTrackMetersAction unchecked; [SHOT] FL 2026 flgap190w):
+// "Show controls on audio tracks", "Show levels on audio tracks", "Show levels on instrument tracks". User options, not
+// saved in the project (FL keeps them with its settings).
+struct HeaderOptions
+{
+    bool audioControls = true;
+    bool audioLevels = true;
+    bool instrumentLevels = false;
+};
+// The mixer track whose level a track header shows (FL draws a stereo peak meter beside the header): an audio track's
+// linked mixer track while audioLevels is on; an instrument track's channel's mixer track (0 = the Master) while
+// instrumentLevels is on. -1 = no meter on this track.
+int meteredInsert (const Song& song, int track, const HeaderOptions& options);
 // Audio clips placed on an audio track play through its mixer track (issue #15, FL 2026 [DECOMP FLEngine FUN_00e66ba0 /
 // FUN_00e66580]): only the clips an edit placed (`touched`: moved, painted, pasted, duplicated, dropped — indices into
 // song.playlist) are routed, never the others, so a channel routed by hand stays where the user put it until its clip
@@ -147,8 +161,49 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
 // (see above), each once, in clip order.
 std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& touched);
 
+// Playlist › Edit › "Drop audio on track headers" (round 189e; FLEngine 2026 [DECOMP] FUN_00e71980 places one file, FUN_00e71430
+// asks, FUN_00e79d60 walks the dropped files; EEDropAudioToPL1..4Action Tags 256..258 / none, saved as DropAudioToPLMode).
+// FL acts only on an unassigned track; each further file goes to the next track. `Ask` (FL's default, "Always ask") shows
+// "Dropped sample(s)": Audio clip(s) / Audio track(s) / Instrument track(s) / Cancel, once for the whole drop.
+enum class HeaderDrop : int { ask = 0, audioClips = 256, audioTracks = 257, instrumentTracks = 258 };
+// FL's mode and its two Edit-menu companions, app settings (FL: registry, not the project): "Dropping on track header
+// locks to content" (AutoLockWhenDropping, off) and "Select tracks when samples are dropped" (SelectPLTracksOnSampleDrop, off).
+struct HeaderDropOptions
+{
+    HeaderDrop mode = HeaderDrop::ask;
+    bool lockToContent = false;
+    bool selectTracks = false;
+};
+HeaderDropOptions& headerDropOptions() noexcept;
+// One dropped sample (`path`, shown as `name`, `lengthTicks` long) on header `track` as `how` (not `ask`), FL's results
+// checked live in FL 2026 (round 189e shots f15/f21/f24): audio clips = a clip at the song start (an audio-clip channel
+// of the same file is reused), the track named and coloured after it; audio track = a new audio-clip channel (FL's
+// "<name> #2" when the name is taken), the track linked to a free mixer track and named after the channel, its clip at the
+// song start; instrument track = a new Sampler channel of the file, the track becomes its instrument track (a free mixer
+// track) with its pattern at the song start. `lock`: the track is locked to content. Returns false when `track` is not
+// an unassigned track or no mixer track is free (FL: "Can't create instrument/audio track|No available mixer track was
+// found.") — then nothing changes.
+bool dropOnHeader (Song& song, int track, const std::string& path, const std::string& name, std::int64_t lengthTicks, HeaderDrop how,
+                   bool lock);
+
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
+
+// Audio clips and the channels they play (round 190ax).
+namespace lynx::audioclips
+{
+// A Playlist audio clip only sounds on an audio clip channel: its voice key (audioClipKey) is no note for a Sampler,
+// which drops it, so a clip that points at a Sampler channel showed its waveform and played nothing (a file dropped on
+// an audio clip channel's Channel rack row turned it into a Sampler; so does a project written by hand). The channels
+// such clips point at, in every clip list (arrangements, clip grid), are put right: a Sampler with a file and no notes
+// becomes the audio clip channel it is used as; one that also plays notes keeps them and its clips move to an audio
+// clip copy of it (same file, levels and mixer track). Clips on channels that hold no sample file are left as they
+// are. Returns how many channels were changed or added.
+int repairChannels (Song& song);
+// The same channel loads another file: an audio clip channel stays one (FL: the channel's type does not change with
+// its sample), a Granulizer / Wave Traveller keeps its engine, every other channel becomes a Sampler named after it.
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name);
+} // namespace lynx::audioclips
 
 // FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).
 namespace lynx::autoclipplace

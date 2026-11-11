@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <map>
 #include <memory>
@@ -8,7 +9,10 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/MagicLasso.h"
+#include "core/MeterBallistics.h"
 #include "core/PickerSelection.h"
+#include "core/PlaylistOps.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -75,6 +79,11 @@ public:
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
     static inline int editPatternsIn = 0;
+    // FL 2026's Playlist menu › View › Track headers (round 190w; FL's defaults): the record / input buttons on audio
+    // tracks, and a stereo level meter beside the header of audio tracks (their mixer track) and instrument tracks
+    // (their channel's mixer track). Kept with the UI settings.
+    static inline bool showAudioTrackControls = true, showAudioTrackLevels = true, showInstrumentTrackLevels = false;
+    void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
     void paint (juce::Graphics& g) override;
@@ -110,8 +119,22 @@ public:
 
     // The key map's playlist.* actions (zoom presets, ripple editing). False for unknown ids.
     bool runAction (const std::string& id);
+    // FL's Playlist menu › Edit and › Select submenus (round 189e: the items of FL's shared EEMenu the Playlist enables,
+    // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
+    juce::PopupMenu editMenu();
+    // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
+    juce::PopupMenu fadeHandleMenu (int index, int side);
+    // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
+    // --snapshot, which also sets the selection it reads (selectForSnapshot)
+    juce::PopupMenu gainMenu (int index);
+    void selectForSnapshot (std::vector<int> indices) { setSelection (std::move (indices)); }
+    juce::PopupMenu selectMenu();
+    // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
+    static inline std::function<juce::String (const std::string& id)> shortcutText;
     // FL's "Clone — What do you want to clone along with the track?" window (round 168f), for --snapshot too.
     static std::unique_ptr<juce::AlertWindow> makeCloneTracksDialog (bool groupHeaderSelected);
+    // FL's "Dropped sample(s)" question of a header drop (round 189e), for --snapshot too.
+    static std::unique_ptr<juce::AlertWindow> makeHeaderDropDialog();
 
     // Ripple editing: resizing a clip's end moves the later clips on its track, deleting closes the gap.
     bool isRippleOn() const noexcept { return ripple; }
@@ -320,6 +343,18 @@ private:
     void setTimeSelection (std::int64_t from, std::int64_t to); // also selects the clips it touches
     void insertTimeSelection();
     void deleteTimeSelection();
+    void sliceInsertTimeSelection(); // round 189e: FL's Slice & insert space / Trim selection
+    void trimTimeSelection();
+    void shiftSelectedClips (int steps, int tracks, bool fine = false); // FL's Shift left / right / up / down; fine = FL's Alt step
+    void moveClips (std::vector<int> chosen, std::int64_t delta, int tracks, bool newUndoStep, bool keepInView); // (keys and wheel nudge)
+    void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
+    void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
+    void showFadeHandleMenu (int index, int side); // FL's fade handle menu (round 189i)
+    void selectBySelectedSource();
+    // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is
+    // "Always ask"
+    void dropOnTrackHeader (const juce::StringArray& files, int track);
+    void dropOnTrackHeaderAs (const juce::StringArray& files, int track, trackmodes::HeaderDrop how);
     // fade handle of an audio clip under the mouse: 1 = fade-in, 2 = fade-out, 0 = none
     int fadeHandleAt (int clip, juce::Point<int> p) const;
     // warp markers (round 175a, M3; a LYNX extra, the user's choice: Live edits them only in its Clip View): an audio
@@ -353,7 +388,7 @@ private:
     void deleteSelection();
     void copySelection();
     void pasteClips (std::int64_t at = -1);
-    void normalizeClips (const std::vector<int>& targets);
+    void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
@@ -457,6 +492,8 @@ private:
     int gainStartY = 0;
     static inline double copiedGainDb = 0.0;
     static inline bool hasCopiedGain = false;
+    static inline double copiedFadeMs = 0.0; // the fade handle menu's Copy value (round 189i)
+    static inline bool hasCopiedFade = false;
     // FL: a double click held on the ruler drags a time selection (as Ctrl+drag); released without moving it clears
     bool rulerDoubleDrag = false;
     bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)
@@ -514,6 +551,9 @@ private:
     void postDragHint (); // what the gesture in progress does (hint bar)
     juce::Rectangle<int> clipMenuButton (int clip) const; // the menu button in a clip's title strip (empty if too narrow)
     juce::uint32 lastWheelEdit = 0;
+    magiclasso::Trail lassoPath; // FL's Magic lasso (round 189g): the mouse trail while the option is on
+    void feedMagicLasso (juce::Point<int> p, bool buttonDown);
+    bool nudgeWithWheel (juce::Point<int> p, float deltaY); // FL's Shift+wheel nudge (round 189g); true = handled
     double zoomBeforeAll = 0.0, scrollBeforeAll = 0.0; // Ctrl+right-click: zoom to everything and back
 
     // smooth wheel scrolling
@@ -524,6 +564,13 @@ private:
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
     ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
+    // round 190w: the track headers' level meters (FL's "Show levels on audio / instrument tracks")
+    int meteredInsertOf (int track) const;
+    bool updateMeterColumn();        // true when the column appeared or went away
+    bool stepHeaderMeters (double nowMs);
+    int meterColumn = 0;             // px at the right of the headers for the meters (0 = no track shows one)
+    std::map<int, std::array<meters::PeakHold, 2>> headerLevels; // per mixer track shown
+    double headerMeterMs = -1.0;
 
     void zoomAroundCentre (double factor);
     void zoomToBars (int bars);
@@ -626,8 +673,14 @@ public:
     void setTitleBarInsets (int left, int right) override
     {
         titleLeft = left;
-        playlist.setTitleBarInsets (juce::jmax (0, left - PatternPicker::width), right);
+        titleRight = right;
+        applyTitleInsets();
         resized();
+    }
+    // the Playlist's toolbar starts after the window title; the pattern picker column (when shown) sits under the title
+    void applyTitleInsets()
+    {
+        playlist.setTitleBarInsets (juce::jmax (0, titleLeft - (pickerHidden ? 0 : PatternPicker::width)), titleRight);
     }
 
     // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
@@ -657,6 +710,7 @@ public:
             return;
         pickerHidden = hidden;
         picker.setVisible (! hidden && (clipGrid == nullptr || gridView != GridView::grid));
+        applyTitleInsets(); // (round 189k: in Simple the toolbar went under the title bar's tools by the picker's width)
         resized();
         repaint();
     }
@@ -689,6 +743,19 @@ public:
         resized();
     }
 
+    // A dock on the right, beside the Playlist (round 189k: the Simple workflow's Finish dock); not owned, nullptr = none.
+    void setSideDock (juce::Component* c, int width)
+    {
+        if (sideDock != nullptr && sideDock != c)
+            removeChildComponent (sideDock);
+        sideDock = c;
+        sideDockWidth = width;
+        if (sideDock != nullptr)
+            addAndMakeVisible (*sideDock);
+        resized();
+    }
+    juce::Component* getSideDock() const noexcept { return sideDock; }
+
     void resized() override
     {
         layoutChildren();
@@ -699,6 +766,8 @@ public:
     void layoutChildren()
     {
         auto area = getLocalBounds();
+        if (sideDock != nullptr) // under the title row (the window's buttons are there)
+            sideDock->setBounds (area.removeFromRight (juce::jmin (sideDockWidth, area.getWidth() / 2)).withTrimmedTop (PlaylistComponent::toolbarHeight));
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
             detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
         if (pickerHidden)
@@ -747,10 +816,12 @@ public:
 private:
     PatternPicker& picker;
     PlaylistComponent& playlist;
-    int titleLeft = 0;
+    int titleLeft = 0, titleRight = 0;
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
+    juce::Component* sideDock = nullptr; // (not owned)
+    int sideDockWidth = 0;
     bool pickerHidden = false;
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;

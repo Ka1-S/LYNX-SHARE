@@ -1030,6 +1030,20 @@ void setBlanks (const Genre& genre, std::vector<ChannelPlan>& channels, FlRand& 
     }
 }
 
+int suggestedTempo (const Genre& genre)
+{
+    return (int) std::lround (genre.defaultTempo);
+}
+
+int suggestedTempo (const Sources& sources, const std::string& genreId)
+{
+    const auto* genre = sources.config != nullptr ? sources.config->find (genreId) : nullptr;
+    static const Config own = builtinConfig();
+    if (genre == nullptr)
+        genre = own.find (genreId) != nullptr ? own.find (genreId) : own.find (own.defaultGenre);
+    return suggestedTempo (*genre);
+}
+
 Plan generate (const Sources& sources, const std::string& genreId, std::uint64_t seed)
 {
     Plan plan;
