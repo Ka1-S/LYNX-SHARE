@@ -322,14 +322,14 @@ word of the registrar's flag value: 1 generator, 2 delay/reverb, 3 dynamics/driv
 | 27 | Gate | dyn | 9 |
 | 28 | Limiter | dyn | 5 |
 | 29 | Autoduck | dyn | 5 / 8 |
-| 30 | Tuned EQ | EQ | ? |
-| 32 | Reverb | rev | ? |
+| 30 | Tuned EQ | EQ | 11 |
+| 32 | Reverb | rev | 16 |
 | 34 | Spacer | EQ | 7 / 8 |
 | 35 | Reverb 2 | rev | 19 |
 | 36 | Multiband Compressor | dyn | 27 / 31 |
 | 40 | Comb Filter | EQ | 12 |
 | 41 | Waveshaper | dyn | 21 |
-| 42 | Tape Stop | mod | ? |
+| 42 | Tape Stop | mod | 8 |
 | 43 | Wow & Flutter | mod | 11 |
 | 44 | Spreader | EQ | 5 |
 | 45 | Pitcher 2 | mod | ? |
@@ -434,4 +434,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    engines) and proved how the module wrapper applies Mix (linear dry/wet), Post Gain (40g − 20 dB on the output) and
    Wet Pan (a balance of the wet). Left: Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
    Stereoizer, Flanger, Autoduck (29), Tremolo and the note effects.
+   Round 190by: SuperSaw (Pocket SuperSaw), Comb Filter, Multiband Compressor and Tape Stop are LYNX engines; Reverb
+   (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Parameter counts read in the
+   code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).

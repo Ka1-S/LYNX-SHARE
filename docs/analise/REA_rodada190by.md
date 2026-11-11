@@ -47,6 +47,200 @@ Differences from FLM, by design:
 CPU (reference renderer, one core, −O1): 0.8…1.7 % of real time for the sets above (12 unison oscillators 1.7 %,
 8-voice chords 1.5 %).
 
+## 2. Pocket Comb Filter (FLM module type 40)
+
+Implementation: `src/core/PocketFxD.cpp` (`Comb`, `CombDetector`), `EffectKind::pocketComb`, "Pocket Comb Filter" in
+the mixer's effect list (Filter). LYNX parameter k = FLM parameter k + 1 (FLM's 0, Enable, is the slot's switch), as
+for every Pocket effect. No FL desktop twin. 15 shipped presets use it (PROVEN-FILE: Manual ×4, Lowest Note ×8,
+Detect Pitch ×3).
+
+### 2.1 Parameters — PROVEN-REA
+
+| FLM # | Name | Default | Law |
+|---|---|---|---|
+| 1 | Mode | 0 | `int(2v)`: Manual, Lowest Note, Detect Pitch |
+| 2 | Pitch | 0.33 | Manual with Snap off: `f = 2499·v⁴ + 1` Hz |
+| 3 | Feedback | 0.8 | `fb = v`, linear, no limiter (1 does not decay) |
+| 4 | Mix | 0.75 | wet gain added to the untouched dry |
+| 5 | Offset | 0.5 | `round(4·(v − 0.5))` octaves, −2…+2; not used in Manual |
+| 6 | Smoothing | 0.25 | per-sample glide coefficient `(1 − v²)·0.1999 + 0.0001` |
+| 7 | Snap | 1 | Manual only: play the note of 10 / 11 instead of Pitch |
+| 8 | Polarity | 0 | `int(3v)`: bit 0 = left feedback negative, bit 1 = right |
+| 9 | Asymmetry | 0.5 | `a = 0.1·(v − 0.5)`: left `f·(1 − a)`, right `f·(1 + a)` |
+| 10 | Pitch Oct | 0.5 | `o = round(7v)` |
+| 11 | Pitch Note | 0.4 | `k = round(11v)`; note `12·o + k` (69 = 440 Hz); defaults: 52, E3 |
+
+### 2.2 Signal — PROVEN-REA, the delay law MEASURED
+
+- Target frequency: Manual as above; Lowest Note = the lowest held key, remembered while none is held; Detect Pitch =
+  the detector's held output. Outside Manual the Offset octaves apply. Clamped to 1…20000 Hz, then one glide per
+  channel (`s ← s − (s − target)·c`, starting from 0 in a new module).
+- The delay is FLM's tape loop (the one of Tape Delay, `core/PocketTape.h`): with N = int(fs), the loop takes
+  `(N − 2)/s + 2` samples a turn and is read one sample later, so the comb's delay is **D = (N − 2)/s + 3 samples**,
+  not fs/s (E3 at 44.1 kHz: 270.57 samples = 163.0 Hz, 19 cents flat; 1 kHz plays 936 Hz). The loop's speed follows
+  its target by 0.1 % a sample, so a pitch change bends what is already in the loop, like tape.
+- Per channel `w = in + sign·fb·wet` goes into the loop; `out = in + mix·wet`. No saturation.
+- Detect Pitch: mid, or the louder side when the side signal is over 1.5× the mid (100 ms mean-square meters,
+  1.2× hysteresis); a 1250 Hz one-pole low-pass; blocks of 2048 samples without overlap; a block above −50 dB gets a
+  YIN estimate (difference function over lags 0…1023 with a 1024-sample window, cumulative-mean normalised, first
+  dip under 0.15, else the global minimum, parabola through it); then an outlier filter at block rate (a running RMS
+  of the estimates, k = exp(−4·2048/fs): an estimate three times off is dropped and the last accepted one kept; a
+  jump of an octave or more has to be confirmed by the mean of the last three raw estimates).
+
+### 2.3 Measured against FLM inside FL
+
+FL's `/R` render of an FL project whose only effect is "FL Studio Mobile Rack FX" holding one Comb Filter module, on
+round 188i's 28 s stimulus (sine steps, drums, noise bursts, sweep, music, tail), against LYNX's import of the same
+module (`flmfx::map` → `tools/flmfxr`, one 512-sample block before the song as FLM gets inside FL). FL writes 16-bit
+files, so about −75 dB is a null.
+
+| Set | What it holds | Score | Error (ESR) |
+|---|---|---|---|
+| defaults (Manual, Snap, E3) | the delay law, mix, feedback | 10 | −76 dB |
+| Pitch 0.5 free, fb 0.9, mix 1, no smoothing | free pitch, glide 0.2 | 10 | −74 dB |
+| Pitch 0.7, Left −, Asymmetry 0.75 | polarity, asymmetry | 10 | −78 dB |
+| Pitch 0.9, Both −, Asymmetry 1, Smoothing 0.8 | slow glide from 0 | 10 | −78 dB |
+| Lowest Note, Offset −1, no key held | plays E2: the remembered key starts as the Pitch Oct / Note pair, not 48 | 10 | −75 dB |
+| Detect Pitch, Offset +1, Smoothing 0.74, Right − | tracking on tones, sweep and music | 8 | −53 dB (sine steps −78, sweep −76, music −73, drums −42, bursts −30) |
+| Detect Pitch, defaults otherwise | — | 4 | −8 dB |
+
+The last set is not a fault to chase: **two FL renders of that same project differ from each other by the same
+amount** (−8.8 dB, score 4, first difference in the sine steps), while the set above repeats bit for bit. The cause
+found: a block that is silent except for an onset at its end has a difference function of zero at every small lag;
+FLM computes it by FFT, so what it normalises there is rounding noise, the "first dip" lands on a lag of a few samples
+(8.8 kHz), and the outlier filter then holds that value for about two seconds. LYNX has its own FFT and so its own
+noise in such blocks.
+
+Corrections to the static reading: the first key of Lowest Note (above). Not copied: on a block under the gate FLM
+applies the Offset factor to the held frequency a second time for one sample.
+
+CPU (one core, -O1 build, 28 s of stereo at 44.1 kHz): 0.26–0.40 % of real time in Manual / Lowest Note, 0.5–0.9 % in
+Detect Pitch.
+
+## 3. Pocket Multiband Compressor (FLM module type 36)
+
+Implementation: `src/core/PocketFxD.cpp` (`Multiband`), `EffectKind::pocketMultiband`, "Pocket Multiband Compressor"
+(Dynamics). 30 LYNX parameters, k = FLM's k + 1; the place of FLM's editor flag 4 is **Solo** (LYNX's own: Off / Low /
+Mid / High; the import sets Off). No FL desktop twin (not Maximus, not Fruity Multiband Compressor): a three-band
+feed-forward peak compressor working in the linear domain. Shipped modules exist with 27 and with 31 values; a
+module with fewer values gets FLM's defaults for the rest.
+
+### 3.1 Parameters — PROVEN-REA
+
+FLM's numbering; the band blocks start at 6 (low), 13 (mid) and 20 (high).
+
+| FLM # | Name | Default | Law |
+|---|---|---|---|
+| 1 | Master gain | 0.5 | `48v − 24` dB |
+| 2, 3 | Low / high crossover | 0.3, 0.7 | `20·2^(9v)` Hz (20 Hz … 10.24 kHz; 130 Hz and 1576 Hz at the defaults) |
+| 4 | (the editor's "solo the selected band" flag) | 0 | interface state; LYNX's Solo knob stands here |
+| 5 | Dry mix | 0 | `v²`, added to every band's gain (see below) |
+| b + 0 | Input gain | 0.5 | `48v − 24` dB |
+| b + 1 | Threshold | 1 | `−48·(1 − v)` dB |
+| b + 2 | Ratio | 0 | `30v + 1` |
+| b + 3 | Attack | 0.3 | `0.05·v²` s (0 … 50 ms) |
+| b + 4 | Release | 0.3 | `0.99v + 0.01` s (10 ms … 1 s) |
+| b + 5 | Gain | 0.5 | `(2v − 1)·24` dB |
+| b + 6 | State | 0 | `int(2v)`: On, Bypass (the band passes as split), Mute |
+| 27, 28, 29 | Low / mid / high width | 0.5 | see below |
+| 30 | Width mode | 0 | `int(v + 0.5)` |
+
+### 3.2 Signal — PROVEN-REA
+
+Three bands from two fourth-order Linkwitz–Riley-type crossovers: low against the rest at the low crossover, the
+rest split again at the high one, and the low band through the high crossover's low-pass + high-pass sum (an
+all-pass) so the three add up flat in level. Per band and sample, on the band's pair:
+
+1. Input and output gain glide 1 % a sample.
+2. Detector level `d = max(|gin·L|, |gin·R|)·gin` (the input gain acts twice on the detector's path).
+3. A peak follower with release (`e1 = d` when d is higher, else `e1 −= e1·cr`), then the attack smoother
+   `e2 += (e1 − e2)·ca`.
+4. A hard knee **in amplitude, not in dB**: above the threshold `G = (thr + (e2 − thr)/ratio)/e2`, else 1.
+5. `out = (dry + G)·gin·in·gout`: the dry mix is a parallel path inside each band (dry 1 without gain reduction
+   is +6 dB).
+6. Width. Mode 0: side × `clamp(2w)`, mid × `clamp(2·(1 − w))` (½ unchanged, 0 mono, 1 side only), w gliding. Mode 1:
+   up to ½ the side is scaled by `w` around an unchanged mid; above ½, `L' = L − c·R`, `R' = R − c·L'` with
+   `c = w − ½`.
+
+The bands are summed and the master gain (gliding) applied. No limiter, no clipping.
+
+The coefficients are `ca = 1 − 0.1^(1/(Ta·FS))` and `cr = 1 − 0.1^(1/(Tr·FS))` with **FS fixed at 44100 whatever the
+running rate** (the band object's own rate field is never updated): at 48 or 96 kHz the ballistics run faster by the
+rate ratio. LYNX copies that, so a project sounds as FLM plays it at that rate. Not copied: on the very first sample
+after a reset FLM's dry term is still its "unset" marker, so that one sample has the gain G − 1.
+
+### 3.3 Measured against FLM inside FL
+
+Same method as §2.3. Eight sets (defaults; two bands muted; ratio 16 under −29 dB thresholds with input gain and
+moved crossover; ratio 31 with the fastest attack and release; ratio 19 with the slowest; band gains with widths
+0.2 / 0.8 / 1; a bypassed band with width mode 1; dry mix 1 with a muted band and the master gain down): all
+**score 9 or 10, error −64…−78 dB** — a null at 16 bits in every set. CPU 0.7–1.1 % of real time.
+
+## 4. Reverb (FLM module type 32) — mapped
+
+`FlmEffects.cpp` `reverb32()`: no new engine. The module is the plate of types 12 and 35 (LYNX: Reeverb 2) behind
+type 12's knobs with its own dry / wet stage — PROVEN-REA:
+
+- DECAY (cubed), HIGH DAMP, PREDELAY, ROOM SIZE, DIFFUSION, WIDTH, LO-CUT, HI-CUT set the plate as in type 12. The
+  controls the module does not reach stay at the plate's defaults: early reflections −3.5 dB, plate −12 dB, bass ×1,
+  crossover 500 Hz.
+- Output = `dry·in + W·pan·(plate + early reflections, through the width stage) + ER²·(raw early reflections)`,
+  with `W = wetLevel·min(2·MIX, 1)`, `dry = dryLevel·(MIX ≤ ½ ? 1 : 2 − 2·MIX)`, `pan` = `clamp(2·(1 − PAN))` left
+  and `clamp(2·PAN)` right, `ER` = EARLY REFL.; parameters 14 and 15 are the unnamed wet and dry levels.
+- In Reeverb 2's terms: dry as above; wet `0.3·10^(−12/20)·W`; early `0.5·10^(−3.5/20)·W + 0.5·ER²`.
+
+Reported as partial when used: PAN off centre; WIDTH other than 100 % together with EARLY REFL. (FLM's width does not
+touch the raw early reflections, Reeverb 2's does); MOD AMOUNT above 0.
+
+Measured (five sets, same method): dry level exact to the plate's integer control (under 0.1 dB); the reverb's
+level on drums, noise, sweep and music within **0.4 dB** per channel, third-octave spectrum within 0.1 dB on average
+(1.5 dB worst band; 2.2 dB with DIFFUSION 0.5), side/mid ratio within 0.4 dB, decay equal (−15.9 against −15.8 dB in
+the half second after the music; −5.0 / −5.1 dB with DECAY 0.6). This settles the −12 dB / −3.5 dB reading. A
+reverb's tail does not null: the 170i scores are 2–6 (ESR −2…−6 dB), driven by the sine steps, where single tones
+differ by up to ±8 dB per channel between FLM's plate and Reeverb 2 (the modes of the two plates do not sit on the
+same frequencies; the same holds for types 12 and 35, which were never rendered tone by tone before). PAN 0.8:
+LYNX's left side is 7 dB too loud, as the partial note says. No shipped content uses type 32.
+
+## 5. Tuned EQ (FLM module type 30) — mapped
+
+`FlmEffects.cpp` `tunedEq()`: the Graphic EQ's eight bands (low shelf, six peaks, high shelf; a band moves twice the
+dB its knob shows, `24v − 12` on the knob) on centres an octave apart, `110·2^((n − 9)/12 + i)` Hz with the Tuning
+note `n = int(11v + 0.001)` (0 = C … 9 = A), all with the Bandwidth's `10v³ + 0.1` octaves — PROVEN-REA. Mapped to one
+or two Parametric EQ slots like the Graphic EQ.
+
+Measured (four sets): flat = exact; a mixed curve at the default Bandwidth: score 8, −39 dB (the high shelf near the
+top of the band differs by under 1 dB from FLM's design); Bandwidth 0.2 and 1.0 (0.18 and 10.1 octaves): score 3, level
+−2.3 / +2.5 dB — LYNX's EQ does not reach those shapes (peak Q 0.1…18, shelf slope 0.1…4), and the import now says so
+("Tuned EQ bandwidth beyond LYNX's EQ range"). FLM's chain also delays the signal by 8 samples (four pairs of
+filters, each handing over two samples late; MEASURED: lag −8); not reproduced. No shipped content uses type 30. An
+own eight-biquad engine would make the extremes exact; left as a decision (see the handoff).
+
+## 6. Pocket Tape Stop (FLM module type 42)
+
+Implementation: `src/core/PocketFxD.cpp` (`TapeStop`), `EffectKind::pocketTapeStop`, "Pocket Tape Stop". LYNX
+parameters: Stop time, Start time, Stop time synced, Start time synced, Play, Warp, Sync (FLM's 1, 2, 3, 4, 5, 6, 7).
+No FL desktop twin (not Gross Beat, not Fruity Scratcher). No shipped content uses it.
+
+PROVEN-REA:
+
+- A stereo recorder of 2^ceil(log2(5·fs)) samples. While Play is on and no ramp runs, the output is the input, bit
+  for bit. Play going off starts a ramp of Stop time: the output is the recording read at a speed that falls from 1
+  to 0, so the pitch falls with it; at the end the last value dies away (two steps a sample of a one-pole with
+  `a = 1 − 44.1/fs`, about 11 ms) into silence. Play going on starts a ramp of Start time: the read head speeds up
+  from the input's present position, fades in through a 200 Hz one-pole, and over the last `min(Start time, 0.1 s)`
+  cross-fades to the live input.
+- Times: free `max(5v, 0.005)` s; synced `S_k / int(BPM)` s with k = round(9v) and S = 0, 15, 22.5, 30, 45, 60, 120,
+  240, 480, 960 (¼ … 16 beats; 0 = the 5 ms floor), taken when the knob is set. Sync chooses the pair.
+- Speed along a ramp of position u (0 stopped … 1 playing): `(B^u − 1)/(B − 1)`, `B = 200^(1 − 2·Warp)` (Warp ½ is a
+  straight line; 1 keeps the speed and drops late; 0 drops early).
+- A reversal in mid-ramp continues from the present speed and takes the matching part of the time.
+- The module runs only while the song plays; stopped, the audio passes.
+
+Measured: Play on = the input (−215 dB); Play off from the start = silence, as in FL. **The ramps are not
+measured**: they need Play to change during the render, which a command-line render of an .flp cannot do with the
+tooling we have (needs a live check). Unit tests hold the laws (speed curve by zero crossings, the decay, the
+cross-fade back to the input bit for bit, reversal, synced times, 44.1 / 48 / 96 kHz). CPU 0.02 % of real time.
+
 ## Appendix A: the SuperSaw module (read in round 190ab, built in round 190by)
 
 ## A1. Host interface (vtable) — PROVEN-REA

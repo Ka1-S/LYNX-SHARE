@@ -365,7 +365,86 @@ void pocket (const flm::Module& m, EffectKind kind, const char* label, Mapped& o
         slot.params[k] = std::clamp (param (m, (int) k + 1, slot.params[k]), 0.0f, 1.0f);
     out.slots.push_back (slot);
 }
+
+// --- round 190by (REA_rodada190by.md §4, §5)
+// Reverb (module 32): the plate of modules 12 and 35 with module 12's controls; the module mixes the dry signal, the
+// plate's output (early reflections at −3.5 dB and the plate at −12 dB, the engine's own defaults, through its width
+// stage) and the raw early reflections itself.
+void reverb32 (const flm::Module& m, bool live, Mapped& out)
+{
+    out.label = "FL Studio Mobile: Reverb";
+    const auto v = [&m] (int i, float fallback) { return param (m, i, fallback); };
+    Plate p;
+    const auto decay = v (1, 0.4f);
+    p.decay = rawControl (decay * decay * decay, 1, 200);
+    p.damping = rawControl (v (2, 0.8f), 5, 221);
+    const auto mix = (double) v (3, 0.4f), er = (double) v (5, 0.25f);
+    p.predelayMs = rawControl (v (6, 0.0f), 0, 250);
+    p.room = rawControl (v (7, 1.0f), 1, 100);
+    p.diffusion = rawControl (v (8, 1.0f), 0, 100);
+    p.separation = rawControl (v (9, 1.0f), 0, 200);
+    p.lowCut = rawControl (v (10, 0.0f), 19, 3000);
+    p.highCut = rawControl (v (11, 1.0f), 5, 221);
+    const auto w = (double) v (14, 1.0f) * std::min (2.0 * mix, 1.0);
+    p.dry = (double) v (15, 1.0f) * (mix <= 0.5 ? 1.0 : 2.0 - 2.0 * mix);
+    p.wet = 0.3 * tenthsDb (-120) * w;
+    p.early = 0.5 * tenthsDb (-35) * w + 0.5 * er * er;
+    if (std::fabs (v (4, 0.5f) - 0.5f) > 1e-3f)
+        out.partial.push_back ("FL Studio Mobile: reverb pan (not reproduced)");
+    if (p.separation != 100 && er > 1e-3)
+        out.partial.push_back ("FL Studio Mobile: reverb width on the early reflections (played with the plate's width)");
+    if (v (13, 0.0f) > 1e-4f)
+        out.partial.push_back ("FL Studio Mobile: reverb modulation (not reproduced)");
+    plateSlots (p, live, out);
+}
+
+// Tuned EQ (module 30): the Graphic EQ's eight bands (low shelf, six peaks, high shelf; a band moves twice the dB
+// its knob shows) on centres an octave apart from 110 Hz × the Tuning note (0 = C … 9 = A … 11 = B), all with the
+// Bandwidth's 10v³ + 0.1 octaves.
+void tunedEq (const flm::Module& m, bool live, Mapped& out)
+{
+    out.label = "FL Studio Mobile: Tuned EQ";
+    const auto note = tunedEqNote (param (m, 9, 0.0f));
+    const auto octaves = tunedEqOctaves (param (m, 10, 0.6f));
+    std::vector<Band> bands;
+    bool outOfRange = false;
+    for (int b = 0; b < 8; ++b)
+    {
+        const auto hz = tunedEqHz (note, b);
+        const auto shown = (double) param (m, 1 + b, 0.5f) * 24.0 - 12.0;
+        const auto kind = b == 0 ? 0 : b == 7 ? 2 : 1;
+        const auto w = 2.0 * pi * hz / designRate;
+        auto band = cookbookBand (kind, hz, shown, octaves, w, out);
+        if (band.type != peq::BandType::off)
+        {
+            // the Bandwidth reaches shapes LYNX's EQ does not (0.1 … 10.1 octaves): say so once
+            const auto raw = kind == 1 ? peakQ (octaves, w) : shelfSlope (octaves, w, std::pow (10.0, band.db / 40.0));
+            if (! outOfRange && (raw < (kind == 1 ? 0.1 : 0.1) || raw > (kind == 1 ? 18.0 : 4.0) || ! std::isfinite (raw)))
+            {
+                outOfRange = true;
+                out.partial.push_back ("FL Studio Mobile: Tuned EQ bandwidth beyond LYNX's EQ range (nearest shape)");
+            }
+        }
+        if (band.type == peq::BandType::off && live)
+            band = { kind == 1 ? peq::BandType::peak : kind == 0 ? peq::BandType::lowShelf : peq::BandType::highShelf, hz, 0.0,
+                     kind == 1 ? std::clamp (peakQ (octaves, w), 0.1, 18.0) : 1.0 };
+        if (band.type != peq::BandType::off)
+            bands.push_back (band);
+    }
+    if (bands.size() <= (std::size_t) peq::bands)
+        out.slots.push_back (eqSlot (bands, 0.0));
+    else
+    {
+        out.slots.push_back (eqSlot ({ bands.begin(), bands.begin() + peq::bands }, 0.0));
+        out.slots.push_back (eqSlot ({ bands.begin() + peq::bands, bands.end() }, 0.0));
+    }
+}
+// --- end of round 190by
 } // namespace
+
+int tunedEqNote (float v) noexcept { return std::clamp ((int) (11.0f * v + 0.001f), 0, 11); }
+double tunedEqHz (int note, int band) noexcept { return 110.0 * std::pow (2.0, (double) (note - 9) / 12.0 + (double) band); }
+double tunedEqOctaves (float v) noexcept { return std::max (10.0 * (double) v * (double) v * (double) v + 0.1, 0.0001); }
 
 double equalizerHz (float v) noexcept { return std::pow (2.0, 9.25 * (double) v + 5.0); }
 double filterHz (float v) noexcept { return std::pow (2.0, 10.3 * (double) v + 4.0); }
@@ -410,6 +489,16 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
         case 41: pocket (m, EffectKind::pocketWaveshaper, "FL Studio Mobile: Waveshaper", out); break;
         case 8: pocket (m, EffectKind::pocketCompressor, "FL Studio Mobile: Compressor", out); break;
         case 44: pocket (m, EffectKind::pocketSpreader, "FL Studio Mobile: Spreader", out); break;
+        // --- round 190by
+        case 40: pocket (m, EffectKind::pocketComb, "FL Studio Mobile: Comb Filter", out); break;
+        case 36:
+            pocket (m, EffectKind::pocketMultiband, "FL Studio Mobile: Multiband Compressor", out);
+            out.slots[0].params[3] = 0.0f; // (FLM's [4] is a flag of its own editor, which solos nothing by itself)
+            break;
+        case 42: pocket (m, EffectKind::pocketTapeStop, "FL Studio Mobile: Tape Stop", out); break;
+        case 32: reverb32 (m, live, out); break;
+        case 30: tunedEq (m, live, out); break;
+        // --- end of round 190by
         default: return out;
     }
     // FLM's module wrapper (PROVEN, REA_rodada182c "F5 effects, round 188h"): Mix is a linear dry/wet blend (a LYNX

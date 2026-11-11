@@ -3168,6 +3168,35 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                 { "Separation", 0.5f } } };
             return info;
         }
+        case EffectKind::pocketComb: // round 190by
+        {
+            static const EffectInfo info { "Pocket Comb Filter", { { "Mode", 0.0f }, { "Pitch", 0.33f }, { "Feedback", 0.8f }, { "Mix", 0.75f },
+                                                                   { "Offset", 0.5f }, { "Smoothing", 0.25f }, { "Snap", 1.0f },
+                                                                   { "Polarity", 0.0f }, { "Asymmetry", 0.5f }, { "Pitch oct", 0.5f },
+                                                                   { "Pitch note", 0.4f } } };
+            return info;
+        }
+        case EffectKind::pocketMultiband: // round 190by
+        {
+            static const EffectInfo info { "Pocket Multiband Compressor",
+                                           { { "Master gain", 0.5f }, { "Low crossover", 0.3f }, { "High crossover", 0.7f }, { "Solo", 0.0f },
+                                             { "Dry mix", 0.0f },
+                                             { "Low input gain", 0.5f }, { "Low threshold", 1.0f }, { "Low ratio", 0.0f }, { "Low attack", 0.3f },
+                                             { "Low release", 0.3f }, { "Low gain", 0.5f }, { "Low state", 0.0f },
+                                             { "Mid input gain", 0.5f }, { "Mid threshold", 1.0f }, { "Mid ratio", 0.0f }, { "Mid attack", 0.3f },
+                                             { "Mid release", 0.3f }, { "Mid gain", 0.5f }, { "Mid state", 0.0f },
+                                             { "High input gain", 0.5f }, { "High threshold", 1.0f }, { "High ratio", 0.0f }, { "High attack", 0.3f },
+                                             { "High release", 0.3f }, { "High gain", 0.5f }, { "High state", 0.0f },
+                                             { "Low width", 0.5f }, { "Mid width", 0.5f }, { "High width", 0.5f }, { "Width mode", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketTapeStop: // round 190by
+        {
+            static const EffectInfo info { "Pocket Tape Stop", { { "Stop time", 0.2f }, { "Start time", 0.2f }, { "Stop time synced", 1.0f / 3.0f },
+                                                                 { "Start time synced", 1.0f / 3.0f }, { "Play", 1.0f }, { "Warp", 0.5f },
+                                                                 { "Sync", 0.0f } } };
+            return info;
+        }
         case EffectKind::rackMixer:
         {
             static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
@@ -4019,6 +4048,12 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::compressorParamText (param, v);
         case EffectKind::pocketSpreader:
             return pocket::spreaderParamText (param, v);
+        case EffectKind::pocketComb:
+            return pocket::combParamText (param, v);
+        case EffectKind::pocketMultiband:
+            return pocket::multibandParamText (param, v);
+        case EffectKind::pocketTapeStop:
+            return pocket::tapeStopParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4403,6 +4438,9 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketWaveshaper: return pocket::makeWaveshaper(); // round 189h
         case EffectKind::pocketCompressor: return pocket::makeCompressor();
         case EffectKind::pocketSpreader: return pocket::makeSpreader();
+        case EffectKind::pocketComb: return pocket::makeComb(); // round 190by
+        case EffectKind::pocketMultiband: return pocket::makeMultiband();
+        case EffectKind::pocketTapeStop: return pocket::makeTapeStop();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

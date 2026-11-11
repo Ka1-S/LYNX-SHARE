@@ -44,6 +44,11 @@ struct Mapped
 // `postGainLive` = the module's Post Gain is automated: the utility that carries it stays even at 0 dB
 Mapped map (const flm::Module& module, bool live = false, bool postGainLive = false);
 
+// round 190by: Tuned EQ's laws (module 30)
+int tunedEqNote (float v) noexcept;                 // ⌊11v + 0.001⌋: 0 = C … 9 = A … 11 = B
+double tunedEqHz (int note, int band) noexcept;     // 110·2^((note − 9)/12 + band), band 0…7
+double tunedEqOctaves (float v) noexcept;           // 10v³ + 0.1
+
 // An automation lane on parameter `param` of the module (FLM's index; −2 = the module's Mix, −3 its Post Gain): the LYNX
 // targets it moves and, per target, the value for each of `values` (0…1, FLM's). Empty = not automatable.
 struct LaneTarget

@@ -2431,9 +2431,23 @@ for now (FL Studio Mobile reference shots and the matching layouts are the next 
 | Pocket Gate | Gate (256-sample RMS blocks, curves, hold) | FLM-exact | floor, opening, delay |
 | Pocket Tape Delay | Tape Delay (variable-speed tape) | FLM-exact | echo position and spread |
 
-Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
-Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
-FL Studio Mobile plugin is the open sound check.
+(The effects this section once listed as "not yet" — Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor,
+Spreader, Stereoizer, Flanger, Autoduck (29), Tremolo — are Pocket engines since rounds 188i / 189h, measured against
+FL's FL Studio Mobile plugin there.)
+
+## Round 190by: Pocket SuperSaw, Comb Filter, Multiband Compressor, Tape Stop; Reverb (32) and Tuned EQ mapped
+
+Laws and measurements: `docs/analise/REA_rodada190by.md`. Measured = FL's command-line render of FL Studio Mobile
+inside FL against LYNX's import of the same module (16-bit files: about −75 dB is a null).
+
+| LYNX | Role (FL Mobile) | Sound | Measured against FL Studio Mobile in FL |
+|---|---|---|---|
+| Pocket SuperSaw (instrument, `core/PocketSuperSaw.*`) | SuperSaw (module 23, 59 knobs: unison saw / pulse, sub, SuperSync, filter with envelope, LFO, arpeggiator, chorus / phaser / delay) | ✅ FLM's laws; band-limited tables | 37 sets: 29 within 0.03 dB energy and 0.3 dB per third octave; the rest differ by FL's 16-bit clipping or by random phases / unison draws. Open: pitch-bend and mod-wheel scale |
+| Pocket Comb Filter (`core/PocketFxD.cpp`) | Comb Filter (40): tape-loop comb, Manual / Lowest Note / Detect Pitch | ✅ FLM's laws, the loop's own delay law | 5 sets score 10 (−74…−78 dB); Detect Pitch 8 on tones, sweep and music; on drums FLM itself does not repeat between two renders |
+| Pocket Multiband Compressor (`core/PocketFxD.cpp`) | Multiband Compressor (36): three bands, linear-domain peak compressors, width per band | ✅ FLM's laws (ballistics fixed to 44.1 kHz as in FLM); Solo knob is LYNX's own | 8 sets score 9–10 (−64…−78 dB) |
+| Pocket Tape Stop (`core/PocketFxD.cpp`) | Tape Stop (42): stop / start ramps on the Play switch, Warp curve, synced times | ✅ FLM's laws | steady states exact; ⚠️ the ramps are checked by unit tests only (need a live check) |
+| Reeverb 2 (+ utility) by import | Reverb (32) | ⚠️ mapped: levels within 0.4 dB, decay and width equal; PAN, WIDTH on the raw early reflections and modulation not reproduced (reported) | 5 sets |
+| Parametric EQ (1–2 slots) by import | Tuned EQ (30) | ⚠️ mapped: exact when flat, −39 dB at the default bandwidth; bandwidths outside the EQ's range are reported; FLM's 8-sample delay not reproduced | 4 sets |
 
 ## Round 190o: Live's MIDI Transformations (core) and Scale Mode in .als (LYNX extras, Ableton-style)
 
