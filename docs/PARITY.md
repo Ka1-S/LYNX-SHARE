@@ -2295,3 +2295,13 @@ FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flag
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
 export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
 have no Detached state: their imported flags are kept as they were.
+
+## Round 190ao: plugin window options (Reload, Pin on top, per-plugin velocity, note on preset load)
+All four are options that change nothing by default.
+
+| Option | FL Studio | Ableton Live | LYNX |
+|---|---|---|---|
+| Reload a crashed plugin | no separate process per plugin: a plugin crash usually takes FL down; the wrapper's Info group has a "Reload / Refresh" entry (`docs/analise/REA_rodada149.md`, not driven yet) | a crashed plugin takes Live down (no sandbox) | "Reload" in the crash message, on the crashed slot / channel menu and in the plugin window (shown in place of the editor); starts the plugin again with its last captured state, in place, with no undo step and without reopening the project. Never automatic: one reload per click. "Reload in a separate process" is offered for a plugin that ran inside LYNX |
+| Pin on top | detached plugin windows stay above FL's main window; no pin among them | plugin windows have no pin; "Auto-Hide Plug-In Windows" is the opposite idea | a pin in the wrapper header and "Pin on top" in the plugin menu: the window stays above LYNX's other secondary windows (not above other applications, like every detached LYNX window). Saved per plugin instance (`pinnedOnTop`) |
+| Per-plugin velocity | none in the wrapper's MIDI group (MIDIInPortWheel, MIDIOutPortWheel, SendNoteOffVelocityBox, SendPitchBendRangeBox, SendPolyAftertouchBox, MidiEventBusCombo, SendAllNotesOffBox; REA 149 C7); the curve is global (MIDI settings) | Velocity MIDI effect per track | LYNX extra: Wrapper settings > MIDI > Velocity: Follow MIDI settings (default) / Linear / Soft / Hard / Fixed, with the fixed value. For notes from a MIDI device; replaces the global curve for that instrument. Saved only when changed (`velocityMode`, `fixedVelocity`) |
+| Note on preset load | none | Hot-Swap previews browser presets, not plugin programs | LYNX extra: "Play a note when a preset loads" in the plugin preset menu of an instrument (off by default, a user setting): a short C5 after a load while the song is stopped |
