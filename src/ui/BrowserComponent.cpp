@@ -522,6 +522,7 @@ public:
             parent.children.push_back (std::move (n));
             return *parent.children.back();
         };
+        quickpick::refreshPluginDatabase (browser.engine); // (the folders as they are on disk now: issue #104)
         auto root = folder (nullptr, tr ("Plugin database"), Icon::plugin);
         root->colour = theme::colour::info;
         auto safe = juce::Component::SafePointer<BrowserComponent> (&browser);
@@ -1836,6 +1837,9 @@ private:
             });
         };
 
+        // (issue #104: the items below act on the Plugin database folder as it is on disk now)
+        if (n.kind == Kind::plugin || n.kind == Kind::plugins)
+            quickpick::refreshPluginDatabase (engine, true);
         if (n.kind == Kind::plugin)
         {
             menu.addSectionHeader (n.label);
@@ -1888,6 +1892,19 @@ private:
             expandItems();
             if (n.kind == Kind::plugins && n.folderKind >= 0) // round 166f (issue #16): the user's folders
                 addFolderItems (menu, n);
+            if (n.kind == Kind::plugins)
+            {
+                // round 190ba (issue #104): the Plugin database is a folder the user can arrange in the file manager, as
+                // FL's (its Browser opens the folder from this menu too). The database itself, Effects / Generators, one
+                // of the user's folders; LYNX's own groups (LYNX SHARE, FL engines, Installed) open the Installed entries
+                juce::File dir = quickpick::pluginDatabaseFolder();
+                if (n.folderKind >= 0)
+                    dir = quickpick::pluginDatabaseFolder (n.folderKind == 1, n.userFolder);
+                else if (n.parent != nullptr && n.parent->kind == Kind::plugins && n.parent->folderKind >= 0)
+                    dir = dir.getChildFile ("Installed").getChildFile (n.parent->folderKind == 1 ? "Generators" : "Effects");
+                menu.addSeparator();
+                menu.addItem (tr ("Open in the file manager"), dir.isDirectory(), false, [dir] { dir.startAsProcess(); });
+            }
             if ((n.kind == Kind::project || n.kind == Kind::plugins) && n.parent == nullptr && browser.tab == allTab) // round 163
             {
                 menu.addSeparator();
