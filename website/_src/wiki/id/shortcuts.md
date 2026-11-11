@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![Jendela Kelola pintasan: daftar aksi yang bisa dicari beserta tombol masing-masing](/assets/img/wiki/shortcuts.webp)
 
-Ini adalah tombol default di 0.1.25 alpha. `Bantuan › Pintasan` (`F1`) menampilkan daftar pintasan di dalam aplikasi. `Opsi › Kelola pintasan...` membuka editor pada gambar, tempat kamu mengubahnya.
+Ini adalah tombol bawaan di 0.1.26 alpha. `Bantuan › Pintasan` (`F1`) menampilkan daftar pintasan di dalam aplikasi. `Opsi › Kelola pintasan...` membuka editor pada gambar, tempat kamu mengubahnya.
 
 > Di macOS aplikasi menampilkan tombol dengan nama Mac: Ctrl ditampilkan sebagai ⌘ dan Alt sebagai ⌥.
 
@@ -76,6 +76,19 @@ Beberapa tombol ini melakukan hal lain di dalam editor yang sedang fokus. Di Pia
 | `Alt+F7` | Keyboard sentuh |
 | `Ctrl+F5` | Tempo tapper |
 | `F1` | Daftar pintasan |
+
+## Tampilan Clip dan tampilan Device
+
+Tombol-tombol ini hanya berfungsi di alur kerja Peluncuran klip.
+
+| Tombol | Fungsinya |
+|---|---|
+| `Ctrl+Alt+L` | Menampilkan atau menyembunyikan tampilan detail |
+| `Ctrl+Alt+3` | Tampilan Clip |
+| `Ctrl+Alt+4` | Tampilan Device |
+| `Shift+Tab` | Beralih antara tampilan Clip dan tampilan Device |
+| `Left` / `Right` | Tampilan Device: memilih perangkat sebelumnya, berikutnya |
+| `Del` atau `Backspace` | Tampilan Device: menghapus efek terpilih |
 
 ## Pattern
 
@@ -171,6 +184,7 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `Alt+L` | Artikulasi |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Buat progresi chord |
+| `Ctrl+Alt+Y` | Menjalankan skrip terakhir lagi |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `Ctrl+B` | Duplikat |
 | `Del` | Hapus clip terpilih |
 | `Shift+Del` | Hapus clip terpilih dan tutup celahnya |
+| `Shift+Left` / `Shift+Right` | Memindahkan clip terpilih satu langkah snap ke kiri, kanan |
+| `Shift+Up` / `Shift+Down` | Memindahkan clip terpilih satu track ke atas, bawah |
+| `Alt+Left` / `Alt+Right` | Menggeser clip terpilih ke kiri, kanan dengan langkah halus, tanpa snap. `Shift+Alt` melakukan hal yang sama |
+| `Ctrl+D` | Membatalkan pilihan clip dan waktu |
+| `Shift+I` | Membalik pilihan |
+| `Shift+C` | Memilih clip dari sumber terpilih |
 | `Shift+S` | Ripple editing aktif atau mati |
 | `Backspace` | Snap mati atau aktif |
 | `Alt+M` / `Shift+Alt+M` | Mute, batalkan mute clip terpilih |
@@ -195,6 +215,8 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `7` / `8` | Turunkan, naikkan pitch clip audio terpilih satu semitone |
 | `9` | Balik clip audio terpilih |
 | `Ctrl+Ins` / `Ctrl+Del` | Sisipkan, hapus sepanjang pilihan waktu di semua track |
+| `Ctrl+Alt+Ins` | Memotong clip dan menyisipkan ruang |
+| `Ctrl+Alt+Home` | Mengubah ukuran clip dari kiri, nyala atau mati |
 | `Ctrl+Left` / `Ctrl+Right` | Pilih waktu sebelumnya, berikutnya |
 | `Ctrl+Enter` | Pilih waktu di sekitar pilihan |
 | `Alt+T` | Tambah marker waktu |
@@ -220,7 +242,7 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `Ctrl+L` | Tautkan channel terpilih ke insert terpilih |
 | `Ctrl+Shift+L` | Tautkan channel terpilih ke insert mulai dari insert terpilih |
 | `Alt+L` | Pilih channel yang tertaut ke insert terpilih |
-| `Del` | Hapus plugin di slot efek terpilih |
+| `Del` | Menghapus insert terpilih. LYNX SHARE bertanya dulu |
 | `Ctrl+E` | Buka editor audio |
 | `Shift+E` | Buka editor audio dan rekam |
 | `Alt+R` | Render insert yang diaktifkan ke file wave |
@@ -242,6 +264,8 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 - Selagi piano keyboard ketik aktif, tombolnya memainkan not dan sebagian besar pintasan satu huruf dijeda (`L` tetap bekerja). Matikan dengan `Ctrl+T`.
 - Sebuah pintasan bekerja di mana saja atau di satu jendela. Pintasan milik sebuah jendela menang atas tombol yang sama yang berlaku di mana saja, selagi jendela itu fokus.
 - Beberapa aksi tidak punya tombol default, misalnya Palet tambah cepat. Beri tombol di editor.
+- Di Playlist, tombol yang memindahkan clip memindahkan semua clip jika tidak ada yang dipilih. Langkah halus `Alt+Left` dan `Alt+Right` adalah satu piksel pada zoom saat ini.
+- Pintasan LYNX SHARE juga berfungsi saat jendela plugin sedang fokus, misalnya `Space`. Huruf dan angka biasa lebih dulu masuk ke plugin, dan `Esc` menutup jendelanya.
 
 ## Terkait
 

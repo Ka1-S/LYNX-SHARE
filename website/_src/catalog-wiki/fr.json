@@ -365,6 +365,54 @@
 "Le bruit, le dither et les phases aléatoires viennent d'un générateur propre à chaque instance, donc ils diffèrent de tout rendu FL donné."
 ]
 },
+"gen-gmsynth-flm": {
+"source": "e07c714bb6",
+"intro": "GMSynth (FLM) joue le module GMSynth des projets FL Studio Mobile : deux oscillateurs plus du bruit, quatre voix, un filtre, des enveloppes, un LFO et trois emplacements d'effet. Il n'est pas listé dans le sélecteur de plugins. Un canal ne le reçoit que lorsque vous ouvrez un projet .flm qui utilise GMSynth. Les spectres d'onde et la table du filtre sont lus à l'exécution dans le dossier de ressources FL Studio Mobile de votre propre installation de FL Studio et ne sont pas inclus. Si ces fichiers sont introuvables à l'ouverture du projet, le canal reste sur le synthé intégré et le rapport d'import liste GMSynth comme non converti.",
+"controls": [
+[
+"Oscillateurs",
+"Ce que joue le moteur : deux oscillateurs, chacun sur l'une des 29 ondes du module, avec hauteur, désaccord, mix et phase pour l'oscillateur B, plus un niveau de bruit."
+],
+[
+"Modulation",
+"Quatre types entre les oscillateurs, AM, FM, SNC et FLT, avec une intensité et une enveloppe d'attack et de decay."
+],
+[
+"Amplitude",
+"Niveau, pan et une enveloppe linéaire d'attack, de decay, de sustain et de release."
+],
+[
+"Filtre",
+"Coupure, résonance, type de filtre et suivi du clavier, avec sa propre enveloppe d'attack et de decay."
+],
+[
+"EG",
+"Une seconde enveloppe avec attack, decay, sustain et release, une intensité, une destination et la vélocité."
+],
+[
+"LFO",
+"Un LFO synchronisé au tempo avec vitesse, forme, intensité et destination."
+],
+[
+"Choir",
+"Jusqu'à quatre copies désaccordées par voix, avec échelle, désaccord et étalement stéréo."
+],
+[
+"Play settings",
+"Transposition, temps de glissement, voix unique et portamento automatique."
+],
+[
+"Effect slots",
+"Trois emplacements. DIST, PHAS, F LP, DLY, RVRB et PAN sont joués. FLNG, F HP, RING et VOX laissent passer le signal, et le rapport d'import les liste quand ils sont activés."
+]
+],
+"tips": [
+"Les réglages viennent du .flm. LYNX SHARE n'a aucune fenêtre pour éditer les paramètres de ce module.",
+"Le volume, le pan et la hauteur du canal s'appliquent par-dessus ceux du module.",
+"Le bruit, le dither et les phases de départ des nouvelles voix viennent d'un générateur propre à chaque instance, donc ils diffèrent de tout rendu donné de FL Studio Mobile.",
+"Le pitch bend et la molette de modulation du module ne sont pas convertis."
+]
+},
 "gen-harmless": {
 "source": "25024826ed",
 "intro": "Harmless est un générateur additif construit sur le moteur du plugin FL du même nom : jusqu'à 528 partiels sinusoïdaux par voix, façonnés par la couleur, l'égaliseur de timbre, le masque d'harmoniques, le filtre, la résonance, le phaser et le pluck, suivis d'un rack de chorus, de délai, de réverb et de compresseur. Il peut être ajouté sans FL Studio et démarre alors de la banque de presets propre à LYNX SHARE. Le compresseur du rack charge ses presets depuis votre propre installation de FL Studio ; sans eux, le compresseur reste désactivé.",
@@ -1447,6 +1495,77 @@
 "Les presets comprennent des grosses caisses, des toms, des caisses claires, des percussions à main, des charleys, des percussions et des effets."
 ]
 },
+"gen-fpc": {
+"source": "2012232d9e",
+"intro": "FPC est un sampler de batterie avec 32 pads répartis en deux banques de 16, BANK A et BANK B. Chaque pad contient une ou plusieurs couches de sample, choisies selon la vélocité. Un seul canal contient tout le kit. Il ouvre les canaux FPC d'un .flp, et les presets de kit .fst de FL se chargent sur un canal. Sans FL Studio, un nouveau FPC est le kit vide de FL : 32 pads sur les notes par défaut de FL, sans samples.",
+"controls": [
+[
+"Pads",
+"Cliquez sur un pad pour le sélectionner et le jouer. Déposez un sample sur un pad pour le charger."
+],
+[
+"BANK A, BANK B",
+"Passe d'une banque de 16 pads à l'autre."
+],
+[
+"Nom du pad",
+"Double-cliquez pour renommer le pad."
+],
+[
+"Midi Note",
+"Cliquez pour choisir la note qui déclenche le pad."
+],
+[
+"Pad volume, pan and tune",
+"Niveau, pan et accord de tout le pad."
+],
+[
+"Mute, Solo",
+"Met le pad en muet ou en solo."
+],
+[
+"Scale Vol",
+"Fait varier le volume selon la vélocité."
+],
+[
+"Cut, Cut By",
+"Le groupe que ce pad coupe et le groupe qui coupe ce pad."
+],
+[
+"Sortie",
+"Décalage de la sortie du pad."
+],
+[
+"CREATE, DELETE",
+"Crée une nouvelle couche ou supprime la couche actuelle. Les flèches montent ou descendent une couche."
+],
+[
+"SPREAD EVEN",
+"Répartit la plage de vélocité entre les couches."
+],
+[
+"Layer volume, pan and tune",
+"Réglages de la couche sélectionnée, avec sa plage active : les vélocités qui la jouent."
+],
+[
+"Charger un échantillon",
+"Charge un sample dans la couche sélectionnée."
+],
+[
+"Déclencher les layers superposés aléatoirement",
+"Comment les couches qui couvrent la même vélocité alternent : Cycle, Random ou Random (avoid previous)."
+],
+[
+"VOL, PAN",
+"Affiche l'enveloppe de volume ou l'enveloppe de pan du pad dans l'éditeur d'enveloppe."
+]
+],
+"tips": [
+"Cliquez avec le bouton gauche sur la forme d'onde pour pré-écouter le sample.",
+"LYNX SHARE n'inclut aucun sample de kit. Les kits viennent de FL Studio et de vos propres fichiers .fst, ou bien vous chargez vos propres samples sur les pads.",
+"Un preset de kit FPC se charge comme un seul canal contenant tout le kit."
+]
+},
 "gen-fruit-kick": {
 "source": "7e9adcf46d",
 "intro": "Fruit Kick est un générateur de grosse caisse construit sur le moteur du plugin FL du même nom : une onde sinusoïdale dont la hauteur et l'amplitude chutent avec le temps, avec un waveshaper facultatif. Une nouvelle instance démarre du preset du plugin dans votre propre installation de FL Studio quand il y en a une, et sinon de la banque de presets propre à LYNX SHARE.",
@@ -1587,8 +1706,8 @@
 ]
 },
 "gen-fruity-slicer": {
-"source": "df9bd1e3b8",
-"intro": "Fruity Slicer charge un sample, le découpe en tranches et joue une tranche par touche, à partir de la note de la première tranche. Vous l'utilisez pour réarranger des boucles de batterie. Il lit l'état enregistré de FL et n'a besoin d'aucun fichier d'une installation de FL.",
+"source": "15efce61bf",
+"intro": "Fruity Slicer charge un sample, le découpe en tranches et joue une tranche par touche, à partir de la note de la première tranche. Vous l'utilisez pour réarranger des boucles de batterie. Un note off termine sa tranche. La fenêtre du canal a aussi une page Envelope / instrument avec les enveloppes, les LFO et le filtre des voix. Il lit l'état enregistré de FL et n'a besoin d'aucun fichier d'une installation de FL.",
 "controls": [
 [
 "Ouvrir",
@@ -1633,10 +1752,32 @@
 [
 "Att and Dec",
 "Fondu d'entrée et fondu de sortie de la tranche, de 0 à 100 ms."
+],
+[
+"LOW and HIGH",
+"Seuils bas et haut du découpage automatique."
+],
+[
+"Enveloppe / instrument",
+"Une page de la fenêtre du canal avec les onglets Panning, Volume, Mod X, Mod Y et Pitch."
+],
+[
+"Enveloppe",
+"Sur chaque onglet : un interrupteur, les boutons Delay, Attack, Hold, Decay, Sustain, Release et Amount, trois boutons Tension et un interrupteur Tempo."
+],
+[
+"LFO",
+"Forme Sine, Triangle ou Pulse, boutons Delay, Attack, Amount et Speed, et interrupteurs Tempo et Global. Global fait suivre la position dans le morceau à la phase."
+],
+[
+"Filtre",
+"Boutons Mod X et Mod Y et type de filtre : Fast LP, LP, BP, HP, BS, LP x2, SVF LP ou SVF LP x2."
 ]
 ],
 "tips": [
 "Double-cliquez sur le nom de la tranche sélectionnée pour la renommer ; chaque tranche peut avoir sa propre touche de déclenchement.",
+"Un nouveau Fruity Slicer démarre comme dans FL : Animate et Declick activés, Dec à 4 ms et l'enveloppe de volume activée avec un court release.",
+"La page d'enveloppe édite les valeurs propres à FL, donc elles sont conservées quand le projet est exporté en .flp.",
 "Les tranches que FL étire dans le temps ne sont pas reproduites exactement dans les projets importés."
 ]
 },
@@ -1704,6 +1845,82 @@
 "tips": [
 "Faites glisser un preset de la liste sur le Channel Rack pour obtenir un nouveau canal avec ce preset.",
 "La réverb et le chorus sont ceux de LYNX SHARE, pas le son de ceux intégrés à FL Studio."
+]
+},
+"gen-slicex": {
+"source": "b1b0e1c0ba",
+"intro": "Slicex charge un sample sur chacun de deux decks, A et B, le découpe en régions et joue chaque région depuis une touche. Il ouvre les réglages du Slicex de FL Studio depuis un .flp et les réécrit à l'export. Une nouvelle instance démarre avec des decks vides et n'a besoin d'aucun fichier d'une installation de FL. Un fichier WAV qui n'apporte pas de régions propres est découpé sur ses coups au chargement.",
+"controls": [
+[
+"Master sliders",
+"Niveau master, niveau master d'aléatoire, niveau master de LFO et hauteur master, de moins 1200 à 1200 cents."
+],
+[
+"MODULATION",
+"Un pad X / Y avec des molettes X et Y. SMOOTH lisse la modulation."
+],
+[
+"LAYERING",
+"Comment les régions d'une même touche jouent ensemble : All, All (gain-compensated), Velocity-mapped, Modulation X-mapped, Modulation Y-mapped, Random, Cycle ou Song time-synced. SAME DECK ne superpose que les régions d'un même deck."
+],
+[
+"CROSSFADE",
+"La courbe entre les régions superposées : none, linear, balanced curve, unbalanced curve ou adding."
+],
+[
+"REGION SETTINGS",
+"La région actuelle, son OUT (décalage de piste de sortie) et son CUT (groupe de coupure), et quatre rangées : AMP (panoramique et volume), FILTER (coupure et résonance), SPEED (hauteur) et START (delay et début du sample). Chaque rangée a un numéro de groupe ART et une intensité."
+],
+[
+"ARTICULATOR",
+"Choisit l'un des 8 groupes d'articulateurs. Son FILTER a un type (LP, BP, BS, HP), un mode (OFF, x1, x2, x3) et des molettes ENV, CUT et RES."
+],
+[
+"PAN, VOL, CUT, RES, SPEED, START",
+"La cible que montre l'éditeur de courbe."
+],
+[
+"ENV, LFO, VEL, MOD X, MOD Y, RAND",
+"La partie de l'articulateur affichée : son enveloppe, son LFO, ou la table depuis la vélocité, la modulation X, la modulation Y ou l'aléatoire."
+],
+[
+"TEMPO, GLOBAL",
+"TEMPO fait suivre le tempo au temps de la courbe. GLOBAL fait courir la phase du LFO avec le morceau."
+],
+[
+"ATT, DEC, SUS, REL",
+"Met à l'échelle les temps d'attack, de decay et de release de l'enveloppe et décale son niveau de sustain."
+],
+[
+"SPD, TNS, SKEW, PW",
+"Vitesse du LFO, tension, asymétrie et largeur d'impulsion."
+],
+[
+"Deck tool row",
+"Loop, Play / pause, Stop, les menus File, Regions, Select et Zoom, l'affichage d'un ou de deux decks, et le deck actuel, A ou B."
+],
+[
+"Fichier",
+"New, Load sample... et Save sample as..., qui enregistre le WAV du deck avec ses régions."
+],
+[
+"Régions",
+"Add region..., Add marker..., Set loop, Delete, Rename all..., Set all cut groups to... et Freeze all."
+],
+[
+"Clavier",
+"Joue les touches et montre lesquelles ont des régions. Son menu propose Assign current region to this key et Select region assigned to this key. Le chiffre à côté règle l'octave de base."
+],
+[
+"Options",
+"Sample start covers whole length, Link velocity to volume, Loop half of regions et HQ envelopes."
+]
+],
+"tips": [
+"Déposez un sample sur un deck pour le charger. Seul un fichier WAV reçoit des marqueurs du découpage automatique, car les marqueurs sont enregistrés dans le WAV du deck.",
+"Le menu d'une région propose Delete, Clone as region, Turn into marker, Rename..., Trigger note et Zoom on.",
+"Les notes de couleur paire jouent le deck A et les notes de couleur impaire jouent le deck B. Les couleurs 14 et 15 jouent à l'envers.",
+"Les menus Snap et View de FL n'y sont pas encore, et les menus File et Regions n'ont que les entrées listées ci-dessus."
 ]
 },
 "gen-wave-traveller": {
@@ -2375,7 +2592,7 @@
 ]
 },
 "fx-apex-limiter": {
-"source": "cd8656b974",
+"source": "1b3edd96e8",
 "intro": "Apex Limiter est un limiteur à anticipation, pensé pour le dernier slot d'une piste ou pour le master. Vous réglez le gain que vous lui envoyez et la hauteur du plafond de sortie, et l'affichage montre l'historique du niveau et la réduction de gain.",
 "controls": [
 [
@@ -2397,6 +2614,14 @@
 [
 "Style",
 "Caractère de la limitation : Clean, Glue, Punch, Dynamic, Dense, Loud, Bus ou Safe."
+],
+[
+"Nivellement",
+"Dans le panneau Advanced. Maintient le niveau à un seuil sous le plafond avec une attack lente, et le plafond rattrape le reste. Désactivé par défaut."
+],
+[
+"Threshold and Attack",
+"Sous Levelling : le niveau maintenu, et la part d'un transitoire qui passe avant que le niveau soit maintenu."
 ],
 [
 "Limitation true peak",
@@ -2425,12 +2650,13 @@
 ],
 "tips": [
 "L'éditeur indique la latence en échantillons dans le coin supérieur gauche.",
-"Activez la limitation true-peak quand le fichier sera converti vers un format avec perte."
+"Activez la limitation true-peak quand le fichier sera converti vers un format avec perte.",
+"Ouvrez le panneau de boutons en bas à gauche de l'affichage, puis Advanced, pour accéder à Levelling. Le désactiver puis le réactiver garde le seuil que vous avez réglé."
 ]
 },
 "fx-compressor": {
-"source": "95054dd4ae",
-"intro": "Compressor réduit le niveau des passages forts d'une piste. Il s'ajoute dans un slot d'insert et sert à égaliser des voix, des batteries et des basses. Il propose un mode LYNX et un mode RCOMP, ainsi qu'un voicing Classic et un voicing Vintage.",
+"source": "86f6769b26",
+"intro": "Compressor réduit le niveau des passages forts d'une piste. Il s'ajoute dans un emplacement d'insert et sert à égaliser des voix, des batteries et des basses. Il propose un voicing Classic et un voicing Vintage. Classic fonctionne en mode net ou avec une loi FET à coude doux et à release dépendant du programme. Le sélecteur LYNX et RComp choisit les plages des contrôles.",
 "controls": [
 [
 "Seuil",
@@ -2473,13 +2699,26 @@
 "Choisit le voicing."
 ],
 [
-"LYNX / RCOMP",
-"Choisit le mode et les plages qu'il utilise."
+"Clean / FET",
+"Affiché avec Classic. Clean est le compresseur tel qu'il était. FET ajoute un coude de 5 dB et un release dépendant du programme. Clean est la valeur par défaut."
+],
+[
+"ARC / Manual, Electro / Opto, Warm / Smooth",
+"Affiché avec Vintage : le mode de release, la courbe de release et le caractère."
+],
+[
+"Old / Measured",
+"Affiché avec Vintage : la courbe statique. Les projets enregistrés avec l'ancienne courbe la gardent jusqu'à ce que vous changiez."
+],
+[
+"LYNX / RComp",
+"Choisit les plages des contrôles de ratio, de gain, d'attack et de release."
 ]
 ],
 "tips": [
 "Réglez Mix sous 100 pour cent pour mélanger le signal non compressé.",
-"Les indicateurs In et Out montrent le niveau avant et après, l'indicateur central montre la variation de gain."
+"Les indicateurs In et Out montrent le niveau avant et après, l'indicateur central montre la variation de gain.",
+"FET est désactivé dans les projets existants, qui sonnent donc comme avant."
 ]
 },
 "fx-crest-compressor": {
@@ -2993,6 +3232,206 @@
 "Quatre des 100 états de démonstration de FL Studio utilisaient la séparation à phase linéaire ou le mode Master Mid, que LYNX SHARE ne fait qu'approcher."
 ]
 },
+"fx-pocket-autoduck": {
+"source": "e6fc9bff7d",
+"intro": "Pocket Autoduck baisse le niveau à chaque temps et le laisse remonter, ce qui donne un son pompé comme une compression en sidechain contre une grosse caisse. Il suit le temps du morceau, pas une entrée audio. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Autoduck, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Ducking",
+"Profondeur de la baisse de niveau, de 0 à 100 %. À 100 %, le signal est silencieux au point le plus bas."
+],
+[
+"Attack",
+"Temps que met le niveau à descendre, d'un temps très court jusqu'à environ un demi-temps. Il est affiché en ms au tempo du morceau."
+],
+[
+"Courbe",
+"Courbe la descente et la remontée. La valeur indique Linear en haut de sa plage."
+],
+[
+"Temps",
+"Durée de tout le duck en fraction du temps, de 0 à 100 %."
+],
+[
+"Shift",
+"Avance ou retarde le duck, de -50 à +50 % d'un temps."
+],
+[
+"Hold",
+"Durée pendant laquelle le niveau reste bas avant de remonter, en fraction de Time."
+],
+[
+"Forme",
+"Forme de la remontée : Accel, Accel 2, Decel, Decel 2, S-Curve ou S-Curve 2."
+]
+],
+"tips": [
+"Le duck se répète toujours une fois par temps. Les autres durées de note ne sont pas disponibles.",
+"Quand le morceau est à l'arrêt, le duck continue de tourner au tempo du morceau."
+]
+},
+"fx-pocket-compressor": {
+"source": "a158158420",
+"intro": "Pocket Compressor réduit le niveau des passages forts d'une piste. Un détecteur de crête avec hold lit le plus fort des deux canaux et un seul gain est appliqué aux deux. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Compressor, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Seuil",
+"Niveau au-dessus duquel la compression commence, de -40 dB à 0 dB."
+],
+[
+"Ratio",
+"De 1:1 à 20:1 sur une loi quadratique. Le haut de la plage indique +inf et maintient le niveau au seuil."
+],
+[
+"Attack",
+"Rapidité avec laquelle le détecteur suit un niveau qui monte, de 0 à 50 ms sur une loi quadratique."
+],
+[
+"Release",
+"Rapidité avec laquelle la crête retenue retombe après le temps de hold, de 10 ms à 500 ms sur une loi quadratique."
+],
+[
+"Niveau",
+"Gain de sortie. Avec Gain auto activé, il va de -20 dB à +20 dB, avec Gain auto désactivé de 0 dB à +40 dB pour la même course du bouton."
+],
+[
+"Hold",
+"Durée pendant laquelle le détecteur garde une crête avant que le release commence, de 0 à 50 ms sur une loi quadratique."
+],
+[
+"Gain auto",
+"Ajoute un gain de compensation calculé d'après Seuil et Ratio, de sorte qu'une entrée à pleine échelle ressorte à pleine échelle."
+],
+[
+"Gain d'entrée",
+"Gain du signal qui alimente seulement le détecteur, de -20 dB à +20 dB. Il ne change pas le niveau de l'audio lui-même."
+],
+[
+"RMS",
+"Conservé pour la compatibilité. FL Studio Mobile ne l'active jamais, donc il indique toujours Off et n'a aucun effet."
+]
+],
+"tips": [
+"Basculer Gain auto décale l'affichage de Niveau de 20 dB, et le niveau de sortie avec lui. Vérifiez Niveau après l'avoir changé.",
+"Il n'y a ni anticipation ni latence."
+]
+},
+"fx-pocket-gate": {
+"source": "18a775e56a",
+"intro": "Pocket Gate baisse le signal tant qu'il est sous un seuil. Utilisez-la pour couper le bruit entre les notes ou resserrer des batteries. Les contrôles sont sur deux pages, LEVEL et ENVELOPE. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Gate, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"LEVEL / ENVELOPE",
+"Bascule entre la page de niveau et la page de temps."
+],
+[
+"Seuil",
+"Niveau qui ouvre la gate, de -60 à +6 dB. La gate s'ouvre quand l'un des deux côtés le dépasse."
+],
+[
+"Asymétrie",
+"De combien le niveau doit tomber sous le seuil avant que la gate se ferme, de 0 à 66 dB."
+],
+[
+"Left and Right meters",
+"Affiche le niveau d'entrée avec un repère au seuil. Le seuil en dB est écrit en dessous."
+],
+[
+"Mix",
+"Profondeur de la gate, de -100 à 100 %. À 100 %, une gate fermée baisse le signal de 60 dB. À 0 %, la gate ne fait rien. Les valeurs négatives inversent la gate : elle baisse le signal tant qu'elle est ouverte."
+],
+[
+"Attack and Release",
+"Temps que met la gate à s'ouvrir et à se fermer, chacun de 0 à 1000 ms."
+],
+[
+"A. Curve and R. Curve",
+"Bipolaire, de -1 à 1. Courbe la rampe d'ouverture et de fermeture. À 0, la rampe est linéaire ; un sens donne une forme logarithmique et l'autre une forme exponentielle."
+],
+[
+"Hold",
+"Durée minimale pendant laquelle la gate reste ouverte après son ouverture, de 0 à 1000 ms."
+]
+],
+"tips": [
+"La gate mesure le niveau par blocs de 256 échantillons et anticipe de 255 échantillons. Elle le déclare comme latence.",
+"Réglez Asymmetry au-dessus de 0 pour éviter que la gate ne claque sur un signal qui oscille autour du seuil."
+]
+},
+"fx-pocket-leveller": {
+"source": "827df6c977",
+"intro": "Pocket Leveller règle le niveau et l'équilibre gauche-droite d'une piste. C'est un trim, il ne compresse pas. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Leveller, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Gain",
+"Longue barre sous l'échelle en dB. Règle le niveau de -60 à +12 dB. La valeur est affichée au-dessus de la barre."
+],
+[
+"Pan",
+"Équilibre entre les côtés, de 100 % G en passant par le centre jusqu'à 100 % D. Il baisse le côté opposé et laisse l'autre côté à plein niveau."
+],
+[
+"Level meter",
+"Fine barre sous l'échelle qui montre le niveau de sortie sur la même échelle en dB que Gain."
+]
+],
+"tips": [
+"L'extrémité gauche de l'échelle est étiquetée -inf., mais le gain le plus bas est de -60 dB, donc le signal n'est pas complètement coupé.",
+"Les changements de Gain et de Pan glissent sur quelques millisecondes, donc les bouger ne produit pas de clic."
+]
+},
+"fx-pocket-limiter": {
+"source": "4419acdf41",
+"intro": "Pocket Limiter est un limiteur de crête avec une anticipation de 2 ms. Poussez le niveau avec In Gain et il retient les crêtes au seuil. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Limiter, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Gain d'entrée",
+"Gain avant le limiteur, de -24 à +24 dB."
+],
+[
+"Seuil",
+"Seuil. Niveau au-dessus duquel le gain est réduit, de -24 à 0 dB."
+],
+[
+"Release",
+"Temps que met le gain à revenir à plein niveau après une crête, de 0,10 à 2,00 secondes."
+],
+[
+"Gain de sortie",
+"Gain après le limiteur, de -24 à +24 dB."
+],
+[
+"Gain reduction display",
+"Trace la réduction de gain récente, de 0 dB sur la ligne du haut jusqu'à 24 dB, avec la valeur la plus récente à droite."
+]
+],
+"tips": [
+"L'anticipation ajoute 2 ms de latence, que l'effet déclare à l'hôte.",
+"Il n'y a pas de gain de compensation automatique. Utilisez Gain de sortie pour régler le niveau final."
+]
+},
+"fx-pocket-limiter-classic": {
+"source": "d5838309b0",
+"intro": "Pocket Limiter Classic est un limiteur de crête simple. Quand le côté le plus fort dépasse le seuil, le gain chute aussitôt puis remonte selon une courbe douce. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Limiter (legacy), et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Seuil",
+"Niveau au-dessus duquel le gain est réduit, de -24 à 0 dB."
+],
+[
+"Temps de relâchement",
+"Temps que met le gain à remonter, affiché de 0 à 100 %. Il va d'environ 200 ms à 0 % jusqu'à 1 seconde à 100 %."
+],
+[
+"Gain de sortie",
+"Niveau de sortie, de -24 à +12 dB."
+]
+],
+"tips": [
+"La sortie est remontée de la valeur dont le seuil est abaissé, donc les crêtes limitées ressortent au niveau de Output Gain. Baisser Threshold rend le signal plus fort.",
+"Il n'y a pas d'anticipation et il n'ajoute aucune latence. Le gain chute en un échantillon quand une crête franchit le seuil."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband est un effet natif de LYNX SHARE pour un insert du Mixer. Il divise le signal en quatre bandes et applique à chacune une compression ou une expansion. Une bande qui ne change pas le gain laisse le signal intact, donc l'effet est transparent au repos.",
@@ -3161,6 +3600,57 @@
 ],
 "tips": [
 "Il existe 120 ordres de traitement possibles, réglés en faisant glisser les chevrons du bas."
+]
+},
+"fx-strike-shaper": {
+"source": "81799e3815",
+"intro": "Strike Shaper est le transient designer propre à LYNX. Il compare deux enveloppes du même signal et règle le gain d'après leur rapport, si bien qu'il réagit de la même façon aux coups faibles et forts et n'a besoin d'aucun seuil. Utilisez Attack pour rendre les attaques plus dures ou plus douces et Sustain pour allonger ou raccourcir les queues. Il n'a pas d'anticipation et n'ajoute aucune latence.",
+"controls": [
+[
+"Attack",
+"Augmente ou diminue l'attaque de chaque coup, de -15 dB à +15 dB, sur une échelle imprimée plus fine près de 0 dB."
+],
+[
+"Sustain",
+"Augmente ou diminue la queue décroissante après chaque coup, de -24 dB à +24 dB."
+],
+[
+"Gain de sortie",
+"Niveau de sortie, de -20 dB à +6 dB, avec 0 dB en haut du bouton."
+],
+[
+"On / Power",
+"Active ou désactive l'effet. La touche ON et le voyant Power font la même chose."
+],
+[
+"Lier",
+"Activé, il utilise un seul détecteur et un seul gain pour les deux canaux, donc l'image stéréo ne bouge pas. Désactivé, il façonne la gauche et la droite séparément."
+],
+[
+"Passe-haut du détecteur",
+"Filtre passe-haut sur le détecteur seulement, Off ou de 20 Hz à 1 kHz. Il empêche les basses fréquences de déclencher le façonnage et ne filtre pas l'audio."
+],
+[
+"Protection",
+"Écrêteur doux en sortie. Il laisse le signal intact sous environ -3 dBFS et ne le laisse jamais dépasser 0 dBFS."
+],
+[
+"Mix",
+"Mélange entre le signal dry et le signal façonné, de 0 à 100 %, pour un traitement parallèle. Le gain de sortie et Guard viennent après."
+],
+[
+"SIG / OVL lamps",
+"SIG s'allume quand il y a du signal en entrée. OVL s'allume quand la crête de sortie atteint la pleine échelle."
+],
+[
+"Attack / Sustain rows",
+"Deux rangées de voyants montrent en direct de combien chaque gain bouge. Le bleu à gauche est une coupe, le rouge à droite une accentuation, avec des paliers à 1, 3, 6, 10 et 15 dB."
+]
+],
+"tips": [
+"Avec Attack et Sustain à 0 dB, Mix à 100 % et Gain de sortie à 0 dB, le signal passe sans changement.",
+"De fortes valeurs d'Attack peuvent ajouter jusqu'à +15 dB sur un coup. Activez Guard ou baissez Gain de sortie si le voyant OVL s'allume.",
+"Survolez un bouton pour lire sa valeur. Faites un clic droit sur un bouton pour son menu de valeur."
 ]
 },
 "fx-transient-processor": {
@@ -4362,6 +4852,66 @@
 "La cible et la banque sélectionnées sont enregistrées avec l'état du plugin."
 ]
 },
+"fx-pocket-tape-delay": {
+"source": "6bcded6837",
+"intro": "Pocket Tape Delay modélise une boucle de bande par côté. La vitesse de la bande glisse vers un nouveau temps de delay, si bien que les échos changent de hauteur pendant que Temps bouge. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Tape Delay, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Temps",
+"Temps de delay, de 0 à 1000 ms. Il n'est pas synchronisé au tempo."
+],
+[
+"Réinj.",
+"Réinjection, de 0 à 100 %. Quelle part de l'écho retourne sur la bande."
+],
+[
+"Asynchrone",
+"Bipolaire, de -100 à 100 %. Raccourcit le delay d'un côté jusqu'à la moitié. Les valeurs négatives raccourcissent le côté gauche, les valeurs positives le côté droit."
+],
+[
+"Mix",
+"Niveau des échos, de 0 à 100 %. Les échos sont ajoutés au signal dry."
+]
+],
+"tips": [
+"Le niveau d'écho est Mix multiplié par Fdbk, donc avec Fdbk à 0, aucun écho n'est audible, quel que soit Mix.",
+"Bougez Temps pendant que le son joue pour obtenir un effet de vitesse de bande."
+]
+},
+"fx-pocket-trance-delay": {
+"source": "390a4b427a",
+"intro": "Pocket Trance Delay est un delay calé sur le tempo du morceau. Les échos sont ajoutés au signal dry, qui reste toujours à plein niveau. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Trance Delay, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"1/4, 3/8, 1/2, 3/4, 1/1",
+"Temps de delay en fraction de temps. Le delay le plus long est de 2 secondes."
+],
+[
+"Stereo / Ping-Pong / Mirror",
+"Choisit le mode. Stereo fait tourner une ligne de delay par côté. Ping-Pong croise les lignes pour que les échos alternent entre les côtés. Mirror utilise des lignes deux fois plus longues et retarde l'entrée gauche du temps de delay."
+],
+[
+"Pan d'entrée",
+"Affiché en mode Ping-Pong seulement, de 0 à 100. Équilibre de l'entrée qui alimente les lignes de delay."
+],
+[
+"Réinjection",
+"Quelle part de chaque écho est renvoyée. Le premier écho est déjà réduit de cette quantité, donc à 0 il n'y a aucun écho."
+],
+[
+"Filtre",
+"Filtre bipolaire dans la boucle de réinjection. Ouvert au centre, un passe-bas en dessous et un passe-haut doux au-dessus."
+],
+[
+"Mix",
+"Niveau des échos. Le curseur suit une loi quadratique."
+]
+],
+"tips": [
+"Changer le temps ou le mode vide les lignes de delay, donc les échos s'arrêtent et repartent.",
+"Un réglage Dry pan enregistré fait que Pan d'entrée panoramique aussi le signal dry en mode Ping-Pong. Il est lu dans le projet .flm et n'a aucun contrôle dans l'éditeur."
+]
+},
 "fx-spiral-echo": {
 "source": "60ff7072a7",
 "intro": "Spiral Echo est un délai natif de LYNX SHARE pour un insert du Mixer. Chaque répétition est décalée en fréquence un peu plus que la précédente, ce qui fait monter ou descendre les échos au lieu de simplement se répéter. En stéréo, le côté droit entend chaque répétition avec le décalage opposé.",
@@ -4943,6 +5493,269 @@
 "tips": [
 "La réinjection est signée, on peut donc la régler sous zéro comme au-dessus.",
 "Le mode Rise est un flanger dont le balayage monte et descend comme un barber-pole."
+]
+},
+"fx-pocket-chorus": {
+"source": "ab0abf77a0",
+"intro": "Pocket Chorus ajoute deux copies modulées du signal au son dry pour un timbre plus large et plus épais. Les copies sont faites à partir de la somme des côtés gauche et droit, et le delay est de 10 ms au plus. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Chorus, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Vitesse",
+"Vitesse de la modulation, de 0,20 à 4,20 Hz. La seconde voix tourne 0,1 Hz plus vite."
+],
+[
+"Profondeur",
+"Amplitude du mouvement de la modulation, de 0 à 100 %."
+],
+[
+"Stéréo",
+"À 100 %, une voix va du côté gauche et l'autre du côté droit. Des valeurs plus basses placent les deux voix des deux côtés."
+],
+[
+"Mix",
+"Niveau des deux voix, de 0 à 100 %. Elles s'ajoutent au signal dry, qui reste à plein niveau. Le contrôle suit une loi quadratique."
+]
+],
+"tips": [
+"Comme les voix s'ajoutent par-dessus le signal dry, de fortes valeurs de Mix augmentent le niveau.",
+"La seconde voix fait un fondu entre le signal actuel et une copie vieille d'environ 10 ms. Son temps de delay ne balaie pas. C'est conforme à FL Studio Mobile."
+]
+},
+"fx-pocket-flanger": {
+"source": "e810108b49",
+"intro": "Pocket Flanger ajoute au signal dry un delay très court balayé par un LFO. Le delay est une boucle de bande dont la vitesse glisse, ce qui adoucit le balayage. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Flanger, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Vitesse LFO",
+"Durée du cycle du LFO quand Sync est activé, en 13 pas : 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 mesure, 2 mesures, 4 mesures, 8 mesures, 16 mesures."
+],
+[
+"Sync",
+"Activé, il utilise Vitesse LFO et suit la position dans le morceau. Désactivé, il utilise Vitesse du LFO."
+],
+[
+"Vitesse du LFO",
+"Vitesse du LFO quand Sync est désactivé, de 0,1 Hz à 10 Hz sur une loi cubique."
+],
+[
+"Forme du LFO",
+"Sine, Saw ou Square."
+],
+[
+"Intensité du LFO",
+"Amplitude du balayage du delay par le LFO autour de son centre, de 0 à 100 %."
+],
+[
+"Délai",
+"Delay central, de 0 à 2,5 ms sur une loi quadratique."
+],
+[
+"Réinjection",
+"Quantité du signal retardé renvoyée dans la boucle, de 0 à 100 %."
+],
+[
+"Inverser la réinjection",
+"Inverse la polarité de la réinjection. Activé par défaut."
+],
+[
+"Stéréo",
+"Avance en phase le LFO du canal droit, jusqu'à un demi-cycle à 100 %."
+],
+[
+"Mix",
+"Niveau du signal retardé ajouté au signal dry, de 0 à 100 % sur une loi quadratique."
+],
+[
+"Inverser le mix",
+"Inverse la polarité du signal retardé. Activé par défaut."
+]
+],
+"tips": [
+"Les libellés de vitesse sont ceux de FL Studio Mobile : 1/1 vaut un temps et 1 mesure vaut seize temps.",
+"Les deux commutateurs d'inversion changent les fréquences que le filtre en peigne annule, essayez les deux réglages.",
+"Après une réinitialisation, le signal retardé reste silencieux jusqu'à ce qu'une boucle ait été enregistrée."
+]
+},
+"fx-pocket-multifx": {
+"source": "c0cd29ed70",
+"intro": "Pocket MultiFX fait tourner l'un de huit effets et place ses deux réglages principaux sur un pad X/Y. Un LFO calé sur la position dans le morceau peut déplacer le réglage X. Il convient aux balayages en direct et à l'automation. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module MultiFX, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Delay, Reverb, LP Filter, HP Filter, Flanger, Phaser, Panner, Vox",
+"Choisit l'effet. L'ancien effet disparaît en fondu et le nouveau apparaît en fondu."
+],
+[
+"X/Y pad",
+"Règle les deux paramètres de l'effet choisi. Les lignes du pad portent les noms des axes. Delay : Feedback et Filter. Reverb : Decay et Filter. LP Filter et HP Filter : Frequency et Resonance. Flanger et Phaser : Frequency et Feedback. Panner : Panning et Distance. Vox : Vowel et Size."
+],
+[
+"Vitesse LFO",
+"Durée d'un cycle du LFO, en dix pas : 1/8, 1/4, 3/8, 1/2 et 3/4 de temps, 1 temps, 2 temps, 1 mesure, 2 mesures et 4 mesures. Dans Delay, elle règle aussi le temps de delay."
+],
+[
+"Forme du LFO",
+"Sine, Saw ou Square."
+],
+[
+"Intensité du LFO",
+"Amplitude du déplacement du réglage X par le LFO. Dans Delay, le LFO déplace plutôt les échos dans le panoramique. Le curseur suit une loi quadratique."
+]
+],
+"tips": [
+"Les filtres LP et HP font 48 dB par octave. LP Filter couvre environ 64 Hz à 20 kHz et HP Filter environ 32 Hz à 5,5 kHz.",
+"Le LFO n'a aucun effet sur Reverb.",
+"Dans Delay, un temps de delay supérieur à 1,5 seconde est divisé par deux jusqu'à ce qu'il tienne."
+]
+},
+"fx-pocket-phaser": {
+"source": "08e5a425cb",
+"intro": "Pocket Phaser fait passer le son par six étages passe-tout du premier ordre balayés par un LFO, et ajoute le résultat par-dessus le signal dry. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Phaser, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Vitesse LFO",
+"Durée du cycle du LFO quand Sync est activé, en 13 pas : 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 mesure, 2 mesures, 4 mesures, 8 mesures, 16 mesures."
+],
+[
+"Intensité du LFO",
+"Amplitude du déplacement des étages par le LFO, de 0 à 100 % sur une loi cubique."
+],
+[
+"Réinjection",
+"Renvoie le dernier étage dans le premier, de 0 à 100 % (jusqu'à 0,95)."
+],
+[
+"Fréquence",
+"Centre du balayage, de 50 Hz à 16 kHz sur une loi quadratique."
+],
+[
+"Mix",
+"Niveau du signal phasé ajouté au signal dry, de 0 à 100 % sur une loi quadratique. Le signal dry reste à plein niveau."
+],
+[
+"Sync",
+"Activé, il utilise Vitesse LFO et suit la position dans le morceau. Désactivé, il utilise Vitesse du LFO."
+],
+[
+"Vitesse du LFO",
+"Vitesse du LFO quand Sync est désactivé, de 0,1 Hz à 10 Hz sur une loi cubique."
+],
+[
+"Forme du LFO",
+"Sine, Saw ou Square."
+],
+[
+"Stéréo",
+"Avance en phase le LFO du canal droit, jusqu'à un demi-cycle à 100 %."
+]
+],
+"tips": [
+"Les libellés de vitesse sont ceux de FL Studio Mobile : 1/1 vaut un temps et 1 mesure vaut seize temps, donc 16 mesures valent 256 temps.",
+"Le balayage est limité à la plage de 50 Hz à 16 kHz."
+]
+},
+"fx-pocket-tremolo": {
+"source": "9bc38f0475",
+"intro": "Pocket Tremolo fait varier le niveau d'un son entre un gain minimum et un gain maximum avec un LFO. Un décalage de phase entre gauche et droite en fait un auto-pan. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Tremolo, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Vitesse",
+"Vitesse du LFO quand Sync est désactivé, de 0,1 Hz à 20 Hz."
+],
+[
+"Sync de la vitesse",
+"Durée du cycle du LFO quand Sync est activé : 1/8, 1/4, 3/8, 1/2, 3/4, temps, 2 temps, 4 temps, 8 temps ou 16 temps."
+],
+[
+"Intensité max.",
+"Gain le plus haut du cycle, de 0 à 100 %. Le régler sous Amount min entraîne le minimum vers le bas."
+],
+[
+"Intensité min.",
+"Gain le plus bas du cycle, de 0 à 100 %. Le régler au-dessus de Amount max entraîne le maximum vers le haut."
+],
+[
+"Décalage de phase",
+"Phase de départ du LFO pour les deux canaux, de 0 à 360."
+],
+[
+"Décalage stéréo",
+"Phase supplémentaire pour le canal droit, de 0 à 360. À 180, les deux côtés bougent en sens opposés."
+],
+[
+"Sync",
+"Activé, il utilise Rate sync et suit la position dans le morceau. Désactivé, il utilise Vitesse."
+],
+[
+"Forme",
+"Courbe l'onde avec un exposant. Indique de 0 à 100, 50 la laisse droite."
+],
+[
+"Lisser",
+"Mélange entre l'onde en ligne droite (0) et sa version arrondie, proche du sinus (100)."
+],
+[
+"Biais",
+"Position du pic dans le cycle. Indique de -100 à +100, 0 donne une montée et une descente symétriques."
+],
+[
+"Largeur",
+"Part du cycle passée près du maximum par rapport au minimum. Indique de 0 à 100, 50 est équilibré."
+]
+],
+"tips": [
+"L'excursion du gain atteint 99 % de la plage entre Amount min et Amount max.",
+"Le gain est lissé par un filtre à environ 333 Hz, donc les formes à arêtes vives ne produisent pas de clic."
+]
+},
+"fx-pocket-wow-flutter": {
+"source": "69299f0824",
+"intro": "Pocket Wow & Flutter fait passer le son par un delay dont la longueur est déplacée par deux LFO sinusoïdaux, ce qui fait osciller la hauteur comme une bande instable. La sortie est entièrement wet, il n'y a pas de contrôle de mix. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Wow & Flutter, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Vitesse du wow",
+"Vitesse du LFO lent quand Sync est désactivé, de 0,1 Hz à 5 Hz."
+],
+[
+"Sync du wow",
+"Durée du cycle du wow quand Sync est activé : 1/8, 1/4, 3/8, 1/2, 3/4, temps, 2 temps, 4 temps, 8 temps ou 16 temps."
+],
+[
+"Intensité du wow",
+"Profondeur du wow, de 0 à 100 % sur une loi exponentielle. À 100 %, le delay oscille sur jusqu'à 142 ms."
+],
+[
+"Vitesse du flutter",
+"Vitesse du LFO rapide quand Sync est désactivé, de 5 Hz à 20 Hz."
+],
+[
+"Sync du flutter",
+"Durée du cycle du flutter quand Sync est activé, même liste que Wow sync."
+],
+[
+"Intensité du flutter",
+"Profondeur du flutter, de 0 à 100 %. Il ajoute jusqu'à 3 ms au delay du wow."
+],
+[
+"Sync",
+"Activé, il cale les deux LFO sur le tempo et utilise les deux durées de sync. Désactivé, il utilise les deux vitesses en Hz."
+],
+[
+"Vitesse aléatoire",
+"Fréquence à laquelle une nouvelle vitesse de wow est tirée, de 0,1 Hz à 10 Hz."
+],
+[
+"Sync aléatoire",
+"Règle le temps entre les tirages sous forme de durée liée au tempo, même liste que Wow sync."
+],
+[
+"Intensité aléatoire",
+"Taille de la fenêtre dans laquelle le tirage aléatoire est pris, de 0 à 100 %. Avec Sync désactivé, la fenêtre est autour de Wow rate ; avec Sync activé, autour du pas de Wow sync. À 0 %, la vitesse du wow ne change pas."
+]
+],
+"tips": [
+"Random rate et Random sync règlent la même minuterie. Celui qu'on a bougé en dernier l'emporte, quel que soit le réglage de Sync.",
+"Le delay augmente avec Wow amount et n'est pas déclaré comme latence, donc de fortes valeurs mettent la piste en retard en plus de la faire osciller.",
+"Avec Sync activé et Random amount à 0 %, le wow suit la position dans le morceau."
 ]
 },
 "fx-rhythmic-envelope": {
@@ -5548,6 +6361,114 @@
 "Baissez Mix pour garder une part du signal propre en dessous."
 ]
 },
+"fx-pocket-distortion": {
+"source": "d41cff05f7",
+"intro": "Pocket Distortion façonne le signal avec l'une de quatre courbes, puis retient des échantillons pour un son écrasé et met la sortie à l'échelle. Utilisez-le pour ajouter du grain aux batteries, aux basses et aux synthés. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Distortion, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Hard / Tube / Soft / Clip",
+"Choisit la courbe. Hard est une courbe à coude qui s'aplatit quand le niveau monte, Tube est une courbe tanh, Soft est une courbe exponentielle et Clip coupe le signal à pleine échelle."
+],
+[
+"Biais",
+"Bipolaire, de -100 à 100. Ajoute un offset avant la courbe pour que les deux moitiés de l'onde soient distordues différemment. Le curseur suit une loi de puissance cinq, donc il agit surtout près des extrémités. Un filtre passe-haut retire l'offset après la courbe."
+],
+[
+"Drive",
+"Quantité de distorsion, affichée de 0 à 100."
+],
+[
+"Stéréo",
+"Répartit le drive entre les côtés, affiché de -100 à 100. À 0, les deux côtés reçoivent tout le drive. Sous 0, le côté gauche reçoit moins de drive, au-dessus de 0 c'est le côté droit."
+],
+[
+"BitCrush",
+"Retient chaque échantillon de sortie pendant 1 à 257 échantillons. Le curseur suit une loi de puissance quatre, donc la première moitié change peu."
+],
+[
+"Gain",
+"Niveau de sortie, de -24 à 0 dB."
+]
+],
+"tips": [
+"BitCrush baisse la fréquence d'échantillonnage en retenant des échantillons. Il ne réduit pas la résolution en bits.",
+"Gain ne fait que baisser le niveau. Utilisez-le pour compenser le niveau qu'ajoute Drive."
+]
+},
+"fx-pocket-waveshaper": {
+"source": "bd9e6bccf5",
+"intro": "Pocket Waveshaper distord un son en le faisant passer par l'une de sept courbes. Deux filtres précèdent la courbe et une section de tonalité à trois bandes la suit, et un LFO peut déplacer les deux contrôles de forme. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Waveshaper, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Forme",
+"La courbe : Soft, Tanh, Crossover, Fold, Octaver, Rectify ou CrossFold."
+],
+[
+"Gain auto",
+"Activé, il ajuste le niveau du signal façonné sur le niveau d'entrée, avec un suiveur lent."
+],
+[
+"X / Y",
+"Deux paramètres de la courbe choisie. Ce qu'ils changent dépend de la forme. Indiquent de 0 à 100."
+],
+[
+"Drive",
+"Gain à l'entrée de la courbe, de 0 dB à 40 dB. Indique de 0 à 100."
+],
+[
+"Gain post",
+"Gain du signal façonné, de -18 dB à +18 dB."
+],
+[
+"Largeur stéréo",
+"Ajoute un offset de signe opposé au signal gauche et droit avant la courbe, pour que les deux côtés soient distordus différemment. Loi de puissance quatre, indique de 0 à 100."
+],
+[
+"Mix",
+"Mélange à puissance égale du signal dry et du signal façonné. Indique de 0 à 100."
+],
+[
+"High cut / Low cut",
+"Filtres à deux pôles avant la courbe, chacun de 20 Hz à 20 kHz."
+],
+[
+"Graves",
+"Bande en cloche à 100 Hz après la courbe. Indique de -18 dB à +18 dB."
+],
+[
+"Mid freq / Mid gain",
+"Bande en cloche après la courbe, de 500 Hz à 2 kHz. Le gain indique de -18 dB à +18 dB."
+],
+[
+"Aigus",
+"Plateau haut à 3,3 kHz après la courbe. Indique de -18 dB à +18 dB."
+],
+[
+"Forme du LFO",
+"Sine, Saw ou Square."
+],
+[
+"Synchro du LFO",
+"Activé, il utilise LFO rate et suit la position dans le morceau. Désactivé, il utilise LFO rate free."
+],
+[
+"Vitesse LFO",
+"Durée du cycle du LFO quand LFO sync est activé : 1/8, 1/4, 3/8, 1/2, 3/4, temps, 2 temps, mesure, 2 mesures ou 4 mesures."
+],
+[
+"Vitesse libre du LFO",
+"Vitesse du LFO quand LFO sync est désactivé, de 0,02 Hz à 9,92 Hz sur une loi cubique."
+],
+[
+"LFO to X / LFO to Y",
+"Amplitude du déplacement de X et de Y par le LFO, de 0 à 100 %. À 100 %, il déplace un contrôle de la moitié de sa plage dans chaque sens."
+]
+],
+"tips": [
+"Le LFO et les valeurs X et Y sont mis à jour une fois par tick du morceau (1/96 de temps), pas à chaque échantillon.",
+"Un filtre DC après la courbe retire l'offset que créent les formes asymétriques et Stereo spread."
+]
+},
 "fx-squeeze": {
 "source": "82c718fe5f",
 "intro": "Squeeze est un effet d'insert qui quantifie le signal sur un nombre réduit de niveaux, peut le gater périodiquement avec sa section Puncher et peut le filtrer avant ou après. Il charge les réglages de Fruity Squeeze depuis un projet .flp importé.",
@@ -5678,7 +6599,7 @@
 ]
 },
 "fx-lynx-tune": {
-"source": "68589fac2a",
+"source": "428780a75c",
 "intro": "LYNX Tune corrige la hauteur d'une voix ou d'un instrument monophonique pendant que vous jouez, sur n'importe quel insert du Mixer. C'est une conception de LYNX SHARE et non l'import d'un autre plugin. Il utilise la détection de hauteur YIN et le décalage TD-PSOLA.",
 "controls": [
 [
@@ -5700,6 +6621,10 @@
 [
 "Formant",
 "Active la préservation des formants. Shift déplace les formants."
+],
+[
+"SOUFFLE",
+"Souffle, de 0 à 100 pour cent. Ajoute un bruit de souffle façonné par les formants de la voix corrigée, sur les sons voisés."
 ],
 [
 "Transposer",
@@ -6196,6 +7121,99 @@
 ],
 "tips": [
 "Une instance neuve démarre directement à ses valeurs établies, sans fondu d'entrée."
+]
+},
+"fx-pocket-spacer": {
+"source": "0bad263ab8",
+"intro": "Pocket Spacer déplace un son dans le champ stéréo avec de courts delays, l'inversion de polarité et un contrôle de largeur. Utilisez-le pour décaler un côté, rétrécir ou élargir une piste, ou travailler séparément le mid et le side. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Spacer, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Délai G/D",
+"Retarde un côté de 300 ms au plus sur une loi cubique. À droite du centre, il retarde le canal gauche ; à gauche du centre, le canal droit. Indique off au centre."
+],
+[
+"Pan",
+"Baisse le niveau du côté opposé. Indique Center au milieu, puis de 0 à 100 %."
+],
+[
+"Séparation",
+"Bipolaire, de -100 % à +100 %, désactivé au centre. Les valeurs positives resserrent l'image jusqu'au mono. Les valeurs négatives soustraient une partie de chaque canal à l'autre pour l'élargir."
+],
+[
+"Inversion G/D",
+"Inverse la polarité des canaux : aucun, gauche, droite ou les deux."
+],
+[
+"Délai M/S",
+"Retarde un signal de la paire mid/side de 100 ms au plus sur une loi de puissance cinq, donc la plage près du centre est très fine (microsecondes). À droite du centre, il retarde le mid ; à gauche du centre, le side."
+],
+[
+"Inversion M/S",
+"Inverse la polarité de la paire mid/side : aucun, mid, side ou les deux."
+],
+[
+"Mode stéréo",
+"Standard encode en mid/side, applique l'étage M/S et décode en gauche/droite. Output M/S laisse le résultat en mid à gauche et en side à droite. Input M/S traite la gauche et la droite entrantes comme mid et side et les décode en gauche/droite."
+]
+],
+"tips": [
+"Les quatre contrôles continus glissent vers leur nouvelle valeur, donc un changement de delay fait glisser la hauteur un instant.",
+"Les delays font partie du son et ne sont pas déclarés comme latence."
+]
+},
+"fx-pocket-spreader": {
+"source": "c1689cdba4",
+"intro": "Pocket Spreader élargit l'image stéréo en retardant un signal latéral et en le rajoutant, et laisse hors de l'élargissement la partie sous la fréquence Low bypass. Il fait tourner le même moteur que Spreader, derrière les plages de contrôle de FL Studio Mobile. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Spreader, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Largeur",
+"Indique de 0,0 à 2,0. Jusqu'à 1,0, il allonge le delay du signal d'élargissement, jusqu'à environ 6,35 ms. Au-dessus de 1,0, le delay reste à son maximum et seul le niveau du signal d'élargissement monte."
+],
+[
+"Contournement des graves",
+"Fréquence sous laquelle le signal est séparé de l'élargissement, de 10 Hz à 10 kHz."
+],
+[
+"Graves mono",
+"Part de la zone sous la fréquence Low bypass qui sort en mono. Continu, indique de 0 à 100."
+],
+[
+"Séparation",
+"Niveau du signal side, de -100 % à +100 %. Indique Original au centre. À -100 %, le signal side est retiré ; à +100 %, il est doublé."
+]
+],
+"tips": [
+"L'effet déclare à la compensation de délai une latence d'environ 6,35 ms (280 échantillons à 44,1 kHz).",
+"Les contrôles sont lissés, donc l'effet apparaît en fondu sur quelques millisecondes après une réinitialisation."
+]
+},
+"fx-pocket-stereoizer": {
+"source": "6f5c30ec3c",
+"intro": "Pocket Stereoizer élargit un son en retardant et en filtrant sa somme mono, puis en ajoutant le résultat au canal gauche et en le soustrayant du droit. Utilisez-le sur des sources mono ou étroites. C'est le moteur sur lequel les projets FL Studio Mobile (.flm) chargent leur module Stereoizer, avec chaque valeur copiée telle quelle, et on peut aussi l'ajouter à n'importe quel emplacement du Mixer.",
+"controls": [
+[
+"Intensité",
+"Niveau du signal ajouté, sur une loi quadratique. Indique de 0 à 100. Près de 0, l'élargissement est désactivé."
+],
+[
+"Timbre",
+"Delay de la somme mono, de 0,5 ms à 50 ms sur une loi cubique. Indique de 0 à 100."
+],
+[
+"Focus",
+"Filtre à un pôle sur le signal retardé. Indique de -100 % à +100 %. Sous le centre, c'est un passe-bas ; au-dessus du centre, un passe-haut."
+],
+[
+"Délai G/D",
+"Retarde un côté de 25 ms au plus sur une loi cubique. Indique de -100 % à +100 %. À gauche du centre, il retarde le canal gauche ; à droite du centre, le canal droit."
+],
+[
+"Pan",
+"Balance linéaire, de -100 % à +100 %. Baisse le côté opposé et glisse vers sa nouvelle valeur."
+]
+],
+"tips": [
+"Le signal ajouté a un signe opposé sur les deux côtés, donc avec L/R delay et Pan au centre, il s'annule quand la sortie est sommée en mono."
 ]
 },
 "fx-spreader": {
@@ -7011,12 +8029,36 @@
 ]
 },
 "gen-fruity-dance": {
-"source": "b830a4e6ca",
-"intro": "Fruity Dance est le danseur propre à LYNX SHARE, dans le rôle du plugin FL du même nom. Il ne produit aucun son ; ce sont les notes du canal qui choisissent le mouvement. Vous pouvez faire glisser le danseur pour le placer et faire un clic droit dessus pour voir ses mouvements.",
+"source": "601e484cb7",
+"intro": "Fruity Dance est le danseur propre à LYNX SHARE, dans le rôle du plugin FL du même nom ; son éditeur s'intitule LYNX Dance. Il ne produit aucun son ; ce sont les notes du canal qui choisissent le mouvement. Vous pouvez faire glisser le danseur pour le placer et faire un clic droit dessus pour voir ses mouvements. Il peut aussi afficher une planche de sprites faite pour Fruity Dance à la place du danseur de LYNX SHARE.",
 "controls": [
 [
 "Pas",
-"Le mouvement de danse utilisé par le canal."
+"Le mouvement de danse utilisé par le canal. Avec une planche de sprites, la liste montre les mouvements propres à la planche."
+],
+[
+"Visible",
+"Affiche ou masque le danseur."
+],
+[
+"Miroir horizontal",
+"Met le danseur en miroir."
+],
+[
+"Synchroniser les changements",
+"Activé : un nouveau mouvement démarre au cycle suivant. Désactivé : il démarre aussitôt."
+],
+[
+"Solide",
+"Activé : le danseur reçoit les clics de souris. Désactivé : les clics le traversent."
+],
+[
+"Garder devant",
+"Garde le danseur devant les panneaux et les plugins ancrés."
+],
+[
+"Sur le bureau",
+"Conservé pour les projets FL Studio. Il ne fait rien ici : les danseurs restent dans la fenêtre principale."
 ],
 [
 "Taille",
@@ -7027,24 +8069,33 @@
 "Vitesse de l'animation, sous forme de multiplicateur."
 ],
 [
-"En miroir",
-"Inverse le mouvement en miroir."
+"Fusion",
+"Fondu de mouvement entre les images d'une planche de sprites, de 0 à 100 pour cent."
 ],
 [
-"Afficher le danseur",
-"Affiche ou masque le danseur."
+"Reflet",
+"Opacité de l'image en miroir sous le danseur."
 ],
 [
-"Couleur de la tenue",
-"Couleur de la tenue du danseur."
+"Couleur de la tenue...",
+"Couleur de la tenue du danseur de LYNX SHARE."
 ],
 [
 "Remettre le danseur",
 "Remet le danseur à sa position par défaut et l'affiche."
+],
+[
+"Charger une feuille de sprites...",
+"Choisit une image au format de Fruity Dance : 8 images en largeur et une ligne par mouvement, avec un fichier texte du même nom qui contient un nom de mouvement par ligne."
+],
+[
+"Danseur de LYNX",
+"Revient au danseur propre à LYNX SHARE."
 ]
 ],
 "tips": [
-"L'éditeur indique quelle touche joue quel mouvement ; les versions en miroir des mouvements sont sur une plage de touches séparée, et d'autres touches masquent ou affichent le danseur."
+"L'éditeur indique quelle touche joue quel mouvement ; les versions en miroir des mouvements sont sur une plage de touches séparée, et d'autres touches masquent ou affichent le danseur.",
+"Le sélecteur de planche de sprites accepte les fichiers PNG et JPEG. Si la taille de l'image ne correspond pas au fichier de noms, l'éditeur indique Bitmap size is incorrect et garde le danseur actuel."
 ]
 },
 "fx-fruity-html-notebook": {
@@ -7258,6 +8309,62 @@
 "En mode Auto, rendez la fenêtre haute et étroite pour obtenir un indicateur, ou large et basse pour obtenir un oscilloscope."
 ]
 },
+"fx-audio-effect-rack": {
+"source": "adc619108a",
+"intro": "Audio Effect Rack est un effet d'emplacement du Mixer bâti sur Patcher en mode rack. Chaque chaîne reçoit la même entrée et les sorties des chaînes sont sommées, avec compensation de délai entre elles. Ajoutez-le depuis le sélecteur de plugins de l'emplacement du Mixer sous le nom Audio Effect Rack, ou groupez des emplacements existants dans un rack. Les Audio Effect Racks des sets Ableton Live (.als) s'ouvrent comme racks, et les racks sont réécrits quand vous exportez un set Live.",
+"controls": [
+[
+"Chain list",
+"Une ligne par chaîne avec son nom, son volume, son pan, un interrupteur on et S pour solo. Le menu de chaîne propose Add chain, Rename, Duplicate, Delete, Move up et Move down."
+],
+[
+"Appareils",
+"Les effets de la chaîne sélectionnée. Le menu d'ajout propose Effects, Plugin effects et Racks, si bien que les racks peuvent être imbriqués."
+],
+[
+"Chain, Hide",
+"Affiche ou masque l'éditeur de zones de sélection de chaîne. Un Audio Effect Rack n'a pas de zones de touches ni de vélocité."
+],
+[
+"Zone bars",
+"Glissez une barre ou ses extrémités pour régler la zone de la chaîne, de 0 à 127. La bande du haut règle les fondus, qui modulent la sortie de la chaîne."
+],
+[
+"Sélecteur de chaîne",
+"La valeur à laquelle les zones sont comparées. Une macro peut la piloter."
+],
+[
+"Macros",
+"Jusqu'à 16 boutons, chacun avec une plaque de nom et une valeur. + et - en affichent plus ou moins : 1, 2, 4 et ainsi de suite jusqu'à 16."
+],
+[
+"Map",
+"Mode Map. Chaque macro reçoit un bouton Map qui ouvre un menu des chaînes, de leurs appareils et paramètres, Chain Volume, Chain Pan et Chain Selector. La liste de mappage montre Macro, Path, Name, Min et Max, avec Invert Range et Delete."
+],
+[
+"Aléat.",
+"Donne à chaque macro mappée une valeur aléatoire. Le menu d'une macro propose Exclude Macro from Randomization."
+],
+[
+"Variations de macros",
+"New enregistre les valeurs des macros. Une variation propose Launch, Overwrite, Rename, Duplicate et Delete."
+],
+[
+"Grouper dans un rack d'effets audio",
+"Dans le menu d'emplacement du Mixer : place l'effet dans un nouveau rack à une chaîne. Group all into Audio Effect Rack déplace toute la chaîne d'emplacements. Le son reste le même et l'automation des paramètres déplacés pilote les macros du rack."
+],
+[
+"Dégrouper",
+"Dans le menu d'emplacement du Mixer d'un rack à une chaîne : remet ses appareils dans les emplacements."
+]
+],
+"tips": [
+"En dehors d'une zone qui se termine sans fondu, l'entrée de la chaîne se ferme, si bien que ses queues s'éteignent d'elles-mêmes.",
+"Depuis un set Live, un rack garde ses chaînes, zones, volume et pan de chaîne, macros, variations et racks imbriqués. Les plugins tiers des chaînes sont conservés. Les appareils propres à Live sont abandonnés et listés dans le rapport d'import.",
+"Un mappage de macro sur un paramètre de plugin VST3 dans un set Live n'est pas conservé. À l'export, les effets intégrés de LYNX SHARE dans une chaîne ne sont pas écrits ; seuls les plugins VST2 et VST3 et les racks imbriqués le sont.",
+"Ungroup n'est pas disponible pour un rack de plus d'une chaîne."
+]
+},
 "fx-fruity-send": {
 "source": "96c8f760a7",
 "intro": "Fruity Send est un plugin de slot d'effet qui envoie le signal, à sa position dans la chaîne, vers un autre insert du Mixer. Vous l'utilisez quand il vous faut un envoi au milieu d'une chaîne, par exemple après un effet mais avant le suivant. Il est lu dans les projets FL Studio à l'import.",
@@ -7334,6 +8441,58 @@
 "Lancez Ping avec votre matériel branché pour régler le délai."
 ]
 },
+"gen-instrument-rack": {
+"source": "8198b21313",
+"intro": "Instrument Rack est un générateur du Channel Rack bâti sur Patcher en mode rack. Chaque chaîne reçoit les mêmes notes et les sorties des chaînes sont sommées. Une chaîne garde ses appareils dans cet ordre : effets MIDI, l'instrument, effets audio. Ajoutez-le depuis le sélecteur de plugins sous le nom Instrument Rack. Les Instrument Racks des sets Ableton Live (.als) s'ouvrent comme racks, et les racks sont réécrits quand vous exportez un set Live.",
+"controls": [
+[
+"Chain list",
+"Une ligne par chaîne avec son nom, son volume, son pan, un interrupteur on et S pour solo. Le menu de chaîne propose Add chain, Rename, Duplicate, Delete, Move up et Move down."
+],
+[
+"Appareils",
+"Les appareils de la chaîne sélectionnée. Le menu d'ajout propose Effects, Plugin effects, Racks, MIDI effects et Instruments. Instruments liste Synth, Instrument Rack et Plugin instruments."
+],
+[
+"Key, Vel, Chain, Hide",
+"Choisit l'éditeur de zones : zones de touches, zones de vélocité, zones de sélection de chaîne, ou aucune. Les zones vont de 0 à 127."
+],
+[
+"Zone bars",
+"Glissez une barre ou ses extrémités pour régler la zone. La bande du haut d'une barre règle les fondus. Les fondus de touches et de vélocité modulent la vélocité des notes qui entrent dans la chaîne. Le fondu de sélection de chaîne module la sortie de la chaîne."
+],
+[
+"Sélecteur de chaîne",
+"La valeur à laquelle les zones de sélection de chaîne sont comparées. Une macro peut la piloter."
+],
+[
+"Macros",
+"Jusqu'à 16 boutons, chacun avec une plaque de nom et une valeur. + et - en affichent plus ou moins : 1, 2, 4 et ainsi de suite jusqu'à 16."
+],
+[
+"Map",
+"Mode Map. Chaque macro reçoit un bouton Map qui ouvre un menu des chaînes, de leurs appareils et paramètres, Chain Volume, Chain Pan et Chain Selector. La liste de mappage montre Macro, Path, Name, Min et Max, avec Invert Range et Delete."
+],
+[
+"Aléat.",
+"Donne à chaque macro mappée une valeur aléatoire. Le menu d'une macro propose Exclude Macro from Randomization."
+],
+[
+"Variations de macros",
+"New enregistre les valeurs des macros. Une variation propose Launch, Overwrite, Rename, Duplicate et Delete. Le menu d'une macro propose Exclude Macro from Variations."
+],
+[
+"Variation morph (LYNX), Launch glide (LYNX)",
+"Ajouts de LYNX SHARE dans le menu des variations, tous deux désactivés par défaut : un curseur Morph entre deux variations, et un temps de glissement pour une variation lancée."
+]
+],
+"tips": [
+"Une macro déplace linéairement chaque paramètre mappé entre Min et Max. Un paramètre n'appartient qu'à une macro à la fois.",
+"Les macros, le sélecteur de chaîne et le morph peuvent être automatisés comme les paramètres publiés d'un Patcher.",
+"Depuis un set Live, un rack garde ses chaînes, zones, volume et pan de chaîne, macros, variations et racks imbriqués. Les plugins tiers des chaînes sont conservés. Les appareils propres à Live sont abandonnés et listés dans le rapport d'import.",
+"Un mappage de macro sur un paramètre de plugin VST3 dans un set Live n'est pas conservé. À l'export, les appareils intégrés de LYNX SHARE dans une chaîne ne sont pas écrits ; seuls les plugins VST2 et VST3 et les racks imbriqués le sont."
+]
+},
 "gen-layer": {
 "source": "bdb4d8e177",
 "intro": "Un Layer est un canal sans son propre. Ajoutez-le au Channel Rack, choisissez quels canaux sont ses enfants, et chaque note envoyée au Layer joue ces enfants. Servez-vous-en pour empiler des instruments, partager un clavier entre plusieurs sons ou alterner entre des samples.",
@@ -7382,6 +8541,61 @@
 "tips": [
 "Dans un Patcher, le Layer a une broche Children : reliez-la par un câble aux générateurs qu'il doit jouer.",
 "Layering > Split children donne à chaque enfant une touche, à partir de la touche racine."
+]
+},
+"gen-midi-effect-rack": {
+"source": "ee0bfb9d44",
+"intro": "MIDI Effect Rack est un générateur du Channel Rack bâti sur Patcher en mode rack. Ses chaînes ne contiennent que des effets MIDI. Chaque chaîne reçoit les mêmes notes, et ce que jouent les chaînes va aux canaux enfants du rack, comme avec un canal Layer. Ajoutez-le depuis le sélecteur de plugins sous le nom MIDI Effect Rack. Les mêmes chaînes d'effets MIDI peuvent aussi se placer en tête d'une chaîne d'Instrument Rack.",
+"controls": [
+[
+"Définir les enfants",
+"Dans le menu de chaîne : fait des canaux sélectionnés dans le Channel Rack les enfants que ce rack joue. Show children les sélectionne de nouveau."
+],
+[
+"Chain list",
+"Une ligne par chaîne. Le menu de chaîne propose Add chain, Rename, Duplicate, Delete, Move up et Move down."
+],
+[
+"Appareils",
+"Les effets MIDI de la chaîne sélectionnée, ajoutés depuis le menu MIDI effects."
+],
+[
+"Key, Vel, Chain, Hide",
+"Choisit l'éditeur de zones : zones de touches, zones de vélocité, zones de sélection de chaîne, ou aucune. Les zones vont de 0 à 127."
+],
+[
+"Zone bars",
+"Glissez une barre ou ses extrémités pour régler la zone. La bande du haut d'une barre règle les fondus. Dans un MIDI Effect Rack, les trois fondus modulent la vélocité des notes."
+],
+[
+"Sélecteur de chaîne",
+"La valeur à laquelle les zones de sélection de chaîne sont comparées. Une macro peut la piloter."
+],
+[
+"Le sélecteur de chaîne filtre les contrôles MIDI",
+"Un interrupteur dans le menu de chaîne, enregistré avec le rack."
+],
+[
+"Macros",
+"Jusqu'à 16 boutons. + et - en affichent plus ou moins."
+],
+[
+"Map",
+"Mode Map. Chaque macro reçoit un bouton Map qui ouvre un menu des paramètres d'appareil des chaînes et de Chain Selector. La liste de mappage montre Macro, Path, Name, Min et Max."
+],
+[
+"Aléat.",
+"Donne à chaque macro mappée une valeur aléatoire, sauf les macros exclues de la randomisation."
+],
+[
+"Variations de macros",
+"Enregistre et lance des jeux de valeurs de macros : New, Launch, Overwrite, Rename, Duplicate et Delete."
+]
+],
+"tips": [
+"Tant que les enfants ne sont pas définis, la barre de titre du rack indique qu'il n'y en a pas encore et le rack ne joue rien.",
+"Les chaînes n'ont ni volume ni pan : un MIDI Effect Rack ne fait que transmettre des notes.",
+"Un MIDI Effect Rack de LYNX SHARE est écrit dans un set Live exporté comme un MIDI Effect Rack, sans les effets MIDI intégrés qu'il contient. À l'ouverture d'un set Live, les MIDI Effect Racks de Live ne sont pas convertis ; ils sont listés dans le rapport d'import."
 ]
 },
 "gen-midi-out": {

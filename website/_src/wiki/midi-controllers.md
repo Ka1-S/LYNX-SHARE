@@ -20,11 +20,13 @@ LYNX SHARE takes notes and controller moves from any MIDI input device. The devi
 | Setting | What it does |
 |---|---|
 | Tick box | Turns the device on or off |
-| `Any MIDI channel` | Listens to every MIDI channel, or to one channel only |
+| `Any MIDI channel` | Listens to every MIDI channel, or to one channel only. `MPE controller` is at the end of this list |
 | `Plays the selected channels` | Notes go to the channels selected in the Channel rack, or always to one fixed channel |
 | `Velocity` | `As played`, `Soft (light playing sounds louder)`, `Hard (needs harder playing)` or `Fixed (every note at full velocity)` |
 | `Performance mode channel` | Notes on this MIDI channel launch Playlist clips while Performance mode is on |
 | `Song marker jump` | Notes on this MIDI channel move the song to a marker instead of playing |
+| `Controller type` | `Detect automatically`, `Generic controller` or a controller profile |
+| `Foot pedal controls note off` | On by default. A sustain pedal (CC 64) or a sostenuto pedal (CC 66) holds the notes. Off, the pedal goes to the plugins as a controller |
 
 ## Link a knob to a control
 
@@ -41,9 +43,44 @@ The link is saved with the project. To remove it, right-click the control again 
 | `Multilink to controllers` | `Ctrl+J` | While it is on, the controls you move are linked, in order, to the hardware controls you move next. It is in the `Options` menu |
 | `Pickup (takeover mode)` | none | On the MIDI page. A controller moves a parameter only after reaching its current value, so nothing jumps |
 
-The MIDI page lists the links under `Links (this project, then global)`. `Controller type` on the same page reads `Generic controller`.
+The MIDI page lists the links under `Links (this project, then global)`. A device whose `Controller type` is `Generic controller` does only what you link by hand.
 
 A third-party plugin's parameters are reached through `Automate plugin parameter` in the channel's menu or the effect slot's menu. Each parameter there has the same link items. See [Automation](/wiki/automation/).
+
+## Controller profiles
+
+A controller profile sets up a device's transport buttons, faders, knobs, pads, lights and display, with nothing to link.
+
+1. Open `Options › MIDI settings...` (`F10`) and tick the device under `Input devices`.
+2. Leave its `Controller type` on `Detect automatically`. The name in brackets is the profile found from the device's port name.
+3. If it shows `Generic controller`, choose the profile from the list yourself.
+4. Read the line beside the box. `Feedback to` names the output port that gets the lights, motor faders and display text.
+
+| Profile | What it maps |
+|---|---|
+| `Mackie Control Universal` | Faders to the inserts' volumes and the Master. V-Pots to pan, to the parameters of the selected channel's plugin or to the Channel rack's volumes. Arm, solo, mute and select per strip, fader banks, play, stop, record, rewind, forward, Pattern or Song mode, metronome, undo and the jog wheel. The display shows names and values |
+| `Mackie Control Extender (XT)` | The same for 8 more strips. The units share one bank, in the order of the `Input devices` list |
+| `Novation Launchkey MK3 (DAW mode)` | Pots to pan, volume or plugin parameters, faders to volume, fader buttons select an insert. Bank, play, stop, record, loop, metronome and undo buttons. The Session pads are the selected channel's 16 steps. Use it on the keyboard's second port |
+| `Akai APC Key 25 mk2` | Knobs to volume, pan or plugin parameters. The two top pad rows are the selected channel's 16 steps and the three below play notes. Track buttons select an insert. Stop, play and record. Use it on the second port |
+| `Arturia KeyLab Essential mk3 (Mackie Control port)` | The Mackie Control map, on the keyboard's MCU/HUI port |
+| `Korg nanoKONTROL2 (Mackie Control mode)` | The Mackie Control map. It is not detected: start the unit in a Mackie Control mode and choose this type by hand |
+
+Knobs and faders that send a position use soft takeover: they move a control only after reaching its value. Controls you linked by hand keep their links. `Controller profiles folder` opens the folder for your own profiles (`*.lynxctl`), and `Refresh device list` reads them again.
+
+The built-in profiles were written from each maker's documentation. They have not been tried on the hardware yet.
+
+## MPE controllers
+
+MPE is at a first stage. An MPE controller plays each note with its own pitch bend, timbre (CC 74) and pressure.
+
+1. On the MIDI page, open the device's box that reads `Any MIDI channel` and choose `MPE controller`.
+2. In the box that appears beside it, choose the member channels, from `Channel 2` to `Channels 2-16`.
+3. Play. To record, see [Recording](/wiki/recording/).
+
+- A recorded note keeps one value of each: its bend as fine pitch, its timbre as Mod X and its strongest pressure as Mod Y. It is not a curve.
+- Of the built-in instruments, the Sampler and the built-in synth follow these values.
+- A third-party plugin receives MPE when `MPE` is on under `MIDI` in the plugin window's `Wrapper settings`. Each note then goes out on its own MIDI channel, 2 to 16.
+- It has not been tried with a real MPE controller yet.
 
 ## The typing keyboard
 
@@ -79,6 +116,8 @@ A third-party plugin's parameters are reached through `Automate plugin parameter
 - A tempo moved by a linked MIDI controller does not resize audio clips. Type or set the final tempo instead.
 - To record what you play, see [Recording](/wiki/recording/). Incoming notes can be snapped to a scale in the [Piano roll](/wiki/piano-roll/).
 - MIDI CC, channel aftertouch and pitch bend sent to a plugin can be automated with `Automate MIDI controller (CC, aftertouch, pitch bend)`.
+- A note held by a pedal is recorded up to the moment the pedal comes up.
+- An automation clip does not take a control back while you move it from a controller. The control follows its automation again when playback next starts.
 
 ## Related
 

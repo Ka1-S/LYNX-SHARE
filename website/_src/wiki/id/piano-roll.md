@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Setiap alat punya tombol huruf. Huruf-huruf itu berfungsi saat piano keyboard ke
 
 ## Keyboard dan penggaris
 
-Klik sebuah tuts di keyboard untuk mendengarnya. Makin ke kanan pada tuts, makin keras. `Ctrl`+klik sebuah tuts memilih not-nya. Seret dengan tombol tengah pada keyboard untuk membuat tuts lebih tinggi atau lebih pendek.
+Klik sebuah tuts di keyboard untuk mendengarnya. Makin ke kanan pada tuts, makin keras. `Ctrl`+klik sebuah tuts memilih not-nya. Seret dengan tombol tengah pada keyboard untuk membuat tuts lebih tinggi atau lebih pendek. Roda zoom vertikal juga bisa, yaitu kotak kecil di ujung bar gulir waktu: seret ke atas atau bawah, atau pakai roda mouse di atasnya.
+
+`Tampilan › Gaya keyboard` di menu Piano roll memilih antara `Tuts datar` dan `Tuts piano (garis di antara tuts putih)`, yang menggambar keyboard tradisional.
 
 Klik penggaris untuk mengatur posisi. `Ctrl`+seret, seret dengan klik kanan, atau klik dua kali lalu seret pada penggaris memilih not dalam rentang waktu. `Ctrl`+roda untuk zoom dan `Shift`+roda untuk menggulir.
 
@@ -56,13 +58,23 @@ Klik penggaris untuk mengatur posisi. `Ctrl`+seret, seret dengan klik kanan, ata
 | Pengaturan | Fungsinya |
 |---|---|
 | Snap | "Main" mengikuti snap di toolbar utama, atau pilih satu untuk jendela ini. |
-| Chord | Mengklik membuat chord yang dipilih, dengan not yang diklik sebagai root. `Shift+N` kembali ke not tunggal. |
-| Tangga nada | Menyorot not dari sebuah tangga nada. Tombol terpisah men-snap not baru dan not yang dipindahkan, serta MIDI masuk, ke tangga nada yang dipilih. |
+| Chord | Mengklik membuat chord yang dipilih, dengan not yang diklik sebagai root. `Shift+N` kembali ke not tunggal. Daftar yang sama adalah `Stempel akor` di menu Piano roll. |
+| Tangga nada | Menyorot not dari sebuah tangga nada. Tombol terpisah men-snap not baru dan not yang dipindahkan, serta MIDI masuk, ke tangga nada yang dipilih. Not yang dipindahkan lalu bergerak per langkah tangga nada, sehingga chord tetap berada di tangga nada, dan `Up` serta `Down` memindahkan satu langkah tangga nada. |
 | Slide (`S`) | Not baru menjadi not slide. Not yang sedang berbunyi meluncur ke sana (glide 808). |
 | Ghost note (`Alt+V`) | Menampilkan not channel lain di belakang notemu. |
 | Warna not | Not baru mendapat warna ini. Ada 16. |
 | Follow | Tampilan menggulir mengikuti playhead selama pattern diputar. |
-| Kotak jalur | Memilih apa yang diedit jalur di bawah: Velocity, Pan, atau Fine pitch. |
+| Kotak jalur | Memilih apa yang diedit jalur di bawah: Velocity, Pan, Fine pitch, Release, Mod X, Mod Y, Chance, atau Velocity range. |
+
+## Chance dan velocity range
+
+Setiap not punya Chance dan Velocity range. Chance adalah seberapa besar kemungkinan not itu diputar setiap kali gilirannya tiba. Velocity range membuat velocity-nya bervariasi antara velocity not dan velocity itu ditambah range-nya. Pilih `Peluang` atau `Rentang velocity (LYNX)` di kotak jalur untuk mengeditnya. `Alat › Peluang (LYNX)` di menu Piano roll mengelompokkan not terpilih agar semuanya atau hanya satu di antaranya yang diputar, dan punya `Atur ulang peluang dan rentang velocity`.
+
+## Alat MIDI dan skrip
+
+`Alat › Alat MIDI...` di menu Piano roll membuka panel dengan Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp, dan Velocity Shaper.
+
+Kolom `Skrip` di menu `Alat` mencantumkan skrip piano roll: milik LYNX SHARE sendiri dan file `.pyscript`, termasuk yang ada di folder skrip FL Studio jika FL Studio terinstal. `Buka folder skrip...` membuka folder untuk skrip milikmu sendiri, dan `Jalankan lagi skrip terakhir` mengulang skrip terakhir.
 
 ## Tombol
 

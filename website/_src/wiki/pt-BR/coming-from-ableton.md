@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Um relatório depois da exportação lista o que ficou de fora.
 ## Bom saber
 
 - Os devices do próprio Live não são recriados. Os efeitos do próprio Live são descartados na importação.
-- Os Instrument, Audio Effect e MIDI Effect Racks entram com suas cadeias, zonas e macros.
+- Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros. Os MIDI Effect Racks do Live ainda não são convertidos e aparecem no relatório de importação.
 - O relatório de importação lista o que ficou de fora.
 - O Live corta os clipes de áudio que se sobrepõem em um set exportado.
 - Os warp markers de um set do Live são mantidos na importação e gravados de volta na exportação.

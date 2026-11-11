@@ -1,5 +1,5 @@
 ---
-source: 3b54a39c97
+source: a06504f3a0
 ---
 ![Halaman MIDI di pengaturan: perangkat input, perangkat output dengan sinkronisasi master, dan sinkronisasi eksternal](/assets/img/wiki/settings-midi.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE menerima not dan gerakan kontroler dari perangkat input MIDI mana pun
 | Pengaturan | Fungsinya |
 |---|---|
 | Kotak centang | Menyalakan atau mematikan perangkat |
-| `Channel MIDI mana pun` | Mendengarkan semua channel MIDI, atau hanya satu channel |
+| `Channel MIDI mana pun` | Mendengarkan semua channel MIDI, atau hanya satu channel. `Pengontrol MPE` ada di akhir daftar ini |
 | `Memainkan channel terpilih` | Not masuk ke channel yang dipilih di Channel Rack, atau selalu ke satu channel tetap |
 | `Velocity` | `Seperti dimainkan`, `Lembut (permainan ringan terdengar lebih keras)`, `Keras (perlu permainan lebih keras)`, atau `Tetap (setiap not dengan velocity penuh)` |
 | `Channel mode performance` | Not pada channel MIDI ini meluncurkan clip Playlist selama mode Performance aktif |
 | `Lompatan marker song` | Not pada channel MIDI ini memindahkan lagu ke sebuah marker, bukan dimainkan |
+| `Jenis kontroler` | `Deteksi otomatis`, `Pengontrol generik`, atau sebuah profil kontroler |
+| `Pedal kaki mengatur akhir nada` | Menyala secara bawaan. Pedal sustain (CC 64) atau pedal sostenuto (CC 66) menahan not. Jika dimatikan, pedal diteruskan ke plugin sebagai kontroler |
 
 ## Menautkan knob ke sebuah kontrol
 
@@ -39,9 +41,44 @@ Tautan ini disimpan bersama proyek. Untuk menghapusnya, klik kanan kontrolnya la
 | `Multilink ke kontroler` | `Ctrl+J` | Selama aktif, kontrol yang kamu gerakkan ditautkan, berurutan, ke kontrol hardware yang kamu gerakkan berikutnya. Ada di menu `Opsi` |
 | `Pickup (mode takeover)` | tidak ada | Ada di halaman MIDI. Kontroler baru menggerakkan parameter setelah mencapai nilainya saat ini, jadi tidak ada yang melompat |
 
-Halaman MIDI mencantumkan tautan di bawah `Tautan (proyek ini, lalu global)`. `Jenis kontroler` di halaman yang sama berbunyi `Kontroler generik`.
+Halaman MIDI mencantumkan tautan di bawah `Tautan (proyek ini, lalu global)`. Perangkat yang `Jenis kontroler`-nya `Pengontrol generik` hanya melakukan apa yang kamu tautkan sendiri.
 
 Parameter plugin pihak ketiga dijangkau lewat `Otomasikan parameter plugin` di menu channel atau menu slot efek. Setiap parameter di sana punya item tautan yang sama. Lihat [Otomasi](/wiki/automation/).
+
+## Profil kontroler
+
+Profil kontroler mengatur tombol transport, fader, knob, pad, lampu, dan layar sebuah perangkat, tanpa ada yang perlu ditautkan.
+
+1. Buka `Opsi › Pengaturan MIDI...` (`F10`) dan centang perangkat di bawah `Perangkat input`.
+2. Biarkan `Jenis kontroler`-nya di `Deteksi otomatis`. Nama dalam tanda kurung adalah profil yang ditemukan dari nama port perangkat.
+3. Jika yang tampil `Pengontrol generik`, pilih sendiri profilnya dari daftar.
+4. Baca baris di samping kotaknya. `Feedback to` menyebut port output yang menerima lampu, motor fader, dan teks layar.
+
+| Profil | Yang dipetakan |
+|---|---|
+| `Mackie Control Universal` | Fader ke volume insert dan Master. V-Pot ke pan, ke parameter plugin channel terpilih, atau ke volume Channel rack. Arm, solo, mute, dan select per strip, bank fader, play, stop, record, rewind, forward, mode Pattern atau Song, metronom, undo, dan jog wheel. Layar menampilkan nama dan nilai |
+| `Mackie Control Extender (XT)` | Hal yang sama untuk 8 strip tambahan. Unit-unit berbagi satu bank, sesuai urutan daftar `Perangkat input` |
+| `Novation Launchkey MK3 (DAW mode)` | Pot ke pan, volume, atau parameter plugin, fader ke volume, tombol fader memilih sebuah insert. Tombol bank, play, stop, record, loop, metronom, dan undo. Pad Session adalah 16 step channel terpilih. Pakai di port kedua keyboard |
+| `Akai APC Key 25 mk2` | Knob ke volume, pan, atau parameter plugin. Dua baris pad teratas adalah 16 step channel terpilih dan tiga baris di bawahnya memainkan not. Tombol track memilih sebuah insert. Stop, play, dan record. Pakai di port kedua |
+| `Arturia KeyLab Essential mk3 (Mackie Control port)` | Pemetaan Mackie Control, di port MCU/HUI milik keyboard |
+| `Korg nanoKONTROL2 (Mackie Control mode)` | Pemetaan Mackie Control. Ia tidak terdeteksi: jalankan unit dalam mode Mackie Control dan pilih tipe ini secara manual |
+
+Knob dan fader yang mengirim posisi memakai soft takeover: mereka baru menggerakkan kontrol setelah mencapai nilainya. Kontrol yang kamu tautkan sendiri tetap dengan tautannya. `Folder profil pengontrol` membuka folder untuk profilmu sendiri (`*.lynxctl`), dan `Segarkan daftar perangkat` membacanya lagi.
+
+Profil bawaan ditulis dari dokumentasi masing-masing pembuat. Profil-profil itu belum dicoba di perangkat kerasnya.
+
+## Kontroler MPE
+
+MPE masih di tahap pertama. Kontroler MPE memainkan tiap not dengan pitch bend, timbre (CC 74), dan tekanannya sendiri.
+
+1. Di halaman MIDI, buka kotak perangkat yang berbunyi `Channel MIDI mana pun` dan pilih `Pengontrol MPE`.
+2. Di kotak yang muncul di sampingnya, pilih channel anggota, dari `Kanal 2` sampai `Channels 2-16`.
+3. Mainkan. Untuk merekam, lihat [Rekaman](/wiki/recording/).
+
+- Not yang direkam menyimpan satu nilai dari masing-masing: bend-nya sebagai fine pitch, timbre-nya sebagai Mod X, dan tekanan terkuatnya sebagai Mod Y. Bukan berupa kurva.
+- Dari instrumen bawaan, Sampler dan synth bawaan mengikuti nilai-nilai ini.
+- Plugin pihak ketiga menerima MPE saat `MPE` menyala di bawah `MIDI` pada `Pengaturan wrapper` jendela plugin. Tiap not lalu keluar di channel MIDI-nya sendiri, 2 sampai 16.
+- Belum dicoba dengan kontroler MPE sungguhan.
 
 ## Keyboard ketik
 
@@ -77,6 +114,8 @@ Parameter plugin pihak ketiga dijangkau lewat `Otomasikan parameter plugin` di m
 - Tempo yang digerakkan oleh kontroler MIDI yang tertaut tidak mengubah ukuran clip audio. Ketik atau atur tempo akhirnya.
 - Untuk merekam apa yang kamu mainkan, lihat [Merekam](/wiki/recording/). Not yang masuk bisa di-snap ke tangga nada di [Piano Roll](/wiki/piano-roll/).
 - MIDI CC, channel aftertouch, dan pitch bend yang dikirim ke plugin bisa diotomasi dengan `Otomasikan kontroler MIDI (CC, aftertouch, pitch bend)`.
+- Not yang ditahan pedal direkam sampai saat pedal dilepas.
+- Clip otomasi tidak mengambil kembali kontrol saat kamu menggerakkannya dari kontroler. Kontrol mengikuti otomasinya lagi saat pemutaran dimulai berikutnya.
 
 ## Terkait
 

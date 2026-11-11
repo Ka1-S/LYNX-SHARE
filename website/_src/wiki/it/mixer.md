@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![Il Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Con il Mixer in primo piano, `Ctrl+L` collega i canali selezionati all'insert se
 - `Ctrl`+clic, o il trascinamento sulle strisce, seleziona un intervallo. `Ctrl+Shift`+clic ne aggiunge o ne toglie una.
 - Trascina una striscia di lato, oppure premi `Alt+Left` e `Alt+Right`, per spostare gli insert selezionati.
 - Clic destro su una striscia per il menu dell'insert. `F2` rinomina e colora l'insert selezionato.
+- `Del`, o `Delete` nel menu dell'insert, elimina gli insert selezionati. LYNX SHARE chiede prima conferma. Spunta `Ricorda la mia scelta` per saltare la domanda la volta successiva.
 
 Spostare, inserire o eliminare insert mantiene mandate, sidechain e automazione sul loro insert.
+
+La sezione `Mixer` del menu dell'insert e `Opzioni › Mixer` hanno altri due comandi. `Disponi gli insert come la Playlist` sposta all'inizio gli insert collegati alle tracce della Playlist, nell'ordine della Playlist. Con `Mantieni i collegamenti agli insert eliminati, in grigio (LYNX)` attivo, le mandate che andavano in un insert eliminato restano, in grigio, così puoi ricollegarle.
 
 ## Mute e solo
 
 Clicca la spia del mute per mettere un insert in mute. Clic destro o `Ctrl`+clic per il solo. `S` mette in solo gli insert selezionati e `Alt+S` li mette in solo insieme agli insert che li alimentano.
+
+Un insert silenziato continua a muovere il suo meter. Nei nuovi progetti e nei progetti FL Studio importati continua anche a eseguire i suoi effetti, e vengono tagliate solo la sua uscita verso il Master e le sue mandate. Per impedire a un insert silenziato di elaborare, attiva `Gli insert silenziati non elaborano (LYNX, risparmia CPU; questo progetto)` nella sezione `Mixer` del menu dell'insert o in `Opzioni › Mixer`. Il suo meter si ferma e i suoi effetti ripartono da zero quando lo riattivi.
 
 ## Effetti
 
@@ -42,7 +47,8 @@ Il pannello degli effetti mostra i dieci slot dell'insert selezionato.
 
 - Trascina uno slot, o usa la rotellina su di esso, per spostarlo su o giù.
 - Clic destro su uno slot per le sue opzioni (sostituisci, sposta, elimina).
-- `Del` elimina il plugin nello slot selezionato.
+- Mentre il menu di uno slot è aperto, `Del` elimina il plugin in quello slot.
+- `Raggruppa in un rack di effetti audio` nel menu dello slot mette l'effetto in un nuovo rack, e `Raggruppa tutto in un rack di effetti audio` lo fa per l'intera catena. `Separa` rimette negli slot gli effetti di un rack a una sola catena.
 - L'interruttore nell'intestazione del pannello attiva o disattiva tutti gli effetti dell'insert.
 - Puoi trascinare un effetto dal Database dei plugin del [Browser](/wiki/browser/) su un insert o su uno slot effetto.
 
@@ -60,6 +66,7 @@ Seleziona l'insert che vuoi instradare. Ogni altra striscia ha allora un interru
 - `Ctrl`+clic instrada solo su quell'insert.
 - `Shift`+clic crea una mandata sidechain. `Ctrl+Shift`+clic la crea solo sidechain.
 - Il clic destro apre le stesse scelte come menu.
+- Per una mandata pre-fader, clicca con il tasto destro sull'interruttore di instradamento o sulla manopola del livello della mandata e spunta `Mandata pre-fader (il fader di questa traccia non la modifica)`. La mandata viene allora contrassegnata `PRE`.
 
 Gli effetti con un ingresso laterale, come un compressore, hanno un selettore `Sidechain da` che elenca gli insert da ascoltare. Sceglierne uno crea l'instradamento per te.
 
@@ -83,12 +90,13 @@ Ogni insert ha un pulsante di armo per la registrazione. Con un insert armato, R
 | Rinominare e colorare | `F2` | Rinomina e colora l'insert selezionato |
 | Solo | `S` | Mette in solo gli insert selezionati |
 | Solo con le sorgenti | `Alt+S` | Mette in solo gli insert selezionati e gli insert che li alimentano |
-| Eliminare un effetto | `Del` | Elimina il plugin nello slot selezionato |
+| Eliminare gli insert | `Del` | Elimina gli insert selezionati, dopo una domanda |
 | Armare e registrare | `Shift+R` | Arma l'insert selezionato e avvia la registrazione |
 
 ## Da sapere
 
-- `Renderizza in audio` (un insert bounciato in una clip audio) suona circa 5 dB più forte dell'insert che sostituisce. È un problema noto nelle note di rilascio della 0.1.25.
+- `Misuratore di loudness accanto al Master (LYNX)`, in `Opzioni › Mixer`, mostra la loudness a breve termine e integrata (LUFS) e il true peak dell'uscita del Master, con un pulsante `Ripristina`.
+- Un plugin strumento con più uscite può suonare ciascuna uscita su un proprio insert. Vedi [Plugin di terze parti](/wiki/plugins/).
 - `Ctrl+L` fa cose diverse nel Channel Rack e nel Mixer. Nel rack sceglie insert liberi. Nel Mixer usa l'insert selezionato.
 - Gli interruttori di instradamento compaiono sulle altre strisce, non su quella selezionata.
 - Il limite è 127 insert per progetto e dieci slot effetto per insert.

@@ -20,6 +20,11 @@
 <h2 id="keys">快速鍵</h2>
 <p>通道機架取得焦點時，這些按鍵才有效。</p>
 <div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td>選取通道</td><td><code>Up</code> / <code>Down</code></td><td>選取上方或下方的通道</td></tr><tr><td>擴大選取</td><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>把上方或下方的通道加入選取範圍</td></tr><tr><td>移動通道</td><td><code>Alt+Up</code> / <code>Alt+Down</code></td><td>將所選通道上移或下移</td></tr><tr><td>全選</td><td><code>Ctrl+A</code></td><td>選取所有通道</td></tr><tr><td>剪下、複製、貼上</td><td><code>Ctrl+X</code> / <code>Ctrl+C</code> / <code>Ctrl+V</code></td><td>剪下、複製或貼上所選通道的步</td></tr><tr><td>輪轉步</td><td><code>Ctrl+Shift+Left</code> / <code>Ctrl+Shift+Right</code></td><td>輪轉所選通道的步</td></tr><tr><td>再製</td><td><code>Alt+C</code></td><td>再製所選通道</td></tr><tr><td>刪除</td><td><code>Alt+Del</code></td><td>刪除所選通道</td></tr><tr><td>群組</td><td><code>Alt+G</code></td><td>把所選通道放進新的篩選群組</td></tr><tr><td>路由到混音器</td><td><code>Ctrl+L</code></td><td>把所選通道送到空閒的混音插入軌</td></tr><tr><td>靜音</td><td><code>1</code> 到 <code>0</code></td><td>將通道 1 到 10 靜音或取消靜音</td></tr><tr><td>獨奏</td><td><code>Ctrl+1</code> 到 <code>Ctrl+0</code></td><td>獨奏通道 1 到 10</td></tr><tr><td>圖形欄</td><td><code>Ctrl+K</code></td><td>顯示或隱藏圖形欄</td></tr></tbody></table></div>
+<h2 id="freeze-a-channel">凍結通道</h2>
+<p>凍結會把通道渲染成音訊，並以該音訊取代它播放。樂器會被卸載，第三方外掛也一樣，所以不佔用 CPU 和記憶體。</p>
+<ol><li>在通道上按右鍵並選擇 <code>凍結</code>。選取了多個通道時，這個項目會寫成 <code>凍結所選通道</code>。</li><li>該列會出現一個雪花標記。通道的音量、聲像和它插入軌的效果器仍照常運作。</li><li>要再次修改音符或樂器，請在通道上按右鍵並選擇 <code>解凍</code>。樂器會帶著原本的設定回來。</li></ol>
+<p>凍結的通道無法編輯：它的步被鎖定，樂器視窗也打不開。如果在凍結之後音符、速度或編排有變動，標記會變色，凍結前做好的音訊會繼續播放，直到你選擇 <code>重新凍結</code>。如果渲染出的音訊檔案不見了，就改由樂器播放。</p>
+<p>凍結只適用於通道。混音器插入軌不能凍結。</p>
 <h2 id="other-things-in-the-channel-menu">通道選單中的其他項目</h2>
 <p><code>鋼琴捲軸</code>、<code>重新命名並設定顏色</code>、<code>取代</code>（更換樂器）、<code>再製</code>、<code>Delete</code>、<code>琶音器</code>、<code>循環點</code>、<code>MIDI 寫入到</code>、<code>通道排序</code>、<code>選取未使用的通道</code> 和 <code>通道設定</code>。</p>
 <h2 id="good-to-know">須知</h2>

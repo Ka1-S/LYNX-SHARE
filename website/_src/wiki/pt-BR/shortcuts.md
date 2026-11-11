@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![A janela Manage shortcuts: uma lista pesquisável de ações com as teclas de cada uma](/assets/img/wiki/shortcuts.webp)
 
-Estas são as teclas padrão na versão 0.1.25 alfa. `Ajuda › Atalhos` (`F1`) mostra a folha de atalhos dentro do app. `Opções › Gerenciar atalhos...` abre o editor da imagem, onde você os altera.
+Estas são as teclas padrão na versão 0.1.26 alfa. `Ajuda › Atalhos` (`F1`) mostra a folha de atalhos dentro do app. `Opções › Gerenciar atalhos...` abre o editor da imagem, onde você os altera.
 
 > No macOS o app mostra as teclas com os nomes do Mac: Ctrl aparece como ⌘ e Alt como ⌥.
 
@@ -76,6 +76,19 @@ Algumas dessas teclas fazem outra coisa dentro de um editor que tem o foco. No P
 | `Alt+F7` | Teclado na tela |
 | `Ctrl+F5` | Tap de tempo |
 | `F1` | Folha de atalhos |
+
+## Clip View e Device View
+
+Estas teclas funcionam só no fluxo por disparo de clipes.
+
+| Tecla | O que faz |
+|---|---|
+| `Ctrl+Alt+L` | Mostrar ou esconder a vista de detalhes |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Alternar entre Clip View e Device View |
+| `Left` / `Right` | Device View: selecionar o dispositivo anterior, o seguinte |
+| `Del` ou `Backspace` | Device View: excluir o efeito selecionado |
 
 ## Patterns
 
@@ -171,6 +184,7 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 | `Alt+L` | Articular |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Gerar progressão de acordes |
+| `Ctrl+Alt+Y` | Executar o último script de novo |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 | `Ctrl+B` | Duplica |
 | `Del` | Exclui os clipes selecionados |
 | `Shift+Del` | Exclui os clipes selecionados e fecha os vãos |
+| `Shift+Left` / `Shift+Right` | Mover os clipes selecionados um passo de grade para a esquerda, para a direita |
+| `Shift+Up` / `Shift+Down` | Mover os clipes selecionados uma faixa para cima, para baixo |
+| `Alt+Left` / `Alt+Right` | Ajustar os clipes selecionados para a esquerda, para a direita por um passo fino, sem grade. `Shift+Alt` faz o mesmo |
+| `Ctrl+D` | Desmarcar clipes e tempo |
+| `Shift+I` | Inverter a seleção |
+| `Shift+C` | Selecionar os clipes da fonte selecionada |
 | `Shift+S` | Liga ou desliga a edição ripple |
 | `Backspace` | Desliga ou liga a grade |
 | `Alt+M` / `Shift+Alt+M` | Silencia, reativa os clipes selecionados |
@@ -195,6 +215,8 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 | `7` / `8` | Baixa, sobe um semitom nos clipes de áudio selecionados |
 | `9` | Inverte os clipes de áudio selecionados |
 | `Ctrl+Ins` / `Ctrl+Del` | Insere, remove a duração da seleção de tempo em todas as faixas |
+| `Ctrl+Alt+Ins` | Fatiar os clipes e inserir espaço |
+| `Ctrl+Alt+Home` | Redimensionar clipes pela esquerda, ligado ou desligado |
 | `Ctrl+Left` / `Ctrl+Right` | Seleciona o tempo anterior, seguinte |
 | `Ctrl+Enter` | Seleciona o tempo em volta da seleção |
 | `Alt+T` | Adiciona um marcador de tempo |
@@ -220,7 +242,7 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 | `Ctrl+L` | Vincula os canais selecionados ao insert selecionado |
 | `Ctrl+Shift+L` | Vincula os canais selecionados a inserts a partir do selecionado |
 | `Alt+L` | Seleciona os canais vinculados ao insert selecionado |
-| `Del` | Exclui o plugin no slot de efeito selecionado |
+| `Del` | Excluir os inserts selecionados. O LYNX SHARE pergunta antes |
 | `Ctrl+E` | Abre o editor de áudio |
 | `Shift+E` | Abre o editor de áudio e grava |
 | `Alt+R` | Renderiza os inserts armados em arquivos wave |
@@ -242,6 +264,8 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 - Enquanto o piano do teclado de digitação está ligado, as teclas dele tocam notas e a maioria dos atalhos de uma letra fica em pausa (`L` continua funcionando). Desligue com `Ctrl+T`.
 - Um atalho funciona em qualquer lugar ou em uma só janela. Um que pertence a uma janela prevalece sobre as mesmas teclas que valem em qualquer lugar, enquanto essa janela tem o foco.
 - Algumas ações não têm tecla padrão, por exemplo a paleta de inserção rápida. Dê uma a elas no editor.
+- Na Playlist, as teclas que movem clipes movem todos os clipes quando nenhum está selecionado. O passo fino de `Alt+Left` e `Alt+Right` é de um pixel no zoom atual.
+- Os atalhos do LYNX SHARE também funcionam enquanto a janela de um plugin tem o foco, por exemplo `Space`. Letras e dígitos simples vão primeiro para o plugin, e `Esc` fecha a janela dele.
 
 ## Veja também
 

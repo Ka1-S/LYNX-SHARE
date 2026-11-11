@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![De Playlist met clips op tracks](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ De letters werken zolang de pianofunctie van het typtoetsenbord (`Ctrl+T`) uit s
 - Dubbelklik op een clip om hem te openen.
 - De knop linksboven op een clip opent het clipmenu (uniek maken, hernoemen en kleuren, chop, en voor audio: pitch, aanpassen aan tempo, reverse).
 - Houd `Alt` ingedrukt tijdens het slepen om de snap te negeren.
-- Audioclips hebben fade-handvatten en een clipgain die je omhoog of omlaag sleept.
+- Audioclips hebben fade-handvatten en een clipgain die je omhoog of omlaag sleept. Klik met rechts op een fade-handvat voor het menu, met `Crossfade maken`. Klik met rechts op het gain-handvat voor `Gain resetten` en `Normaliseren`.
 - `Shift+M` schakelt Stretch: de grootte van een audioclip wijzigen rekt dan de audio in plaats van hem af te knippen.
+- `Shift+Left` en `Shift+Right` verplaatsen de geselecteerde clips één snapstap, `Shift+Up` en `Shift+Down` één track. `Alt+Left` en `Alt+Right` verplaatsen ze één schermpixel bij de huidige zoom, zonder snap. Zonder geselecteerde clip verschuiven alle clips.
+- `Uniek maken als sample` in het menu van een audioclip geeft de clip een nieuw bestand met wat hij speelde, met pitch, stretch en reverse al in de audio verwerkt.
+- Een audioclip met warpmarkers toont die als kleine vlaggetjes op zijn bovenrand. Sleep een vlaggetje zijwaarts om de marker te verplaatsen.
+
+## De menu's Edit en Select
+
+Het menu van de Playlist heeft een submenu `Bewerken` en een submenu `Selecteren`. `Bewerken` bevat de clipcommando's: knippen, kopiëren en plakken, `Naar links schuiven`, `Naar rechts schuiven`, `Omhoog schuiven`, `Omlaag schuiven`, `Uniek maken`, `Uniek maken als sample`, `Ruimte invoegen`, `Ruimte verwijderen`, de samenvoegcommando's en de fade-opties. `Selecteren` heeft `Selecteren op geselecteerde bron` (`Shift+C`), `Selectie omkeren` (`Shift+I`), `Deselecteren` (`Ctrl+D`), de gemute en de overlappende clips, en `Magische lasso`. Met `Magische lasso` aan beweeg je de muis in een lus om clips heen, zonder een knop in te drukken, om ze te selecteren.
 
 ## Tracks
 
 In de kop van een track selecteert klikken, voegt `Ctrl`+klikken toe of haalt weg, selecteert `Shift`+klikken een reeks en opent rechtsklikken het trackmenu. `Shift`+wiel verplaatst de track omhoog of omlaag. Het lampje van de track mute hem (klikken) of zet hem solo (`Ctrl`+klikken of rechtsklikken). Sleep de deler tussen twee tracks om er één in grootte te wijzigen, of `Shift`+slepen om ze allemaal aan te passen.
+
+`Beeld` in het menu van de Playlist kiest wat de trackkoppen tonen: `Bediening op audiotracks tonen`, `Niveaus op audiotracks tonen` en `Niveaus op instrumenttracks tonen`.
+
+## Patternblokken
+
+Met `Patternblokken (huidig project)` aan in het menu van de Playlist heeft een onderdeel onder de tracks één rij per pattern. Daar plaatst het Potlood één blok en sleept het langs zijn rij, schildert de Kwast blokken en wist de Gum ze. Rechtsklikken wist met elk gereedschap.
 
 ## Liniaal, loop en markers
 
@@ -78,6 +91,9 @@ Het arrangementvak in de werkbalk wisselt tussen arrangementen. Een project kan 
 | Ripple-verwijdering | `Shift+Del` | Verwijdert de geselecteerde clips en sluit de gaten |
 | Ripple-bewerking | `Shift+S` | Zet ripple-bewerking aan of uit |
 | Mute, unmute | `Alt+M` / `Shift+Alt+M` | Mute of unmute de geselecteerde clips |
+| Clips verschuiven | `Shift+Left` / `Shift+Right` | Verplaatst de geselecteerde clips één snapstap |
+| Naar een andere track verschuiven | `Shift+Up` / `Shift+Down` | Verplaatst de geselecteerde clips één track |
+| Clips nudgen | `Alt+Left` / `Alt+Right` | Verplaatst de geselecteerde clips één schermpixel, zonder snap |
 | Uniek maken | `Ctrl+Shift+V` | Maakt de geselecteerde clips uniek |
 | Samenvoegen | `Ctrl+G` | Voegt patternclips samen |
 | Stretch | `Shift+M` | Schakelt Stretch voor het aanpassen van audioclips |

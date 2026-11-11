@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Met de focus op de Mixer koppelt `Ctrl+L` de geselecteerde kanalen aan de gesele
 - `Ctrl`+klik, of slepen over strips, selecteert een bereik. `Ctrl+Shift`+klik voegt er een toe of haalt er een weg.
 - Sleep een strip opzij, of druk op `Alt+Left` en `Alt+Right`, om de geselecteerde inserts te verplaatsen.
 - Klik met rechts op een strip voor het insertmenu. `F2` hernoemt en kleurt de geselecteerde insert.
+- `Del`, of `Delete` in het insertmenu, verwijdert de geselecteerde inserts. LYNX SHARE vraagt eerst om bevestiging. Vink `Mijn keuze onthouden` aan om de vraag de volgende keer over te slaan.
 
 Inserts verplaatsen, invoegen of verwijderen laat sends, sidechains en automatisering bij hun insert.
+
+In het onderdeel `Mixer` van het insertmenu en in `Opties › Mixer` staan nog twee commando's. `Inserts ordenen zoals de Playlist` zet de inserts die aan Playlist-tracks zijn gekoppeld vooraan, in de volgorde van de Playlist. Met `Koppelingen naar verwijderde inserts grijs bewaren (LYNX)` aan blijven de sends die naar een verwijderde insert gingen, grijs, staan, zodat je ze opnieuw kunt verbinden.
 
 ## Mute en solo
 
 Klik op het mutelampje om een insert te muten. Klik met rechts of `Ctrl`+klik erop voor solo. `S` zet de geselecteerde inserts solo, en `Alt+S` zet ze solo samen met de inserts die ze voeden.
+
+Een gemute insert houdt zijn meter in beweging. In nieuwe projecten en in geïmporteerde FL Studio-projecten blijft hij ook zijn effecten draaien, en alleen zijn uitgang naar de Master en zijn sends worden afgesneden. Om te voorkomen dat een gemute insert nog rekent, zet je `Gedempte inserts verwerken niets (LYNX, bespaart CPU; dit project)` aan in het onderdeel `Mixer` van het insertmenu of in `Opties › Mixer`. Zijn meter stopt dan en zijn effecten beginnen schoon als je de mute opheft.
 
 ## Effecten
 
@@ -42,7 +47,8 @@ Het effectenpaneel toont de tien slots van de geselecteerde insert.
 
 - Sleep een slot, of gebruik het wiel erboven, om het omhoog of omlaag te verplaatsen.
 - Klik met rechts op een slot voor zijn opties (vervangen, verplaatsen, verwijderen).
-- `Del` verwijdert de plugin in het geselecteerde slot.
+- Zolang het menu van een slot open is, verwijdert `Del` de plugin in dat slot.
+- `Groeperen in audio-effectrack` in het menu van het slot zet het effect in een nieuw rack, en `Alles groeperen in audio-effectrack` doet dat voor de hele keten. `Groep opheffen` zet de effecten van een rack met één keten terug in de slots.
 - De schakelaar in de kop van het paneel zet alle effecten van de insert aan of uit.
 - Je kunt een effect uit de Plugindatabase van de [Browser](/wiki/browser/) naar een insert of een effectslot slepen.
 
@@ -60,6 +66,7 @@ Selecteer de insert die je wilt routeren. Elke andere strip heeft dan een routes
 - `Ctrl`+klik routeert alleen naar die insert.
 - `Shift`+klik maakt een sidechain-send. `Ctrl+Shift`+klik maakt hem alleen sidechain.
 - Rechtsklikken opent dezelfde keuzes als menu.
+- Voor een pre-fader send klik je met rechts op de routeschakelaar of de levelknop van de send en vink je `Pre-fader-send (de fader van dit spoor verandert hem niet)` aan. De send is dan gemarkeerd met `PRE`.
 
 Effecten met een zij-ingang, zoals een compressor, hebben een kiezer `Sidechain van` die de inserts toont waarnaar geluisterd kan worden. Een keuze maakt de route voor je aan.
 
@@ -83,12 +90,13 @@ Elke insert heeft een opname-armknop. Met een gearmde insert nemen Rec en Play z
 | Hernoemen en kleuren | `F2` | Hernoemt en kleurt de geselecteerde insert |
 | Solo | `S` | Zet de geselecteerde inserts solo |
 | Solo met bronnen | `Alt+S` | Zet de geselecteerde inserts en de inserts die ze voeden solo |
-| Effect verwijderen | `Del` | Verwijdert de plugin in het geselecteerde slot |
+| Inserts verwijderen | `Del` | Verwijdert de geselecteerde inserts, na een vraag |
 | Armen en opnemen | `Shift+R` | Armt de geselecteerde insert en start de opname |
 
 ## Goed om te weten
 
-- `Renderen naar audio` (een insert die naar een audioclip wordt gebounced) klinkt ongeveer 5 dB luider dan de insert die het vervangt. Dit is een bekend probleem in de releasenotes van 0.1.25.
+- `Luidheidsmeter naast de Master (LYNX)`, in `Opties › Mixer`, toont de loudness op korte termijn en de geïntegreerde loudness (LUFS) en de true peak van de uitgang van de Master, met een knop `Reset`.
+- Een instrumentplugin met meerdere uitgangen kan elke uitgang op een eigen insert laten spelen. Zie [Plugins van derden](/wiki/plugins/).
 - `Ctrl+L` doet verschillende dingen in het Channel Rack en in de Mixer. In het rack kiest het vrije inserts. In de Mixer gebruikt het de geselecteerde insert.
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.
 - De limiet is 127 inserts per project en tien effectslots per insert.

@@ -20,6 +20,11 @@
 <h2 id="keys">키</h2>
 <p>채널 랙에 포커스가 있을 때 동작합니다.</p>
 <div class="tablewrap"><table><thead><tr><th>명령</th><th>키</th><th>동작</th></tr></thead><tbody><tr><td>채널 선택</td><td><code>Up</code> / <code>Down</code></td><td>위 또는 아래 채널을 선택합니다</td></tr><tr><td>선택 확장</td><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>위 또는 아래 채널을 선택에 추가합니다</td></tr><tr><td>채널 이동</td><td><code>Alt+Up</code> / <code>Alt+Down</code></td><td>선택한 채널을 위나 아래로 옮깁니다</td></tr><tr><td>모두 선택</td><td><code>Ctrl+A</code></td><td>모든 채널을 선택합니다</td></tr><tr><td>잘라내기, 복사, 붙여넣기</td><td><code>Ctrl+X</code> / <code>Ctrl+C</code> / <code>Ctrl+V</code></td><td>선택한 채널의 스텝을 잘라내거나 복사하거나 붙여넣습니다</td></tr><tr><td>스텝 회전</td><td><code>Ctrl+Shift+Left</code> / <code>Ctrl+Shift+Right</code></td><td>선택한 채널의 스텝을 회전합니다</td></tr><tr><td>복제</td><td><code>Alt+C</code></td><td>선택한 채널을 복제합니다</td></tr><tr><td>삭제</td><td><code>Alt+Del</code></td><td>선택한 채널을 삭제합니다</td></tr><tr><td>그룹</td><td><code>Alt+G</code></td><td>선택한 채널을 새 필터 그룹에 넣습니다</td></tr><tr><td>믹서로 라우팅</td><td><code>Ctrl+L</code></td><td>선택한 채널을 빈 믹서 인서트로 보냅니다</td></tr><tr><td>뮤트</td><td><code>1</code>부터 <code>0</code></td><td>채널 1~10을 뮤트하거나 해제합니다</td></tr><tr><td>솔로</td><td><code>Ctrl+1</code>부터 <code>Ctrl+0</code></td><td>채널 1~10을 솔로로 만듭니다</td></tr><tr><td>그래프 레인</td><td><code>Ctrl+K</code></td><td>그래프 레인을 표시하거나 숨깁니다</td></tr></tbody></table></div>
+<h2 id="freeze-a-channel">채널 프리즈</h2>
+<p>프리즈는 채널을 오디오로 렌더링하고 그 오디오를 대신 재생합니다. 악기는 서드파티 플러그인이라도 언로드되므로 CPU와 메모리를 쓰지 않습니다.</p>
+<ol><li>채널을 오른쪽 클릭하고 <code>프리즈</code>를 고릅니다. 채널을 여러 개 선택했으면 항목이 <code>선택한 채널 프리즈</code>로 나옵니다.</li><li>행에 눈송이 태그가 붙습니다. 채널의 볼륨, 팬, 인서트의 이펙트는 전과 같이 작동합니다.</li><li>노트나 악기를 다시 바꾸려면 채널을 오른쪽 클릭하고 <code>프리즈 해제</code>를 고릅니다. 악기는 이전 설정 그대로 돌아옵니다.</li></ol>
+<p>프리즈된 채널은 편집할 수 없습니다. 스텝이 잠기고 악기 창도 열리지 않습니다. 프리즈 뒤에 노트, 템포, 어레인지먼트가 바뀌면 태그 색이 바뀌고, <code>다시 프리즈</code>를 고를 때까지 전에 만든 오디오가 계속 재생됩니다. 렌더링된 오디오 파일이 없으면 대신 악기가 재생됩니다.</p>
+<p>프리즈는 채널에서만 작동합니다. 믹서 인서트는 프리즈할 수 없습니다.</p>
 <h2 id="other-things-in-the-channel-menu">채널 메뉴의 다른 항목</h2>
 <p><code>피아노 롤</code>, <code>이름 및 색상 변경</code>, <code>교체</code>(악기 교체), <code>복제</code>, <code>Delete</code>, <code>아르페지에이터</code>, <code>루프 지점</code>, <code>MIDI 기록 대상</code>, <code>채널 정렬</code>, <code>사용하지 않는 채널 선택</code>, <code>채널 설정</code>.</p>
 <h2 id="good-to-know">알아 두면 좋은 점</h2>

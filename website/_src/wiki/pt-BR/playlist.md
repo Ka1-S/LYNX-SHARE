@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![A Playlist com clipes nas faixas](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ As letras funcionam enquanto o piano do teclado de digitação (`Ctrl+T`) está 
 - Dê um clique duplo em um clipe para abri-lo.
 - O botão no canto superior esquerdo de um clipe abre o menu do clipe (tornar único, renomear e colorir, picotar e, para áudio: pitch, ajustar ao tempo, inverter).
 - Mantenha `Alt` pressionado ao arrastar para ignorar a grade.
-- Clipes de áudio têm alças de fade e um ganho de clipe que você arrasta para cima ou para baixo.
+- Clipes de áudio têm alças de fade e um ganho de clipe que você arrasta para cima ou para baixo. Clique com o botão direito em uma alça de fade para abrir o menu dela, com `Criar crossfade`. Clique com o botão direito na alça de ganho para `Zerar ganho` e `Normalizar`.
 - `Shift+M` liga o Stretch: redimensionar um clipe de áudio passa a esticar o áudio em vez de cortá-lo.
+- `Shift+Left` e `Shift+Right` movem os clipes selecionados um passo de grade, `Shift+Up` e `Shift+Down` uma faixa. `Alt+Left` e `Alt+Right` movem os clipes um pixel de tela no zoom atual, sem grade. Sem nenhum clipe selecionado, todos os clipes se movem.
+- `Tornar único como amostra` no menu de um clipe de áudio dá ao clipe um arquivo novo com o que ele tocava, com o pitch, o stretch e o reverso já gravados no áudio.
+- Um clipe de áudio com warp markers os mostra como pequenas bandeiras na borda de cima. Arraste uma bandeira para o lado para mover o marcador.
+
+## Menus Edit e Select
+
+O menu da Playlist tem um submenu `Editar` e um `Selecionar`. `Editar` guarda os comandos de clipe: recortar, copiar e colar, `Deslocar para a esquerda`, `Deslocar para a direita`, `Deslocar para cima`, `Deslocar para baixo`, `Tornar único`, `Tornar único como amostra`, `Inserir espaço`, `Excluir espaço`, os comandos de mesclagem e as opções de fade. `Selecionar` tem `Selecionar pela fonte selecionada` (`Shift+C`), `Inverter seleção` (`Shift+I`), `Desmarcar` (`Ctrl+D`), os clipes mudos e os sobrepostos, e `Laço mágico`. Com `Laço mágico` ligado, mova o mouse em volta dos clipes, num laço, sem apertar botão, para selecioná-los.
 
 ## Faixas
 
 No cabeçalho de uma faixa, o clique seleciona, `Ctrl`+clique adiciona ou remove, `Shift`+clique seleciona um intervalo e o clique com o botão direito abre o menu da faixa. `Shift`+roda move a faixa para cima ou para baixo. A luz da faixa a silencia (clique) ou a coloca em solo (`Ctrl`+clique ou clique com o botão direito). Arraste o divisor entre duas faixas para redimensionar uma, ou `Shift`+arrastar para redimensionar todas.
+
+`Exibir` no menu da Playlist escolhe o que os cabeçalhos das faixas mostram: `Mostrar controles nas trilhas de áudio`, `Mostrar níveis nas trilhas de áudio` e `Mostrar níveis nas trilhas de instrumento`.
+
+## Pattern Blocks
+
+Com `Blocos de pattern (projeto atual)` ligado no menu da Playlist, uma seção embaixo das faixas tem uma linha por pattern. Ali, o Lápis coloca um bloco e o arrasta ao longo da linha, o Pincel pinta blocos e a Borracha os exclui. O botão direito apaga com qualquer ferramenta.
 
 ## Régua, loop e marcadores
 
@@ -78,6 +91,9 @@ A caixa de arranjo na barra de ferramentas alterna entre arranjos. Um projeto po
 | Excluir com ripple | `Shift+Del` | Exclui os clipes selecionados e fecha os vãos |
 | Edição ripple | `Shift+S` | Liga ou desliga a edição ripple |
 | Silenciar, reativar | `Alt+M` / `Shift+Alt+M` | Silencia ou reativa os clipes selecionados |
+| Mover clipes | `Shift+Left` / `Shift+Right` | Move os clipes selecionados um passo de grade |
+| Mover para outra faixa | `Shift+Up` / `Shift+Down` | Move os clipes selecionados uma faixa |
+| Ajuste fino de clipes | `Alt+Left` / `Alt+Right` | Move os clipes selecionados um pixel de tela, sem grade |
 | Tornar único | `Ctrl+Shift+V` | Torna únicos os clipes selecionados |
 | Mesclar | `Ctrl+G` | Mescla clipes de pattern |
 | Stretch | `Shift+M` | Liga o Stretch ao redimensionar clipes de áudio |

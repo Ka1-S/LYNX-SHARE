@@ -109,16 +109,56 @@ The 0.1.26 texts are in the page sources; every picture is still from 0.1.25. No
   picture is replaced. A shot of the Share plugins dialog and of the Simple workflow would fit the new paragraphs.
 - **New pictures the texts would carry** (none is referenced yet, so nothing is broken without them): Simple
   workflow, Clip View with racks, Slicex and FPC editors, Freeze in the Channel rack, the loudness meter.
-- **Catalogue** (`_src/catalog.json`, 167 entries, all from 0.1.25): 0.1.26 adds Slicex, FPC, Strike Shaper, GMSynth
-  (FLM) and the Pocket effects (Distortion, Limiter, Limiter Classic, Leveller, Gate, Trance Delay, Tape Delay,
-  MultiFX, Autoduck, Chorus, Spacer, Stereoizer, Wow & Flutter, Phaser, Flanger, Tremolo, Waveshaper, Compressor,
-  Spreader). Each needs an entry (`desc`, `wiki`), its picture and 14 translations; Compressor (FET), Apex Limiter
-  (Levelling), LYNX Tune (Breathiness), Fruity Slicer (envelope page) and LYNX Dance (sprite sheets) need their
-  pictures and wiki tables refreshed.
-- **Wiki**: Simple layout, Layouts, File formats, Coming from Ableton Live and Coming from FL Studio are updated.
-  Still written for 0.1.25: Plugins (docked windows, Reload, Pin on top), Mixer, Playlist, Piano roll, MIDI
-  controllers (profiles, MPE), Online sessions (shared plugins), Recording, Settings (LYNX extras), Shortcuts (its
-  summary names 0.1.25) and Command line.
+- **Catalogue** (`_src/catalog.json`, 193 entries): the 0.1.26 entries are written, with their wiki pages and 14
+  translations: Slicex, FPC, GMSynth (FLM), Instrument Rack, MIDI Effect Rack, Audio Effect Rack, Strike Shaper and
+  the 19 Pocket effects. They have no picture yet, so their cards and pages show the name plate. Each entry's `img`
+  already names the render `LYNX.exe --pluginthumbs R\thumbs` writes for it (the name is the picker key folded by
+  `pluginthumbs::fileNameFor` in `src/ui/PluginThumbs.cpp`: slug plus the FNV-1a hash of the key), so at the release
+  it is only: draw the thumbs with the 0.1.26 build, run `import-shots.py R`, build. Expected files:
+
+  | Plugin | Render in `R/thumbs/` | Picture the import writes |
+  |---|---|---|
+  | `Pocket Distortion` | `fx-pocket-distortion-a516163b.png` | `assets/img/plugins/fx-pocket-distortion.webp` |
+  | `Pocket Limiter Classic` | `fx-pocket-limiter-classic-9f7b85ec.png` | `assets/img/plugins/fx-pocket-limiter-classic.webp` |
+  | `Pocket Limiter` | `fx-pocket-limiter-78c822c4.png` | `assets/img/plugins/fx-pocket-limiter.webp` |
+  | `Pocket Leveller` | `fx-pocket-leveller-9ec3e94d.png` | `assets/img/plugins/fx-pocket-leveller.webp` |
+  | `Pocket Gate` | `fx-pocket-gate-62c77eab.png` | `assets/img/plugins/fx-pocket-gate.webp` |
+  | `Pocket Trance Delay` | `fx-pocket-trance-delay-66c6fd82.png` | `assets/img/plugins/fx-pocket-trance-delay.webp` |
+  | `Pocket Tape Delay` | `fx-pocket-tape-delay-0f54b1b3.png` | `assets/img/plugins/fx-pocket-tape-delay.webp` |
+  | `Pocket MultiFX` | `fx-pocket-multifx-a84fac6f.png` | `assets/img/plugins/fx-pocket-multifx.webp` |
+  | `Pocket Autoduck` | `fx-pocket-autoduck-46067e8e.png` | `assets/img/plugins/fx-pocket-autoduck.webp` |
+  | `Pocket Chorus` | `fx-pocket-chorus-b213cc3e.png` | `assets/img/plugins/fx-pocket-chorus.webp` |
+  | `Pocket Spacer` | `fx-pocket-spacer-392cfe80.png` | `assets/img/plugins/fx-pocket-spacer.webp` |
+  | `Pocket Stereoizer` | `fx-pocket-stereoizer-a5e00518.png` | `assets/img/plugins/fx-pocket-stereoizer.webp` |
+  | `Pocket Wow & Flutter` | `fx-pocket-wow--flutter-26cf9583.png` | `assets/img/plugins/fx-pocket-wow-flutter.webp` |
+  | `Pocket Phaser` | `fx-pocket-phaser-71135523.png` | `assets/img/plugins/fx-pocket-phaser.webp` |
+  | `Pocket Flanger` | `fx-pocket-flanger-555624c5.png` | `assets/img/plugins/fx-pocket-flanger.webp` |
+  | `Pocket Tremolo` | `fx-pocket-tremolo-accd2ac8.png` | `assets/img/plugins/fx-pocket-tremolo.webp` |
+  | `Pocket Waveshaper` | `fx-pocket-waveshaper-fb5855fc.png` | `assets/img/plugins/fx-pocket-waveshaper.webp` |
+  | `Pocket Compressor` | `fx-pocket-compressor-16f7badd.png` | `assets/img/plugins/fx-pocket-compressor.webp` |
+  | `Pocket Spreader` | `fx-pocket-spreader-513f9c08.png` | `assets/img/plugins/fx-pocket-spreader.webp` |
+  | `Strike Shaper` | `fx-strike-shaper-f0a21b19.png` | `assets/img/plugins/fx-strike-shaper.webp` |
+  | `Slicex` | `gen-slicex-3a81a870.png` | `assets/img/plugins/gen-slicex.webp` |
+  | `FPC` | `gen-fpc-4469dc65.png` | `assets/img/plugins/gen-fpc.webp` |
+  | `Instrument Rack` | `gen-instrument-rack-afeab4be.png` | `assets/img/plugins/gen-instrument-rack.webp` |
+  | `MIDI Effect Rack` | `gen-midi-effect-rack-4e12ccdb.png` | `assets/img/plugins/gen-midi-effect-rack.webp` |
+  | `Audio Effect Rack` | `fx-audio-effect-rack-4ff76714.png` | `assets/img/plugins/fx-audio-effect-rack.webp` |
+
+  GMSynth (FLM) is not in the plugin picker (a channel gets it only from a `.flm`), so no mode of the program draws
+  it: its `img` is empty and it keeps the name plate. Five 0.1.25 entries changed and their texts are updated; their
+  pictures must be drawn again with the rest: `art/compressor-after-100.png` and `-200.png` (FET),
+  `art/apex-limiter-after-100.png` and `-200.png` (Levelling), `art/lynx-tune-after-100.png` and `-200.png` (BREATH),
+  `thumbs/gen-fruity-slicer-2a00813d.png` (envelope page: the thumb shows the plugin page only) and
+  `thumbs/gen-fruity-dance-d1b027b0.png` (sprite sheet items).
+- **Wiki**: updated for 0.1.26: Simple layout, Layouts, File formats, Coming from Ableton Live, Coming from FL
+  Studio, Plugins, Mixer, Playlist, Piano roll, MIDI controllers, Online sessions, Recording, Settings, Shortcuts,
+  Command line and Channel rack (Freeze). Not re-read against 0.1.26: Browser (Preview in time, similar samples),
+  Exporting (one file per marker section, presets, For other apps), Automation, Importing projects, Audio setup,
+  Troubleshooting, Tour, First song, Getting started, Install, Undo history. The pictures on the updated pages still
+  show 0.1.25 windows; draw them again from the 0.1.26 build with `--snapshot` (the Settings window now has eight
+  page tabs, so `assets/img/wiki/settings-general.webp` first). New sections that have no picture and would gain
+  from one: Freeze (Channel rack), docked plugin windows and Connections (Plugins), Controller type and MPE
+  controller (MIDI controllers), Share plugins with guests (Online sessions), LYNX extras (Settings).
 - The Updates entry's `date` is 2026-11-11, the day it was written: set the release day.
 
 ## Other notes

@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Mixer odaktayken `Ctrl+L`, seçili kanalları seçili insert'e bağlar; `Ctrl+Sh
 - `Ctrl`+tıklama ya da şeritler üzerinde sürükleme bir aralık seçer. `Ctrl+Shift`+tıklama birini ekler veya çıkarır.
 - Seçili insert'leri taşımak için bir şeridi yana sürükleyin ya da `Alt+Left` ve `Alt+Right` tuşlarına basın.
 - Insert menüsü için bir şeride sağ tıklayın. `F2` seçili insert'i yeniden adlandırır ve renklendirir.
+- `Del` veya insert menüsündeki `Delete`, seçili insert'leri siler. LYNX SHARE önce sorar. Soruyu bir dahaki sefere atlamak için `Seçimimi hatırla`'ı işaretleyin.
 
 Insert'leri taşımak, araya eklemek veya silmek, send'leri, sidechain'leri ve otomasyonu kendi insert'inde tutar.
+
+Insert menüsünün `Mixer` bölümünde ve `Seçenekler › Mixer` içinde iki komut daha vardır. `Insert'leri Playlist gibi sırala`, Playlist iz'lerine bağlı insert'leri Playlist'in sırasıyla öne alır. `Silinen insert'lere giden bağlantıları gri olarak koru (LYNX)` açıkken silinen bir insert'e giden gönderimler gri olarak kalır, böylece onları yeniden bağlayabilirsiniz.
 
 ## Sessiz ve solo
 
 Bir insert'i susturmak için mute ışığına tıklayın. Solo için sağ tıklayın veya `Ctrl`+tıklayın. `S` seçili insert'leri solo yapar, `Alt+S` onları, kendilerini besleyen insert'lerle birlikte solo yapar.
+
+Sessize alınmış bir insert'in metresi hareket etmeye devam eder. Yeni projelerde ve içe aktarılan FL Studio projelerinde efektlerini de çalıştırmayı sürdürür; yalnızca Master'a çıkışı ve gönderimleri kesilir. Sessize alınmış bir insert'in işlem yapmasını durdurmak için insert menüsünün `Mixer` bölümünde veya `Seçenekler › Mixer` içinde `Sessize alınan insert'ler işlenmez (LYNX, CPU tasarrufu; bu proje)` seçeneğini açın. Metresi o zaman durur ve sessizden çıkarınca efektleri sıfırdan başlar.
 
 ## Efektler
 
@@ -42,7 +47,8 @@ Efekt paneli, seçili insert'in on yuvasını gösterir.
 
 - Bir yuvayı yukarı veya aşağı taşımak için sürükleyin ya da üzerinde tekerleği kullanın.
 - Seçenekleri (değiştir, taşı, sil) için bir yuvaya sağ tıklayın.
-- `Del` seçili yuvadaki plugin'i siler.
+- Bir yuvanın menüsü açıkken `Del`, o yuvadaki plugin'i siler.
+- Yuva menüsündeki `Ses efekti rafında grupla` efekti yeni bir rack'e koyar, `Tümünü ses efekti rafında grupla` bunu tüm zincir için yapar. `Grubu çöz`, tek zincirli bir rack'in efektlerini yuvalara geri koyar.
 - Panelin başlığındaki anahtar, insert'in tüm efektlerini açar veya kapatır.
 - Bir efekti [Browser](/wiki/browser/)'ın Plugin veritabanından bir insert'in veya efekt yuvasının üzerine sürükleyebilirsiniz.
 
@@ -60,6 +66,7 @@ Yönlendirmek istediğiniz insert'i seçin. Bütün diğer şeritlerde bir yönl
 - `Ctrl`+tıklama yalnızca o insert'e yönlendirir.
 - `Shift`+tıklama sidechain send yapar. `Ctrl+Shift`+tıklama yalnızca sidechain yapar.
 - Sağ tıklama aynı seçenekleri bir menü olarak açar.
+- Pre-fader gönderim için rota anahtarına veya gönderimin seviye düğmesine sağ tıklayıp `Fader öncesi send (bu kanalın fader'ı onu değiştirmez)`'ı işaretleyin. Gönderim o zaman `PRE` ile işaretlenir.
 
 Kompresör gibi yan girişi olan efektlerin, dinlenecek insert'leri listeleyen bir `Sidechain kaynağı` seçicisi vardır. Birini seçmek yönlendirmeyi sizin için kurar.
 
@@ -83,12 +90,13 @@ Her insert'in bir kayda hazırlama düğmesi vardır. Bir insert kayda hazırken
 | Yeniden adlandır ve renklendir | `F2` | Seçili insert'i yeniden adlandırır ve renklendirir |
 | Solo | `S` | Seçili insert'leri solo yapar |
 | Kaynaklarıyla solo | `Alt+S` | Seçili insert'leri ve onları besleyen insert'leri solo yapar |
-| Efekti sil | `Del` | Seçili yuvadaki plugin'i siler |
+| Insert'leri sil | `Del` | Seçili insert'leri, bir soru sorduktan sonra siler |
 | Hazırla ve kaydet | `Shift+R` | Seçili insert'i kayda hazırlar ve kaydı başlatır |
 
 ## Bilmekte fayda var
 
-- `Sese render al` (bir insert'in ses klibine bounce edilmesi), yerine geçtiği insert'ten yaklaşık 5 dB daha yüksek çalar. Bu, 0.1.25 sürüm notlarındaki bilinen bir sorundur.
+- `Seçenekler › Mixer` içindeki `Master'ın yanında ses yüksekliği ölçer (LYNX)`, Master çıkışının kısa vadeli ve entegre loudness'ını (LUFS) ve true peak'ini bir `Sıfırla` düğmesiyle gösterir.
+- Birden fazla çıkışı olan bir enstrüman plugin'i her çıkışını kendi insert'inde çalabilir. Bkz. [Üçüncü taraf plugin'ler](/wiki/plugins/).
 - `Ctrl+L` Channel Rack'te ve Mixer'da farklı işler yapar. Rack'te boş insert'leri seçer. Mixer'da seçili insert'i kullanır.
 - Yönlendirme anahtarları seçili şeridde değil, diğer şeritlerde görünür.
 - Sınır, proje başına 127 insert ve insert başına on efekt yuvasıdır.

@@ -49,7 +49,9 @@ Each tool has a letter key. The letters work while the typing keyboard piano (`C
 
 ## Keyboard and ruler
 
-Click a key on the keyboard to hear it. Further right on the key is louder. `Ctrl`+click a key selects its notes. Middle-drag on the keyboard makes the keys taller or shorter.
+Click a key on the keyboard to hear it. Further right on the key is louder. `Ctrl`+click a key selects its notes. Middle-drag on the keyboard makes the keys taller or shorter. So does the vertical zoom wheel, the small square at the end of the time scroll bar: drag it up or down, or use the mouse wheel over it.
+
+`View › Keyboard style` in the Piano roll's menu chooses between `Flat keys` and `Piano keys (lines between the white keys)`, which draws a traditional keyboard.
 
 Click the ruler to set the position. `Ctrl`+drag, right-drag or double-click-drag on the ruler selects the notes in a time range. `Ctrl`+wheel zooms and `Shift`+wheel scrolls.
 
@@ -58,13 +60,23 @@ Click the ruler to set the position. `Ctrl`+drag, right-drag or double-click-dra
 | Setting | What it does |
 |---|---|
 | Snap | "Main" follows the snap in the main toolbar, or pick one for this window. |
-| Chord | Clicking creates the chosen chord, with the clicked note as the root. `Shift+N` goes back to single notes. |
-| Scale | Highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale. |
+| Chord | Clicking creates the chosen chord, with the clicked note as the root. `Shift+N` goes back to single notes. The same list is `Chord stamp` in the Piano roll's menu. |
+| Scale | Highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale. Moved notes then move by scale steps, so a chord stays in the scale, and `Up` and `Down` move one scale step. |
 | Slide (`S`) | New notes are slide notes. The note that is sounding glides to them (808 glide). |
 | Ghost notes (`Alt+V`) | Shows the other channels' notes behind yours. |
 | Note colour | New notes get this colour. There are 16. |
 | Follow | The view scrolls with the playhead while the pattern plays. |
-| Lane box | Chooses what the bottom lane edits: Velocity, Pan or Fine pitch. |
+| Lane box | Chooses what the bottom lane edits: Velocity, Pan, Fine pitch, Release, Mod X, Mod Y, Chance or Velocity range. |
+
+## Chance and velocity range
+
+Every note has a Chance and a Velocity range. Chance is how likely the note is to play each time it comes round. Velocity range lets its velocity vary between the note's velocity and that velocity plus the range. Pick `Chance` or `Velocity range (LYNX)` in the lane box to edit them. `Tools › Chance (LYNX)` in the Piano roll's menu groups the selected notes so that all of them or only one of them plays, and has `Reset chance and velocity range`.
+
+## MIDI tools and scripts
+
+`Tools › MIDI Tools...` in the Piano roll's menu opens a panel with Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp and Velocity Shaper.
+
+The `Scripts` column of the `Tools` menu lists piano roll scripts: LYNX SHARE's own and `.pyscript` files, including the ones in FL Studio's script folders if FL Studio is installed. `Open script folder...` opens the folder for your own scripts, and `Run last script again` repeats the last one.
 
 ## Keys
 

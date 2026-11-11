@@ -365,6 +365,54 @@
 "Gürültü, dither ve rastgele fazlar her örneğe ait bir üreteçten gelir; bu yüzden herhangi bir FL render'ından farklıdır."
 ]
 },
+"gen-gmsynth-flm": {
+"source": "e07c714bb6",
+"intro": "GMSynth (FLM), FL Studio Mobile projelerinin GMSynth modülünü çalar: iki osilatör ve gürültü, dört voice, bir filtre, envelope'lar, bir LFO ve üç efekt yuvası. Plugin seçicide listelenmez. Bir kanal onu yalnızca GMSynth kullanan bir .flm projesi açtığınızda alır. Dalga spektrumları ve filtre tablosu, kendi FL Studio kurulumunuzun FL Studio Mobile kaynak klasöründen çalışma anında okunur ve dahil değildir. Proje açılırken bu dosyalar bulunamazsa kanal dahili synth'te kalır ve içe aktarma raporu GMSynth'i dönüştürülmedi olarak listeler.",
+"controls": [
+[
+"Osilatörler",
+"Motorun çaldığı şey: her biri modülün 29 dalgasından birinde iki osilatör; osilatör B için pitch, detune, mix ve faz, ayrıca bir gürültü seviyesi."
+],
+[
+"Modülasyon",
+"Osilatörler arasında dört tür, AM, FM, SNC ve FLT; bir miktar ve bir attack ve decay envelope'u ile."
+],
+[
+"Amp",
+"Seviye, pan ve doğrusal bir attack, decay, sustain ve release envelope'u."
+],
+[
+"Filtre",
+"Cutoff, rezonans, filtre türü ve klavye takibi; kendi attack ve decay envelope'uyla."
+],
+[
+"EG",
+"Attack, decay, sustain ve release, bir miktar, bir hedef ve velocity içeren ikinci bir envelope."
+],
+[
+"LFO",
+"Rate, şekil, miktar ve hedefi olan, tempoya senkron bir LFO."
+],
+[
+"Choir",
+"Voice başına dörde kadar detune edilmiş kopya; scale, detune ve stereo yayılım ile."
+],
+[
+"Play settings",
+"Transpose, slide süresi, tek voice ve otomatik portamento."
+],
+[
+"Effect slots",
+"Üç yuva. DIST, PHAS, F LP, DLY, RVRB ve PAN çalınır. FLNG, F HP, RING ve VOX sinyali olduğu gibi geçirir ve açıkken içe aktarma raporu bunları listeler."
+]
+],
+"tips": [
+"Ayarlar .flm'den gelir. LYNX SHARE'in bu modülün parametrelerini düzenleyen bir penceresi yoktur.",
+"Kanalın sesi, pan'ı ve pitch'i modülün kendi değerlerinin üstüne uygulanır.",
+"Gürültü, dither ve yeni voice'ların başlangıç fazları her örneğin sahip olduğu bir üreteçten gelir, bu yüzden herhangi bir FL Studio Mobile render'ından farklıdır.",
+"Modülün pitch bend'i ve mod wheel'i dönüştürülmez."
+]
+},
 "gen-harmless": {
 "source": "25024826ed",
 "intro": "Harmless, aynı adlı FL plugin'inin motoru üzerine kurulu additive bir generator'dür: ses başına en fazla 528 sinüs partiyeli; colour, timbre EQ, harmonic mask, filtre, rezonans, phaser ve pluck ile şekillenir, ardından chorus, delay, reverb ve kompresörden oluşan bir rack gelir. FL Studio olmadan eklenebilir ve o zaman LYNX SHARE'in kendi preset bankasıyla başlar. Rack'in kompresörü preset'lerini kendi FL Studio kurulumunuzdan yükler; onlar yoksa kompresör kapalı kalır.",
@@ -1447,6 +1495,77 @@
 "Preset'lerde kick'ler, tom'lar, snare'ler, el davulları, hat'ler, perküsyon ve efekt sesleri bulunur."
 ]
 },
+"gen-fpc": {
+"source": "2012232d9e",
+"intro": "FPC, 16'lık iki bankta, BANK A ve BANK B, 32 pad'li bir davul sampler'ıdır. Her pad, velocity'ye göre seçilen bir veya daha fazla sample katmanı tutar. Tüm kit tek bir kanalda durur. Bir .flp'nin FPC kanallarını açar ve FL'nin .fst kit preset'leri bir kanala yüklenir. FL Studio olmadan yeni bir FPC, FL'nin boş kitidir: FL'nin varsayılan notalarında 32 pad, sample yok.",
+"controls": [
+[
+"Pads",
+"Bir pad'i seçmek ve çalmak için tıklayın. Yüklemek için bir pad'in üzerine sample bırakın."
+],
+[
+"BANK A, BANK B",
+"16'şar pad'lik iki bank arasında geçiş yapar."
+],
+[
+"Pad adı",
+"Pad'i yeniden adlandırmak için çift tıklayın."
+],
+[
+"Midi Note",
+"Pad'i tetikleyen notayı seçmek için tıklayın."
+],
+[
+"Pad volume, pan and tune",
+"Tüm pad'in seviyesi, pan'ı ve tuning'i."
+],
+[
+"Mute, Solo",
+"Pad'i sessize alın veya solo yapın."
+],
+[
+"Scale Vol",
+"Sesi velocity ile ölçekler."
+],
+[
+"Cut, Cut By",
+"Bu pad'in kestiği grup ve bu pad'i kesen grup."
+],
+[
+"Çıkış",
+"Pad çıkış ofseti."
+],
+[
+"CREATE, DELETE",
+"Yeni bir katman oluşturur veya geçerli olanı siler. Oklar bir katmanı yukarı veya aşağı taşır."
+],
+[
+"SPREAD EVEN",
+"Velocity aralığını katmanlara yayar."
+],
+[
+"Layer volume, pan and tune",
+"Seçili katmanın ayarları ve etkin aralığı: onu çalan velocity'ler."
+],
+[
+"Sample yükle",
+"Seçili katmana bir sample yükler."
+],
+[
+"Çakışan layer'ları rastgele tetikle",
+"Aynı velocity'yi kapsayan katmanların sırayla nasıl çaldığı: Cycle, Random veya Random (avoid previous)."
+],
+[
+"VOL, PAN",
+"Pad'in ses envelope'unu veya pan envelope'unu envelope editöründe gösterir."
+]
+],
+"tips": [
+"Sample'ı önceden dinlemek için dalga formuna sol tıklayın.",
+"LYNX SHARE hiç kit sample'ı içermez. Kitler FL Studio'nun ve kendi .fst dosyalarınızdan gelir ya da kendi sample'larınızı pad'lere yüklersiniz.",
+"Bir FPC kit preset'i tüm kitle birlikte tek bir kanal olarak yüklenir."
+]
+},
 "gen-fruit-kick": {
 "source": "7e9adcf46d",
 "intro": "Fruit Kick, aynı adlı FL plugin'inin motoru üzerine kurulu bir kick generator'üdür: perdesi ve genliği zamanla düşen bir sinüs dalgası ve isteğe bağlı bir waveshaper. Yeni bir örnek, varsa kendi FL Studio kurulumunuzdaki plugin preset'iyle, yoksa LYNX SHARE'in kendi preset bankasıyla başlar.",
@@ -1587,8 +1706,8 @@
 ]
 },
 "gen-fruity-slicer": {
-"source": "df9bd1e3b8",
-"intro": "Fruity Slicer bir sample yükler, onu dilimlere böler ve ilk dilimin notasından başlayarak her tuşta bir dilim çalar. Davul loop'larını yeniden düzenlemek için kullanılır. FL'nin kayıtlı durumunu okur ve bir FL kurulumundan hiçbir dosya gerektirmez.",
+"source": "15efce61bf",
+"intro": "Fruity Slicer bir sample yükler, onu dilimlere böler ve ilk dilimin notasından başlayarak her tuşta bir dilim çalar. Davul loop'larını yeniden düzenlemek için kullanılır. Bir note-off dilimini bitirir. Kanal penceresinde ayrıca voice'ların envelope'larının, LFO'larının ve filtresinin olduğu bir Envelope / instrument sayfası vardır. FL'nin kayıtlı durumunu okur ve bir FL kurulumundan hiçbir dosya gerektirmez.",
 "controls": [
 [
 "Aç",
@@ -1633,10 +1752,32 @@
 [
 "Att and Dec",
 "Dilimin fade in ve fade out'u, 0 ile 100 ms."
+],
+[
+"LOW and HIGH",
+"Otomatik dilimlemenin alt ve üst threshold'ları."
+],
+[
+"Envelope / enstrüman",
+"Kanal penceresinin Panning, Volume, Mod X, Mod Y ve Pitch sekmeli bir sayfası."
+],
+[
+"Envelope",
+"Her sekmede: bir anahtar, Delay, Attack, Hold, Decay, Sustain, Release ve Amount düğmeleri, üç Tension düğmesi ve bir Tempo anahtarı."
+],
+[
+"LFO",
+"Sine, Triangle veya Pulse şekli, Delay, Attack, Amount ve Speed düğmeleri, Tempo ve Global anahtarları. Global fazın şarkı konumunu izlemesini sağlar."
+],
+[
+"Filtre",
+"Mod X ve Mod Y düğmeleri ve filtre türü: Fast LP, LP, BP, HP, BS, LP x2, SVF LP veya SVF LP x2."
 ]
 ],
 "tips": [
 "Yeniden adlandırmak için seçili dilimin adına çift tıklayın; her dilimin kendi tetik tuşu olabilir.",
+"Yeni bir Fruity Slicer FL'deki gibi başlar: Animate ve Declick açık, Dec 4 ms'de ve ses envelope'u kısa bir release ile açık.",
+"Envelope sayfası FL'nin kendi değerlerini düzenler, bu yüzden proje bir .flp'ye dışa aktarılırken korunurlar.",
 "FL'nin zamanda esnettiği dilimler içe aktarılan projelerde tam olarak yeniden üretilmez."
 ]
 },
@@ -1704,6 +1845,82 @@
 "tips": [
 "Yeni bir kanal oluşturmak için listeden bir preset'i Channel Rack'e sürükleyin.",
 "Reverb ve chorus LYNX SHARE'in kendi efektleridir, FL Studio'nun dahili olanlarının sesi değildir."
+]
+},
+"gen-slicex": {
+"source": "b1b0e1c0ba",
+"intro": "Slicex, A ve B adlı iki dekin her birine bir sample yükler, onu bölgelere böler ve her bölgeyi bir tuştan çalar. FL Studio'nun Slicex ayarlarını bir .flp'den açar ve dışa aktarırken geri yazar. Yeni bir örnek boş deklerle başlar ve bir FL kurulumundan hiçbir dosya gerektirmez. Kendi bölgelerini getirmeyen bir WAV dosyası yüklenirken vuruşlarına göre dilimlenir.",
+"controls": [
+[
+"Master sliders",
+"Master seviyesi, Master randomness seviyesi, Master LFO seviyesi ve Master pitch, eksi 1200 ile 1200 cent."
+],
+[
+"MODULATION",
+"X ve Y tekerlekleri olan bir X / Y pad. SMOOTH modülasyonu yumuşatır."
+],
+[
+"LAYERING",
+"Aynı tuştaki bölgelerin birlikte nasıl çaldığı: All, All (gain-compensated), Velocity-mapped, Modulation X-mapped, Modulation Y-mapped, Random, Cycle veya Song time-synced. SAME DECK yalnızca aynı dekin bölgelerini katmanlar."
+],
+[
+"CROSSFADE",
+"Katmanlı bölgeler arasındaki eğri: none, linear, balanced curve, unbalanced curve veya adding."
+],
+[
+"REGION SETTINGS",
+"Geçerli bölge, OUT (çıkış iz ofseti) ve CUT (cut grubu) ile dört satır: AMP (pan ve ses), FILTER (cutoff ve rezonans), SPEED (pitch) ve START (delay ve sample başlangıcı). Her satırın bir ART grup numarası ve bir miktarı vardır."
+],
+[
+"ARTICULATOR",
+"8 articulator grubundan birini seçer. FILTER'ının bir türü (LP, BP, BS, HP), bir modu (OFF, x1, x2, x3) ve ENV, CUT ve RES tekerlekleri vardır."
+],
+[
+"PAN, VOL, CUT, RES, SPEED, START",
+"Eğri editörünün gösterdiği hedef."
+],
+[
+"ENV, LFO, VEL, MOD X, MOD Y, RAND",
+"Gösterilen articulator parçası: envelope'u, LFO'su veya velocity, modulation X, modulation Y ya da randomness'tan gelen harita."
+],
+[
+"TEMPO, GLOBAL",
+"TEMPO eğrinin zamanının tempoyu izlemesini sağlar. GLOBAL, LFO fazının şarkıyla birlikte ilerlemesini sağlar."
+],
+[
+"ATT, DEC, SUS, REL",
+"Envelope'un attack, decay ve release sürelerini ölçekler ve sustain seviyesini kaydırır."
+],
+[
+"SPD, TNS, SKEW, PW",
+"LFO hızı, tension, skew ve pulse genişliği."
+],
+[
+"Deck tool row",
+"Loop, Play / pause, Stop, File, Regions, Select ve Zoom menüleri, tek veya çift dek ekranı ve geçerli dek, A veya B."
+],
+[
+"Dosya",
+"New, Load sample... ve dekin WAV'ını bölgeleriyle kaydeden Save sample as...."
+],
+[
+"Bölgeler",
+"Add region..., Add marker..., Set loop, Delete, Rename all..., Set all cut groups to... ve Freeze all."
+],
+[
+"Klavye",
+"Tuşları çalar ve hangilerinin bölgesi olduğunu gösterir. Menüsünde Assign current region to this key ve Select region assigned to this key vardır. Yanındaki rakam temel oktavı ayarlar."
+],
+[
+"Seçenekler",
+"Sample start covers whole length, Link velocity to volume, Loop half of regions ve HQ envelopes."
+]
+],
+"tips": [
+"Yüklemek için bir dekin üzerine sample bırakın. Otomatik dilimlemeden yalnızca bir WAV dosyası marker alır, çünkü marker'lar dekin WAV'ında saklanır.",
+"Bir bölgenin menüsünde Delete, Clone as region, Turn into marker, Rename..., Trigger note ve Zoom on vardır.",
+"Çift renkli notalar dek A'yı, tek renkli notalar dek B'yi çalar. 14 ve 15 renkleri ters çalar.",
+"FL'nin Snap ve View menüleri henüz yok, File ve Regions menülerinde yalnızca yukarıda listelenen girişler var."
 ]
 },
 "gen-wave-traveller": {
@@ -2375,7 +2592,7 @@
 ]
 },
 "fx-apex-limiter": {
-"source": "cd8656b974",
+"source": "1b3edd96e8",
 "intro": "Apex Limiter, bir kanalın veya master'ın son yuvası için look-ahead'li bir limiter'dır. İçine ne kadar gain basacağınızı ve çıkış tavanının nerede duracağını ayarlarsınız; ekran seviye geçmişini ve gain reduction'ı gösterir.",
 "controls": [
 [
@@ -2397,6 +2614,14 @@
 [
 "Stil",
 "Limiting karakteri: Clean, Glue, Punch, Dynamic, Dense, Loud, Bus veya Safe."
+],
+[
+"Seviyeleme",
+"Advanced panelinde. Seviyeyi tavanın altındaki bir threshold'da yavaş bir attack ile tutar, kalanını tavan yakalar. Varsayılan olarak kapalı."
+],
+[
+"Threshold and Attack",
+"Levelling altında: tutulan seviye ve seviye tutulmadan önce bir transient'in ne kadarının geçtiği."
 ],
 [
 "True peak limitleme",
@@ -2425,12 +2650,13 @@
 ],
 "tips": [
 "Editör, gecikmeyi sample cinsinden sol üst köşede gösterir.",
-"Dosya kayıplı bir formata dönüştürülecekse true-peak limiting'i açın."
+"Dosya kayıplı bir formata dönüştürülecekse true-peak limiting'i açın.",
+"Levelling'e ulaşmak için ekranın sol altındaki düğme panelini, sonra Advanced'i açın. Kapatıp yeniden açmak ayarladığınız threshold'u korur."
 ]
 },
 "fx-compressor": {
-"source": "95054dd4ae",
-"intro": "Compressor, bir kanalın yüksek seviyeli kısımlarının seviyesini düşürür. Bir insert yuvasına eklenir ve vokalleri, davulları ve basları dengelemek için kullanılır. LYNX ve RCOMP modları ile Classic ve Vintage sesleri vardır.",
+"source": "86f6769b26",
+"intro": "Compressor, bir kanalın yüksek seviyeli kısımlarının seviyesini düşürür. Bir insert yuvasına eklenir ve vokalleri, davulları ve basları dengelemek için kullanılır. Classic ve Vintage karakterleri vardır. Classic temiz çalışır ya da yumuşak knee'li ve programa bağlı release'li bir FET eğrisiyle çalışır. LYNX ve RComp anahtarı kontrollerin aralıklarını seçer.",
 "controls": [
 [
 "Threshold",
@@ -2473,13 +2699,26 @@
 "Sesi seçer."
 ],
 [
-"LYNX / RCOMP",
-"Modu ve kullandığı aralıkları seçer."
+"Clean / FET",
+"Classic ile gösterilir. Clean, kompresörün eski hâlidir. FET 5 dB'lik bir knee ve programa bağlı bir release ekler. Varsayılan Clean'dir."
+],
+[
+"ARC / Manual, Electro / Opto, Warm / Smooth",
+"Vintage ile gösterilir: release modu, release eğrisi ve karakter."
+],
+[
+"Old / Measured",
+"Vintage ile gösterilir: statik eğri. Eski eğriyle kaydedilen projeler siz değiştirene kadar onu korur."
+],
+[
+"LYNX / RComp",
+"Ratio, gain, attack ve release kontrollerinin aralıklarını seçer."
 ]
 ],
 "tips": [
 "Sıkıştırılmamış sinyali karıştırmak için Mix'i yüzde 100'ün altında kullanın.",
-"In ve Out metreleri öncesindeki ve sonrasındaki seviyeyi, ortadaki metre gain değişimini gösterir."
+"In ve Out metreleri öncesindeki ve sonrasındaki seviyeyi, ortadaki metre gain değişimini gösterir.",
+"FET mevcut projelerde kapalıdır, bu yüzden eskisi gibi duyulurlar."
 ]
 },
 "fx-crest-compressor": {
@@ -2993,6 +3232,206 @@
 "100 FL Studio demo durumundan dördü linear-phase split veya Master Mid modunu kullanıyordu; LYNX SHARE bunları yalnızca yaklaşık karşılar."
 ]
 },
+"fx-pocket-autoduck": {
+"source": "e6fc9bff7d",
+"intro": "Pocket Autoduck seviyeyi her vuruşta düşürür ve yeniden yükselmesine izin verir; bu, bir kick'e karşı sidechain kompresyonu gibi pompalayan bir ses verir. Bir ses girişini değil, şarkının vuruşunu izler. FL Studio Mobile projelerinin (.flm) Autoduck modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Ducking",
+"Seviye düşüşünün derinliği, 0 ile 100%. 100%'de sinyal en alçak noktada sessizdir."
+],
+[
+"Attack",
+"Seviyenin düşmesi için gereken süre, çok kısa bir süreden yaklaşık yarım vuruşa kadar. Şarkı temposunda ms olarak gösterilir."
+],
+[
+"Eğri",
+"Düşüşü ve toparlanmayı büker. Aralığın en üstünde değer Linear yazar."
+],
+[
+"Zaman",
+"Tüm duck'ın uzunluğu, vuruşun bir parçası olarak, 0 ile 100%."
+],
+[
+"Shift",
+"Duck'ı daha erken veya daha geç yapar, vuruşun -50 ile +50%'si."
+],
+[
+"Hold",
+"Seviyenin toparlanmadan önce ne kadar aşağıda kaldığı, Time'ın bir parçası olarak."
+],
+[
+"Şekil",
+"Toparlanmanın şekli: Accel, Accel 2, Decel, Decel 2, S-Curve veya S-Curve 2."
+]
+],
+"tips": [
+"Duck her zaman vuruş başına bir kez tekrarlanır. Başka nota uzunlukları yoktur.",
+"Şarkı durmuşken duck şarkı temposunda çalışmaya devam eder."
+]
+},
+"fx-pocket-compressor": {
+"source": "a158158420",
+"intro": "Pocket Compressor bir kanalın yüksek kısımlarının seviyesini düşürür. Hold'lu bir tepe detektörü iki kanalın yüksek olanını okur ve ikisine tek bir gain uygulanır. FL Studio Mobile projelerinin (.flm) Compressor modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Thresh",
+"Compression'ın başladığı seviye, -40 dB ile 0 dB."
+],
+[
+"Ratio",
+"Kare yasasıyla 1:1 ile 20:1. Aralığın en üstü +inf yazar ve seviyeyi threshold'da tutar."
+],
+[
+"Attack",
+"Detektörün yükselen bir seviyeyi ne kadar hızlı izlediği, kare yasasıyla 0 ile 50 ms."
+],
+[
+"Release",
+"Tutulan tepenin hold süresinden sonra ne kadar hızlı düştüğü, kare yasasıyla 10 ms ile 500 ms."
+],
+[
+"Seviye",
+"Çıkış gain'i. Auto gain açıkken -20 dB ile +20 dB yazar, Auto gain kapalıyken aynı düğme hareketi için 0 dB ile +40 dB."
+],
+[
+"Hold",
+"Release başlamadan önce detektörün bir tepeyi tuttuğu süre, kare yasasıyla 0 ile 50 ms."
+],
+[
+"Otomatik gain",
+"Thresh ve Ratio'dan hesaplanan make-up gain ekler; böylece tam ölçekli bir giriş tam ölçekte çıkar."
+],
+[
+"Giriş gain",
+"Yalnızca detektörü besleyen sinyalin gain'i, -20 dB ile +20 dB. Sesin kendi seviyesini değiştirmez."
+],
+[
+"RMS",
+"Uyumluluk için saklanır. FL Studio Mobile bunu hiç açmaz, bu yüzden hep Off yazar ve etkisi yoktur."
+]
+],
+"tips": [
+"Auto gain'i değiştirmek Level göstergesini 20 dB, onunla birlikte çıkış seviyesini de kaydırır. Değiştirdikten sonra Level'a bakın.",
+"Look-ahead yoktur ve gecikme yoktur."
+]
+},
+"fx-pocket-gate": {
+"source": "18a775e56a",
+"intro": "Pocket Gate sinyali bir threshold'un altındayken düşürür. Notalar arasındaki gürültüyü kesmek veya davulları sıkılaştırmak için kullanın. Kontroller iki sayfadadır: LEVEL ve ENVELOPE. FL Studio Mobile projelerinin (.flm) Gate modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"LEVEL / ENVELOPE",
+"Seviye sayfası ile zamanlama sayfası arasında geçiş yapar."
+],
+[
+"Threshold",
+"Gate'i açan seviye, -60 ile +6 dB. Taraflardan biri bunun üstündeyse gate açılır."
+],
+[
+"Asimetri",
+"Gate kapanmadan önce seviyenin threshold'un ne kadar altına düşmesi gerektiği, 0 ile 66 dB."
+],
+[
+"Left and Right meters",
+"Giriş seviyesini, threshold'da bir işaretle gösterir. dB cinsinden threshold altına yazılır."
+],
+[
+"Mix",
+"Gate'in derinliği, -100 ile 100%. 100%'de kapalı bir gate sinyali 60 dB düşürür. 0%'de gate hiçbir şey yapmaz. Negatif değerler gate'i ters çevirir, yani açıkken sinyali düşürür."
+],
+[
+"Attack and Release",
+"Gate'in açılması ve kapanması için gereken süre, her biri 0 ile 1000 ms."
+],
+[
+"A. Curve and R. Curve",
+"İki kutuplu, -1 ile 1. Açılma ve kapanma rampasını büker. 0'da rampa doğrusaldır, bir yön logaritmik, öbürü üstel bir şekil verir."
+],
+[
+"Hold",
+"Gate açıldıktan sonra açık kaldığı en kısa süre, 0 ile 1000 ms."
+]
+],
+"tips": [
+"Gate seviyeyi 256 sample'lık bloklarla ölçer ve 255 sample ileri bakar. Bunu gecikme olarak bildirir.",
+"Threshold çevresinde dolaşan bir sinyalde gate'in çırpınmasını önlemek için Asymmetry'yi 0'ın üstüne ayarlayın."
+]
+},
+"fx-pocket-leveller": {
+"source": "827df6c977",
+"intro": "Pocket Leveller bir izin seviyesini ve sol sağ dengesini ayarlar. Bir trim'dir ve compression yapmaz. FL Studio Mobile projelerinin (.flm) Leveller modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Gain",
+"dB ölçeğinin altındaki uzun çubuk. Seviyeyi -60 ile +12 dB arasında ayarlar. Değer çubuğun üstünde gösterilir."
+],
+[
+"Pan",
+"Taraflar arasındaki denge, 100% L'den ortaya, oradan 100% R'ye. Karşı tarafı düşürür, diğer tarafı tam seviyede bırakır."
+],
+[
+"Level meter",
+"Ölçeğin altındaki ince çubuk; çıkış seviyesini Gain ile aynı dB ölçeğinde gösterir."
+]
+],
+"tips": [
+"Ölçeğin sol ucu -inf. yazar, ama en düşük gain -60 dB'dir, bu yüzden sinyal tamamen susturulmaz.",
+"Gain ve Pan değişiklikleri birkaç milisaniye içinde kayar, bu yüzden onları oynatmak tıklama yapmaz."
+]
+},
+"fx-pocket-limiter": {
+"source": "4419acdf41",
+"intro": "Pocket Limiter 2 ms look-ahead'li bir tepe limiter'ıdır. Seviyeyi In Gain ile itin, tepeleri threshold'da tutar. FL Studio Mobile projelerinin (.flm) Limiter modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Giriş gain",
+"Limiter'dan önceki gain, -24 ile +24 dB."
+],
+[
+"Threshold",
+"Threshold. Gain'in düşürülmeye başladığı seviye, -24 ile 0 dB."
+],
+[
+"Release",
+"Bir tepeden sonra gain'in tam seviyeye dönmesi için gereken süre, 0.10 ile 2.00 saniye."
+],
+[
+"Çıkış gain",
+"Limiter'dan sonraki gain, -24 ile +24 dB."
+],
+[
+"Gain reduction display",
+"Son gain reduction'ı çizer; üst çizgide 0 dB'den 24 dB'ye kadar, en yeni değer sağda."
+]
+],
+"tips": [
+"Look-ahead 2 ms gecikme ekler ve efekt bunu host'a bildirir.",
+"Otomatik make-up gain yoktur. Son seviyeyi ayarlamak için Out Gain'i kullanın."
+]
+},
+"fx-pocket-limiter-classic": {
+"source": "d5838309b0",
+"intro": "Pocket Limiter Classic basit bir tepe limiter'ıdır. Yüksek taraf threshold'u aşınca gain bir anda düşer, sonra yumuşak bir eğriyle toparlanır. FL Studio Mobile projelerinin (.flm) Limiter (eski) modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Threshold",
+"Gain'in düşürülmeye başladığı seviye, -24 ile 0 dB."
+],
+[
+"Bırakma süresi",
+"Gain'in toparlanması için gereken süre, 0 ile 100% olarak gösterilir. 0%'de yaklaşık 200 ms'den 100%'de 1 saniyeye kadar gider."
+],
+[
+"Çıkış gain",
+"Çıkış seviyesi, -24 ile +12 dB."
+]
+],
+"tips": [
+"Çıkış, threshold'un indirildiği miktar kadar yükseltilir, böylece sınırlanan tepeler Output Gain seviyesinde çıkar. Threshold'u düşürmek sinyali yükseltir.",
+"Look-ahead yoktur ve gecikme eklemez. Bir tepe threshold'u geçtiğinde gain bir sample içinde düşer."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband, mixer insert'i için LYNX SHARE'e özgü bir efekttir. Sinyali dört banda böler ve her birine kompresyon ya da expansion uygular. Gain'i değiştirmeyen bir bant sinyale dokunmaz; yani efekt boştayken şeffaftır.",
@@ -3161,6 +3600,57 @@
 ],
 "tips": [
 "Alttaki ok işaretleri sürüklenerek belirlenen 120 olası işlem sırası vardır."
+]
+},
+"fx-strike-shaper": {
+"source": "81799e3815",
+"intro": "Strike Shaper, LYNX'in kendi transient designer'ıdır. Aynı sinyalin iki envelope'unu karşılaştırır ve gain'i oranlarından belirler; bu yüzden sessiz ve yüksek vuruşlara aynı şekilde tepki verir ve threshold gerektirmez. Başlangıçları sertleştirmek veya yumuşatmak için Attack'i, kuyrukları uzatmak veya kısaltmak için Sustain'i kullanın. Look-ahead'i yoktur ve gecikme eklemez.",
+"controls": [
+[
+"Attack",
+"Her vuruşun başlangıcını yükseltir veya alçaltır, -15 dB ile +15 dB; 0 dB yakınında daha ince olan basılı bir ölçekte."
+],
+[
+"Sustain",
+"Her vuruştan sonra sönen kuyruğu yükseltir veya alçaltır, -24 dB ile +24 dB."
+],
+[
+"Çıkış gain",
+"Çıkış seviyesi, -20 dB ile +6 dB; 0 dB düğmenin en üstündedir."
+],
+[
+"On / Power",
+"Efekti açar veya kapatır. ON tuşu ve Power lambası aynı şeyi yapar."
+],
+[
+"Bağla",
+"Açıkken iki kanal için tek bir detektör ve tek bir gain kullanılır, bu yüzden stereo görüntü kaymaz. Kapalıyken sol ve sağ ayrı şekillenir."
+],
+[
+"Dedektör yüksek geçiren",
+"Yalnızca detektörde high-pass filtre, Off veya 20 Hz ile 1 kHz. Alçak frekansların şekillendirmeyi tetiklemesini önler ve sesi filtrelemez."
+],
+[
+"Koruma",
+"Çıkışta soft clipper. Sinyale yaklaşık -3 dBFS'nin altında dokunmaz ve 0 dBFS'yi geçmesine asla izin vermez."
+],
+[
+"Mix",
+"Paralel işlem için dry ve şekillendirilmiş sinyal arasındaki karışım, 0 ile 100 %. Output gain ve Guard bundan sonra gelir."
+],
+[
+"SIG / OVL lamps",
+"Giriş sinyali varken SIG yanar. Çıkış tepesi tam ölçeğe ulaşınca OVL yanar."
+],
+[
+"Attack / Sustain rows",
+"İki lamba sırası, her gain'in ne kadar hareket ettiğini canlı gösterir. Soldaki mavi bir kesmedir, sağdaki kırmızı bir yükseltmedir; adımlar 1, 3, 6, 10 ve 15 dB'dedir."
+]
+],
+"tips": [
+"Attack ve Sustain 0 dB'de, Mix 100 %'de ve Output gain 0 dB'deyken sinyal değişmeden geçer.",
+"Büyük Attack yükseltmeleri bir vuruşa +15 dB'ye kadar ekleyebilir. OVL lambası yanarsa Guard'ı açın veya Output gain'i düşürün.",
+"Değerini okumak için bir düğmenin üzerine gelin. Değer menüsü için bir düğmeye sağ tıklayın."
 ]
 },
 "fx-transient-processor": {
@@ -4362,6 +4852,66 @@
 "Seçili hedef ve bank plugin durumuyla birlikte kaydedilir."
 ]
 },
+"fx-pocket-tape-delay": {
+"source": "6bcded6837",
+"intro": "Pocket Tape Delay her taraf için bir bant döngüsü modeller. Bant hızı yeni bir delay süresine kayar, bu yüzden Time hareket ederken yankıların pitch'i değişir. FL Studio Mobile projelerinin (.flm) Tape Delay modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Zaman",
+"Delay süresi, 0 ile 1000 ms. Tempoya senkron değildir."
+],
+[
+"Geri bes.",
+"Feedback, 0 ile 100%. Yankının ne kadarının banta geri gittiği."
+],
+[
+"Asenkron",
+"İki kutuplu, -100 ile 100%. Bir tarafın delay'ini yarıya kadar kısaltır. Negatif değerler sol tarafı, pozitif değerler sağ tarafı kısaltır."
+],
+[
+"Mix",
+"Yankıların seviyesi, 0 ile 100%. Yankılar dry sinyale eklenir."
+]
+],
+"tips": [
+"Yankı seviyesi Mix çarpı Fdbk'dir, bu yüzden Fdbk 0'dayken hangi Mix ayarında olursa olsun yankı duyulmaz.",
+"Bant hızı efekti için ses çalarken Time'ı oynatın."
+]
+},
+"fx-pocket-trance-delay": {
+"source": "390a4b427a",
+"intro": "Pocket Trance Delay şarkı temposuna kilitli bir delay'dir. Yankılar, her zaman tam seviyede kalan dry sinyale eklenir. FL Studio Mobile projelerinin (.flm) Trance Delay modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"1/4, 3/8, 1/2, 3/4, 1/1",
+"Delay süresi, vuruşun bir parçası olarak. En uzun delay 2 saniyedir."
+],
+[
+"Stereo / Ping-Pong / Mirror",
+"Modu seçer. Stereo her taraf için bir delay hattı çalıştırır. Ping-Pong hatları çaprazlar, böylece yankılar taraflar arasında dönüşümlü gelir. Mirror iki kat uzunlukta hatlar kullanır ve sol girişi delay süresi kadar geciktirir."
+],
+[
+"Giriş pan",
+"Yalnızca Ping-Pong modunda gösterilir, 0 ile 100. Delay hatlarını besleyen girişin dengesi."
+],
+[
+"Feedback",
+"Her yankının ne kadarının geri beslendiği. İlk yankı bu miktarla zaten ölçeklenmiştir, bu yüzden 0'da yankı yoktur."
+],
+[
+"Filtre",
+"Feedback döngüsündeki iki kutuplu filtre. Ortada açık, altında low-pass, üstünde hafif bir high-pass."
+],
+[
+"Mix",
+"Yankıların seviyesi. Kaydırıcı kare yasasını izler."
+]
+],
+"tips": [
+"Süreyi veya modu değiştirmek delay hatlarını temizler, bu yüzden yankılar durur ve yeniden başlar.",
+"Saklanan bir Dry pan ayarı, Input Pan'ın Ping-Pong modunda dry sinyali de pan'lamasını sağlar. .flm projesinden okunur ve editörde kontrolü yoktur."
+]
+},
 "fx-spiral-echo": {
 "source": "60ff7072a7",
 "intro": "Spiral Echo, mixer insert'i için LYNX SHARE'e özgü bir delay'dir. Her tekrar öncekinden biraz daha fazla frekans kaydırılır; bu yüzden yankılar yalnızca tekrarlanmak yerine yükselir veya alçalır. Stereoda sağ taraf her tekrarı ters kaydırmayla duyar.",
@@ -4943,6 +5493,269 @@
 "tips": [
 "Feedback işaretlidir, bu yüzden sıfırın altına olduğu kadar üstüne de ayarlanabilir.",
 "Rise modu, sweep'i barber-pole gibi yükselip alçalan bir flanger'dır."
+]
+},
+"fx-pocket-chorus": {
+"source": "ab0abf77a0",
+"intro": "Pocket Chorus, daha geniş ve kalın bir ton için dry sese sinyalin iki modüle edilmiş kopyasını ekler. Kopyalar sol ve sağ tarafın toplamından yapılır ve delay en fazla 10 ms'dir. FL Studio Mobile projelerinin (.flm) Chorus modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Hız",
+"Modülasyonun hızı, 0.20 ile 4.20 Hz. İkinci ses 0.1 Hz daha hızlı çalışır."
+],
+[
+"Derinlik",
+"Modülasyonun ne kadar uzağa gittiği, 0 ile 100%."
+],
+[
+"Stereo",
+"100%'de bir ses sol tarafa, öbürü sağ tarafa gider. Düşük değerler iki sesi de iki tarafa koyar."
+],
+[
+"Mix",
+"İki sesin seviyesi, 0 ile 100%. Tam seviyede kalan dry sinyale eklenirler. Kontrol bir kare yasasını izler."
+]
+],
+"tips": [
+"Sesler dry sinyalin üzerine eklendiği için yüksek Mix değerleri seviyeyi yükseltir.",
+"İkinci ses, geçerli sinyal ile yaklaşık 10 ms eski bir kopya arasında geçiş yapar. Delay süresi süpürmez. Bu, FL Studio Mobile ile aynıdır."
+]
+},
+"fx-pocket-flanger": {
+"source": "e810108b49",
+"intro": "Pocket Flanger dry sinyale çok kısa, LFO ile süpürülen bir delay ekler. Delay, hızı kayarak değişen bant tarzı bir döngüdür; bu süpürmeyi yumuşatır. FL Studio Mobile projelerinin (.flm) Flanger modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"LFO hızı",
+"Sync açıkken LFO döngüsünün uzunluğu, 13 adımda: 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 bar, 2 bars, 4 bars, 8 bars, 16 bars."
+],
+[
+"Sync",
+"Açıkken LFO rate kullanılır ve şarkı konumu izlenir. Kapalıyken LFO speed kullanılır."
+],
+[
+"LFO hızı",
+"Sync kapalıyken LFO'nun hızı, kübik yasayla 0.1 Hz ile 10 Hz."
+],
+[
+"LFO şekli",
+"Sine, Saw veya Square."
+],
+[
+"LFO miktarı",
+"LFO'nun delay'i merkezinin çevresinde ne kadar süpürdüğü, 0 ile 100 %."
+],
+[
+"Delay",
+"Merkez delay, kare yasasıyla 0 ile 2.5 ms."
+],
+[
+"Feedback",
+"Geciktirilmiş sinyalin döngüye geri beslenen miktarı, 0 ile 100 %."
+],
+[
+"Feedback'i ters çevir",
+"Feedback'in polaritesini ters çevirir. Varsayılan olarak açık."
+],
+[
+"Stereo",
+"Sağ kanalın LFO'sunu fazda öne alır, 100 %'de yarım döngüye kadar."
+],
+[
+"Mix",
+"Dry sinyale eklenen geciktirilmiş sinyalin seviyesi, kare yasasıyla 0 ile 100 %."
+],
+[
+"Mix'i ters çevir",
+"Geciktirilmiş sinyalin polaritesini ters çevirir. Varsayılan olarak açık."
+]
+],
+"tips": [
+"Rate etiketleri FL Studio Mobile'ın kendisine aittir: 1/1 bir vuruş, 1 bar on altı vuruştur.",
+"İki invert anahtarı comb filtresinin hangi frekansları sildiğini değiştirir, iki ayarı da deneyin.",
+"Reset'ten sonra geciktirilmiş sinyal, bir döngü kaydedilene kadar sessiz kalır."
+]
+},
+"fx-pocket-multifx": {
+"source": "c0cd29ed70",
+"intro": "Pocket MultiFX sekiz efektten birini çalıştırır ve iki ana ayarını bir X/Y pad'e koyar. Şarkı konumuna kilitli bir LFO X ayarını oynatabilir. Canlı süpürmelere ve otomasyona uygundur. FL Studio Mobile projelerinin (.flm) MultiFX modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Delay, Reverb, LP Filter, HP Filter, Flanger, Phaser, Panner, Vox",
+"Efekti seçer. Eski efekt söner, yenisi yavaşça açılır."
+],
+[
+"X/Y pad",
+"Seçili efektin iki ayarını belirler. Pad üzerindeki çizgiler eksenlerin adlarını taşır. Delay: Feedback ve Filter. Reverb: Decay ve Filter. LP Filter ve HP Filter: Frequency ve Resonance. Flanger ve Phaser: Frequency ve Feedback. Panner: Panning ve Distance. Vox: Vowel ve Size."
+],
+[
+"LFO hızı",
+"Bir LFO döngüsünün uzunluğu, on adımda: bir vuruşun 1/8, 1/4, 3/8, 1/2 ve 3/4'ü, 1 vuruş, 2 vuruş, 1 bar, 2 bar ve 4 bar. Delay'de delay süresini de belirler."
+],
+[
+"LFO şekli",
+"Sine, Saw veya Square."
+],
+[
+"LFO miktarı",
+"LFO'nun X ayarını ne kadar oynattığı. Delay'de LFO bunun yerine yankıları pan'lar. Kaydırıcı kare yasasını izler."
+]
+],
+"tips": [
+"LP ve HP filtreleri oktav başına 48 dB'dir. LP Filter yaklaşık 64 Hz ile 20 kHz'i, HP Filter yaklaşık 32 Hz ile 5.5 kHz'i kapsar.",
+"LFO'nun Reverb üzerinde etkisi yoktur.",
+"Delay'de 1.5 saniyeden uzun bir delay süresi, sığana kadar yarıya bölünür."
+]
+},
+"fx-pocket-phaser": {
+"source": "08e5a425cb",
+"intro": "Pocket Phaser sesi, bir LFO'nun süpürdüğü altı birinci dereceden all-pass aşamasından geçirir ve sonucu dry sinyalin üzerine ekler. FL Studio Mobile projelerinin (.flm) Phaser modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"LFO hızı",
+"Sync açıkken LFO döngüsünün uzunluğu, 13 adımda: 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 bar, 2 bars, 4 bars, 8 bars, 16 bars."
+],
+[
+"LFO miktarı",
+"LFO'nun aşamaları ne kadar oynattığı, kübik yasayla 0 ile 100 %."
+],
+[
+"Feedback",
+"Son aşamayı birinciye geri besler, 0 ile 100 % (0.95'e kadar)."
+],
+[
+"Frekans",
+"Süpürmenin merkezi, kare yasasıyla 50 Hz ile 16 kHz."
+],
+[
+"Mix",
+"Dry sinyale eklenen faz kaydırılmış sinyalin seviyesi, kare yasasıyla 0 ile 100 %. Dry sinyal tam seviyede kalır."
+],
+[
+"Sync",
+"Açıkken LFO rate kullanılır ve şarkı konumu izlenir. Kapalıyken LFO speed kullanılır."
+],
+[
+"LFO hızı",
+"Sync kapalıyken LFO'nun hızı, kübik yasayla 0.1 Hz ile 10 Hz."
+],
+[
+"LFO şekli",
+"Sine, Saw veya Square."
+],
+[
+"Stereo",
+"Sağ kanalın LFO'sunu fazda öne alır, 100 %'de yarım döngüye kadar."
+]
+],
+"tips": [
+"Rate etiketleri FL Studio Mobile'ın kendisine aittir: 1/1 bir vuruş, 1 bar on altı vuruştur, yani 16 bars 256 vuruştur.",
+"Süpürme 50 Hz ile 16 kHz aralığıyla sınırlıdır."
+]
+},
+"fx-pocket-tremolo": {
+"source": "9bc38f0475",
+"intro": "Pocket Tremolo bir sesin seviyesini bir LFO ile minimum ve maksimum gain arasında hareket ettirir. Sol ve sağ arasındaki bir faz farkı onu auto-pan'a çevirir. FL Studio Mobile projelerinin (.flm) Tremolo modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Hız",
+"Sync kapalıyken LFO'nun hızı, 0.1 Hz ile 20 Hz."
+],
+[
+"Hız sync",
+"Sync açıkken LFO döngüsünün uzunluğu: 1/8, 1/4, 3/8, 1/2, 3/4, beat, 2 beats, 4 beats, 8 beats veya 16 beats."
+],
+[
+"Maks. miktar",
+"Döngünün en yüksek gain'i, 0 ile 100 %. Bunu Amount min'in altına ayarlamak minimumu da onunla birlikte aşağı çeker."
+],
+[
+"Min. miktar",
+"Döngünün en düşük gain'i, 0 ile 100 %. Bunu Amount max'in üstüne ayarlamak maksimumu da onunla birlikte yukarı iter."
+],
+[
+"Faz ofseti",
+"LFO'nun iki kanal için başlangıç fazı, 0 ile 360."
+],
+[
+"Stereo kayması",
+"Sağ kanal için ek faz, 0 ile 360. 180'de iki taraf zıt yönlerde hareket eder."
+],
+[
+"Sync",
+"Açıkken Rate sync kullanılır ve şarkı konumu izlenir. Kapalıyken Rate kullanılır."
+],
+[
+"Şekil",
+"Dalgayı bir üsle büker. 0 ile 100 yazar, 50 dalgayı bükmeden bırakır."
+],
+[
+"Yumuşak",
+"Düz çizgili dalga (0) ile onun yuvarlatılmış, sinüse benzer hâli (100) arasındaki karışım."
+],
+[
+"Eğiklik",
+"Tepenin döngü içindeki konumu. -100 ile +100 yazar, 0 simetrik bir yükseliş ve düşüştür."
+],
+[
+"Genişlik",
+"Döngünün maksimuma yakın geçirilen kısmının minimuma yakın kısma oranı. 0 ile 100 yazar, 50 eşittir."
+]
+],
+"tips": [
+"Gain salınımı, Amount min ile Amount max arasındaki aralığın 99 %'una ulaşır.",
+"Gain yaklaşık 333 Hz'lik bir filtreyle yumuşatılır, bu yüzden sert kenarlı şekiller tıklama yapmaz."
+]
+},
+"fx-pocket-wow-flutter": {
+"source": "69299f0824",
+"intro": "Pocket Wow & Flutter sesi, uzunluğu iki sinüs LFO'sunun oynattığı bir delay'den geçirir; bu, pitch'i dengesiz bir bant gibi büker. Çıkış tamamen wet'tir, mix kontrolü yoktur. FL Studio Mobile projelerinin (.flm) Wow & Flutter modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Wow hızı",
+"Sync kapalıyken yavaş LFO'nun hızı, 0.1 Hz ile 5 Hz."
+],
+[
+"Wow sync",
+"Sync açıkken wow döngüsünün uzunluğu: 1/8, 1/4, 3/8, 1/2, 3/4, beat, 2 beats, 4 beats, 8 beats veya 16 beats."
+],
+[
+"Wow miktarı",
+"Wow'un derinliği, üstel yasayla 0 ile 100 %. 100 %'de delay 142 ms'ye kadar salınır."
+],
+[
+"Flutter hızı",
+"Sync kapalıyken hızlı LFO'nun hızı, 5 Hz ile 20 Hz."
+],
+[
+"Flutter sync",
+"Sync açıkken flutter döngüsünün uzunluğu, Wow sync ile aynı liste."
+],
+[
+"Flutter miktarı",
+"Flutter'ın derinliği, 0 ile 100 %. Wow delay'inin üstüne 3 ms'ye kadar ekler."
+],
+[
+"Sync",
+"Açıkken iki LFO da tempoya kilitlenir ve iki sync uzunluğu kullanılır. Kapalıyken Hz cinsinden iki rate kullanılır."
+],
+[
+"Rastgele hız",
+"Yeni bir wow hızının ne sıklıkla seçildiği, 0.1 Hz ile 10 Hz."
+],
+[
+"Rastgele sync",
+"Seçimler arasındaki süreyi bir tempo uzunluğu olarak ayarlar, Wow sync ile aynı liste."
+],
+[
+"Rastgele miktar",
+"Rastgele seçimin alındığı pencerenin boyutu, 0 ile 100 %. Sync kapalıyken pencere Wow rate çevresindedir, Sync açıkken Wow sync adımı çevresindedir. 0 %'de wow hızı değişmez."
+]
+],
+"tips": [
+"Random rate ve Random sync aynı zamanlayıcıyı ayarlar. Sync ne olursa olsun en son oynatılan geçerli olur.",
+"Delay Wow amount ile büyür ve gecikme olarak bildirilmez, bu yüzden yüksek değerler izi hem dalgalı hem geç yapar.",
+"Sync açık ve Random amount 0 %'dayken wow şarkı konumunu izler."
 ]
 },
 "fx-rhythmic-envelope": {
@@ -5548,6 +6361,114 @@
 "Altta temiz sinyalin bir kısmını tutmak için Mix'i kısın."
 ]
 },
+"fx-pocket-distortion": {
+"source": "d41cff05f7",
+"intro": "Pocket Distortion sinyali dört eğriden biriyle şekillendirir, sonra ezilmiş bir ses için sample'ları tutar ve çıkışı ölçekler. Davullara, baslara ve synth'lere pürüz katmak için kullanın. FL Studio Mobile projelerinin (.flm) Distortion modülünü yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Hard / Tube / Soft / Clip",
+"Eğriyi seçer. Hard, seviye yükseldikçe düzleşen bir knee eğrisidir, Tube bir tanh eğrisidir, Soft üstel bir eğridir ve Clip sinyali tam ölçekte keser."
+],
+[
+"Bias",
+"İki kutuplu, -100 ile 100. Dalganın iki yarısı farklı bozulsun diye eğriden önce bir ofset ekler. Kaydırıcı beşinci kuvvet yasasını izler, bu yüzden çoğunlukla uçlarda etki eder. Bir high-pass filtre ofseti eğriden sonra kaldırır."
+],
+[
+"Drive",
+"Bozulma miktarı, 0 ile 100 olarak gösterilir."
+],
+[
+"Stereo",
+"Drive'ı taraflar arasında paylaştırır, -100 ile 100 olarak gösterilir. 0'da iki taraf da tam drive alır. 0'ın altında sol taraf daha az drive alır, 0'ın üstünde sağ taraf daha az alır."
+],
+[
+"BitCrush",
+"Her çıkış sample'ını 1 ile 257 sample boyunca tutar. Kaydırıcı dördüncü kuvvet yasasını izler, bu yüzden ilk yarı az değişir."
+],
+[
+"Gain",
+"Çıkış seviyesi, -24 ile 0 dB."
+]
+],
+"tips": [
+"BitCrush sample'ları tutarak örnekleme hızını düşürür. Bit derinliğini azaltmaz.",
+"Gain yalnızca seviyeyi düşürür. Drive'ın eklediği seviyeyi telafi etmek için kullanın."
+]
+},
+"fx-pocket-waveshaper": {
+"source": "bd9e6bccf5",
+"intro": "Pocket Waveshaper bir sesi yedi eğriden birinden geçirerek bozar. Eğriden önce iki filtre, sonra üç bantlı bir ton bölümü gelir ve bir LFO iki şekil kontrolünü oynatabilir. FL Studio Mobile projelerinin (.flm) Waveshaper modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Şekil",
+"Eğri: Soft, Tanh, Crossover, Fold, Octaver, Rectify veya CrossFold."
+],
+[
+"Otomatik kazanç",
+"Açıkken şekillendirilmiş sinyalin seviyesini, yavaş bir izleyiciyle giriş seviyesine eşitler."
+],
+[
+"X / Y",
+"Seçili eğrinin iki parametresi. Neyi değiştirdikleri şekle bağlıdır. 0 ile 100 yazar."
+],
+[
+"Drive",
+"Eğriye giren gain, 0 dB ile 40 dB. 0 ile 100 yazar."
+],
+[
+"Post gain",
+"Şekillendirilmiş sinyalin gain'i, -18 dB ile +18 dB."
+],
+[
+"Stereo yayılım",
+"Eğriden önce sol ve sağ sinyale zıt işaretli bir ofset ekler, böylece iki taraf farklı bozulur. Dördüncü kuvvet yasası, 0 ile 100 yazar."
+],
+[
+"Mix",
+"Dry ve şekillendirilmiş sinyalin eşit güçlü karışımı. 0 ile 100 yazar."
+],
+[
+"High cut / Low cut",
+"Eğriden önce iki kutuplu filtreler, her biri 20 Hz ile 20 kHz."
+],
+[
+"Bas",
+"Eğriden sonra 100 Hz'de bell bandı. -18 dB ile +18 dB yazar."
+],
+[
+"Mid freq / Mid gain",
+"Eğriden sonra bell bandı, 500 Hz ile 2 kHz. Gain -18 dB ile +18 dB yazar."
+],
+[
+"Tiz",
+"Eğriden sonra 3.3 kHz'de high shelf. -18 dB ile +18 dB yazar."
+],
+[
+"LFO şekli",
+"Sine, Saw veya Square."
+],
+[
+"LFO senkronu",
+"Açıkken LFO rate kullanılır ve şarkı konumu izlenir. Kapalıyken LFO rate free kullanılır."
+],
+[
+"LFO hızı",
+"LFO sync açıkken LFO döngüsünün uzunluğu: 1/8, 1/4, 3/8, 1/2, 3/4, beat, 2 beats, bar, 2 bars veya 4 bars."
+],
+[
+"Serbest LFO hızı",
+"LFO sync kapalıyken LFO'nun hızı, kübik yasayla 0.02 Hz ile 9.92 Hz."
+],
+[
+"LFO to X / LFO to Y",
+"LFO'nun X ve Y'yi ne kadar oynattığı, 0 ile 100 %. 100 %'de bir kontrolü her yönde aralığının yarısı kadar oynatır."
+]
+],
+"tips": [
+"LFO ile X ve Y değerleri örnek başına değil, şarkı tick'i başına (vuruşun 1/96'sı) bir kez güncellenir.",
+"Eğriden sonraki bir DC filtresi, asimetrik şekillerin ve Stereo spread'in oluşturduğu ofseti kaldırır."
+]
+},
 "fx-squeeze": {
 "source": "82c718fe5f",
 "intro": "Squeeze, sinyali azaltılmış sayıda seviyeye quantize eden, Puncher bölümüyle periyodik olarak gate'leyebilen ve öncesinde ya da sonrasında filtreleyebilen bir insert efektidir. Fruity Squeeze ayarlarını içe aktarılan bir .flp projesinden yükler.",
@@ -5678,7 +6599,7 @@
 ]
 },
 "fx-lynx-tune": {
-"source": "68589fac2a",
+"source": "428780a75c",
 "intro": "LYNX Tune, siz çalarken herhangi bir mixer insert'inde bir sesin veya tek notalı bir enstrümanın pitch'ini düzeltir. LYNX SHARE tasarımıdır, başka bir plugin'in içe aktarımı değildir. YIN pitch algılama ve TD-PSOLA kaydırma kullanır.",
 "controls": [
 [
@@ -5700,6 +6621,10 @@
 [
 "Formant",
 "Formant korumasını açar. Shift formant'ları kaydırır."
+],
+[
+"NEFES",
+"Breathiness, yüzde 0 ile 100. Düzeltilen sesin formantlarıyla şekillenmiş nefes gürültüsünü, seslendirilen seslerde ekler."
 ],
 [
 "Transpoze",
@@ -6196,6 +7121,99 @@
 ],
 "tips": [
 "Yeni bir örnek devreye girerek değil, yerleşmiş değerlerinden başlar."
+]
+},
+"fx-pocket-spacer": {
+"source": "0bad263ab8",
+"intro": "Pocket Spacer bir sesi stereo alanda kısa delay'ler, polarite ters çevirme ve bir genişlik kontrolüyle dolaştırır. Bir tarafı kaydırmak, bir izi daraltmak veya genişletmek ya da mid ve side'ı ayrı ayrı işlemek için kullanın. FL Studio Mobile projelerinin (.flm) Spacer modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"L/R gecikmesi",
+"Bir tarafı kübik yasayla 300 ms'ye kadar geciktirir. Merkezin sağı sol kanalı, solu sağ kanalı geciktirir. Ortada Off yazar."
+],
+[
+"Pan",
+"Karşı tarafın seviyesini düşürür. Ortada Center, sonra 0 ile 100 % yazar."
+],
+[
+"Ayrım",
+"İki kutuplu, -100 % ile +100 %, ortada kapalı. Pozitif değerler görüntüyü mono'ya kadar daraltır. Negatif değerler her kanalın bir kısmını diğerinden çıkararak genişletir."
+],
+[
+"L/R ters çevirme",
+"Kanalların polaritesini ters çevirir: hiçbiri, sol, sağ veya ikisi."
+],
+[
+"M/S gecikmesi",
+"Mid/side çiftinden bir sinyali beşinci kuvvet yasasıyla 100 ms'ye kadar geciktirir, bu yüzden merkez yakınındaki aralık çok incedir (mikrosaniye). Merkezin sağı mid'i, solu side'ı geciktirir."
+],
+[
+"M/S ters çevirme",
+"Mid/side çiftinin polaritesini ters çevirir: hiçbiri, mid, side veya ikisi."
+],
+[
+"Stereo modu",
+"Standard, mid/side'a kodlar, M/S aşamasını uygular ve sol/sağa geri çözer. Output M/S sonucu solda mid, sağda side olarak bırakır. Input M/S gelen sol ve sağı mid ve side sayar ve sol/sağa çözer."
+]
+],
+"tips": [
+"Dört sürekli kontrol yeni bir değere kayar, bu yüzden bir delay değişikliği pitch'i bir an büker.",
+"Delay'ler sesin parçasıdır ve gecikme olarak bildirilmez."
+]
+},
+"fx-pocket-spreader": {
+"source": "c1689cdba4",
+"intro": "Pocket Spreader bir yan sinyali geciktirip geri ekleyerek stereo görüntüyü genişletir ve Low bypass frekansının altındaki kısmı genişletmenin dışında bırakır. FL Studio Mobile'ın kontrol aralıklarının arkasında Spreader ile aynı motoru çalıştırır. FL Studio Mobile projelerinin (.flm) Spreader modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Genişlik",
+"0.0 ile 2.0 yazar. 1.0'a kadar genişletme sinyalinin delay'ini yaklaşık 6.35 ms'ye kadar uzatır. 1.0'ın üstünde delay en yüksek değerinde kalır ve yalnızca genişletme sinyalinin seviyesi yükselir."
+],
+[
+"Bas baypası",
+"Sinyalin genişletmeden ayrıldığı frekansın altı, 10 Hz ile 10 kHz."
+],
+[
+"Mono bas",
+"Low bypass frekansının altındaki kısmın ne kadarının mono çıkacağı. Sürekli, 0 ile 100 yazar."
+],
+[
+"Ayrım",
+"Side sinyalinin seviyesi, -100 % ile +100 %. Ortada Original yazar. -100 %'de side sinyali kaldırılır, +100 %'de iki katına çıkar."
+]
+],
+"tips": [
+"Efekt, delay telafisine yaklaşık 6.35 ms (44.1 kHz'de 280 sample) gecikme bildirir.",
+"Kontroller yumuşatılmıştır, bu yüzden efekt reset'ten sonra birkaç milisaniye içinde yavaşça açılır."
+]
+},
+"fx-pocket-stereoizer": {
+"source": "6f5c30ec3c",
+"intro": "Pocket Stereoizer bir sesi, mono toplamını geciktirip filtreleyerek, sonucu sol kanala ekleyip sağdan çıkararak genişletir. Mono veya dar kaynaklarda kullanın. FL Studio Mobile projelerinin (.flm) Stereoizer modülünü, her değer olduğu gibi kopyalanarak yükledikleri motordur ve herhangi bir mixer yuvasına da eklenebilir.",
+"controls": [
+[
+"Güç",
+"Eklenen sinyalin seviyesi, kare yasasıyla. 0 ile 100 yazar. 0 yakınında genişletme kapalıdır."
+],
+[
+"Tını",
+"Mono toplamın delay'i, kübik yasayla 0.5 ms ile 50 ms. 0 ile 100 yazar."
+],
+[
+"Odak",
+"Geciktirilmiş sinyal üzerinde tek kutuplu filtre. -100 % ile +100 % yazar. Merkezin altında low-pass, üstünde high-pass olur."
+],
+[
+"L/R gecikmesi",
+"Bir tarafı kübik yasayla 25 ms'ye kadar geciktirir. -100 % ile +100 % yazar. Merkezin solu sol kanalı, sağı sağ kanalı geciktirir."
+],
+[
+"Pan",
+"Doğrusal denge, -100 % ile +100 %. Karşı tarafı düşürür ve yeni bir değere kayar."
+]
+],
+"tips": [
+"Eklenen sinyal iki tarafta ters işaretlidir, bu yüzden L/R delay ve Pan ortadayken çıkış mono'ya toplandığında kendini siler."
 ]
 },
 "fx-spreader": {
@@ -7011,12 +8029,36 @@
 ]
 },
 "gen-fruity-dance": {
-"source": "b830a4e6ca",
-"intro": "Fruity Dance, aynı adlı FL plugin'inin yerine geçen LYNX SHARE'in kendi dansçısıdır. Ses çıkarmaz; kanalın notaları hareketi seçer. Dansçıyı yerleştirmek için sürükleyebilir, hareketleri için sağ tıklayabilirsiniz.",
+"source": "601e484cb7",
+"intro": "Fruity Dance, aynı adlı FL plugin'inin yerine geçen LYNX SHARE'in kendi dansçısıdır; editörünün başlığı LYNX Dance'tir. Ses çıkarmaz; kanalın notaları hareketi seçer. Dansçıyı yerleştirmek için sürükleyebilir, hareketleri için sağ tıklayabilirsiniz. LYNX SHARE'in dansçısı yerine Fruity Dance için yapılmış bir sprite sheet de gösterebilir.",
 "controls": [
 [
 "Hareket",
-"Kanalın kullandığı dans hareketi."
+"Kanalın kullandığı dans hareketi. Bir sprite sheet ile liste, sheet'in kendi hareketlerini gösterir."
+],
+[
+"Görünür",
+"Dansçıyı gösterir veya gizler."
+],
+[
+"Yatay olarak aynala",
+"Dansçıyı aynalar."
+],
+[
+"Değişiklikleri senkronize et",
+"Açık: yeni bir hareket bir sonraki döngüde başlar. Kapalı: hemen başlar."
+],
+[
+"Katı",
+"Açık: dansçı fare tıklamalarını alır. Kapalı: tıklamalar içinden geçer."
+],
+[
+"Önde tut",
+"Dansçıyı panellerin ve yerleştirilmiş plugin'lerin önünde tutar."
+],
+[
+"Masaüstünde",
+"FL Studio projeleri için saklanır. Burada hiçbir şey yapmaz: dansçılar ana pencerenin içinde kalır."
 ],
 [
 "Boyut",
@@ -7027,24 +8069,33 @@
 "Animasyonun hızı, çarpan olarak."
 ],
 [
-"Aynalanmış",
-"Hareketi aynalar."
+"Karışım",
+"Bir sprite sheet'in kareleri arasında hareket harmanlaması, yüzde 0 ile 100."
 ],
 [
-"Dansçıyı göster",
-"Dansçıyı gösterir veya gizler."
+"Yansıma",
+"Dansçının altındaki ayna görüntüsünün opaklığı."
 ],
 [
-"Kıyafet rengi",
-"Dansçının kıyafet rengi."
+"Kıyafet rengi...",
+"LYNX SHARE dansçısının kıyafet rengi."
 ],
 [
 "Dansçıyı geri koy",
 "Dansçıyı varsayılan konumuna sıfırlar ve gösterir."
+],
+[
+"Sprite sayfası yükle...",
+"Fruity Dance biçiminde bir resim seçin: yanlamasına 8 kare ve hareket başına bir satır; yanında aynı adlı, satır başına bir hareket adı olan bir metin dosyası bulunur."
+],
+[
+"LYNX dansçısı",
+"LYNX SHARE'in kendi dansçısına geri döner."
 ]
 ],
 "tips": [
-"Editör hangi tuşun hangi hareketi çaldığını listeler; hareketlerin aynalı sürümleri ayrı bir tuş aralığındadır, diğer tuşlar dansçıyı gizler veya gösterir."
+"Editör hangi tuşun hangi hareketi çaldığını listeler; hareketlerin aynalı sürümleri ayrı bir tuş aralığındadır, diğer tuşlar dansçıyı gizler veya gösterir.",
+"Sprite sheet seçici PNG ve JPEG dosyalarını kabul eder. Resmin boyutu adlar dosyasına uymazsa editör Bitmap size is incorrect der ve geçerli dansçıyı korur."
 ]
 },
 "fx-fruity-html-notebook": {
@@ -7258,6 +8309,62 @@
 "Auto modunda, metre için pencereyi uzun ve dar, osiloskop için geniş ve kısa yapın."
 ]
 },
+"fx-audio-effect-rack": {
+"source": "adc619108a",
+"intro": "Audio Effect Rack, Patcher'ın rack modunda kurulu bir mixer yuvası efektidir. Her zincir aynı girişi alır ve zincirlerin çıkışları aralarında gecikme telafisiyle toplanır. Mixer yuvasının plugin seçicisinden Audio Effect Rack olarak ekleyin ya da mevcut yuvaları bir rack'e gruplayın. Ableton Live setlerindeki (.als) Audio Effect Rack'ler rack olarak açılır ve bir Live seti dışa aktardığınızda rack'ler geri yazılır.",
+"controls": [
+[
+"Chain list",
+"Her zincir için adı, sesi, pan'ı, bir açma anahtarı ve solo için S olan bir satır. Zincir menüsünde Add chain, Rename, Duplicate, Delete, Move up ve Move down vardır."
+],
+[
+"Cihazlar",
+"Seçili zincirin efektleri. Ekleme menüsü Effects, Plugin effects ve Racks sunar, böylece rack'ler iç içe konabilir."
+],
+[
+"Chain, Hide",
+"Zincir seçim bölgesi editörünü göster veya gizle. Audio Effect Rack'in tuş veya velocity bölgeleri yoktur."
+],
+[
+"Zone bars",
+"Zincirin bölgesini ayarlamak için bir çubuğu veya uçlarını sürükleyin, 0 ile 127. Üstteki şerit, zincirin çıkışını ölçekleyen fade'leri ayarlar."
+],
+[
+"Zincir seçici",
+"Bölgelerin karşılaştırıldığı değer. Bir makro bunu sürebilir."
+],
+[
+"Makrolar",
+"16'ya kadar düğme, her birinde bir isim plakası ve bir değer. + ve - daha çok veya daha az gösterir: 1, 2, 4 ve böyle 16'ya kadar."
+],
+[
+"Map",
+"Map modu. Her makro, zincirlerin, aygıtlarının ve parametrelerinin, Chain Volume, Chain Pan ve Chain Selector'ın menüsünü açan bir Map düğmesi alır. Eşleme listesi Macro, Path, Name, Min ve Max'i, Invert Range ve Delete ile gösterir."
+],
+[
+"Rast",
+"Eşlenmiş her makroya rastgele bir değer verir. Bir makronun menüsünde Exclude Macro from Randomization vardır."
+],
+[
+"Makro varyasyonları",
+"New makro değerlerini saklar. Bir varyasyonda Launch, Overwrite, Rename, Duplicate ve Delete vardır."
+],
+[
+"Ses efekti rafında grupla",
+"Mixer yuva menüsünde: efekti tek zincirli yeni bir rack'e taşır. Group all into Audio Effect Rack, yuvaların tüm zincirini taşır. Ses aynı kalır ve taşınan parametrelerin otomasyonu rack'in makrolarını sürer."
+],
+[
+"Grubu çöz",
+"Tek zincirli bir rack'in mixer yuva menüsünde: aygıtlarını yuvalara geri koyar."
+]
+],
+"tips": [
+"Fade'siz biten bir bölgenin dışında zincirin girişi kapanır, böylece kuyrukları sonuna kadar çalar.",
+"Bir Live setinden gelen rack, zincirlerini, bölgelerini, zincir sesini ve pan'ını, makrolarını, varyasyonlarını ve iç içe rack'lerini korur. Zincirlerdeki üçüncü taraf plugin'ler korunur. Live'ın kendi aygıtları atılır ve içe aktarma raporunda listelenir.",
+"Bir Live setinde VST3 plugin parametresindeki makro eşlemesi korunmaz. Dışa aktarırken bir zincirdeki LYNX SHARE dahili efektleri yazılmaz; yalnızca VST2 ve VST3 plugin'leri ile iç içe rack'ler yazılır.",
+"Birden fazla zincirli bir rack için Ungroup kullanılamaz."
+]
+},
 "fx-fruity-send": {
 "source": "96c8f760a7",
 "intro": "Fruity Send, zincirdeki konumunda bulunan sinyali başka bir mixer insert'ine gönderen bir efekt yuvası plugin'idir. Bir zincirin ortasından send gerektiğinde, örneğin bir efektten sonra ama bir sonrakinden önce kullanırsınız. FL Studio projeleri içe aktarılırken okunur.",
@@ -7334,6 +8441,58 @@
 "Gecikmeyi ayarlamak için donanımınız bağlıyken Ping'i çalıştırın."
 ]
 },
+"gen-instrument-rack": {
+"source": "8198b21313",
+"intro": "Instrument Rack, Patcher'ın rack modunda kurulu bir Channel Rack generator'üdür. Her zincir aynı notaları alır ve zincirlerin çıkışları toplanır. Bir zincir aygıtlarını şu sırayla tutar: MIDI efektleri, enstrüman, ses efektleri. Plugin seçiciden Instrument Rack olarak ekleyin. Ableton Live setlerindeki (.als) Instrument Rack'ler rack olarak açılır ve bir Live seti dışa aktardığınızda rack'ler geri yazılır.",
+"controls": [
+[
+"Chain list",
+"Her zincir için adı, sesi, pan'ı, bir açma anahtarı ve solo için S olan bir satır. Zincir menüsünde Add chain, Rename, Duplicate, Delete, Move up ve Move down vardır."
+],
+[
+"Cihazlar",
+"Seçili zincirin aygıtları. Ekleme menüsü Effects, Plugin effects, Racks, MIDI effects ve Instruments sunar. Instruments, Synth, Instrument Rack ve Plugin instruments'ı listeler."
+],
+[
+"Key, Vel, Chain, Hide",
+"Bölge editörünü seçin: tuş bölgeleri, velocity bölgeleri, zincir seçim bölgeleri veya hiçbiri. Bölgeler 0 ile 127 arasındadır."
+],
+[
+"Zone bars",
+"Bölgeyi ayarlamak için bir çubuğu veya uçlarını sürükleyin. Bir çubuğun üst şeridi fade'leri ayarlar. Tuş ve velocity fade'leri zincire giren notaların velocity'sini ölçekler. Zincir seçim fade'i zincirin çıkışını ölçekler."
+],
+[
+"Zincir seçici",
+"Zincir seçim bölgelerinin karşılaştırıldığı değer. Bir makro bunu sürebilir."
+],
+[
+"Makrolar",
+"16'ya kadar düğme, her birinde bir isim plakası ve bir değer. + ve - daha çok veya daha az gösterir: 1, 2, 4 ve böyle 16'ya kadar."
+],
+[
+"Map",
+"Map modu. Her makro, zincirlerin, aygıtlarının ve parametrelerinin, Chain Volume, Chain Pan ve Chain Selector'ın menüsünü açan bir Map düğmesi alır. Eşleme listesi Macro, Path, Name, Min ve Max'i, Invert Range ve Delete ile gösterir."
+],
+[
+"Rast",
+"Eşlenmiş her makroya rastgele bir değer verir. Bir makronun menüsünde Exclude Macro from Randomization vardır."
+],
+[
+"Makro varyasyonları",
+"New makro değerlerini saklar. Bir varyasyonda Launch, Overwrite, Rename, Duplicate ve Delete vardır. Bir makronun menüsünde Exclude Macro from Variations vardır."
+],
+[
+"Variation morph (LYNX), Launch glide (LYNX)",
+"Varyasyon menüsündeki LYNX SHARE eklemeleri, ikisi de varsayılan olarak kapalı: iki varyasyon arasında bir Morph kaydırıcısı ve başlatılan bir varyasyon için bir glide süresi."
+]
+],
+"tips": [
+"Bir makro, eşlenmiş her parametreyi Min ile Max arasında doğrusal olarak oynatır. Bir parametre aynı anda tek bir makroya aittir.",
+"Makrolar, zincir seçici ve morph, bir Patcher'ın yayımlanmış parametreleri gibi otomatize edilebilir.",
+"Bir Live setinden gelen rack, zincirlerini, bölgelerini, zincir sesini ve pan'ını, makrolarını, varyasyonlarını ve iç içe rack'lerini korur. Zincirlerdeki üçüncü taraf plugin'ler korunur. Live'ın kendi aygıtları atılır ve içe aktarma raporunda listelenir.",
+"Bir Live setinde VST3 plugin parametresindeki makro eşlemesi korunmaz. Dışa aktarırken bir zincirdeki LYNX SHARE dahili aygıtları yazılmaz; yalnızca VST2 ve VST3 plugin'leri ile iç içe rack'ler yazılır."
+]
+},
 "gen-layer": {
 "source": "bdb4d8e177",
 "intro": "Layer, kendi sesi olmayan bir kanaldır. Channel Rack'e ekleyin, hangi kanalların onun alt kanalları olacağını seçin; Layer'a gönderilen her nota o alt kanalları çalar. Enstrümanları üst üste bindirmek, bir klavyeyi sesler arasında bölmek veya sample'lar arasında sırayla geçmek için kullanın.",
@@ -7382,6 +8541,61 @@
 "tips": [
 "Bir Patcher'ın içinde Layer'ın bir Children pini vardır: onu çalması gereken generator'lere kablolayın.",
 "Katmanlama > Split children, kök tuştan başlayarak her alt kanala bir tuş verir."
+]
+},
+"gen-midi-effect-rack": {
+"source": "ee0bfb9d44",
+"intro": "MIDI Effect Rack, Patcher'ın rack modunda kurulu bir Channel Rack generator'üdür. Zincirleri yalnızca MIDI efektleri tutar. Her zincir aynı notaları alır ve zincirlerin çaldığı şey, bir Layer kanalında olduğu gibi rack'in alt kanallarına gider. Plugin seçiciden MIDI Effect Rack olarak ekleyin. Aynı MIDI efekt zincirleri bir Instrument Rack zincirinin başında da durabilir.",
+"controls": [
+[
+"Alt kanalları ata",
+"Zincir menüsünde: Channel Rack'te seçili kanalları, bu rack'in çaldığı alt kanallar yapar. Show children onları yeniden seçer."
+],
+[
+"Chain list",
+"Her zincir için bir satır. Zincir menüsünde Add chain, Rename, Duplicate, Delete, Move up ve Move down vardır."
+],
+[
+"Cihazlar",
+"Seçili zincirin MIDI efektleri; MIDI effects menüsünden eklenir."
+],
+[
+"Key, Vel, Chain, Hide",
+"Bölge editörünü seçin: tuş bölgeleri, velocity bölgeleri, zincir seçim bölgeleri veya hiçbiri. Bölgeler 0 ile 127 arasındadır."
+],
+[
+"Zone bars",
+"Bölgeyi ayarlamak için bir çubuğu veya uçlarını sürükleyin. Bir çubuğun üst şeridi fade'leri ayarlar. Bir MIDI Effect Rack'te üç fade de notaların velocity'sini ölçekler."
+],
+[
+"Zincir seçici",
+"Zincir seçim bölgelerinin karşılaştırıldığı değer. Bir makro bunu sürebilir."
+],
+[
+"Zincir seçici MIDI kontrollerini süzer",
+"Zincir menüsünde bir anahtar; rack ile birlikte saklanır."
+],
+[
+"Makrolar",
+"16'ya kadar düğme. + ve - daha çok veya daha az gösterir."
+],
+[
+"Map",
+"Map modu. Her makro, zincirlerin aygıt parametrelerinin ve Chain Selector'ın menüsünü açan bir Map düğmesi alır. Eşleme listesi Macro, Path, Name, Min ve Max'i gösterir."
+],
+[
+"Rast",
+"Rastgeleleştirmenin dışında bırakılan makrolar hariç, eşlenmiş her makroya rastgele bir değer verir."
+],
+[
+"Makro varyasyonları",
+"Makro değeri setlerini saklayın ve başlatın: New, Launch, Overwrite, Rename, Duplicate ve Delete."
+]
+],
+"tips": [
+"Alt kanallar ayarlanana kadar rack'in başlık çubuğu henüz hiç olmadığını söyler ve rack hiçbir şey çalmaz.",
+"Zincirlerin sesi veya pan'ı yoktur: bir MIDI Effect Rack yalnızca nota geçirir.",
+"Bir LYNX SHARE MIDI Effect Rack, dışa aktarılan bir Live setine, içindeki dahili MIDI efektleri olmadan, bir MIDI Effect Rack olarak yazılır. Bir Live seti açılırken Live'ın MIDI Effect Rack'leri dönüştürülmez; içe aktarma raporunda listelenir."
 ]
 },
 "gen-midi-out": {

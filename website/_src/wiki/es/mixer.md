@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Con el foco en el Mixer, `Ctrl+L` vincula los canales seleccionados al insert se
 - `Ctrl`+clic, o arrastrar por varias franjas, selecciona un rango. `Ctrl+Shift`+clic añade o quita una.
 - Arrastra una franja hacia un lado, o pulsa `Alt+Left` y `Alt+Right`, para mover los inserts seleccionados.
 - Haz clic derecho en una franja para ver el menú del insert. `F2` cambia el nombre y el color del insert seleccionado.
+- `Del`, o `Delete` en el menú del insert, elimina los inserts seleccionados. LYNX SHARE pregunta antes. Marca `Recordar mi elección` para saltarte la pregunta la próxima vez.
 
 Mover, insertar o eliminar inserts mantiene los envíos, sidechains y la automatización en su insert.
+
+La sección `Mixer` del menú del insert y `Opciones › Mixer` tienen dos comandos más. `Ordenar inserts como la Playlist` mueve al principio los inserts vinculados a pistas de la Playlist, en el orden de la Playlist. Con `Conservar enlaces a inserts eliminados, en gris (LYNX)` activado, los envíos que iban a un insert eliminado se quedan, en gris, para que puedas conectarlos de nuevo.
 
 ## Silenciar y solo
 
 Haz clic en la luz de silenciar para silenciar un insert. Clic derecho o `Ctrl`+clic para solo. `S` pone en solo los inserts seleccionados, y `Alt+S` los pone en solo junto con los inserts que los alimentan.
+
+Un insert silenciado mantiene su medidor en movimiento. En proyectos nuevos y en proyectos de FL Studio importados también sigue ejecutando sus efectos, y solo se corta su salida al Master y sus envíos. Para que un insert silenciado deje de procesar, activa `Los inserts silenciados no procesan (LYNX, ahorra CPU; este proyecto)` en la sección `Mixer` del menú del insert o en `Opciones › Mixer`. Entonces su medidor se detiene y sus efectos empiezan de cero al quitar el silencio.
 
 ## Efectos
 
@@ -42,7 +47,8 @@ El panel de efectos muestra las diez ranuras del insert seleccionado.
 
 - Arrastra una ranura, o usa la rueda sobre ella, para subirla o bajarla.
 - Haz clic derecho en una ranura para ver sus opciones (reemplazar, mover, eliminar).
-- `Del` elimina el plugin de la ranura seleccionada.
+- Mientras el menú de una ranura está abierto, `Del` elimina el plugin de esa ranura.
+- `Agrupar en rack de efectos de audio` en el menú de la ranura mete el efecto en un rack nuevo, y `Agrupar todo en rack de efectos de audio` lo hace con toda la cadena. `Desagrupar` devuelve a las ranuras los efectos de un rack de una sola cadena.
 - El interruptor de la cabecera del panel activa o desactiva todos los efectos del insert.
 - Puedes arrastrar un efecto desde la base de plugins del [Browser](/wiki/browser/) a un insert o a una ranura de efecto.
 
@@ -60,6 +66,7 @@ Selecciona el insert que quieres enrutar. Entonces cada una de las demás franja
 - `Ctrl`+clic enruta solo a ese insert.
 - `Shift`+clic crea un envío de sidechain. `Ctrl+Shift`+clic lo crea solo de sidechain.
 - El clic derecho abre las mismas opciones como menú.
+- Para un envío pre-fader, haz clic derecho en el interruptor de ruta o en el mando de nivel del envío y marca `Envío pre-fader (el fader de esta pista no lo mueve)`. El envío se marca entonces como `PRE`.
 
 Los efectos con entrada lateral, como un compresor, tienen un selector `Sidechain desde` que lista los inserts que se pueden escuchar. Al elegir uno se crea la ruta por ti.
 
@@ -83,12 +90,13 @@ Cada insert tiene un botón de armado de grabación. Con un insert armado, Rec y
 | Renombrar y colorear | `F2` | Cambia el nombre y el color del insert seleccionado |
 | Solo | `S` | Pone en solo los inserts seleccionados |
 | Solo con fuentes | `Alt+S` | Pone en solo los inserts seleccionados y los inserts que los alimentan |
-| Eliminar efecto | `Del` | Elimina el plugin de la ranura seleccionada |
+| Eliminar inserts | `Del` | Elimina los inserts seleccionados, tras una pregunta |
 | Armar y grabar | `Shift+R` | Arma el insert seleccionado y empieza a grabar |
 
 ## Conviene saber
 
-- `Renderizar a audio` (un insert convertido en un clip de audio) suena unos 5 dB más fuerte que el insert que reemplaza. Es un problema conocido de las notas de la versión 0.1.25.
+- `Medidor de sonoridad junto al Master (LYNX)`, en `Opciones › Mixer`, muestra la sonoridad a corto plazo e integrada (LUFS) y el true peak de la salida del Master, con un botón `Reset`.
+- Un plugin de instrumento con varias salidas puede reproducir cada salida en su propio insert. Consulta [Plugins de terceros](/wiki/plugins/).
 - `Ctrl+L` hace cosas distintas en el Channel Rack y en el Mixer. En el rack elige inserts libres. En el Mixer usa el insert seleccionado.
 - Los interruptores de ruta aparecen en las demás franjas, no en la seleccionada.
 - El límite es de 127 inserts por proyecto y diez ranuras de efecto por insert.

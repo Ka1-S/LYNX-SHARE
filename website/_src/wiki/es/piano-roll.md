@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![El Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Cada herramienta tiene una tecla de letra. Las letras funcionan mientras el pian
 
 ## Teclado y regla
 
-Haz clic en una tecla del teclado para oírla. Cuanto más a la derecha de la tecla, más fuerte. `Ctrl`+clic en una tecla selecciona sus notas. Arrastrar con el botón central en el teclado hace las teclas más altas o más bajas.
+Haz clic en una tecla del teclado para oírla. Cuanto más a la derecha de la tecla, más fuerte. `Ctrl`+clic en una tecla selecciona sus notas. Arrastrar con el botón central en el teclado hace las teclas más altas o más bajas. También lo hace la rueda de zoom vertical, el pequeño cuadrado al final de la barra de desplazamiento del tiempo: arrástrala hacia arriba o abajo, o usa la rueda del ratón sobre ella.
+
+`Ver › Estilo del teclado` en el menú del Piano Roll elige entre `Teclas planas` y `Teclas de piano (líneas entre las teclas blancas)`, que dibuja un teclado tradicional.
 
 Haz clic en la regla para fijar la posición. `Ctrl`+arrastrar, arrastrar con el botón derecho o doble clic y arrastrar en la regla selecciona las notas de un rango de tiempo. `Ctrl`+rueda hace zoom y `Shift`+rueda desplaza.
 
@@ -56,13 +58,23 @@ Haz clic en la regla para fijar la posición. `Ctrl`+arrastrar, arrastrar con el
 | Ajuste | Qué hace |
 |---|---|
 | Ajuste | "Main" sigue el ajuste de la barra de herramientas principal, o elige uno para esta ventana. |
-| Acorde | Al hacer clic se crea el acorde elegido, con la nota pulsada como fundamental. `Shift+N` vuelve a las notas sueltas. |
-| Escala | Resalta las notas de una escala. Un botón aparte ajusta a la escala elegida las notas nuevas y movidas, y el MIDI entrante. |
+| Acorde | Al hacer clic se crea el acorde elegido, con la nota pulsada como fundamental. `Shift+N` vuelve a las notas sueltas. La misma lista es `Sello de acorde` en el menú del Piano Roll. |
+| Escala | Resalta las notas de una escala. Un botón aparte ajusta a la escala elegida las notas nuevas y movidas, y el MIDI entrante. Las notas movidas se mueven entonces por pasos de escala, de modo que un acorde se queda en la escala, y `Up` y `Down` mueven un paso de escala. |
 | Slide (`S`) | Las notas nuevas son notas slide. La nota que está sonando se desliza hacia ellas (glide 808). |
 | Notas fantasma (`Alt+V`) | Muestra las notas de los otros canales detrás de las tuyas. |
 | Color de nota | Las notas nuevas reciben este color. Hay 16. |
 | Seguir | La vista se desplaza con el cursor de reproducción mientras suena el patrón. |
-| Caja de carril | Elige qué edita el carril de abajo: Velocidad, Pan o Afinación fina. |
+| Caja de carril | Elige qué edita el carril de abajo: Velocidad, Pan, Afinación fina, Liberación, Mod X, Mod Y, Probabilidad o Rango de velocidad. |
+
+## Probabilidad y rango de velocidad
+
+Cada nota tiene una Probabilidad y un Rango de velocidad. La Probabilidad es cuán probable es que la nota suene cada vez que le toca. El Rango de velocidad deja que su velocidad varíe entre la velocidad de la nota y esa velocidad más el rango. Elige `Probabilidad` o `Rango de velocity (LYNX)` en la caja de carril para editarlos. `Herram. › Probabilidad (LYNX)` en el menú del Piano Roll agrupa las notas seleccionadas para que suenen todas o solo una de ellas, y tiene `Restablecer probabilidad y rango de velocity`.
+
+## Herramientas MIDI y scripts
+
+`Herram. › Herramientas MIDI...` en el menú del Piano Roll abre un panel con Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp y Velocity Shaper.
+
+La columna `Scripts` del menú `Herram.` lista los scripts del Piano Roll: los propios de LYNX SHARE y los archivos `.pyscript`, incluidos los de las carpetas de scripts de FL Studio si FL Studio está instalado. `Abrir la carpeta de scripts...` abre la carpeta para tus propios scripts, y `Ejecutar de nuevo el último script` repite el último.
 
 ## Teclas
 

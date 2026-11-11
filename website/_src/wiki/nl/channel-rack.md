@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Het Channel Rack met steprijen](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Deze werken zolang het Channel Rack de focus heeft.
 | Mute | `1` tot `0` | Mute of unmute kanaal 1 tot 10 |
 | Solo | `Ctrl+1` tot `Ctrl+0` | Zet kanaal 1 tot 10 solo |
 | Grafiekbaan | `Ctrl+K` | Toont of verbergt de grafiekbaan |
+
+## Een kanaal bevriezen
+
+Bevriezen rendert een kanaal naar audio en speelt die audio in zijn plaats af. Het instrument wordt uit het geheugen gehaald, ook een plugin van derden, zodat het geen CPU en geen geheugen gebruikt.
+
+1. Klik met rechts op het kanaal en kies `Bevriezen`. Als er meerdere kanalen zijn geselecteerd, staat er `Geselecteerde kanalen bevriezen`.
+2. De rij krijgt een sneeuwvlokje. Het volume en de pan van het kanaal en de effecten van zijn insert werken nog als voorheen.
+3. Om de noten of het instrument weer te wijzigen, klik je met rechts op het kanaal en kies je `Ontdooien`. Het instrument komt terug met de instellingen die het had.
+
+Een bevroren kanaal kan niet worden bewerkt: zijn steps zijn vergrendeld en het venster van zijn instrument opent niet. Als de noten, het tempo of het arrangement na het bevriezen veranderen, verandert het sneeuwvlokje van kleur en blijft de eerder gemaakte audio spelen totdat je `Opnieuw bevriezen` kiest. Ontbreken de gerenderde audiobestanden, dan speelt het instrument in plaats daarvan.
+
+Bevriezen werkt alleen op kanalen. Een Mixer-insert kan niet worden bevroren.
 
 ## Andere opties in het kanaalmenu
 

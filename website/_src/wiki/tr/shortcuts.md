@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![Kısayolları yönet penceresi: her eylemin tuşlarıyla aranabilir bir liste](/assets/img/wiki/shortcuts.webp)
 
-Bunlar 0.1.25 alfadaki varsayılan tuşlardır. `Yardım › Kısayollar` (`F1`) uygulamanın içinde kısayol listesini gösterir. `Seçenekler › Kısayolları yönet...` resimdeki, tuşları değiştirdiğiniz editörü açar.
+Bunlar 0.1.26 alfadaki varsayılan tuşlardır. `Yardım › Kısayollar` (`F1`) uygulamanın içinde kısayol listesini gösterir. `Seçenekler › Kısayolları yönet...` resimdeki, tuşları değiştirdiğiniz editörü açar.
 
 > macOS'ta uygulama tuşları Mac adlarıyla gösterir: Ctrl, ⌘ olarak ve Alt, ⌥ olarak görünür.
 
@@ -76,6 +76,19 @@ Bu tuşların bazıları odaktaki bir editörde başka bir şey yapar. Piano Rol
 | `Alt+F7` | Dokunmatik klavye |
 | `Ctrl+F5` | Tempo tapper |
 | `F1` | Kısayol listesi |
+
+## Clip View ve Device View
+
+Bu tuşlar yalnızca Klip başlatma iş akışında çalışır.
+
+| Tuş | Ne yapar |
+|---|---|
+| `Ctrl+Alt+L` | Ayrıntı görünümünü göster veya gizle |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Clip View ile Device View arasında geçiş |
+| `Left` / `Right` | Device View: önceki, sonraki aygıtı seç |
+| `Del` or `Backspace` | Device View: seçili efekti sil |
 
 ## Pattern'ler
 
@@ -171,6 +184,7 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `Alt+L` | Artikülasyon |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Akor yürüyüşü üret |
+| `Ctrl+Alt+Y` | Son script'i yeniden çalıştır |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `Ctrl+B` | Çoğalt |
 | `Del` | Seçili klipleri sil |
 | `Shift+Del` | Seçili klipleri sil ve boşlukları kapat |
+| `Shift+Left` / `Shift+Right` | Seçili klipleri bir snap adımı sola, sağa kaydır |
+| `Shift+Up` / `Shift+Down` | Seçili klipleri bir iz yukarı, aşağı kaydır |
+| `Alt+Left` / `Alt+Right` | Seçili klipleri snap olmadan ince bir adımla sola, sağa it. `Shift+Alt` aynısını yapar |
+| `Ctrl+D` | Klip ve zaman seçimini kaldır |
+| `Shift+I` | Seçimi ters çevir |
+| `Shift+C` | Seçili kaynağın kliplerini seç |
 | `Shift+S` | Ripple düzenlemeyi aç veya kapat |
 | `Backspace` | Snap'i kapat veya aç |
 | `Alt+M` / `Shift+Alt+M` | Seçili klipleri sustur, sesini aç |
@@ -195,6 +215,8 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `7` / `8` | Seçili ses kliplerinin pitch'ini bir yarım ses aşağı, yukarı al |
 | `9` | Seçili ses kliplerini ters çevir |
 | `Ctrl+Ins` / `Ctrl+Del` | Zaman seçiminin uzunluğunu tüm izlere ekle, tüm izlerden kaldır |
+| `Ctrl+Alt+Ins` | Klipleri dilimle ve boşluk ekle |
+| `Ctrl+Alt+Home` | Klipleri soldan yeniden boyutlandırma, açık veya kapalı |
 | `Ctrl+Left` / `Ctrl+Right` | Önceki, sonraki zamanı seç |
 | `Ctrl+Enter` | Seçimin çevresindeki zamanı seç |
 | `Alt+T` | Zaman işaretçisi ekle |
@@ -220,7 +242,7 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `Ctrl+L` | Seçili kanalları seçili insert'e bağla |
 | `Ctrl+Shift+L` | Seçili kanalları seçili olandan başlayarak insert'lere bağla |
 | `Alt+L` | Seçili insert'e bağlı kanalları seç |
-| `Del` | Seçili efekt yuvasındaki plugin'i sil |
+| `Del` | Seçili insert'leri sil. LYNX SHARE önce sorar |
 | `Ctrl+E` | Ses editörünü aç |
 | `Shift+E` | Ses editörünü aç ve kaydet |
 | `Alt+R` | Kayda hazır insert'leri wave dosyalarına render et |
@@ -242,6 +264,8 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 - Yazı klavyesi piyanosu açıkken tuşları nota çalar ve tek harfli kısayolların çoğu durdurulur (`L` yine çalışır). `Ctrl+T` ile kapatın.
 - Bir kısayol ya her yerde ya da tek bir pencerede çalışır. Bir pencereye ait olan, o pencere odaktayken her yerde çalışan aynı tuşlara üstün gelir.
 - Bazı eylemlerin varsayılan tuşu yoktur, örneğin Hızlı ekleme paleti. Editörde onlara bir tuş verin.
+- Playlist'te klipleri hareket ettiren tuşlar, hiçbiri seçili değilken tüm klipleri hareket ettirir. `Alt+Left` ve `Alt+Right` tuşlarının ince adımı, geçerli zoom'da bir pikseldir.
+- LYNX SHARE'in kısayolları bir plugin penceresi odaktayken de çalışır, örneğin `Space`. Düz harfler ve rakamlar önce plugin'e gider, `Esc` ise penceresini kapatır.
 
 ## İlgili sayfalar
 

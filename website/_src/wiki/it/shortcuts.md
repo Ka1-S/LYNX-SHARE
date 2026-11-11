@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![La finestra Gestisci scorciatoie: un elenco di azioni con ricerca e i tasti di ciascuna](/assets/img/wiki/shortcuts.webp)
 
-Questi sono i tasti predefiniti nella 0.1.25 alpha. `Aiuto › Scorciatoie` (`F1`) mostra l'elenco delle scorciatoie dentro l'app. `Opzioni › Gestisci scorciatoie...` apre l'editor mostrato nell'immagine, dove le cambi.
+Questi sono i tasti predefiniti nella 0.1.26 alpha. `Aiuto › Scorciatoie` (`F1`) mostra l'elenco delle scorciatoie dentro l'app. `Opzioni › Gestisci scorciatoie...` apre l'editor mostrato nell'immagine, dove le cambi.
 
 > Su macOS l'app mostra i tasti con i nomi del Mac: Ctrl appare come ⌘ e Alt come ⌥.
 
@@ -76,6 +76,19 @@ Alcuni di questi tasti fanno altro dentro un editor che ha il focus. Nel Piano R
 | `Alt+F7` | Tastiera touch |
 | `Ctrl+F5` | Tempo tapper |
 | `F1` | Elenco delle scorciatoie |
+
+## Clip View e Device View
+
+Questi tasti funzionano solo nel flusso a lancio di clip.
+
+| Tasto | Cosa fa |
+|---|---|
+| `Ctrl+Alt+L` | Mostra o nasconde la vista di dettaglio |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Passa tra Clip View e Device View |
+| `Left` / `Right` | Device View: seleziona il dispositivo precedente, successivo |
+| `Del` or `Backspace` | Device View: elimina l'effetto selezionato |
 
 ## Pattern
 
@@ -171,6 +184,7 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `Alt+L` | Articola |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Genera progressione di accordi |
+| `Ctrl+Alt+Y` | Esegue di nuovo l'ultimo script |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `Ctrl+B` | Duplica |
 | `Del` | Elimina le clip selezionate |
 | `Shift+Del` | Elimina le clip selezionate e chiude gli spazi |
+| `Shift+Left` / `Shift+Right` | Sposta le clip selezionate di uno step di snap a sinistra, a destra |
+| `Shift+Up` / `Shift+Down` | Sposta le clip selezionate di una traccia in su, in giù |
+| `Alt+Left` / `Alt+Right` | Sposta le clip selezionate a sinistra, a destra di un passo fine, senza snap. `Shift+Alt` fa lo stesso |
+| `Ctrl+D` | Deseleziona clip e tempo |
+| `Shift+I` | Inverte la selezione |
+| `Shift+C` | Seleziona le clip della sorgente selezionata |
 | `Shift+S` | Modifica ripple attiva o disattiva |
 | `Backspace` | Snap disattivato o attivato |
 | `Alt+M` / `Shift+Alt+M` | Silenzia, riattiva le clip selezionate |
@@ -195,6 +215,8 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `7` / `8` | Abbassa, alza di un semitono le clip audio selezionate |
 | `9` | Reverse delle clip audio selezionate |
 | `Ctrl+Ins` / `Ctrl+Del` | Inserisce, rimuove la durata della selezione temporale su tutte le tracce |
+| `Ctrl+Alt+Ins` | Taglia le clip e inserisce spazio |
+| `Ctrl+Alt+Home` | Ridimensionamento delle clip da sinistra, attivo o disattivo |
 | `Ctrl+Left` / `Ctrl+Right` | Seleziona il tempo precedente, successivo |
 | `Ctrl+Enter` | Seleziona il tempo attorno alla selezione |
 | `Alt+T` | Aggiunge un marker temporale |
@@ -220,7 +242,7 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `Ctrl+L` | Collega i canali selezionati all'insert selezionato |
 | `Ctrl+Shift+L` | Collega i canali selezionati agli insert a partire da quello selezionato |
 | `Alt+L` | Seleziona i canali collegati all'insert selezionato |
-| `Del` | Elimina il plugin nello slot di effetto selezionato |
+| `Del` | Elimina gli insert selezionati. LYNX SHARE chiede prima conferma |
 | `Ctrl+E` | Apre l'editor audio |
 | `Shift+E` | Apre l'editor audio e registra |
 | `Alt+R` | Renderizza gli insert armati in file wave |
@@ -242,6 +264,8 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 - Mentre il pianoforte sulla tastiera del PC è attivo, i suoi tasti suonano note e la maggior parte delle scorciatoie a lettera singola è in pausa (`L` funziona ancora). Disattivalo con `Ctrl+T`.
 - Una scorciatoia vale ovunque oppure in una sola finestra. Quella che appartiene a una finestra prevale sugli stessi tasti validi ovunque, finché quella finestra ha il focus.
 - Alcune azioni non hanno un tasto predefinito, per esempio la palette di aggiunta rapida. Assegnagliene uno nell'editor.
+- Nella Playlist, i tasti che spostano le clip spostano tutte le clip quando nessuna è selezionata. Il passo fine di `Alt+Left` e `Alt+Right` è un pixel allo zoom corrente.
+- Le scorciatoie di LYNX SHARE funzionano anche mentre una finestra di plugin ha il focus, per esempio `Space`. Lettere e cifre semplici vanno prima al plugin, e `Esc` chiude la sua finestra.
 
 ## Correlati
 

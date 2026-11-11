@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![Playlist z klipami na ścieżkach](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ Litery działają, gdy pianino z klawiatury komputera (`Ctrl+T`) jest wyłączon
 - Kliknij klip dwukrotnie, aby go otworzyć.
 - Przycisk w lewym górnym rogu klipu otwiera menu klipu (uczyń unikalnym, zmień nazwę i kolor, potnij, a dla audio: wysokość, dopasuj do tempa, odwróć).
 - Przytrzymaj `Alt` podczas przeciągania, aby zignorować przyciąganie.
-- Klipy audio mają uchwyty fade i wzmocnienie klipu, które przeciągasz w górę lub w dół.
+- Klipy audio mają uchwyty fade i wzmocnienie klipu, które przeciągasz w górę lub w dół. Kliknij prawym przyciskiem uchwyt fade, żeby otworzyć jego menu z `Utwórz przenikanie`. Kliknij prawym przyciskiem uchwyt wzmocnienia, żeby dostać `Resetuj gain` i `Normalizuj`.
 - `Shift+M` przełącza Stretch: zmiana rozmiaru klipu audio rozciąga wtedy dźwięk zamiast go przycinać.
+- `Shift+Left` i `Shift+Right` przesuwają zaznaczone klipy o jeden krok przyciągania, `Shift+Up` i `Shift+Down` o jedną ścieżkę. `Alt+Left` i `Alt+Right` przesuwają je o jeden piksel ekranu przy bieżącym zoomie, bez przyciągania. Gdy nie zaznaczono żadnego klipu, przesuwają się wszystkie klipy.
+- `Uczyń unikalnym jako sampel` w menu klipu audio daje klipowi nowy plik z tym, co klip grał, z jego wysokością, rozciągnięciem i odwróceniem już zapisanymi w audio.
+- Klip audio z markerami warp pokazuje je jako małe flagi na górnej krawędzi. Przeciągnij flagę w bok, żeby przesunąć marker.
+
+## Menu Edit i Select
+
+Menu Playlisty ma podmenu `Edycja` i `Zaznacz`. `Edycja` zawiera polecenia klipów: wytnij, kopiuj i wklej, `Przesuń w lewo`, `Przesuń w prawo`, `Przesuń w górę`, `Przesuń w dół`, `Uczyń unikalnym`, `Uczyń unikalnym jako sampel`, `Wstaw odstęp`, `Usuń odstęp`, polecenia scalania i opcje fade. `Zaznacz` ma `Zaznacz według wybranego źródła` (`Shift+C`), `Odwróć zaznaczenie` (`Shift+I`), `Odznacz` (`Ctrl+D`), klipy wyciszone i nakładające się oraz `Magiczne lasso`. Przy włączonym `Magiczne lasso` poruszaj myszą w pętli wokół klipów, bez wciskania przycisku, żeby je zaznaczyć.
 
 ## Ścieżki
 
 W nagłówku ścieżki klik zaznacza, `Ctrl`+klik dodaje lub usuwa, `Shift`+klik zaznacza zakres, a prawy klik otwiera menu ścieżki. `Shift`+kółko przesuwa ścieżkę w górę lub w dół. Lampka ścieżki wycisza ją (klik) lub włącza solo (`Ctrl`+klik lub prawy klik). Przeciągnij linię między dwiema ścieżkami, aby zmienić rozmiar jednej, albo `Shift`+przeciąganie, aby zmienić rozmiar wszystkich.
+
+`Widok` w menu Playlisty wybiera, co pokazują nagłówki ścieżek: `Pokazuj kontrolki na ścieżkach audio`, `Pokazuj poziomy na ścieżkach audio` i `Pokazuj poziomy na ścieżkach instrumentów`.
+
+## Bloki patternów
+
+Gdy w menu Playlisty włączone jest `Bloki patternów (bieżący projekt)`, sekcja pod ścieżkami ma jeden wiersz na pattern. Tam Ołówek stawia jeden blok i przeciąga go wzdłuż wiersza, Pędzel maluje bloki, a Gumka je usuwa. Prawy przycisk myszy kasuje dowolnym narzędziem.
 
 ## Linijka, pętla i znaczniki
 
@@ -78,6 +91,9 @@ Pole aranżacji na pasku narzędzi przełącza między aranżacjami. Projekt mo�
 | Usuń z zamknięciem luk | `Shift+Del` | Usuwa zaznaczone klipy i zamyka luki |
 | Edycja ripple | `Shift+S` | Włącza lub wyłącza edycję ripple |
 | Wycisz, przywróć | `Alt+M` / `Shift+Alt+M` | Wycisza lub przywraca zaznaczone klipy |
+| Przesuń klipy | `Shift+Left` / `Shift+Right` | Przesuwa zaznaczone klipy o jeden krok przyciągania |
+| Przesuń na inną ścieżkę | `Shift+Up` / `Shift+Down` | Przesuwa zaznaczone klipy o jedną ścieżkę |
+| Przesuń klipy delikatnie | `Alt+Left` / `Alt+Right` | Przesuwa zaznaczone klipy o jeden piksel ekranu, bez przyciągania |
 | Uczyń unikalnym | `Ctrl+Shift+V` | Czyni zaznaczone klipy unikalnymi |
 | Scal | `Ctrl+G` | Scala klipy patternów |
 | Stretch | `Shift+M` | Przełącza Stretch przy zmianie rozmiaru klipów audio |

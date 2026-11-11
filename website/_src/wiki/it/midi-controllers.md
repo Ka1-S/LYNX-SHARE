@@ -1,5 +1,5 @@
 ---
-source: 3b54a39c97
+source: a06504f3a0
 ---
 ![La pagina MIDI delle impostazioni: dispositivi di ingresso, dispositivi di uscita con sincronia master e sincronia esterna](/assets/img/wiki/settings-midi.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE riceve note e movimenti dei controller da qualsiasi dispositivo di in
 | Impostazione | Cosa fa |
 |---|---|
 | Casella da spuntare | Attiva o disattiva il dispositivo |
-| `Qualsiasi canale MIDI` | Ascolta ogni canale MIDI, oppure un solo canale |
+| `Qualsiasi canale MIDI` | Ascolta ogni canale MIDI, oppure un solo canale. `Controller MPE` è alla fine di questa lista |
 | `Suona i canali selezionati` | Le note vanno ai canali selezionati nel Channel Rack, oppure sempre a un canale fisso |
 | `Velocity` | `Come suonato`, `Morbida (un tocco leggero suona più forte)`, `Dura (richiede un tocco più forte)` o `Fissa (ogni nota alla velocity massima)` |
 | `Canale della modalità performance` | Le note su questo canale MIDI lanciano le clip della Playlist mentre la modalità performance è attiva |
 | `Salto a marker del brano` | Le note su questo canale MIDI spostano il brano a un marker invece di suonare |
+| `Tipo di controller` | `Rileva automaticamente`, `Controller generico` o un profilo di controller |
+| `Il pedale controlla il rilascio delle note` | Attivo per impostazione predefinita. Un pedale di sustain (CC 64) o di sostenuto (CC 66) trattiene le note. Disattivato, il pedale arriva ai plugin come controller |
 
 ## Collegare una manopola a un controllo
 
@@ -39,9 +41,44 @@ Il collegamento viene salvato con il progetto. Per rimuoverlo, clicca di nuovo c
 | `Multilink ai controller` | `Ctrl+J` | Finché è attivo, i controlli che muovi vengono collegati, in ordine, ai controlli hardware che muovi subito dopo. Si trova nel menu `Opzioni` |
 | `Pickup (modalità takeover)` | nessuno | Nella pagina MIDI. Un controller muove un parametro solo dopo aver raggiunto il suo valore attuale, così niente salta |
 
-La pagina MIDI elenca i collegamenti sotto `Collegamenti (progetto, globali)`. `Tipo di controller` nella stessa pagina riporta `Controller generico`.
+La pagina MIDI elenca i collegamenti sotto `Collegamenti (progetto, globali)`. Un dispositivo il cui `Tipo di controller` è `Controller generico` fa solo ciò che colleghi a mano.
 
 I parametri di un plugin di terze parti si raggiungono con `Automatizza parametro del plugin` nel menu del canale o nel menu dello slot effetto. Ogni parametro lì ha le stesse voci di collegamento. Vedi [Automazione](/wiki/automation/).
+
+## Profili di controller
+
+Un profilo di controller configura i pulsanti del trasporto, i fader, le manopole, i pad, le luci e il display di un dispositivo, senza nulla da collegare.
+
+1. Apri `Opzioni › Impostazioni MIDI...` (`F10`) e spunta il dispositivo sotto `Dispositivi di ingresso`.
+2. Lascia il suo `Tipo di controller` su `Rileva automaticamente`. Il nome tra parentesi è il profilo trovato dal nome della porta del dispositivo.
+3. Se mostra `Controller generico`, scegli tu il profilo dalla lista.
+4. Leggi la riga accanto al riquadro. `Feedback to` indica la porta di uscita che riceve le luci, i fader motorizzati e il testo del display.
+
+| Profilo | Cosa mappa |
+|---|---|
+| `Mackie Control Universal` | Fader ai volumi degli insert e al Master. V-Pot al pan, ai parametri del plugin del canale selezionato o ai volumi del Channel rack. Arm, solo, mute e select per ogni strip, banchi di fader, play, stop, record, rewind, forward, modalità Pattern o Song, metronomo, undo e la jog wheel. Il display mostra nomi e valori |
+| `Mackie Control Extender (XT)` | Lo stesso per altre 8 strip. Le unità condividono un solo banco, nell'ordine della lista `Dispositivi di ingresso` |
+| `Novation Launchkey MK3 (DAW mode)` | Pot a pan, volume o parametri dei plugin, fader al volume, i pulsanti dei fader selezionano un insert. Pulsanti di banco, play, stop, record, loop, metronomo e undo. I pad Session sono i 16 step del canale selezionato. Usalo sulla seconda porta della tastiera |
+| `Akai APC Key 25 mk2` | Manopole a volume, pan o parametri dei plugin. Le due file di pad in alto sono i 16 step del canale selezionato e le tre sotto suonano note. I pulsanti delle tracce selezionano un insert. Stop, play e record. Usalo sulla seconda porta |
+| `Arturia KeyLab Essential mk3 (Mackie Control port)` | La mappa Mackie Control, sulla porta MCU/HUI della tastiera |
+| `Korg nanoKONTROL2 (Mackie Control mode)` | La mappa Mackie Control. Non viene rilevato: avvia l'unità in una modalità Mackie Control e scegli questo tipo a mano |
+
+Le manopole e i fader che inviano una posizione usano il soft takeover: muovono un controllo solo dopo aver raggiunto il suo valore. I controlli che hai collegato a mano mantengono i loro collegamenti. `Cartella dei profili controller` apre la cartella per i tuoi profili (`*.lynxctl`), e `Aggiorna dispositivi` li rilegge.
+
+I profili integrati sono stati scritti dalla documentazione di ciascun produttore. Non sono ancora stati provati sull'hardware.
+
+## Controller MPE
+
+L'MPE è a un primo stadio. Un controller MPE suona ogni nota con il proprio pitch bend, timbro (CC 74) e pressione.
+
+1. Nella pagina MIDI, apri il riquadro del dispositivo che riporta `Qualsiasi canale MIDI` e scegli `Controller MPE`.
+2. Nel riquadro che compare accanto, scegli i canali membro, da `Canale 2` a `Channels 2-16`.
+3. Suona. Per registrare, vedi [Registrazione](/wiki/recording/).
+
+- Una nota registrata conserva un solo valore di ciascuno: il suo bend come intonazione fine, il suo timbro come Mod X e la sua pressione più forte come Mod Y. Non è una curva.
+- Tra gli strumenti integrati, il Sampler e il synth integrato seguono questi valori.
+- Un plugin di terze parti riceve l'MPE quando `MPE` è attivo sotto `MIDI` in `Impostazioni del wrapper` della finestra del plugin. Ogni nota esce allora sul proprio canale MIDI, da 2 a 16.
+- Non è ancora stato provato con un vero controller MPE.
 
 ## La tastiera del PC
 
@@ -77,6 +114,8 @@ I parametri di un plugin di terze parti si raggiungono con `Automatizza parametr
 - Un tempo mosso da un controller MIDI collegato non ridimensiona le clip audio. Digita o imposta invece il tempo finale.
 - Per registrare ciò che suoni, vedi [Registrazione](/wiki/recording/). Le note in ingresso possono essere agganciate a una scala nel [Piano Roll](/wiki/piano-roll/).
 - MIDI CC, aftertouch di canale e pitch bend inviati a un plugin si possono automatizzare con `Automatizza controller MIDI (CC, aftertouch, pitch bend)`.
+- Una nota trattenuta da un pedale viene registrata fino al momento in cui il pedale si alza.
+- Una clip di automazione non riprende un controllo mentre lo muovi da un controller. Il controllo segue di nuovo la sua automazione alla successiva partenza della riproduzione.
 
 ## Correlati
 

@@ -1,11 +1,11 @@
 ---
 title: Shortcuts
-summary: The default keyboard shortcuts of LYNX SHARE 0.1.25, by window.
+summary: The default keyboard shortcuts of LYNX SHARE 0.1.26, by window.
 status: full
 ---
 ![The Manage shortcuts window: a searchable list of actions with the keys of each](/assets/img/wiki/shortcuts.webp)
 
-These are the default keys in 0.1.25 alpha. `Help › Shortcuts` (`F1`) shows the shortcut sheet inside the app. `Options › Manage shortcuts...` opens the editor in the picture, where you change them.
+These are the default keys in 0.1.26 alpha. `Help › Shortcuts` (`F1`) shows the shortcut sheet inside the app. `Options › Manage shortcuts...` opens the editor in the picture, where you change them.
 
 > On macOS the app shows the keys with Mac names: Ctrl is shown as ⌘ and Alt as ⌥.
 
@@ -78,6 +78,19 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 | `Alt+F7` | Touch keyboard |
 | `Ctrl+F5` | Tempo tapper |
 | `F1` | Shortcut sheet |
+
+## Clip View and Device View
+
+These keys work in the Clip-launch workflow only.
+
+| Key | What it does |
+|---|---|
+| `Ctrl+Alt+L` | Show or hide the detail view |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Switch between Clip View and Device View |
+| `Left` / `Right` | Device View: select the previous, next device |
+| `Del` or `Backspace` | Device View: delete the selected effect |
 
 ## Patterns
 
@@ -173,6 +186,7 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Alt+L` | Articulate |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Generate chord progression |
+| `Ctrl+Alt+Y` | Run the last script again |
 
 ## Playlist
 
@@ -184,6 +198,12 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Ctrl+B` | Duplicate |
 | `Del` | Delete the selected clips |
 | `Shift+Del` | Delete the selected clips and close the gaps |
+| `Shift+Left` / `Shift+Right` | Move the selected clips one snap step left, right |
+| `Shift+Up` / `Shift+Down` | Move the selected clips one track up, down |
+| `Alt+Left` / `Alt+Right` | Nudge the selected clips left, right by a fine step, without snap. `Shift+Alt` does the same |
+| `Ctrl+D` | Deselect clips and time |
+| `Shift+I` | Invert the selection |
+| `Shift+C` | Select the clips of the selected source |
 | `Shift+S` | Ripple editing on or off |
 | `Backspace` | Snap off or on |
 | `Alt+M` / `Shift+Alt+M` | Mute, unmute the selected clips |
@@ -197,6 +217,8 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `7` / `8` | Pitch the selected audio clips one semitone down, up |
 | `9` | Reverse the selected audio clips |
 | `Ctrl+Ins` / `Ctrl+Del` | Insert, remove the time selection's length on all tracks |
+| `Ctrl+Alt+Ins` | Slice the clips and insert space |
+| `Ctrl+Alt+Home` | Resizing clips from the left, on or off |
 | `Ctrl+Left` / `Ctrl+Right` | Select the previous, next time |
 | `Ctrl+Enter` | Select time around the selection |
 | `Alt+T` | Add a time marker |
@@ -222,7 +244,7 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Ctrl+L` | Link the selected channels to the selected insert |
 | `Ctrl+Shift+L` | Link the selected channels to inserts starting from the selected one |
 | `Alt+L` | Select the channels linked to the selected insert |
-| `Del` | Delete the plugin in the selected effect slot |
+| `Del` | Delete the selected inserts. LYNX SHARE asks first |
 | `Ctrl+E` | Open the audio editor |
 | `Shift+E` | Open the audio editor and record |
 | `Alt+R` | Render the armed inserts to wave files |
@@ -244,6 +266,8 @@ Each key opens the dialog of one note tool in the Piano roll.
 - While the typing keyboard piano is on, its keys play notes and most single-letter shortcuts are paused (`L` still works). Turn it off with `Ctrl+T`.
 - A shortcut works either everywhere or in one window. One that belongs to a window wins over the same keys that work everywhere, while that window has focus.
 - Some actions have no default key, for example the Quick-add palette. Give them one in the editor.
+- In the Playlist, the keys that move clips move every clip when none is selected. The fine step of `Alt+Left` and `Alt+Right` is one pixel at the current zoom.
+- LYNX SHARE's shortcuts also work while a plugin window has focus, for example `Space`. Plain letters and digits go to the plugin first, and `Esc` closes its window.
 
 ## Related
 

@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![La fenêtre d'enregistrement demande quoi enregistrer : audio, notes et automation, tout, ou audio dans l'éditeur audio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Les notes viennent d'un clavier MIDI, du clavier de saisie (`Ctrl+T`) ou du clav
 - `Quantifier les notes enregistrées sur le magnétisme global` se trouve dans les options d'enregistrement.
 - `Saisie pas à pas` (`Ctrl+E`) fonctionne à l'arrêt : chaque note jouée entre dans le pattern, un pas de magnétisme après l'autre.
 - `Capturer le MIDI` (`Ctrl+Shift+Alt+R`) place dans le pattern les notes que vous venez de jouer, même si l'enregistrement était désactivé.
+- La pédale de sustain (CC 64) et la pédale de sostenuto (CC 66) retiennent les notes que vous jouez, et une note enregistrée dure jusqu'au relâchement de la pédale. Un canal Layer transmet la pédale à ses canaux. Avec `La pédale contrôle la fin des notes` désactivé dans `Options › Réglages MIDI...`, la pédale va aux plugins comme un contrôleur.
+- En mode Song, les notes enregistrées dans un clip de pattern plus long que son pattern restent là où vous les avez jouées, et le pattern s'allonge. La prise n'est pas repliée sur les premières mesures du pattern. Avec `Les clips de pattern étirés bouclent leur pattern (LYNX)` activé, seules les notes jouées sur des mesures qui avaient déjà des notes vont dans la boucle.
 
 Les commandes que vous bougez pendant l'enregistrement sont écrites en clips d'automation en mode Song et en événements de pattern en mode Pattern. Voir [Automation](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Les options se trouvent dans `Options › Enregistrement` et dans le menu du cli
 | `L'enregistrement lance la lecture` | aucune | Activer l'enregistrement appuie aussi sur lecture |
 | `Désarmer les inserts à l'arrêt de l'enregistrement` | aucune | Les inserts armés sont libérés après chaque prise |
 
+`Faible latence à l'enregistrement` se trouve dans le menu du clic droit du bouton d'enregistrement et dans le menu d'insert du Mixer sous `Enregistrement sur disque`. Il est désactivé par défaut. Tant qu'un insert avec une entrée est armé, ou que son monitoring est sur `Actif`, les effets qui ajoutent de la latence sur son chemin vers le Master sont contournés. Cela ne change que ce que vous entendez : un insert garde tous ses effets quand la prise est captée après eux, par exemple avec `Après les effets`. Les effets reviennent quand l'insert est désarmé.
+
+`Outils › Annuler l'enregistrement` jette ce que la passe d'enregistrement en cours a écrit (ses notes, son automation et ses prises audio) et désactive l'enregistrement. La lecture continue et les inserts armés restent armés.
+
 ## Enregistrement en boucle et prises
 
 Avec `Enregistrement en boucle` actif, l'enregistrement boucle sur la région de boucle en mode Song, ou sur le pattern en mode Pattern. Désactivé, l'enregistrement continue tout droit.
@@ -76,7 +82,7 @@ Chaque passage d'un enregistrement audio en boucle tombe sur la piste de Playlis
 
 - Un projet enregistré garde ses prises dans `Audio/Recorded`, à côté du fichier de projet.
 - Un projet non enregistré enregistre dans `LYNX/Recordings` de votre dossier Musique.
-- Les prises sont des fichiers WAV à la fréquence d'échantillonnage du périphérique audio, en 24 bits ou 32 bits flottant. Le format et les noms des prises se règlent sous `Enregistrement` dans `Options › Réglages audio...`.
+- Les prises sont des fichiers WAV à la fréquence d'échantillonnage du périphérique audio, en 16 bits, 24 bits ou 32 bits flottant. Le format (`Format de fichier`) et les noms des prises se règlent sous `Enregistrement` dans `Options › Réglages audio...`.
 - `Ouvrir le dossier des enregistrements` se trouve dans le menu du clic droit du bouton d'enregistrement. `Fichier › Supprimer les enregistrements inutilisés et enregistrer...` supprime les prises que le projet n'utilise plus.
 
 ## Bon à savoir

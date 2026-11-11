@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![Kayıt penceresi ne kaydedileceğini soruyor: ses, notalar ve otomasyon, her şey ya da ses editörüne ses](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Notalar bir MIDI klavyeden, bilgisayar klavyesinden (`Ctrl+T`) ya da dokunmatik 
 - `Kaydedilen notaları genel snap'e kuantize et` kayıt seçeneklerindedir.
 - `Adım adım giriş` (`Ctrl+E`) durmuşken çalışır: çaldığınız her nota snap adımı kadar arayla, birbiri ardına pattern'e girer.
 - `MIDI yakala` (`Ctrl+Shift+Alt+R`), kayıt kapalı olsa bile az önce çaldığınız notaları pattern'e koyar.
+- Sustain pedalı (CC 64) ve sostenuto pedalı (CC 66) çaldığınız notaları tutar ve kaydedilen nota pedal kalkana kadar sürer. Bir Layer kanalı pedalı kanallarına iletir. `Seçenekler › MIDI ayarları...` içinde `Ayak pedalı nota bırakmayı yönetir` kapalıyken pedal bunun yerine plugin'lere bir kontrolcü olarak gider.
+- Song modunda, pattern'inden uzun bir pattern klibine kaydedilen notalar çaldığınız yerde kalır ve pattern büyür. Kayıt, pattern'in ilk ölçülerinin üzerine geri katlanmaz. `Uzatılmış pattern klipleri pattern'lerini döngüye alır (LYNX)` açıkken yalnızca zaten nota olan ölçülerin üzerinde çalınan notalar döngüye girer.
 
 Kayıt sırasında oynattığınız kontroller Song modunda otomasyon klipleri, Pattern modunda pattern olayları olarak yazılır. Bkz. [Otomasyon](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Seçenekler `Seçenekler › Kayıt` içinde ve kayıt düğmesinin sağ tık me
 | `Kayıt çalmayı başlatır` | yok | Kaydı açmak çal'a da basar |
 | `Kayıt durunca insert'lerin kayıt hazırlığını kaldır` | yok | Her kayıttan sonra kayda hazır insert'ler serbest bırakılır |
 
+`Kayıt sırasında düşük gecikme`, kayıt düğmesinin sağ tık menüsünde ve Mixer'ın insert menüsünde `Diske kayıt` altındadır. Varsayılan olarak kapalıdır. Girişi olan bir insert kayda hazırken veya izlemesi `Açık` iken, Master'a giden yolda gecikme ekleyen efektler devre dışı bırakılır. Bu yalnızca duyduğunuzu değiştirir: kayıt efektlerden sonra alınıyorsa, örneğin `Efektlerden sonra` ile, insert tüm efektlerini korur. İnsert'in kayda hazırlığı kaldırılınca efektler geri gelir.
+
+`Araçlar › Kaydı iptal et`, geçerli kayıt geçişinin yazdıklarını (notalarını, otomasyonunu ve ses kayıtlarını) atar ve kaydı kapatır. Çalma sürer ve kayda hazır insert'ler hazır kalır.
+
 ## Döngülü kayıt ve kayıtlar
 
 `Döngülü kayıt` açıkken kayıt, Song modunda döngü bölgesinde, Pattern modunda pattern üzerinde döner. Kapalıyken kayıt düz devam eder.
@@ -76,7 +82,7 @@ Bir ses döngüsü kaydının her geçişi sıradaki boş Playlist izine düşer
 
 - Kaydedilmiş bir proje, kayıtlarını proje dosyasının yanındaki `Audio/Recorded` içinde tutar.
 - Kaydedilmemiş bir proje, Music klasörünüzdeki `LYNX/Recordings` içine kaydeder.
-- Kayıtlar, ses aygıtının örnekleme hızında, 24 bit veya 32 bit float WAV dosyalarıdır. Format ve kayıt adları `Seçenekler › Ses ayarları...` içindeki `Kayıt` altında ayarlanır.
+- Kayıtlar, ses aygıtının örnekleme hızında, 16 bit, 24 bit veya 32 bit float WAV dosyalarıdır. Format (`Dosya formatı`) ve kayıt adları `Seçenekler › Ses ayarları...` içindeki `Kayıt` altında ayarlanır.
 - `Kayıtlar klasörünü aç` kayıt düğmesinin sağ tık menüsündedir. `Dosya › Kullanılmayan kayıtları sil ve kaydet...` projenin artık kullanmadığı kayıtları siler.
 
 ## Bilmekte fayda var

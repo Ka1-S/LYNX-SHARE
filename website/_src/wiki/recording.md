@@ -50,6 +50,8 @@ Notes come from a MIDI keyboard, the typing keyboard (`Ctrl+T`) or the touch key
 - `Quantize recorded notes to the global snap` is in the recording options.
 - `Step edit` (`Ctrl+E`) works while stopped: each note you play goes into the pattern one snap step after the other.
 - `Capture MIDI` (`Ctrl+Shift+Alt+R`) puts the notes you just played into the pattern, even though recording was off.
+- The sustain pedal (CC 64) and the sostenuto pedal (CC 66) hold the notes you play, and a recorded note lasts until the pedal comes up. A Layer channel passes the pedal on to its channels. With `Foot pedal controls note off` off in `Options › MIDI settings...`, the pedal goes to the plugins as a controller instead.
+- In Song mode, notes recorded into a pattern clip that is longer than its pattern stay where you played them, and the pattern grows. The take is not folded back over the pattern's first bars. With `Stretched pattern clips loop their pattern (LYNX)` on, only notes played over bars that already had notes go into the loop.
 
 Controls you move while recording are written as automation clips in Song mode and as pattern events in Pattern mode. See [Automation](/wiki/automation/).
 
@@ -68,6 +70,10 @@ The options are in `Options › Recording` and in the record button's right-clic
 | `Recording starts playback` | none | Turning recording on also presses play |
 | `Disarm the inserts when recording stops` | none | Armed inserts are released after each take |
 
+`Low latency while recording` is in the record button's right-click menu and in the Mixer's insert menu under `Disk recording`. It is off by default. While an insert with an input is armed, or its monitoring is `On`, the effects that add latency on its way to the Master are bypassed. This changes only what you hear: an insert keeps all its effects when the take is tapped after them, for example with `Post effects`. The effects come back when the insert is disarmed.
+
+`Tools › Cancel recording` throws away what the current recording pass wrote (its notes, automation and audio takes) and turns recording off. Playback goes on and the armed inserts stay armed.
+
 ## Loop recording and takes
 
 With `Loop record` on, recording loops over the loop region in Song mode, or over the pattern in Pattern mode. With it off, recording plays straight on.
@@ -78,7 +84,7 @@ Each pass of an audio loop recording lands on the next free Playlist track, and 
 
 - A saved project keeps its takes in `Audio/Recorded`, next to the project file.
 - An unsaved project records into `LYNX/Recordings` in your Music folder.
-- Takes are WAV files at the audio device's sample rate, 24-bit or 32-bit float. The format and the take names are set under `Recording` in `Options › Audio settings...`.
+- Takes are WAV files at the audio device's sample rate, 16-bit, 24-bit or 32-bit float. The format (`File format`) and the take names are set under `Recording` in `Options › Audio settings...`.
 - `Open recordings folder` is in the record button's right-click menu. `File › Delete unused recordings and save...` removes takes the project no longer uses.
 
 ## Good to know

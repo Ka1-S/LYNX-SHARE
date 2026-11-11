@@ -1,5 +1,5 @@
 ---
-source: 45c1275215
+source: be0fc22373
 ---
 ![Dolna część Menedżera pluginów z uwagą, że każdy plik pluginu jest badany w osobnym procesie](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -46,6 +46,12 @@ Skanowane są foldery standardowe oraz te, które dodasz:
 - macOS: `VST3`, `Components` i `CLAP` w `~/Library/Audio/Plug-Ins` i `/Library/Audio/Plug-Ins`.
 - Linux: `~/.vst3`, `~/.clap`, `~/.lv2`, `~/.vst` oraz te same foldery w `/usr/lib` i `/usr/local/lib`.
 
+## Pluginy zadokowane i odłączone
+
+Edytor pluginu otwiera się w głównym oknie, tak jak inne panele. `Odłączony` w menu okna pluginu daje temu pluginowi własne okno, a `Przypnij na wierzchu` w tym samym menu trzyma odłączone okno nad innymi oknami LYNX SHARE.
+
+`Odłączaj wszystkie nowe wtyczki` w `Opcje › Ustawienia ogólne...` otwiera każdy dodany plugin jako odłączony. `Narzędzia › Przełącz wszystkie edytory pluginów na` ustawia `Zadokowany` lub `Odłączony` dla wszystkich pluginów projektu.
+
 ## Uruchamianie pluginów w osobnym procesie
 
 Domyślnie plugin działa wewnątrz LYNX SHARE, więc plugin, który się wywali, może zabrać ze sobą program. Opcjonalnie każdy plugin działa we własnym procesie.
@@ -54,15 +60,17 @@ Domyślnie plugin działa wewnątrz LYNX SHARE, więc plugin, który się wywali
 2. Włącz `Uruchamiaj pluginy w osobnym procesie (chroni LYNX SHARE przed awariami)`.
 3. Otwórz projekt ponownie, aby zastosować to do pluginów, które są już otwarte.
 
-Jeśli taki plugin się wywali albo przestanie odpowiadać, zostaje wyciszony, pojawia się komunikat, a LYNX SHARE działa dalej. Zapisz projekt i otwórz go ponownie, aby wczytać plugin jeszcze raz. Edytor pluginu otwiera się w osobnym oknie.
+Jeśli taki plugin się wywali albo przestanie odpowiadać, zostaje wyciszony, pojawia się komunikat, a LYNX SHARE działa dalej. `Odśwież` w tym komunikacie uruchamia plugin ponownie z ustawieniami z ostatniego zapisu lub kopii zapasowej, bez ponownego otwierania projektu. Edytor pluginu otwiera się w osobnym oknie i nie można go zadokować ani przypiąć.
 
 Aby zrobić to tylko dla jednego pluginu, użyj `Uruchamiaj w osobnym procesie` albo `Always run <plugin> in a separate process` w menu wrappera w oknie pluginu. Gdy edytor pluginu się wywali, komunikat, który się pojawi, oferuje także to drugie.
 
 Działa to w Windows i Linuksie, a od wersji 0.1.25 także w macOS.
 
+Plugin, który się wywali wewnątrz LYNX SHARE, zostaje wyłączony, a jego komunikat też ma `Odśwież`. Później użyj `Odśwież plugin po awarii` w menu kanału lub w menu slotu efektu.
+
 ## Pluginy 32-bitowe (tylko Windows)
 
-W Windows 32-bitowe pluginy VST2 i VST3 działają przez most (`LYNX-bridge32.exe`). Most nie dodaje latencji. Plugin, który się w nim wywali, zatrzymuje się sam, a LYNX SHARE gra dalej. Edytor pluginu przez most otwiera się w osobnym oknie. Gdy zainstalowane są i 32-bitowa, i 64-bitowa wersja pluginu, `Rozmiar bitowy` w `Ustawienia wrappera` w oknie pluginu wybiera, która się wczyta.
+W Windows 32-bitowe pluginy VST2 i VST3 działają przez most (`LYNX-bridge32.exe`). Most nie dodaje latencji. Plugin, który się w nim wywali, zatrzymuje się sam, a LYNX SHARE gra dalej. Edytor pluginu przez most otwiera się w osobnym oknie i nie można go zadokować ani przypiąć. Gdy zainstalowane są i 32-bitowa, i 64-bitowa wersja pluginu, `Rozmiar bitowy` w `Ustawienia wrappera` w oknie pluginu wybiera, która się wczyta.
 
 ## Monitor wydajności pluginów
 
@@ -78,16 +86,35 @@ W Windows 32-bitowe pluginy VST2 i VST3 działają przez most (`LYNX-bridge32.ex
 | `Reset przy odtwarzaniu` | Zaczyna średnie i szczyty od nowa przy każdym starcie odtwarzania |
 | `Resetuj` | Czyści średnie i szczyty od razu |
 
+## Wyślij wyjścia instrumentu na osobne inserty
+
+Plugin instrumentu z kilkoma wyjściami może grać każde z nich na własnym insercie Mixera. W oknie pluginu kliknij `Ustawienia wrappera`, a potem kartę `Przetwarzanie`. W `Połączenia` każde wyjście ma lampkę, która je włącza lub wyłącza, oraz numer: na którym insercie po własnym insercie kanału gra. `Automatycznie przypisz wyjścia` daje każdemu wyjściu następny insert, a `Resetuj` wraca do ustawień domyślnych.
+
+## Folder Plugin database
+
+Foldery Plugin database w [Browserze](/wiki/browser/), wybór pluginu i menu pluginów to folder na dysku: `LYNX/Plugin database` w folderze Dokumenty. Aby go otworzyć, kliknij prawym przyciskiem `Baza pluginów` w Browserze i wybierz `Otwórz`.
+
+- `Efekty` i `Generatory` zawierają po jednym pliku `.lynxplugin` na plugin. Twórz foldery i podfoldery (do 4 poziomów) i przenoś do nich pliki.
+- Zmień nazwę pliku, żeby zmienić nazwę pluginu w menu. Usuń plik, żeby wyjąć plugin z menu. Plugin nie zostaje odinstalowany.
+- `Zainstalowane` ma wpis dla każdego pluginu. Skopiuj wpis do `Efekty` lub `Generatory`, żeby przywrócić plugin.
+
+## Otwórz projekt bez jego pluginów
+
+`Plik › Otwórz bez pluginów innych firm...` otwiera projekt LYNX SHARE z wyłączonymi wszystkimi pluginami innych producentów, dla projektu, który się nie otwiera albo wywala podczas wczytywania. Zapisane ustawienia pluginów zostają. `Plik › Włącz ponownie pluginy...` włącza je ponownie.
+
 ## Gdy plugin nie jest zainstalowany
 
 LYNX SHARE najpierw szuka tego samego pluginu po identyfikatorze, potem po pliku, a na końcu po nazwie. Projekt zapisany z VST2 otwiera się z VST3 tego samego produktu i odwrotnie, ale wtedy plugin gra z ustawieniami domyślnymi.
 
-Jeśli efekt w ogóle nie jest zainstalowany, jego slot zajmuje efekt LYNX SHARE o tej samej roli, a oryginał zostaje w projekcie. Zobacz [Wbudowane instrumenty i efekty](/wiki/built-in/). `Pomoc › Brakujące pliki...` wymienia pluginy, które zastąpiono.
+Jeśli efekt w ogóle nie jest zainstalowany, jego slot zajmuje efekt LYNX SHARE o tej samej roli, a oryginał zostaje w projekcie. Tam, gdzie da się odczytać zapisane ustawienia pluginu, zastępnik startuje z pasującymi ustawieniami. Przełącznik to `Zastępuj brakujące pluginy odpowiednikami LYNX SHARE` w `Opcje › Ustawienia ogólne...`. Zobacz [Wbudowane instrumenty i efekty](/wiki/built-in/). `Pomoc › Brakujące pliki...` wymienia pluginy, które zastąpiono.
 
 ## Warto wiedzieć
 
 - Okno hostowanego pluginu ma pasek presetów: własne programy pluginu, Twoje presety, `Zapisz preset...`, `Wczytaj plik presetu...` i `Eksportuj plik presetu...`. Pliki `.fxp`, `.fxb` i `.vstpreset` wczytują się tylko do pluginu, który działa wewnątrz LYNX SHARE, a nie w osobnym procesie.
 - Monitor mierzy tylko wtedy, gdy jego okno jest otwarte.
+- Gdy okno pluginu ma fokus, klawisz, którego plugin nie używa, gra na klawiaturze pianina. W Windows, przy wyłączonym przycisku klawiatury w nagłówku okna, LYNX SHARE obsługuje klawisze przed pluginem, razem ze skrótami.
+- Własne menu parametru pluginu VST3 zaczyna się od pozycji LYNX SHARE, takich jak `Utwórz klip automatyki`. Zobacz [Automatyka](/wiki/automation/).
+- `MPE` w sekcji `MIDI` w `Ustawienia wrappera` pluginu wysyła każdą nutę na jej własnym kanale MIDI. Zobacz [Kontrolery MIDI](/wiki/midi-controllers/).
 - Brakujące instrumenty nie są jeszcze zastępowane. Brakujący plugin instrumentu staje się wbudowanym syntezatorem dobranym według nazwy kanału.
 
 ## Powiązane

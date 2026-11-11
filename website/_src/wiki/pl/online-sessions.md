@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Z innymi osobami można pracować nad projektem na dwa sposoby, oba w `Plik › Sesja online`. Paczka to plik, który wysyłasz znajomemu, a on odsyła partię z powrotem. Nie potrzebuje sieci, konta ani serwera. Sesja na żywo łączy wszystkich przez internet przez przekaźnik LYNX SHARE, a każda zmiana trafia do wszystkich. W jednym projekcie bierze udział do 4 osób, razem z tobą.
 
@@ -64,6 +64,7 @@ Menu `Plik › Sesja online` ma te polecenia, gdy sesja trwa:
 | `Czat sesji...` | Otwiera czat. Pozycja menu pokazuje liczbę nieprzeczytanych wiadomości |
 | `Podążaj za transportem osoby prowadzącej` | Dla gości: odtwarzanie, stop i pozycja podążają za gospodarzem |
 | `Osoby i uprawnienia...` | Dla gospodarza: co każda osoba może zmieniać i co każda zachowuje na końcu |
+| `Udostępnij pluginy gościom...` | Dla gospodarza: których z twoich pluginów mogą używać goście. Pozycja menu pokazuje, ile jest udostępnionych |
 | `Pokaż kod zaproszenia...` | Dla gospodarza: pokazuje kod jeszcze raz, z przyciskiem `Kopiuj` |
 | `Zakończ sesję na żywo` | Dla gospodarza. Wszyscy wychodzą, a kod przestaje działać |
 | `Opuść sesję na żywo` | Dla gościa. Twoja partia projektu zostaje u ciebie |
@@ -77,6 +78,27 @@ Kanał lub insert, którego pluginu nie ma na twoim komputerze, gra zastępstwo 
 - W paczce zastępstwa to rendery audio zrobione przy zapisie paczki. Podążają za klipami, które przesuwasz, ale nie za zmianami nut pluginu, którego nie masz. Poproś jego właściciela o nową paczkę.
 - W sesji na żywo partie używające pluginu, którego ktoś nie ma, są renderowane przez osobę, która go ma, i przesyłane pozostałym jako audio.
 
+## Udostępnij swoje pluginy gościom
+
+W sesji na żywo gospodarz może pozwolić gościom używać pluginów, które ma tylko on.
+
+Gospodarz robi tak:
+
+1. Wybierz `Plik › Sesja online › Udostępnij pluginy gościom...`.
+2. Zaznacz pluginy do udostępnienia. `Szukaj w swoich pluginach` zawęża listę. Nic nie jest udostępniane, dopóki tego nie zaznaczysz.
+
+Gość robi tak:
+
+1. Otwórz menu pluginów jednego ze swoich kanałów lub slotów efektów. Udostępnione pluginy są na początku, pod `On <host>'s computer`.
+2. Wybierz jeden. Jego okno wylicza parametry pluginu jako suwaki, z `Szukaj parametrów`.
+3. Dodawaj nuty i poruszaj suwakami. Okno pokazuje `Updating...`, gdy komputer gospodarza renderuje, a potem `Aktualne`.
+
+- Plugin zostaje na komputerze gospodarza i działa na licencji gospodarza. LYNX SHARE nigdy nie wysyła pluginu, jego plików, presetów ani licencji.
+- Gość słyszy render, który po chwili podąża za nutami i wartościami. Nie jest odtwarzany na żywo, a gość nie dostaje własnego okna pluginu.
+- Gdy gospodarza nie ma, gra ostatni render. Udostępnianie kończy się wraz z sesją, a ostatni render zostaje.
+- Gość z rolą `Tylko słuchanie (bez edycji)` nie może używać udostępnionych pluginów.
+- Niektóre licencje pluginów nie pozwalają, by obsługiwał je ktoś inny, nawet zdalnie. Sprawdź każdą licencję, zanim udostępnisz plugin.
+
 ## Co idzie przez sieć
 
 Paczki to pliki. Nic nie jest nigdzie wysyłane.
@@ -89,6 +111,8 @@ Sesja na żywo łączy się tylko wtedy, gdy w niej jesteś. Wszystko idzie prze
 - Obie strony powinny używać tej samej wersji LYNX SHARE. Podsumowanie paczki ostrzega, gdy się różnią.
 - Gość, któremu zerwie się połączenie, łączy się sam ponownie i zachowuje swoje zmiany.
 - Jeśli LYNX SHARE gospodarza zamknie się w trakcie sesji, przy następnym starcie program proponuje jej wznowienie, a goście łączą się sami ponownie.
+- Jeśli LYNX SHARE gościa zamknie się w trakcie sesji, przy następnym starcie program pyta, czy wrócić. `Wróć` przywraca cię jako tę samą osobę, z twoją partią i wszystkim, co zmieniłeś. Działa to przez 12 godzin.
+- Wersja na Linuksa może prowadzić sesję na żywo od 0.1.26.
 - W sesji na żywo cofanie i ponawianie przywracają tylko twoje własne zmiany.
 - Każdy, kto ma kod zaproszenia, może poprosić o dołączenie, ale dopiero gdy gospodarz go wpuści.
 

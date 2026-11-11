@@ -73,7 +73,7 @@ A report after the export lists what was left out.
 ## Good to know
 
 - Live's own devices are not recreated. Live's own effects are dropped on import.
-- Instrument, Audio Effect and MIDI Effect Racks come in with their chains, zones and macros.
+- Instrument and Audio Effect Racks come in with their chains, zones and macros. Live's MIDI Effect Racks are not converted yet and are listed in the import report.
 - The import report lists what was left out.
 - Live trims audio clips that overlap in an exported set.
 - Warp markers from a Live set are kept on import and written back on export.

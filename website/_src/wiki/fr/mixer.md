@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Quand le Mixer a le focus, `Ctrl+L` lie les canaux sélectionnés à l'insert s�
 - `Ctrl`+clic, ou glisser sur plusieurs bandes, sélectionne une plage. `Ctrl+Shift`+clic en ajoute ou en retire une.
 - Faites glisser une bande latéralement, ou appuyez sur `Alt+Left` et `Alt+Right`, pour déplacer les inserts sélectionnés.
 - Faites un clic droit sur une bande pour le menu de l'insert. `F2` renomme et colore l'insert sélectionné.
+- `Del`, ou `Delete` dans le menu de l'insert, supprime les inserts sélectionnés. LYNX SHARE demande d'abord confirmation. Cochez `Mémoriser mon choix` pour ne plus avoir la question.
 
 Déplacer, insérer ou supprimer des inserts garde les envois, les sidechains et l'automation sur leur insert.
+
+La section `Mixer` du menu de l'insert et `Options › Mixer` ont deux commandes de plus. `Ranger les inserts comme la Playlist` place en tête les inserts liés à des pistes de la Playlist, dans l'ordre de la Playlist. Avec `Garder les liens vers les inserts supprimés, grisés (LYNX)` activé, les sends qui allaient vers un insert supprimé restent, grisés, pour que vous puissiez les reconnecter.
 
 ## Muet et solo
 
 Cliquez sur le voyant Muet pour rendre un insert muet. Faites un clic droit ou `Ctrl`+clic dessus pour le solo. `S` met en solo les inserts sélectionnés, et `Alt+S` les met en solo avec les inserts qui les alimentent.
+
+Un insert muet garde son vumètre actif. Dans les nouveaux projets et dans les projets FL Studio importés, il continue aussi de faire tourner ses effets, et seules sa sortie vers le Master et ses sends sont coupés. Pour qu'un insert muet cesse de traiter le son, activez `Les inserts coupés ne traitent rien (LYNX, économise le CPU ; ce projet)` dans la section `Mixer` du menu de l'insert ou dans `Options › Mixer`. Son vumètre s'arrête alors et ses effets repartent de zéro quand vous le réactivez.
 
 ## Effets
 
@@ -42,7 +47,8 @@ Le panneau d'effets montre les dix emplacements de l'insert sélectionné.
 
 - Faites glisser un emplacement, ou utilisez la molette dessus, pour le monter ou le descendre.
 - Faites un clic droit sur un emplacement pour ses options (remplacer, déplacer, supprimer).
-- `Del` supprime le plugin de l'emplacement sélectionné.
+- Tant que le menu d'un emplacement est ouvert, `Del` supprime le plugin de cet emplacement.
+- `Grouper dans un rack d'effets audio` dans le menu de l'emplacement place l'effet dans un nouveau rack, et `Tout grouper dans un rack d'effets audio` le fait pour toute la chaîne. `Dégrouper` remet dans les emplacements les effets d'un rack à une seule chaîne.
 - L'interrupteur dans l'en-tête du panneau active ou désactive tous les effets de l'insert.
 - Vous pouvez faire glisser un effet depuis la Base de plugins du [Browser](/wiki/browser/) sur un insert ou un emplacement d'effet.
 
@@ -60,6 +66,7 @@ Sélectionnez l'insert que vous voulez router. Chaque autre bande a alors un int
 - `Ctrl`+clic route vers cet insert uniquement.
 - `Shift`+clic crée un envoi sidechain. `Ctrl+Shift`+clic le crée en sidechain seul.
 - Le clic droit ouvre les mêmes choix sous forme de menu.
+- Pour un send pré-fader, faites un clic droit sur le commutateur de routage ou sur le bouton de niveau du send et cochez `Send pré-fader (le fader de cette piste ne le modifie pas)`. Le send est alors marqué `PRE`.
 
 Les effets avec une entrée latérale, comme un compresseur, ont un sélecteur `Sidechain depuis` qui liste les inserts à écouter. En choisir un crée le routage pour vous.
 
@@ -83,12 +90,13 @@ Chaque insert a un bouton d'armement d'enregistrement. Avec un insert armé, Rec
 | Renommer et colorer | `F2` | Renomme et colore l'insert sélectionné |
 | Solo | `S` | Met en solo les inserts sélectionnés |
 | Solo avec les sources | `Alt+S` | Met en solo les inserts sélectionnés et les inserts qui les alimentent |
-| Supprimer un effet | `Del` | Supprime le plugin de l'emplacement sélectionné |
+| Supprimer des inserts | `Del` | Supprime les inserts sélectionnés, après confirmation |
 | Armer et enregistrer | `Shift+R` | Arme l'insert sélectionné et lance l'enregistrement |
 
 ## Bon à savoir
 
-- `Rendre en audio` (un insert converti en clip audio) joue environ 5 dB plus fort que l'insert qu'il remplace. C'est un problème connu des notes de version 0.1.25.
+- `Mesure de sonie à côté du Master (LYNX)`, dans `Options › Mixer`, affiche la sonie à court terme et intégrée (LUFS) et le true peak de la sortie du Master, avec un bouton `Réinitialiser`.
+- Un plugin instrument à plusieurs sorties peut jouer chaque sortie sur son propre insert. Voir [Plugins tiers](/wiki/plugins/).
 - `Ctrl+L` ne fait pas la même chose dans le Channel Rack et dans le Mixer. Dans le Channel Rack, il choisit des inserts libres. Dans le Mixer, il utilise l'insert sélectionné.
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.
 - La limite est de 127 inserts par projet et de dix emplacements d'effets par insert.

@@ -81,6 +81,18 @@ These work while the Channel rack has focus.
 | Solo | `Ctrl+1` to `Ctrl+0` | Solos channels 1 to 10 |
 | Graph lane | `Ctrl+K` | Shows or hides the graph lane |
 
+## Freeze a channel
+
+Freezing renders a channel to audio and plays that audio in its place. The instrument is unloaded, a third-party plugin too, so it uses no CPU and no memory.
+
+1. Right-click the channel and choose `Freeze`. With several channels selected the item reads `Freeze selected channels`.
+2. The row gets a snowflake tag. The channel's volume, pan and the effects of its insert still work as before.
+3. To change the notes or the instrument again, right-click the channel and choose `Unfreeze`. The instrument comes back with the settings it had.
+
+A frozen channel cannot be edited: its steps are locked and its instrument window does not open. If the notes, the tempo or the arrangement change after the freeze, the tag changes colour and the audio made before keeps playing until you choose `Re-freeze`. If the rendered audio files are missing, the instrument plays instead.
+
+Freeze works on channels only. A Mixer insert cannot be frozen.
+
 ## Other things in the channel menu
 
 `Piano Roll`, `Rename and color`, `Replace` (swap the instrument), `Clone`, `Delete`, `Arpeggiator`, `Loop point`, `Burn MIDI to`, `Sort channels`, `Select unused channels` and `Channel settings`.

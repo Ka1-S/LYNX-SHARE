@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Le Channel Rack avec ses lignes de steps](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Elles fonctionnent quand le Channel Rack a le focus.
 | Muet | `1` to `0` | Coupe ou rétablit le son des canaux 1 à 10 |
 | Solo | `Ctrl+1` to `Ctrl+0` | Met en solo les canaux 1 à 10 |
 | Couloir de graphe | `Ctrl+K` | Affiche ou masque le couloir de graphe |
+
+## Figer un canal
+
+Figer rend un canal en audio et joue cet audio à sa place. L'instrument est déchargé, même un plugin tiers, si bien qu'il n'utilise ni CPU ni mémoire.
+
+1. Faites un clic droit sur le canal et choisissez `Figer`. Avec plusieurs canaux sélectionnés, l'élément indique `Geler les canaux sélectionnés`.
+2. La ligne reçoit une étiquette en flocon de neige. Le volume et le pan du canal et les effets de son insert fonctionnent comme avant.
+3. Pour modifier de nouveau les notes ou l'instrument, faites un clic droit sur le canal et choisissez `Dégeler`. L'instrument revient avec les réglages qu'il avait.
+
+Un canal figé ne peut pas être modifié : ses steps sont verrouillés et la fenêtre de son instrument ne s'ouvre pas. Si les notes, le tempo ou l'arrangement changent après le gel, l'étiquette change de couleur et l'audio fait avant continue de jouer jusqu'à ce que vous choisissiez `Re-geler`. Si les fichiers audio rendus sont introuvables, c'est l'instrument qui joue.
+
+Figer ne fonctionne que sur les canaux. Un insert du Mixer ne peut pas être figé.
 
 ## Autres éléments du menu du canal
 

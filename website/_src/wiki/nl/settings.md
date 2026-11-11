@@ -1,9 +1,9 @@
 ---
-source: 841fdd7d67
+source: ab2c2f14eb
 ---
-![De pagina Algemeen van het venster Instellingen, met de zeven paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
+![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 
-Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bestanden, Project en Info. De eerste vijf horen bij het programma. Project en Info horen bij het geopende project en worden ermee opgeslagen. Elke pagina heeft een eigen item bovenaan het menu `Opties`.
+Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Bestanden, LYNX extras, Project en Info. De eerste zes horen bij het programma. Project en Info horen bij het geopende project en worden ermee opgeslagen. Elke pagina heeft een eigen item bovenaan het menu `Opties`.
 
 ## Een instelling wijzigen
 
@@ -15,7 +15,7 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 
 ## Audio
 
-`Opties › Audio-instellingen...`. Driver, apparaten, samplefrequentie, buffergrootte en opname. [Audio instellen](/wiki/audio-setup/) beschrijft deze pagina.
+`Opties › Audio-instellingen...`. Driver, apparaten, samplefrequentie, buffergrootte en opname. [Audio instellen](/wiki/audio-setup/) beschrijft deze pagina. Onder `Opname` biedt `Bestandsformaat` nu ook `WAV 16 bit (de samplefrequentie van het apparaat)`.
 
 ## MIDI
 
@@ -26,7 +26,10 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 | Instelling | Wat het doet |
 |---|---|
 | Invoerapparaten | Elk apparaat kan worden uitgezet, naar één MIDI-kanaal luisteren, en een vast kanaal van het Channel Rack bespelen in plaats van de geselecteerde |
-| `Lijst vernieuwen` | Zoekt opnieuw naar apparaten |
+| `Type controller` | Per ingangsapparaat: `Automatisch detecteren`, `Generieke controller` of een controllerprofiel, zoals Mackie Control. De regel ernaast noemt de poort die de lampjes en het display krijgt |
+| `MPE-controller` | Aan het eind van de MIDI-kanaallijst van een apparaat. Elke noot komt met zijn eigen bend, timbre en druk. Een tweede vak stelt de ledenkanalen in |
+| `Lijst vernieuwen` | Zoekt opnieuw naar apparaten en leest je controllerprofielen opnieuw in |
+| `Map met controllerprofielen` | Opent de map voor je eigen controllerprofielen (`*.lynxctl`) |
 | `Master-sync versturen` | Stuurt MIDI clock met Song Position Pointer, of MIDI Time Code, naar een uitgangsapparaat. `Offset (ms)` stuurt hem later of eerder |
 | `All notes off versturen` | Stuurt all notes off naar het apparaat bij init en na een export |
 | `Sync met externe clock` | LYNX SHARE volgt de MIDI-clock van de gekozen ingang: tempo, start, continue, stop en positie |
@@ -34,6 +37,8 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 | `Kanaal van de performance-modus` | Noten op dit kanaal lanceren Playlist-clips in Performance-modus |
 | `Songmarker-sprong` | Noten op dit kanaal verplaatsen het nummer naar een marker in plaats van te spelen |
 | `Pickup (takeover-modus)` | Een controller beweegt een parameter pas nadat hij de huidige waarde heeft bereikt |
+| `Voetpedaal bepaalt het einde van noten` | Standaard aan: het sustain- en het sostenutopedaal houden noten vast. Uit gaat het pedaal naar de plugins |
+| `Een gamecontroller gebruiken` | Een gamecontroller bedient het transport en kan net als een MIDI-controller worden gekoppeld. Standaard uit |
 | Koppelingen | De controllerkoppelingen van dit project, daarna de globale, met `Ontkoppelen` en `Alles verwijderen` |
 
 ## Algemeen
@@ -42,7 +47,8 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 
 | Instelling | Wat het doet |
 |---|---|
-| `Lay-outstijl` | Patroonwerkwijze (standaard) of Clipstart-werkwijze |
+| `Lay-outstijl` | Patternwerkwijze (standaard), Clipstart-werkwijze of Eenvoudige werkwijze |
+| `Standaardsjabloon`, `Project bij het starten` | De template die opent met `Bestand › Nieuw`, en wat opent bij het opstarten: `Leeg project`, `Standaardsjabloon` of `Laatst gebruikt project`. Met `Bestand › Opslaan als sjabloon...` voeg je je eigen toe |
 | `Sessieclips uit Live-sets` | Waar de sessieclips van een geïmporteerde Live-set heen gaan: het clipraster, of de Playlist na het arrangement |
 | `Taal`, `Lettertype van de interface` | Toegepast bij de volgende start |
 | `Interfacegrootte`, `Menudichtheid` | Schaal van de hele interface, en compacte of ruime menu's |
@@ -53,10 +59,16 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 | `Tekenen met de GPU (Direct2D)` | Zet uit als het grafische stuurprogramma crasht of het scherm flikkert |
 | Opstarten | Splashscreen, opstartgeluid, en bij elke start op de achtergrond zoeken naar nieuwe plugins |
 | Bewerken | Typtoetsenbord als piano, kanaaleditors open houden, de seektijd onthouden, uitgerekte patternclips loopen |
+| `Alle nieuwe plug-ins losmaken` | Aan: het venster van een plugin die je toevoegt opent losgemaakt, bovenop de panelen. Uit (standaard): het opent vastgemaakt in het hoofdvenster |
+| `Monofoon schilderen in de pianorol` | Aan: het Tekenen-gereedschap vervangt de noten onder elke nieuwe noot, en Shift tekent erboven. Uit: andersom |
+| `Gekoppelde modules automatisch selecteren` | Een pluginvenster focussen selecteert zijn mixertrack. Standaard aan |
+| `Voorrang van het typtoetsenbord standaard uitschakelen` | Voor plugins die je vanaf dat moment toevoegt. Standaard uit |
 | `Maximaal aantal ongedaan-maakstappen` | 25 tot 1000 |
+| `Berichten beheren` | Onder `Tips en waarschuwingen`. Aangevinkte meldingen worden getoond. Vink er een uit om zijn vraag over te slaan |
 | Back-up | Hoe vaak een back-upkopie wordt opgeslagen, hoeveel er per project bewaard blijven, en `Back-upmap openen` |
 | `Plugins in een apart proces draaien` | Een crashende plugin haalt LYNX SHARE niet onderuit. Standaard uit |
-| `Ontbrekende plugins vervangen door LYNX-SHARE-equivalenten` | Standaard aan. Het project behoudt de originele plugin |
+| `Ontbrekende plugins vervangen door LYNX-SHARE-equivalenten` | Standaard aan. Als een project een plugin van derden gebruikt die niet is geïnstalleerd, laadt de vervanger van LYNX SHARE met overeenkomstige instellingen waar hij die heeft. Het project behoudt de originele plugin en gebruikt hem weer zodra hij is geïnstalleerd |
+| `Aantal open plug-in-editors beperken` | Maximaal 25 pluginvensters blijven open. Standaard aan |
 | `Crashrapporten` | Vragen na een crash of freeze (standaard), altijd versturen of nooit versturen |
 | `Automatisch controleren op updates` | De updatecontrole bij het opstarten, met `Nu controleren` |
 
@@ -80,6 +92,24 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 | Zoekmappen voor ontbrekende samples | Het venster Ontbrekende bestanden zoekt zelf in deze mappen en hun submappen |
 | Browsermappen | Getoond in de maplijst van de Browser, en ook doorzocht op ontbrekende samples |
 | Pluginmappen | Gescand op plugins door `Opties › Plugins scannen` |
+
+## LYNX extras
+
+`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. Alle staan standaard uit. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
+
+| Instelling | Wat het doet |
+|---|---|
+| `Luidheidsmeter naast de Master (LYNX)` | Loudness op korte termijn en geïntegreerd (LUFS) en de true peak van de Master, met een Reset-knop |
+| `Alleen gebruikte inserts tonen` | Verbergt de Mixer-inserts die niets gebruikt |
+| `Koppelingen naar verwijderde inserts grijs bewaren (LYNX)` | Een insert verwijderen laat de koppelingen die erin gingen staan, zodat ze opnieuw kunnen worden verbonden |
+| `Mixergroepen volgen de Playlist (LYNX)` | De groepen van de Mixer weerspiegelen de trackgroepen van de Playlist |
+| `Automatiseringsbanen` | Automatisering kan in banen onder een Playlist-track staan |
+| `Liniaal: songmaten (LYNX)` | De liniaal van de Piano Roll toont de maatnummers van de plek in de song waar het pattern speelt |
+| `De waarde van een regelaar naast de muis tonen bij aanwijzen (LYNX)` | De waarde verschijnt naast de cursor, niet alleen in de hintbalk |
+| `Na loopopname speelt alleen de laatste doorgang` | De eerdere doorgangen blijven eronder, gemute |
+| `W toont of verbergt het venster van het geselecteerde apparaat` | Een toets voor de Device-weergave |
+| `Een apparaat selecteren selecteert de insert ervan in de Mixer` | De Mixer volgt het apparaat dat je in de Device-weergave kiest |
+| `Een gamecontroller gebruiken` | Dezelfde schakelaar als op de MIDI-pagina |
 
 ## Project
 
@@ -109,6 +139,8 @@ Het venster Instellingen heeft zeven pagina's: Audio, MIDI, Algemeen, Thema, Bes
 - `Plugins in een apart proces draaien` geldt voor plugins die vanaf dat moment worden geopend. Open het project opnieuw om de andere te verplaatsen.
 - De update-instellingen ontbreken in de Microsoft Store-versie, omdat de Store hem bijwerkt.
 - Sneltoetsen staan in `Opties › Sneltoetsen beheren...`, niet op een pagina van Instellingen.
+- Sommige schakelaars staan in menu's, niet in dit venster. `Lage latentie tijdens opnemen` staat in het menu met opnameopties naast de opnameknop en in het menu `Opnemen naar schijf` van de Mixer. `Klavierstijl` staat in het menu View van de Piano Roll.
+- De plugin database is een map, `Plugindatabase` in de map `LYNX` van je documenten. Je kunt hem indelen in de bestandsbeheerder.
 
 ## Gerelateerd
 

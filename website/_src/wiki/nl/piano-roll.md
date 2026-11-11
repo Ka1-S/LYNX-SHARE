@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![De Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Elk gereedschap heeft een lettertoets. De letters werken zolang de typtoetsenbor
 
 ## Klavier en liniaal
 
-Klik op een toets van het klavier om hem te horen. Verder naar rechts op de toets is harder. `Ctrl`+klik op een toets selecteert zijn noten. Slepen met de middelste knop op het klavier maakt de toetsen hoger of lager.
+Klik op een toets van het klavier om hem te horen. Verder naar rechts op de toets is harder. `Ctrl`+klik op een toets selecteert zijn noten. Slepen met de middelste knop op het klavier maakt de toetsen hoger of lager. Dat doet ook het verticale zoomwiel, het kleine vierkantje aan het eind van de tijdscrollbalk: sleep het omhoog of omlaag, of gebruik het muiswiel erboven.
+
+`Beeld › Klavierstijl` in het menu van de Piano Roll kiest tussen `Vlakke toetsen` en `Pianotoetsen (lijnen tussen de witte toetsen)`, dat een traditioneel klavier tekent.
 
 Klik op de liniaal om de positie in te stellen. `Ctrl`+slepen, met rechts slepen of dubbelklikken-slepen op de liniaal selecteert de noten in een tijdbereik. `Ctrl`+wiel zoomt en `Shift`+wiel scrolt.
 
@@ -56,13 +58,23 @@ Klik op de liniaal om de positie in te stellen. `Ctrl`+slepen, met rechts slepen
 | Instelling | Wat het doet |
 |---|---|
 | Snap | "Hoofd" volgt de snap in de hoofdwerkbalk, of kies er een voor dit venster. |
-| Akkoord | Klikken maakt het gekozen akkoord, met de aangeklikte noot als grondtoon. `Shift+N` gaat terug naar losse noten. |
-| Toonladder | Licht de noten van een toonladder op. Een aparte knop snapt nieuwe en verplaatste noten, en binnenkomende MIDI, naar de gekozen toonladder. |
+| Akkoord | Klikken maakt het gekozen akkoord, met de aangeklikte noot als grondtoon. `Shift+N` gaat terug naar losse noten. Dezelfde lijst is `Akkoordstempel` in het menu van de Piano Roll. |
+| Toonladder | Licht de noten van een toonladder op. Een aparte knop snapt nieuwe en verplaatste noten, en binnenkomende MIDI, naar de gekozen toonladder. Verplaatste noten gaan dan in toonladderstappen, zodat een akkoord in de toonladder blijft, en `Up` en `Down` verplaatsen één toonladderstap. |
 | Slide (`S`) | Nieuwe noten zijn slide-noten. De noot die klinkt glijdt naar ze toe (808 glide). |
 | Ghost notes (`Alt+V`) | Toont de noten van de andere kanalen achter de jouwe. |
 | Nootkleur | Nieuwe noten krijgen deze kleur. Er zijn er 16. |
 | Volgen | De weergave scrolt mee met de afspeelkop terwijl het pattern speelt. |
-| Banenvak | Kiest wat de onderste baan bewerkt: Velocity, Pan of Fijne pitch. |
+| Banenvak | Kiest wat de onderste baan bewerkt: Velocity, Pan, Fijne pitch, Release, Mod X, Mod Y, Kans of Velocity-bereik. |
+
+## Kans en velocity-bereik
+
+Elke noot heeft een Kans en een Velocity-bereik. Kans is hoe waarschijnlijk het is dat de noot speelt elke keer dat hij aan de beurt komt. Met het Velocity-bereik varieert de velocity tussen de velocity van de noot en die velocity plus het bereik. Kies `Kans` of `Velocitybereik (LYNX)` in het banenvak om ze te bewerken. `Extra › Kans (LYNX)` in het menu van de Piano Roll groepeert de geselecteerde noten zodat ze allemaal of slechts één ervan speelt, en heeft `Kans en velocitybereik herstellen`.
+
+## MIDI-tools en scripts
+
+`Extra › MIDI-tools...` in het menu van de Piano Roll opent een paneel met Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp en Velocity Shaper.
+
+De kolom `Scripts` van het menu `Extra` toont de Piano Roll-scripts: die van LYNX SHARE zelf en `.pyscript`-bestanden, ook die in de scriptmappen van FL Studio als FL Studio is geïnstalleerd. `Scriptmap openen...` opent de map voor je eigen scripts, en `Laatste script opnieuw uitvoeren` herhaalt het laatste script.
 
 ## Toetsen
 

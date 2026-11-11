@@ -1,5 +1,5 @@
 ---
-source: 98829adcb8
+source: a5c1d056c8
 ---
 LYNX SHARE penceresini açmadan da çalışır. Bir seçenek projeyi sese render eder, diğerleri onu FL Studio projesine veya Ableton Live set'ine dönüştürür, birkaçı da test içindir. Projenin kendi kontrolleri de aynı seçenekleri kullanır.
 
@@ -20,6 +20,12 @@ LYNX.exe project.lynx
 
 LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `.flm` ve `.mid` kabul eder. Göreli yol, geçerli klasörden alınır.
 
+```
+LYNX.exe --no-plugins project.lynx
+```
+
+Bir `.lynx` projesini, `Dosya › Üçüncü taraf plugin'ler olmadan aç...` gibi, üçüncü taraf plugin'lerini yüklemeden açar. Her plugin ayarlarını korur. Bir plugin'in açılmasını engellediği proje için kullanın.
+
 ## Günlük kullanım seçenekleri
 
 | Seçenek | Ne yapar |
@@ -33,12 +39,15 @@ LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `
 | `--export-flp ... --substitute` | Yalnızca LYNX'te bulunan plugin'leri sese render etmek yerine en yakın FL plugin'iyle değiştirir |
 | `--export-als <project> <folder>` | Live 12 için `<folder>/<name> Project/<name>.als` konumuna bir Ableton Live set'i yazar |
 | `--export-als ... --live11` | Set'i Live 11 için yazar |
+| `--export-bundle <project> <folder>` | `Dosya › Dışa aktar › Diğer uygulamalar için...` paketini klasöre yazar |
+| `--export-bundle ... --zip` | Klasörü zipler. Yerine `<folder>.zip` gelir |
+| `--export-bundle ... --no-mixdown` | Mixdown'ı paketin dışında bırakır |
 | `--devices <report.txt>` | Bu bilgisayarın ses sürücüsü türlerini ve aygıtlarını listeler |
 | `--showcase <out.lynx>` | LYNX SHARE'in kendi demo projesini yazar |
 | `--lang <id>` | Bu çalıştırma için başka bir arayüz dili kullanır, örneğin `--lang pt-BR` |
 | `--menu-entry on` veya `kapalı` | Yalnızca Linux AppImage: LYNX SHARE'i uygulamalar menüsüne ekler veya kaldırır |
 
-`--export`, `--stems` ve `--export-flp` proje olarak bir `.lynx`, `.flp` veya `.als` alır. `--export-als` ayrıca `.flm` de alır.
+`--export`, `--stems` ve `--export-flp` proje olarak bir `.lynx`, `.flp` veya `.als` alır. `--export-als` ayrıca `.flm` de alır. `--export-bundle` bir `.lynx`, `.flp` veya `.als` alır.
 
 Örnekler:
 
@@ -48,6 +57,7 @@ LYNX.exe --export song.lynx drums.wav --insert 1
 LYNX.exe --stems song.lynx song.wav
 LYNX.exe --export-flp song.lynx song.flp
 LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --export-bundle song.lynx out-folder --zip
 LYNX.exe --devices devices.txt
 LYNX --lang de
 ```
@@ -78,7 +88,7 @@ LYNX --devicetest PipeWire "System default" out.txt
 
 ## Bilmekte fayda var
 
-- Sonuçlar terminale değil dosyalara gider. `--export` `<out>.txt` yazar, `--export-flp` `<out.flp>.txt` yazar, `--export-als` klasöre `export-als.txt` yazar ve `--stems` `<base.wav>.txt` yazar.
+- Sonuçlar terminale değil dosyalara gider. `--export` `<out>.txt` yazar, `--export-flp` `<out.flp>.txt` yazar, `--export-als` klasöre `export-als.txt` yazar, `--export-bundle` klasöre `export-bundle.txt` yazar ve `--stems` `<base.wav>.txt` yazar.
 - Program standart girdiyi okur. Bir kabuk döngüsünde her çağrıya `< /dev/null` ekleyin.
 - `--snapshot`, `LYNX_SNAPSHOT_SIZE` ortam değişkeni aksini söylemedikçe (örneğin `1920x1080`) 1280x720 boyutunda çizer.
 - `--lang`, `Seçenekler › Genel ayarlar...` içinde listelenen dillerin kimliklerini alır, örneğin `en`, `pt-BR`, `de`, `es`, `fr` veya `ja`. Bilinmeyen bir kimlik yok sayılır.

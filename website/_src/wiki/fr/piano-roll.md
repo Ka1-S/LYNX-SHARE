@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Le Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Chaque outil a une touche-lettre. Les lettres fonctionnent quand le clavier-pian
 
 ## Clavier et règle
 
-Cliquez sur une touche du clavier pour l'entendre. Plus à droite sur la touche, plus c'est fort. `Ctrl`+clic sur une touche sélectionne ses notes. Glisser avec le bouton du milieu sur le clavier agrandit ou réduit la hauteur des touches.
+Cliquez sur une touche du clavier pour l'entendre. Plus à droite sur la touche, plus c'est fort. `Ctrl`+clic sur une touche sélectionne ses notes. Glisser avec le bouton du milieu sur le clavier agrandit ou réduit la hauteur des touches. La molette de zoom vertical fait de même : c'est le petit carré au bout de la barre de défilement du temps. Glissez-la vers le haut ou le bas, ou utilisez la molette de la souris dessus.
+
+`Vue › Style du clavier` dans le menu du Piano Roll permet de choisir entre `Touches plates` et `Touches de piano (lignes entre les touches blanches)`, qui dessine un clavier traditionnel.
 
 Cliquez sur la règle pour fixer la position. `Ctrl`+glisser, glisser avec le clic droit ou double-clic puis glisser sur la règle sélectionne les notes d'une plage de temps. `Ctrl`+molette zoome et `Shift`+molette fait défiler.
 
@@ -56,13 +58,23 @@ Cliquez sur la règle pour fixer la position. `Ctrl`+glisser, glisser avec le cl
 | Réglage | Ce qu'il fait |
 |---|---|
 | Magnétisme | « Principal » suit le magnétisme de la barre d'outils principale, ou choisissez-en un pour cette fenêtre. |
-| Accord | Un clic crée l'accord choisi, avec la note cliquée comme fondamentale. `Shift+N` revient aux notes seules. |
-| Gamme | Met en évidence les notes d'une gamme. Un bouton séparé cale les notes nouvelles et déplacées, ainsi que le MIDI entrant, sur la gamme choisie. |
+| Accord | Un clic crée l'accord choisi, avec la note cliquée comme fondamentale. `Shift+N` revient aux notes seules. La même liste est `Tampon d'accord` dans le menu du Piano Roll. |
+| Gamme | Met en évidence les notes d'une gamme. Un bouton séparé cale les notes nouvelles et déplacées, ainsi que le MIDI entrant, sur la gamme choisie. Les notes déplacées avancent alors par degrés de la gamme, si bien qu'un accord reste dans la gamme, et `Up` et `Down` déplacent d'un degré. |
 | Slide (`S`) | Les nouvelles notes sont des notes slide. La note qui sonne glisse vers elles (glide 808). |
 | Notes fantômes (`Alt+V`) | Affiche les notes des autres canaux derrière les vôtres. |
 | Couleur de note | Les nouvelles notes prennent cette couleur. Il y en a 16. |
 | Suivre | La vue défile avec la tête de lecture pendant la lecture du pattern. |
-| Liste du couloir | Choisit ce que le couloir du bas édite : Vélocité, Pan ou Hauteur fine. |
+| Liste du couloir | Choisit ce que le couloir du bas édite : Vélocité, Pan, Hauteur fine, Release, Mod X, Mod Y, Chance ou Plage de vélocité. |
+
+## Chance et plage de vélocité
+
+Chaque note a une Chance et une Plage de vélocité. La Chance indique la probabilité que la note joue à chaque passage. La Plage de vélocité laisse sa vélocité varier entre la vélocité de la note et cette vélocité plus la plage. Choisissez `Probabilité` ou `Plage de vélocité (LYNX)` dans la liste du couloir pour les éditer. `Outils › Probabilité (LYNX)` dans le menu du Piano Roll regroupe les notes sélectionnées de façon que toutes jouent ou qu'une seule joue, et propose `Réinitialiser probabilité et plage de vélocité`.
+
+## Outils MIDI et scripts
+
+`Outils › Outils MIDI...` dans le menu du Piano Roll ouvre un panneau avec Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp et Velocity Shaper.
+
+La colonne `Scripts` du menu `Outils` liste les scripts du Piano Roll : ceux de LYNX SHARE et les fichiers `.pyscript`, y compris ceux des dossiers de scripts de FL Studio si FL Studio est installé. `Ouvrir le dossier des scripts...` ouvre le dossier de vos propres scripts, et `Relancer le dernier script` répète le dernier.
 
 ## Touches
 

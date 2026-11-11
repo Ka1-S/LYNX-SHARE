@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Channel Rack z wierszami kroków](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Działają, gdy Channel Rack ma fokus.
 | Wycisz | `1` do `0` | Wycisza lub przywraca kanały od 1 do 10 |
 | Solo | `Ctrl+1` do `Ctrl+0` | Włącza solo dla kanałów od 1 do 10 |
 | Pas wykresu | `Ctrl+K` | Pokazuje lub ukrywa pas wykresu |
+
+## Zamrażanie kanału
+
+Zamrożenie renderuje kanał do audio i gra to audio w jego miejsce. Instrument zostaje wyładowany, plugin innego producenta też, więc nie zużywa CPU ani pamięci.
+
+1. Kliknij kanał prawym przyciskiem i wybierz `Zamroź`. Przy kilku zaznaczonych kanałach pozycja brzmi `Zamroź wybrane kanały`.
+2. Wiersz dostaje znacznik w kształcie płatka śniegu. Głośność i panorama kanału oraz efekty jego inserta nadal działają jak przedtem.
+3. Aby znów zmienić nuty lub instrument, kliknij kanał prawym przyciskiem i wybierz `Odmroź`. Instrument wraca z ustawieniami, które miał.
+
+Zamrożonego kanału nie można edytować: jego kroki są zablokowane, a okno instrumentu się nie otwiera. Jeśli nuty, tempo lub aranżacja zmienią się po zamrożeniu, znacznik zmienia kolor, a audio zrobione wcześniej gra dalej, dopóki nie wybierzesz `Zamroź ponownie`. Jeśli brakuje wyrenderowanych plików audio, zamiast nich gra instrument.
+
+Zamrażanie działa tylko na kanałach. Inserta Mixera nie można zamrozić.
 
 ## Inne pozycje w menu kanału
 

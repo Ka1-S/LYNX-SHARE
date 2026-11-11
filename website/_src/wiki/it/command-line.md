@@ -1,5 +1,5 @@
 ---
-source: 98829adcb8
+source: a5c1d056c8
 ---
 LYNX SHARE funziona anche senza aprire la sua finestra. Un'opzione renderizza un progetto in audio, altre lo convertono in un progetto FL Studio o in un set di Ableton Live, e diverse servono per i test. I controlli del progetto stesso usano le stesse opzioni.
 
@@ -20,6 +20,12 @@ LYNX.exe project.lynx
 
 Avvia LYNX SHARE con la finestra e apre il file. Accetta `.lynx`, `.flp`, `.als`, `.flm` e `.mid`. Un percorso relativo parte dalla cartella corrente.
 
+```
+LYNX.exe --no-plugins project.lynx
+```
+
+Apre un progetto `.lynx` senza caricare i suoi plugin di terze parti, come fa `File › Apri senza plugin di terze parti...`. Ogni plugin conserva le sue impostazioni. Usalo per un progetto che un plugin impedisce di aprire.
+
 ## Opzioni per l'uso di ogni giorno
 
 | Opzione | Cosa fa |
@@ -33,12 +39,15 @@ Avvia LYNX SHARE con la finestra e apre il file. Accetta `.lynx`, `.flp`, `.als`
 | `--export-flp ... --substitute` | Sostituisce i plugin solo LYNX con il plugin FL più vicino invece di renderizzarli in audio |
 | `--export-als <project> <folder>` | Scrive un set di Ableton Live in `<folder>/<name> Project/<name>.als`, per Live 12 |
 | `--export-als ... --live11` | Scrive il set per Live 11 |
+| `--export-bundle <project> <folder>` | Scrive nella cartella il pacchetto di `File › Esporta › Per altre app...` |
+| `--export-bundle ... --zip` | Comprime la cartella in zip. Viene sostituita da `<folder>.zip` |
+| `--export-bundle ... --no-mixdown` | Lascia fuori dal pacchetto il mixdown |
 | `--devices <report.txt>` | Elenca i tipi di driver audio e i dispositivi di questo computer |
 | `--showcase <out.lynx>` | Scrive il progetto demo di LYNX SHARE |
 | `--lang <id>` | Usa un'altra lingua dell'interfaccia per questa esecuzione, per esempio `--lang pt-BR` |
 | `--menu-entry on` o `off` | Solo AppImage Linux: aggiunge LYNX SHARE al menu delle applicazioni, o lo rimuove |
 
-`--export`, `--stems` e `--export-flp` accettano come progetto un file `.lynx`, `.flp` o `.als`. `--export-als` accetta anche `.flm`.
+`--export`, `--stems` e `--export-flp` accettano come progetto un file `.lynx`, `.flp` o `.als`. `--export-als` accetta anche `.flm`. `--export-bundle` accetta un file `.lynx`, `.flp` o `.als`.
 
 Esempi:
 
@@ -48,6 +57,7 @@ LYNX.exe --export song.lynx drums.wav --insert 1
 LYNX.exe --stems song.lynx song.wav
 LYNX.exe --export-flp song.lynx song.flp
 LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --export-bundle song.lynx out-folder --zip
 LYNX.exe --devices devices.txt
 LYNX --lang de
 ```
@@ -78,7 +88,7 @@ LYNX --devicetest PipeWire "System default" out.txt
 
 ## Da sapere
 
-- I risultati vanno in file, non nel terminale. `--export` scrive `<out>.txt`, `--export-flp` scrive `<out.flp>.txt`, `--export-als` scrive `export-als.txt` nella cartella e `--stems` scrive `<base.wav>.txt`.
+- I risultati vanno in file, non nel terminale. `--export` scrive `<out>.txt`, `--export-flp` scrive `<out.flp>.txt`, `--export-als` scrive `export-als.txt` nella cartella, `--export-bundle` scrive `export-bundle.txt` nella cartella e `--stems` scrive `<base.wav>.txt`.
 - Il programma legge lo standard input. In un ciclo di shell, aggiungi `< /dev/null` a ogni chiamata.
 - `--snapshot` disegna a 1280x720 salvo che la variabile d'ambiente `LYNX_SNAPSHOT_SIZE` dica altro, per esempio `1920x1080`.
 - `--lang` accetta gli id delle lingue elencate in `Opzioni › Impostazioni generali...`, come `en`, `pt-BR`, `de`, `es`, `fr` o `ja`. Un id sconosciuto viene ignorato.

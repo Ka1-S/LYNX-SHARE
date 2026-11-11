@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 ## Bilmekte fayda var
 
 - Live'ın kendi cihazları yeniden oluşturulmaz. Live'ın kendi efektleri içe aktarmada bırakılır.
-- Instrument, Audio Effect ve MIDI Effect rack'leri zincirleri, bölgeleri ve makrolarıyla gelir.
+- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir. Live'ın MIDI Effect Rack'leri henüz dönüştürülmez ve içe aktarma raporunda listelenir.
 - İçe aktarma raporu dışarıda bırakılanları listeler.
 - Live, dışa aktarılmış bir set'te üst üste binen ses kliplerini kırpar.
 - Bir Live set'indeki warp işaretçileri içe aktarmada korunur ve dışa aktarmada geri yazılır.

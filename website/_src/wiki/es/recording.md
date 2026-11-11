@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![La ventana Grabación pregunta qué grabar: audio, notas y automatización, todo, o audio en el editor de audio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Las notas vienen de un teclado MIDI, del teclado del ordenador (`Ctrl+T`) o del 
 - `Cuantizar las notas grabadas al ajuste global` está en las opciones de grabación.
 - `Edición por pasos` (`Ctrl+E`) funciona con la reproducción detenida: cada nota que tocas entra en el patrón un paso de ajuste tras otro.
 - `Capturar MIDI` (`Ctrl+Shift+Alt+R`) pone en el patrón las notas que acabas de tocar, aunque la grabación estuviera desactivada.
+- El pedal de sustain (CC 64) y el pedal de sostenuto (CC 66) mantienen las notas que tocas, y una nota grabada dura hasta que el pedal se suelta. Un canal Layer pasa el pedal a sus canales. Con `El pedal controla el final de las notas` desactivado en `Opciones › Configuración MIDI...`, el pedal llega a los plugins como un controlador.
+- En el modo Song, las notas grabadas en un clip de patrón más largo que su patrón se quedan donde las tocaste, y el patrón crece. La toma no se pliega sobre los primeros compases del patrón. Con `Los clips de patrón estirados repiten su patrón (LYNX)` activado, solo las notas tocadas sobre compases que ya tenían notas entran en el bucle.
 
 Los controles que mueves durante la grabación se escriben como clips de automatización en modo Canción y como eventos del patrón en modo Patrón. Mira [Automatización](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Las opciones están en `Opciones › Grabación` y en el menú de clic derecho d
 | `Grabar inicia la reproducción` | ninguna | Al activar la grabación también se pulsa reproducir |
 | `Desarmar los inserts al detener la grabación` | ninguna | Los inserts armados se liberan tras cada toma |
 
+`Baja latencia al grabar` está en el menú de clic derecho del botón de grabar y en el menú del insert del Mixer, en `Grabación en disco`. Está desactivado por defecto. Mientras un insert con entrada está armado, o su monitorización está en `Act.`, se omiten los efectos que añaden latencia en su camino al Master. Esto cambia solo lo que oyes: un insert conserva todos sus efectos cuando la toma se captura después de ellos, por ejemplo con `Post efectos`. Los efectos vuelven cuando el insert se desarma.
+
+`Herram. › Cancelar grabación` descarta lo que escribió la pasada de grabación actual (sus notas, automatización y tomas de audio) y desactiva la grabación. La reproducción continúa y los inserts armados siguen armados.
+
 ## Grabación en bucle y tomas
 
 Con `Grabación en bucle` activado, la grabación se repite sobre la región del bucle en modo Canción, o sobre el patrón en modo Patrón. Desactivado, la grabación sigue de largo.
@@ -76,7 +82,7 @@ Cada pasada de una grabación de audio en bucle cae en la siguiente pista libre 
 
 - Un proyecto guardado conserva sus tomas en `Audio/Recorded`, junto al archivo del proyecto.
 - Un proyecto sin guardar graba en `LYNX/Recordings` dentro de tu carpeta Música.
-- Las tomas son archivos WAV a la frecuencia de muestreo del dispositivo de audio, de 24 bits o 32 bits flotante. El formato y los nombres de las tomas se fijan en `Grabación` dentro de `Opciones › Configuración de audio...`.
+- Las tomas son archivos WAV a la frecuencia de muestreo del dispositivo de audio, de 16 bits, 24 bits o 32 bits flotante. El formato (`Formato de archivo`) y los nombres de las tomas se fijan en `Grabación` dentro de `Opciones › Configuración de audio...`.
 - `Abrir carpeta de grabaciones` está en el menú de clic derecho del botón de grabar. `Archivo › Eliminar grabaciones sin usar y guardar...` elimina las tomas que el proyecto ya no usa.
 
 ## Conviene saber

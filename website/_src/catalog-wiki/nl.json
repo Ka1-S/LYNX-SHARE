@@ -365,6 +365,54 @@
 "Ruis, dither en willekeurige fasen komen uit een generator die van elke instantie is, dus ze verschillen van elke gegeven FL-render."
 ]
 },
+"gen-gmsynth-flm": {
+"source": "e07c714bb6",
+"intro": "GMSynth (FLM) speelt de GMSynth-module van FL Studio Mobile-projecten: twee oscillatoren plus ruis, vier stemmen, een filter, envelopes, één LFO en drie effectslots. Hij staat niet in de plugin-kiezer. Een kanaal krijgt hem alleen als je een .flm-project opent dat GMSynth gebruikt. De golfspectra en de filtertabel worden tijdens het draaien gelezen uit de map met FL Studio Mobile-bronnen van je eigen FL Studio-installatie en zijn niet meegeleverd. Als die bestanden bij het openen van het project niet worden gevonden, blijft het kanaal op de ingebouwde synth en meldt het importrapport GMSynth als niet omgezet.",
+"controls": [
+[
+"Oscillatoren",
+"Wat de engine speelt: twee oscillatoren, elk op een van de 29 golven van de module, met pitch, detune, mix en fase voor oscillator B, plus een ruisniveau."
+],
+[
+"Modulatie",
+"Vier soorten tussen de oscillatoren, AM, FM, SNC en FLT, met een hoeveelheid en een attack- en decay-envelope."
+],
+[
+"Amp",
+"Niveau, pan en een lineaire envelope met attack, decay, sustain en release."
+],
+[
+"Filter",
+"Cutoff, resonantie, filtersoort en keyboardtracking, met een eigen attack- en decay-envelope."
+],
+[
+"EG",
+"Een tweede envelope met attack, decay, sustain en release, een hoeveelheid, een bestemming en velocity."
+],
+[
+"LFO",
+"Eén LFO met tempo-sync met snelheid, vorm, hoeveelheid en bestemming."
+],
+[
+"Choir",
+"Tot vier ontstemde kopieën per stem, met schaal, detune en stereospreiding."
+],
+[
+"Play settings",
+"Transpose, slide-tijd, enkele stem en automatische portamento."
+],
+[
+"Effect slots",
+"Drie slots. DIST, PHAS, F LP, DLY, RVRB en PAN worden gespeeld. FLNG, F HP, RING en VOX laten het signaal ongewijzigd door, en het importrapport noemt ze als ze aan staan."
+]
+],
+"tips": [
+"De instellingen komen uit de .flm. LYNX SHARE heeft geen venster dat de parameters van deze module bewerkt.",
+"Het volume, de pan en de pitch van het kanaal worden bovenop die van de module zelf toegepast.",
+"Ruis, dither en de startfases van nieuwe stemmen komen van een generator die elke instantie zelf heeft, dus ze verschillen van elke gegeven render van FL Studio Mobile.",
+"De pitchbend en het modulatiewiel van de module worden niet omgezet."
+]
+},
 "gen-harmless": {
 "source": "25024826ed",
 "intro": "Harmless is een additieve generator gebouwd op de engine van de gelijknamige FL-plugin: tot 528 sinusdeeltonen per stem, gevormd door kleur, timbre-EQ, harmonisch masker, filter, resonantie, phaser en pluck, gevolgd door een rack met chorus, delay, reverb en compressor. Hij kan zonder FL Studio worden toegevoegd en begint dan met de eigen presetbank van LYNX SHARE. De compressor van het rack laadt zijn presets uit je eigen FL Studio-installatie; zonder die presets blijft de compressor uit.",
@@ -1447,6 +1495,77 @@
 "De presets bevatten kicks, toms, snares, handdrums, hats, percussie en effectgeluiden."
 ]
 },
+"gen-fpc": {
+"source": "2012232d9e",
+"intro": "FPC is een drumsampler met 32 pads in twee banken van 16, BANK A en BANK B. Elke pad bevat een of meer samplelagen, gekozen op velocity. Eén kanaal bevat de hele kit. Hij opent de FPC-kanalen van een .flp, en de kitpresets (.fst) van FL laden op een kanaal. Zonder FL Studio is een nieuwe FPC de lege kit van FL: 32 pads op de standaardnoten van FL zonder samples.",
+"controls": [
+[
+"Pads",
+"Klik op een pad om hem te selecteren en af te spelen. Sleep een sample op een pad om hem te laden."
+],
+[
+"BANK A, BANK B",
+"Wissel tussen de twee banken van 16 pads."
+],
+[
+"Padnaam",
+"Dubbelklik om de pad te hernoemen."
+],
+[
+"Midi Note",
+"Klik om de noot te kiezen die de pad triggert."
+],
+[
+"Pad volume, pan and tune",
+"Niveau, pan en stemming van de hele pad."
+],
+[
+"Mute, Solo",
+"Mute of solo de pad."
+],
+[
+"Scale Vol",
+"Schaal het volume met de velocity."
+],
+[
+"Cut, Cut By",
+"De groep die deze pad afkapt en de groep waardoor deze pad wordt afgekapt."
+],
+[
+"Uitgang",
+"Offset van de uitgang van de pad."
+],
+[
+"CREATE, DELETE",
+"Maak een nieuwe laag of verwijder de huidige. De pijlen verplaatsen een laag omhoog of omlaag."
+],
+[
+"SPREAD EVEN",
+"Verdeel het velocitybereik over de lagen."
+],
+[
+"Layer volume, pan and tune",
+"Instellingen van de geselecteerde laag, met zijn actieve bereik: de velocity's die hem spelen."
+],
+[
+"Sample laden",
+"Laadt een sample in de geselecteerde laag."
+],
+[
+"Overlappende layers willekeurig activeren",
+"Hoe lagen die dezelfde velocity bestrijken om de beurt spelen: Cycle, Random of Random (avoid previous)."
+],
+[
+"VOL, PAN",
+"Toon de volume-envelope of pan-envelope van de pad in de envelope-editor."
+]
+],
+"tips": [
+"Klik met links op de golfvorm om het sample te beluisteren.",
+"LYNX SHARE bevat geen kitsamples. Kits komen uit de .fst-bestanden van FL Studio en je eigen bestanden, of je laadt je eigen samples op de pads.",
+"Een FPC-kitpreset laadt als één kanaal met de hele kit."
+]
+},
 "gen-fruit-kick": {
 "source": "7e9adcf46d",
 "intro": "Fruit Kick is een kickdrumgenerator gebouwd op de engine van de gelijknamige FL-plugin: een sinusgolf waarvan toonhoogte en amplitude in de tijd dalen, met een optionele waveshaper. Een nieuwe instantie begint met de preset van de plugin in je eigen FL Studio-installatie als die er is, en anders met de eigen presetbank van LYNX SHARE.",
@@ -1587,8 +1706,8 @@
 ]
 },
 "gen-fruity-slicer": {
-"source": "df9bd1e3b8",
-"intro": "Fruity Slicer laadt een sample, knipt het in slices en speelt één slice per toets, beginnend bij de noot van de eerste slice. Je gebruikt hem om drumloops te herschikken. Hij leest de opgeslagen status van FL en heeft geen bestanden uit een FL-installatie nodig.",
+"source": "15efce61bf",
+"intro": "Fruity Slicer laadt een sample, knipt het in slices en speelt één slice per toets, beginnend bij de noot van de eerste slice. Je gebruikt hem om drumloops te herschikken. Een note-off beëindigt zijn slice. Het kanaalvenster heeft ook een pagina Envelope / instrument met de envelopes, LFO's en het filter van de stemmen. Hij leest de opgeslagen status van FL en heeft geen bestanden uit een FL-installatie nodig.",
 "controls": [
 [
 "Openen",
@@ -1633,10 +1752,32 @@
 [
 "Att and Dec",
 "Fade-in en fade-out van de slice, 0 tot 100 ms."
+],
+[
+"LOW and HIGH",
+"Lage en hoge drempel voor automatisch slicen."
+],
+[
+"Envelope / instrument",
+"Een pagina van het kanaalvenster met de tabs Panning, Volume, Mod X, Mod Y en Pitch."
+],
+[
+"Envelope",
+"Op elke tab: een schakelaar, de knoppen Delay, Attack, Hold, Decay, Sustain, Release en Amount, drie Tension-knoppen en een Tempo-schakelaar."
+],
+[
+"LFO",
+"Vorm Sine, Triangle of Pulse, de knoppen Delay, Attack, Amount en Speed, en de schakelaars Tempo en Global. Global laat de fase de positie in het nummer volgen."
+],
+[
+"Filter",
+"De knoppen Mod X en Mod Y en het filtertype: Fast LP, LP, BP, HP, BS, LP x2, SVF LP of SVF LP x2."
 ]
 ],
 "tips": [
 "Dubbelklik op de naam van de geselecteerde slice om hem te hernoemen. Elke slice kan een eigen triggertoets hebben.",
+"Een nieuwe Fruity Slicer begint zoals in FL: Animate en Declick aan, Dec op 4 ms en de volume-envelope aan met een korte release.",
+"De envelopepagina bewerkt de eigen waarden van FL, dus ze blijven behouden als het project naar een .flp wordt geëxporteerd.",
 "Slices die FL in de tijd uitrekt, worden in geïmporteerde projecten niet exact nagebootst."
 ]
 },
@@ -1704,6 +1845,82 @@
 "tips": [
 "Sleep een preset uit de lijst naar de Channel Rack om een nieuw kanaal ermee te krijgen.",
 "De reverb en chorus zijn die van LYNX SHARE zelf, niet het geluid van de ingebouwde exemplaren van FL Studio."
+]
+},
+"gen-slicex": {
+"source": "b1b0e1c0ba",
+"intro": "Slicex laadt op elk van twee decks, A en B, een sample, knipt het in regio's en speelt elke regio vanaf een toets. Hij opent de instellingen van Slicex van FL Studio uit een .flp en schrijft ze bij export terug. Een nieuwe instantie begint met lege decks en heeft geen bestanden uit een FL-installatie nodig. Een WAV-bestand dat zelf geen regio's meebrengt, wordt bij het laden op zijn aanslagen geslicet.",
+"controls": [
+[
+"Master sliders",
+"Master-niveau, Master-randomnessniveau, Master-LFO-niveau en Master-pitch, min 1200 tot 1200 cent."
+],
+[
+"MODULATION",
+"Een X / Y-pad met X- en Y-wielen. SMOOTH vlakt de modulatie af."
+],
+[
+"LAYERING",
+"Hoe regio's op dezelfde toets samen spelen: All, All (gain-compensated), Velocity-mapped, Modulation X-mapped, Modulation Y-mapped, Random, Cycle of Song time-synced. SAME DECK laat alleen regio's van hetzelfde deck lagen vormen."
+],
+[
+"CROSSFADE",
+"De curve tussen gelaagde regio's: none, linear, balanced curve, unbalanced curve of adding."
+],
+[
+"REGION SETTINGS",
+"De huidige regio, zijn OUT (offset van de uitgangstrack) en CUT (cutgroep), en vier rijen: AMP (panning en volume), FILTER (cutoff en resonantie), SPEED (pitch) en START (delay en samplestart). Elke rij heeft een ART-groepsnummer en een hoeveelheid."
+],
+[
+"ARTICULATOR",
+"Kiest een van de 8 articulatorgroepen. Zijn FILTER heeft een type (LP, BP, BS, HP), een modus (OFF, x1, x2, x3) en de wielen ENV, CUT en RES."
+],
+[
+"PAN, VOL, CUT, RES, SPEED, START",
+"Het doel dat de curve-editor toont."
+],
+[
+"ENV, LFO, VEL, MOD X, MOD Y, RAND",
+"Het deel van de articulator dat wordt getoond: zijn envelope, zijn LFO, of de map van velocity, modulatie X, modulatie Y of randomness."
+],
+[
+"TEMPO, GLOBAL",
+"TEMPO laat de tijd van de curve het tempo volgen. GLOBAL laat de LFO-fase met het nummer meelopen."
+],
+[
+"ATT, DEC, SUS, REL",
+"Schaal de attack-, decay- en releasetijden van de envelope en verschuif zijn sustainniveau."
+],
+[
+"SPD, TNS, SKEW, PW",
+"LFO-snelheid, tension, skew en pulsbreedte."
+],
+[
+"Deck tool row",
+"Loop, Play / pause, Stop, de menu's File, Regions, Select en Zoom, weergave met een of twee decks, en het huidige deck, A of B."
+],
+[
+"Bestand",
+"New, Load sample... en Save sample as..., dat de WAV van het deck met zijn regio's opslaat."
+],
+[
+"Regio's",
+"Add region..., Add marker..., Set loop, Delete, Rename all..., Set all cut groups to... en Freeze all."
+],
+[
+"Klavier",
+"Speelt de toetsen en toont welke regio's hebben. Zijn menu heeft Assign current region to this key en Select region assigned to this key. Het cijfer ernaast stelt het basisoctaaf in."
+],
+[
+"Opties",
+"Sample start covers whole length, Link velocity to volume, Loop half of regions en HQ envelopes."
+]
+],
+"tips": [
+"Sleep een sample op een deck om het te laden. Alleen een WAV-bestand krijgt markers uit het automatische slicen, omdat de markers in de WAV van het deck worden opgeslagen.",
+"Het menu van een regio heeft Delete, Clone as region, Turn into marker, Rename..., Trigger note en Zoom on.",
+"Noten met een even kleur spelen deck A en noten met een oneven kleur spelen deck B. Kleuren 14 en 15 spelen omgekeerd.",
+"De menu's Snap en View van FL zijn er nog niet, en de menu's File en Regions hebben alleen de hierboven genoemde items."
 ]
 },
 "gen-wave-traveller": {
@@ -2375,7 +2592,7 @@
 ]
 },
 "fx-apex-limiter": {
-"source": "cd8656b974",
+"source": "1b3edd96e8",
 "intro": "Apex Limiter is een look-ahead limiter voor het laatste slot van een track of de master. Je stelt in hoeveel gain erin gaat en waar het uitgangsplafond ligt. Het display toont het niveauverloop en de gain reduction.",
 "controls": [
 [
@@ -2397,6 +2614,14 @@
 [
 "Stijl",
 "Karakter van de limiting: Clean, Glue, Punch, Dynamic, Dense, Loud, Bus of Safe."
+],
+[
+"Nivellering",
+"In het paneel Advanced. Houdt het niveau met een trage attack op een drempel onder het plafond, en het plafond vangt de rest op. Standaard uit."
+],
+[
+"Threshold and Attack",
+"Onder Levelling: het niveau dat wordt vastgehouden, en hoeveel van een transient erdoor mag voordat het niveau wordt vastgehouden."
 ],
 [
 "True-peak-limiting",
@@ -2425,12 +2650,13 @@
 ],
 "tips": [
 "De editor toont de latentie in samples in de linkerbovenhoek.",
-"Zet true-peak limiting aan als het bestand naar een lossy formaat wordt geconverteerd."
+"Zet true-peak limiting aan als het bestand naar een lossy formaat wordt geconverteerd.",
+"Open het knoppenpaneel linksonder in het display en dan Advanced om bij Levelling te komen. Als je het uit en weer aan zet, blijft de threshold die je instelde behouden."
 ]
 },
 "fx-compressor": {
-"source": "95054dd4ae",
-"intro": "Compressor verlaagt het niveau van de luide delen van een track. Je voegt hem toe aan een insertslot en gebruikt hem om zang, drums en bassen gelijkmatiger te maken. Hij heeft een LYNX- en een RCOMP-modus, en een Classic- en een Vintage-klank.",
+"source": "86f6769b26",
+"intro": "Compressor verlaagt het niveau van de luide delen van een track. Je voegt hem toe aan een insertslot en gebruikt hem om zang, drums en bassen gelijkmatiger te maken. Hij heeft een Classic- en een Vintage-klank. Classic werkt zuiver of met een FET-curve met een zachte knie en een release die van het programma afhangt. De schakelaar LYNX en RComp kiest de bereiken van de regelaars.",
 "controls": [
 [
 "Threshold",
@@ -2473,13 +2699,26 @@
 "Kiest de klank."
 ],
 [
-"LYNX / RCOMP",
-"Kiest de modus en de bereiken die daarbij horen."
+"Clean / FET",
+"Getoond bij Classic. Clean is de compressor zoals hij was. FET voegt een knie van 5 dB toe en een release die van het programma afhangt. Clean is de standaard."
+],
+[
+"ARC / Manual, Electro / Opto, Warm / Smooth",
+"Getoond bij Vintage: de releasemodus, de releasecurve en het karakter."
+],
+[
+"Old / Measured",
+"Getoond bij Vintage: de statische curve. Projecten die met de oude curve zijn opgeslagen, houden die totdat je overschakelt."
+],
+[
+"LYNX / RComp",
+"Kiest de bereiken van de regelaars voor ratio, gain, attack en release."
 ]
 ],
 "tips": [
 "Zet Mix onder 100 procent om het ongecomprimeerde signaal erdoorheen te mengen.",
-"De meters In en Out tonen het niveau ervoor en erna, de middelste meter toont de gainverandering."
+"De meters In en Out tonen het niveau ervoor en erna, de middelste meter toont de gainverandering.",
+"FET staat uit in bestaande projecten, zodat ze klinken als voorheen."
 ]
 },
 "fx-crest-compressor": {
@@ -2993,6 +3232,206 @@
 "Vier van de 100 FL Studio-demostatussen gebruikten de lineaire-fasesplitsing of de modus Master Mid, die LYNX SHARE slechts benadert."
 ]
 },
+"fx-pocket-autoduck": {
+"source": "e6fc9bff7d",
+"intro": "Pocket Autoduck verlaagt het niveau op elke tel en laat het weer stijgen, wat een pompend geluid geeft zoals sidechaincompressie tegen een kick. Hij volgt de tel van het nummer, niet een audio-ingang. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Autoduck-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Ducking",
+"Diepte van de niveaudaling, 0 tot 100%. Bij 100% is het signaal op het laagste punt stil."
+],
+[
+"Attack",
+"Tijd die het niveau nodig heeft om te dalen, van een heel korte tijd tot ongeveer een halve tel. Getoond in ms bij het tempo van het nummer."
+],
+[
+"Curve",
+"Buigt de daling en het herstel. De waarde toont Linear aan de bovenkant van het bereik."
+],
+[
+"Tijd",
+"Lengte van de hele duck als deel van de tel, 0 tot 100%."
+],
+[
+"Shift",
+"Verschuift de duck eerder of later, -50 tot +50% van een tel."
+],
+[
+"Hold",
+"Hoe lang het niveau laag blijft voordat het herstelt, als deel van Time."
+],
+[
+"Vorm",
+"Vorm van het herstel: Accel, Accel 2, Decel, Decel 2, S-Curve of S-Curve 2."
+]
+],
+"tips": [
+"De duck herhaalt zich altijd één keer per tel. Andere notenlengtes zijn niet beschikbaar.",
+"Terwijl het nummer stilstaat, blijft de duck op het tempo van het nummer doorlopen."
+]
+},
+"fx-pocket-compressor": {
+"source": "a158158420",
+"intro": "Pocket Compressor verlaagt het niveau van de luide delen van een track. Een peakdetector met hold leest het luidste van de twee kanalen en één gain wordt op beide toegepast. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Compressor-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Thresh",
+"Niveau waarboven de compressie begint, -40 dB tot 0 dB."
+],
+[
+"Ratio",
+"1:1 tot 20:1 op een kwadratische wet. De top van het bereik toont +inf en houdt het niveau op de threshold."
+],
+[
+"Attack",
+"Hoe snel de detector een stijgend niveau volgt, 0 tot 50 ms op een kwadratische wet."
+],
+[
+"Release",
+"Hoe snel de vastgehouden piek daalt na de holdtijd, 10 ms tot 500 ms op een kwadratische wet."
+],
+[
+"Niveau",
+"Uitgangsgain. Met Auto gain aan toont hij -20 dB tot +20 dB, met Auto gain uit 0 dB tot +40 dB voor dezelfde draaiweg van de knop."
+],
+[
+"Hold",
+"Tijd dat de detector een piek vasthoudt voordat de release begint, 0 tot 50 ms op een kwadratische wet."
+],
+[
+"Auto-gain",
+"Voegt make-upgain toe die wordt berekend uit Thresh en Ratio, zodat een ingang op volle schaal ook op volle schaal uitkomt."
+],
+[
+"Ingangsgain",
+"Gain van alleen het signaal dat de detector voedt, -20 dB tot +20 dB. Het verandert het niveau van de audio zelf niet."
+],
+[
+"RMS",
+"Bewaard voor compatibiliteit. FL Studio Mobile zet hem nooit aan, dus hij toont altijd Off en heeft geen effect."
+]
+],
+"tips": [
+"Auto gain omschakelen verschuift de Level-uitlezing met 20 dB en het uitgangsniveau ermee. Controleer Level nadat je het hebt veranderd.",
+"Er is geen look-ahead en geen latentie."
+]
+},
+"fx-pocket-gate": {
+"source": "18a775e56a",
+"intro": "Pocket Gate verlaagt het signaal zolang het onder een threshold ligt. Gebruik hem om ruis tussen noten weg te halen of om drums strakker te maken. De regelaars staan op twee pagina's, LEVEL en ENVELOPE. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Gate-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"LEVEL / ENVELOPE",
+"Schakelt tussen de niveaupagina en de timingpagina."
+],
+[
+"Threshold",
+"Niveau dat de gate opent, -60 tot +6 dB. De gate opent als een van beide kanten erboven ligt."
+],
+[
+"Asymmetrie",
+"Hoe ver onder de threshold het niveau moet zakken voordat de gate sluit, 0 tot 66 dB."
+],
+[
+"Left and Right meters",
+"Toont het ingangsniveau met een streepje bij de threshold. De threshold in dB staat eronder."
+],
+[
+"Mix",
+"Diepte van de gate, -100 tot 100%. Bij 100% verlaagt een gesloten gate het signaal met 60 dB. Bij 0% doet de gate niets. Negatieve waarden keren de gate om, zodat hij het signaal verlaagt terwijl hij open is."
+],
+[
+"Attack and Release",
+"Tijd die de gate nodig heeft om te openen en om te sluiten, elk 0 tot 1000 ms."
+],
+[
+"A. Curve and R. Curve",
+"Bipolair, -1 tot 1. Buigt de opening en de sluitingshelling. Bij 0 is de helling lineair, de ene richting geeft een logaritmische vorm en de andere een exponentiële vorm."
+],
+[
+"Hold",
+"Kortste tijd dat de gate open blijft nadat hij is geopend, 0 tot 1000 ms."
+]
+],
+"tips": [
+"De gate meet het niveau in blokken van 256 samples en kijkt 255 samples vooruit. Dit meldt hij als latentie.",
+"Zet Asymmetry boven 0 om te voorkomen dat de gate klappert bij een signaal dat rond de threshold zweeft."
+]
+},
+"fx-pocket-leveller": {
+"source": "827df6c977",
+"intro": "Pocket Leveller stelt het niveau en de balans links/rechts van een track in. Het is een trim en comprimeert niet. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Leveller-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Gain",
+"Lange balk onder de dB-schaal. Stelt het niveau in van -60 tot +12 dB. De waarde staat boven de balk."
+],
+[
+"Pan",
+"Balans tussen de kanten, van 100% L via het midden tot 100% R. Het verlaagt de tegenovergestelde kant en laat de andere kant op vol niveau."
+],
+[
+"Level meter",
+"Dunne balk onder de schaal die het uitgangsniveau toont op dezelfde dB-schaal als Gain."
+]
+],
+"tips": [
+"Het linkereinde van de schaal heet -inf., maar de laagste gain is -60 dB, dus het signaal wordt niet helemaal gemute.",
+"Veranderingen van Gain en Pan glijden over enkele milliseconden, dus als je ze beweegt klikt het niet."
+]
+},
+"fx-pocket-limiter": {
+"source": "4419acdf41",
+"intro": "Pocket Limiter is een peaklimiter met 2 ms look-ahead. Duw het niveau omhoog met In Gain en hij houdt de pieken op de threshold. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Limiter-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"In-gain",
+"Gain vóór de limiter, -24 tot +24 dB."
+],
+[
+"Threshold",
+"Threshold. Niveau waarboven de gain wordt verlaagd, -24 tot 0 dB."
+],
+[
+"Release",
+"Tijd die de gain nodig heeft om na een piek terug te keren naar vol niveau, 0,10 tot 2,00 seconden."
+],
+[
+"Uitgangsgain",
+"Gain na de limiter, -24 tot +24 dB."
+],
+[
+"Gain reduction display",
+"Tekent de recente gainreductie, van 0 dB op de bovenste lijn tot 24 dB, met de nieuwste waarde rechts."
+]
+],
+"tips": [
+"De look-ahead voegt 2 ms latentie toe, die het effect aan de host meldt.",
+"Er is geen automatische make-upgain. Gebruik Out Gain om het eindniveau in te stellen."
+]
+},
+"fx-pocket-limiter-classic": {
+"source": "d5838309b0",
+"intro": "Pocket Limiter Classic is een eenvoudige peaklimiter. Als de luidste kant over de threshold gaat, daalt de gain meteen en herstelt dan langs een vloeiende curve. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Limiter (legacy)-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Threshold",
+"Niveau waarboven de gain wordt verlaagd, -24 tot 0 dB."
+],
+[
+"Releasetijd",
+"Hoe lang de gain nodig heeft om te herstellen, getoond als 0 tot 100%. Het loopt van ongeveer 200 ms bij 0% tot 1 seconde bij 100%."
+],
+[
+"Uitgangsgain",
+"Uitgangsniveau, -24 tot +12 dB."
+]
+],
+"tips": [
+"De uitgang wordt opgeschaald met het bedrag waarmee de threshold is verlaagd, zodat gelimiteerde pieken op het niveau van Output Gain uitkomen. Threshold verlagen maakt het signaal luider.",
+"Er is geen look-ahead en hij voegt geen latentie toe. De gain daalt binnen één sample als een piek de threshold overschrijdt."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband is een eigen effect van LYNX SHARE voor een mixer-insert. Het splitst het signaal in vier banden en past op elke band compressie of expansie toe. Een band die de gain niet verandert, laat het signaal ongemoeid, dus het effect is in rust transparant.",
@@ -3161,6 +3600,57 @@
 ],
 "tips": [
 "Er zijn 120 mogelijke verwerkingsvolgordes, in te stellen door de chevrons onderaan te slepen."
+]
+},
+"fx-strike-shaper": {
+"source": "81799e3815",
+"intro": "Strike Shaper is de eigen transient designer van LYNX. Hij vergelijkt twee envelopes van hetzelfde signaal en stelt de gain in uit hun verhouding, dus hij reageert hetzelfde op zachte en luide aanslagen en heeft geen threshold nodig. Gebruik Attack om aanzetten harder of zachter te maken en Sustain om staarten langer of korter te maken. Hij heeft geen look-ahead en voegt geen latentie toe.",
+"controls": [
+[
+"Attack",
+"Verhoogt of verlaagt het begin van elke aanslag, -15 dB tot +15 dB, op een afgedrukte schaal die fijner is bij 0 dB."
+],
+[
+"Sustain",
+"Verhoogt of verlaagt de wegstervende staart na elke aanslag, -24 dB tot +24 dB."
+],
+[
+"Uitgangsgain",
+"Uitgangsniveau, -20 dB tot +6 dB, met 0 dB bovenaan de knop."
+],
+[
+"On / Power",
+"Zet het effect aan of uit. De toets ON en het Power-lampje doen hetzelfde."
+],
+[
+"Koppelen",
+"Aan gebruikt één detector en één gain voor beide kanalen, zodat het stereobeeld niet verschuift. Uit vormt links en rechts apart."
+],
+[
+"Hoogdoorlaat van de detector",
+"Hoogdoorlaatfilter alleen op de detector, Off of 20 Hz tot 1 kHz. Het voorkomt dat lage frequenties de vormgeving activeren en filtert de audio zelf niet."
+],
+[
+"Bescherming",
+"Softclipper op de uitgang. Hij laat het signaal onder ongeveer -3 dBFS met rust en laat het nooit voorbij 0 dBFS komen."
+],
+[
+"Mix",
+"Blend tussen het droge en het gevormde signaal, 0 tot 100 %, voor parallelle bewerking. Output gain en Guard komen erna."
+],
+[
+"SIG / OVL lamps",
+"SIG licht op als er ingangssignaal is. OVL licht op als de uitgangspiek volle schaal bereikt."
+],
+[
+"Attack / Sustain rows",
+"Twee rijen lampjes tonen live hoe ver elke gain beweegt. Blauw links is een verlaging, rood rechts is een verhoging, met stappen bij 1, 3, 6, 10 en 15 dB."
+]
+],
+"tips": [
+"Met Attack en Sustain op 0 dB, Mix op 100 % en Output gain op 0 dB gaat het signaal ongewijzigd door.",
+"Grote verhogingen van Attack kunnen tot +15 dB op een aanslag toevoegen. Zet Guard aan of verlaag Output gain als het OVL-lampje oplicht.",
+"Houd de muis boven een knop om zijn waarde te lezen. Klik met rechts op een knop voor zijn waardemenu."
 ]
 },
 "fx-transient-processor": {
@@ -4362,6 +4852,66 @@
 "Het gekozen doel en de gekozen bank worden met de pluginstatus opgeslagen."
 ]
 },
+"fx-pocket-tape-delay": {
+"source": "6bcded6837",
+"intro": "Pocket Tape Delay modelleert één tapelus per kant. De tapesnelheid glijdt naar een nieuwe delaytijd, dus de echo's veranderen van toonhoogte terwijl Time beweegt. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Tape Delay-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Tijd",
+"Delaytijd, 0 tot 1000 ms. Hij is niet aan het tempo gesynchroniseerd."
+],
+[
+"Feedb.",
+"Feedback, 0 tot 100%. Hoeveel van de echo terug op de tape gaat."
+],
+[
+"Asynchroon",
+"Bipolair, -100 tot 100%. Verkort de delay van één kant met maximaal de helft. Negatieve waarden verkorten de linkerkant, positieve waarden de rechterkant."
+],
+[
+"Mix",
+"Niveau van de echo's, 0 tot 100%. De echo's worden bij het droge signaal opgeteld."
+]
+],
+"tips": [
+"Het echoniveau is Mix maal Fdbk, dus met Fdbk op 0 is bij elke Mix-stand geen echo te horen.",
+"Beweeg Time terwijl er geluid speelt voor een tapesnelheid-effect."
+]
+},
+"fx-pocket-trance-delay": {
+"source": "390a4b427a",
+"intro": "Pocket Trance Delay is een delay die aan het tempo van het nummer vastzit. De echo's worden bij het droge signaal opgeteld, dat altijd op vol niveau blijft. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Trance Delay-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"1/4, 3/8, 1/2, 3/4, 1/1",
+"Delaytijd als deel van een tel. De langste delay is 2 seconden."
+],
+[
+"Stereo / Ping-Pong / Mirror",
+"Kiest de modus. Stereo draait één delaylijn per kant. Ping-Pong kruist de lijnen zodat de echo's tussen de kanten wisselen. Mirror gebruikt lijnen van dubbele lengte en vertraagt de linkeringang met de delaytijd."
+],
+[
+"Ingangspan",
+"Alleen getoond in de modus Ping-Pong, 0 tot 100. Balans van de ingang die de delaylijnen voedt."
+],
+[
+"Feedback",
+"Hoeveel van elke echo wordt teruggevoerd. De eerste echo is al met dit bedrag geschaald, dus bij 0 zijn er geen echo's."
+],
+[
+"Filter",
+"Bipolair filter in de feedbacklus. Open in het midden, een laagdoorlaatfilter eronder en een zacht hoogdoorlaatfilter erboven."
+],
+[
+"Mix",
+"Niveau van de echo's. De schuifregelaar volgt een kwadratische wet."
+]
+],
+"tips": [
+"Als je de tijd of de modus verandert, worden de delaylijnen gewist, dus de echo's stoppen en beginnen opnieuw.",
+"Een opgeslagen instelling Dry pan zorgt dat Input Pan in de modus Ping-Pong ook het droge signaal panned. Ze wordt uit het .flm-project gelezen en heeft geen regelaar in de editor."
+]
+},
 "fx-spiral-echo": {
 "source": "60ff7072a7",
 "intro": "Spiral Echo is een eigen delay van LYNX SHARE voor een mixer-insert. Elke herhaling wordt iets verder in frequentie verschoven dan de vorige, waardoor de echo's stijgen of dalen in plaats van simpelweg te herhalen. In stereo hoort de rechterkant elke herhaling met de tegenovergestelde verschuiving.",
@@ -4943,6 +5493,269 @@
 "tips": [
 "Feedback heeft een teken, dus je kunt hem zowel onder als boven nul instellen.",
 "De modus Rise is een flanger waarvan de sweep als een barber-pole stijgt en daalt."
+]
+},
+"fx-pocket-chorus": {
+"source": "ab0abf77a0",
+"intro": "Pocket Chorus voegt twee gemoduleerde kopieën van het signaal toe aan het droge geluid voor een bredere, dikkere toon. De kopieën worden gemaakt van de som van de linker- en rechterkant en de delay is hoogstens 10 ms. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Chorus-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Rate",
+"Snelheid van de modulatie, 0,20 tot 4,20 Hz. De tweede stem loopt 0,1 Hz sneller."
+],
+[
+"Diepte",
+"Hoe ver de modulatie beweegt, 0 tot 100%."
+],
+[
+"Stereo",
+"Bij 100% gaat de ene stem naar de linkerkant en de andere naar de rechterkant. Lagere waarden zetten beide stemmen op beide kanten."
+],
+[
+"Mix",
+"Niveau van de twee stemmen, 0 tot 100%. Ze worden bij het droge signaal opgeteld, dat op vol niveau blijft. De regelaar volgt een kwadratische wet."
+]
+],
+"tips": [
+"Omdat de stemmen bovenop het droge signaal worden opgeteld, verhogen hoge Mix-waarden het niveau.",
+"De tweede stem faadt tussen het huidige signaal en een kopie van ongeveer 10 ms oud. Zijn delaytijd sweept niet. Dit komt overeen met FL Studio Mobile."
+]
+},
+"fx-pocket-flanger": {
+"source": "e810108b49",
+"intro": "Pocket Flanger voegt een heel korte delay toe aan het droge signaal, die door een LFO wordt gesweept. De delay is een lus in tapestijl waarvan de snelheid glijdt, wat de sweep zachter maakt. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Flanger-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"LFO-snelh.",
+"Lengte van de LFO-cyclus als Sync aan staat, in 13 stappen: 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 maat, 2 maten, 4 maten, 8 maten, 16 maten."
+],
+[
+"Sync",
+"Aan gebruikt LFO rate en volgt de positie in het nummer. Uit gebruikt LFO speed."
+],
+[
+"LFO-snelheid",
+"Snelheid van de LFO als Sync uit staat, 0,1 Hz tot 10 Hz op een derdemachtswet."
+],
+[
+"LFO-vorm",
+"Sine, Saw of Square."
+],
+[
+"LFO-hoeveelheid",
+"Hoe ver de LFO de delay rond zijn midden sweept, 0 tot 100 %."
+],
+[
+"Delay",
+"Middelste delay, 0 tot 2,5 ms op een kwadratische wet."
+],
+[
+"Feedback",
+"Hoeveelheid van het vertraagde signaal die terug de lus in gaat, 0 tot 100 %."
+],
+[
+"Feedback inverteren",
+"Keert de polariteit van de feedback om. Standaard aan."
+],
+[
+"Stereo",
+"Zet de LFO van het rechterkanaal in fase vooruit, tot een halve cyclus bij 100 %."
+],
+[
+"Mix",
+"Niveau van het vertraagde signaal dat bij het droge signaal wordt opgeteld, 0 tot 100 % op een kwadratische wet."
+],
+[
+"Mix omkeren",
+"Keert de polariteit van het vertraagde signaal om. Standaard aan."
+]
+],
+"tips": [
+"De snelheidslabels zijn die van FL Studio Mobile zelf: 1/1 is één tel en 1 maat is zestien tellen.",
+"De twee omkeerschakelaars veranderen welke frequenties het kamfilter uitdooft, probeer beide standen.",
+"Na een reset blijft het vertraagde signaal stil totdat één lus is opgenomen."
+]
+},
+"fx-pocket-multifx": {
+"source": "c0cd29ed70",
+"intro": "Pocket MultiFX draait een van acht effecten en zet zijn twee belangrijkste instellingen op een X/Y-pad. Een LFO die aan de positie in het nummer vastzit, kan de X-instelling bewegen. Het past bij live sweeps en automatisering. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun MultiFX-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Delay, Reverb, LP Filter, HP Filter, Flanger, Phaser, Panner, Vox",
+"Kiest het effect. Het oude effect faadt uit en het nieuwe faadt in."
+],
+[
+"X/Y pad",
+"Stelt de twee instellingen van het gekozen effect in. De lijnen op het pad dragen de namen van de assen. Delay: Feedback en Filter. Reverb: Decay en Filter. LP Filter en HP Filter: Frequency en Resonance. Flanger en Phaser: Frequency en Feedback. Panner: Panning en Distance. Vox: Vowel en Size."
+],
+[
+"LFO-snelh.",
+"Lengte van één LFO-cyclus, in tien stappen: 1/8, 1/4, 3/8, 1/2 en 3/4 tel, 1 tel, 2 tellen, 1 maat, 2 maten en 4 maten. Bij Delay stelt het ook de delaytijd in."
+],
+[
+"LFO-vorm",
+"Sine, Saw of Square."
+],
+[
+"LFO-hoeveelheid",
+"Hoe ver de LFO de X-instelling beweegt. Bij Delay panned de LFO in plaats daarvan de echo's. De schuifregelaar volgt een kwadratische wet."
+]
+],
+"tips": [
+"De LP- en HP-filters zijn 48 dB per octaaf. LP Filter bestrijkt ongeveer 64 Hz tot 20 kHz en HP Filter ongeveer 32 Hz tot 5,5 kHz.",
+"De LFO heeft geen effect op Reverb.",
+"Bij Delay wordt een delaytijd boven 1,5 seconde gehalveerd totdat hij past."
+]
+},
+"fx-pocket-phaser": {
+"source": "08e5a425cb",
+"intro": "Pocket Phaser stuurt het geluid door zes all-passtrappen van de eerste orde die door een LFO worden gesweept, en telt het resultaat op bij het droge signaal. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Phaser-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"LFO-snelh.",
+"Lengte van de LFO-cyclus als Sync aan staat, in 13 stappen: 1/4, 3/8, 1/2, 3/4, 1/1, 2/1, 4/1, 8/1, 1 maat, 2 maten, 4 maten, 8 maten, 16 maten."
+],
+[
+"LFO-hoeveelheid",
+"Hoe ver de LFO de trappen beweegt, 0 tot 100 % op een derdemachtswet."
+],
+[
+"Feedback",
+"Voert de laatste trap terug in de eerste, 0 tot 100 % (tot 0,95)."
+],
+[
+"Frequentie",
+"Midden van de sweep, 50 Hz tot 16 kHz op een kwadratische wet."
+],
+[
+"Mix",
+"Niveau van het gefaseerde signaal dat bij het droge signaal wordt opgeteld, 0 tot 100 % op een kwadratische wet. Het droge signaal blijft op vol niveau."
+],
+[
+"Sync",
+"Aan gebruikt LFO rate en volgt de positie in het nummer. Uit gebruikt LFO speed."
+],
+[
+"LFO-snelheid",
+"Snelheid van de LFO als Sync uit staat, 0,1 Hz tot 10 Hz op een derdemachtswet."
+],
+[
+"LFO-vorm",
+"Sine, Saw of Square."
+],
+[
+"Stereo",
+"Zet de LFO van het rechterkanaal in fase vooruit, tot een halve cyclus bij 100 %."
+]
+],
+"tips": [
+"De snelheidslabels zijn die van FL Studio Mobile zelf: 1/1 is één tel en 1 maat is zestien tellen, dus 16 maten is 256 tellen.",
+"De sweep is beperkt tot het bereik van 50 Hz tot 16 kHz."
+]
+},
+"fx-pocket-tremolo": {
+"source": "9bc38f0475",
+"intro": "Pocket Tremolo beweegt het niveau van een geluid met een LFO tussen een minimale en een maximale gain. Een faseverschil tussen links en rechts maakt er een auto-pan van. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Tremolo-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Rate",
+"Snelheid van de LFO als Sync uit staat, 0,1 Hz tot 20 Hz."
+],
+[
+"Rate-sync",
+"Lengte van de LFO-cyclus als Sync aan staat: 1/8, 1/4, 3/8, 1/2, 3/4, tel, 2 tellen, 4 tellen, 8 tellen of 16 tellen."
+],
+[
+"Max. hoeveelheid",
+"Hoogste gain van de cyclus, 0 tot 100 %. Als je hem onder Amount min zet, gaat het minimum mee omlaag."
+],
+[
+"Min. hoeveelheid",
+"Laagste gain van de cyclus, 0 tot 100 %. Als je hem boven Amount max zet, gaat het maximum mee omhoog."
+],
+[
+"Fase-offset",
+"Startfase van de LFO voor beide kanalen, 0 tot 360."
+],
+[
+"Stereoverschuiving",
+"Extra fase voor het rechterkanaal, 0 tot 360. Bij 180 bewegen de twee kanten in tegengestelde richting."
+],
+[
+"Sync",
+"Aan gebruikt Rate sync en volgt de positie in het nummer. Uit gebruikt Rate."
+],
+[
+"Vorm",
+"Buigt de golf met een exponent. Toont 0 tot 100, 50 laat hem ongebogen."
+],
+[
+"Smooth",
+"Mengt tussen de golf met rechte lijnen (0) en zijn afgeronde, sinusachtige versie (100)."
+],
+[
+"Skew",
+"Positie van de piek binnen de cyclus. Toont -100 tot +100, 0 is een symmetrische stijging en daling."
+],
+[
+"Breedte",
+"Deel van de cyclus dat bij het maximum wordt doorgebracht tegenover het minimum. Toont 0 tot 100, 50 is gelijk."
+]
+],
+"tips": [
+"De gainzwaai bereikt 99 % van het bereik tussen Amount min en Amount max.",
+"De gain wordt afgevlakt door een filter bij ongeveer 333 Hz, dus scherpe vormen klikken niet."
+]
+},
+"fx-pocket-wow-flutter": {
+"source": "69299f0824",
+"intro": "Pocket Wow & Flutter stuurt het geluid door een delay waarvan de lengte door twee sinus-LFO's wordt bewogen, wat de toonhoogte buigt als een onvaste tape. De uitgang is volledig wet, er is geen mixregelaar. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Wow & Flutter-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Wow-rate",
+"Snelheid van de trage LFO als Sync uit staat, 0,1 Hz tot 5 Hz."
+],
+[
+"Wow-sync",
+"Lengte van de wow-cyclus als Sync aan staat: 1/8, 1/4, 3/8, 1/2, 3/4, tel, 2 tellen, 4 tellen, 8 tellen of 16 tellen."
+],
+[
+"Wow-hoeveelheid",
+"Diepte van de wow, 0 tot 100 % op een exponentiële wet. Bij 100 % slingert de delay over maximaal 142 ms."
+],
+[
+"Flutter-rate",
+"Snelheid van de snelle LFO als Sync uit staat, 5 Hz tot 20 Hz."
+],
+[
+"Flutter-sync",
+"Lengte van de flutter-cyclus als Sync aan staat, dezelfde lijst als Wow sync."
+],
+[
+"Flutter-hoeveelheid",
+"Diepte van de flutter, 0 tot 100 %. Hij voegt tot 3 ms toe bovenop de wow-delay."
+],
+[
+"Sync",
+"Aan zet beide LFO's vast aan het tempo en gebruikt de twee synclengtes. Uit gebruikt de twee snelheden in Hz."
+],
+[
+"Willekeurige rate",
+"Hoe vaak een nieuwe wow-snelheid wordt gekozen, 0,1 Hz tot 10 Hz."
+],
+[
+"Willekeurige sync",
+"Stelt de tijd tussen de keuzes in als tempolengte, dezelfde lijst als Wow sync."
+],
+[
+"Willekeurige hoeveelheid",
+"Grootte van het venster waaruit de willekeurige keuze wordt gedaan, 0 tot 100 %. Met Sync uit ligt het venster rond Wow rate, met Sync aan rond de stap van Wow sync. Bij 0 % verandert de wow-snelheid niet."
+]
+],
+"tips": [
+"Random rate en Random sync stellen dezelfde timer in. Degene die als laatste is bewogen wint, wat Sync ook is.",
+"De delay groeit met Wow amount en wordt niet als latentie gemeld, dus hoge waarden maken de track te laat én wiebelig.",
+"Met Sync aan en Random amount op 0 % volgt de wow de positie in het nummer."
 ]
 },
 "fx-rhythmic-envelope": {
@@ -5548,6 +6361,114 @@
 "Draai Mix terug om wat van het schone signaal eronder te houden."
 ]
 },
+"fx-pocket-distortion": {
+"source": "d41cff05f7",
+"intro": "Pocket Distortion vormt het signaal met een van vier curves, houdt dan samples vast voor een gecrusht geluid en schaalt de uitgang. Gebruik hem om drums, bassen en synths wat rauwheid te geven. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Distortion-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Hard / Tube / Soft / Clip",
+"Kiest de curve. Hard is een kniecurve die afvlakt naarmate het niveau stijgt, Tube is een tanh-curve, Soft is een exponentiële curve en Clip kapt het signaal af op volle schaal."
+],
+[
+"Bias",
+"Bipolair, -100 tot 100. Voegt vóór de curve een offset toe zodat de twee helften van de golf verschillend vervormen. De schuifregelaar volgt een vijfdemachtswet, dus hij werkt vooral bij de uiteinden. Een hoogdoorlaatfilter haalt de offset na de curve weg."
+],
+[
+"Drive",
+"Hoeveelheid vervorming, getoond als 0 tot 100."
+],
+[
+"Stereo",
+"Verdeelt de drive over de kanten, getoond als -100 tot 100. Bij 0 krijgen beide kanten de volle drive. Onder 0 krijgt de linkerkant minder drive, boven 0 de rechterkant."
+],
+[
+"BitCrush",
+"Houdt elke uitgangssample vast voor 1 tot 257 samples. De schuifregelaar volgt een vierdemachtswet, dus de eerste helft verandert weinig."
+],
+[
+"Gain",
+"Uitgangsniveau, -24 tot 0 dB."
+]
+],
+"tips": [
+"BitCrush verlaagt de samplefrequentie door samples vast te houden. Het verlaagt de bitdiepte niet.",
+"Gain verlaagt alleen het niveau. Gebruik hem om het niveau te compenseren dat Drive toevoegt."
+]
+},
+"fx-pocket-waveshaper": {
+"source": "bd9e6bccf5",
+"intro": "Pocket Waveshaper vervormt een geluid door het door een van zeven curves te sturen. Twee filters komen vóór de curve en een toonsectie met drie banden erna, en een LFO kan de twee vormregelaars bewegen. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Waveshaper-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Vorm",
+"De curve: Soft, Tanh, Crossover, Fold, Octaver, Rectify of CrossFold."
+],
+[
+"Automatische gain",
+"Aan past het niveau van het gevormde signaal aan het ingangsniveau aan, met een trage volger."
+],
+[
+"X / Y",
+"Twee parameters van de gekozen curve. Wat ze veranderen hangt van de vorm af. Tonen 0 tot 100."
+],
+[
+"Drive",
+"Gain in de curve, 0 dB tot 40 dB. Toont 0 tot 100."
+],
+[
+"Post-gain",
+"Gain van het gevormde signaal, -18 dB tot +18 dB."
+],
+[
+"Stereobreedte",
+"Voegt voor de curve een offset met tegengesteld teken toe aan het linker- en rechtersignaal, zodat de twee kanten verschillend vervormen. Vierdemachtswet, toont 0 tot 100."
+],
+[
+"Mix",
+"Blend met gelijk vermogen van droog en gevormd signaal. Toont 0 tot 100."
+],
+[
+"High cut / Low cut",
+"Filters met twee polen vóór de curve, elk 20 Hz tot 20 kHz."
+],
+[
+"Bass",
+"Bell-band bij 100 Hz na de curve. Toont -18 dB tot +18 dB."
+],
+[
+"Mid freq / Mid gain",
+"Bell-band na de curve, 500 Hz tot 2 kHz. Gain toont -18 dB tot +18 dB."
+],
+[
+"Treble",
+"High shelf bij 3,3 kHz na de curve. Toont -18 dB tot +18 dB."
+],
+[
+"LFO-vorm",
+"Sine, Saw of Square."
+],
+[
+"LFO-sync",
+"Aan gebruikt LFO rate en volgt de positie in het nummer. Uit gebruikt LFO rate free."
+],
+[
+"LFO-snelh.",
+"Lengte van de LFO-cyclus als LFO sync aan staat: 1/8, 1/4, 3/8, 1/2, 3/4, tel, 2 tellen, maat, 2 maten of 4 maten."
+],
+[
+"Vrije LFO-snelheid",
+"Snelheid van de LFO als LFO sync uit staat, 0,02 Hz tot 9,92 Hz op een derdemachtswet."
+],
+[
+"LFO to X / LFO to Y",
+"Hoe ver de LFO X en Y beweegt, 0 tot 100 %. Bij 100 % beweegt hij een regelaar de helft van zijn bereik naar elke kant."
+]
+],
+"tips": [
+"De LFO en de waarden van X en Y worden één keer per songtick (1/96 van een tel) bijgewerkt, niet per sample.",
+"Een DC-filter na de curve haalt de offset weg die asymmetrische vormen en Stereo spread veroorzaken."
+]
+},
 "fx-squeeze": {
 "source": "82c718fe5f",
 "intro": "Squeeze is een insert-effect dat het signaal kwantiseert tot een kleiner aantal niveaus, het met zijn sectie Puncher periodiek kan gaten en het ervoor of erna kan filteren. Hij laadt de instellingen van Fruity Squeeze uit een geïmporteerd .flp-project.",
@@ -5678,7 +6599,7 @@
 ]
 },
 "fx-lynx-tune": {
-"source": "68589fac2a",
+"source": "428780a75c",
 "intro": "LYNX Tune corrigeert tijdens het spelen de toonhoogte van een stem of een instrument met enkele noten, op elke mixer-insert. Het is een eigen ontwerp van LYNX SHARE en geen import van een andere plugin. Het gebruikt YIN-pitchdetectie en TD-PSOLA-verschuiving.",
 "controls": [
 [
@@ -5700,6 +6621,10 @@
 [
 "Formant",
 "Schakelt formantbehoud in. Shift verplaatst de formanten."
+],
+[
+"ADEM",
+"Ademruis, 0 tot 100 procent. Voegt ademruis toe dat is gevormd door de formanten van de gecorrigeerde stem, op stemhebbende klanken."
 ],
 [
 "Transponeren",
@@ -6196,6 +7121,99 @@
 ],
 "tips": [
 "Een nieuwe instantie begint op zijn ingestelde waarden in plaats van in te faden."
+]
+},
+"fx-pocket-spacer": {
+"source": "0bad263ab8",
+"intro": "Pocket Spacer verplaatst een geluid door het stereobeeld met korte delays, polariteitsomkering en een breedteregelaar. Gebruik hem om één kant te verschuiven, een track smaller of breder te maken, of mid en side apart te bewerken. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Spacer-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"L/R-vertraging",
+"Vertraagt één kant met maximaal 300 ms op een derdemachtswet. Rechts van het midden vertraagt het linkerkanaal, links van het midden het rechterkanaal. Toont off in het midden."
+],
+[
+"Pan",
+"Verlaagt het niveau van de tegenovergestelde kant. Toont Center in het midden, daarna 0 tot 100 %."
+],
+[
+"Scheiding",
+"Bipolair, -100 % tot +100 %, uit in het midden. Positieve waarden maken het beeld smaller tot mono. Negatieve waarden trekken een deel van elk kanaal van het andere af om het breder te maken."
+],
+[
+"L/R-inversie",
+"Keert de polariteit van de kanalen om: geen, links, rechts of beide."
+],
+[
+"M/S-vertraging",
+"Vertraagt één signaal van het mid/side-paar met maximaal 100 ms op een vijfdemachtswet, dus het bereik dicht bij het midden is heel fijn (microseconden). Rechts van het midden vertraagt mid, links van het midden side."
+],
+[
+"M/S-inversie",
+"Keert de polariteit van het mid/side-paar om: geen, mid, side of beide."
+],
+[
+"Stereomodus",
+"Standard codeert naar mid/side, past de M/S-trap toe en decodeert terug naar links/rechts. Output M/S laat het resultaat als mid links en side rechts staan. Input M/S behandelt het binnenkomende links en rechts als mid en side en decodeert ze naar links/rechts."
+]
+],
+"tips": [
+"De vier continue regelaars glijden naar een nieuwe waarde, dus een delayverandering buigt even de toonhoogte.",
+"De delays maken deel uit van het geluid en worden niet als latentie gemeld."
+]
+},
+"fx-pocket-spreader": {
+"source": "c1689cdba4",
+"intro": "Pocket Spreader verbreedt het stereobeeld door een zijsignaal te vertragen en weer bij te mengen, en laat het deel onder de frequentie Low bypass buiten de verbreding. Hij draait dezelfde engine als Spreader achter de regelaarbereiken van FL Studio Mobile. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Spreader-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Breedte",
+"Toont 0,0 tot 2,0. Tot 1,0 verlengt het de delay van het verbredende signaal, tot ongeveer 6,35 ms. Boven 1,0 blijft de delay op zijn maximum en stijgt alleen het niveau van het verbredende signaal."
+],
+[
+"Laag-bypass",
+"Frequentie waaronder het signaal van de verbreding wordt afgesplitst, 10 Hz tot 10 kHz."
+],
+[
+"Mono-bas",
+"Hoeveel van het deel onder de frequentie Low bypass in mono wordt uitgestuurd. Continu, toont 0 tot 100."
+],
+[
+"Scheiding",
+"Niveau van het zijsignaal, -100 % tot +100 %. Toont Original in het midden. Bij -100 % wordt het zijsignaal verwijderd, bij +100 % wordt het verdubbeld."
+]
+],
+"tips": [
+"Het effect meldt een latentie van ongeveer 6,35 ms (280 samples bij 44,1 kHz) aan de delaycompensatie.",
+"De regelaars worden afgevlakt, dus het effect faadt na een reset in over enkele milliseconden."
+]
+},
+"fx-pocket-stereoizer": {
+"source": "6f5c30ec3c",
+"intro": "Pocket Stereoizer verbreedt een geluid door de monosom te vertragen en te filteren, en het resultaat dan bij het linkerkanaal op te tellen en van het rechter af te trekken. Gebruik hem op mono of smalle bronnen. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Stereoizer-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Sterkte",
+"Niveau van het toegevoegde signaal, op een kwadratische wet. Toont 0 tot 100. Dicht bij 0 is de verbreding uitgeschakeld."
+],
+[
+"Timbre",
+"Delay van de monosom, van 0,5 ms tot 50 ms op een derdemachtswet. Toont 0 tot 100."
+],
+[
+"Focus",
+"Eenpolig filter op het vertraagde signaal. Toont -100 % tot +100 %. Onder het midden is het een laagdoorlaatfilter, boven het midden een hoogdoorlaatfilter."
+],
+[
+"L/R-vertraging",
+"Vertraagt één kant met maximaal 25 ms op een derdemachtswet. Toont -100 % tot +100 %. Links van het midden vertraagt het linkerkanaal, rechts van het midden het rechterkanaal."
+],
+[
+"Pan",
+"Lineaire balans, -100 % tot +100 %. Verlaagt de tegenovergestelde kant en glijdt naar een nieuwe waarde."
+]
+],
+"tips": [
+"Het toegevoegde signaal heeft aan de twee kanten een tegengesteld teken, dus met L/R delay en Pan in het midden dooft het uit als de uitgang naar mono wordt opgeteld."
 ]
 },
 "fx-spreader": {
@@ -7011,12 +8029,36 @@
 ]
 },
 "gen-fruity-dance": {
-"source": "b830a4e6ca",
-"intro": "Fruity Dance is de eigen danser van LYNX SHARE in de rol van de FL-plugin met dezelfde naam. Hij maakt geen geluid. De noten van het kanaal kiezen de move. Je kunt de danser slepen om hem te plaatsen en er met rechts op klikken voor zijn moves.",
+"source": "601e484cb7",
+"intro": "Fruity Dance is de eigen danser van LYNX SHARE in de rol van de FL-plugin met dezelfde naam; zijn editor heet LYNX Dance. Hij maakt geen geluid; de noten van het kanaal kiezen de move. Je kunt de danser slepen om hem te plaatsen en er met rechts op klikken voor zijn moves. Hij kan ook een spritesheet tonen die voor Fruity Dance is gemaakt, in plaats van de danser van LYNX SHARE.",
 "controls": [
 [
 "Move",
-"De dansmove die het kanaal gebruikt."
+"De dansmove die het kanaal gebruikt. Met een spritesheet toont de lijst de eigen moves van de sheet."
+],
+[
+"Zichtbaar",
+"Toon of verberg de danser."
+],
+[
+"Horizontaal spiegelen",
+"Spiegel de danser."
+],
+[
+"Wijzigingen synchroniseren",
+"Aan: een nieuwe move begint bij de volgende cyclus. Uit: hij begint meteen."
+],
+[
+"Massief",
+"Aan: de danser pakt muisklikken op. Uit: klikken gaan erdoorheen."
+],
+[
+"Vooraan houden",
+"Houd de danser vóór de panelen en vastgemaakte plugins."
+],
+[
+"Op het bureaublad",
+"Bewaard voor FL Studio-projecten. Het doet hier niets: de dansers blijven binnen het hoofdvenster."
 ],
 [
 "Grootte",
@@ -7027,24 +8069,33 @@
 "Snelheid van de animatie, als vermenigvuldiger."
 ],
 [
-"Gespiegeld",
-"Spiegel de move."
+"Mengen",
+"Bewegingsmenging tussen de frames van een spritesheet, 0 tot 100 procent."
 ],
 [
-"De danser tonen",
-"Toon of verberg de danser."
+"Reflectie",
+"Doorzichtigheid van het spiegelbeeld onder de danser."
 ],
 [
-"Kleur van de outfit",
-"Kleur van het outfit van de danser."
+"Kleur van de outfit...",
+"Kleur van de outfit van de danser van LYNX SHARE."
 ],
 [
 "De danser terugzetten",
 "Zet de danser terug op zijn standaardpositie en toon hem."
+],
+[
+"Spritesheet laden...",
+"Kies een plaatje in het formaat van Fruity Dance: 8 frames breed en één rij per move, met een tekstbestand met dezelfde naam dat één movenaam per regel heeft."
+],
+[
+"Danser van LYNX",
+"Ga terug naar de eigen danser van LYNX SHARE."
 ]
 ],
 "tips": [
-"De editor toont welke toets welke move speelt. Gespiegelde versies van de moves zitten op een apart bereik van toetsen, en verdere toetsen verbergen of tonen de danser."
+"De editor toont welke toets welke move speelt. Gespiegelde versies van de moves zitten op een apart bereik van toetsen, en verdere toetsen verbergen of tonen de danser.",
+"De spritesheet-kiezer accepteert PNG- en JPEG-bestanden. Als de afmetingen van het plaatje niet bij het namenbestand passen, meldt de editor Bitmap size is incorrect en houdt hij de huidige danser."
 ]
 },
 "fx-fruity-html-notebook": {
@@ -7258,6 +8309,62 @@
 "Maak in de modus Auto het venster hoog en smal voor een meter, of breed en laag voor een scope."
 ]
 },
+"fx-audio-effect-rack": {
+"source": "adc619108a",
+"intro": "Audio Effect Rack is een mixerslot-effect gebouwd op Patcher in rackmodus. Elke keten krijgt dezelfde ingang en de uitgangen van de ketens worden opgeteld, met delaycompensatie ertussen. Voeg hem toe vanuit de plugin-kiezer van het mixerslot als Audio Effect Rack, of groepeer bestaande slots tot een rack. Audio Effect Racks in Ableton Live-sets (.als) openen als racks, en racks worden teruggeschreven als je een Live-set exporteert.",
+"controls": [
+[
+"Chain list",
+"Eén rij per keten met zijn naam, volume, pan, een aan-schakelaar en S voor solo. Het ketenmenu heeft Add chain, Rename, Duplicate, Delete, Move up en Move down."
+],
+[
+"Apparaten",
+"De effecten van de geselecteerde keten. Het toevoegmenu biedt Effects, Plugin effects en Racks, zodat racks genest kunnen worden."
+],
+[
+"Chain, Hide",
+"De editor voor de ketenselectiezones tonen of verbergen. Een Audio Effect Rack heeft geen toets- of velocityzones."
+],
+[
+"Zone bars",
+"Sleep een balk of zijn uiteinden om de zone van de keten in te stellen, 0 tot 127. De bovenste strook stelt de fades in, die de uitgang van de keten schalen."
+],
+[
+"Ketenkiezer",
+"De waarde waarmee de zones worden vergeleken. Een macro kan hem aansturen."
+],
+[
+"Macro's",
+"Tot 16 knoppen, elk met een naamplaatje en een waarde. + en - tonen er meer of minder: 1, 2, 4 enzovoort tot 16."
+],
+[
+"Map",
+"Map-modus. Elke macro krijgt een Map-knop die een menu opent met de ketens, hun apparaten en parameters, Chain Volume, Chain Pan en Chain Selector. De koppellijst toont Macro, Path, Name, Min en Max, met Invert Range en Delete."
+],
+[
+"Rand",
+"Geeft elke gekoppelde macro een willekeurige waarde. Het menu van een macro heeft Exclude Macro from Randomization."
+],
+[
+"Macrovariaties",
+"New slaat de macrowaarden op. Een variatie heeft Launch, Overwrite, Rename, Duplicate en Delete."
+],
+[
+"Groeperen in audio-effectrack",
+"In het mixerslotmenu: zet het effect in een nieuw rack met één keten. Group all into Audio Effect Rack zet de hele keten van slots erin. Het geluid blijft hetzelfde en automatisering van de verplaatste parameters stuurt de macro's van het rack aan."
+],
+[
+"Groep opheffen",
+"In het mixerslotmenu van een rack met één keten: zet zijn apparaten terug in de slots."
+]
+],
+"tips": [
+"Buiten een zone die zonder fade eindigt, sluit de ingang van de keten, zodat zijn staarten uitklinken.",
+"Uit een Live-set behoudt een rack zijn ketens, zones, ketenvolume en -pan, macro's, variaties en geneste racks. Plugins van derden in de ketens blijven behouden. De eigen apparaten van Live vallen weg en staan in het importrapport.",
+"Een macrokoppeling op een VST3-pluginparameter in een Live-set blijft niet behouden. Bij export worden effecten van LYNX SHARE in een keten niet geschreven; alleen VST2- en VST3-plugins en geneste racks wel.",
+"Ungroup is niet beschikbaar voor een rack met meer dan één keten."
+]
+},
 "fx-fruity-send": {
 "source": "96c8f760a7",
 "intro": "Fruity Send is een plugin voor effectslots die het signaal op zijn plek in de keten naar een andere mixer-insert stuurt. Je gebruikt hem als je een send midden in een keten nodig hebt, bijvoorbeeld na het ene effect maar voor het volgende. Hij wordt uit FL Studio-projecten gelezen als ze worden geïmporteerd.",
@@ -7334,6 +8441,58 @@
 "Voer Ping uit met je apparatuur aangesloten om de delay in te stellen."
 ]
 },
+"gen-instrument-rack": {
+"source": "8198b21313",
+"intro": "Instrument Rack is een generator van het Channel Rack, gebouwd op Patcher in rackmodus. Elke keten krijgt dezelfde noten en de uitgangen van de ketens worden opgeteld. Een keten houdt zijn apparaten in deze volgorde: MIDI-effecten, het instrument, audio-effecten. Voeg hem toe vanuit de plugin-kiezer als Instrument Rack. Instrument Racks in Ableton Live-sets (.als) openen als racks, en racks worden teruggeschreven als je een Live-set exporteert.",
+"controls": [
+[
+"Chain list",
+"Eén rij per keten met zijn naam, volume, pan, een aan-schakelaar en S voor solo. Het ketenmenu heeft Add chain, Rename, Duplicate, Delete, Move up en Move down."
+],
+[
+"Apparaten",
+"De apparaten van de geselecteerde keten. Het toevoegmenu biedt Effects, Plugin effects, Racks, MIDI effects en Instruments. Instruments toont Synth, Instrument Rack en Plugin instruments."
+],
+[
+"Key, Vel, Chain, Hide",
+"Kies de zone-editor: toetszones, velocityzones, ketenselectiezones of geen. Zones lopen van 0 tot 127."
+],
+[
+"Zone bars",
+"Sleep een balk of zijn uiteinden om de zone in te stellen. De bovenste strook van een balk stelt de fades in. Fades van toets en velocity schalen de velocity van de noten die de keten binnenkomen. De ketenselectiefade schaalt de uitgang van de keten."
+],
+[
+"Ketenkiezer",
+"De waarde waarmee de ketenselectiezones worden vergeleken. Een macro kan hem aansturen."
+],
+[
+"Macro's",
+"Tot 16 knoppen, elk met een naamplaatje en een waarde. + en - tonen er meer of minder: 1, 2, 4 enzovoort tot 16."
+],
+[
+"Map",
+"Map-modus. Elke macro krijgt een Map-knop die een menu opent met de ketens, hun apparaten en parameters, Chain Volume, Chain Pan en Chain Selector. De koppellijst toont Macro, Path, Name, Min en Max, met Invert Range en Delete."
+],
+[
+"Rand",
+"Geeft elke gekoppelde macro een willekeurige waarde. Het menu van een macro heeft Exclude Macro from Randomization."
+],
+[
+"Macrovariaties",
+"New slaat de macrowaarden op. Een variatie heeft Launch, Overwrite, Rename, Duplicate en Delete. Het menu van een macro heeft Exclude Macro from Variations."
+],
+[
+"Variation morph (LYNX), Launch glide (LYNX)",
+"Toevoegingen van LYNX SHARE in het variatiemenu, beide standaard uit: een Morph-schuifregelaar tussen twee variaties, en een glijtijd voor een gelanceerde variatie."
+]
+],
+"tips": [
+"Een macro beweegt elke gekoppelde parameter lineair tussen Min en Max. Een parameter hoort tegelijk bij één macro.",
+"De macro's, de ketenkiezer en de morph kunnen worden geautomatiseerd zoals de gepubliceerde parameters van een Patcher.",
+"Uit een Live-set behoudt een rack zijn ketens, zones, ketenvolume en -pan, macro's, variaties en geneste racks. Plugins van derden in de ketens blijven behouden. De eigen apparaten van Live vallen weg en staan in het importrapport.",
+"Een macrokoppeling op een VST3-pluginparameter in een Live-set blijft niet behouden. Bij export worden ingebouwde apparaten van LYNX SHARE in een keten niet geschreven; alleen VST2- en VST3-plugins en geneste racks wel."
+]
+},
 "gen-layer": {
 "source": "bdb4d8e177",
 "intro": "Een Layer is een kanaal zonder eigen geluid. Voeg hem toe aan de Channel Rack, kies welke kanalen zijn children zijn, en elke noot die naar de Layer wordt gestuurd speelt die children af. Gebruik hem om instrumenten te stapelen, een keyboard tussen geluiden te splitsen of tussen samples af te wisselen.",
@@ -7382,6 +8541,61 @@
 "tips": [
 "In een Patcher heeft de Layer een Children-pin: verbind die met kabels met de generators die hij moet spelen.",
 "Layering > Split children geeft elk child één toets, beginnend bij de grondtoets."
+]
+},
+"gen-midi-effect-rack": {
+"source": "ee0bfb9d44",
+"intro": "MIDI Effect Rack is een generator van het Channel Rack, gebouwd op Patcher in rackmodus. Zijn ketens bevatten alleen MIDI-effecten. Elke keten krijgt dezelfde noten, en wat de ketens spelen gaat naar de kindkanalen van het rack, zoals bij een Layer-kanaal. Voeg hem toe vanuit de plugin-kiezer als MIDI Effect Rack. Dezelfde ketens van MIDI-effecten kunnen ook vooraan in een keten van een Instrument Rack staan.",
+"controls": [
+[
+"Children instellen",
+"In het ketenmenu: maakt van de kanalen die in het Channel Rack zijn geselecteerd de kinderen die dit rack speelt. Show children selecteert ze opnieuw."
+],
+[
+"Chain list",
+"Eén rij per keten. Het ketenmenu heeft Add chain, Rename, Duplicate, Delete, Move up en Move down."
+],
+[
+"Apparaten",
+"De MIDI-effecten van de geselecteerde keten, toegevoegd vanuit het menu MIDI effects."
+],
+[
+"Key, Vel, Chain, Hide",
+"Kies de zone-editor: toetszones, velocityzones, ketenselectiezones of geen. Zones lopen van 0 tot 127."
+],
+[
+"Zone bars",
+"Sleep een balk of zijn uiteinden om de zone in te stellen. De bovenste strook van een balk stelt de fades in. In een MIDI Effect Rack schalen alle drie de fades de velocity van de noten."
+],
+[
+"Ketenkiezer",
+"De waarde waarmee de ketenselectiezones worden vergeleken. Een macro kan hem aansturen."
+],
+[
+"Ketenkiezer filtert MIDI-controllers",
+"Een schakelaar in het ketenmenu, opgeslagen met het rack."
+],
+[
+"Macro's",
+"Tot 16 knoppen. + en - tonen er meer of minder."
+],
+[
+"Map",
+"Map-modus. Elke macro krijgt een Map-knop die een menu opent met de apparaatparameters van de ketens en Chain Selector. De koppellijst toont Macro, Path, Name, Min en Max."
+],
+[
+"Rand",
+"Geeft elke gekoppelde macro een willekeurige waarde, behalve macro's die van randomisatie zijn uitgesloten."
+],
+[
+"Macrovariaties",
+"Sla sets macrowaarden op en lanceer ze: New, Launch, Overwrite, Rename, Duplicate en Delete."
+]
+],
+"tips": [
+"Zolang er geen kinderen zijn ingesteld, zegt de titelbalk van het rack dat er nog geen zijn en speelt het rack niets.",
+"De ketens hebben geen volume of pan: een MIDI Effect Rack geeft alleen noten door.",
+"Een MIDI Effect Rack van LYNX SHARE wordt in een geëxporteerde Live-set geschreven als MIDI Effect Rack, zonder de ingebouwde MIDI-effecten erin. Als een Live-set wordt geopend, worden de MIDI Effect Racks van Live niet omgezet; ze staan in het importrapport."
 ]
 },
 "gen-midi-out": {

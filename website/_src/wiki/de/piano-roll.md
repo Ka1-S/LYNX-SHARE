@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Das Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Jedes Werkzeug hat eine Buchstabentaste. Die Buchstaben funktionieren, solange d
 
 ## Klaviatur und Lineal
 
-Klicke auf eine Taste der Klaviatur, um sie zu hören. Weiter rechts auf der Taste ist lauter. `Ctrl`+Klick auf eine Taste wählt ihre Noten. Mit der mittleren Taste auf der Klaviatur ziehen macht die Tasten höher oder niedriger.
+Klicke auf eine Taste der Klaviatur, um sie zu hören. Weiter rechts auf der Taste ist lauter. `Ctrl`+Klick auf eine Taste wählt ihre Noten. Mit der mittleren Taste auf der Klaviatur ziehen macht die Tasten höher oder niedriger. Das tut auch das vertikale Zoomrad, das kleine Quadrat am Ende der Zeit-Bildlaufleiste: Ziehe es nach oben oder unten oder nutze das Mausrad darüber.
+
+`Ansicht › Klaviatur-Stil` im Menü des Piano Roll wählt zwischen `Flache Tasten` und `Klaviertasten (Linien zwischen den weißen Tasten)`, was eine herkömmliche Klaviatur zeichnet.
 
 Klicke auf das Lineal, um die Position zu setzen. `Ctrl`+Ziehen, Ziehen mit rechts oder Doppelklick-Ziehen auf dem Lineal wählt die Noten in einem Zeitbereich. `Ctrl`+Mausrad zoomt und `Shift`+Mausrad scrollt.
 
@@ -56,13 +58,23 @@ Klicke auf das Lineal, um die Position zu setzen. `Ctrl`+Ziehen, Ziehen mit rech
 | Einstellung | Was sie tut |
 |---|---|
 | Raster | „Main“ folgt dem Raster der Haupt-Werkzeugleiste, oder du wählst eines für dieses Fenster. |
-| Akkord | Ein Klick erzeugt den gewählten Akkord, mit der angeklickten Note als Grundton. `Shift+N` geht zurück zu einzelnen Noten. |
-| Skala | Hebt die Noten einer Skala hervor. Ein eigener Button rastet neue und verschobene Noten sowie eingehendes MIDI auf die gewählte Skala ein. |
+| Akkord | Ein Klick erzeugt den gewählten Akkord, mit der angeklickten Note als Grundton. `Shift+N` geht zurück zu einzelnen Noten. Dieselbe Liste ist `Akkord-Stempel` im Menü des Piano Roll. |
+| Skala | Hebt die Noten einer Skala hervor. Ein eigener Button rastet neue und verschobene Noten sowie eingehendes MIDI auf die gewählte Skala ein. Verschobene Noten bewegen sich dann in Skalenschritten, sodass ein Akkord in der Skala bleibt, und `Up` und `Down` bewegen um einen Skalenschritt. |
 | Slide (`S`) | Neue Noten sind Slide-Noten. Die gerade klingende Note gleitet zu ihnen (808-Glide). |
 | Ghost-Notes (`Alt+V`) | Zeigt die Noten der anderen Kanäle hinter deinen. |
 | Notenfarbe | Neue Noten bekommen diese Farbe. Es gibt 16. |
 | Folgen | Die Ansicht scrollt mit dem Abspielcursor, während das Pattern spielt. |
-| Spurfeld | Wählt, was die untere Spur bearbeitet: Velocity, Pan oder Feinstimmung. |
+| Spurfeld | Wählt, was die untere Spur bearbeitet: Velocity, Pan, Fine pitch, Release, Mod X, Mod Y, Chance oder Velocity range. |
+
+## Chance und Velocity-Bereich
+
+Jede Note hat eine Chance und einen Velocity-Bereich. Die Chance gibt an, wie wahrscheinlich die Note bei jedem Durchlauf spielt. Der Velocity-Bereich lässt ihre Velocity zwischen der Velocity der Note und dieser Velocity plus dem Bereich schwanken. Wähle `Wahrscheinlichkeit` oder `Velocity-Bereich (LYNX)` im Spurfeld, um sie zu bearbeiten. `Tools › Wahrscheinlichkeit (LYNX)` im Menü des Piano Roll gruppiert die gewählten Noten so, dass entweder alle oder nur eine von ihnen spielt, und hat `Wahrscheinlichkeit und Velocity-Bereich zurücksetzen`.
+
+## MIDI-Tools und Skripte
+
+`Tools › MIDI-Werkzeuge...` im Menü des Piano Roll öffnet ein Panel mit Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp und Velocity Shaper.
+
+Die Spalte `Skripte` im Menü `Tools` listet Piano-Roll-Skripte auf: die eigenen von LYNX SHARE und `.pyscript`-Dateien, darunter die in den Skriptordnern von FL Studio, falls FL Studio installiert ist. `Skriptordner öffnen...` öffnet den Ordner für deine eigenen Skripte, und `Letztes Skript erneut ausführen` wiederholt das letzte.
 
 ## Tasten
 

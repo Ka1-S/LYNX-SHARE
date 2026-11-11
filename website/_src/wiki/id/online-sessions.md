@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Ada dua cara mengerjakan proyek bersama orang lain, dan keduanya ada di `File › Sesi online`. Paket adalah file yang kamu kirim ke teman, yang lalu mengirim sebuah bagian kembali. Tidak butuh jaringan, akun, atau server. Sesi live menghubungkan semua orang lewat internet melalui relay LYNX SHARE, dan setiap perubahan sampai ke semua orang. Hingga 4 orang ikut dalam satu proyek, termasuk kamu.
 
@@ -64,6 +64,7 @@ Menu `File › Sesi online` punya perintah berikut selama sesi berjalan:
 | `Obrolan sesi...` | Membuka obrolan. Item menu menampilkan jumlah pesan yang belum dibaca |
 | `Ikuti transport host` | Untuk tamu: play, stop, dan posisi mengikuti host |
 | `Orang dan izin...` | Untuk host: apa yang boleh diubah tiap orang, dan apa yang disimpan masing-masing di akhir |
+| `Bagikan plugin ke para tamu...` | Untuk host: plugin milikmu yang boleh dipakai tamu. Item menu menunjukkan berapa banyak yang dibagikan |
 | `Tampilkan kode undangan...` | Untuk host: menampilkan kode lagi, dengan tombol `Salin` |
 | `Akhiri sesi live` | Untuk host. Semua orang keluar, dan kodenya berhenti berlaku |
 | `Keluar dari sesi live` | Untuk tamu. Bagianmu dari proyek tetap bersamamu |
@@ -77,6 +78,27 @@ Channel atau insert yang pluginnya tidak terpasang di komputermu memainkan stand
 - Dalam paket, stand-in adalah render audio yang dibuat saat paket disimpan. Stand-in mengikuti clip yang kamu pindahkan, tetapi tidak mengikuti perubahan not dari plugin yang tidak kamu punya. Minta pemiliknya mengirim paket baru.
 - Dalam sesi live, bagian yang memakai plugin yang tidak dimiliki seseorang di-render oleh orang yang memilikinya dan di-stream ke yang lain sebagai audio.
 
+## Bagikan pluginmu ke para tamu
+
+Di sesi live, host bisa membiarkan tamu memakai plugin yang hanya dimiliki host.
+
+Host melakukan ini:
+
+1. Pilih `File › Sesi online › Bagikan plugin ke para tamu...`.
+2. Centang plugin yang akan dibagikan. `Cari di plugin Anda` mempersempit daftar. Tidak ada yang dibagikan sampai kamu mencentangnya.
+
+Tamu melakukan ini:
+
+1. Buka menu plugin salah satu channel atau slot efekmu. Plugin yang dibagikan muncul lebih dulu, di bawah `On <host>'s computer`.
+2. Pilih salah satunya. Jendelanya mencantumkan parameter plugin sebagai slider, dengan `Cari parameter`.
+3. Tambahkan not dan gerakkan slider. Jendela menampilkan `Updating...` saat komputer host sedang me-render, lalu `Terbaru`.
+
+- Plugin tetap berada di komputer host dan berjalan dengan lisensi host. LYNX SHARE tidak pernah mengirim plugin, file, preset, atau lisensinya.
+- Tamu mendengar hasil render yang mengikuti not dan nilai setelah beberapa saat. Ia tidak diputar secara langsung, dan tamu tidak mendapat jendela milik plugin itu sendiri.
+- Selama host tidak ada, render terakhir yang diputar. Pembagian berhenti saat sesi berakhir, dan render terakhir tetap ada.
+- Tamu dengan peran `Hanya mendengarkan (tanpa suntingan)` tidak bisa memakai plugin yang dibagikan.
+- Sebagian lisensi plugin tidak mengizinkan orang lain mengoperasikan plugin, bahkan dari jarak jauh. Periksa tiap lisensi sebelum kamu membagikan.
+
 ## Apa yang lewat jaringan
 
 Paket adalah file. Tidak ada yang diunggah ke mana pun.
@@ -89,6 +111,8 @@ Sesi live hanya terhubung selama kamu berada di dalamnya. Semuanya lewat relay `
 - Kedua pihak sebaiknya memakai versi LYNX SHARE yang sama. Ringkasan paket memberi peringatan kalau berbeda.
 - Tamu yang koneksinya putus tersambung kembali sendiri dan suntingannya tetap ada.
 - Kalau LYNX SHARE milik host tertutup selama sesi, saat dijalankan berikutnya program menawarkan untuk melanjutkannya, dan para tamu tersambung kembali sendiri.
+- Jika LYNX SHARE milik tamu tertutup selama sesi, saat dibuka berikutnya akan ditanya apakah mau masuk kembali. `Masuk lagi` mengembalikanmu sebagai orang yang sama, dengan bagianmu dan semua yang sudah kamu ubah. Ini berlaku selama 12 jam.
+- Versi Linux bisa menjadi host sesi live sejak 0.1.26.
 - Dalam sesi live, urungkan dan ulangi hanya mengembalikan suntinganmu sendiri.
 - Siapa pun yang punya kode undangan bisa meminta bergabung, tetapi hanya setelah host mengizinkan mereka masuk.
 

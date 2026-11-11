@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Step satırlarıyla Channel Rack](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Bunlar Channel Rack odaktayken çalışır.
 | Sessiz | `1` - `0` | 1 ile 10 arası kanalları susturur veya sesini açar |
 | Solo | `Ctrl+1` - `Ctrl+0` | 1 ile 10 arası kanalları solo yapar |
 | Grafik şeridi | `Ctrl+K` | Grafik şeridini gösterir veya gizler |
+
+## Bir kanalı dondurma
+
+Dondurma, bir kanalı sese render eder ve onun yerine o sesi çalar. Enstrüman, üçüncü taraf plugin de olsa, bellekten çıkarılır; böylece CPU ve bellek kullanmaz.
+
+1. Kanala sağ tıklayıp `Dondur` seçin. Birden fazla kanal seçiliyken öğe `Seçili kanalları dondur` olarak görünür.
+2. Satır bir kar tanesi etiketi alır. Kanalın sesi, pan'ı ve insert'inin efektleri eskisi gibi çalışır.
+3. Notaları veya enstrümanı yeniden değiştirmek için kanala sağ tıklayıp `Çöz` seçin. Enstrüman sahip olduğu ayarlarla geri gelir.
+
+Dondurulmuş bir kanal düzenlenemez: step'leri kilitlidir ve enstrüman penceresi açılmaz. Notalar, tempo veya aranjman dondurmadan sonra değişirse etiket renk değiştirir ve önceden yapılan ses, `Yeniden dondur` seçene kadar çalmaya devam eder. Render edilen ses dosyaları eksikse bunun yerine enstrüman çalar.
+
+Dondurma yalnızca kanallarda çalışır. Bir Mixer insert'i dondurulamaz.
 
 ## Kanal menüsündeki diğer şeyler
 

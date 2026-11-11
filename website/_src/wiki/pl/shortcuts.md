@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![Okno Zarządzaj skrótami: przeszukiwalna lista akcji z klawiszami każdej z nich](/assets/img/wiki/shortcuts.webp)
 
-To domyślne klawisze w wersji 0.1.25 alfa. `Pomoc › Skróty` (`F1`) pokazuje ściągawkę skrótów w programie. `Opcje › Zarządzaj skrótami...` otwiera edytor widoczny na obrazku, w którym je zmieniasz.
+To domyślne klawisze w wersji 0.1.26 alfa. `Pomoc › Skróty` (`F1`) pokazuje ściągawkę skrótów w programie. `Opcje › Zarządzaj skrótami...` otwiera edytor widoczny na obrazku, w którym je zmieniasz.
 
 > W macOS program pokazuje klawisze pod nazwami z Maca: Ctrl jest pokazywany jako ⌘, a Alt jako ⌥.
 
@@ -76,6 +76,19 @@ Niektóre z tych klawiszy robią coś innego w edytorze, który ma fokus. W Pian
 | `Alt+F7` | Klawiatura dotykowa |
 | `Ctrl+F5` | Tap tempo |
 | `F1` | Ściągawka skrótów |
+
+## Clip View i Device View
+
+Te klawisze działają tylko w pracy z uruchamianiem klipów.
+
+| Klawisz | Co robi |
+|---|---|
+| `Ctrl+Alt+L` | Pokaż lub ukryj widok szczegółów |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Przełącz między Clip View a Device View |
+| `Left` / `Right` | Device View: zaznacz poprzednie, następne urządzenie |
+| `Del` lub `Backspace` | Device View: usuń zaznaczony efekt |
 
 ## Patterny
 
@@ -171,6 +184,7 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `Alt+L` | Articulate |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Generuj progresję akordów |
+| `Ctrl+Alt+Y` | Uruchom ostatni skrypt jeszcze raz |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `Ctrl+B` | Duplikuj |
 | `Del` | Usuwa zaznaczone klipy |
 | `Shift+Del` | Usuwa zaznaczone klipy i zamyka luki |
+| `Shift+Left` / `Shift+Right` | Przesuń zaznaczone klipy o jeden krok przyciągania w lewo, w prawo |
+| `Shift+Up` / `Shift+Down` | Przesuń zaznaczone klipy o jedną ścieżkę w górę, w dół |
+| `Alt+Left` / `Alt+Right` | Przesuń zaznaczone klipy w lewo, w prawo o drobny krok, bez przyciągania. `Shift+Alt` robi to samo |
+| `Ctrl+D` | Odznacz klipy i czas |
+| `Shift+I` | Odwróć zaznaczenie |
+| `Shift+C` | Zaznacz klipy zaznaczonego źródła |
 | `Shift+S` | Włącza lub wyłącza edycję ripple |
 | `Backspace` | Wyłącza lub włącza przyciąganie |
 | `Alt+M` / `Shift+Alt+M` | Wycisza, przywraca zaznaczone klipy |
@@ -195,6 +215,8 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `7` / `8` | Obniża, podwyższa zaznaczone klipy audio o półton |
 | `9` | Odwraca zaznaczone klipy audio |
 | `Ctrl+Ins` / `Ctrl+Del` | Wstawia, usuwa długość zaznaczenia czasu na wszystkich ścieżkach |
+| `Ctrl+Alt+Ins` | Potnij klipy i wstaw przestrzeń |
+| `Ctrl+Alt+Home` | Zmiana rozmiaru klipów od lewej, włącz lub wyłącz |
 | `Ctrl+Left` / `Ctrl+Right` | Zaznacza poprzedni, następny czas |
 | `Ctrl+Enter` | Zaznacza czas wokół zaznaczenia |
 | `Alt+T` | Dodaje znacznik czasu |
@@ -220,7 +242,7 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `Ctrl+L` | Łączy zaznaczone kanały z zaznaczonym insertem |
 | `Ctrl+Shift+L` | Łączy zaznaczone kanały z insertami, zaczynając od zaznaczonego |
 | `Alt+L` | Zaznacza kanały połączone z zaznaczonym insertem |
-| `Del` | Usuwa plugin w zaznaczonym slocie efektu |
+| `Del` | Usuń zaznaczone inserty. LYNX SHARE najpierw pyta |
 | `Ctrl+E` | Otwiera edytor audio |
 | `Shift+E` | Otwiera edytor audio i nagrywa |
 | `Alt+R` | Renderuje uzbrojone inserty do plików WAV |
@@ -242,6 +264,8 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 - Gdy pianino z klawiatury komputera jest włączone, jego klawisze grają nuty, a większość jednoliterowych skrótów jest wstrzymana (`L` nadal działa). Wyłączasz je przez `Ctrl+T`.
 - Skrót działa albo wszędzie, albo w jednym oknie. Skrót przypisany do okna wygrywa z tymi samymi klawiszami działającymi wszędzie, dopóki to okno ma fokus.
 - Niektóre akcje nie mają domyślnego klawisza, na przykład Paleta szybkiego dodawania. Nadaj im go w edytorze.
+- W Playliście klawisze przesuwające klipy przesuwają wszystkie klipy, gdy żaden nie jest zaznaczony. Drobny krok `Alt+Left` i `Alt+Right` to jeden piksel przy bieżącym zoomie.
+- Skróty LYNX SHARE działają też, gdy okno pluginu ma fokus, na przykład `Space`. Zwykłe litery i cyfry trafiają najpierw do pluginu, a `Esc` zamyka jego okno.
 
 ## Powiązane
 

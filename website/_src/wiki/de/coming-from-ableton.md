@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![Das Clip-Start-Layout: ein Clip-Raster mit Szenen neben der Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Ein Bericht nach dem Export listet auf, was ausgelassen wurde.
 ## Gut zu wissen
 
 - Die eigenen Devices von Live werden nicht nachgebaut. Die eigenen Effekte von Live fallen beim Import weg.
-- Instrument-, Audio-Effect- und MIDI-Effect-Racks kommen mit ihren Ketten, Zonen und Makros.
+- Instrument- und Audio-Effect-Racks kommen mit ihren Ketten, Zonen und Makros. Die MIDI-Effect-Racks von Live werden noch nicht umgewandelt und stehen im Importbericht.
 - Der Importbericht listet auf, was ausgelassen wurde.
 - Live kürzt Audioclips, die sich in einem exportierten Set überlappen.
 - Warp-Marker aus einem Live-Set bleiben beim Import erhalten und werden beim Export zurückgeschrieben.

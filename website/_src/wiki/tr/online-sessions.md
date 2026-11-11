@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Bir projede başkalarıyla çalışmanın iki yolu vardır ve ikisi de `Dosya › Çevrimiçi oturum` altındadır. Paket, bir arkadaşınıza gönderdiğiniz ve onun bir parti geri gönderdiği dosyadır. Ağ, hesap ya da sunucu gerektirmez. Canlı oturum ise herkesi internet üzerinden LYNX SHARE relay'i aracılığıyla bağlar ve her değişiklik herkese ulaşır. Bir projede siz dahil en fazla 4 kişi yer alır.
 
@@ -64,6 +64,7 @@ Oturum sürerken `Dosya › Çevrimiçi oturum` menüsünde şu komutlar bulunur
 | `Oturum sohbeti...` | Sohbeti açar. Menü öğesi okunmamış mesaj sayısını gösterir |
 | `Ev sahibinin aktarımını takip et` | Misafirler için: çalma, durdurma ve konum ev sahibini izler |
 | `Kişiler ve izinler...` | Ev sahibi için: her kişinin neyi değiştirebileceği ve sonunda neyin elinde kalacağı |
+| `Plugin'leri misafirlerle paylaş...` | Host için: hangi plugin'lerinizi konukların kullanabileceği. Menü öğesi kaç tanesinin paylaşıldığını gösterir |
 | `Davet kodunu göster...` | Ev sahibi için: kodu bir `Kopyala` düğmesiyle yeniden gösterir |
 | `Canlı oturumu sonlandır` | Ev sahibi için. Herkes ayrılır ve kod geçersiz olur |
 | `Canlı oturumdan ayrıl` | Bir misafir için. Projedeki partiniz sizde kalır |
@@ -77,6 +78,27 @@ Plugin'i bilgisayarınızda kurulu olmayan bir kanal ya da insert, yedeğini ça
 - Bir pakette yedekler, paket kaydedilirken yapılan ses render'larıdır. Taşıdığınız klipleri izlerler, ama sahip olmadığınız bir plugin'in notalarında yapılan düzenlemeleri izlemezler. Sahibinden yeni bir paket isteyin.
 - Canlı oturumda, birinin sahip olmadığı bir plugin'i kullanan partiler, plugin'e sahip kişi tarafından render edilir ve diğerlerine ses olarak akıtılır.
 
+## Plugin'lerinizi konuklarla paylaşın
+
+Canlı bir oturumda host, konukların yalnızca host'ta bulunan plugin'leri kullanmasına izin verebilir.
+
+Host şunu yapar:
+
+1. `Dosya › Çevrimiçi oturum › Plugin'leri misafirlerle paylaş...` seçin.
+2. Paylaşılacak plugin'leri işaretleyin. `Plugin'lerinde ara` listeyi daraltır. İşaretlemediğiniz hiçbir şey paylaşılmaz.
+
+Konuk şunu yapar:
+
+1. Kanallarınızdan birinin veya efekt yuvalarınızdan birinin plugin menüsünü açın. Paylaşılan plugin'ler `On <host>'s computer` altında en başta gelir.
+2. Birini seçin. Penceresi plugin'in parametrelerini kaydırıcılar olarak listeler; `Parametrelerde ara` ile.
+3. Nota ekleyin ve kaydırıcıları oynatın. Host'un bilgisayarı render alırken pencerede `Updating...`, sonra `Güncel` yazar.
+
+- Plugin host'un bilgisayarında kalır ve host'un lisansı altında çalışır. LYNX SHARE plugin'i, dosyalarını, preset'lerini veya lisansını asla göndermez.
+- Konuk, kısa bir gecikmeyle notaları ve değerleri izleyen bir render duyar. Canlı çalınmaz ve konuk plugin'in kendi penceresini almaz.
+- Host yokken son render çalar. Oturum bitince paylaşım durur, son render kalır.
+- `Yalnızca dinleme (düzenleme yok)` rolündeki bir konuk paylaşılan plugin'leri kullanamaz.
+- Bazı plugin lisansları, uzaktan bile olsa, başkalarının plugin'i kullanmasına izin vermez. Paylaşmadan önce her lisansı kontrol edin.
+
 ## Ağ üzerinden neler geçer
 
 Paketler dosyadır. Hiçbir yere yüklenmez.
@@ -89,6 +111,8 @@ Canlı oturum yalnızca içindeyken bağlanır. Her şey `relay.lynx-share.com` 
 - İki taraf da aynı LYNX SHARE sürümünü kullanmalıdır. Sürümler farklıysa paket özeti uyarır.
 - Bağlantısı kopan misafir kendiliğinden yeniden bağlanır ve düzenlemelerini korur.
 - Oturum sırasında ev sahibinin LYNX SHARE'i kapanırsa bir sonraki açılışta oturumu sürdürmeyi önerir ve misafirler kendiliğinden yeniden bağlanır.
+- Bir konuğun LYNX SHARE'i oturum sırasında kapanırsa bir sonraki açılışta geri girmek isteyip istemediğiniz sorulur. `Geri dön`, sizi aynı kişi olarak, kendi parçanız ve değiştirdiğiniz her şeyle geri getirir. Bu 12 saat boyunca çalışır.
+- Linux sürümü 0.1.26'dan beri canlı oturum açabilir.
 - Canlı oturumda geri al ve yinele yalnızca kendi düzenlemelerinizi geri getirir.
 - Davet koduna sahip herkes katılmak için istekte bulunabilir, ama yalnızca ev sahibi içeri aldıktan sonra katılır.
 

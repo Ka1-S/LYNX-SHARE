@@ -48,6 +48,12 @@ The standard folders are scanned, plus the ones you add:
 - macOS: `VST3`, `Components` and `CLAP` in `~/Library/Audio/Plug-Ins` and `/Library/Audio/Plug-Ins`.
 - Linux: `~/.vst3`, `~/.clap`, `~/.lv2`, `~/.vst` and the same folders under `/usr/lib` and `/usr/local/lib`.
 
+## Docked and detached plugin windows
+
+A plugin's editor opens inside the main window, like the other panels. `Detached` in the plugin window's menu gives that plugin a window of its own, and `Pin on top` in the same menu keeps a detached window above LYNX SHARE's other windows.
+
+`Detach all new plugins` in `Options › General settings...` opens every plugin you add detached. `Tools › Switch all plugin editors to` sets `Attached` or `Detached` for all plugins of the project.
+
 ## Run plugins in a separate process
 
 By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take the program down. As an option, each plugin runs in its own process.
@@ -56,15 +62,17 @@ By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take th
 2. Turn on `Run plugins in a separate process (protects LYNX SHARE from crashes)`.
 3. Reopen the project to apply it to plugins that are already open.
 
-If such a plugin crashes or stops answering, it is muted, a message appears and LYNX SHARE keeps running. Save the project and reopen it to load the plugin again. The plugin's editor opens in its own window.
+If such a plugin crashes or stops answering, it is muted, a message appears and LYNX SHARE keeps running. `Reload` in that message starts the plugin again with the settings from the last save or backup, without reopening the project. The plugin's editor opens in its own window and cannot be docked or pinned.
 
 To do this for one plugin only, use `Run in a separate process` or `Always run <plugin> in a separate process` in the plugin window's wrapper menu. When a plugin's editor crashes, the message that appears offers the second one too.
 
 This works on Windows and Linux, and since 0.1.25 on macOS.
 
+A plugin that crashes inside LYNX SHARE is switched off, and its message offers `Reload` too. Later, use `Reload crashed plugin` in the channel's menu or the effect slot's menu.
+
 ## 32-bit plugins (Windows only)
 
-On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.exe`). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. A bridged plugin's editor opens in its own window. When both a 32-bit and a 64-bit build of a plugin are installed, `Bit size` in the plugin window's `Wrapper settings` chooses which one loads.
+On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.exe`). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. A bridged plugin's editor opens in its own window and cannot be docked or pinned. When both a 32-bit and a 64-bit build of a plugin are installed, `Bit size` in the plugin window's `Wrapper settings` chooses which one loads.
 
 ## Plugin performance monitor
 
@@ -80,16 +88,35 @@ On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.ex
 | `Reset on play` | Starts averages and peaks again each time playback starts |
 | `Reset` | Clears averages and peaks now |
 
+## Send an instrument's outputs to separate inserts
+
+An instrument plugin with several outputs can play each one on its own Mixer insert. In the plugin's window, click `Wrapper settings`, then the `Processing` tab. Under `Connections`, each output has a light that turns it on or off and a number: how many inserts after the channel's own insert it plays on. `Auto map outputs` gives each output the next insert, and `Reset` goes back to the defaults.
+
+## The Plugin database folder
+
+The folders of the [Browser](/wiki/browser/)'s Plugin database, the plugin picker and the plugin menus are a folder on disk: `LYNX/Plugin database` in your Documents folder. To open it, right-click `Plugin database` in the Browser and choose `Open`.
+
+- `Effects` and `Generators` hold one `.lynxplugin` file per plugin. Make folders and subfolders (up to 4 levels) and move the files into them.
+- Rename a file to rename the plugin in the menus. Delete a file to take the plugin out of the menus. It is not uninstalled.
+- `Installed` has an entry for every plugin. Copy one into `Effects` or `Generators` to bring a plugin back.
+
+## Open a project without its plugins
+
+`File › Open without third-party plugins...` opens a LYNX SHARE project with every third-party plugin switched off, for a project that will not open or crashes while it loads. The plugins' saved settings are kept. `File › Switch plugins back on...` turns them on again.
+
 ## When a plugin is not installed
 
 LYNX SHARE first looks for the same plugin by its identifier, then by file, then by name. A project saved with the VST2 opens with the VST3 of the same product and the other way round, but then the plugin plays with its default settings.
 
-If an effect is not installed at all, a LYNX SHARE effect with the same role takes its slot and the original stays in the project. See [Built-in instruments and effects](/wiki/built-in/). `Help › Missing files...` lists the plugins that were replaced.
+If an effect is not installed at all, a LYNX SHARE effect with the same role takes its slot and the original stays in the project. Where the plugin's saved settings can be read, the stand-in starts with matching settings. The switch is `Substitute missing plugins with LYNX SHARE equivalents` in `Options › General settings...`. See [Built-in instruments and effects](/wiki/built-in/). `Help › Missing files...` lists the plugins that were replaced.
 
 ## Good to know
 
 - A hosted plugin's window has a preset bar: the plugin's own programs, your presets, `Save preset...`, `Load preset file...` and `Export preset file...`. `.fxp`, `.fxb` and `.vstpreset` files only load into a plugin that runs inside LYNX SHARE, not in a separate process.
 - The monitor measures only while its window is open.
+- While a plugin's window has focus, a key the plugin does not use plays the typing keyboard piano. On Windows, with the keyboard button in the window's header off, LYNX SHARE handles keys before the plugin, shortcuts included.
+- A VST3 plugin's own parameter menu starts with LYNX SHARE's items, such as `Create automation clip`. See [Automation](/wiki/automation/).
+- `MPE` under `MIDI` in a plugin's `Wrapper settings` sends each note on its own MIDI channel. See [MIDI controllers](/wiki/midi-controllers/).
 - Missing instruments are not substituted yet. A missing instrument plugin becomes a built-in synth chosen by the channel name.
 
 ## Related

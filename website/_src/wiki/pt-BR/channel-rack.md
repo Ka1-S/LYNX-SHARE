@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![O Channel Rack com linhas de steps](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Funcionam enquanto o Channel Rack está com o foco.
 | Mudo | `1` a `0` | Silencia ou reativa os canais 1 a 10 |
 | Solo | `Ctrl+1` a `Ctrl+0` | Coloca em solo os canais 1 a 10 |
 | Faixa de gráfico | `Ctrl+K` | Mostra ou oculta a faixa de gráfico |
+
+## Congelar um canal
+
+Congelar renderiza um canal em áudio e toca esse áudio no lugar dele. O instrumento é descarregado, plugin de terceiros também, então não usa CPU nem memória.
+
+1. Clique com o botão direito no canal e escolha `Congelar`. Com vários canais selecionados, o item diz `Congelar os canais selecionados`.
+2. A linha ganha uma etiqueta de floco de neve. O volume, o pan do canal e os efeitos do insert dele continuam funcionando como antes.
+3. Para mudar as notas ou o instrumento de novo, clique com o botão direito no canal e escolha `Descongelar`. O instrumento volta com as configurações que tinha.
+
+Um canal congelado não pode ser editado: os steps ficam travados e a janela do instrumento não abre. Se as notas, o tempo ou o arranjo mudarem depois do congelamento, a etiqueta muda de cor e o áudio feito antes continua tocando até você escolher `Recongelar`. Se os arquivos de áudio renderizados estiverem faltando, o instrumento toca no lugar.
+
+Congelar funciona só em canais. Um insert do Mixer não pode ser congelado.
 
 ## Outras opções do menu do canal
 

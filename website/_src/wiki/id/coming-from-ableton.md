@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Laporan setelah ekspor mencantumkan apa yang tidak ikut ditulis.
 ## Perlu diketahui
 
 - Device bawaan Live sendiri tidak dibuat ulang. Efek bawaan Live dibuang saat impor.
-- Rack Instrument, Audio Effect, dan MIDI Effect masuk beserta rantai, zona, dan makronya.
+- Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya. MIDI Effect Rack milik Live belum dikonversi dan dicantumkan di laporan impor.
 - Laporan impor mencantumkan apa yang tidak ikut diimpor.
 - Live memangkas clip audio yang saling tumpang tindih dalam set yang diekspor.
 - Warp marker dari set Live dipertahankan saat impor dan ditulis kembali saat ekspor.

@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Il Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Ogni strumento ha un tasto a lettera. Le lettere funzionano mentre il pianoforte
 
 ## Tastiera e righello
 
-Clicca un tasto sulla tastiera per sentirlo. Più a destra sul tasto è più forte. `Ctrl`+clic su un tasto ne seleziona le note. Il trascinamento con il tasto centrale sulla tastiera rende i tasti più alti o più bassi.
+Clicca un tasto sulla tastiera per sentirlo. Più a destra sul tasto è più forte. `Ctrl`+clic su un tasto ne seleziona le note. Il trascinamento con il tasto centrale sulla tastiera rende i tasti più alti o più bassi. Lo fa anche la rotella dello zoom verticale, il piccolo quadrato alla fine della barra di scorrimento del tempo: trascinala su o giù, oppure usa la rotella del mouse sopra di essa.
+
+`Vista › Stile della tastiera` nel menu del Piano roll sceglie tra `Tasti piatti` e `Tasti di pianoforte (linee tra i tasti bianchi)`, che disegna una tastiera tradizionale.
 
 Clicca il righello per impostare la posizione. `Ctrl`+trascina, trascina con il tasto destro o doppio clic e trascina sul righello selezionano le note in un intervallo di tempo. `Ctrl`+rotellina fa lo zoom e `Shift`+rotellina scorre.
 
@@ -56,13 +58,23 @@ Clicca il righello per impostare la posizione. `Ctrl`+trascina, trascina con il 
 | Impostazione | Cosa fa |
 |---|---|
 | Snap | "Principale" segue lo snap della barra degli strumenti principale, oppure ne scegli uno per questa finestra. |
-| Accordo | Cliccando si crea l'accordo scelto, con la nota cliccata come fondamentale. `Shift+N` torna alle note singole. |
-| Scala | Evidenzia le note di una scala. Un pulsante separato aggancia alla scala scelta le note nuove e spostate, e il MIDI in ingresso. |
+| Accordo | Cliccando si crea l'accordo scelto, con la nota cliccata come fondamentale. `Shift+N` torna alle note singole. La stessa lista è `Timbro accordo` nel menu del Piano roll. |
+| Scala | Evidenzia le note di una scala. Un pulsante separato aggancia alla scala scelta le note nuove e spostate, e il MIDI in ingresso. Le note spostate si muovono allora per gradi della scala, così un accordo resta nella scala, e `Up` e `Down` spostano di un grado della scala. |
 | Slide (`S`) | Le nuove note sono note slide. La nota che sta suonando scivola verso di esse (glide 808). |
 | Note fantasma (`Alt+V`) | Mostra dietro alle tue le note degli altri canali. |
 | Colore nota | Le nuove note ricevono questo colore. Ce ne sono 16. |
 | Segui | La vista scorre con il cursore di riproduzione mentre il pattern suona. |
-| Riquadro della corsia | Sceglie cosa modifica la corsia in basso: Velocity, Pan o Intonazione fine. |
+| Riquadro della corsia | Sceglie cosa modifica la corsia in basso: Velocity, Pan, Intonazione fine, Release, Mod X, Mod Y, Chance o Velocity range. |
+
+## Chance e velocity range
+
+Ogni nota ha una Chance e un Velocity range. La Chance è la probabilità che la nota suoni a ogni passaggio. Il Velocity range lascia variare la velocity della nota tra la sua velocity e quella velocity più il range. Scegli `Probabilità` o `Intervallo di velocity (LYNX)` nel riquadro della corsia per modificarli. `Strumenti › Probabilità (LYNX)` nel menu del Piano roll raggruppa le note selezionate in modo che suonino tutte o ne suoni una sola, e ha `Reimposta probabilità e intervallo di velocity`.
+
+## Strumenti MIDI e script
+
+`Strumenti › Strumenti MIDI...` nel menu del Piano roll apre un pannello con Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp e Velocity Shaper.
+
+La colonna `Script` del menu `Strumenti` elenca gli script del Piano roll: quelli propri di LYNX SHARE e i file `.pyscript`, compresi quelli nelle cartelle degli script di FL Studio se FL Studio è installato. `Apri la cartella degli script...` apre la cartella per i tuoi script, e `Esegui di nuovo l'ultimo script` ripete l'ultimo.
 
 ## Tasti
 

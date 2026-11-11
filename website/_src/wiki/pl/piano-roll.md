@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Każde narzędzie ma klawisz literowy. Litery działają, gdy pianino z klawiatu
 
 ## Klawiatura i linijka
 
-Kliknij klawisz na klawiaturze, żeby go usłyszeć. Im dalej w prawo na klawiszu, tym głośniej. `Ctrl`+klik klawisza zaznacza jego nuty. Przeciągnięcie środkowym przyciskiem na klawiaturze robi klawisze wyższe lub niższe.
+Kliknij klawisz na klawiaturze, żeby go usłyszeć. Im dalej w prawo na klawiszu, tym głośniej. `Ctrl`+klik klawisza zaznacza jego nuty. Przeciągnięcie środkowym przyciskiem na klawiaturze robi klawisze wyższe lub niższe. To samo robi pionowe kółko zoomu, małe kwadratowe pole na końcu paska przewijania czasu: przeciągnij je w górę lub w dół albo użyj kółka myszy nad nim.
+
+`Widok › Styl klawiatury` w menu Piano Roll wybiera między `Płaskie klawisze` a `Klawisze fortepianu (linie między białymi klawiszami)`, który rysuje tradycyjną klawiaturę.
 
 Kliknij linijkę, żeby ustawić pozycję. `Ctrl`+przeciągnięcie, przeciągnięcie prawym przyciskiem albo dwuklik z przeciągnięciem na linijce zaznacza nuty w zakresie czasu. `Ctrl`+kółko zmienia powiększenie, a `Shift`+kółko przewija.
 
@@ -56,13 +58,23 @@ Kliknij linijkę, żeby ustawić pozycję. `Ctrl`+przeciągnięcie, przeciągni�
 | Ustawienie | Co robi |
 |---|---|
 | Przyciąganie | "Główne" podąża za przyciąganiem na głównym pasku narzędzi albo wybierasz własne dla tego okna. |
-| Akord | Kliknięcie tworzy wybrany akord, z klikniętą nutą jako prymą. `Shift+N` wraca do pojedynczych nut. |
-| Skala | Podświetla nuty skali. Osobny przycisk przyciąga nowe i przesunięte nuty oraz przychodzące MIDI do wybranej skali. |
+| Akord | Kliknięcie tworzy wybrany akord, z klikniętą nutą jako prymą. `Shift+N` wraca do pojedynczych nut. Ta sama lista to `Stempel akordu` w menu Piano Roll. |
+| Skala | Podświetla nuty skali. Osobny przycisk przyciąga nowe i przesunięte nuty oraz przychodzące MIDI do wybranej skali. Przesunięte nuty przesuwają się wtedy o stopnie skali, więc akord zostaje w skali, a `Up` i `Down` przesuwają o jeden stopień skali. |
 | Slide (`S`) | Nowe nuty są nutami slide. Brzmiąca nuta ślizga się do nich (glide 808). |
 | Nuty-duchy (`Alt+V`) | Pokazuje nuty innych kanałów za twoimi. |
 | Kolor nut | Nowe nuty dostają ten kolor. Jest ich 16. |
 | Podążanie | Widok przewija się z kursorem odtwarzania, gdy pattern gra. |
-| Pole ścieżki | Wybiera, co edytuje dolna ścieżka: Velocity, Panoramę lub Dostrojenie. |
+| Pole ścieżki | Wybiera, co edytuje dolna ścieżka: Velocity, Panoramę, Dostrojenie, Release, Mod X, Mod Y, Szansę lub Zakres velocity. |
+
+## Szansa i zakres velocity
+
+Każda nuta ma Szansę i Zakres velocity. Szansa to prawdopodobieństwo, że nuta zagra za każdym razem, gdy przychodzi jej kolej. Zakres velocity pozwala jej velocity zmieniać się między velocity nuty a tym velocity plus zakres. Wybierz `Szansa` lub `Zakres velocity (LYNX)` w polu ścieżki, żeby je edytować. `Narzędzia › Szansa (LYNX)` w menu Piano Roll grupuje zaznaczone nuty tak, że gra albo każda z nich, albo tylko jedna, i ma `Resetuj szansę i zakres velocity`.
+
+## Narzędzia MIDI i skrypty
+
+`Narzędzia › Narzędzia MIDI...` w menu Piano Roll otwiera panel z Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp i Velocity Shaper.
+
+Kolumna `Skrypty` menu `Narzędzia` wymienia skrypty Piano Roll: własne skrypty LYNX SHARE i pliki `.pyscript`, także te z folderów skryptów FL Studio, jeśli FL Studio jest zainstalowane. `Otwórz folder skryptów...` otwiera folder na własne skrypty, a `Uruchom ponownie ostatni skrypt` powtarza ostatni.
 
 ## Klawisze
 

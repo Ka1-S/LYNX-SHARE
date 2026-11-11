@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Das Channel Rack mit Step-Zeilen](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Diese gelten, solange das Channel Rack den Fokus hat.
 | Stummschalten | `1` bis `0` | Schaltet die Kanäle 1 bis 10 stumm oder wieder laut |
 | Solo | `Ctrl+1` bis `Ctrl+0` | Schaltet die Kanäle 1 bis 10 solo |
 | Graph-Spur | `Ctrl+K` | Blendet die Graph-Spur ein oder aus |
+
+## Einen Kanal einfrieren
+
+Beim Einfrieren wird ein Kanal zu Audio gerendert, und dieses Audio spielt an seiner Stelle. Das Instrument wird entladen, auch ein Fremd-Plugin, sodass es weder CPU noch Speicher braucht.
+
+1. Klicke mit der rechten Maustaste auf den Kanal und wähle `Einfrieren`. Sind mehrere Kanäle gewählt, heißt der Eintrag `Ausgewählte Kanäle einfrieren`.
+2. Die Zeile bekommt ein Schneeflocken-Zeichen. Lautstärke und Pan des Kanals sowie die Effekte seines Inserts funktionieren weiter wie bisher.
+3. Um die Noten oder das Instrument wieder zu ändern, klicke mit der rechten Maustaste auf den Kanal und wähle `Auftauen`. Das Instrument kommt mit den Einstellungen zurück, die es hatte.
+
+Ein eingefrorener Kanal lässt sich nicht bearbeiten: Seine Steps sind gesperrt, und das Fenster seines Instruments öffnet sich nicht. Ändern sich nach dem Einfrieren die Noten, das Tempo oder das Arrangement, wechselt das Zeichen die Farbe, und das zuvor erzeugte Audio spielt weiter, bis du `Erneut einfrieren` wählst. Fehlen die gerenderten Audiodateien, spielt stattdessen das Instrument.
+
+Einfrieren funktioniert nur bei Kanälen. Ein Mixer-Insert lässt sich nicht einfrieren.
 
 ## Weitere Einträge im Kanalmenü
 

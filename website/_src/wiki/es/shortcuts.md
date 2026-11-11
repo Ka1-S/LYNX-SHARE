@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![La ventana Gestionar atajos: una lista con búsqueda de acciones con las teclas de cada una](/assets/img/wiki/shortcuts.webp)
 
-Estas son las teclas por defecto de la 0.1.25 alfa. `Ayuda › Atajos` (`F1`) muestra la hoja de atajos dentro de la app. `Opciones › Gestionar atajos...` abre el editor de la imagen, donde los cambias.
+Estas son las teclas por defecto de la 0.1.26 alfa. `Ayuda › Atajos` (`F1`) muestra la hoja de atajos dentro de la app. `Opciones › Gestionar atajos...` abre el editor de la imagen, donde los cambias.
 
 > En macOS la app muestra las teclas con nombres de Mac: Ctrl se muestra como ⌘ y Alt como ⌥.
 
@@ -76,6 +76,19 @@ Algunas de estas teclas hacen otra cosa dentro de un editor que tiene el foco. E
 | `Alt+F7` | Teclado táctil |
 | `Ctrl+F5` | Tap tempo |
 | `F1` | Hoja de atajos |
+
+## Clip View y Device View
+
+Estas teclas funcionan solo en el flujo por lanzamiento de clips.
+
+| Tecla | Qué hace |
+|---|---|
+| `Ctrl+Alt+L` | Muestra u oculta la vista de detalle |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Cambia entre Clip View y Device View |
+| `Left` / `Right` | Device View: selecciona el dispositivo anterior, siguiente |
+| `Del` o `Backspace` | Device View: elimina el efecto seleccionado |
 
 ## Patrones
 
@@ -171,6 +184,7 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `Alt+L` | Articular |
 | `Alt+E` | Máquina de riffs |
 | `Alt+P` | Generar progresión de acordes |
+| `Ctrl+Alt+Y` | Ejecuta de nuevo el último script |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `Ctrl+B` | Duplicar |
 | `Del` | Elimina los clips seleccionados |
 | `Shift+Del` | Elimina los clips seleccionados y cierra los huecos |
+| `Shift+Left` / `Shift+Right` | Mueve los clips seleccionados un paso de ajuste a la izquierda, a la derecha |
+| `Shift+Up` / `Shift+Down` | Mueve los clips seleccionados una pista hacia arriba, hacia abajo |
+| `Alt+Left` / `Alt+Right` | Empuja los clips seleccionados a la izquierda, a la derecha con un paso fino, sin ajuste. `Shift+Alt` hace lo mismo |
+| `Ctrl+D` | Deselecciona clips y tiempo |
+| `Shift+I` | Invierte la selección |
+| `Shift+C` | Selecciona los clips de la fuente seleccionada |
 | `Shift+S` | Activa o desactiva la edición con desplazamiento |
 | `Backspace` | Desactiva o activa el ajuste |
 | `Alt+M` / `Shift+Alt+M` | Silencia, activa los clips seleccionados |
@@ -195,6 +215,8 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `7` / `8` | Baja, sube un semitono los clips de audio seleccionados |
 | `9` | Invierte los clips de audio seleccionados |
 | `Ctrl+Ins` / `Ctrl+Del` | Inserta, quita la longitud de la selección de tiempo en todas las pistas |
+| `Ctrl+Alt+Ins` | Corta los clips e inserta espacio |
+| `Ctrl+Alt+Home` | Activa o desactiva el cambio de tamaño de clips desde la izquierda |
 | `Ctrl+Left` / `Ctrl+Right` | Selecciona el tiempo anterior, siguiente |
 | `Ctrl+Enter` | Selecciona el tiempo alrededor de la selección |
 | `Alt+T` | Añade un marcador de tiempo |
@@ -220,7 +242,7 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `Ctrl+L` | Vincula los canales seleccionados al insert seleccionado |
 | `Ctrl+Shift+L` | Vincula los canales seleccionados a inserts a partir del seleccionado |
 | `Alt+L` | Selecciona los canales vinculados al insert seleccionado |
-| `Del` | Elimina el plugin de la ranura de efecto seleccionada |
+| `Del` | Elimina los inserts seleccionados. LYNX SHARE pregunta antes |
 | `Ctrl+E` | Abre el editor de audio |
 | `Shift+E` | Abre el editor de audio y graba |
 | `Alt+R` | Renderiza los inserts armados a archivos WAV |
@@ -242,6 +264,8 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 - Mientras el piano del teclado de escritura está activado, sus teclas tocan notas y la mayoría de los atajos de una sola letra quedan en pausa (`L` sigue funcionando). Desactívalo con `Ctrl+T`.
 - Un atajo funciona en todas partes o en una sola ventana. El que pertenece a una ventana gana a las mismas teclas que funcionan en todas partes, mientras esa ventana tiene el foco.
 - Algunas acciones no tienen tecla por defecto, por ejemplo la paleta de inserción rápida. Asígnales una en el editor.
+- En la Playlist, las teclas que mueven clips mueven todos los clips cuando no hay ninguno seleccionado. El paso fino de `Alt+Left` y `Alt+Right` es un píxel con el zoom actual.
+- Los atajos de LYNX SHARE también funcionan mientras una ventana de plugin tiene el foco, por ejemplo `Space`. Las letras y los dígitos sueltos van primero al plugin, y `Esc` cierra su ventana.
 
 ## Relacionado
 

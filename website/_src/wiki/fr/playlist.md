@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![La Playlist avec des clips sur des pistes](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ Les lettres fonctionnent tant que le piano du clavier de saisie (`Ctrl+T`) est d
 - Double-cliquez sur un clip pour l'ouvrir.
 - Le bouton en haut à gauche d'un clip ouvre le menu du clip (rendre unique, renommer et colorer, découper, et pour l'audio : hauteur, adapter au tempo, inverser).
 - Maintenez `Alt` en glissant pour ignorer le magnétisme.
-- Les clips audio ont des poignées de fondu et un gain de clip que vous glissez vers le haut ou le bas.
+- Les clips audio ont des poignées de fondu et un gain de clip que vous glissez vers le haut ou le bas. Faites un clic droit sur une poignée de fondu pour son menu, avec `Créer un fondu enchaîné`. Faites un clic droit sur la poignée de gain pour `Réinitialiser le gain` et `Normaliser`.
 - `Shift+M` active l'étirement : redimensionner un clip audio étire alors l'audio au lieu de le couper.
+- `Shift+Left` et `Shift+Right` déplacent les clips sélectionnés d'un pas de magnétisme, `Shift+Up` et `Shift+Down` d'une piste. `Alt+Left` et `Alt+Right` les déplacent d'un pixel d'écran au zoom actuel, sans magnétisme. Sans clip sélectionné, tous les clips bougent.
+- `Rendre unique comme échantillon` dans le menu d'un clip audio donne au clip un nouveau fichier qui contient ce qu'il jouait, avec sa hauteur, son étirement et son inversion déjà dans l'audio.
+- Un clip audio qui a des marqueurs de warp les affiche sous forme de petits drapeaux sur son bord supérieur. Glissez un drapeau sur le côté pour déplacer le marqueur.
+
+## Menus Edit et Select
+
+Le menu de la Playlist a un sous-menu `Éditer` et un sous-menu `Sélectionner`. `Éditer` contient les commandes de clips : couper, copier et coller, `Décaler à gauche`, `Décaler à droite`, `Décaler vers le haut`, `Décaler vers le bas`, `Rendre unique`, `Rendre unique comme échantillon`, `Insérer de l'espace`, `Supprimer l'espace`, les commandes de fusion et les options de fondu. `Sélectionner` propose `Sélectionner par la source sélectionnée` (`Shift+C`), `Inverser la sélection` (`Shift+I`), `Désélectionner` (`Ctrl+D`), les clips muets et les clips qui se chevauchent, et `Lasso magique`. Avec `Lasso magique` activé, déplacez la souris en boucle autour des clips, sans appuyer sur un bouton, pour les sélectionner.
 
 ## Pistes
 
 Dans l'en-tête d'une piste, un clic sélectionne, `Ctrl`+clic ajoute ou retire, `Shift`+clic sélectionne une plage et un clic droit ouvre le menu de la piste. `Shift`+molette déplace la piste vers le haut ou le bas. Le voyant de la piste la coupe (clic) ou la met en solo (`Ctrl`+clic ou clic droit). Glissez la séparation entre deux pistes pour en redimensionner une, ou `Shift`+glissé pour toutes les redimensionner.
+
+`Vue` dans le menu de la Playlist choisit ce qu'affichent les en-têtes de piste : `Afficher les contrôles sur les pistes audio`, `Afficher les niveaux sur les pistes audio` et `Afficher les niveaux sur les pistes d'instrument`.
+
+## Blocs de pattern
+
+Avec `Blocs de pattern (projet actuel)` activé dans le menu de la Playlist, une section sous les pistes a une ligne par pattern. Là, le Crayon place un bloc et le fait glisser le long de sa ligne, le Pinceau peint des blocs et la Gomme les supprime. Le clic droit efface avec n'importe quel outil.
 
 ## Règle, boucle et marqueurs
 
@@ -78,6 +91,9 @@ La case d'arrangement de la barre d'outils permet de passer d'un arrangement à 
 | Suppression avec ripple | `Shift+Del` | Supprime les clips sélectionnés et referme les trous |
 | Édition ripple | `Shift+S` | Active ou désactive l'édition ripple |
 | Couper le son, rétablir | `Alt+M` / `Shift+Alt+M` | Coupe ou rétablit le son des clips sélectionnés |
+| Décaler des clips | `Shift+Left` / `Shift+Right` | Déplace les clips sélectionnés d'un pas de magnétisme |
+| Décaler vers une autre piste | `Shift+Up` / `Shift+Down` | Déplace les clips sélectionnés d'une piste |
+| Ajuster des clips | `Alt+Left` / `Alt+Right` | Déplace les clips sélectionnés d'un pixel d'écran, sans magnétisme |
 | Rendre unique | `Ctrl+Shift+V` | Rend uniques les clips sélectionnés |
 | Fusionner | `Ctrl+G` | Fusionne des clips de pattern |
 | Étirement | `Shift+M` | Active l'étirement pour redimensionner les clips audio |

@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![A janela Gravação pergunta o que gravar: áudio, notas e automação, tudo, ou áudio no editor de áudio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ As notas vêm de um teclado MIDI, do teclado do computador (`Ctrl+T`) ou do tecl
 - `Quantizar as notas gravadas no snap global` está nas opções de gravação.
 - `Edição por passos` (`Ctrl+E`) funciona com a música parada: cada nota que você toca entra no pattern, um passo da grade depois do outro.
 - `Capturar MIDI` (`Ctrl+Shift+Alt+R`) põe no pattern as notas que você acabou de tocar, mesmo com a gravação desligada.
+- O pedal de sustain (CC 64) e o pedal de sostenuto (CC 66) seguram as notas que você toca, e uma nota gravada dura até o pedal subir. Um canal Layer repassa o pedal para os canais dele. Com `O pedal controla o fim das notas` desligado em `Opções › Configurações de MIDI...`, o pedal vai para os plugins como um controlador.
+- No modo Song, as notas gravadas em um clipe de pattern mais longo que o pattern ficam onde você as tocou, e o pattern cresce. O take não é dobrado de volta sobre os primeiros compassos do pattern. Com `Clipes de pattern esticados repetem o pattern (LYNX)` ligado, só as notas tocadas sobre compassos que já tinham notas entram no loop.
 
 Os controles que você mexe durante a gravação são escritos como clipes de automação no modo Song e como eventos do pattern no modo Pattern. Veja [Automação](/wiki/automation/).
 
@@ -66,6 +68,10 @@ As opções estão em `Opções › Gravação` e no menu de clique direito do b
 | `Gravar inicia a reprodução` | nenhuma | Ligar a gravação também aperta play |
 | `Desarmar os inserts quando a gravação parar` | nenhuma | Os inserts armados são liberados depois de cada take |
 
+`Baixa latência durante a gravação` fica no menu do botão direito do botão de gravar e no menu do insert do Mixer, em `Gravação em disco`. Vem desligado por padrão. Enquanto um insert com entrada está armado, ou o monitoramento dele está em `Ligado`, os efeitos que acrescentam latência no caminho até o Master são ignorados. Isso muda só o que você ouve: um insert mantém todos os seus efeitos quando o take é captado depois deles, por exemplo com `Pós-efeitos`. Os efeitos voltam quando o insert é desarmado.
+
+`Ferramentas › Cancelar gravação` descarta o que a passada de gravação atual escreveu (notas, automação e takes de áudio) e desliga a gravação. A reprodução continua e os inserts armados continuam armados.
+
 ## Gravação em loop e takes
 
 Com `Gravação em loop` ligado, a gravação repete a região de loop no modo Song, ou o pattern no modo Pattern. Desligado, a gravação segue direto.
@@ -76,7 +82,7 @@ Cada passagem de uma gravação de áudio em loop cai na próxima faixa livre da
 
 - Um projeto salvo guarda os takes dele em `Audio/Recorded`, ao lado do arquivo do projeto.
 - Um projeto não salvo grava em `LYNX/Recordings`, na sua pasta Música.
-- Os takes são arquivos WAV na taxa de amostragem do dispositivo de áudio, 24 bits ou 32 bits float. O formato e os nomes dos takes são definidos em `Gravação`, em `Opções › Configurações de áudio...`.
+- Os takes são arquivos WAV na taxa de amostragem do dispositivo de áudio, em 16 bits, 24 bits ou 32 bits float. O formato (`Formato do arquivo`) e os nomes dos takes são definidos em `Gravação`, em `Opções › Configurações de áudio...`.
 - `Abrir pasta de gravações` está no menu de clique direito do botão de gravar. `Arquivo › Excluir gravações não usadas e salvar...` remove os takes que o projeto não usa mais.
 
 ## Bom saber

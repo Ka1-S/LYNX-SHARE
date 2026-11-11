@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![Het venster Sneltoetsen beheren: een doorzoekbare lijst van acties met de toetsen van elke actie](/assets/img/wiki/shortcuts.webp)
 
-Dit zijn de standaardtoetsen in 0.1.25 alpha. `Help › Sneltoetsen` (`F1`) toont het sneltoetsenoverzicht in de app. `Opties › Sneltoetsen beheren...` opent de editor op de afbeelding, waar je ze wijzigt.
+Dit zijn de standaardtoetsen in 0.1.26 alpha. `Help › Sneltoetsen` (`F1`) toont het sneltoetsenoverzicht in de app. `Opties › Sneltoetsen beheren...` opent de editor op de afbeelding, waar je ze wijzigt.
 
 > Op macOS toont de app de toetsen met Mac-namen: Ctrl wordt getoond als ⌘ en Alt als ⌥.
 
@@ -76,6 +76,19 @@ Een aantal van deze toetsen doet iets anders binnen een editor die de focus heef
 | `Alt+F7` | Aanraaktoetsenbord |
 | `Ctrl+F5` | Tempo tapper |
 | `F1` | Overzicht sneltoetsen |
+
+## Clip View en Device View
+
+Deze toetsen werken alleen in de Clipstart-werkwijze.
+
+| Toets | Wat hij doet |
+|---|---|
+| `Ctrl+Alt+L` | De detailweergave tonen of verbergen |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Wisselen tussen Clip View en Device View |
+| `Left` / `Right` | Device View: het vorige, volgende apparaat selecteren |
+| `Del` of `Backspace` | Device View: het geselecteerde effect verwijderen |
 
 ## Patterns
 
@@ -171,6 +184,7 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `Alt+L` | Articuleren |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Akkoordprogressie genereren |
+| `Ctrl+Alt+Y` | Het laatste script opnieuw uitvoeren |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `Ctrl+B` | Dupliceren |
 | `Del` | De geselecteerde clips verwijderen |
 | `Shift+Del` | De geselecteerde clips verwijderen en de gaten sluiten |
+| `Shift+Left` / `Shift+Right` | De geselecteerde clips één snapstap naar links, rechts verplaatsen |
+| `Shift+Up` / `Shift+Down` | De geselecteerde clips één track omhoog, omlaag verplaatsen |
+| `Alt+Left` / `Alt+Right` | De geselecteerde clips met een fijne stap naar links, rechts nudgen, zonder snap. `Shift+Alt` doet hetzelfde |
+| `Ctrl+D` | Clips en tijd deselecteren |
+| `Shift+I` | De selectie omkeren |
+| `Shift+C` | De clips van de geselecteerde bron selecteren |
 | `Shift+S` | Ripple-bewerking aan of uit |
 | `Backspace` | Snap uit of aan |
 | `Alt+M` / `Shift+Alt+M` | De geselecteerde clips muten, unmuten |
@@ -195,6 +215,8 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `7` / `8` | De geselecteerde audioclips een halve toon omlaag, omhoog pitchen |
 | `9` | De geselecteerde audioclips reversen |
 | `Ctrl+Ins` / `Ctrl+Del` | De lengte van de tijdselectie op alle tracks invoegen, verwijderen |
+| `Ctrl+Alt+Ins` | De clips slicen en ruimte invoegen |
+| `Ctrl+Alt+Home` | Clips vanaf links vergroten of verkleinen, aan of uit |
 | `Ctrl+Left` / `Ctrl+Right` | De vorige, volgende tijd selecteren |
 | `Ctrl+Enter` | Tijd rond de selectie selecteren |
 | `Alt+T` | Een tijdmarker toevoegen |
@@ -220,7 +242,7 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `Ctrl+L` | De geselecteerde kanalen koppelen aan de geselecteerde insert |
 | `Ctrl+Shift+L` | De geselecteerde kanalen koppelen aan inserts, te beginnen bij de geselecteerde |
 | `Alt+L` | De kanalen selecteren die aan de geselecteerde insert zijn gekoppeld |
-| `Del` | De plugin in het geselecteerde effectslot verwijderen |
+| `Del` | De geselecteerde inserts verwijderen. LYNX SHARE vraagt eerst om bevestiging |
 | `Ctrl+E` | De audio-editor openen |
 | `Shift+E` | De audio-editor openen en opnemen |
 | `Alt+R` | De gearmde inserts renderen naar wave-bestanden |
@@ -242,6 +264,8 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 - Zolang het pianotoetsenbord van het typtoetsenbord aan staat, spelen de toetsen noten en liggen de meeste sneltoetsen met één letter stil (`L` werkt nog). Zet het uit met `Ctrl+T`.
 - Een sneltoets werkt overal of in één venster. Een sneltoets die bij een venster hoort, wint van dezelfde toetsen die overal werken, zolang dat venster de focus heeft.
 - Sommige acties hebben geen standaardtoets, bijvoorbeeld het Snel-toevoegpalet. Geef ze er in de editor een.
+- In de Playlist verplaatsen de toetsen die clips verplaatsen alle clips als er geen is geselecteerd. De fijne stap van `Alt+Left` en `Alt+Right` is één pixel bij de huidige zoom.
+- De sneltoetsen van LYNX SHARE werken ook terwijl een pluginvenster focus heeft, bijvoorbeeld `Space`. Gewone letters en cijfers gaan eerst naar de plugin, en `Esc` sluit zijn venster.
 
 ## Gerelateerd
 

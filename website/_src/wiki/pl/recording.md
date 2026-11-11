@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![Okno Nagrywanie pyta, co nagrywać: audio, nuty i automatykę, wszystko albo audio do edytora audio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Nuty pochodzą z klawiatury MIDI, klawiatury komputera (`Ctrl+T`) lub klawiatury
 - `Kwantyzuj nagrane nuty do globalnego przyciągania` jest w opcjach nagrywania.
 - `Wprowadzanie krokowe` (`Ctrl+E`) działa przy zatrzymaniu: każda zagrana nuta trafia do patternu o jeden krok przyciągania dalej.
 - `Przechwyć MIDI` (`Ctrl+Shift+Alt+R`) wstawia do patternu nuty, które właśnie zagrałeś, choć nagrywanie było wyłączone.
+- Pedał sustain (CC 64) i pedał sostenuto (CC 66) przytrzymują grane nuty, a nagrana nuta trwa do chwili, gdy pedał się podnosi. Kanał Layer przekazuje pedał swoim kanałom. Gdy `Pedał steruje wyłączaniem nut` w `Opcje › Ustawienia MIDI...` jest wyłączone, pedał trafia do pluginów jako kontroler.
+- W trybie Song nuty nagrane do klipu patternu dłuższego niż jego pattern zostają tam, gdzie je zagrałeś, a pattern rośnie. Ujęcie nie jest zawijane na pierwsze takty patternu. Przy włączonym `Rozciągnięte klipy patternów zapętlają swój pattern (LYNX)` do pętli trafiają tylko nuty zagrane w taktach, które już miały nuty.
 
 Elementy poruszane podczas nagrywania są zapisywane jako klipy automatyki w trybie Song i jako zdarzenia patternu w trybie Pattern. Zobacz [Automatyka](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Opcje są w `Opcje › Nagrywanie` i w menu prawego przycisku przycisku nagrywan
 | `Nagrywanie uruchamia odtwarzanie` | brak | Włączenie nagrywania naciska też odtwarzanie |
 | `Rozbrój inserty po zatrzymaniu nagrywania` | brak | Uzbrojone inserty są zwalniane po każdym ujęciu |
 
+`Niska latencja podczas nagrywania` jest w menu prawego przycisku myszy przy przycisku nagrywania i w menu inserta Mixera w sekcji `Nagrywanie na dysk`. Domyślnie jest wyłączone. Gdy insert z wejściem jest uzbrojony albo jego monitoring ma wartość `Wł.`, efekty dodające latencję na drodze do Master są omijane. Zmienia to tylko to, co słyszysz: insert zachowuje wszystkie swoje efekty, gdy ujęcie jest pobierane po nich, na przykład przez `Po efektach`. Efekty wracają, gdy insert przestaje być uzbrojony.
+
+`Narzędzia › Anuluj nagrywanie` wyrzuca to, co zapisał bieżący przebieg nagrywania (jego nuty, automatykę i ujęcia audio) i wyłącza nagrywanie. Odtwarzanie trwa dalej, a uzbrojone inserty zostają uzbrojone.
+
 ## Nagrywanie w pętli i ujęcia
 
 Przy włączonym `Nagrywanie w pętli` nagrywanie zapętla się nad regionem pętli w trybie Song albo nad patternem w trybie Pattern. Przy wyłączonym nagrywanie biegnie prosto dalej.
@@ -76,7 +82,7 @@ Każde przejście nagrywania audio w pętli ląduje na następnej wolnej ścież
 
 - Zapisany projekt trzyma swoje ujęcia w `Audio/Recorded`, obok pliku projektu.
 - Niezapisany projekt nagrywa do `LYNX/Recordings` w twoim folderze Muzyka.
-- Ujęcia to pliki WAV z częstotliwością próbkowania urządzenia audio, 24-bit lub 32-bit float. Format i nazwy ujęć ustawia się w `Nagrywanie` w `Opcje › Ustawienia audio...`.
+- Ujęcia to pliki WAV z częstotliwością próbkowania urządzenia audio, 16-bit, 24-bit lub 32-bit float. Format (`Format pliku`) i nazwy ujęć ustawia się w `Nagrywanie` w `Opcje › Ustawienia audio...`.
 - `Otwórz folder nagrań` jest w menu prawego przycisku przycisku nagrywania. `Plik › Usuń nieużywane nagrania i zapisz...` usuwa ujęcia, których projekt już nie używa.
 
 ## Warto wiedzieć

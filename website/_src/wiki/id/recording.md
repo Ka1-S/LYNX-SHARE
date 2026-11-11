@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![Jendela Rekaman menanyakan apa yang direkam: audio, not dan otomasi, semuanya, atau audio ke editor audio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Not berasal dari keyboard MIDI, keyboard ketik (`Ctrl+T`) atau keyboard sentuh, 
 - `Kuantisasi not rekaman ke snap global` ada di opsi rekaman.
 - `Input per langkah` (`Ctrl+E`) bekerja saat berhenti: setiap not yang kamu mainkan masuk ke pattern, satu langkah snap demi satu.
 - `Tangkap MIDI` (`Ctrl+Shift+Alt+R`) memasukkan not yang baru saja kamu mainkan ke pattern, walaupun perekaman sedang mati.
+- Pedal sustain (CC 64) dan pedal sostenuto (CC 66) menahan not yang kamu mainkan, dan not yang direkam bertahan sampai pedal dilepas. Channel Layer meneruskan pedal ke channel-channelnya. Dengan `Pedal kaki mengatur akhir nada` dimatikan di `Opsi › Pengaturan MIDI...`, pedal diteruskan ke plugin sebagai kontroler.
+- Di mode Song, not yang direkam ke clip pattern yang lebih panjang daripada patternnya tetap berada di tempat kamu memainkannya, dan pattern bertambah panjang. Take tidak dilipat kembali ke atas bar pertama pattern. Dengan `Klip pattern yang diregangkan mengulang pattern-nya (LYNX)` menyala, hanya not yang dimainkan di atas bar yang sudah berisi not yang masuk ke loop.
 
 Kontrol yang kamu gerakkan saat merekam ditulis sebagai clip otomasi dalam mode Song dan sebagai event pattern dalam mode Pattern. Lihat [Otomasi](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Opsinya ada di `Opsi › Rekaman` dan di menu klik kanan tombol rekam.
 | `Rekam memulai pemutaran` | tidak ada | Menyalakan perekaman juga menekan play |
 | `Batalkan siaga insert saat rekaman berhenti` | tidak ada | Insert yang disiagakan dilepas setelah setiap take |
 
+`Latensi rendah saat merekam` ada di menu klik kanan tombol rekam dan di menu insert Mixer di bawah `Perekaman ke disk`. Secara bawaan mati. Selama insert yang punya input sedang di-arm, atau monitoring-nya `Aktif`, efek yang menambah latensi di jalurnya menuju Master dilewati. Ini hanya mengubah apa yang kamu dengar: insert tetap memakai semua efeknya saat take diambil setelah efek-efek itu, misalnya dengan `Setelah efek`. Efeknya kembali saat insert di-disarm.
+
+`Alat › Batalkan perekaman` membuang apa yang ditulis putaran rekaman saat ini (not, otomasi, dan take audionya) dan mematikan perekaman. Pemutaran terus berjalan dan insert yang di-arm tetap di-arm.
+
 ## Rekam loop dan take
 
 Dengan `Rekam berulang` aktif, perekaman berulang di region loop dalam mode Song, atau di pattern dalam mode Pattern. Saat mati, perekaman terus berjalan lurus.
@@ -76,7 +82,7 @@ Setiap putaran rekam loop audio mendarat di track Playlist kosong berikutnya, da
 
 - Proyek yang tersimpan menyimpan take-nya di `Audio/Recorded`, di sebelah file proyek.
 - Proyek yang belum disimpan merekam ke `LYNX/Recordings` di folder Music-mu.
-- Take berupa file WAV pada sample rate perangkat audio, 24 bit atau 32 bit float. Format dan nama take diatur di bawah `Rekaman` di `Opsi › Pengaturan audio...`.
+- Take berupa file WAV pada sample rate perangkat audio, 16 bit, 24 bit, atau 32 bit float. Format (`Format file`) dan nama take diatur di bawah `Rekaman` di `Opsi › Pengaturan audio...`.
 - `Buka folder rekaman` ada di menu klik kanan tombol rekam. `File › Hapus rekaman tak terpakai dan simpan...` menghapus take yang tidak lagi dipakai proyek.
 
 ## Baik diketahui

@@ -1,5 +1,5 @@
 ---
-source: 3b54a39c97
+source: a06504f3a0
 ---
 ![Ayarların MIDI sayfası: giriş aygıtları, master sync'li çıkış aygıtları ve harici sync](/assets/img/wiki/settings-midi.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE, notaları ve kontrolcü hareketlerini herhangi bir MIDI giriş aygı
 | Ayar | Ne yapar |
 |---|---|
 | Onay kutusu | Aygıtı açar veya kapatır |
-| `Her MIDI kanalı` | Her MIDI kanalını ya da yalnızca tek bir kanalı dinler |
+| `Her MIDI kanalı` | Her MIDI kanalını ya da yalnızca tek bir kanalı dinler. `MPE denetleyici` bu listenin sonundadır |
 | `Seçili kanalları çalar` | Notalar Channel Rack'te seçili kanallara ya da her zaman sabit bir kanala gider |
 | `Velocity` | `Çalındığı gibi`, `Yumuşak (hafif çalış daha yüksek duyulur)`, `Sert (daha güçlü çalış gerektirir)` veya `Sabit (her nota tam velocity'de)` |
 | `Performans modu kanalı` | Performans modu açıkken bu MIDI kanalındaki notalar Playlist kliplerini başlatır |
 | `Song işaretçisine atlama` | Bu MIDI kanalındaki notalar çalmak yerine şarkıyı bir işaretçiye götürür |
+| `Kontrolcü türü` | `Otomatik algıla`, `Genel denetleyici` veya bir kontrolcü profili |
+| `Ayak pedalı nota bırakmayı yönetir` | Varsayılan olarak açıktır. Bir sustain pedalı (CC 64) veya sostenuto pedalı (CC 66) notaları tutar. Kapalıyken pedal plugin'lere bir kontrolcü olarak gider |
 
 ## Bir knob'u bir kontrole bağlamak
 
@@ -39,9 +41,44 @@ Bağlantı projeyle birlikte kaydedilir. Kaldırmak için kontrole yeniden sağ 
 | `Denetleyicilere çoklu bağlantı` | `Ctrl+J` | Açıkken, oynattığınız kontroller sırayla, sonra oynatacağınız donanım kontrolleriyle bağlanır. `Seçenekler` menüsündedir |
 | `Pickup (devralma modu)` | yok | MIDI sayfasında. Kontrolcü, bir parametreyi ancak şu anki değerine ulaştıktan sonra oynatır; böylece hiçbir şey sıçramaz |
 
-MIDI sayfası bağlantıları `Bağlantılar (proje > genel)` altında listeler. Aynı sayfadaki `Kontrolcü türü`, `Genel kontrolcü` der.
+MIDI sayfası bağlantıları `Bağlantılar (proje > genel)` altında listeler. `Kontrolcü türü` değeri `Genel denetleyici` olan bir cihaz yalnızca elle bağladığınızı yapar.
 
 Üçüncü taraf bir plugin'in parametrelerine, kanalın menüsündeki ya da efekt yuvasının menüsündeki `Plugin parametresini otomatikleştir` ile ulaşılır. Oradaki her parametrenin aynı bağlantı öğeleri vardır. Bkz. [Otomasyon](/wiki/automation/).
+
+## Kontrolcü profilleri
+
+Bir kontrolcü profili, bağlanacak hiçbir şey olmadan cihazın transport düğmelerini, fader'larını, düğmelerini, pad'lerini, ışıklarını ve ekranını ayarlar.
+
+1. `Seçenekler › MIDI ayarları...` (`F10`) açın ve `Giriş aygıtları` altında cihazı işaretleyin.
+2. Cihazın `Kontrolcü türü` değerini `Otomatik algıla` üzerinde bırakın. Parantez içindeki ad, cihazın port adından bulunan profildir.
+3. `Genel denetleyici` görünüyorsa profili listeden kendiniz seçin.
+4. Kutunun yanındaki satırı okuyun. `Feedback to`, ışıkları, motorlu fader'ları ve ekran metnini alan çıkış portunu belirtir.
+
+| Profil | Neyi eşler |
+|---|---|
+| `Mackie Control Universal` | Fader'lar insert'lerin sesine ve Master'a. V-Pot'lar pan'a, seçili kanalın plugin'inin parametrelerine veya Channel rack'in seslerine. Her strip için arm, solo, mute ve select, fader bank'ları, play, stop, record, rewind, forward, Pattern veya Song modu, metronom, undo ve jog tekerleği. Ekran adları ve değerleri gösterir |
+| `Mackie Control Extender (XT)` | 8 strip daha için aynısı. Cihazlar tek bir bank'ı paylaşır, sıra `Giriş aygıtları` listesindeki gibidir |
+| `Novation Launchkey MK3 (DAW mode)` | Pot'lar pan, ses veya plugin parametrelerine, fader'lar sese, fader düğmeleri bir insert seçer. Bank, play, stop, record, loop, metronom ve undo düğmeleri. Session pad'leri seçili kanalın 16 step'idir. Klavyenin ikinci portunda kullanın |
+| `Akai APC Key 25 mk2` | Düğmeler ses, pan veya plugin parametrelerine. Üstteki iki pad sırası seçili kanalın 16 step'idir, alttaki üçü nota çalar. İz düğmeleri bir insert seçer. Stop, play ve record. İkinci portta kullanın |
+| `Arturia KeyLab Essential mk3 (Mackie Control port)` | Klavyenin MCU/HUI portunda Mackie Control eşlemesi |
+| `Korg nanoKONTROL2 (Mackie Control mode)` | Mackie Control eşlemesi. Otomatik algılanmaz: cihazı bir Mackie Control modunda başlatın ve bu türü elle seçin |
+
+Konum gönderen düğmeler ve fader'lar soft takeover kullanır: bir kontrolü yalnızca değerine ulaştıktan sonra hareket ettirirler. Elle bağladığınız kontroller bağlantılarını korur. `Denetleyici profilleri klasörü` kendi profilleriniz (`*.lynxctl`) için klasörü açar, `Aygıt listesini yenile` onları yeniden okur.
+
+Dahili profiller her üreticinin belgelerinden yazıldı. Henüz donanım üzerinde denenmedi.
+
+## MPE kontrolcüleri
+
+MPE ilk aşamadadır. Bir MPE kontrolcüsü her notayı kendi pitch bend'i, timbre'ı (CC 74) ve basıncıyla çalar.
+
+1. MIDI sayfasında cihazın `Her MIDI kanalı` yazan kutusunu açın ve `MPE denetleyici` seçin.
+2. Yanında beliren kutuda üye kanalları seçin: `Kanal 2`'den `Channels 2-16`'ya kadar.
+3. Çalın. Kayıt için bkz. [Kayıt](/wiki/recording/).
+
+- Kaydedilen bir nota bunların her birinden tek değer tutar: bend'i ince pitch olarak, timbre'ı Mod X olarak ve en güçlü basıncı Mod Y olarak. Bir eğri değildir.
+- Dahili enstrümanlardan Sampler ve dahili synth bu değerleri izler.
+- Üçüncü taraf bir plugin, plugin penceresinin `Wrapper ayarları` bölümünde `MIDI` altındaki `MPE` açıkken MPE alır. Her nota o zaman kendi MIDI kanalından, 2 ile 16 arasında çıkar.
+- Henüz gerçek bir MPE kontrolcüsüyle denenmedi.
 
 ## Bilgisayar klavyesi
 
@@ -77,6 +114,8 @@ MIDI sayfasındaki `Çıkış aygıtları`, aktarımı donanıma ve diğer yazı
 - Bağlı bir MIDI kontrolcüyle oynatılan tempo, ses kliplerini yeniden boyutlandırmaz. Bunun yerine son tempoyu yazın veya ayarlayın.
 - Çaldıklarınızı kaydetmek için bkz. [Kayıt](/wiki/recording/). Gelen notalar [Piano Roll](/wiki/piano-roll/)'da bir gama oturtulabilir.
 - Bir plugin'e gönderilen MIDI CC, kanal aftertouch ve pitch bend, `MIDI kontrolcüyü otomatikleştir (CC, aftertouch, pitch bend)` ile otomatikleştirilebilir.
+- Pedalla tutulan bir nota, pedal kalkana kadar kaydedilir.
+- Bir otomasyon klibi, bir kontrolü kontrolcüden oynatırken onu geri almaz. Kontrol, çalma bir sonraki başladığında otomasyonunu yeniden izler.
 
 ## İlgili sayfalar
 

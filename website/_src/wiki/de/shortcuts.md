@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![Das Fenster Tastenkürzel verwalten: eine durchsuchbare Liste von Aktionen mit ihren Tasten](/assets/img/wiki/shortcuts.webp)
 
-Das sind die Standardtasten in 0.1.25 Alpha. `Hilfe › Tastenkürzel` (`F1`) zeigt die Tastenkürzel-Übersicht in der App. `Optionen › Tastenkürzel verwalten...` öffnet den Editor aus dem Bild, in dem du sie änderst.
+Das sind die Standardtasten in 0.1.26 Alpha. `Hilfe › Tastenkürzel` (`F1`) zeigt die Tastenkürzel-Übersicht in der App. `Optionen › Tastenkürzel verwalten...` öffnet den Editor aus dem Bild, in dem du sie änderst.
 
 > Unter macOS zeigt die App die Tasten mit Mac-Namen: Ctrl erscheint als ⌘ und Alt als ⌥.
 
@@ -76,6 +76,19 @@ Einige dieser Tasten tun in einem Editor mit Fokus etwas anderes. Im Piano Roll 
 | `Alt+F7` | Bildschirmtastatur |
 | `Ctrl+F5` | Tempo-Tapper |
 | `F1` | Tastenkürzel-Übersicht |
+
+## Clip View und Device View
+
+Diese Tasten funktionieren nur im Clip-Start-Arbeitsablauf.
+
+| Taste | Was sie macht |
+|---|---|
+| `Ctrl+Alt+L` | Die Detailansicht zeigen oder ausblenden |
+| `Ctrl+Alt+3` | Clip View |
+| `Ctrl+Alt+4` | Device View |
+| `Shift+Tab` | Zwischen Clip View und Device View wechseln |
+| `Left` / `Right` | Device View: das vorherige, nächste Gerät wählen |
+| `Del` or `Backspace` | Device View: den gewählten Effekt löschen |
 
 ## Patterns
 
@@ -171,6 +184,7 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `Alt+L` | Artikulieren |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Akkordfolge erzeugen |
+| `Ctrl+Alt+Y` | Das letzte Skript erneut ausführen |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `Ctrl+B` | Duplizieren |
 | `Del` | Die gewählten Clips löschen |
 | `Shift+Del` | Die gewählten Clips löschen und die Lücken schließen |
+| `Shift+Left` / `Shift+Right` | Die gewählten Clips um einen Raster-Schritt nach links, rechts verschieben |
+| `Shift+Up` / `Shift+Down` | Die gewählten Clips um eine Spur nach oben, unten verschieben |
+| `Alt+Left` / `Alt+Right` | Die gewählten Clips in einem feinen Schritt nach links, rechts nudgen, ohne Raster. `Shift+Alt` tut dasselbe |
+| `Ctrl+D` | Clips und Zeit abwählen |
+| `Shift+I` | Die Auswahl umkehren |
+| `Shift+C` | Die Clips der gewählten Quelle auswählen |
 | `Shift+S` | Ripple-Bearbeitung ein oder aus |
 | `Backspace` | Raster aus oder ein |
 | `Alt+M` / `Shift+Alt+M` | Die gewählten Clips stumm-, wieder laut schalten |
@@ -195,6 +215,8 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `7` / `8` | Die gewählten Audioclips um einen Halbton nach unten, oben transponieren |
 | `9` | Die gewählten Audioclips umkehren |
 | `Ctrl+Ins` / `Ctrl+Del` | Die Länge der Zeitauswahl auf allen Spuren einfügen, entfernen |
+| `Ctrl+Alt+Ins` | Die Clips teilen und Platz einfügen |
+| `Ctrl+Alt+Home` | Clips von links in der Größe ändern, an oder aus |
 | `Ctrl+Left` / `Ctrl+Right` | Die vorherige, nächste Zeit wählen |
 | `Ctrl+Enter` | Zeit um die Auswahl herum wählen |
 | `Alt+T` | Einen Zeitmarker hinzufügen |
@@ -220,7 +242,7 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `Ctrl+L` | Die gewählten Kanäle mit dem gewählten Insert verknüpfen |
 | `Ctrl+Shift+L` | Die gewählten Kanäle mit Inserts verknüpfen, beginnend beim gewählten |
 | `Alt+L` | Die mit dem gewählten Insert verknüpften Kanäle wählen |
-| `Del` | Das Plugin im gewählten Effekt-Slot löschen |
+| `Del` | Die gewählten Inserts löschen. LYNX SHARE fragt vorher nach |
 | `Ctrl+E` | Den Audio-Editor öffnen |
 | `Shift+E` | Den Audio-Editor öffnen und aufnehmen |
 | `Alt+R` | Die scharfgeschalteten Inserts in Wave-Dateien rendern |
@@ -242,6 +264,8 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 - Solange das Tastaturklavier der Schreibtastatur an ist, spielen seine Tasten Noten, und die meisten Ein-Buchstaben-Kürzel ruhen (`L` funktioniert weiterhin). Schalte es mit `Ctrl+T` aus.
 - Ein Tastenkürzel gilt entweder überall oder in einem Fenster. Eines, das zu einem Fenster gehört, hat Vorrang vor denselben Tasten, die überall gelten, solange dieses Fenster den Fokus hat.
 - Einige Aktionen haben keine Standardtaste, zum Beispiel die Schnellauswahl. Gib ihnen im Editor eine.
+- Wenn in der Playlist kein Clip gewählt ist, bewegen die Tasten, die Clips verschieben, jeden Clip. Der feine Schritt von `Alt+Left` und `Alt+Right` ist ein Pixel bei der aktuellen Zoomstufe.
+- Die Tastenkürzel von LYNX SHARE funktionieren auch, während ein Plugin-Fenster den Fokus hat, zum Beispiel `Space`. Einfache Buchstaben und Ziffern gehen zuerst an das Plugin, und `Esc` schließt sein Fenster.
 
 ## Verwandt
 

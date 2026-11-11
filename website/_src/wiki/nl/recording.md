@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![Het venster Opname vraagt wat er opgenomen moet worden: audio, noten en automatisering, alles, of audio in de audio-editor](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Noten komen van een MIDI-keyboard, het typetoetsenbord (`Ctrl+T`) of het aanraak
 - `Opgenomen noten kwantiseren op de globale snap` staat in de opname-opties.
 - `Stapinvoer` (`Ctrl+E`) werkt als het transport stilstaat: elke noot die je speelt gaat een snapstap na de andere in het pattern.
 - `MIDI vangen` (`Ctrl+Shift+Alt+R`) zet de noten die je net speelde in het pattern, ook al stond opnemen uit.
+- Het sustainpedaal (CC 64) en het sostenutopedaal (CC 66) houden de noten vast die je speelt, en een opgenomen noot duurt tot het pedaal omhoogkomt. Een Layer-kanaal geeft het pedaal door aan zijn kanalen. Met `Voetpedaal bepaalt het einde van noten` uit in `Opties › MIDI-instellingen...` gaat het pedaal als controller naar de plugins.
+- In Song-modus blijven noten die je opneemt in een patternclip die langer is dan zijn pattern staan waar je ze speelde, en het pattern groeit mee. De take wordt niet teruggevouwen over de eerste maten van het pattern. Met `Uitgerekte patroonclips herhalen hun patroon (LYNX)` aan komen alleen noten die je speelt over maten waar al noten stonden in de loop.
 
 Regelaars die je tijdens het opnemen beweegt, worden in Song-modus als automation clips geschreven en in Pattern-modus als pattern-events. Zie [Automation](/wiki/automation/).
 
@@ -66,6 +68,10 @@ De opties staan in `Opties › Opname` en in het rechtsklikmenu van de opnamekno
 | `Opnemen start het afspelen` | none | Opnemen aanzetten drukt ook op afspelen |
 | `Inserts ontwapenen wanneer de opname stopt` | none | Gearmde inserts worden na elke take losgelaten |
 
+`Lage latentie tijdens opnemen` staat in het rechtsklikmenu van de opnameknop en in het insertmenu van de Mixer onder `Opnemen naar schijf`. Het staat standaard uit. Zolang een insert met een ingang is scherpgesteld, of zijn monitoring `Aan` staat, worden de effecten die latentie toevoegen op zijn weg naar de Master gebypasst. Dit verandert alleen wat je hoort: een insert houdt al zijn effecten als de take erachter wordt afgetapt, bijvoorbeeld met `Na de effecten`. De effecten komen terug als de insert niet meer is scherpgesteld.
+
+`Extra › Opname annuleren` gooit weg wat de huidige opnamedoorgang schreef (de noten, automatisering en audiotakes) en zet opnemen uit. Het afspelen gaat door en de scherpgestelde inserts blijven scherpgesteld.
+
 ## Loopopname en takes
 
 Met `Loop-opname` aan loopt de opname over de loopregio in Song-modus, of over het pattern in Pattern-modus. Met uit loopt de opname gewoon door.
@@ -76,7 +82,7 @@ Elke doorgang van een audioloopopname komt op de volgende vrije Playlist-track, 
 
 - Een opgeslagen project bewaart zijn takes in `Audio/Recorded`, naast het projectbestand.
 - Een niet-opgeslagen project neemt op in `LYNX/Recordings` in je map Muziek.
-- Takes zijn WAV-bestanden met de samplefrequentie van het audioapparaat, 24-bit of 32-bit float. Het formaat en de naam van de takes stel je in onder `Opname` in `Opties › Audio-instellingen...`.
+- Takes zijn WAV-bestanden met de samplefrequentie van het audioapparaat, 16-bit, 24-bit of 32-bit float. Het formaat (`Bestandsformaat`) en de namen van de takes stel je in onder `Opname` in `Opties › Audio-instellingen...`.
 - `Map met opnames openen` staat in het rechtsklikmenu van de opnameknop. `Bestand › Ongebruikte opnames verwijderen en opslaan...` verwijdert takes die het project niet meer gebruikt.
 
 ## Goed om te weten

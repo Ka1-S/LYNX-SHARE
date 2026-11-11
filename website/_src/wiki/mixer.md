@@ -31,12 +31,17 @@ With the Mixer focused, `Ctrl+L` links the selected channels to the selected ins
 - `Ctrl`+click, or drag across strips, selects a range. `Ctrl+Shift`+click adds or removes one.
 - Drag a strip sideways, or press `Alt+Left` and `Alt+Right`, to move the selected inserts.
 - Right-click a strip for the insert menu. `F2` renames and colours the selected insert.
+- `Del`, or `Delete` in the insert menu, deletes the selected inserts. LYNX SHARE asks first. Tick `Remember my choice` to skip the question next time.
 
 Moving, inserting or deleting inserts keeps sends, sidechains and automation on their insert.
+
+The insert menu's `Mixer` section and `Options › Mixer` have two more commands. `Arrange inserts like the Playlist` moves the inserts linked to Playlist tracks to the front, in the Playlist's order. With `Keep links to deleted inserts, greyed (LYNX)` on, the sends that went into a deleted insert stay, greyed, so you can connect them again.
 
 ## Mute and solo
 
 Click the mute light to mute an insert. Right-click or `Ctrl`+click it to solo. `S` solos the selected inserts, and `Alt+S` solos them together with the inserts that feed them.
+
+A muted insert keeps its meter moving. In new projects and in imported FL Studio projects it also keeps running its effects, and only its output to the Master and its sends is cut. To stop a muted insert from processing, turn on `Muted inserts don't process (LYNX, saves CPU; this project)` in the insert menu's `Mixer` section or in `Options › Mixer`. Its meter then stops and its effects start fresh when you unmute it.
 
 ## Effects
 
@@ -44,7 +49,8 @@ The effects panel shows the ten slots of the selected insert.
 
 - Drag a slot, or use the wheel over it, to move it up or down.
 - Right-click a slot for its options (replace, move, delete).
-- `Del` deletes the plugin in the selected slot.
+- While a slot's menu is open, `Del` deletes the plugin in that slot.
+- `Group into Audio Effect Rack` in the slot's menu puts the effect into a new rack, and `Group all into Audio Effect Rack` does it for the whole chain. `Ungroup` puts a one-chain rack's effects back into the slots.
 - The switch in the panel's header turns all effects of the insert on or off.
 - You can drag an effect from the [Browser](/wiki/browser/)'s Plugin database onto an insert or an effect slot.
 
@@ -62,6 +68,7 @@ Select the insert you want to route. Every other strip then has a route switch:
 - `Ctrl`+click routes to that insert only.
 - `Shift`+click makes a sidechain send. `Ctrl+Shift`+click makes it sidechain only.
 - Right-click opens the same choices as a menu.
+- For a pre-fader send, right-click the route switch or the send's level knob and tick `Pre-fader send (not moved by this track's fader)`. The send is then marked `PRE`.
 
 Effects with a side input, such as a compressor, have a `Sidechain from` picker that lists the inserts to listen to. Picking one creates the route for you.
 
@@ -85,12 +92,13 @@ Each insert has a record-arm button. With an insert armed, Rec and Play record i
 | Rename and colour | `F2` | Renames and colours the selected insert |
 | Solo | `S` | Solos the selected inserts |
 | Solo with sources | `Alt+S` | Solos the selected inserts and the inserts that feed them |
-| Delete effect | `Del` | Deletes the plugin in the selected slot |
+| Delete inserts | `Del` | Deletes the selected inserts, after a question |
 | Arm and record | `Shift+R` | Arms the selected insert and starts recording |
 
 ## Good to know
 
-- `Render to audio` (an insert bounced to an audio clip) plays about 5 dB louder than the insert it replaces. This is a known issue in the 0.1.25 release notes.
+- `Loudness meter beside the Master (LYNX)`, in `Options › Mixer`, shows the short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a `Reset` button.
+- An instrument plugin with several outputs can play each output on its own insert. See [Third-party plugins](/wiki/plugins/).
 - `Ctrl+L` does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.
 - The route switches appear on the other strips, not on the selected one.
 - The limit is 127 inserts per project and ten effect slots per insert.

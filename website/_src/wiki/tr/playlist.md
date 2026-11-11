@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![İzlerde kliplerle Playlist](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ Harfler, yazı klavyesi piyanosu (`Ctrl+T`) kapalıyken çalışır.
 - Açmak için bir klibe çift tıklayın.
 - Klibin sol üstündeki düğme klip menüsünü açar (benzersiz yap, yeniden adlandır ve renklendir, doğra; ses için ayrıca: pitch, tempoya uydur, ters).
 - Snap'i yok saymak için sürüklerken `Alt` tuşunu basılı tutun.
-- Ses kliplerinin fade tutamaçları ve yukarı veya aşağı sürüklediğiniz bir klip gain'i vardır.
+- Ses kliplerinin fade tutamaçları ve yukarı veya aşağı sürüklediğiniz bir klip gain'i vardır. Bir fade tutamacına sağ tıklarsanız `Çapraz geçiş oluştur` içeren menüsü açılır. Gain tutamacına sağ tıklarsanız `Gain'i sıfırla` ve `Normalize et` çıkar.
 - `Shift+M` Stretch'i açıp kapatır: açıkken bir ses klibini boyutlandırmak sesi kesmek yerine uzatıp sıkıştırır.
+- `Shift+Left` ve `Shift+Right` seçili klipleri bir snap adımı, `Shift+Up` ve `Shift+Down` bir iz kaydırır. `Alt+Left` ve `Alt+Right` onları snap olmadan, geçerli zoom'da bir ekran pikseli kaydırır. Hiç klip seçili değilse tüm klipler kayar.
+- Bir ses klibinin menüsündeki `Örnek olarak benzersiz yap`, kliple çaldığı şeyi tutan yeni bir dosya verir; klibin pitch'i, stretch'i ve reverse'ü artık sesin içindedir.
+- Warp işaretçileri olan bir ses klibi bunları üst kenarında küçük bayraklar olarak gösterir. İşaretçiyi taşımak için bayrağı yana sürükleyin.
+
+## Edit ve Select menüleri
+
+Playlist'in menüsünde bir `Düzen` ve bir `Seç` alt menüsü vardır. `Düzen` klip komutlarını taşır: kes, kopyala ve yapıştır, `Sola kaydır`, `Sağa kaydır`, `Yukarı kaydır`, `Aşağı kaydır`, `Benzersiz yap`, `Örnek olarak benzersiz yap`, `Boşluk ekle`, `Boşluğu sil`, birleştirme komutları ve fade seçenekleri. `Seç` içinde `Seçili kaynağa göre seç` (`Shift+C`), `Seçimi tersine çevir` (`Shift+I`), `Seçimi kaldır` (`Ctrl+D`), sessize alınmış ve üst üste binen klipler ile `Sihirli kement` vardır. `Sihirli kement` açıkken seçmek için fareyi hiçbir düğmeye basmadan klip çevresinde bir döngüyle gezdirin.
 
 ## İzler
 
 Bir izin başlığında tıklamak seçer, `Ctrl`+tık ekler veya çıkarır, `Shift`+tık bir aralık seçer ve sağ tık iz menüsünü açar. `Shift`+tekerlek izi yukarı veya aşağı taşır. İzin ışığı onu susturur (tık) ya da solo yapar (`Ctrl`+tık veya sağ tık). Birini yeniden boyutlandırmak için iki iz arasındaki ayırıcıyı sürükleyin, hepsini yeniden boyutlandırmak için `Shift`+sürükleyin.
+
+Playlist menüsündeki `Görünüm`, iz başlıklarının ne göstereceğini seçer: `Ses parçalarında denetimleri göster`, `Ses parçalarında seviyeleri göster` ve `Enstrüman parçalarında seviyeleri göster`.
+
+## Pattern blokları
+
+Playlist menüsünde `Pattern blokları (geçerli proje)` açıkken izlerin altındaki bir bölümde her pattern için bir satır bulunur. Orada Kalem bir blok yerleştirir ve satırı boyunca sürükler, Fırça blokları boyar, Silgi onları siler. Sağ tık, hangi araç olursa olsun siler.
 
 ## Cetvel, döngü ve işaretçiler
 
@@ -78,6 +91,9 @@ Araç çubuğundaki aranjman kutusu aranjmanlar arasında geçiş yapar. Bir pro
 | Ripple silme | `Shift+Del` | Seçili klipleri siler ve boşlukları kapatır |
 | Ripple düzenleme | `Shift+S` | Ripple düzenlemeyi açar veya kapatır |
 | Sessiz, sesli | `Alt+M` / `Shift+Alt+M` | Seçili klipleri susturur veya seslerini açar |
+| Klipleri kaydır | `Shift+Left` / `Shift+Right` | Seçili klipleri bir snap adımı kaydırır |
+| Başka bir iz'e kaydır | `Shift+Up` / `Shift+Down` | Seçili klipleri bir iz kaydırır |
+| Klipleri it | `Alt+Left` / `Alt+Right` | Seçili klipleri snap olmadan bir ekran pikseli kaydırır |
 | Benzersiz yap | `Ctrl+Shift+V` | Seçili klipleri benzersiz yapar |
 | Birleştir | `Ctrl+G` | Pattern kliplerini birleştirir |
 | Stretch | `Shift+M` | Ses kliplerini boyutlandırırken Stretch'i açıp kapatır |

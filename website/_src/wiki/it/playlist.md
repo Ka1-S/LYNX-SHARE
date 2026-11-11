@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![La Playlist con clip sulle tracce](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ Le lettere funzionano mentre il pianoforte sulla tastiera del PC (`Ctrl+T`) è s
 - Fai doppio clic su una clip per aprirla.
 - Il pulsante in alto a sinistra di una clip apre il menu della clip (rendi unica, rinomina e colora, spezza e, per l'audio: pitch, adatta al tempo, reverse).
 - Tieni premuto `Alt` mentre trascini per ignorare lo snap.
-- Le clip audio hanno maniglie di fade e un gain della clip che trascini su o giù.
+- Le clip audio hanno maniglie di fade e un gain della clip che trascini su o giù. Clicca con il tasto destro su una maniglia di fade per il suo menu, con `Crea dissolvenza incrociata`. Clicca con il tasto destro sulla maniglia del gain per `Azzera gain` e `Normalizza`.
 - `Shift+M` attiva Stretch: ridimensionare una clip audio allora allunga l'audio invece di tagliarlo.
+- `Shift+Left` e `Shift+Right` spostano le clip selezionate di uno step di snap, `Shift+Up` e `Shift+Down` di una traccia. `Alt+Left` e `Alt+Right` le spostano di un pixel dello schermo allo zoom corrente, senza snap. Se nessuna clip è selezionata, si spostano tutte le clip.
+- `Rendi unico come campione` nel menu di una clip audio dà alla clip un nuovo file che contiene ciò che ha suonato, con intonazione, stretch e reverse già nell'audio.
+- Una clip audio con warp marker li mostra come piccole bandiere sul bordo superiore. Trascina una bandiera di lato per spostare il marker.
+
+## Menu Edit e Select
+
+Il menu della Playlist ha un sottomenu `Modifica` e uno `Seleziona`. `Modifica` contiene i comandi sulle clip: taglia, copia e incolla, `Sposta a sinistra`, `Sposta a destra`, `Sposta su`, `Sposta giù`, `Rendi unico`, `Rendi unico come campione`, `Inserisci spazio`, `Elimina spazio`, i comandi di unione e le opzioni di fade. `Seleziona` ha `Seleziona per sorgente selezionata` (`Shift+C`), `Inverti selezione` (`Shift+I`), `Deseleziona` (`Ctrl+D`), le clip mute e quelle sovrapposte, e `Lazo magico`. Con `Lazo magico` attivo, muovi il mouse in un giro intorno alle clip, senza premere un pulsante, per selezionarle.
 
 ## Tracce
 
 Nell'intestazione di una traccia, il clic seleziona, `Ctrl`+clic aggiunge o toglie, `Shift`+clic seleziona un intervallo e il clic destro apre il menu della traccia. `Shift`+rotella sposta la traccia su o giù. La spia della traccia la silenzia (clic) o la mette in solo (`Ctrl`+clic o clic destro). Trascina il divisore tra due tracce per ridimensionarne una, oppure `Shift`+trascina per ridimensionarle tutte.
+
+`Vista` nel menu della Playlist sceglie cosa mostrano le intestazioni delle tracce: `Mostra i controlli sulle tracce audio`, `Mostra i livelli sulle tracce audio` e `Mostra i livelli sulle tracce strumento`.
+
+## Pattern Blocks
+
+Con `Blocchi di pattern (progetto attuale)` attivo nel menu della Playlist, una sezione sotto le tracce ha una riga per pattern. Lì la Matita mette un blocco e lo trascina lungo la sua riga, il Pennello dipinge blocchi e la Gomma li elimina. Il clic destro cancella con qualsiasi strumento.
 
 ## Righello, loop e marker
 
@@ -78,6 +91,9 @@ La casella dell'arrangiamento nella barra degli strumenti passa da un arrangiame
 | Elimina con ripple | `Shift+Del` | Elimina le clip selezionate e chiude gli spazi |
 | Modifica ripple | `Shift+S` | Attiva o disattiva la modifica ripple |
 | Mute, riattiva | `Alt+M` / `Shift+Alt+M` | Silenzia o riattiva le clip selezionate |
+| Spostare le clip | `Shift+Left` / `Shift+Right` | Sposta le clip selezionate di uno step di snap |
+| Spostare su un'altra traccia | `Shift+Up` / `Shift+Down` | Sposta le clip selezionate di una traccia |
+| Spostamento fine delle clip | `Alt+Left` / `Alt+Right` | Sposta le clip selezionate di un pixel dello schermo, senza snap |
 | Rendi unico | `Ctrl+Shift+V` | Rende uniche le clip selezionate |
 | Unisci | `Ctrl+G` | Unisce le clip di pattern |
 | Stretch | `Shift+M` | Attiva Stretch per ridimensionare le clip audio |

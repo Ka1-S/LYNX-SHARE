@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Es gibt zwei Wege, mit anderen an einem Projekt zu arbeiten, und beide stehen unter `Datei › Online-Session`. Ein Paket ist eine Datei, die du an einen Freund schickst, der einen Part zurückschickt. Es braucht kein Netzwerk, kein Konto und keinen Server. Eine Live-Session verbindet alle über das Internet mit dem LYNX-SHARE-Relay, und jede Änderung erreicht alle. Bis zu 4 Personen arbeiten an einem Projekt, du eingeschlossen.
 
@@ -64,6 +64,7 @@ Das Menü `Datei › Online-Session` hat diese Befehle, solange eine Session lä
 | `Session-Chat...` | Öffnet den Chat. Der Menüeintrag zeigt die Zahl ungelesener Nachrichten |
 | `Dem Transport der Session-Leitung folgen` | Für Gäste: Wiedergabe, Stopp und Position folgen dem Host |
 | `Personen und Rechte...` | Für den Host: was jede Person ändern darf und was jede am Ende behält |
+| `Plugins mit Gästen teilen...` | Für den Host: welche deiner Plugins die Gäste nutzen dürfen. Der Menüeintrag zeigt, wie viele geteilt sind |
 | `Einladungscode anzeigen...` | Für den Host: zeigt den Code erneut, mit einem Button `Kopieren` |
 | `Live-Session beenden` | Für den Host. Alle verlassen die Session, und der Code funktioniert nicht mehr |
 | `Live-Session verlassen` | Für einen Gast. Dein Part des Projekts bleibt bei dir |
@@ -77,6 +78,27 @@ Ein Kanal oder Insert, dessen Plugin auf deinem Computer nicht installiert ist, 
 - In einem Paket sind die Platzhalter Audio-Renders, die beim Speichern des Pakets erstellt werden. Sie folgen Clips, die du verschiebst, aber nicht Änderungen an den Noten eines Plugins, das du nicht hast. Bitte dessen Besitzer um ein neues Paket.
 - In einer Live-Session werden Parts, die ein Plugin nutzen, das jemand nicht hat, von der Person gerendert, die es hat, und als Audio an die anderen gestreamt.
 
+## Deine Plugins mit den Gästen teilen
+
+In einer Live-Session kann der Host die Gäste Plugins nutzen lassen, die nur der Host hat.
+
+Der Host geht so vor:
+
+1. Wähle `Datei › Online-Session › Plugins mit Gästen teilen...`.
+2. Hake die Plugins an, die geteilt werden sollen. `In deinen Plugins suchen` schränkt die Liste ein. Nichts wird geteilt, solange du es nicht anhakst.
+
+Ein Gast geht so vor:
+
+1. Öffne das Plugin-Menü eines deiner Kanäle oder Effekt-Slots. Die geteilten Plugins stehen zuerst, unter `On <host>'s computer`.
+2. Wähle eines. Sein Fenster listet die Parameter des Plugins als Slider auf, mit `Parameter suchen`.
+3. Füge Noten hinzu und bewege die Slider. Das Fenster zeigt `Updating...`, während der Rechner des Hosts rendert, danach `Aktuell`.
+
+- Das Plugin bleibt auf dem Rechner des Hosts und läuft unter der Lizenz des Hosts. LYNX SHARE sendet nie das Plugin, seine Dateien, seine Presets oder seine Lizenz.
+- Der Gast hört ein Render, das den Noten und Werten nach einem Moment folgt. Es wird nicht live gespielt, und der Gast bekommt nicht das eigene Fenster des Plugins.
+- Ist der Host nicht da, spielt das letzte Render. Das Teilen endet mit der Session, und das letzte Render bleibt.
+- Ein Gast mit der Rolle `Nur zuhören (keine Änderungen)` kann geteilte Plugins nicht nutzen.
+- Manche Plugin-Lizenzen erlauben es anderen Personen nicht, das Plugin zu bedienen, auch nicht aus der Ferne. Prüfe jede Lizenz, bevor du teilst.
+
 ## Was über das Netzwerk geht
 
 Pakete sind Dateien. Nichts wird irgendwohin hochgeladen.
@@ -89,6 +111,8 @@ Eine Live-Session verbindet sich nur, solange du in einer bist. Alles läuft üb
 - Beide Seiten sollten dieselbe Version von LYNX SHARE benutzen. Die Zusammenfassung des Pakets warnt, wenn sie abweichen.
 - Ein Gast, dessen Verbindung abbricht, verbindet sich von selbst neu und behält seine Änderungen.
 - Wenn LYNX SHARE beim Host während einer Session geschlossen wird, bietet der nächste Start an, sie fortzusetzen, und die Gäste verbinden sich von selbst neu.
+- Wenn sich das LYNX SHARE eines Gasts während einer Session schließt, fragt der nächste Start, ob du wieder beitreten willst. `Wieder einsteigen` bringt dich als dieselbe Person zurück, mit deiner Stimme und allem, was du geändert hattest. Das funktioniert 12 Stunden lang.
+- Die Linux-Version kann seit 0.1.26 eine Live-Session hosten.
 - In einer Live-Session holen Rückgängig und Wiederholen nur deine eigenen Änderungen zurück.
 - Jeder mit dem Einladungscode kann um Beitritt bitten, aber erst nachdem der Host ihn hereingelassen hat.
 

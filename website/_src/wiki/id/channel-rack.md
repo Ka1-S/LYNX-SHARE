@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Channel Rack dengan baris-baris step](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Ini bekerja saat Channel Rack sedang fokus.
 | Mute | `1` sampai `0` | Me-mute atau membatalkan mute channel 1 sampai 10 |
 | Solo | `Ctrl+1` sampai `Ctrl+0` | Solo channel 1 sampai 10 |
 | Jalur grafik | `Ctrl+K` | Menampilkan atau menyembunyikan jalur grafik |
+
+## Bekukan sebuah channel
+
+Pembekuan me-render channel menjadi audio dan memutar audio itu sebagai penggantinya. Instrumen dibongkar dari memori, plugin pihak ketiga juga, jadi tidak memakai CPU dan memori.
+
+1. Klik kanan channel dan pilih `Bekukan`. Jika beberapa channel dipilih, itemnya berbunyi `Bekukan channel terpilih`.
+2. Barisnya mendapat tag kepingan salju. Volume channel, pan, dan efek insert-nya tetap berfungsi seperti sebelumnya.
+3. Untuk mengubah not atau instrumennya lagi, klik kanan channel dan pilih `Cairkan`. Instrumen kembali dengan pengaturan yang dimilikinya.
+
+Channel yang dibekukan tidak bisa diedit: step-nya terkunci dan jendela instrumennya tidak terbuka. Jika not, tempo, atau aransemen berubah setelah pembekuan, tag berganti warna dan audio yang dibuat sebelumnya terus diputar sampai kamu memilih `Bekukan ulang`. Jika file audio hasil render hilang, instrumennya yang diputar.
+
+Pembekuan hanya berlaku untuk channel. Insert Mixer tidak bisa dibekukan.
 
 ## Hal lain di menu channel
 

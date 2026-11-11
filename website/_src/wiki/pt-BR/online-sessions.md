@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Há duas formas de trabalhar em um projeto com outras pessoas, e as duas estão em `Arquivo › Sessão online`. Um pacote é um arquivo que você manda a um amigo, que devolve uma parte. Não precisa de rede, conta nem servidor. Uma sessão ao vivo conecta todo mundo pela internet por meio do relay do LYNX SHARE, e cada alteração chega a todos. Até 4 pessoas participam de um projeto, você incluído.
 
@@ -64,6 +64,7 @@ O menu `Arquivo › Sessão online` tem estes comandos enquanto uma sessão est�
 | `Chat da sessão...` | Abre o chat. O item do menu mostra o número de mensagens não lidas |
 | `Seguir o transporte de quem criou a sessão` | Para convidados: tocar, parar e a posição seguem os de quem criou a sessão |
 | `Pessoas e permissões...` | Para quem criou a sessão: o que cada pessoa pode alterar e com o que cada uma fica no fim |
+| `Compartilhar plugins com quem entrar...` | Para o host: quais dos seus plugins os convidados podem usar. O item do menu mostra quantos estão compartilhados |
 | `Mostrar código de convite...` | Para quem criou a sessão: mostra o código de novo, com um botão `Copia` |
 | `Encerrar sessão ao vivo` | Para quem criou a sessão. Todos saem e o código deixa de funcionar |
 | `Sair da sessão ao vivo` | Para um convidado. Sua parte do projeto fica com você |
@@ -77,6 +78,27 @@ Um canal ou insert cujo plugin não está instalado no seu computador toca um su
 - Em um pacote, os substitutos são renders de áudio feitos quando o pacote é salvo. Eles acompanham os clipes que você move, mas não as edições nas notas de um plugin que você não tem. Peça um pacote novo a quem o tem.
 - Em uma sessão ao vivo, as partes que usam um plugin que alguém não tem são renderizadas por quem o tem e enviadas aos outros como áudio por streaming.
 
+## Compartilhar seus plugins com os convidados
+
+Em uma sessão ao vivo, o host pode deixar os convidados usarem plugins que só o host tem.
+
+O host faz assim:
+
+1. Escolha `Arquivo › Sessão online › Compartilhar plugins com quem entrar...`.
+2. Marque os plugins a compartilhar. `Buscar nos seus plugins` reduz a lista. Nada é compartilhado até você marcar.
+
+Um convidado faz assim:
+
+1. Abra o menu de plugins de um dos seus canais ou slots de efeito. Os plugins compartilhados vêm primeiro, em `On <host>'s computer`.
+2. Escolha um. A janela dele lista os parâmetros do plugin como sliders, com `Buscar parâmetros`.
+3. Adicione notas e mova os sliders. A janela mostra `Updating...` enquanto o computador do host renderiza, e depois `Atualizado`.
+
+- O plugin fica no computador do host e roda com a licença do host. O LYNX SHARE nunca envia o plugin, seus arquivos, seus presets nem sua licença.
+- O convidado ouve um render que acompanha as notas e os valores depois de um instante. Não é tocado ao vivo, e o convidado não recebe a janela do próprio plugin.
+- Enquanto o host está ausente, o último render toca. O compartilhamento termina quando a sessão acaba, e o último render permanece.
+- Um convidado com o papel `Só ouvir (sem edições)` não pode usar plugins compartilhados.
+- Algumas licenças de plugin não permitem que outras pessoas operem o plugin, nem remotamente. Confira cada licença antes de compartilhar.
+
 ## O que passa pela rede
 
 Os pacotes são arquivos. Nada é enviado para lugar nenhum.
@@ -89,6 +111,8 @@ Uma sessão ao vivo só se conecta enquanto você está em uma. Tudo passa pelo 
 - Os dois lados devem usar a mesma versão do LYNX SHARE. O resumo do pacote avisa quando elas diferem.
 - Um convidado cuja conexão cai reconecta sozinho e mantém as edições dele.
 - Se o LYNX SHARE de quem criou a sessão fechar durante ela, na próxima abertura ele oferece retomá-la, e os convidados reconectam sozinhos.
+- Se o LYNX SHARE de um convidado fecha durante uma sessão, na próxima abertura ele pergunta se quer voltar. `Voltar` leva você de volta como a mesma pessoa, com a sua parte e tudo o que você tinha mudado. Isso funciona por 12 horas.
+- A versão para Linux pode hospedar uma sessão ao vivo desde a 0.1.26.
 - Em uma sessão ao vivo, desfazer e refazer trazem de volta só as suas próprias edições.
 - Qualquer pessoa com o código de convite pode pedir para entrar, mas só depois que quem criou a sessão a deixa entrar.
 

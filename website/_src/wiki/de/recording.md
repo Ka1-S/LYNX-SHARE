@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![Das Aufnahmefenster fragt, was aufgenommen werden soll: Audio, Noten und Automation, alles, oder Audio in den Audio-Editor](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Noten kommen von einem MIDI-Keyboard, der Computertastatur (`Ctrl+T`) oder der T
 - `Aufgenommene Noten am globalen Raster quantisieren` steht in den Aufnahmeoptionen.
 - `Schritteingabe` (`Ctrl+E`) funktioniert im Stillstand: Jede Note, die du spielst, geht ein Raster-Step nach dem anderen ins Pattern.
 - `MIDI einfangen` (`Ctrl+Shift+Alt+R`) legt die Noten, die du gerade gespielt hast, ins Pattern, auch wenn die Aufnahme aus war.
+- Das Sustain-Pedal (CC 64) und das Sostenuto-Pedal (CC 66) halten die Noten, die du spielst, und eine aufgenommene Note dauert, bis das Pedal losgelassen wird. Ein Layer-Kanal gibt das Pedal an seine Kanäle weiter. Ist `Fußpedal steuert Note-Off` unter `Optionen › MIDI-Einstellungen...` aus, geht das Pedal stattdessen als Controller an die Plugins.
+- Im Song-Modus bleiben Noten, die in einen Pattern-Clip aufgenommen werden, der länger ist als sein Pattern, dort, wo du sie gespielt hast, und das Pattern wächst. Die Aufnahme wird nicht über die ersten Takte des Patterns zurückgefaltet. Ist `Gedehnte Pattern-Clips wiederholen ihr Pattern (LYNX)` an, gehen nur Noten in den Loop, die über Takten gespielt wurden, die schon Noten hatten.
 
 Regler, die du während der Aufnahme bewegst, werden im Song-Modus als Automationsclips geschrieben und im Pattern-Modus als Pattern-Events. Siehe [Automation](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Die Optionen stehen unter `Optionen › Aufnahme` und im Rechtsklick-Menü des A
 | `Aufnahme startet die Wiedergabe` | keine | Das Einschalten der Aufnahme drückt auch Wiedergabe |
 | `Aufnahmebereitschaft der Inserts beim Aufnahmestopp aufheben` | keine | Scharfgeschaltete Inserts werden nach jedem Take freigegeben |
 
+`Niedrige Latenz bei der Aufnahme` steht im Rechtsklick-Menü des Aufnahme-Buttons und im Insert-Menü des Mixers unter `Aufnahme auf Festplatte`. Standardmäßig ist es aus. Solange ein Insert mit einem Eingang scharf geschaltet ist oder sein Monitoring auf `An` steht, werden die Effekte umgangen, die auf seinem Weg zum Master Latenz hinzufügen. Das ändert nur, was du hörst: Ein Insert behält alle seine Effekte, wenn die Aufnahme hinter ihnen abgegriffen wird, zum Beispiel mit `Nach den Effekten`. Die Effekte kommen zurück, wenn das Insert nicht mehr scharf ist.
+
+`Tools › Aufnahme abbrechen` verwirft, was der aktuelle Aufnahmedurchgang geschrieben hat (seine Noten, Automation und Audio-Takes), und schaltet die Aufnahme aus. Die Wiedergabe läuft weiter, und die scharf geschalteten Inserts bleiben scharf.
+
 ## Loop-Aufnahme und Takes
 
 Bei eingeschaltetem `Loop-Aufnahme` läuft die Aufnahme im Song-Modus über die Loop-Region im Loop, im Pattern-Modus über das Pattern. Ist es aus, läuft die Aufnahme einfach weiter.
@@ -76,7 +82,7 @@ Jeder Durchgang einer Audio-Loop-Aufnahme landet auf der nächsten freien Playli
 
 - Ein gespeichertes Projekt behält seine Takes in `Audio/Recorded`, neben der Projektdatei.
 - Ein ungespeichertes Projekt nimmt in `LYNX/Recordings` in deinem Musikordner auf.
-- Takes sind WAV-Dateien mit der Samplerate des Audiogeräts, 24-Bit oder 32-Bit Float. Das Format und die Namen der Takes legst du unter `Aufnahme` in `Optionen › Audioeinstellungen...` fest.
+- Takes sind WAV-Dateien mit der Samplerate des Audiogeräts, 16-Bit, 24-Bit oder 32-Bit Float. Das Format (`Dateiformat`) und die Namen der Takes legst du unter `Aufnahme` in `Optionen › Audioeinstellungen...` fest.
 - `Aufnahmeordner öffnen` steht im Rechtsklick-Menü des Aufnahme-Buttons. `Datei › Unbenutzte Aufnahmen löschen und speichern...` entfernt Takes, die das Projekt nicht mehr nutzt.
 
 ## Gut zu wissen

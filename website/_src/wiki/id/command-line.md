@@ -1,5 +1,5 @@
 ---
-source: 98829adcb8
+source: a5c1d056c8
 ---
 LYNX SHARE juga bisa berjalan tanpa membuka jendelanya. Satu opsi merender proyek menjadi audio, opsi lain mengonversinya ke proyek FL Studio atau set Ableton Live, dan beberapa lagi ada untuk pengujian. Pemeriksaan milik proyek ini sendiri memakai opsi yang sama.
 
@@ -20,6 +20,12 @@ LYNX.exe project.lynx
 
 Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima: `.lynx`, `.flp`, `.als`, `.flm`, dan `.mid`. Path relatif dihitung dari folder saat ini.
 
+```
+LYNX.exe --no-plugins project.lynx
+```
+
+Membuka proyek `.lynx` tanpa memuat plugin pihak ketiganya, seperti yang dilakukan `File › Buka tanpa plugin pihak ketiga...`. Tiap plugin menyimpan pengaturannya. Pakai untuk proyek yang terus dicegah terbuka oleh sebuah plugin.
+
 ## Opsi untuk pemakaian sehari-hari
 
 | Opsi | Fungsinya |
@@ -33,12 +39,15 @@ Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima:
 | `--export-flp ... --substitute` | Menukar plugin khusus LYNX dengan plugin FL terdekat, bukan merendernya menjadi audio |
 | `--export-als <project> <folder>` | Menulis set Ableton Live ke `<folder>/<name> Project/<name>.als`, untuk Live 12 |
 | `--export-als ... --live11` | Menulis set untuk Live 11 |
+| `--export-bundle <project> <folder>` | Menulis paket dari `File › Ekspor › Untuk aplikasi lain...` ke dalam folder |
+| `--export-bundle ... --zip` | Meng-zip folder. Folder diganti dengan `<folder>.zip` |
+| `--export-bundle ... --no-mixdown` | Tidak menyertakan mixdown di paket |
 | `--devices <report.txt>` | Mencantumkan jenis driver audio dan perangkat di komputer ini |
 | `--showcase <out.lynx>` | Menulis proyek demo milik LYNX SHARE sendiri |
 | `--lang <id>` | Memakai bahasa antarmuka lain untuk satu kali jalan, misalnya `--lang pt-BR` |
 | `--menu-entry on` atau `nonaktif` | Khusus AppImage Linux: menambahkan LYNX SHARE ke menu aplikasi, atau menghapusnya |
 
-`--export`, `--stems`, dan `--export-flp` menerima `.lynx`, `.flp`, atau `.als` sebagai proyek. `--export-als` juga menerima `.flm`.
+`--export`, `--stems`, dan `--export-flp` menerima `.lynx`, `.flp`, atau `.als` sebagai proyek. `--export-als` juga menerima `.flm`. `--export-bundle` menerima `.lynx`, `.flp`, atau `.als`.
 
 Contoh:
 
@@ -48,6 +57,7 @@ LYNX.exe --export song.lynx drums.wav --insert 1
 LYNX.exe --stems song.lynx song.wav
 LYNX.exe --export-flp song.lynx song.flp
 LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --export-bundle song.lynx out-folder --zip
 LYNX.exe --devices devices.txt
 LYNX --lang de
 ```
@@ -78,7 +88,7 @@ LYNX --devicetest PipeWire "System default" out.txt
 
 ## Perlu diketahui
 
-- Hasilnya masuk ke file, bukan ke terminal. `--export` menulis `<out>.txt`, `--export-flp` menulis `<out.flp>.txt`, `--export-als` menulis `export-als.txt` di folder itu, dan `--stems` menulis `<base.wav>.txt`.
+- Hasilnya masuk ke file, bukan ke terminal. `--export` menulis `<out>.txt`, `--export-flp` menulis `<out.flp>.txt`, `--export-als` menulis `export-als.txt` di folder itu, `--export-bundle` menulis `export-bundle.txt` di folder itu, dan `--stems` menulis `<base.wav>.txt`.
 - Program membaca standard input. Dalam loop shell, tambahkan `< /dev/null` pada setiap pemanggilan.
 - `--snapshot` menggambar pada 1280x720 kecuali variabel lingkungan `LYNX_SNAPSHOT_SIZE` menyatakan lain, misalnya `1920x1080`.
 - `--lang` menerima id bahasa yang tercantum di `Opsi › Pengaturan umum...`, seperti `en`, `pt-BR`, `de`, `es`, `fr`, atau `ja`. Id yang tidak dikenal diabaikan.

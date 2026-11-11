@@ -1,5 +1,5 @@
 ---
-source: 2e33c00ef4
+source: 0d51822a6b
 ---
 ![La finestra Registrazione chiede cosa registrare: audio, note e automazione, tutto, oppure audio nell'editor audio](/assets/img/wiki/record-dialog.webp)
 
@@ -48,6 +48,8 @@ Le note arrivano da una tastiera MIDI, dalla tastiera del PC (`Ctrl+T`) o dalla 
 - `Quantizza le note registrate sullo snap globale` è nelle opzioni di registrazione.
 - `Inserimento a passi` (`Ctrl+E`) funziona da fermo: ogni nota che suoni entra nel pattern un passo di snap dopo l'altro.
 - `Cattura MIDI` (`Ctrl+Shift+Alt+R`) mette nel pattern le note che hai appena suonato, anche se la registrazione era disattivata.
+- Il pedale di sustain (CC 64) e il pedale di sostenuto (CC 66) trattengono le note che suoni, e una nota registrata dura finché il pedale non si alza. Un canale Layer passa il pedale ai suoi canali. Con `Il pedale controlla il rilascio delle note` disattivato in `Opzioni › Impostazioni MIDI...`, il pedale arriva invece ai plugin come controller.
+- In modalità Song, le note registrate in una clip di pattern più lunga del suo pattern restano dove le hai suonate, e il pattern si allunga. La take non viene ripiegata sulle prime battute del pattern. Con `Le clip di pattern allungate ripetono il loro pattern (LYNX)` attivo, nel loop entrano solo le note suonate sulle battute che avevano già note.
 
 I controlli che muovi durante la registrazione vengono scritti come clip di automazione in modalità Brano e come eventi del pattern in modalità Pattern. Vedi [Automazione](/wiki/automation/).
 
@@ -66,6 +68,10 @@ Le opzioni sono in `Opzioni › Registrazione` e nel menu del clic destro del pu
 | `La registrazione avvia la riproduzione` | nessuno | Attivare la registrazione preme anche play |
 | `Disarma gli insert quando la registrazione si ferma` | nessuno | Gli insert armati vengono rilasciati dopo ogni take |
 
+`Bassa latenza in registrazione` si trova nel menu del tasto destro del pulsante di registrazione e nel menu dell'insert del Mixer sotto `Registrazione su disco`. È disattivato per impostazione predefinita. Finché un insert con un ingresso è armato, o il suo monitoraggio è su `On`, gli effetti che aggiungono latenza sul suo percorso verso il Master vengono bypassati. Cambia solo ciò che senti: un insert mantiene tutti i suoi effetti quando la take è prelevata dopo di essi, per esempio con `Dopo gli effetti`. Gli effetti tornano quando l'insert viene disarmato.
+
+`Strumenti › Annulla registrazione` butta via ciò che il passaggio di registrazione corrente ha scritto (le sue note, l'automazione e le take audio) e disattiva la registrazione. La riproduzione continua e gli insert armati restano armati.
+
 ## Registrazione in loop e take
 
 Con `Registrazione in loop` attivo, la registrazione fa il loop sulla regione del loop in modalità Brano, o sul pattern in modalità Pattern. Con l'opzione disattivata, la registrazione prosegue dritta.
@@ -76,7 +82,7 @@ Ogni passaggio di una registrazione audio in loop finisce sulla successiva tracc
 
 - Un progetto salvato conserva le sue take in `Audio/Recorded`, accanto al file di progetto.
 - Un progetto non salvato registra in `LYNX/Recordings` nella tua cartella Musica.
-- Le take sono file WAV alla frequenza di campionamento del dispositivo audio, a 24 bit o 32 bit float. Il formato e i nomi delle take si impostano sotto `Registrazione` in `Opzioni › Impostazioni audio...`.
+- Le take sono file WAV alla frequenza di campionamento del dispositivo audio, a 16 bit, 24 bit o 32 bit float. Il formato (`Formato del file`) e i nomi delle take si impostano sotto `Registrazione` in `Opzioni › Impostazioni audio...`.
 - `Apri cartella delle registrazioni` è nel menu del clic destro del pulsante di registrazione. `File › Elimina registrazioni inutilizzate e salva...` rimuove le take che il progetto non usa più.
 
 ## Da sapere

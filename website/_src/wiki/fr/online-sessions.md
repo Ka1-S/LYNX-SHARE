@@ -1,5 +1,5 @@
 ---
-source: 27354bbca9
+source: 7db9a73959
 ---
 Il y a deux façons de travailler à plusieurs sur un projet, et les deux sont sous `Fichier › Session en ligne`. Un paquet est un fichier que vous envoyez à un ami, qui vous renvoie une partie. Il ne demande ni réseau, ni compte, ni serveur. Une session en direct relie tout le monde par internet via le relais LYNX SHARE, et chaque modification parvient à tous. Jusqu'à 4 personnes participent à un projet, vous compris.
 
@@ -64,6 +64,7 @@ Le menu `Fichier › Session en ligne` contient ces commandes tant qu'une sessio
 | `Chat de la session...` | Ouvre le chat. L'entrée de menu affiche le nombre de messages non lus |
 | `Suivre le transport de l'hôte` | Pour les invités : la lecture, l'arrêt et la position suivent l'hôte |
 | `Personnes et autorisations...` | Pour l'hôte : ce que chaque personne peut modifier, et ce que chacune garde à la fin |
+| `Partager des plugins avec les personnes invitées...` | Pour l'hôte : lesquels de vos plugins les invités peuvent utiliser. L'élément de menu indique combien sont partagés |
 | `Afficher le code d'invitation...` | Pour l'hôte : affiche de nouveau le code, avec un bouton `Copie` |
 | `Mettre fin à la session en direct` | Pour l'hôte. Tout le monde part, et le code cesse de fonctionner |
 | `Quitter la session en direct` | Pour un invité. Votre partie du projet reste chez vous |
@@ -77,6 +78,27 @@ Un canal ou un insert dont le plugin n'est pas installé sur votre ordinateur jo
 - Dans un paquet, les remplaçants sont des rendus audio faits à l'enregistrement du paquet. Ils suivent les clips que vous déplacez, mais pas les modifications des notes d'un plugin que vous n'avez pas. Demandez un nouveau paquet à son propriétaire.
 - Dans une session en direct, les parties qui utilisent un plugin que quelqu'un n'a pas sont rendues par la personne qui l'a et diffusées aux autres sous forme d'audio.
 
+## Partager vos plugins avec les invités
+
+Dans une session en direct, l'hôte peut laisser les invités utiliser des plugins que seul l'hôte possède.
+
+L'hôte fait ceci :
+
+1. Choisissez `Fichier › Session en ligne › Partager des plugins avec les personnes invitées...`.
+2. Cochez les plugins à partager. `Rechercher dans vos plugins` réduit la liste. Rien n'est partagé tant que vous ne l'avez pas coché.
+
+Un invité fait ceci :
+
+1. Ouvrez le menu de plugins d'un de vos canaux ou emplacements d'effet. Les plugins partagés viennent en premier, sous `On <host>'s computer`.
+2. Choisissez-en un. Sa fenêtre liste les paramètres du plugin sous forme de curseurs, avec `Rechercher des paramètres`.
+3. Ajoutez des notes et bougez les curseurs. La fenêtre affiche `Updating...` pendant que l'ordinateur de l'hôte fait le rendu, puis `À jour`.
+
+- Le plugin reste sur l'ordinateur de l'hôte et tourne sous la licence de l'hôte. LYNX SHARE n'envoie jamais le plugin, ses fichiers, ses presets ni sa licence.
+- L'invité entend un rendu qui suit les notes et les valeurs après un court instant. Ce n'est pas joué en direct, et l'invité n'a pas la fenêtre propre du plugin.
+- Quand l'hôte est absent, le dernier rendu est lu. Le partage s'arrête à la fin de la session, et le dernier rendu reste.
+- Un invité avec le rôle `Écoute seule (aucune modification)` ne peut pas utiliser les plugins partagés.
+- Certaines licences de plugin n'autorisent pas d'autres personnes à utiliser le plugin, même à distance. Vérifiez chaque licence avant de partager.
+
 ## Ce qui passe par le réseau
 
 Les paquets sont des fichiers. Rien n'est envoyé nulle part.
@@ -89,6 +111,8 @@ Une session en direct ne se connecte que pendant que vous y êtes. Tout passe pa
 - Les deux côtés devraient utiliser la même version de LYNX SHARE. Le résumé du paquet avertit quand elles diffèrent.
 - Un invité dont la connexion tombe se reconnecte tout seul et garde ses modifications.
 - Si LYNX SHARE se ferme chez l'hôte pendant une session, le démarrage suivant propose de la reprendre, et les invités se reconnectent tout seuls.
+- Si LYNX SHARE se ferme chez un invité pendant une session, le démarrage suivant demande s'il faut y retourner. `Y revenir` vous ramène en tant que la même personne, avec votre partie et tout ce que vous aviez modifié. Cela fonctionne pendant 12 heures.
+- La version Linux peut héberger une session en direct depuis la 0.1.26.
 - Dans une session en direct, annuler et rétablir ne ramènent que vos propres modifications.
 - Toute personne qui a le code d'invitation peut demander à rejoindre, mais seulement après que l'hôte l'a fait entrer.
 

@@ -1,5 +1,5 @@
 ---
-source: e767f4482b
+source: f245a8e1b7
 ---
 ![Die Playlist mit Clips auf Spuren](/assets/img/playlist.webp)
 
@@ -44,12 +44,25 @@ Die Buchstaben funktionieren, solange das Tastaturklavier der Schreibtastatur (`
 - Doppelklicke einen Clip, um ihn zu öffnen.
 - Die Taste oben links an einem Clip öffnet das Clipmenü (eigenständig machen, umbenennen und färben, zerteilen, und bei Audio: Tonhöhe, ans Tempo anpassen, umkehren).
 - Halte beim Ziehen `Alt` gedrückt, um das Raster zu ignorieren.
-- Audioclips haben Fade-Griffe und eine Clip-Lautstärke, die du nach oben oder unten ziehst.
+- Audioclips haben Fade-Griffe und eine Clip-Lautstärke, die du nach oben oder unten ziehst. Klicke mit der rechten Maustaste auf einen Fade-Griff für sein Menü mit `Crossfade erstellen`. Klicke mit der rechten Maustaste auf den Lautstärke-Griff für `Gain zurücksetzen` und `Normalisieren`.
 - `Shift+M` schaltet Stretch um: Wird ein Audioclip dann in der Größe geändert, wird das Audio gedehnt, statt abgeschnitten.
+- `Shift+Left` und `Shift+Right` verschieben die gewählten Clips um einen Raster-Schritt, `Shift+Up` und `Shift+Down` um eine Spur. `Alt+Left` und `Alt+Right` verschieben sie um einen Bildschirmpixel bei der aktuellen Zoomstufe, ohne Raster. Ist kein Clip gewählt, bewegen sich alle Clips.
+- `Als Sample eindeutig machen` im Menü eines Audioclips gibt dem Clip eine neue Datei mit dem, was er gespielt hat, wobei Tonhöhe, Stretch und Reverse schon im Audio stecken.
+- Ein Audioclip mit Warp-Markern zeigt sie als kleine Fähnchen an seiner Oberkante. Ziehe ein Fähnchen zur Seite, um den Marker zu verschieben.
+
+## Die Menüs Edit und Select
+
+Das Menü der Playlist hat ein Untermenü `Bearbeiten` und eines `Auswählen`. `Bearbeiten` enthält die Clip-Befehle: Ausschneiden, Kopieren und Einfügen, `Nach links verschieben`, `Nach rechts verschieben`, `Nach oben verschieben`, `Nach unten verschieben`, `Eigenständig machen`, `Als Sample eindeutig machen`, `Leerraum einfügen`, `Leerraum löschen`, die Befehle zum Zusammenführen und die Fade-Optionen. `Auswählen` hat `Nach ausgewählter Quelle auswählen` (`Shift+C`), `Auswahl umkehren` (`Shift+I`), `Auswahl aufheben` (`Ctrl+D`), die stummen und die überlappenden Clips sowie `Magisches Lasso`. Ist `Magisches Lasso` an, bewege die Maus ohne gedrückte Taste in einer Schleife um Clips, um sie zu wählen.
 
 ## Spuren
 
 Im Kopf einer Spur wählt ein Klick aus, `Ctrl`+Klick fügt hinzu oder entfernt, `Shift`+Klick wählt einen Bereich, und Rechtsklick öffnet das Spurmenü. `Shift`+Mausrad schiebt die Spur nach oben oder unten. Das Lämpchen der Spur schaltet sie stumm (Klick) oder solo (`Ctrl`+Klick oder Rechtsklick). Ziehe die Trennlinie zwischen zwei Spuren, um eine in der Größe zu ändern, oder `Shift`+Ziehen für alle.
+
+`Ansicht` im Menü der Playlist wählt, was die Spurköpfe zeigen: `Bedienelemente auf Audiospuren anzeigen`, `Pegel auf Audiospuren anzeigen` und `Pegel auf Instrumentenspuren anzeigen`.
+
+## Pattern-Blöcke
+
+Ist `Pattern-Blöcke (aktuelles Projekt)` im Menü der Playlist an, hat ein Bereich unter den Spuren eine Zeile pro Pattern. Dort setzt der Stift einen Block und zieht ihn an seiner Zeile entlang, der Pinsel malt Blöcke und der Radierer löscht sie. Ein Rechtsklick löscht mit jedem Werkzeug.
 
 ## Lineal, Loop und Marker
 
@@ -78,6 +91,9 @@ Das Arrangement-Feld in der Werkzeugleiste schaltet zwischen Arrangements um. Ei
 | Löschen mit Nachrücken | `Shift+Del` | Löscht die gewählten Clips und schließt die Lücken |
 | Ripple-Bearbeitung | `Shift+S` | Schaltet die Ripple-Bearbeitung ein oder aus |
 | Stummschalten, Laut | `Alt+M` / `Shift+Alt+M` | Schaltet die gewählten Clips stumm oder wieder laut |
+| Clips verschieben | `Shift+Left` / `Shift+Right` | Verschiebt die gewählten Clips um einen Raster-Schritt |
+| Auf eine andere Spur verschieben | `Shift+Up` / `Shift+Down` | Verschiebt die gewählten Clips um eine Spur |
+| Clips nudgen | `Alt+Left` / `Alt+Right` | Verschiebt die gewählten Clips um einen Bildschirmpixel, ohne Raster |
 | Eigenständig machen | `Ctrl+Shift+V` | Macht die gewählten Clips eigenständig |
 | Zusammenführen | `Ctrl+G` | Führt Pattern-Clips zusammen |
 | Stretch | `Shift+M` | Schaltet Stretch für das Ändern der Größe von Audioclips um |

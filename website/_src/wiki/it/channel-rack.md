@@ -1,5 +1,5 @@
 ---
-source: f08a3da66d
+source: 200df26182
 ---
 ![Il Channel Rack con le righe di step](/assets/img/rack.webp)
 
@@ -78,6 +78,18 @@ Funzionano mentre il Channel Rack ha il focus.
 | Mute | `1` a `0` | Silenzia o riattiva i canali da 1 a 10 |
 | Solo | `Ctrl+1` a `Ctrl+0` | Mette in solo i canali da 1 a 10 |
 | Corsia del grafico | `Ctrl+K` | Mostra o nasconde la corsia del grafico |
+
+## Bloccare un canale
+
+Il blocco renderizza un canale in audio e suona quell'audio al suo posto. Lo strumento viene scaricato, anche un plugin di terze parti, così non usa né CPU né memoria.
+
+1. Clicca con il tasto destro sul canale e scegli `Blocca`. Con più canali selezionati la voce diventa `Congela i canali selezionati`.
+2. La riga riceve un'etichetta a fiocco di neve. Il volume e il pan del canale e gli effetti del suo insert funzionano come prima.
+3. Per cambiare di nuovo le note o lo strumento, clicca con il tasto destro sul canale e scegli `Scongela`. Lo strumento torna con le impostazioni che aveva.
+
+Un canale bloccato non si può modificare: i suoi step sono bloccati e la finestra del suo strumento non si apre. Se le note, il tempo o l'arrangiamento cambiano dopo il blocco, l'etichetta cambia colore e l'audio fatto prima continua a suonare finché non scegli `Ricongela`. Se i file audio renderizzati mancano, suona invece lo strumento.
+
+Il blocco funziona solo sui canali. Un insert del Mixer non si può bloccare.
 
 ## Altre voci del menu del canale
 

@@ -46,12 +46,25 @@ The letters work while the typing keyboard piano (`Ctrl+T`) is off.
 - Double-click a clip to open it.
 - The button at a clip's top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).
 - Hold `Alt` while dragging to ignore the snap.
-- Audio clips have fade handles and a clip gain you drag up or down.
+- Audio clips have fade handles and a clip gain you drag up or down. Right-click a fade handle for its menu, with `Create crossfade`. Right-click the gain handle for `Reset gain` and `Normalize`.
 - `Shift+M` switches Stretch: resizing an audio clip then stretches the audio instead of cutting it.
+- `Shift+Left` and `Shift+Right` move the selected clips one snap step, `Shift+Up` and `Shift+Down` one track. `Alt+Left` and `Alt+Right` move them one screen pixel at the current zoom, without snap. With no clip selected, all clips move.
+- `Make unique as sample` in an audio clip's menu gives the clip a new file that holds what it played, with its pitch, stretch and reverse already in the audio.
+- An audio clip with warp markers shows them as small flags on its top edge. Drag a flag sideways to move the marker.
+
+## Edit and Select menus
+
+The Playlist's menu has an `Edit` and a `Select` submenu. `Edit` holds the clip commands: cut, copy and paste, `Shift left`, `Shift right`, `Shift up`, `Shift down`, `Make unique`, `Make unique as sample`, `Insert space`, `Delete space`, the merge commands and the fade options. `Select` has `Select by selected source` (`Shift+C`), `Invert selection` (`Shift+I`), `Deselect` (`Ctrl+D`), the muted and the overlapping clips, and `Magic lasso`. With `Magic lasso` on, move the mouse in a loop around clips, without pressing a button, to select them.
 
 ## Tracks
 
 In a track's header, click selects, `Ctrl`+click adds or removes, `Shift`+click selects a range and right-click opens the track menu. `Shift`+wheel moves the track up or down. The track's light mutes it (click) or solos it (`Ctrl`+click or right-click). Drag the divider between two tracks to resize one, or `Shift`+drag to resize all.
+
+`View` in the Playlist's menu chooses what the track headers show: `Show controls on audio tracks`, `Show levels on audio tracks` and `Show levels on instrument tracks`.
+
+## Pattern Blocks
+
+With `Pattern blocks (current project)` on in the Playlist's menu, a section under the tracks has one row per pattern. There, the Pencil places one block and drags it along its row, the Brush paints blocks and the Eraser deletes them. Right-click erases with any tool.
 
 ## Ruler, loop and markers
 
@@ -80,6 +93,9 @@ The arrangement box in the toolbar switches between arrangements. A project can 
 | Ripple delete | `Shift+Del` | Deletes the selected clips and closes the gaps |
 | Ripple editing | `Shift+S` | Turns ripple editing on or off |
 | Mute, unmute | `Alt+M` / `Shift+Alt+M` | Mutes or unmutes the selected clips |
+| Shift clips | `Shift+Left` / `Shift+Right` | Moves the selected clips one snap step |
+| Shift to another track | `Shift+Up` / `Shift+Down` | Moves the selected clips one track |
+| Nudge clips | `Alt+Left` / `Alt+Right` | Moves the selected clips one screen pixel, without snap |
 | Make unique | `Ctrl+Shift+V` | Makes the selected clips unique |
 | Merge | `Ctrl+G` | Merges pattern clips |
 | Stretch | `Shift+M` | Switches Stretch for resizing audio clips |

@@ -1,5 +1,5 @@
 ---
-source: 45c1275215
+source: be0fc22373
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -46,6 +46,12 @@ Standart klasörler ve sizin eklediğiniz klasörler taranır:
 - macOS: `~/Library/Audio/Plug-Ins` ve `/Library/Audio/Plug-Ins` içindeki `VST3`, `Components` ve `CLAP`.
 - Linux: `~/.vst3`, `~/.clap`, `~/.lv2`, `~/.vst` ve `/usr/lib` ile `/usr/local/lib` altındaki aynı klasörler.
 
+## Yerleşik ve ayrı plugin pencereleri
+
+Bir plugin'in editörü, diğer paneller gibi ana pencerenin içinde açılır. Plugin penceresinin menüsündeki `Ayrılmış` o plugin'e kendi penceresini verir, aynı menüdeki `Üste sabitle` ise ayrılmış bir pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar.
+
+`Seçenekler › Genel ayarlar...` içindeki `Tüm yeni eklentileri ayır`, eklediğiniz her plugin'i ayrı pencerede açar. `Araçlar › Tüm plugin düzenleyicilerini şuna geçir` projedeki tüm plugin'ler için `Yerleşik` veya `Ayrılmış` ayarlar.
+
 ## Plugin'leri ayrı süreçte çalıştırma
 
 Varsayılan olarak bir plugin LYNX SHARE'in içinde çalışır; bu yüzden çöken bir plugin programı da düşürebilir. İsteğe bağlı olarak her plugin kendi sürecinde çalışır.
@@ -54,15 +60,17 @@ Varsayılan olarak bir plugin LYNX SHARE'in içinde çalışır; bu yüzden çö
 2. `Plugin'leri ayrı süreçte çalıştır (LYNX SHARE'i çökmelere karşı korur)` seçeneğini açın.
 3. Zaten açık olan plugin'lere uygulamak için projeyi yeniden açın.
 
-Böyle bir plugin çökerse veya yanıt vermeyi bırakırsa susturulur, bir ileti görünür ve LYNX SHARE çalışmaya devam eder. Plugin'i yeniden yüklemek için projeyi kaydedip yeniden açın. Plugin'in editörü kendi penceresinde açılır.
+Böyle bir plugin çökerse veya yanıt vermeyi bırakırsa susturulur, bir ileti görünür ve LYNX SHARE çalışmaya devam eder. O iletideki `Yeniden yükle`, plugin'i projeyi yeniden açmadan, son kayıttaki veya yedekteki ayarlarla yeniden başlatır. Plugin'in editörü kendi penceresinde açılır; yerleştirilemez ve üste sabitlenemez.
 
 Bunu yalnızca tek bir plugin için yapmak üzere, plugin penceresinin wrapper menüsünde `Ayrı süreçte çalıştır` veya `Always run <plugin> in a separate process` seçeneğini kullanın. Bir plugin'in editörü çöktüğünde görünen ileti ikincisini de sunar.
 
 Bu Windows ve Linux'ta çalışır, macOS'ta ise 0.1.25'ten beri.
 
+LYNX SHARE içinde çöken bir plugin kapatılır ve iletisi de `Yeniden yükle` sunar. Sonradan kanalın menüsündeki veya efekt yuvasının menüsündeki `Çöken plugin'i yeniden yükle` kullanılabilir.
+
 ## 32 bit plugin'ler (yalnızca Windows)
 
-Windows'ta 32 bit VST2 ve VST3 plugin'leri bir köprü (`LYNX-bridge32.exe`) üzerinden çalışır. Köprü gecikme eklemez. İçinde çöken plugin kendi kendine durur, LYNX SHARE çalmaya devam eder. Köprülenmiş bir plugin'in editörü kendi penceresinde açılır. Bir plugin'in hem 32 bit hem 64 bit derlemesi kuruluysa plugin penceresinin `Wrapper ayarları` bölümündeki `Bit boyutu` hangisinin yükleneceğini seçer.
+Windows'ta 32 bit VST2 ve VST3 plugin'leri bir köprü (`LYNX-bridge32.exe`) üzerinden çalışır. Köprü gecikme eklemez. İçinde çöken plugin kendi kendine durur, LYNX SHARE çalmaya devam eder. Köprülenmiş bir plugin'in editörü kendi penceresinde açılır; yerleştirilemez ve üste sabitlenemez. Bir plugin'in hem 32 bit hem 64 bit derlemesi kuruluysa plugin penceresinin `Wrapper ayarları` bölümündeki `Bit boyutu` hangisinin yükleneceğini seçer.
 
 ## Plugin performans monitörü
 
@@ -78,16 +86,35 @@ Windows'ta 32 bit VST2 ve VST3 plugin'leri bir köprü (`LYNX-bridge32.exe`) üz
 | `Çalınca sıfırla` | Her çalma başladığında ortalamaları ve tepeleri yeniden başlatır |
 | `Sıfırla` | Ortalamaları ve tepeleri şimdi temizler |
 
+## Bir enstrümanın çıkışlarını ayrı insert'lere gönderme
+
+Birden fazla çıkışı olan bir enstrüman plugin'i, her çıkışı kendi Mixer insert'inde çalabilir. Plugin penceresinde `Wrapper ayarları`'e, sonra `İşleme` sekmesine tıklayın. `Bağlantılar` altında her çıkışın onu açıp kapatan bir ışığı ve bir sayısı vardır: kanalın kendi insert'inden kaç insert sonrasında çaldığı. `Çıkışları otomatik eşle` her çıkışa bir sonraki insert'i verir, `Sıfırla` varsayılanlara döner.
+
+## Plugin database klasörü
+
+[Browser](/wiki/browser/)'daki Plugin database'in klasörleri, plugin seçici ve plugin menüleri diskte bir klasördür: Belgeler klasörünüzdeki `LYNX/Plugin database`. Açmak için Browser'da `Plugin veritabanı`'e sağ tıklayıp `Aç`'ı seçin.
+
+- `Efektler` ve `Üreteçler`, plugin başına bir `.lynxplugin` dosyası tutar. Klasörler ve alt klasörler (4 seviyeye kadar) oluşturup dosyaları içine taşıyın.
+- Menülerdeki plugin'i yeniden adlandırmak için dosyayı yeniden adlandırın. Plugin'i menülerden çıkarmak için dosyayı silin. Plugin kaldırılmış olmaz.
+- `Kurulu`'da her plugin için bir kayıt vardır. Bir plugin'i geri getirmek için birini `Efektler` veya `Üreteçler` içine kopyalayın.
+
+## Plugin'leri olmadan proje açma
+
+`Dosya › Üçüncü taraf plugin'ler olmadan aç...`, açılmayan veya yüklenirken çöken bir proje için, bir LYNX SHARE projesini tüm üçüncü taraf plugin'ler kapalı olarak açar. Plugin'lerin kayıtlı ayarları korunur. `Dosya › Plugin'leri yeniden aç...` onları yeniden açar.
+
 ## Bir plugin kurulu olmadığında
 
 LYNX SHARE aynı plugin'i önce tanımlayıcısıyla, sonra dosyasıyla, sonra adıyla arar. VST2 ile kaydedilmiş bir proje aynı ürünün VST3'üyle açılır, tersi de geçerlidir; ancak o zaman plugin varsayılan ayarlarıyla çalar.
 
-Bir efekt hiç kurulu değilse aynı işi gören bir LYNX SHARE efekti yuvasını alır ve orijinal projede kalır. Bkz. [Dahili enstrümanlar ve efektler](/wiki/built-in/). `Yardım › Eksik dosyalar...` yerine konan plugin'leri listeler.
+Bir efekt hiç kurulu değilse aynı işi gören bir LYNX SHARE efekti yuvasını alır ve orijinal projede kalır. Plugin'in kayıtlı ayarları okunabiliyorsa yedek efekt eşleşen ayarlarla başlar. Anahtar, `Seçenekler › Genel ayarlar...` içindeki `Eksik plugin'lerin yerine LYNX SHARE karşılıklarını kullan`'tir. Bkz. [Dahili enstrümanlar ve efektler](/wiki/built-in/). `Yardım › Eksik dosyalar...` yerine konan plugin'leri listeler.
 
 ## Bilmekte fayda var
 
 - Barındırılan bir plugin'in penceresinde bir preset çubuğu vardır: plugin'in kendi programları, preset'leriniz, `Preset kaydet...`, `Preset dosyası yükle...` ve `Preset dosyası dışa aktar...`. `.fxp`, `.fxb` ve `.vstpreset` dosyaları yalnızca LYNX SHARE'in içinde çalışan bir plugin'e yüklenir, ayrı bir süreçte çalışana yüklenmez.
 - Monitör yalnızca penceresi açıkken ölçer.
+- Bir plugin penceresi odaktayken, plugin'in kullanmadığı bir tuş yazı klavyesi piyanosunu çalar. Windows'ta, pencere başlığındaki klavye düğmesi kapalıyken LYNX SHARE tuşları, kısayollar dahil, plugin'den önce işler.
+- Bir VST3 plugin'in kendi parametre menüsü, `Otomasyon klibi oluştur` gibi LYNX SHARE öğeleriyle başlar. Bkz. [Otomasyon](/wiki/automation/).
+- Bir plugin'in `Wrapper ayarları` bölümünde `MIDI` altındaki `MPE`, her notayı kendi MIDI kanalından gönderir. Bkz. [MIDI kontrolcüleri](/wiki/midi-controllers/).
 - Eksik enstrümanların yerine henüz bir şey konmaz. Eksik bir enstrüman plugin'i, kanal adına göre seçilen dahili bir synth olur.
 
 ## İlgili sayfalar

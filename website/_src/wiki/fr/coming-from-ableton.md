@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![La disposition Clip-launch : une grille de clips avec des scènes à côté de la Playlist](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Un rapport après l'export liste ce qui a été laissé de côté.
 ## À savoir
 
 - Les devices propres à Live ne sont pas recréés. Les effets propres à Live sont abandonnés à l'import.
-- Les racks d'instruments, d'effets audio et d'effets MIDI arrivent avec leurs chaînes, leurs zones et leurs macros.
+- Les Instrument Racks et les Audio Effect Racks arrivent avec leurs chaînes, leurs zones et leurs macros. Les MIDI Effect Racks de Live ne sont pas encore convertis et sont listés dans le rapport d'import.
 - Le rapport d'import liste ce qui a été laissé de côté.
 - Live rogne les clips audio qui se chevauchent dans un set exporté.
 - Les marqueurs de warp d'un set Live sont conservés à l'import et réécrits à l'export.

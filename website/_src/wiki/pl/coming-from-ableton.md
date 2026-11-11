@@ -1,5 +1,5 @@
 ---
-source: 5551746a5b
+source: 2285f3e677
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
@@ -71,7 +71,7 @@ Raport po eksporcie wymienia, co pominięto.
 ## Warto wiedzieć
 
 - Własne urządzenia Live nie są odtwarzane. Własne efekty Live są przy imporcie pomijane.
-- Racki Instrument, Audio Effect i MIDI Effect wchodzą ze swoimi łańcuchami, strefami i makrami.
+- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami. Racki MIDI Effect z Live nie są jeszcze konwertowane i są wymienione w raporcie importu.
 - Raport importu wymienia, co pominięto.
 - Live przycina klipy audio, które na siebie nachodzą, w wyeksportowanym secie.
 - Znaczniki warp z setu Live są zachowywane przy imporcie i zapisywane z powrotem przy eksporcie.

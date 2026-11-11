@@ -1,9 +1,9 @@
 ---
-source: 5efc5c8254
+source: 98cfcfdbfe
 ---
 ![La fenêtre Gérer les raccourcis : une liste d'actions avec recherche et les touches de chacune](/assets/img/wiki/shortcuts.webp)
 
-Ce sont les touches par défaut de la 0.1.25 alpha. `Aide › Raccourcis` (`F1`) affiche la fiche des raccourcis dans l'application. `Options › Gérer les raccourcis...` ouvre l'éditeur de l'image, où vous les modifiez.
+Ce sont les touches par défaut de la 0.1.26 alpha. `Aide › Raccourcis` (`F1`) affiche la fiche des raccourcis dans l'application. `Options › Gérer les raccourcis...` ouvre l'éditeur de l'image, où vous les modifiez.
 
 > Sous macOS, l'application affiche les touches avec leurs noms Mac : Ctrl s'affiche ⌘ et Alt s'affiche ⌥.
 
@@ -76,6 +76,19 @@ Certaines de ces touches font autre chose dans un éditeur qui a le focus. Dans 
 | `Alt+F7` | Clavier tactile |
 | `Ctrl+F5` | Tap tempo |
 | `F1` | Aide-mémoire des raccourcis |
+
+## Vue du clip et Vue des appareils
+
+Ces touches ne fonctionnent que dans le flux par lancement de clips.
+
+| Touche | Ce qu'elle fait |
+|---|---|
+| `Ctrl+Alt+L` | Afficher ou masquer la vue de détail |
+| `Ctrl+Alt+3` | Vue du clip |
+| `Ctrl+Alt+4` | Vue des appareils |
+| `Shift+Tab` | Passer de la Vue du clip à la Vue des appareils |
+| `Left` / `Right` | Vue des appareils : sélectionner l'appareil précédent, suivant |
+| `Del` ou `Backspace` | Vue des appareils : supprimer l'effet sélectionné |
 
 ## Patterns
 
@@ -171,6 +184,7 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `Alt+L` | Articuler |
 | `Alt+E` | Riff machine |
 | `Alt+P` | Générer une progression d'accords |
+| `Ctrl+Alt+Y` | Relancer le dernier script |
 
 ## Playlist
 
@@ -182,6 +196,12 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `Ctrl+B` | Dupliquer |
 | `Del` | Supprime les clips sélectionnés |
 | `Shift+Del` | Supprime les clips sélectionnés et referme les trous |
+| `Shift+Left` / `Shift+Right` | Déplacer les clips sélectionnés d'un pas de magnétisme vers la gauche, la droite |
+| `Shift+Up` / `Shift+Down` | Déplacer les clips sélectionnés d'une piste vers le haut, le bas |
+| `Alt+Left` / `Alt+Right` | Ajuster les clips sélectionnés vers la gauche, la droite d'un pas fin, sans magnétisme. `Shift+Alt` fait de même |
+| `Ctrl+D` | Désélectionner les clips et le temps |
+| `Shift+I` | Inverser la sélection |
+| `Shift+C` | Sélectionner les clips de la source sélectionnée |
 | `Shift+S` | Active ou désactive l'édition ripple |
 | `Backspace` | Désactive ou active le magnétisme |
 | `Alt+M` / `Shift+Alt+M` | Coupe, rétablit le son des clips sélectionnés |
@@ -195,6 +215,8 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `7` / `8` | Baisse, monte d'un demi-ton la hauteur des clips audio sélectionnés |
 | `9` | Inverse les clips audio sélectionnés |
 | `Ctrl+Ins` / `Ctrl+Del` | Insère, retire la longueur de la sélection de temps sur toutes les pistes |
+| `Ctrl+Alt+Ins` | Trancher les clips et insérer de l'espace |
+| `Ctrl+Alt+Home` | Redimensionner les clips par la gauche, activé ou désactivé |
 | `Ctrl+Left` / `Ctrl+Right` | Sélectionne le temps précédent, suivant |
 | `Ctrl+Enter` | Sélectionne le temps autour de la sélection |
 | `Alt+T` | Ajoute un marqueur de temps |
@@ -220,7 +242,7 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `Ctrl+L` | Lie les canaux sélectionnés à l'insert sélectionné |
 | `Ctrl+Shift+L` | Lie les canaux sélectionnés à des inserts à partir de celui qui est sélectionné |
 | `Alt+L` | Sélectionne les canaux liés à l'insert sélectionné |
-| `Del` | Supprime le plugin du slot d'effet sélectionné |
+| `Del` | Supprimer les inserts sélectionnés. LYNX SHARE demande d'abord confirmation |
 | `Ctrl+E` | Ouvre l'éditeur audio |
 | `Shift+E` | Ouvre l'éditeur audio et enregistre |
 | `Alt+R` | Rend les inserts armés en fichiers wave |
@@ -242,6 +264,8 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 - Tant que le piano du clavier de saisie est activé, ses touches jouent des notes et la plupart des raccourcis à une lettre sont suspendus (`L` fonctionne toujours). Désactivez-le avec `Ctrl+T`.
 - Un raccourci fonctionne soit partout, soit dans une seule fenêtre. Celui qui appartient à une fenêtre l'emporte sur les mêmes touches valables partout, tant que cette fenêtre a le focus.
 - Certaines actions n'ont pas de touche par défaut, par exemple la palette d'ajout rapide. Donnez-leur-en une dans l'éditeur.
+- Dans la Playlist, les touches qui déplacent des clips déplacent tous les clips quand aucun n'est sélectionné. Le pas fin de `Alt+Left` et `Alt+Right` est d'un pixel au zoom actuel.
+- Les raccourcis de LYNX SHARE fonctionnent aussi quand la fenêtre d'un plugin a le focus, par exemple `Space`. Les lettres et chiffres simples vont d'abord au plugin, et `Esc` ferme sa fenêtre.
 
 ## Voir aussi
 

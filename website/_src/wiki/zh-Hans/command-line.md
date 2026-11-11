@@ -1,5 +1,5 @@
 ---
-source: 98829adcb8
+source: a5c1d056c8
 ---
 LYNX SHARE 也可以不打开窗口直接运行。一个选项可以把工程渲染为音频，另外一些可以把它转换为 FL Studio 工程或 Ableton Live 套装，还有几个用于测试。工程自身的检查也使用同样的选项。
 
@@ -20,6 +20,12 @@ LYNX.exe project.lynx
 
 带窗口启动 LYNX SHARE 并打开该文件。它接受 `.lynx`、`.flp`、`.als`、`.flm` 和 `.mid`。相对路径从当前文件夹算起。
 
+```
+LYNX.exe --no-plugins project.lynx
+```
+
+打开 `.lynx` 工程而不加载其中的第三方插件，与 `文件 › 不加载第三方插件打开...` 相同。每个插件都保留自己的设置。适用于总被某个插件卡住而无法打开的工程。
+
 ## 日常使用的选项
 
 | 选项 | 作用 |
@@ -33,12 +39,15 @@ LYNX.exe project.lynx
 | `--export-flp ... --substitute` | 把仅限 LYNX 的插件换成最接近的 FL 插件，而不是把它们渲染为音频 |
 | `--export-als <project> <folder>` | 把 Ableton Live 套装写到 `<folder>/<name> Project/<name>.als`，适用于 Live 12 |
 | `--export-als ... --live11` | 写出适用于 Live 11 的套装 |
+| `--export-bundle <project> <folder>` | 把 `文件 › 导出 › 用于其他应用...` 的包写入该文件夹 |
+| `--export-bundle ... --zip` | 压缩该文件夹。它会被 `<folder>.zip` 取代 |
+| `--export-bundle ... --no-mixdown` | 包中不含混音文件 |
 | `--devices <report.txt>` | 列出这台电脑的音频驱动类型和设备 |
 | `--showcase <out.lynx>` | 写出 LYNX SHARE 自己的演示工程 |
 | `--lang <id>` | 本次运行使用另一种界面语言，例如 `--lang pt-BR` |
 | `--menu-entry on` 或 `关` | 仅限 Linux AppImage：把 LYNX SHARE 添加到应用程序菜单，或将其移除 |
 
-`--export`、`--stems` 和 `--export-flp` 接受 `.lynx`、`.flp` 或 `.als` 作为工程。`--export-als` 还接受 `.flm`。
+`--export`、`--stems` 和 `--export-flp` 接受 `.lynx`、`.flp` 或 `.als` 作为工程。`--export-als` 还接受 `.flm`。`--export-bundle` 接受 `.lynx`、`.flp` 或 `.als`。
 
 示例：
 
@@ -48,6 +57,7 @@ LYNX.exe --export song.lynx drums.wav --insert 1
 LYNX.exe --stems song.lynx song.wav
 LYNX.exe --export-flp song.lynx song.flp
 LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --export-bundle song.lynx out-folder --zip
 LYNX.exe --devices devices.txt
 LYNX --lang de
 ```
@@ -78,7 +88,7 @@ LYNX --devicetest PipeWire "System default" out.txt
 
 ## 须知
 
-- 结果写入文件，而不是输出到终端。`--export` 写入 `<out>.txt`，`--export-flp` 写入 `<out.flp>.txt`，`--export-als` 在该文件夹中写入 `export-als.txt`，`--stems` 写入 `<base.wav>.txt`。
+- 结果写入文件，而不是输出到终端。`--export` 写入 `<out>.txt`，`--export-flp` 写入 `<out.flp>.txt`，`--export-als` 在该文件夹中写入 `export-als.txt`，`--export-bundle` 在该文件夹中写入 `export-bundle.txt`，`--stems` 写入 `<base.wav>.txt`。
 - 程序会读取标准输入。在 shell 循环中，请给每次调用加上 `< /dev/null`。
 - `--snapshot` 默认以 1280x720 绘制，除非环境变量 `LYNX_SNAPSHOT_SIZE` 另有设定，例如 `1920x1080`。
 - `--lang` 接受 `选项 › 常规设置...` 中所列语言的 id，例如 `en`、`pt-BR`、`de`、`es`、`fr` 或 `ja`。未知的 id 会被忽略。

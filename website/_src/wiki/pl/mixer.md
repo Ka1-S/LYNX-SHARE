@@ -1,5 +1,5 @@
 ---
-source: b2de12e24d
+source: 1e4bc038df
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -29,12 +29,17 @@ Przy aktywnym Mixerze `Ctrl+L` łączy zaznaczone kanały z zaznaczonym insertem
 - `Ctrl`+klik albo przeciągnięcie przez paski zaznacza zakres. `Ctrl+Shift`+klik dodaje lub usuwa jeden.
 - Przeciągnij pasek na bok albo naciśnij `Alt+Left` i `Alt+Right`, żeby przesunąć zaznaczone inserty.
 - Kliknij pasek prawym przyciskiem, żeby zobaczyć menu insertu. `F2` zmienia nazwę i kolor zaznaczonego insertu.
+- `Del` lub `Delete` w menu inserta usuwa zaznaczone inserty. LYNX SHARE najpierw pyta. Zaznacz `Zapamiętaj wybór`, żeby następnym razem pominąć pytanie.
 
 Przesuwanie, wstawianie i usuwanie insertów zachowuje sendy, sidechainy i automatykę przy ich insertach.
+
+Sekcja `Mixer` w menu inserta i `Opcje › Mixer` mają jeszcze dwa polecenia. `Ułóż inserty jak w Playliście` przenosi inserty powiązane ze ścieżkami Playlisty na początek, w kolejności Playlisty. Gdy włączone jest `Zachowaj połączenia z usuniętymi insertami, wyszarzone (LYNX)`, wysyłki, które szły do usuniętego inserta, zostają wyszarzone, więc możesz je połączyć ponownie.
 
 ## Wyciszenie i solo
 
 Kliknij kontrolkę wyciszenia, żeby wyciszyć insert. Kliknij ją prawym przyciskiem albo z `Ctrl`, żeby włączyć solo. `S` włącza solo na zaznaczonych insertach, a `Alt+S` włącza je razem z insertami, które je zasilają.
+
+Wyciszony insert nadal porusza miernikiem. W nowych projektach i w zaimportowanych projektach FL Studio nadal też uruchamia swoje efekty, a odcięte jest tylko jego wyjście do Master i jego wysyłki. Aby wyciszony insert przestał przetwarzać dźwięk, włącz `Wyciszone inserty nie przetwarzają (LYNX, oszczędza CPU; ten projekt)` w sekcji `Mixer` menu inserta lub w `Opcje › Mixer`. Jego miernik się wtedy zatrzymuje, a efekty startują od zera po wyłączeniu wyciszenia.
 
 ## Efekty
 
@@ -42,7 +47,8 @@ Panel efektów pokazuje dziesięć slotów zaznaczonego insertu.
 
 - Przeciągnij slot albo użyj kółka nad nim, żeby przesunąć go w górę lub w dół.
 - Kliknij slot prawym przyciskiem, żeby zobaczyć jego opcje (zastąp, przesuń, usuń).
-- `Del` usuwa plugin w zaznaczonym slocie.
+- Gdy menu slotu jest otwarte, `Del` usuwa plugin w tym slocie.
+- `Grupuj w rack efektów audio` w menu slotu wkłada efekt do nowego racka, a `Grupuj wszystko w rack efektów audio` robi to dla całego łańcucha. `Rozgrupuj` wkłada efekty racka z jednym łańcuchem z powrotem do slotów.
 - Przełącznik w nagłówku panelu włącza lub wyłącza wszystkie efekty insertu.
 - Efekt z bazy pluginów w [Browserze](/wiki/browser/) możesz przeciągnąć na insert albo slot efektu.
 
@@ -60,6 +66,7 @@ Zaznacz insert, który chcesz poprowadzić. Każdy pozostały pasek ma wtedy prz
 - `Ctrl`+klik prowadzi tylko do tego insertu.
 - `Shift`+klik robi send sidechain. `Ctrl+Shift`+klik robi go tylko jako sidechain.
 - Prawy klik otwiera te same wybory jako menu.
+- Dla wysyłki pre-fader kliknij prawym przyciskiem przełącznik trasy lub pokrętło poziomu wysyłki i zaznacz `Send pre-fader (fader tej ścieżki go nie zmienia)`. Wysyłka jest wtedy oznaczona `PRE`.
 
 Efekty z wejściem bocznym, jak kompresor, mają wybór `Sidechain z`, który wylicza inserty do nasłuchu. Wybranie jednego tworzy trasę za ciebie.
 
@@ -83,12 +90,13 @@ Każdy insert ma przycisk uzbrojenia nagrywania. Gdy insert jest uzbrojony, Nagr
 | Zmień nazwę i kolor | `F2` | Zmienia nazwę i kolor zaznaczonego insertu |
 | Solo | `S` | Włącza solo na zaznaczonych insertach |
 | Solo ze źródłami | `Alt+S` | Włącza solo na zaznaczonych insertach i insertach, które je zasilają |
-| Usuń efekt | `Del` | Usuwa plugin w zaznaczonym slocie |
+| Usuń inserty | `Del` | Usuwa zaznaczone inserty, po pytaniu |
 | Uzbrój i nagrywaj | `Shift+R` | Uzbraja zaznaczony insert i zaczyna nagrywanie |
 
 ## Warto wiedzieć
 
-- `Renderuj do audio` (insert zgrany do klipu audio) gra około 5 dB głośniej niż insert, który zastępuje. To znany problem z uwag do wydania 0.1.25.
+- `Miernik głośności obok Mastera (LYNX)` w `Opcje › Mixer` pokazuje głośność krótkoterminową i zintegrowaną (LUFS) oraz true peak wyjścia Mastera, z przyciskiem `Resetuj`.
+- Plugin instrumentu z kilkoma wyjściami może grać każde wyjście na własnym insercie. Zobacz [Pluginy innych producentów](/wiki/plugins/).
 - `Ctrl+L` robi co innego w Channel Racku i w Mixerze. W racku wybiera wolne inserty. W Mixerze używa zaznaczonego insertu.
 - Przełączniki tras pojawiają się na innych paskach, nie na zaznaczonym.
 - Limit to 127 insertów na projekt i dziesięć slotów efektów na insert.

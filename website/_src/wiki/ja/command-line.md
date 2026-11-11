@@ -1,5 +1,5 @@
 ---
-source: 98829adcb8
+source: a5c1d056c8
 ---
 LYNX SHAREは、ウィンドウを開かずに実行することもできます。プロジェクトをオーディオにレンダリングするオプション、FL StudioプロジェクトやAbleton Liveセットに変換するオプション、テスト用のオプションがいくつかあります。プロジェクト自身のチェックも、同じオプションを使っています。
 
@@ -20,6 +20,12 @@ LYNX.exe project.lynx
 
 ウィンドウつきでLYNX SHAREを起動し、そのファイルを開きます。受け付けるのは `.lynx`、`.flp`、`.als`、`.flm`、`.mid` です。相対パスは、現在のフォルダーを基準にします。
 
+```
+LYNX.exe --no-plugins project.lynx
+```
+
+`.lynx` プロジェクトを、サードパーティ製プラグインを読み込まずに開きます。`ファイル › サードパーティ製プラグインなしで開く...` と同じです。各プラグインの設定は保たれます。プラグインのせいで開けないプロジェクトに使います。
+
 ## 普段使いのオプション
 
 | オプション | 働き |
@@ -33,12 +39,15 @@ LYNX.exe project.lynx
 | `--export-flp ... --substitute` | LYNX専用のプラグインを、オーディオにレンダリングする代わりに、最も近いFLのプラグインに置き換える |
 | `--export-als <project> <folder>` | Live 12向けに、Ableton Liveセットを `<folder>/<name> Project/<name>.als` に書き出す |
 | `--export-als ... --live11` | Live 11向けのセットを書き出す |
+| `--export-bundle <project> <folder>` | `ファイル › エクスポート › 他のアプリ用...` のパッケージを、フォルダーに書き出します |
+| `--export-bundle ... --zip` | フォルダーをzipにします。フォルダーは `<folder>.zip` に置き換えられます |
+| `--export-bundle ... --no-mixdown` | パッケージからミックスダウンを除きます |
 | `--devices <report.txt>` | このコンピューターのオーディオドライバーの種類とデバイスを一覧にする |
 | `--showcase <out.lynx>` | LYNX SHARE独自のデモプロジェクトを書き出す |
 | `--lang <id>` | 今回の実行だけ、別のインターフェース言語を使う。例: `--lang pt-BR` |
 | `--menu-entry on` または `オフ` | Linux AppImageのみ: LYNX SHAREをアプリケーションメニューに追加する、または削除する |
 
-`--export`、`--stems`、`--export-flp` は、プロジェクトとして `.lynx`、`.flp`、`.als` を受け付けます。`--export-als` は `.flm` も受け付けます。
+`--export`、`--stems`、`--export-flp` は、プロジェクトとして `.lynx`、`.flp`、`.als` を受け付けます。`--export-als` は `.flm` も受け付けます。`--export-bundle` は `.lynx`、`.flp`、`.als` を受け付けます。
 
 例:
 
@@ -48,6 +57,7 @@ LYNX.exe --export song.lynx drums.wav --insert 1
 LYNX.exe --stems song.lynx song.wav
 LYNX.exe --export-flp song.lynx song.flp
 LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --export-bundle song.lynx out-folder --zip
 LYNX.exe --devices devices.txt
 LYNX --lang de
 ```
@@ -78,7 +88,7 @@ LYNX --devicetest PipeWire "System default" out.txt
 
 ## 知っておくと便利なこと
 
-- 結果はターミナルではなく、ファイルに出力されます。`--export` は `<out>.txt`、`--export-flp` は `<out.flp>.txt`、`--export-als` はフォルダー内の `export-als.txt`、`--stems` は `<base.wav>.txt` に書きます。
+- 結果はターミナルではなく、ファイルに出力されます。`--export` は `<out>.txt`、`--export-flp` は `<out.flp>.txt`、`--export-als` はフォルダー内の `export-als.txt`、`--export-bundle` はフォルダー内の `export-bundle.txt`、`--stems` は `<base.wav>.txt` に書きます。
 - プログラムは標準入力を読みます。シェルのループの中では、各呼び出しに `< /dev/null` を付けてください。
 - `--snapshot` は、環境変数 `LYNX_SNAPSHOT_SIZE` で指定しない限り、1280x720で描画します。指定の例: `1920x1080`。
 - `--lang` には、`オプション › 全般設定...` に並ぶ言語のIDを指定できます。`en`、`pt-BR`、`de`、`es`、`fr`、`ja` などです。未知のIDは無視されます。

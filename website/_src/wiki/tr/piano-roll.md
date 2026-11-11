@@ -1,5 +1,5 @@
 ---
-source: 5291e1e4ad
+source: 217f097c97
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -47,7 +47,9 @@ Her aracın bir harf tuşu vardır. Harfler, klavyeden piyano (`Ctrl+T`) kapalı
 
 ## Klavye ve cetvel
 
-Bir sesi duymak için klavyedeki bir tuşa tıklayın. Tuşun daha sağına tıklamak daha yüksek çalar. Bir tuşa `Ctrl`+tıklama onun notalarını seçer. Klavyede orta tuşla sürüklemek tuşları daha uzun veya kısa yapar.
+Bir sesi duymak için klavyedeki bir tuşa tıklayın. Tuşun daha sağına tıklamak daha yüksek çalar. Bir tuşa `Ctrl`+tıklama onun notalarını seçer. Klavyede orta tuşla sürüklemek tuşları daha uzun veya kısa yapar. Dikey zoom çarkı da aynısını yapar: zaman kaydırma çubuğunun ucundaki küçük kare. Yukarı veya aşağı sürükleyin ya da üzerinde fare tekerleğini kullanın.
+
+Piano roll menüsündeki `Görünüm › Klavye stili`, `Düz tuşlar` ile geleneksel bir klavye çizen `Piyano tuşları (beyaz tuşlar arasında çizgiler)` arasında seçim yapar.
 
 Konumu belirlemek için cetvele tıklayın. Cetvelde `Ctrl`+sürükleme, sağ tuşla sürükleme veya çift tıklayıp sürükleme bir zaman aralığındaki notaları seçer. `Ctrl`+tekerlek zoom yapar, `Shift`+tekerlek kaydırır.
 
@@ -56,13 +58,23 @@ Konumu belirlemek için cetvele tıklayın. Cetvelde `Ctrl`+sürükleme, sağ tu
 | Ayar | Ne yapar |
 |---|---|
 | Snap | "Ana", ana araç çubuğundaki snap'i izler; ya da bu pencere için birini seçin. |
-| Akor | Tıklama, tıklanan nota kök olacak şekilde seçilen akoru oluşturur. `Shift+N` tek notalara geri döner. |
-| Gam | Bir gamın notalarını vurgular. Ayrı bir düğme, yeni ve taşınan notaları ve gelen MIDI'yi seçilen gama oturtur. |
+| Akor | Tıklama, tıklanan nota kök olacak şekilde seçilen akoru oluşturur. `Shift+N` tek notalara geri döner. Aynı liste, Piano roll menüsündeki `Akor damgası`'tir. |
+| Gam | Bir gamın notalarını vurgular. Ayrı bir düğme, yeni ve taşınan notaları ve gelen MIDI'yi seçilen gama oturtur. Taşınan notalar o zaman gam adımlarıyla hareket eder, böylece bir akor gamda kalır; `Up` ve `Down` bir gam adımı hareket eder. |
 | Slide (`S`) | Yeni notalar slide notası olur. Çalmakta olan nota onlara kayar (808 kayması). |
 | Hayalet notalar (`Alt+V`) | Diğer kanalların notalarını sizinkilerin arkasında gösterir. |
 | Nota rengi | Yeni notalar bu rengi alır. 16 tane vardır. |
 | Takip | Pattern çalarken görünüm çalma imleciyle birlikte kayar. |
-| Şerit kutusu | Alttaki şeridin neyi düzenleyeceğini seçer: Velocity, Pan veya İnce pitch. |
+| Şerit kutusu | Alttaki şeridin neyi düzenleyeceğini seçer: Velocity, Pan, İnce pitch, Release, Mod X, Mod Y, Chance veya Velocity range. |
+
+## Chance ve velocity range
+
+Her notanın bir Chance'ı ve bir Velocity range'i vardır. Chance, notanın her turda çalma olasılığıdır. Velocity range, velocity'sinin notanın velocity'si ile o velocity artı range arasında değişmesini sağlar. Bunları düzenlemek için şerit kutusunda `Olasılık` veya `Velocity aralığı (LYNX)` seçin. Piano roll menüsündeki `Araçlar › Olasılık (LYNX)`, seçili notaları hepsi ya da yalnızca biri çalacak şekilde gruplar ve `Olasılığı ve velocity aralığını sıfırla` içerir.
+
+## MIDI araçları ve script'ler
+
+Piano roll menüsündeki `Araçlar › MIDI Araçları...`, Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp ve Velocity Shaper içeren bir panel açar.
+
+`Araçlar` menüsünün `Betikler` sütunu piano roll script'lerini listeler: LYNX SHARE'in kendileri ve FL Studio kuruluysa FL Studio'nun script klasörlerindekiler dahil `.pyscript` dosyaları. `Betik klasörünü aç...` kendi script'leriniz için klasörü açar, `Son betiği yeniden çalıştır` sonuncuyu tekrarlar.
 
 ## Tuşlar
 

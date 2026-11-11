@@ -66,6 +66,7 @@ The `File › Online session` menu has these commands while a session runs:
 | `Session chat...` | Opens the chat. The menu item shows the number of unread messages |
 | `Follow the host's transport` | For guests: play, stop and position follow the host |
 | `People and permissions...` | For the host: what each person may change, and what each keeps at the end |
+| `Share plugins with guests...` | For the host: which of your plugins the guests may use. The menu item shows how many are shared |
 | `Show invite code...` | For the host: shows the code again, with a `Copy` button |
 | `End live session` | For the host. Everyone leaves, and the code stops working |
 | `Leave live session` | For a guest. Your part of the project stays with you |
@@ -79,6 +80,27 @@ A channel or insert whose plugin is not installed on your computer plays a stand
 - In a package, the stand-ins are audio renders made when the package is saved. They follow clips you move, but not edits to the notes of a plugin you do not have. Ask its owner for a new package.
 - In a live session, parts that use a plugin someone does not have are rendered by the person who has it and streamed to the others as audio.
 
+## Share your plugins with the guests
+
+In a live session the host can let the guests use plugins that only the host has.
+
+The host does this:
+
+1. Choose `File › Online session › Share plugins with guests...`.
+2. Tick the plugins to share. `Search your plugins` narrows the list. Nothing is shared until you tick it.
+
+A guest does this:
+
+1. Open the plugin menu of one of your channels or effect slots. The shared plugins come first, under `On <host>'s computer`.
+2. Choose one. Its window lists the plugin's parameters as sliders, with `Search parameters`.
+3. Add notes and move the sliders. The window shows `Updating...` while the host's computer renders, then `Up to date`.
+
+- The plugin stays on the host's computer and runs under the host's licence. LYNX SHARE never sends the plugin, its files, its presets or its licence.
+- The guest hears a render that follows the notes and values after a moment. It is not played live, and the guest does not get the plugin's own window.
+- While the host is away, the last render plays. Sharing stops when the session ends, and the last render stays.
+- A guest with the `Listen only (no edits)` role cannot use shared plugins.
+- Some plugin licences do not allow other people to operate the plugin, even remotely. Check each licence before you share.
+
 ## What goes over the network
 
 Packages are files. Nothing is uploaded anywhere.
@@ -91,6 +113,8 @@ A live session connects only while you are in one. Everything goes through the r
 - Both sides should use the same LYNX SHARE version. The package summary warns when they differ.
 - A guest whose connection drops reconnects by itself and keeps their edits.
 - If the host's LYNX SHARE closes during a session, the next start offers to resume it, and the guests reconnect by themselves.
+- If a guest's LYNX SHARE closes during a session, the next start asks whether to go back in. `Go back in` returns you as the same person, with your part and everything you had changed. This works for 12 hours.
+- The Linux version can host a live session since 0.1.26.
 - In a live session, undo and redo bring back only your own edits.
 - Anyone with the invite code can ask to join, but only after the host lets them in.
 
