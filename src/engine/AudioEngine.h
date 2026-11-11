@@ -174,6 +174,7 @@ public:
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
     void stampWorkTime();
     double workSecondsNow() const;
+    void resetWorkTime();  // Project info › "Reset working time": created = now, working time 0, the clock restarts
     void markCreatedNow(); // a new project: Project info › created = now (when it has no date yet)
     // Offline render mode for the hosted plugins (setNonRealtime), around renderOffline.
     void setPluginsRenderMode (bool offline);

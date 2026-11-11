@@ -345,6 +345,8 @@ private:
     void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
+    void autoCloseDevice(); // Settings › Audio › "Auto close" (round 190bx), from the timer
+    bool deviceClosedByAutoClose = false;
     void confirmPrepareForMidiExport();
     void saveClipboardToBrowser (bool midi);
     juce::PopupMenu makeSwitchAudioClipsMenu (bool selectedOnly);

@@ -1767,6 +1767,15 @@ public:
             return;
         }
 
+        if (args.contains ("--settingsshot"))
+        {
+            // LYNX.exe --settingsshot prefix: round 190bx — every Settings page off-screen at the window's size, in a
+            // small window (390 x 390) and, for the long pages, whole (see runSettingsShot)
+            runSettingsShot (args[args.indexOf ("--settingsshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--perfshot"))
         {
             // LYNX.exe --perfshot prefix project: the Playlist in Performance mode with a few clips launched and waiting,
@@ -12614,6 +12623,49 @@ private:
             saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getRecordMenuForSnapshot() }, prefix + "-recordmenu.png");
             juce::File (prefix + "-tracks.txt").replaceWithText (report);
         }
+    }
+
+    // Round 190bx: the Settings pages alone (the full --snapshot takes minutes). prefix-settings-<page>.png at the
+    // window's size, -small.png at 390 x 390 (rows must scroll, never be cut off or squeezed) and -whole.png tall
+    // enough to show every row of the page.
+    void runSettingsShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        {
+            lynx::AudioEngine offline (false);
+            offline.editSong ([] (lynx::Song& s) {
+                s.info = { "Night Drive", "LYNX SHARE demo", "Synthwave", "https://lynx-share.com",
+                           "Made with LYNX SHARE.\nDrums and bass from the Channel Rack, pads from the Browser.", false };
+            }, false);
+            auto shoot = [&] (lynx::SettingsPage page, const juce::String& name, int width, int height) {
+                auto panel = lynx::makeSettingsPanel (offline, page);
+                if (width > 0)
+                    panel->setSize (width, height);
+                juce::Component frame;
+                frame.setSize (panel->getWidth(), panel->getHeight());
+                frame.addAndMakeVisible (*panel);
+                panel->setTopLeftPosition (0, 0);
+                juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
+                {
+                    juce::Graphics g (image);
+                    g.fillAll (lynx::theme::panel);
+                    frame.paintEntireComponent (g, false);
+                }
+                savePng (image, prefix + "-settings-" + name + ".png");
+            };
+            const std::pair<lynx::SettingsPage, const char*> pages[] = { { lynx::SettingsPage::audio, "audio" },     { lynx::SettingsPage::midi, "midi" },
+                                                                         { lynx::SettingsPage::general, "general" }, { lynx::SettingsPage::theme, "theme" },
+                                                                         { lynx::SettingsPage::files, "files" },     { lynx::SettingsPage::extras, "extras" },
+                                                                         { lynx::SettingsPage::project, "project" }, { lynx::SettingsPage::info, "info" } };
+            for (const auto& [page, name] : pages)
+            {
+                shoot (page, name, 0, 0);
+                shoot (page, juce::String (name) + "-small", 390, 390);
+            }
+            shoot (lynx::SettingsPage::audio, "audio-whole", 680, 1500);
+            shoot (lynx::SettingsPage::general, "general-whole", 680, 2300);
+        }
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
 
     void runFeat166Shot (const juce::String& prefix, const juce::String& projectPath)

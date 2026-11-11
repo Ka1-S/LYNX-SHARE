@@ -1,6 +1,7 @@
 #include "core/RackRenderer.h"
 #include "core/Rack.h"
 #include "core/MixerOps.h"
+#include "core/FlSettings.h"
 
 #include "core/FpcInstrument.h"
 #include "core/FruitySlicer.h"
@@ -2927,7 +2928,9 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
         // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
         // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
+        // (nor anything while FL's Settings › Audio › CPU › "Smart disable" is off: the global switch, round 190bx)
         if (key < smartDisable.size() && slots[i].smartDisable && ! (isPlugin && ! slots[i].plugin.allowSmartDisable)
+            && flsettings::options().smartDisable.load (std::memory_order_relaxed)
             && ! (connections != nullptr && connections->mainSource > 0)
             && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
             && slots[i].kind != EffectKind::newtime
@@ -4074,11 +4077,15 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     };
 
     // the task graph (round 165i): channels and inserts by readiness; else the channel pass, then the inserts by layers
-    if (! runTaskGraph (state, playing, channels, numSamples, meters))
+    // FL's Settings › Audio › CPU (round 190bx): "Multithreaded generator processing" and "Multithreaded mixer
+    // processing". With either off that half runs on the audio thread alone (the layers then: the task graph mixes both).
+    const auto threadGenerators = flsettings::options().multithreadGenerators.load (std::memory_order_relaxed);
+    const auto threadMixer = flsettings::options().multithreadMixer.load (std::memory_order_relaxed);
+    if (! (threadGenerators && threadMixer) || ! runTaskGraph (state, playing, channels, numSamples, meters))
     {
-        if (workers != nullptr && state.parallel && state.audioThreadChannels.empty())
+        if (workers != nullptr && state.parallel && threadGenerators && state.audioThreadChannels.empty())
             workers->parallelFor (channels, channel);
-        else if (workers != nullptr && state.parallel)
+        else if (workers != nullptr && state.parallel && threadGenerators)
         {
             // "Allow threaded processing" off: those channels on this thread, the rest in parallel
             auto threaded = [&state, &channel, channels] (int i) {
@@ -4148,7 +4155,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             const auto& layer = split ? state.threadedLayers[d] : state.mixerLayers[d];
             auto track = [this, &state, &layer, numSamples, meters] (int i) { processTrack (state, layer[(std::size_t) i], numSamples, meters); };
 
-            if (workers != nullptr && state.parallel && layer.size() > 1)
+            if (workers != nullptr && state.parallel && threadMixer && layer.size() > 1)
                 workers->parallelFor ((int) layer.size(), track);
             else
                 for (int i = 0; i < (int) layer.size(); ++i)

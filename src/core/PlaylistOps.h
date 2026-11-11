@@ -202,7 +202,9 @@ namespace lynx::audioclips
 int repairChannels (Song& song);
 // The same channel loads another file: an audio clip channel stays one (FL: the channel's type does not change with
 // its sample), a Granulizer / Wave Traveller keeps its engine, every other channel becomes a Sampler named after it.
-void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name);
+// `autoName`: FL's General › "Auto name channels" (on by default; round 190bx, core/FlSettings.h): off = the
+// channel keeps the name it has (a channel without one still takes the file's).
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name, bool autoName = true);
 } // namespace lynx::audioclips
 
 // FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).

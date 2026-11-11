@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/FlResampler.h"
+#include "core/FlSettings.h"
 #include "core/SlicexEngine.h"
 
 namespace lynx
@@ -118,7 +119,9 @@ public:
         const auto rendering = offlineRendering();
         sampleRate = sr > 0.0 ? sr : 44100.0;
         engine.setRate ((int) std::lround (sr), rendering);
-        engine.setInterpolation (rendering ? flrs::renderQuality : flrs::liveQuality);
+        // (playback: Settings › Audio › "Resampling quality", round 190bx; FL tells its plugins the method when it
+        // changes, FUN_01366a70. Here it is taken when the engine is prepared.)
+        engine.setInterpolation (rendering ? flrs::renderQuality : flsettings::options().interpolation.load (std::memory_order_relaxed));
     }
 
     void configure (const ChannelDef& channel, double bpm) noexcept override

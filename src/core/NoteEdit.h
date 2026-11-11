@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "core/Song.h"
+#include "core/FlSettings.h"
 
 namespace lynx::noteedit
 {
@@ -201,11 +202,14 @@ void removeTrack (Song& song, int track);
 // Swaps two tracks (their clips and headers), in every arrangement.
 void swapTracks (Song& song, int a, int b);
 // Solo: `track` plays alone (every other track muted); on the only unmuted track it unmutes all.
-void soloTrack (Song& song, int track, int trackCount);
+// `memory` (round 190bx, core/FlSettings.h; null = none kept): the solo remembers every track's mute switch; with
+// `restore` (FL's General › "Restore previous state after solo") the un-solo puts them back instead of unmuting
+// everything.
+void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* memory = nullptr, bool restore = false);
 // FL's channel solo (FUN_00ffaaa0, REA_rodada167l §5): `channel` plays and every other channel is muted, except the
 // ones with "Lock active/mute state"; on a channel already playing alone (among the unlocked ones) every channel the
-// solo touched plays again.
-void soloChannel (Song& song, int channel);
+// solo touched plays again (`memory` / `restore`: as soloTrack's).
+void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory = nullptr, bool restore = false);
 
 // --- Playlist track groups (FL's "Group with above track", REA round 104) -----------------------------
 // A track with `grouped` set belongs to the group of the nearest ungrouped track above it: the header.

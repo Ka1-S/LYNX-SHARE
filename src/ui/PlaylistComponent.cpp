@@ -1,5 +1,6 @@
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
+#include "core/FlSettings.h"
 #include "core/RulerGestures.h"
 #include "ui/ColourPicker.h"
 #include "ui/TrackIcons.h"
@@ -3695,7 +3696,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         if (onLed && (flmods::popup (e.mods) || flmods::ctrl (e.mods)))
-            engine.editSong ([track, count = numTracks()] (Song& s) { noteedit::soloTrack (s, track, count); });
+            engine.editSong ([track, count = numTracks()] (Song& s) {
+                noteedit::soloTrack (s, track, count, &flsettings::trackSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
+            });
         else if (flmods::popup (e.mods))
             showTrackMenu (track);
         else if (onLed)
