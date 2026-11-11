@@ -8366,3 +8366,4 @@ countries: tw hk mo
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "實測：依參考擬合的模型；經典：此前儲存的專案所用的模型"

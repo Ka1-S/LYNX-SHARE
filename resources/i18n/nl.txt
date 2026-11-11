@@ -8366,3 +8366,4 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Gemeten: het model dat op de referentie is afgestemd; klassiek: dat van projecten die eerder zijn opgeslagen"
