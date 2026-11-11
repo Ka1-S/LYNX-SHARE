@@ -1,7 +1,7 @@
 language: Türkçe
 countries: tr
 
-# LYNX SHARE interface in Türkçe (JUCE LocalisedStrings format).
+# LYNX interface in Türkçe (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/tr-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4559,6 +4559,7 @@ countries: tr
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "Rapor gönderilemedi ({0}); LYNX SHARE bir sonraki açılışta tekrar dener"
 "Report a problem" = "Sorun bildir"
 "Report a problem..." = "Sorun bildir..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Güncellemeleri denetle..."
 "Check for updates automatically" = "Güncellemeleri otomatik denetle"
@@ -5282,6 +5283,27 @@ countries: tr
 "RPN..." = "RPN..."
 "Send MIDI" = "MIDI gönder"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboard notalarını, programı ve “MIDI gönder”e ayarlı kontrolleri, MIDI giriş portu bu port olan plugin'lere gönderir (plugin penceresi > Ayarlar > MIDI > Giriş portu)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "İşaretçi döngüsü"
+"Marker skip" = "İşaretçi atlama"
+"Marker pause" = "İşaretçi duraklatma"
+"Pattern length" = "Pattern uzunluğu"
+"Bar override" = "Ölçü geçersiz kılma"
+"Key/Scale" = "Ton/Gam"
+"Loop length" = "Döngü uzunluğu"
+"Add one every" = "Şu aralıkla bir ekle"
+"8 bars" = "8 ölçü"
+"Bars" = "Ölçü"
+"Add jump to next bar" = "Sonraki ölçüye atlama ekle"
+"Change to marker loop" = "İşaretçi döngüsüne çevir"
+"Time markers" = "Zaman işaretçileri"
+"Quantize song jumps" = "Song atlamalarını kuantize et"
+"Place loop (from this marker to the next)" = "Döngü yerleştir (bu işaretçiden sonrakine)"
+"Song marker jump" = "Song işaretçisine atlama"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Bu kanaldaki notalar çalmak yerine song'u bir işaretçiye götürür: nota 0 ilk işaretçiye, sonraki ikinciye gider... (Playlist › Song atlamalarını kuantize et çalarken geçerlidir)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "Sonraki song işaretçisine atla (çalarken Song atlamalarını kuantize et)"
+"Jump to the previous song marker" = "Önceki song işaretçisine atla"
 "MUTE" = "SESSİZ"
 "CHANNEL" = "KANAL"
 "Bar:Beat:Tick" = "Ölçü:Vuruş:Tick"
@@ -5694,6 +5716,62 @@ countries: tr
 "Black notes" = "Siyah tuşlar"
 "Sharps (#)" = "Diyezler (#)"
 "Flats (b)" = "Bemoller (b)"
+"Advanced looping" = "Gelişmiş döngü"
+"Burn" = "Yaz"
+"Burn MIDI to" = "MIDI'yi şuraya yaz"
+"Burn all looping channels" = "Döngüdeki tüm kanalları yaz"
+"Burn selected channels" = "Seçili kanalları yaz"
+"Burn to pattern" = "Pattern'e yaz"
+"Channel looping" = "Kanal döngüsü"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Kanal döngüsü: pattern'den kısa kanallar onun sonuna kadar tekrar eder (poliritim)  [LMB] aç / kapat  [RMB] döngü türü (step kanalları, tüm kanallar, gelişmiş) ve Pattern'e yaz"
+"Channel looping: {0}" = "Kanal döngüsü: {0}"
+"Don't loop" = "Döngü yok"
+"Echo delay" = "Echo delay"
+"Every {0} steps" = "Her {0} step'te"
+"Loop all channels" = "Tüm kanalları döngüle"
+"Loop point" = "Döngü noktası"
+"Loop point ({0} steps)" = "Döngü noktası ({0} step)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Döngü noktası: [LMB] sürükle veya [Wheel] step olarak ayarlar  [2xLMB] sonraki ölçü  [RMB] Döngü yok / Step / Vuruş / Ölçü, Pattern'e yaz"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Döngü tekrarı (döngü noktasından sonra): [LMB] tekrarladığı step'i düzenler"
+"Loop step channels" = "Step kanallarını döngüle"
+"Loop type" = "Döngü türü"
+"Looping on" = "Döngü açık"
+"Nothing to burn" = "Yazılacak bir şey yok"
+"Reset after burning to MIDI" = "MIDI'ye yazdıktan sonra sıfırla"
+"Select what you want to reset:" = "Neyi sıfırlamak istediğini seç:"
+"Set to next bar" = "Sonraki ölçüye ayarla"
+"Set to next beat" = "Sonraki vuruşa ayarla"
+"The selected channel doesn't contain any notes to burn." = "Seçili kanalda yazılacak nota yok."
+"Time (shift and gate)" = "Zaman (kaydırma ve gate)"
+"loop at the next bar" = "sonraki ölçüde döngü"
+"loop at the next beat" = "sonraki vuruşta döngü"
+"loop at the next step" = "sonraki step'te döngü"
+"Receive notes from" = "Notaları şuradan al"
+"Unlock" = "Kilidi aç"
+"not connected" = "bağlı değil"
+"No MIDI input device" = "MIDI giriş aygıtı yok"
+"(locked: receives the notes of {0})" = "(kilitli: {0} notalarını alır)"
+"Create sampled instrument..." = "Örneklenmiş enstrüman oluştur..."
+"Create sampled instrument" = "Örneklenmiş enstrüman oluştur"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0} enstrümanını tuş tuş çalar ve kayıtlardan bir Sampler kanalı oluşturur."
+"Sampling the instrument..." = "Enstrüman örnekleniyor..."
+"Writing the samples..." = "Sample'lar yazılıyor..."
+"Could not sample the instrument" = "Enstrüman örneklenemedi"
+"Low note" = "En pes nota"
+"High note" = "En tiz nota"
+"Keys per zone" = "Bölge başına tuş"
+"Root offset" = "Kök nota kaydırma"
+"Velocity layers" = "Velocity katmanları"
+"Max velocity" = "Maks. velocity"
+"Release after (seconds)" = "Bırakma süresi (saniye)"
+"Max length after release (seconds)" = "Bırakmadan sonra maks. uzunluk (saniye)"
+"Stop on" = "Durdurma koşulu"
+"Max length" = "Maks. uzunluk"
+"16-bit integer" = "16 bit tamsayı"
+"Mono (merged)" = "Mono (birleştirilmiş)"
+"Enable insert effects" = "Insert efektlerini etkinleştir"
+"Enable master effects" = "Master efektlerini etkinleştir"
+"could not read {0}" = "{0} okunamadı"
 "Key to" = "Tuş işlevi"
 "Percent" = "Yüzde"
 "Use regions" = "Bölgeleri kullan"
@@ -5708,7 +5786,6 @@ countries: tr
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Başlatılacak klipler için şarkının önüne boş sütunlar, her birine bir işaretçi ve şarkının başladığı yere bir Start işaretçisi ekler; performans modu açılır."
 "Marker count" = "İşaretçi sayısı"
 "2 steps" = "2 step"
-"8 bars" = "8 ölçü"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5834,7 +5911,6 @@ countries: tr
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "Ölçü cinsinden pattern uzunluğu: [LMB] sürükleyin veya [Wheel] ile değiştirin  [2xLMB] otomatik (notalardan)  [RMB] menü"
 "Pattern length: {0} (automatic, from the notes)" = "Pattern uzunluğu: {0} (otomatik, notalardan)"
 "Pattern length (bars, 0 = automatic)" = "Pattern uzunluğu (ölçü, 0 = otomatik)"
-"Pattern length" = "Pattern uzunluğu"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "Takip: Channel Rack'ten uzun bir pattern çalan step'le birlikte sayfa değiştirir; kapalıyken kaydırdığınız yerde kalır"
 "Follow the playhead (page along with the playing step) on/off" = "Çalma imlecini takip et (çalan step'le sayfa değiştir) aç/kapat"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "Takip: görünüm çalma konumuyla birlikte sayfa değiştirir; kapalıyken kaydırdığınız yerde kalır"
@@ -5901,9 +5977,6 @@ countries: tr
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Ters stereo"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Kesme modu (C): bir notayı oradan kesmek için tıklayın; bir notayı öncekine yapıştırmak için Ctrl+tıklayın"
 "Score" = "Nota yazısı"
@@ -5946,7 +6019,6 @@ countries: tr
 "Set image wallpaper..." = "Arka plan resmi ayarla..."
 "Remove image wallpaper" = "Arka plan resmini kaldır"
 "Set background color..." = "Arka plan rengini ayarla..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Metronom kanalı"
 "Metronome target mixer track" = "Metronomun hedef mikser kanalı"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "Metronomun çaldığı mikser kanalı (--- Master'dır). Tık sesi hiçbir zaman dışa aktarıma girmez."
@@ -5982,8 +6054,6 @@ countries: tr
 "Ghost channels" = "Hayalet kanallar"
 "Add multiple..." = "Birden fazla ekle..."
 "You can add a maximum of {0} inserts." = "En fazla {0} insert ekleyebilirsiniz."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Klip kazancı: [LMB] yukarı / aşağı sürükle (seçili klipler birlikte)  [RMB] menü"
 "Automatic crossfades (current project) on/off" = "Otomatik çapraz geçişler (geçerli proje) aç/kapat"
 "Automatic crossfades (current project)" = "Otomatik çapraz geçişler (geçerli proje)"
@@ -5998,14 +6068,11 @@ countries: tr
 "Yes" = "Evet"
 "Make clip unique?" = "Klip benzersiz yapılsın mı?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "\"{0}\" klibi başka bir ses parçasında da kullanılıyor.\n\nBu örneği benzersiz yapıp ardından bu ses parçasına yönlendirmek ister misiniz?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "GIRTLAK"
 "Scale steps" = "Gam basamakları"
 "In scale" = "Gamda"
 "AMPLITUDE" = "GENLİK"
 "VARIATION" = "VARYASYON"
-
-# round 167f: FL Emphasis
 "Delta" = "Delta"
 "Envelope order" = "Zarf derecesi"
 "Linking" = "Bağlama"
@@ -6160,6 +6227,7 @@ countries: tr
 "Load preset..." = "Ön ayar yükle..."
 "Save preset as..." = "Ön ayarı farklı kaydet..."
 "Page {0}" = "Sayfa {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Yumuşak (kosinüs)"
 "Bezier" = "Bézier"
@@ -6249,7 +6317,6 @@ countries: tr
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ enstrümanı: [LMB] önizle  [2xLMB] yeni LYNX Soundfont kanalı (veya seçili kanala)  Channel Rack'e sürükle"
 "Open a .sf2 / .sf3 / .sfz file" = ".sf2 / .sf3 / .sfz dosyası aç"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: SoundFont 2 / 3 bank'larını ve SFZ enstrümanlarını çalar. Tüm SoundFont'larınızda preset arayın, önizlemek için tıklayın, yüklemek için çift tıklayın."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "SEVİYELER"
 "Loop A" = "Döngü A"
 "Loop B" = "Döngü B"
@@ -6306,6 +6373,22 @@ countries: tr
 "Expand all grouped tracks" = "Tüm gruplanmış parçaları genişlet"
 "Purge unused audio clips" = "Kullanılmayan ses kliplerini temizle"
 "Create variants when stretching audio clips" = "Ses kliplerini esnetirken varyant oluştur"
+"Extract stems from sample" = "Sample'dan stem'leri çıkar"
+"Extracting stems..." = "Stem'ler çıkarılıyor..."
+"Downloading the stem model..." = "Stem modeli indiriliyor..."
+"Checking the stem model..." = "Stem modeli denetleniyor..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime yüklenemedi. Stem çıkarma için macOS 13.4 veya üstü gerekir."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime yüklenemedi. Microsoft Visual C++ Redistributable (x64) paketini https://aka.ms/vs/17/release/vc_redist.x64.exe adresinden kurup yeniden deneyin."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime yüklenemedi. Stem çıkarma için sistemin libstdc++ kitaplığı gerekir."
+"The model returned an unexpected result." = "Model beklenmeyen bir sonuç döndürdü."
+"The sample is empty." = "Sample boş."
+"The downloaded model failed its checksum, so it was not used." = "İndirilen model sağlama toplamı denetimini geçemedi, bu yüzden kullanılmadı."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Stem çıkarma için HT-Demucs modeli gerekir. LYNX SHARE'in parçası değildir: bir kez indirilir ({0} MB) ve {1} içinde saklanır."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Kaynak: {0} (Meta AI Research'ün Demucs v4 modelinin ONNX dışa aktarımı)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Lisans: Demucs kodu MIT lisanslıdır. Yazarlarının dediği gibi, eğitilmiş ağırlıkların lisansı net değildir: eğitim verileri, bir kısmı yalnızca araştırma amaçlı olan MUSDB18-HQ'yu içerir. Bunun kullanımınıza, özellikle ticari kullanıma uyup uymadığına kendiniz karar verin."
+"Download" = "İndir"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Stem çıkarma için ONNX Runtime ({0}) gerekir; LYNX SHARE'in kurulum programı ve zip dosyasıyla gelir, ancak programın yanında bulunamadı. LYNX SHARE'i kurulum programıyla kurun veya zip dosyasının tamamını açın."
+"Stems are still being extracted. Try again when that has finished." = "Stem'ler hâlâ çıkarılıyor. Bitince yeniden deneyin."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Playlist seçimini birleştir (seçimin başından)"
@@ -6354,6 +6437,7 @@ countries: tr
 "The project has no mixer states, effects or notes to export." = "Projede dışa aktarılacak mikser durumu, efekt veya nota yok."
 "Some files could not be written:" = "Bazı dosyalar yazılamadı:"
 "Project bones..." = "Proje kemikleri..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "Erkek"
 "Female" = "Kadın"
@@ -6447,8 +6531,6 @@ countries: tr
 "Pattern time markers: Add time signature change..." = "Desen zaman işaretçileri: Ölçü değişikliği ekle..."
 "Delete all markers" = "Tüm işaretçileri sil"
 "Colour group" = "Renk grubu"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "Her zaman|Basılı"
 "Arpeggio" = "Arpej"
 "Auto|Man" = "Oto|Manuel"
@@ -6521,22 +6603,6 @@ countries: tr
 "Set as time signature" = "Ölçü birimi olarak ayarla"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "Zaman bölümü: FL Studio'nun özgün sistemi (ölçü başına vuruş, vuruş başına adım). Ölçü birimi: geleneksel ölçü birimleri (pay / payda)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "Payda: {0} (Channel Rack'in adım ızgarası vuruş başına {1} adım)."
-"Extract stems from sample" = "Sample'dan stem'leri çıkar"
-"Extracting stems..." = "Stem'ler çıkarılıyor..."
-"Downloading the stem model..." = "Stem modeli indiriliyor..."
-"Checking the stem model..." = "Stem modeli denetleniyor..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime yüklenemedi. Stem çıkarma için macOS 13.4 veya üstü gerekir."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime yüklenemedi. Microsoft Visual C++ Redistributable (x64) paketini https://aka.ms/vs/17/release/vc_redist.x64.exe adresinden kurup yeniden deneyin."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime yüklenemedi. Stem çıkarma için sistemin libstdc++ kitaplığı gerekir."
-"The model returned an unexpected result." = "Model beklenmeyen bir sonuç döndürdü."
-"The sample is empty." = "Sample boş."
-"The downloaded model failed its checksum, so it was not used." = "İndirilen model sağlama toplamı denetimini geçemedi, bu yüzden kullanılmadı."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Stem çıkarma için HT-Demucs modeli gerekir. LYNX SHARE'in parçası değildir: bir kez indirilir ({0} MB) ve {1} içinde saklanır."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Kaynak: {0} (Meta AI Research'ün Demucs v4 modelinin ONNX dışa aktarımı)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Lisans: Demucs kodu MIT lisanslıdır. Yazarlarının dediği gibi, eğitilmiş ağırlıkların lisansı net değildir: eğitim verileri, bir kısmı yalnızca araştırma amaçlı olan MUSDB18-HQ'yu içerir. Bunun kullanımınıza, özellikle ticari kullanıma uyup uymadığına kendiniz karar verin."
-"Download" = "İndir"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Stem çıkarma için ONNX Runtime ({0}) gerekir; LYNX SHARE'in kurulum programı ve zip dosyasıyla gelir, ancak programın yanında bulunamadı. LYNX SHARE'i kurulum programıyla kurun veya zip dosyasının tamamını açın."
-"Stems are still being extracted. Try again when that has finished." = "Stem'ler hâlâ çıkarılıyor. Bitince yeniden deneyin."
 "Configuration" = "Yapılandırma"
 "Transp." = "Transp."
 "Master envelope" = "Ana zarf"
@@ -6572,8 +6638,6 @@ countries: tr
 "sequencer on" = "dizici açık"
 "sequencer off" = "dizici kapalı"
 "transpose {0}" = "transpoze {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} vuruş geri"
 "Beat {0}" = "Vuruş {0}"
 "The first point of the envelope can't be removed." = "Zarfın ilk noktası kaldırılamaz."
@@ -6610,6 +6674,7 @@ countries: tr
 "now" = "şimdi"
 "1 bar back" = "1 ölçü geri"
 "2 bars back" = "2 ölçü geri"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Sample'ı değiştir"
 "Generate steps" = "Adım üret"
@@ -6671,6 +6736,7 @@ countries: tr
 "Lo-fi" = "Lo-fi"
 "Pads 1-8" = "Pad 1-8"
 "Pads 9-16" = "Pad 9-16"
+"Sequencer" = "Sekansör"
 "Sub bass" = "Alt bas"
 "Var base" = "Değ. taban"
 "Sampling" = "Örnekleme"
@@ -6684,7 +6750,6 @@ countries: tr
 "Morph to" = "Morph hedefi"
 "Harm" = "Harm."
 "Lvl" = "Svy"
-"Hi-cut" = "Tiz kesme"
 "Lo-cut" = "Bas kesme"
 "String 1" = "Tel 1"
 "String 2" = "Tel 2"
@@ -6767,7 +6832,6 @@ countries: tr
 "MODULE 2" = "MODÜL 2"
 "MODULE 3" = "MODÜL 3"
 "MODULE 4" = "MODÜL 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Cetvel: [LMB] şarkı konumu  [RMB] veya [Ctrl][LMB] veya [2xLMB] sürükle: zaman seçimi (döngü)  [Shift][LMB] sürükle: taşı  [Ctrl][RMB] sürükle: zoom  [RMB] tıkla: menü  [Alt] snap yok"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Cetvel: [LMB] konum  [Alt] snap yok  [Ctrl][LMB], [RMB] veya [2xLMB] sürükle bir zaman aralığındaki notaları seçer  [Ctrl][Wheel] zoom  [Shift][Wheel] kaydır"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "İşaretçi: [LMB] ona atla (çalarken: şarkı atlamalarını kuantize et adımında)  [Ctrl][LMB] sonraki işaretçiye kadar seç  [RMB] eylem, yeniden adlandır, sil"
@@ -6790,8 +6854,6 @@ countries: tr
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Kayda hazır: Rec + Play bu insert'i bir Playlist klibine kaydeder  [RMB] dosyaya kaydet"
 "Recording: {0}" = "Kaydediliyor: {0}"
 "dry input" = "kuru giriş"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "Uyarla"
 "Alt" = "Alt"
 "Amplifier" = "Amplifikatör"
@@ -6818,6 +6880,7 @@ countries: tr
 "HC" = "HC"
 "HD" = "HD"
 "Harmonic mask" = "Harmonik maske"
+"Hi-cut" = "Tiz kesme"
 "Kb" = "Kl"
 "Kbd" = "Klv"
 "LC" = "LC"
@@ -6849,9 +6912,6 @@ countries: tr
 "Vel sens" = "Vel duy"
 "Vib" = "Vib"
 "Voice mode" = "Ses modu"
-"Sequencer" = "Sekansör"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Yedek: eklentisi bu bilgisayarda kurulu değil, bu partinin render'ı çalıyor (eklenti ayarları korunur)"
 "Send project..." = "Projeyi gönder..."
 "Send my part back..." = "Partimi geri gönder..."
@@ -6945,8 +7005,8 @@ countries: tr
 "Lock" = "Kilit"
 "Mute the selected clips (all when none is selected)" = "Seçili klipleri sessize al (hiçbiri seçili değilse hepsini)"
 "Unmute the selected clips (all when none is selected)" = "Seçili kliplerin sesini aç (hiçbiri seçili değilse hepsinin)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "Kaldırılan step'leri sessize al"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern'i çal / duraklat  [RMB] durdur ve çalmanın başladığı yere dön (tekrar: pattern'in başına)"
 "Live sessions need a newer libcurl on this computer ({0})" = "Canlı oturumlar için bu bilgisayarda daha yeni bir libcurl gerekiyor ({0})"
 "Opening the session..." = "Oturum açılıyor..."
 "Too many sessions were opened from this connection. Try again in a while." = "Bu bağlantıdan çok fazla oturum açıldı. Bir süre sonra tekrar dene."
@@ -7036,8 +7096,6 @@ countries: tr
 "{0} files arriving" = "{0} dosya geliyor"
 "Live session with {0}" = "{0} ile canlı oturum"
 "Undo left alone what someone else changed since: {0}" = "Geri al, o zamandan beri başka birinin değiştirdiğine dokunmadı: {0}"
-"Mute removed steps" = "Kaldırılan step'leri sessize al"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern'i çal / duraklat  [RMB] durdur ve çalmanın başladığı yere dön (tekrar: pattern'in başına)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "Canlı oturum sürdürülemedi: bağlantı geri gelmedi."
@@ -7121,8 +7179,6 @@ countries: tr
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 "no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"
 "arrows step, click for the list, drag or mouse wheel to change" = "oklar bir adım ilerletir, liste için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Ana: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "Son oynanan parametre: en son hareket ettirdiğiniz kontrol ve değeri. Menüsü için tıklayın (otomasyon klibi, kontrolcüye bağla, olaylar, değer)"
 "LAST TWEAKED" = "SON OYNANAN"
@@ -7139,8 +7195,6 @@ countries: tr
 "Playlist snap" = "Playlist snap'i"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Cetvel: [LMB] konum  [Alt] snap yok  [Ctrl][LMB], [RMB] veya [2xLMB] sürükle bir zaman aralığındaki notaları seçer  [Ctrl][Wheel] / kıstırma zoom  [Shift][Wheel] kaydır"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Cetvel: [LMB] şarkı konumu  [RMB] veya [Ctrl][LMB] veya [2xLMB] sürükle: zaman seçimi (döngü)  [Shift][LMB] sürükle: taşı  [Ctrl][RMB] sürükle, [Ctrl][Wheel] / kıstırma: zoom  [RMB] tıkla: menü  [Alt] snap yok"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "Kapalı (gerçek zamanlarını koru)"
 "1/32 note" = "1/32 nota"
 "1/16 note" = "1/16 nota"
@@ -7155,8 +7209,6 @@ countries: tr
 "Number of steps" = "Adım sayısı"
 "Dual" = "Çift"
 "Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Eklenti seçici: her eklenti bir resim olarak; birini Channel Rack'e veya Mikser'e sürükleyin (sağ tık: hızlı ekleme paleti)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "çift tık, sağ tık veya Enter: yeni bir kanal; Channel Rack'e sürükleyin (bir kanalın üstüne: enstrümanını değiştirir)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "çift tık, sağ tık veya Enter: seçili mikser insert'üne; bir mikser insert'üne veya slotlarından birine sürükleyin"
@@ -7168,14 +7220,11 @@ countries: tr
 "Last tweaked ({0})" = "Son ayarlanan ({0})"
 "Deactivate" = "Devre dışı bırak"
 "Automate Patcher parameter" = "Patcher parametresini otomatikleştir"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Kaydedilen notaları harmanla: açık (yeni notalar pattern'deki notalara eklenir)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Kaydedilen notaları harmanla: kapalı (kaydedilen kanalın eski notaları değiştirilir)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Kaydedilen notaları harmanla: açıkken bir kayıt notalarını pattern'e ekler (overdub); kapalıyken kaydedilen kanalın eski notaları değiştirilir"
 "Tempo tapper: tap the beat to set the tempo" = "Tempo tıklayıcı: tempoyu ayarlamak için vuruşa dokunun"
 "Blend recorded notes" = "Kaydedilen notaları harmanla"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "Kaydedilen notaları harmanla aç/kapat (kapalı: değiştir)"
 "Loop record on/off" = "Döngülü kayıt aç/kapat"
 "Step edit on/off" = "Adım adım giriş aç/kapat"
@@ -7192,9 +7241,8 @@ countries: tr
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Adım adım giriş: aktarım durmuşken çaldığınız notalar mevcut pattern'e konumda, bir ızgara adımı uzunluğunda girer; tuşları bırakın, konum bir adım ilerler (akorlar: birlikte basılı tutun)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: ses kaydı yalnızca döngü bölgesini tutar (çalma içinden geçer; ön ve son kayıt payı kayıt seçeneklerinde)"
 "Punch in/out" = "Punch in/out"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Yardım için herhangi bir şeyin üzerine gelin  [F1] kısayollar  [F5]-[F9] pencereler  [Space] çal/durdur"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Seçili kanalların adımlarını kes"
 "Copy the selected channels' steps" = "Seçili kanalların adımlarını kopyala"
@@ -7203,16 +7251,12 @@ countries: tr
 "Note names on every Piano roll key" = "Piano Roll'un her tuşunda nota adları"
 "[LMB] drag up / down: step through the patterns" = "[LMB] yukarı / aşağı sürükle: pattern'ler arasında gez"
 "Playhead column in the Channel Rack" = "Channel Rack içinde çalma sütunu"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Döngü kaydı: açık (kayıt döner: Song modunda döngü bölgesi, her turda bir çekim; Pattern modunda pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Döngü kaydı: kapalı (kayıt düz devam eder: döngü bölgesinin içinden ya da uzayan pattern'in sonunun ötesine)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Döngü kaydı: açık, kayıt döner (Song modu: döngü bölgesi, her turda bir çekim; Pattern modu: pattern); kapalı, düz devam eder, döngü bölgesinin içinden ya da pattern'in sonunun ötesine, ve her şeyi çalındığı yerde tutar (pattern uzar)"
 "Echo time" = "Yankı süresi"
 "Prime numbers" = "Asal sayılar"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic paneli: tek ekranlık donanım satüratörü (Drive, Punish, beş stil)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} kaydedildi."
 "Everything went over as FL Studio's own data." = "Her şey FL Studio'nun kendi verisi olarak aktarıldı."
 "Export to FL Studio" = "FL Studio'ya dışa aktar"
@@ -7235,11 +7279,9 @@ countries: tr
 "Worth knowing" = "Bilmekte fayda var"
 "Samples not on this PC" = "Bu PC'de olmayan sample'lar"
 "Steps use channel colour" = "Adımlar kanal rengini kullanır"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "Ana|İnce ayar"
 "E type|G type" = "E tipi|G tipi"
 "Modern console" = "Modern konsol"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Doyur|Konsol E|Konsol G|Konsol A|Konsol N|Konsol Y|Lamba|Gitar amfisi|Bas amfisi"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "Drive bölümünü açar: kanal şeridinin sonunda, çıkıştan önce doyum"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Doyum türü: yumuşak bir clipper, beş konsol kanalı, bir lamba katı veya bir gitar / bas amfisi"
@@ -7247,8 +7289,6 @@ countries: tr
 "Level into the drive: more distortion without changing the drive" = "Drive'a giren seviye: drive'ı değiştirmeden daha fazla distorsiyon"
 "Level after the drive" = "Drive'dan sonraki seviye"
 "Blends the clean signal back in" = "Temiz sinyali geri karıştırır"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Alan"
 "Modern|Vintage|Plate" = "Modern|Vintage|Plaka"
 "Distance" = "Mesafe"
@@ -7257,80 +7297,7 @@ countries: tr
 "Low decay" = "Alçak sönüm"
 "High decay" = "Yüksek sönüm"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "İşaretçi döngüsü"
-"Marker skip" = "İşaretçi atlama"
-"Marker pause" = "İşaretçi duraklatma"
-"Bar override" = "Ölçü geçersiz kılma"
-"Key/Scale" = "Ton/Gam"
-"Loop length" = "Döngü uzunluğu"
-"Add one every" = "Şu aralıkla bir ekle"
-"Bars" = "Ölçü"
-"Add jump to next bar" = "Sonraki ölçüye atlama ekle"
-"Change to marker loop" = "İşaretçi döngüsüne çevir"
-"Time markers" = "Zaman işaretçileri"
-"Quantize song jumps" = "Song atlamalarını kuantize et"
-"Place loop (from this marker to the next)" = "Döngü yerleştir (bu işaretçiden sonrakine)"
-"Song marker jump" = "Song işaretçisine atlama"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Bu kanaldaki notalar çalmak yerine song'u bir işaretçiye götürür: nota 0 ilk işaretçiye, sonraki ikinciye gider... (Playlist › Song atlamalarını kuantize et çalarken geçerlidir)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "Sonraki song işaretçisine atla (çalarken Song atlamalarını kuantize et)"
-"Jump to the previous song marker" = "Önceki song işaretçisine atla"
-"Advanced looping" = "Gelişmiş döngü"
-"Burn" = "Yaz"
-"Burn MIDI to" = "MIDI'yi şuraya yaz"
-"Burn all looping channels" = "Döngüdeki tüm kanalları yaz"
-"Burn selected channels" = "Seçili kanalları yaz"
-"Burn to pattern" = "Pattern'e yaz"
-"Channel looping" = "Kanal döngüsü"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Kanal döngüsü: pattern'den kısa kanallar onun sonuna kadar tekrar eder (poliritim)  [LMB] aç / kapat  [RMB] döngü türü (step kanalları, tüm kanallar, gelişmiş) ve Pattern'e yaz"
-"Channel looping: {0}" = "Kanal döngüsü: {0}"
-"Don't loop" = "Döngü yok"
-"Echo delay" = "Echo delay"
-"Every {0} steps" = "Her {0} step'te"
-"Loop all channels" = "Tüm kanalları döngüle"
-"Loop point" = "Döngü noktası"
-"Loop point ({0} steps)" = "Döngü noktası ({0} step)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Döngü noktası: [LMB] sürükle veya [Wheel] step olarak ayarlar  [2xLMB] sonraki ölçü  [RMB] Döngü yok / Step / Vuruş / Ölçü, Pattern'e yaz"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Döngü tekrarı (döngü noktasından sonra): [LMB] tekrarladığı step'i düzenler"
-"Loop step channels" = "Step kanallarını döngüle"
-"Loop type" = "Döngü türü"
-"Looping on" = "Döngü açık"
-"Nothing to burn" = "Yazılacak bir şey yok"
-"Reset after burning to MIDI" = "MIDI'ye yazdıktan sonra sıfırla"
-"Select what you want to reset:" = "Neyi sıfırlamak istediğini seç:"
-"Set to next bar" = "Sonraki ölçüye ayarla"
-"Set to next beat" = "Sonraki vuruşa ayarla"
-"The selected channel doesn't contain any notes to burn." = "Seçili kanalda yazılacak nota yok."
-"Time (shift and gate)" = "Zaman (kaydırma ve gate)"
-"loop at the next bar" = "sonraki ölçüde döngü"
-"loop at the next beat" = "sonraki vuruşta döngü"
-"loop at the next step" = "sonraki step'te döngü"
-"Receive notes from" = "Notaları şuradan al"
-"Unlock" = "Kilidi aç"
-"not connected" = "bağlı değil"
-"No MIDI input device" = "MIDI giriş aygıtı yok"
-"(locked: receives the notes of {0})" = "(kilitli: {0} notalarını alır)"
-"Create sampled instrument..." = "Örneklenmiş enstrüman oluştur..."
-"Create sampled instrument" = "Örneklenmiş enstrüman oluştur"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0} enstrümanını tuş tuş çalar ve kayıtlardan bir Sampler kanalı oluşturur."
-"Sampling the instrument..." = "Enstrüman örnekleniyor..."
-"Writing the samples..." = "Sample'lar yazılıyor..."
-"Could not sample the instrument" = "Enstrüman örneklenemedi"
-"Low note" = "En pes nota"
-"High note" = "En tiz nota"
-"Keys per zone" = "Bölge başına tuş"
-"Root offset" = "Kök nota kaydırma"
-"Velocity layers" = "Velocity katmanları"
-"Max velocity" = "Maks. velocity"
-"Release after (seconds)" = "Bırakma süresi (saniye)"
-"Max length after release (seconds)" = "Bırakmadan sonra maks. uzunluk (saniye)"
-"Stop on" = "Durdurma koşulu"
-"Max length" = "Maks. uzunluk"
-"16-bit integer" = "16 bit tamsayı"
-"Mono (merged)" = "Mono (birleştirilmiş)"
-"Enable insert effects" = "Insert efektlerini etkinleştir"
-"Enable master effects" = "Master efektlerini etkinleştir"
-"could not read {0}" = "{0} okunamadı"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "Pattern {0}"
 "a pattern" = "bir pattern"
 "a channel" = "bir kanal"
@@ -7342,7 +7309,6 @@ countries: tr
 "{0} in {1}" = "{1} içinde {0}"
 "Playlist clip" = "Playlist klibi"
 "ON" = "AÇIK"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Yok|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Stil yerine kullanılan üç kompresör karakteri daha: yumuşak, opto-elektronik veya mastering"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} çöktü. Projenizi şimdi kaydedin (en güvenlisi yeni bir dosya olarak)."
@@ -7495,7 +7461,6 @@ countries: tr
 "Start time (H:M:S:Frame)" = "Başlangıç zamanı (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "Bitiş zamanı (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "Geçerli zaman (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "Gürültü azaltma"
 "Group bypass" = "Grup bypass"
@@ -7594,7 +7559,6 @@ countries: tr
 "HighCut" = "High cut"
 "Rushin" = "Aceleci"
 "Draggin" = "Sürükleyen"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Şeride giren seviye"
 "Level out of the strip, after the output mix" = "Şeritten çıkan seviye, çıkış mix'inden sonra"
 "Blend of the processed strip with the dry input" = "İşlenmiş şeridin kuru girişle karışımı"
@@ -7751,8 +7715,6 @@ countries: tr
 "Auto listen" = "Otomatik dinleme"
 "Auto\nlisten" = "Otomatik\ndinleme"
 "EQ auto listen" = "EQ otomatik dinleme"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "Yerel"
 "32 bit" = "32 bit"
 "64 bit" = "64 bit"
@@ -7772,12 +7734,11 @@ countries: tr
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animasyonlar: paneller yumuşakça belirip kaybolur, düğmeler yavaşça yanar, tekerlek yumuşak kaydırır"
 "{0} minutes" = "{0} dakika"
 "Longest wait between backups" = "Yedekler arası en uzun bekleme"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "Bu kayıtlardan comp oluştur"
 "After loop recording, only the last pass plays" = "Döngü kaydından sonra yalnızca son geçiş çalar"
 "Loop-recorded audio: every pass plays" = "Döngüde kaydedilen ses: tüm geçişler çalar"
 "Loop-recorded audio: every pass is muted" = "Döngüde kaydedilen ses: tüm geçişler sessize alınır"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Klip ızgarası"
 "Stop all clips" = "Tüm klipleri durdur"
@@ -7880,8 +7841,6 @@ countries: tr
 "That track is fed by this one: the link would make a loop." = "O kanal bu kanaldan besleniyor: bağlantı bir döngü oluşturur."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Sidechain girişi: bu efektin dinlediği insert. Birini seçmek onu buraya 0 seviyesinde yönlendirir; kendi çıkışları korunur  [LMB] seç"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Sidechain girişi: bu eklentinin yan girişinin dinlediği insert. Birini seçmek onu buraya 0 seviyesinde yönlendirir; kendi çıkışları korunur"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "Bir sample yükle (Sample menüsü) ya da buraya bırak"
 "Open a sample to slice (or drop one here)" = "Dilimlemek için bir sample aç (ya da buraya bırak)"
 "Slicing" = "Dilimleme"
@@ -7986,8 +7945,6 @@ countries: tr
 "Adds the file's time signature to the pattern's markers" = "Dosyanın ölçü birimini desenin işaretçilerine ekler"
 "Scores" = "Skorlar"
 "Folders" = "Klasörler"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "Denetleyicilere çoklu bağlantı"
 "Please tweak the controls you want to link..." = "Bağlamak istediğiniz kontrolleri oynatın..."
 "Multilink to controllers on/off" = "Denetleyicilere çoklu bağlantı açık/kapalı"
@@ -8053,6 +8010,7 @@ countries: tr
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Parça sesi: [LMB] tıkla veya sürükle  [Shift] ince  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Parça pan: [LMB] yukarı / aşağı sürükle  [Shift] ince  [2xLMB] orta"
 "Track effects: [LMB] open the effects of its mixer track" = "Parça efektleri: [LMB] mikser kanalının efektlerini aç"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Bu inserte bir efekt ekle (veya Tarayıcı'dan birini bırak)"
 "Channel on / off (its mute)" = "Kanal açık / kapalı (sesi kapatma)"
@@ -8160,6 +8118,7 @@ countries: tr
 "Mixer track offset for output {0}" = "{0}. çıkış için mikser kanalı kayması"
 "Deactivate output {0}" = "{0}. çıkışı devre dışı bırak"
 "Activate output {0}" = "{0}. çıkışı etkinleştir"
+
 # --- Game controller (round 184a, S16)
 "Game controller" = "Oyun kumandası"
 "Use a game controller" = "Oyun kumandası kullan"
@@ -8183,6 +8142,7 @@ countries: tr
 "D-pad down" = "Yön tuşu aşağı"
 "D-pad left" = "Yön tuşu sol"
 "D-pad right" = "Yön tuşu sağ"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "Kanalları sil"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "Seçili {0} mikser kanalı |silinecek|. Emin misiniz?"
@@ -8382,6 +8342,20 @@ countries: tr
 "Blend of the shaped signal with the dry one (parallel processing)" = "Biçimlendirilmiş sinyalin kuru sinyalle karışımı (paralel işleme)"
 "One gain for both channels, so the stereo image stays put" = "Stereo görüntü kaymasın diye iki kanal için tek bir kazanç"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Pes notaları dedektörden uzak tutar (davul bus'ındaki bir kick)"
+"Chance (LYNX)" = "Olasılık (LYNX)"
+"Velocity range (LYNX)" = "Velocity aralığı (LYNX)"
+"Group the selected notes: play all" = "Seçili notaları grupla: hepsini çal"
+"Group the selected notes: play one" = "Seçili notaları grupla: birini çal"
+"Ungroup the chance of the selected notes" = "Seçili notaların olasılık grubunu çöz"
+"Reset chance and velocity range" = "Olasılığı ve velocity aralığını sıfırla"
+"New chance seed (draws again for the whole project)" = "Yeni olasılık tohumu (tüm projede yeniden çeker)"
+"Show the chance lane" = "Olasılık şeridini göster"
+"Chance" = "Olasılık"
+"Vel. range" = "Vel. aralığı"
+"How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Notanın her sırası geldiğinde çalma olasılığı (LYNX; Live'ın nota Chance'i)"
+"Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Her çalışta velocity, notanın velocity'si ile velocity + bu aralık arasında rastgele seçilir (LYNX)"
+"Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Bırakma velocity'si: notanın sonuyla onu kullanan enstrümanlara gönderilir (eklentiler, Patcher)"
+
 "For a file with a true-peak ceiling: {0}" = "Gerçek tepe sınırı olan bir dosya için: {0}"
 "(look)" = "(görünüm)"
 # --- Default template (issue #123, round 186a)
@@ -8436,6 +8410,7 @@ countries: tr
 "Send to {0} (deleted)" = "{0} kanalına gönderim (silindi)"
 "Disconnected links" = "Kopuk bağlantılar"
 "Keep links to deleted inserts, greyed (LYNX)" = "Silinen insert'lere giden bağlantıları gri olarak koru (LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8518,6 +8493,7 @@ countries: tr
 "side" = "yan"
 "Output M/S" = "Çıkış M/S"
 "Input M/S" = "Giriş M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8537,6 +8513,7 @@ countries: tr
 "Amount min" = "Min. miktar"
 "Stereo offset" = "Stereo kayması"
 "16 bars" = "16 ölçü"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8553,6 +8530,35 @@ countries: tr
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Ölçülmüş: referansa uydurulmuş model; klasik: daha önce kaydedilen projelerin modeli"
+"{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)" = "{0} dondurulmuş: düzenlemek için çözün ([RMB] kanalda, Çöz)"
+"There is no such channel." = "Böyle bir kanal yok."
+"An audio clip is audio already: there is nothing to freeze." = "Bir ses klibi zaten sestir: dondurulacak bir şey yok."
+"This channel makes no sound of its own: there is nothing to freeze." = "Bu kanal kendi başına ses üretmez: dondurulacak bir şey yok."
+"This channel's plugin is not loaded: there is nothing to render." = "Bu kanalın eklentisi yüklü değil: işlenecek bir şey yok."
+"This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart." = "Bu eklenti çıkışları diğer mikser insertlerine gönderiyor (İşleme > Bağlantılar): tek bir dondurulmuş ses dosyası bunları ayrı tutamaz."
+"This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart." = "Bu Patcher çıkışları diğer mikser insertlerine gönderiyor: tek bir dondurulmuş ses dosyası bunları ayrı tutamaz."
+"A Layer channel plays this channel: remove it from the Layer to freeze it." = "Bir Layer kanalı bu kanalı çalıyor: dondurmak için onu Layer'dan çıkarın."
+"Performance mode launches clips live: a frozen channel could not follow them." = "Performance modu klipleri canlı başlatır: dondurulmuş bir kanal bunları takip edemez."
+"This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them." = "Bu kanal, canlı başlatılan klip ızgarasındaki kliplerde çalıyor: dondurulmuş bir kanal bunları takip edemez."
+"Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze" = "Dondurulmuş, ancak ses dosyaları eksik: bunun yerine enstrüman çalıyor.  [RMB] Yeniden dondur veya Çöz"
+"Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it" = "Dondurulmuş, güncel değil: notalar, tempo veya aranje dondurmadan sonra değişti, önceden oluşturulan ses çalmaya devam ediyor.  [RMB] Yeniden dondur günceller"
+"Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit" = "Dondurulmuş: işlenmiş sesi çalıyor ve enstrüman boşaltılmış (CPU yok, RAM yok).  [RMB] Düzenlemek için çöz"
+"Freeze selected channels" = "Seçili kanalları dondur"
+"Unfreeze selected channels" = "Seçili kanalları çöz"
+"Unfreeze" = "Çöz"
+"Re-freeze selected channels" = "Seçili kanalları yeniden dondur"
+"Re-freeze" = "Yeniden dondur"
+"The plugin {0} is not installed on this PC: there is nothing to render." = "{0} eklentisi bu bilgisayarda yüklü değil: işlenecek bir şey yok."
+"Freezing {0}..." = "{0} donduruluyor..."
+"{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it." = "{0} dondurulmuş: sesi çalıyor ve enstrüman boşaltılmış. Çözmek için kanala sağ tıklayın."
+"Could not freeze" = "Dondurulamadı"
+"Can't freeze this channel" = "Bu kanal dondurulamaz"
+"Frozen: Unfreeze to edit" = "Dondurulmuş: düzenlemek için çözün"
+"A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Bir kontrolcü bu enstrümanın düğmelerine bağlı ve onları canlı hareket ettiriyor: dondurulmuş ses onu takip edemez."
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Şarkıyı dosya olarak kaydet"

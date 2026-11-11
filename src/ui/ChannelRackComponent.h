@@ -107,6 +107,7 @@ public:
     bool isPianoRollView() const noexcept { return pianoRollView; }
     bool areGraphLanesShown() const noexcept { return graphLanes; }
     juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
+    ui::Hint getChannelHintForSnapshot (int channel); // the hint of the channel's name button (--freezetest)
     void setGraphLevelForSnapshot (int level) { graphLevel = level; graphLanes = true; updateSize(); repaint(); }
     void rotateSelected (int steps);
     void fillSelected (int every);
@@ -226,6 +227,12 @@ private:
     void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
     void rename (int channel);
     void openPluginWindow (int channel);
+    // Freeze (round 190ay, ui/ExportDialog.h freezeChannel): the frozen channel's hint; "Unfreeze to edit" in the hint
+    // bar when an edit of a frozen channel is refused (true = refused); Freeze / Re-freeze of several channels, one
+    // render after the other (by uid: the rack may change between two renders)
+    juce::String frozenHint (int channel);
+    bool refuseFrozenEdit (int channel);
+    void freezeChannels (std::vector<std::uint64_t> uids);
     void sliceChannel (int channel);
     bool isEditorOpen (int channel);
     void closeEditor (int channel);

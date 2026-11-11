@@ -1,7 +1,7 @@
 language: 한국어
 countries: kr
 
-# LYNX SHARE interface in 한국어 (JUCE LocalisedStrings format).
+# LYNX interface in 한국어 (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/ko-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4559,6 +4559,7 @@ countries: kr
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "보고서를 보낼 수 없습니다({0}). 다음 시작 시 다시 시도합니다"
 "Report a problem" = "문제 보고"
 "Report a problem..." = "문제 보고..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "업데이트 확인..."
 "Check for updates automatically" = "자동으로 업데이트 확인"
@@ -5282,6 +5283,27 @@ countries: kr
 "RPN..." = "RPN..."
 "Send MIDI" = "MIDI 전송"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboard는 노트, 프로그램, “MIDI 전송”으로 설정한 컨트롤을 MIDI 입력 포트가 이 포트인 플러그인으로 보냅니다(플러그인 창 > 설정 > MIDI > 입력 포트)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "마커 루프"
+"Marker skip" = "마커 건너뛰기"
+"Marker pause" = "마커 일시정지"
+"Pattern length" = "패턴 길이"
+"Bar override" = "마디 재정의"
+"Key/Scale" = "키/스케일"
+"Loop length" = "루프 길이"
+"Add one every" = "추가 간격"
+"8 bars" = "8마디"
+"Bars" = "마디"
+"Add jump to next bar" = "다음 마디로 점프 추가"
+"Change to marker loop" = "마커 루프로 변경"
+"Time markers" = "타임 마커"
+"Quantize song jumps" = "송 점프 퀀타이즈"
+"Place loop (from this marker to the next)" = "루프 배치(이 마커부터 다음 마커까지)"
+"Song marker jump" = "송 마커 점프"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "이 채널의 노트는 연주되지 않고 송을 마커로 이동합니다: 노트 0은 첫 번째 마커, 다음 노트는 두 번째로... (재생 중에는 Playlist › 송 점프 퀀타이즈가 적용됨)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "다음 송 마커로 점프(재생 중에는 송 점프 퀀타이즈)"
+"Jump to the previous song marker" = "이전 송 마커로 점프"
 "MUTE" = "뮤트"
 "CHANNEL" = "채널"
 "Bar:Beat:Tick" = "마디:박:틱"
@@ -5694,6 +5716,62 @@ countries: kr
 "Black notes" = "검은 건반"
 "Sharps (#)" = "샵(#)"
 "Flats (b)" = "플랫(b)"
+"Advanced looping" = "고급 루프"
+"Burn" = "기록"
+"Burn MIDI to" = "MIDI 기록 대상"
+"Burn all looping channels" = "루프 중인 모든 채널 기록"
+"Burn selected channels" = "선택한 채널 기록"
+"Burn to pattern" = "패턴에 기록"
+"Channel looping" = "채널 루프"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "채널 루프: 패턴보다 짧은 채널이 끝까지 반복됩니다(폴리리듬)  [LMB] 켬 / 끔  [RMB] 루프 종류(스텝 채널, 모든 채널, 고급) 및 패턴에 기록"
+"Channel looping: {0}" = "채널 루프: {0}"
+"Don't loop" = "루프 안 함"
+"Echo delay" = "에코 딜레이"
+"Every {0} steps" = "{0}스텝마다"
+"Loop all channels" = "모든 채널 루프"
+"Loop point" = "루프 지점"
+"Loop point ({0} steps)" = "루프 지점({0}스텝)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "루프 지점: [LMB] 드래그 또는 [Wheel]로 스텝 단위 설정  [2xLMB] 다음 마디  [RMB] 루프 안 함 / 스텝 / 박 / 마디, 패턴에 기록"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "루프 반복(루프 지점 이후): [LMB] 반복하는 스텝 편집"
+"Loop step channels" = "스텝 채널 루프"
+"Loop type" = "루프 종류"
+"Looping on" = "루프 켬"
+"Nothing to burn" = "기록할 내용 없음"
+"Reset after burning to MIDI" = "MIDI로 기록한 후 초기화"
+"Select what you want to reset:" = "초기화할 항목 선택:"
+"Set to next bar" = "다음 마디로 설정"
+"Set to next beat" = "다음 박으로 설정"
+"The selected channel doesn't contain any notes to burn." = "선택한 채널에 기록할 노트가 없습니다."
+"Time (shift and gate)" = "타임(시프트와 게이트)"
+"loop at the next bar" = "다음 마디에서 루프"
+"loop at the next beat" = "다음 박에서 루프"
+"loop at the next step" = "다음 스텝에서 루프"
+"Receive notes from" = "노트 수신 위치"
+"Unlock" = "잠금 해제"
+"not connected" = "연결 안 됨"
+"No MIDI input device" = "MIDI 입력 장치 없음"
+"(locked: receives the notes of {0})" = "(잠김: {0}의 노트 수신)"
+"Create sampled instrument..." = "샘플링 악기 만들기..."
+"Create sampled instrument" = "샘플링 악기 만들기"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0}을(를) 건반별로 연주해 녹음으로 Sampler 채널을 만듭니다."
+"Sampling the instrument..." = "악기 샘플링 중..."
+"Writing the samples..." = "샘플 쓰는 중..."
+"Could not sample the instrument" = "악기를 샘플링할 수 없음"
+"Low note" = "최저음"
+"High note" = "최고음"
+"Keys per zone" = "존당 건반 수"
+"Root offset" = "루트 오프셋"
+"Velocity layers" = "벨로시티 레이어"
+"Max velocity" = "최대 벨로시티"
+"Release after (seconds)" = "릴리스까지(초)"
+"Max length after release (seconds)" = "릴리스 후 최대 길이(초)"
+"Stop on" = "정지 조건"
+"Max length" = "최대 길이"
+"16-bit integer" = "16비트 정수"
+"Mono (merged)" = "모노(합침)"
+"Enable insert effects" = "인서트 이펙트 사용"
+"Enable master effects" = "마스터 이펙트 사용"
+"could not read {0}" = "{0}을(를) 읽을 수 없음"
 "Key to" = "키 동작"
 "Percent" = "퍼센트"
 "Use regions" = "영역 사용"
@@ -5708,7 +5786,6 @@ countries: kr
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "송 앞에 실행할 클립용 빈 열을 삽입하고, 각 열에 마커를, 송이 시작되는 곳에 Start 마커를 둡니다. 퍼포먼스 모드가 켜집니다."
 "Marker count" = "마커 수"
 "2 steps" = "2스텝"
-"8 bars" = "8마디"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "트랙: [LMB] 선택  [Ctrl][LMB] 추가 / 제거  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5834,7 +5911,6 @@ countries: kr
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "패턴 길이(마디): [LMB] 드래그 또는 [Wheel]로 변경  [2xLMB] 자동(노트 기준)  [RMB] 메뉴"
 "Pattern length: {0} (automatic, from the notes)" = "패턴 길이: {0}(자동, 노트 기준)"
 "Pattern length (bars, 0 = automatic)" = "패턴 길이(마디, 0 = 자동)"
-"Pattern length" = "패턴 길이"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "따라가기: 채널 랙보다 긴 패턴은 재생 중인 스텝에 맞춰 페이지가 넘어갑니다. 끄면 스크롤한 위치에 머뭅니다"
 "Follow the playhead (page along with the playing step) on/off" = "재생 헤드 따라가기(재생 중인 스텝에 맞춰 페이지 넘김) 켜기/끄기"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "따라가기: 보기가 재생 위치에 맞춰 페이지를 넘깁니다. 끄면 스크롤한 위치에 머뭅니다"
@@ -5901,9 +5977,6 @@ countries: kr
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "반전 스테레오"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "자르기 모드 (C): 노트를 클릭하면 그 위치에서 자르고, Ctrl+클릭하면 앞 노트에 붙입니다"
 "Score" = "악보"
@@ -5946,7 +6019,6 @@ countries: kr
 "Set image wallpaper..." = "배경 이미지 설정..."
 "Remove image wallpaper" = "배경 이미지 제거"
 "Set background color..." = "배경 색상 설정..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "메트로놈 트랙"
 "Metronome target mixer track" = "메트로놈 대상 믹서 트랙"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "메트로놈이 재생되는 믹서 트랙 (---은 마스터). 클릭 소리는 내보내기에 포함되지 않습니다."
@@ -5982,8 +6054,6 @@ countries: kr
 "Ghost channels" = "고스트 채널"
 "Add multiple..." = "여러 개 추가..."
 "You can add a maximum of {0} inserts." = "인서트는 최대 {0}개까지 추가할 수 있습니다."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "클립 게인: [LMB] 위 / 아래로 드래그 (선택한 클립을 함께)  [RMB] 메뉴"
 "Automatic crossfades (current project) on/off" = "자동 크로스페이드 (현재 프로젝트) 켜기/끄기"
 "Automatic crossfades (current project)" = "자동 크로스페이드 (현재 프로젝트)"
@@ -5998,14 +6068,11 @@ countries: kr
 "Yes" = "예"
 "Make clip unique?" = "클립을 고유하게 만들까요?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "클립 \"{0}\"이(가) 다른 오디오 트랙에서도 사용되고 있습니다.\n\n이 인스턴스를 고유하게 만든 다음 이 오디오 트랙으로 라우팅할까요?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "목 길이"
 "Scale steps" = "스케일 단계"
 "In scale" = "스케일 내"
 "AMPLITUDE" = "진폭"
 "VARIATION" = "변화"
-
-# round 167f: FL Emphasis
 "Delta" = "델타"
 "Envelope order" = "엔벨로프 차수"
 "Linking" = "링크"
@@ -6160,6 +6227,7 @@ countries: kr
 "Load preset..." = "프리셋 불러오기..."
 "Save preset as..." = "다른 이름으로 프리셋 저장..."
 "Page {0}" = "페이지 {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "부드럽게 (코사인)"
 "Bezier" = "베지어"
@@ -6249,7 +6317,6 @@ countries: kr
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ 악기: [LMB] 미리 듣기  [2xLMB] 새 LYNX Soundfont 채널(또는 선택한 채널에)  채널 랙으로 드래그"
 "Open a .sf2 / .sf3 / .sfz file" = ".sf2 / .sf3 / .sfz 파일 열기"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: SoundFont 2 / 3 뱅크와 SFZ 악기를 재생합니다. 모든 SoundFont에서 프리셋을 검색하고, 클릭하여 미리 듣고, 더블 클릭하여 불러오세요."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "레벨"
 "Loop A" = "루프 A"
 "Loop B" = "루프 B"
@@ -6306,6 +6373,22 @@ countries: kr
 "Expand all grouped tracks" = "그룹화된 트랙 모두 펼치기"
 "Purge unused audio clips" = "사용하지 않는 오디오 클립 정리"
 "Create variants when stretching audio clips" = "오디오 클립을 늘일 때 변형 만들기"
+"Extract stems from sample" = "샘플에서 스템 추출"
+"Extracting stems..." = "스템을 추출하는 중..."
+"Downloading the stem model..." = "스템 모델을 다운로드하는 중..."
+"Checking the stem model..." = "스템 모델을 확인하는 중..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime을 불러오지 못했습니다. 스템 추출에는 macOS 13.4 이상이 필요합니다."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime을 불러오지 못했습니다. https://aka.ms/vs/17/release/vc_redist.x64.exe 에서 Microsoft Visual C++ Redistributable (x64)을 설치한 뒤 다시 시도하세요."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime을 불러오지 못했습니다. 스템 추출에는 시스템의 libstdc++가 필요합니다."
+"The model returned an unexpected result." = "모델이 예상하지 못한 결과를 반환했습니다."
+"The sample is empty." = "샘플이 비어 있습니다."
+"The downloaded model failed its checksum, so it was not used." = "다운로드한 모델이 체크섬 확인을 통과하지 못해 사용하지 않았습니다."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "스템 추출에는 HT-Demucs 모델이 필요합니다. LYNX SHARE에 포함되어 있지 않아 한 번 다운로드({0} MB)한 뒤 {1}에 보관합니다."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "출처: {0} (Meta AI Research의 Demucs v4 ONNX 변환본)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "라이선스: Demucs 코드는 MIT입니다. 저자들의 말처럼 학습된 가중치의 라이선스는 명확하지 않습니다. 학습 데이터에는 일부가 연구용으로만 허용된 MUSDB18-HQ가 포함되어 있습니다. 특히 상업적 용도에 맞는지는 직접 판단하세요."
+"Download" = "다운로드"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "스템 추출에는 ONNX Runtime({0})이 필요합니다. LYNX SHARE 설치 프로그램과 zip에 들어 있지만 프로그램 옆에 없습니다. 설치 프로그램으로 LYNX SHARE를 설치하거나 zip 전체를 압축 해제하세요."
+"Stems are still being extracted. Try again when that has finished." = "아직 스템을 추출하고 있습니다. 끝난 뒤 다시 시도하세요."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Playlist 선택 통합 (선택 시작부터)"
@@ -6354,6 +6437,7 @@ countries: kr
 "The project has no mixer states, effects or notes to export." = "프로젝트에 내보낼 믹서 상태, 이펙트 또는 노트가 없습니다."
 "Some files could not be written:" = "일부 파일을 쓸 수 없습니다:"
 "Project bones..." = "프로젝트 본..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "남성"
 "Female" = "여성"
@@ -6447,8 +6531,6 @@ countries: kr
 "Pattern time markers: Add time signature change..." = "패턴 시간 마커: 박자표 변경 추가..."
 "Delete all markers" = "모든 마커 삭제"
 "Colour group" = "색상 그룹"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "항상|홀드"
 "Arpeggio" = "아르페지오"
 "Auto|Man" = "자동|수동"
@@ -6521,22 +6603,6 @@ countries: kr
 "Set as time signature" = "박자표로 설정"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "시간 분할: FL Studio 고유 방식 (마디당 박, 박당 스텝). 박자표: 전통적인 박자표 (분자 / 분모)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "분모: {0} (Channel Rack 스텝 그리드는 박당 {1} 스텝)."
-"Extract stems from sample" = "샘플에서 스템 추출"
-"Extracting stems..." = "스템을 추출하는 중..."
-"Downloading the stem model..." = "스템 모델을 다운로드하는 중..."
-"Checking the stem model..." = "스템 모델을 확인하는 중..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime을 불러오지 못했습니다. 스템 추출에는 macOS 13.4 이상이 필요합니다."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime을 불러오지 못했습니다. https://aka.ms/vs/17/release/vc_redist.x64.exe 에서 Microsoft Visual C++ Redistributable (x64)을 설치한 뒤 다시 시도하세요."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime을 불러오지 못했습니다. 스템 추출에는 시스템의 libstdc++가 필요합니다."
-"The model returned an unexpected result." = "모델이 예상하지 못한 결과를 반환했습니다."
-"The sample is empty." = "샘플이 비어 있습니다."
-"The downloaded model failed its checksum, so it was not used." = "다운로드한 모델이 체크섬 확인을 통과하지 못해 사용하지 않았습니다."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "스템 추출에는 HT-Demucs 모델이 필요합니다. LYNX SHARE에 포함되어 있지 않아 한 번 다운로드({0} MB)한 뒤 {1}에 보관합니다."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "출처: {0} (Meta AI Research의 Demucs v4 ONNX 변환본)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "라이선스: Demucs 코드는 MIT입니다. 저자들의 말처럼 학습된 가중치의 라이선스는 명확하지 않습니다. 학습 데이터에는 일부가 연구용으로만 허용된 MUSDB18-HQ가 포함되어 있습니다. 특히 상업적 용도에 맞는지는 직접 판단하세요."
-"Download" = "다운로드"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "스템 추출에는 ONNX Runtime({0})이 필요합니다. LYNX SHARE 설치 프로그램과 zip에 들어 있지만 프로그램 옆에 없습니다. 설치 프로그램으로 LYNX SHARE를 설치하거나 zip 전체를 압축 해제하세요."
-"Stems are still being extracted. Try again when that has finished." = "아직 스템을 추출하고 있습니다. 끝난 뒤 다시 시도하세요."
 "Configuration" = "구성"
 "Transp." = "트랜스."
 "Master envelope" = "마스터 엔벨로프"
@@ -6572,8 +6638,6 @@ countries: kr
 "sequencer on" = "시퀀서 켜짐"
 "sequencer off" = "시퀀서 꺼짐"
 "transpose {0}" = "조옮김 {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0}박 전"
 "Beat {0}" = "박 {0}"
 "The first point of the envelope can't be removed." = "엔벨로프의 첫 번째 포인트는 삭제할 수 없습니다."
@@ -6610,6 +6674,7 @@ countries: kr
 "now" = "현재"
 "1 bar back" = "1마디 전"
 "2 bars back" = "2마디 전"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "샘플 교체"
 "Generate steps" = "스텝 생성"
@@ -6678,12 +6743,13 @@ countries: kr
 "Var peak" = "변화 피크"
 "Var slide" = "변화 슬라이드"
 "Var phase" = "변화 위상"
+"Osc 1" = "오실 1"
+"Osc 2" = "오실 2"
 "Selected" = "선택됨"
 "Num" = "번호"
 "Morph to" = "모프 대상"
 "Harm" = "배음"
 "Lvl" = "레벨"
-"Hi-cut" = "하이컷"
 "Lo-cut" = "로우컷"
 "String 1" = "현 1"
 "String 2" = "현 2"
@@ -6766,7 +6832,6 @@ countries: kr
 "MODULE 2" = "모듈 2"
 "MODULE 3" = "모듈 3"
 "MODULE 4" = "모듈 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "눈금자: [LMB] 송 위치  [RMB] 또는 [Ctrl][LMB] 또는 [2xLMB] 드래그: 시간 선택(루프)  [Shift][LMB] 드래그: 이동  [Ctrl][RMB] 드래그: 줌  [RMB] 클릭: 메뉴  [Alt] 스냅 없음"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "눈금자: [LMB] 위치  [Alt] 스냅 없음  [Ctrl][LMB], [RMB] 또는 [2xLMB] 드래그로 시간 범위의 노트 선택  [Ctrl][Wheel] 줌  [Shift][Wheel] 스크롤"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "마커: [LMB] 해당 위치로 이동(재생 중: 다음 송 점프 퀀타이즈 단계에서)  [Ctrl][LMB] 다음 마커까지 선택  [RMB] 동작, 이름 바꾸기, 삭제"
@@ -6789,8 +6854,6 @@ countries: kr
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "녹음 대기: Rec + Play로 이 인서트를 Playlist 클립에 녹음  [RMB] 파일로 녹음"
 "Recording: {0}" = "녹음: {0}"
 "dry input" = "드라이 입력"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "적응"
 "Alt" = "Alt"
 "Amplifier" = "앰프"
@@ -6817,6 +6880,7 @@ countries: kr
 "HC" = "HC"
 "HD" = "HD"
 "Harmonic mask" = "배음 마스크"
+"Hi-cut" = "하이컷"
 "Kb" = "건반"
 "Kbd" = "건반"
 "LC" = "LC"
@@ -6827,8 +6891,6 @@ countries: kr
 "Modulation 1" = "모듈레이션 1"
 "Modulation 2" = "모듈레이션 2"
 "Osc" = "오실"
-"Osc 1" = "오실 1"
-"Osc 2" = "오실 2"
 "Osc 3" = "오실 3"
 "Output EQ" = "출력 EQ"
 "Panner" = "패너"
@@ -6850,8 +6912,6 @@ countries: kr
 "Vel sens" = "벨로 감도"
 "Vib" = "비브라토"
 "Voice mode" = "보이스 모드"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "대체 음원: 이 플러그인이 이 PC에 설치되어 있지 않아 이 파트의 렌더링이 재생됩니다(플러그인 설정은 유지됨)"
 "Send project..." = "프로젝트 보내기..."
 "Send my part back..." = "내 파트 돌려보내기..."
@@ -6945,8 +7005,8 @@ countries: kr
 "Lock" = "자물쇠"
 "Mute the selected clips (all when none is selected)" = "선택한 클립 음소거 (선택이 없으면 모두)"
 "Unmute the selected clips (all when none is selected)" = "선택한 클립 음소거 해제 (선택이 없으면 모두)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "제거한 스텝 음소거"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "패턴 재생 / 일시 정지  [RMB] 정지하고 재생을 시작한 위치로 돌아가기 (다시 누르면: 패턴 시작으로)"
 "Live sessions need a newer libcurl on this computer ({0})" = "라이브 세션을 사용하려면 이 컴퓨터에 더 새로운 libcurl이 필요합니다({0})"
 "Opening the session..." = "세션을 여는 중..."
 "Too many sessions were opened from this connection. Try again in a while." = "이 연결에서 너무 많은 세션이 열렸습니다. 잠시 후 다시 시도하세요."
@@ -7036,8 +7096,6 @@ countries: kr
 "{0} files arriving" = "파일 {0}개 수신 중"
 "Live session with {0}" = "{0} 님과의 라이브 세션"
 "Undo left alone what someone else changed since: {0}" = "실행 취소는 그 후 다른 사람이 변경한 것은 건드리지 않았습니다: {0}"
-"Mute removed steps" = "제거한 스텝 음소거"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "패턴 재생 / 일시 정지  [RMB] 정지하고 재생을 시작한 위치로 돌아가기 (다시 누르면: 패턴 시작으로)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "라이브 세션을 재개할 수 없습니다: 연결이 돌아오지 않았습니다."
@@ -7121,8 +7179,6 @@ countries: kr
 "click to step, drag or mouse wheel to change" = "클릭하면 다음 값, 드래그나 마우스 휠로 변경"
 "no effect with the current mode (another engine is in use)" = "현재 모드에서는 효과 없음 (다른 엔진 사용 중)"
 "arrows step, click for the list, drag or mouse wheel to change" = "화살표로 한 단계씩, 클릭하면 목록, 드래그나 마우스 휠로 변경"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "메인: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "마지막으로 조정한 파라미터: 마지막으로 움직인 컨트롤과 그 값. 클릭하면 메뉴 (오토메이션 클립, 컨트롤러 연결, 이벤트, 값)"
 "LAST TWEAKED" = "마지막 조정"
@@ -7139,8 +7195,6 @@ countries: kr
 "Playlist snap" = "플레이리스트 스냅"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "눈금자: [LMB] 위치  [Alt] 스냅 없음  [Ctrl][LMB], [RMB] 또는 [2xLMB] 드래그로 시간 범위의 노트 선택  [Ctrl][Wheel] / 핀치 줌  [Shift][Wheel] 스크롤"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "눈금자: [LMB] 송 위치  [RMB] 또는 [Ctrl][LMB] 또는 [2xLMB] 드래그: 시간 선택(루프)  [Shift][LMB] 드래그: 이동  [Ctrl][RMB] 드래그, [Ctrl][Wheel] / 핀치: 줌  [RMB] 클릭: 메뉴  [Alt] 스냅 없음"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "끔 (실제 타이밍 유지)"
 "1/32 note" = "32분음표"
 "1/16 note" = "16분음표"
@@ -7155,8 +7209,6 @@ countries: kr
 "Number of steps" = "스텝 수"
 "Dual" = "듀얼"
 "Align all channel editors" = "모든 채널 편집기 정렬"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "플러그인 선택기: 모든 플러그인을 그림으로 표시; Channel Rack 또는 믹서로 드래그 (오른쪽 클릭: 빠른 추가 팔레트)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "더블 클릭, 오른쪽 클릭 또는 Enter: 새 채널; Channel Rack으로 드래그 (채널 위: 그 악기를 교체)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "더블 클릭, 오른쪽 클릭 또는 Enter: 선택한 믹서 인서트에; 믹서 인서트나 그 슬롯으로 드래그"
@@ -7168,14 +7220,11 @@ countries: kr
 "Last tweaked ({0})" = "마지막으로 조정 ({0})"
 "Deactivate" = "비활성화"
 "Automate Patcher parameter" = "Patcher 파라미터 오토메이션"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "녹음 노트 섞기: 켬 (새 노트가 패턴의 노트에 더해짐)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "녹음 노트 섞기: 끔 (녹음한 채널의 이전 노트를 대체)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "녹음 노트 섞기: 켜면 테이크의 노트를 패턴에 더하고(오버더브), 끄면 녹음한 채널의 이전 노트를 대체합니다"
 "Tempo tapper: tap the beat to set the tempo" = "탭 템포: 박자를 두드려 템포를 설정"
 "Blend recorded notes" = "녹음 노트 섞기"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "녹음 노트 섞기 켜기/끄기 (끄기: 교체)"
 "Loop record on/off" = "루프 녹음 켜기/끄기"
 "Step edit on/off" = "스텝 입력 켜기/끄기"
@@ -7192,9 +7241,8 @@ countries: kr
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "스텝 입력: 트랜스포트가 멈춘 상태에서 연주한 노트가 현재 패턴의 위치에 스냅 한 스텝 길이로 들어갑니다. 키를 떼면 위치가 한 스텝 이동합니다 (코드: 함께 누르기)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "펀치 인/아웃: 오디오 녹음은 루프 구간만 남깁니다 (재생은 그 구간을 지나감, 프리롤/포스트롤은 녹음 옵션에서)"
 "Punch in/out" = "펀치 인/아웃"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "아무 곳이나 가리키면 도움말  [F1] 단축키  [F5]-[F9] 창  [Space] 재생/정지"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "선택한 채널의 스텝 잘라내기"
 "Copy the selected channels' steps" = "선택한 채널의 스텝 복사"
@@ -7203,16 +7251,12 @@ countries: kr
 "Note names on every Piano roll key" = "Piano Roll의 모든 건반에 음 이름 표시"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 위 / 아래로 드래그: 패턴 넘기기"
 "Playhead column in the Channel Rack" = "채널 랙의 재생 위치 열"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "루프 녹음: 켜짐 (녹음이 반복: Song 모드에서는 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드에서는 패턴)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "루프 녹음: 꺼짐 (녹음이 그대로 진행: 루프 구간을 지나거나, 패턴 끝을 넘어 패턴이 길어짐)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "루프 녹음: 켜짐, 녹음이 반복 (Song 모드: 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드: 패턴); 꺼짐, 그대로 진행하여 루프 구간을 지나거나 패턴 끝을 넘고, 연주한 자리에 모두 남김 (패턴이 길어짐)"
 "Echo time" = "에코 타임"
 "Prime numbers" = "소수"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic 패널: 한 화면 하드웨어 새츄레이터 (Drive, Punish, 다섯 가지 스타일)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} 저장됨."
 "Everything went over as FL Studio's own data." = "모두 FL Studio 고유 데이터로 넘어갔습니다."
 "Export to FL Studio" = "FL Studio로 내보내기"
@@ -7235,11 +7279,9 @@ countries: kr
 "Worth knowing" = "알아둘 점"
 "Samples not on this PC" = "이 PC에 없는 샘플"
 "Steps use channel colour" = "스텝에 채널 색상 사용"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "메인|조정"
 "E type|G type" = "E 타입|G 타입"
 "Modern console" = "모던 콘솔"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "새추레이트|콘솔 E|콘솔 G|콘솔 A|콘솔 N|콘솔 Y|진공관|기타 앰프|베이스 앰프"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "드라이브 섹션을 켭니다: 스트립 끝, 출력 앞의 새추레이션"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "새추레이션 종류: 소프트 클리퍼, 콘솔 채널 다섯 가지, 진공관 단, 기타 / 베이스 앰프"
@@ -7247,8 +7289,6 @@ countries: kr
 "Level into the drive: more distortion without changing the drive" = "드라이브로 들어가는 레벨: 드라이브를 바꾸지 않고 왜곡을 더합니다"
 "Level after the drive" = "드라이브 뒤의 레벨"
 "Blends the clean signal back in" = "깨끗한 신호를 다시 섞습니다"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|스페이스"
 "Modern|Vintage|Plate" = "모던|빈티지|플레이트"
 "Distance" = "거리"
@@ -7257,80 +7297,7 @@ countries: kr
 "Low decay" = "저역 디케이"
 "High decay" = "고역 디케이"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "마커 루프"
-"Marker skip" = "마커 건너뛰기"
-"Marker pause" = "마커 일시정지"
-"Bar override" = "마디 재정의"
-"Key/Scale" = "키/스케일"
-"Loop length" = "루프 길이"
-"Add one every" = "추가 간격"
-"Bars" = "마디"
-"Add jump to next bar" = "다음 마디로 점프 추가"
-"Change to marker loop" = "마커 루프로 변경"
-"Time markers" = "타임 마커"
-"Quantize song jumps" = "송 점프 퀀타이즈"
-"Place loop (from this marker to the next)" = "루프 배치(이 마커부터 다음 마커까지)"
-"Song marker jump" = "송 마커 점프"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "이 채널의 노트는 연주되지 않고 송을 마커로 이동합니다: 노트 0은 첫 번째 마커, 다음 노트는 두 번째로... (재생 중에는 Playlist › 송 점프 퀀타이즈가 적용됨)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "다음 송 마커로 점프(재생 중에는 송 점프 퀀타이즈)"
-"Jump to the previous song marker" = "이전 송 마커로 점프"
-"Advanced looping" = "고급 루프"
-"Burn" = "기록"
-"Burn MIDI to" = "MIDI 기록 대상"
-"Burn all looping channels" = "루프 중인 모든 채널 기록"
-"Burn selected channels" = "선택한 채널 기록"
-"Burn to pattern" = "패턴에 기록"
-"Channel looping" = "채널 루프"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "채널 루프: 패턴보다 짧은 채널이 끝까지 반복됩니다(폴리리듬)  [LMB] 켬 / 끔  [RMB] 루프 종류(스텝 채널, 모든 채널, 고급) 및 패턴에 기록"
-"Channel looping: {0}" = "채널 루프: {0}"
-"Don't loop" = "루프 안 함"
-"Echo delay" = "에코 딜레이"
-"Every {0} steps" = "{0}스텝마다"
-"Loop all channels" = "모든 채널 루프"
-"Loop point" = "루프 지점"
-"Loop point ({0} steps)" = "루프 지점({0}스텝)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "루프 지점: [LMB] 드래그 또는 [Wheel]로 스텝 단위 설정  [2xLMB] 다음 마디  [RMB] 루프 안 함 / 스텝 / 박 / 마디, 패턴에 기록"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "루프 반복(루프 지점 이후): [LMB] 반복하는 스텝 편집"
-"Loop step channels" = "스텝 채널 루프"
-"Loop type" = "루프 종류"
-"Looping on" = "루프 켬"
-"Nothing to burn" = "기록할 내용 없음"
-"Reset after burning to MIDI" = "MIDI로 기록한 후 초기화"
-"Select what you want to reset:" = "초기화할 항목 선택:"
-"Set to next bar" = "다음 마디로 설정"
-"Set to next beat" = "다음 박으로 설정"
-"The selected channel doesn't contain any notes to burn." = "선택한 채널에 기록할 노트가 없습니다."
-"Time (shift and gate)" = "타임(시프트와 게이트)"
-"loop at the next bar" = "다음 마디에서 루프"
-"loop at the next beat" = "다음 박에서 루프"
-"loop at the next step" = "다음 스텝에서 루프"
-"Receive notes from" = "노트 수신 위치"
-"Unlock" = "잠금 해제"
-"not connected" = "연결 안 됨"
-"No MIDI input device" = "MIDI 입력 장치 없음"
-"(locked: receives the notes of {0})" = "(잠김: {0}의 노트 수신)"
-"Create sampled instrument..." = "샘플링 악기 만들기..."
-"Create sampled instrument" = "샘플링 악기 만들기"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0}을(를) 건반별로 연주해 녹음으로 Sampler 채널을 만듭니다."
-"Sampling the instrument..." = "악기 샘플링 중..."
-"Writing the samples..." = "샘플 쓰는 중..."
-"Could not sample the instrument" = "악기를 샘플링할 수 없음"
-"Low note" = "최저음"
-"High note" = "최고음"
-"Keys per zone" = "존당 건반 수"
-"Root offset" = "루트 오프셋"
-"Velocity layers" = "벨로시티 레이어"
-"Max velocity" = "최대 벨로시티"
-"Release after (seconds)" = "릴리스까지(초)"
-"Max length after release (seconds)" = "릴리스 후 최대 길이(초)"
-"Stop on" = "정지 조건"
-"Max length" = "최대 길이"
-"16-bit integer" = "16비트 정수"
-"Mono (merged)" = "모노(합침)"
-"Enable insert effects" = "인서트 이펙트 사용"
-"Enable master effects" = "마스터 이펙트 사용"
-"could not read {0}" = "{0}을(를) 읽을 수 없음"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "패턴 {0}"
 "a pattern" = "패턴"
 "a channel" = "채널"
@@ -7342,7 +7309,6 @@ countries: kr
 "{0} in {1}" = "{1}의 {0}"
 "Playlist clip" = "Playlist 클립"
 "ON" = "켬"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "없음|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "스타일 대신 쓰는 컴프레서 캐릭터 세 가지: 스무스, 광전자식, 마스터링"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0}이(가) 충돌했습니다. 지금 프로젝트를 저장하세요(새 파일로 저장하는 것이 가장 안전합니다)."
@@ -7495,7 +7461,6 @@ countries: kr
 "Start time (H:M:S:Frame)" = "시작 시간 (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "종료 시간 (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "현재 시간 (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "노이즈 감소"
 "Group bypass" = "그룹 바이패스"
@@ -7594,7 +7559,6 @@ countries: kr
 "HighCut" = "하이 컷"
 "Rushin" = "서두름"
 "Draggin" = "끌림"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "스트립으로 들어가는 레벨"
 "Level out of the strip, after the output mix" = "스트립에서 나가는 레벨(출력 믹스 이후)"
 "Blend of the processed strip with the dry input" = "처리된 신호와 드라이 입력의 블렌드"
@@ -7751,8 +7715,6 @@ countries: kr
 "Auto listen" = "자동 모니터"
 "Auto\nlisten" = "자동\n모니터"
 "EQ auto listen" = "EQ 자동 모니터"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "네이티브"
 "32 bit" = "32비트"
 "64 bit" = "64비트"
@@ -7772,12 +7734,11 @@ countries: kr
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "애니메이션: 패널이 서서히 나타나고 사라지며, 버튼이 부드럽게 켜지고, 휠 스크롤이 부드럽게 움직입니다"
 "{0} minutes" = "{0}분"
 "Longest wait between backups" = "백업 사이 최대 대기 시간"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "이 테이크로 컴프 만들기"
 "After loop recording, only the last pass plays" = "루프 녹음 후 마지막 패스만 재생"
 "Loop-recorded audio: every pass plays" = "루프 녹음한 오디오: 모든 패스 재생"
 "Loop-recorded audio: every pass is muted" = "루프 녹음한 오디오: 모든 패스 음소거"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "클립 그리드"
 "Stop all clips" = "모든 클립 정지"
@@ -7880,8 +7841,6 @@ countries: kr
 "That track is fed by this one: the link would make a loop." = "그 트랙은 이 트랙에서 신호를 받습니다: 연결하면 루프가 생깁니다."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "사이드체인 입력: 이 이펙트가 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다  [LMB] 선택"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "사이드체인 입력: 이 플러그인의 사이드 입력이 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "샘플을 불러오거나(Sample 메뉴) 여기에 놓으세요"
 "Open a sample to slice (or drop one here)" = "자를 샘플 열기(또는 여기에 놓기)"
 "Slicing" = "슬라이스"
@@ -7986,8 +7945,6 @@ countries: kr
 "Adds the file's time signature to the pattern's markers" = "파일의 박자표를 패턴 마커에 추가합니다"
 "Scores" = "스코어"
 "Folders" = "폴더"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "컨트롤러에 멀티링크"
 "Please tweak the controls you want to link..." = "연결할 컨트롤을 움직이세요..."
 "Multilink to controllers on/off" = "컨트롤러에 멀티링크 켜기/끄기"
@@ -8053,6 +8010,7 @@ countries: kr
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "트랙 볼륨: [LMB] 클릭 또는 드래그  [Shift] 미세  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "트랙 팬: [LMB] 위 / 아래로 드래그  [Shift] 미세  [2xLMB] 가운데"
 "Track effects: [LMB] open the effects of its mixer track" = "트랙 이펙트: [LMB] 믹서 트랙의 이펙트 열기"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "이 인서트에 이펙트 추가 (또는 브라우저에서 끌어다 놓기)"
 "Channel on / off (its mute)" = "채널 켜기 / 끄기 (뮤트)"
@@ -8160,6 +8118,7 @@ countries: kr
 "Mixer track offset for output {0}" = "출력 {0}의 믹서 트랙 오프셋"
 "Deactivate output {0}" = "출력 {0} 비활성화"
 "Activate output {0}" = "출력 {0} 활성화"
+
 # --- Game controller (round 184a, S16)
 "Game controller" = "게임 컨트롤러"
 "Use a game controller" = "게임 컨트롤러 사용"
@@ -8183,6 +8142,7 @@ countries: kr
 "D-pad down" = "방향 패드 아래"
 "D-pad left" = "방향 패드 왼쪽"
 "D-pad right" = "방향 패드 오른쪽"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "트랙 삭제"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "선택한 믹서 트랙 {0}개를 |삭제|합니다. 계속할까요?"
@@ -8382,6 +8342,20 @@ countries: kr
 "Blend of the shaped signal with the dry one (parallel processing)" = "다듬은 신호와 드라이 신호의 혼합 (병렬 처리)"
 "One gain for both channels, so the stereo image stays put" = "두 채널에 하나의 게인을 적용해 스테레오 이미지가 움직이지 않게 합니다"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "낮은 음을 검출기에서 제외합니다 (드럼 버스의 킥 등)"
+"Chance (LYNX)" = "확률 (LYNX)"
+"Velocity range (LYNX)" = "벨로시티 범위 (LYNX)"
+"Group the selected notes: play all" = "선택한 노트 그룹화: 모두 재생"
+"Group the selected notes: play one" = "선택한 노트 그룹화: 하나 재생"
+"Ungroup the chance of the selected notes" = "선택한 노트의 확률 그룹 해제"
+"Reset chance and velocity range" = "확률과 벨로시티 범위 초기화"
+"New chance seed (draws again for the whole project)" = "새 확률 시드 (프로젝트 전체를 다시 뽑기)"
+"Show the chance lane" = "확률 레인 보기"
+"Chance" = "확률"
+"Vel. range" = "벨로 범위"
+"How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "노트 차례가 올 때마다 재생될 확률 (LYNX; Live의 노트 Chance)"
+"Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "재생될 때마다 벨로시티가 노트의 벨로시티와 벨로시티 + 이 범위 사이에서 뽑힙니다 (LYNX)"
+"Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "릴리스 벨로시티: 노트가 끝날 때 이를 사용하는 악기로 보내집니다 (플러그인, Patcher)"
+
 "For a file with a true-peak ceiling: {0}" = "트루 피크 상한이 있는 파일은: {0}"
 "(look)" = "(룩)"
 # --- Default template (issue #123, round 186a)
@@ -8436,6 +8410,7 @@ countries: kr
 "Send to {0} (deleted)" = "{0}(으)로 보내기(삭제됨)"
 "Disconnected links" = "끊어진 링크"
 "Keep links to deleted inserts, greyed (LYNX)" = "삭제된 인서트로 가는 링크를 회색으로 유지(LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8518,6 +8493,7 @@ countries: kr
 "side" = "사이드"
 "Output M/S" = "출력 M/S"
 "Input M/S" = "입력 M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8537,6 +8513,7 @@ countries: kr
 "Amount min" = "최소 양"
 "Stereo offset" = "스테레오 오프셋"
 "16 bars" = "16마디"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8553,6 +8530,35 @@ countries: kr
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "측정: 레퍼런스에 맞춘 모델, 클래식: 그 이전에 저장된 프로젝트의 모델"
+"{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)" = "{0}이(가) 프리즈됨: 편집하려면 프리즈 해제 (채널에서 [RMB], 프리즈 해제)"
+"There is no such channel." = "해당 채널이 없습니다."
+"An audio clip is audio already: there is nothing to freeze." = "오디오 클립은 이미 오디오입니다: 프리즈할 것이 없습니다."
+"This channel makes no sound of its own: there is nothing to freeze." = "이 채널은 자체 소리를 내지 않습니다: 프리즈할 것이 없습니다."
+"This channel's plugin is not loaded: there is nothing to render." = "이 채널의 플러그인이 로드되지 않았습니다: 렌더링할 것이 없습니다."
+"This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart." = "이 플러그인은 출력을 다른 믹서 인서트로 보냅니다 (처리 > 연결): 프리즈된 오디오 파일 하나로는 이를 분리해 유지할 수 없습니다."
+"This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart." = "이 Patcher는 출력을 다른 믹서 인서트로 보냅니다: 프리즈된 오디오 파일 하나로는 이를 분리해 유지할 수 없습니다."
+"A Layer channel plays this channel: remove it from the Layer to freeze it." = "Layer 채널이 이 채널을 재생합니다: 프리즈하려면 Layer에서 제거하세요."
+"Performance mode launches clips live: a frozen channel could not follow them." = "Performance 모드는 클립을 라이브로 실행합니다: 프리즈된 채널은 따라갈 수 없습니다."
+"This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them." = "이 채널은 라이브로 실행되는 클립 그리드의 클립에서 재생됩니다: 프리즈된 채널은 따라갈 수 없습니다."
+"Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze" = "프리즈됨, 하지만 오디오 파일이 없습니다: 대신 악기가 재생됩니다.  [RMB] 다시 프리즈 또는 프리즈 해제"
+"Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it" = "프리즈됨, 최신 아님: 프리즈 이후 노트, 템포 또는 편곡이 바뀌었으며 이전에 만든 오디오가 계속 재생됩니다.  [RMB] 다시 프리즈하면 업데이트됩니다"
+"Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit" = "프리즈됨: 렌더링된 오디오가 재생되고 악기는 언로드되었습니다 (CPU 없음, RAM 없음).  [RMB] 프리즈 해제하여 편집"
+"Freeze selected channels" = "선택한 채널 프리즈"
+"Unfreeze selected channels" = "선택한 채널 프리즈 해제"
+"Unfreeze" = "프리즈 해제"
+"Re-freeze selected channels" = "선택한 채널 다시 프리즈"
+"Re-freeze" = "다시 프리즈"
+"The plugin {0} is not installed on this PC: there is nothing to render." = "플러그인 {0}이(가) 이 PC에 설치되어 있지 않습니다: 렌더링할 것이 없습니다."
+"Freezing {0}..." = "{0} 프리즈 중..."
+"{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it." = "{0}이(가) 프리즈됨: 오디오가 재생되고 악기는 언로드되었습니다. 채널을 마우스 오른쪽 버튼으로 클릭하여 프리즈를 해제하세요."
+"Could not freeze" = "프리즈할 수 없습니다"
+"Can't freeze this channel" = "이 채널은 프리즈할 수 없습니다"
+"Frozen: Unfreeze to edit" = "프리즈됨: 프리즈 해제하여 편집"
+"A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "컨트롤러가 이 악기의 노브에 연결되어 라이브로 움직입니다: 프리즈된 오디오는 따라갈 수 없습니다."
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "곡을 파일로 저장"

@@ -7,6 +7,7 @@
 #include <set>
 
 #include "core/MissingFiles.h"
+#include "core/PatternBlocks.h"
 #include "core/ProjectSafety.h"
 #include "core/SessionIds.h"
 #include "core/Sha256.h"
@@ -102,6 +103,7 @@ exportopts::Options stemOptions (double sampleRate, double tailSeconds)
     o.tail = exportopts::TailMode::leave;
     o.maxTailSeconds = tailSeconds;
     o.hqAllPlugins = false;  // the quality that is heard while playing
+    o.disableMaxPolyphony = false; // (and the channels' Max polyphony as while playing: lifted, a stem differs, round 190ay)
     o.normalize = false;
     o.loopMarkers = false;   // (no extra chunks: the stem's bytes are only audio)
     o.playlistMarkers = false;
@@ -527,6 +529,226 @@ void apply (Song& song, const std::vector<Rendered>& rendered)
             if (c.uid == r.uid && r.uid != 0)
                 c.standIns = r.standIns;
     }
+}
+
+std::string freezeSource (const Song& song, int channel, double sampleRate)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return {};
+    Song mini;
+    mini.bpm = song.bpm;
+    mini.beatsPerBar = song.beatsPerBar;
+    mini.swing = song.swing;
+    mini.masterPitch = song.masterPitch;
+    auto c = song.channels[(std::size_t) channel];
+    c.uid = 0;
+    c.standIns.clear();
+    c.freeze = {};
+    c.name.clear();
+    c.colour = 0;
+    c.icon = 0;
+    c.volume = 1.0f; // (volume, pan, mute and the insert apply live)
+    c.pan = 0.0f;
+    c.mixerTrack = 0;
+    c.muted = false;
+    c.group = -1;
+    const auto stateBytes = c.plugin.state.size();
+    c.plugin.state.clear();
+    mini.channels = { c };
+    // every pattern keeps its number (the clips refer to it), holding only what this channel plays in it
+    std::vector<char> plays (song.patterns.size(), 0);
+    for (std::size_t p = 0; p < song.patterns.size(); ++p)
+    {
+        const auto& source = song.patterns[p];
+        Pattern q;
+        for (auto n : source.notes)
+            if (n.channel == channel)
+                n.channel = 0, q.notes.push_back (n);
+        plays[p] = ! q.notes.empty();
+        if (plays[p])
+        {
+            q.lengthTicks = source.effectiveLength (song.beatsPerBar);
+            q.loopOn = source.loopOn;
+            q.loopMode = source.loopMode;
+            for (auto l : source.channelLoops)
+                if (l.channel == channel)
+                    l.channel = 0, q.channelLoops.push_back (l);
+            for (auto lane : source.events)
+                if (lane.target.kind == AutomationTargetKind::tempo
+                    || (lane.target.kind == AutomationTargetKind::channelParam && lane.target.index == channel))
+                {
+                    lane.target.index = 0;
+                    q.events.push_back (lane);
+                }
+        }
+        mini.patterns.push_back (std::move (q));
+    }
+    // the automation that reaches the stem: the tempo and the instrument's own parameters
+    std::vector<int> kept (song.automations.size(), -1);
+    for (std::size_t a = 0; a < song.automations.size(); ++a)
+    {
+        const auto& t = song.automations[a].target;
+        if (t.kind != AutomationTargetKind::tempo && ! (t.kind == AutomationTargetKind::channelParam && t.index == channel))
+            continue;
+        auto copy = song.automations[a];
+        copy.uid = 0;
+        copy.target.index = 0;
+        kept[a] = (int) mini.automations.size();
+        mini.automations.push_back (std::move (copy));
+    }
+    auto clips = song.playlist;
+    for (const auto& block : patternblocks::asClips (song)) // (FL's legacy Pattern Blocks play as clips)
+        clips.push_back (block);
+    for (auto clip : clips)
+    {
+        if (clip.kind == ClipKind::pattern)
+        {
+            if (clip.pattern < 0 || clip.pattern >= (int) plays.size() || ! plays[(std::size_t) clip.pattern])
+                continue;
+            clip.muted = clip.muted || song.isTrackMuted (clip.track);
+        }
+        else if (clip.kind == ClipKind::automation)
+        {
+            if (clip.automation < 0 || clip.automation >= (int) kept.size() || kept[(std::size_t) clip.automation] < 0)
+                continue;
+            clip.automation = kept[(std::size_t) clip.automation];
+        }
+        else
+            continue;
+        clip.track = 0;
+        clip.uid = 0;
+        clip.gridSlot = -1;
+        mini.playlist.push_back (clip);
+    }
+    std::stable_sort (mini.playlist.begin(), mini.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    mini.mixer = Song::defaultMixer (0);
+    const auto json = ProjectFile::toJson (mini, false) + "|freeze|" + juce::String ((juce::int64) stateBytes) + "|" + juce::String (song.songLength())
+                      + "|" + juce::String (sampleRate, 1);
+    const auto bytes = json.toStdString();
+    return sha256Hex ((const std::uint8_t*) bytes.data(), bytes.size());
+}
+
+Song freshForExport (const Song& song, bool timelineKept, std::vector<int>* thawed)
+{
+    std::vector<int> stale;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+    {
+        const auto& f = song.channels[(std::size_t) c].freeze;
+        if (! f.on())
+            continue;
+        if (! timelineKept)
+        {
+            stale.push_back (c);
+            continue;
+        }
+        // the rate the channel was frozen at is its audio's (the source counts it); audio that is not there is the
+        // engine's case (it plays the instrument)
+        const auto* whole = standins::find (f.stems, 0, false);
+        if (whole == nullptr)
+            continue;
+        juce::WavAudioFormat wav;
+        const auto file = fileOf (whole->path);
+        if (! file.existsAsFile())
+            continue;
+        std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (file.createInputStream().release(), true));
+        if (reader == nullptr || freezeSource (song, c, reader->sampleRate) != f.source)
+            stale.push_back (c);
+    }
+    if (thawed != nullptr)
+        *thawed = stale;
+    if (stale.empty())
+        return song;
+    auto copy = song;
+    for (const auto c : stale)
+        copy.channels[(std::size_t) c].freeze = {};
+    return copy;
+}
+
+bool renderFreeze (const Song& song, int channel, double sampleRate, const juce::File& folder, std::vector<StandIn>& stems,
+                   const std::function<bool (double)>& progress, juce::String& error)
+{
+    stems.clear();
+    if (channel < 0 || channel >= (int) song.channels.size())
+    {
+        error = "no such channel";
+        return false;
+    }
+    if (! folder.createDirectory())
+    {
+        error = "could not create " + folder.getFullPathName();
+        return false;
+    }
+    const auto& def = song.channels[(std::size_t) channel];
+    const auto tail = standins::tailTicks (song);
+    const auto tailSeconds = ticksToSeconds (song, tail);
+    const auto stamp = juce::String (uids::newProjectId()).substring (0, 8);
+    const auto base = juce::File::createLegalFileName ((def.name.empty() ? juce::String ("Channel ") + juce::String (channel + 1) : str (def.name)) + " (frozen " + stamp + ")");
+    std::vector<const PluginRef*> refs;
+    standins::pluginsOf (def, refs);
+    const auto plugins = pluginNames (refs);
+    // the pattern stems share one render: it is the shorter part unless the song is very short
+    const auto plan = standins::channelPatternRender (song, channel);
+    const auto songTicks = (double) std::max<std::int64_t> (1, song.songLength()), loopTicks = (double) plan.end;
+    const auto share = songTicks / (songTicks + loopTicks);
+    auto fail = [&] {
+        for (const auto& s : stems)
+            fileOf (s.path).deleteFile();
+        stems.clear();
+        return false;
+    };
+
+    // Song mode: the whole song
+    {
+        auto renderSongCopy = standins::channelTimelineRender (song, channel);
+        freeze::lighten (renderSongCopy, channel);
+        const auto file = folder.getChildFile (base + ".wav");
+        if (! renderSong (renderSongCopy, stemOptions (sampleRate, tailSeconds), file, [&] (double p) { return ! progress || progress (share * p); }, error))
+            return fail();
+        StandIn s;
+        s.path = utf8 (file.getFullPathName());
+        s.lengthTicks = song.songLength() + tail;
+        s.plugin = plugins;
+        stems.push_back (s);
+    }
+
+    // Pattern mode: each pattern's loop pass
+    if (! plan.segments.empty())
+    {
+        auto renderSongCopy = plan.song;
+        freeze::lighten (renderSongCopy, channel);
+        const auto whole = folder.getChildFile (base + " (render).wav");
+        if (! renderSong (renderSongCopy, stemOptions (sampleRate, tailSeconds), whole, [&] (double p) { return ! progress || progress (share + (1.0 - share) * p); }, error))
+            return fail();
+        juce::AudioBuffer<float> audio;
+        double rate = sampleRate;
+        const auto read = readWav (whole, audio, rate);
+        whole.deleteFile();
+        if (! read)
+        {
+            error = "could not read " + whole.getFullPathName();
+            return fail();
+        }
+        const auto samplesOf = [&] (std::int64_t ticks) { return (int) std::llround (ticksToSeconds (song, ticks) * rate); };
+        for (const auto& seg : plan.segments)
+        {
+            const auto& name = song.patterns[(std::size_t) seg.pattern].name;
+            const auto file = folder.getChildFile (base + " - " + juce::File::createLegalFileName (str (name.empty() ? "Pattern " + std::to_string (seg.pattern + 1) : name))
+                                                   + " " + juce::String (seg.pattern + 1) + " (loop).wav");
+            if (! writeWav (file, audio, samplesOf (seg.loopFrom), samplesOf (seg.loopFrom + seg.length) - samplesOf (seg.loopFrom), rate))
+            {
+                error = "could not write " + file.getFullPathName();
+                return fail();
+            }
+            StandIn s;
+            s.pattern = seg.patternUid;
+            s.loop = true;
+            s.path = utf8 (file.getFullPathName());
+            s.lengthTicks = seg.length;
+            s.plugin = plugins;
+            stems.push_back (s);
+        }
+    }
+    return ! progress || progress (1.0);
 }
 
 bool write (const Song& song, Manifest manifest, PluginHost& host, const juce::File& file, WriteResult& result, juce::String& error)

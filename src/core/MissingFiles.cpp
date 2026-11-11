@@ -86,6 +86,8 @@ void channelSamples (Channel& c, const std::string& user, Fn& fn)
             fn (z.path, user.empty() ? c.name : user);
     for (auto& s : c.standIns) // Online Sessions' renders (round 168a)
         fn (s.path, (user.empty() ? c.name : user) + ": stand-in");
+    for (auto& s : c.freeze.stems) // a frozen channel's audio (round 190ay)
+        fn (s.path, (user.empty() ? c.name : user) + ": frozen audio");
     docSamples (c.patcher, inPatcher (user.empty() ? c.name : user), fn);
 }
 

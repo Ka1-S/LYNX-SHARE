@@ -6,6 +6,7 @@
 
 #include "core/SessionIds.h"
 #include "core/StandIns.h"
+#include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
 #include "core/MarkerPlan.h"
@@ -3894,9 +3895,25 @@ void AudioEngine::publishSong()
     // (no copy of the song for the almost every project that has none)
     std::optional<Song> projectedSong;
     standins::Projected projected;
-    if (standins::hasAny (song))
-        projectedSong = standins::project (song, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
-    const Song& played = projectedSong ? *projectedSong : song;
+    // Freeze (round 190ay): a frozen channel whose audio is not on disk (the project moved without it, a freeze brought
+    // back by Undo after its files went) plays its instrument: out of date beats silent
+    std::optional<Song> thawedSong;
+    frozenMissing.clear();
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+        if (const auto& f = song.channels[i].freeze; f.on())
+        {
+            const auto* whole = standins::find (f.stems, 0, false);
+            if (whole != nullptr && juce::File (juce::String::fromUTF8 (whole->path.c_str())).existsAsFile())
+                continue;
+            if (! thawedSong)
+                thawedSong = song;
+            thawedSong->channels[i].freeze = {};
+            frozenMissing.push_back ((int) i);
+        }
+    const Song& unprojected = thawedSong ? *thawedSong : song;
+    if (standins::hasAny (unprojected))
+        projectedSong = standins::project (unprojected, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
+    const Song& played = projectedSong ? *projectedSong : unprojected;
     {
         // round 190ap: the slots whose plugin is switched off ("Open without third-party plugins"), for their badges
         const auto hold = pluginsOff() || pluginHoldOwner.load() == nullptr ? pluginHoldState() : pluginhold::State();
@@ -4890,6 +4907,21 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
         text << "\n";
     }
     return text;
+}
+
+bool AudioEngine::freezeOutOfDate (int channel)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
+        return false;
+    if (freezeChecks.size() < song.channels.size())
+        freezeChecks.resize (song.channels.size());
+    auto& check = freezeChecks[(std::size_t) channel];
+    if (check.stamp != songStamp)
+    {
+        check.stamp = songStamp;
+        check.outOfDate = sessionpack::freezeSource (song, channel, transport.sampleRate.load()) != song.channels[(std::size_t) channel].freeze.source;
+    }
+    return check.outOfDate;
 }
 
 std::shared_ptr<Instrument> AudioEngine::getChannelInstrument (int channel) const

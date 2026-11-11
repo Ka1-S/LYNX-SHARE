@@ -838,6 +838,21 @@ struct StandIn
     bool operator== (const StandIn&) const = default;
 };
 
+// Freeze (round 190ay): the channel's own output — after its instrument / plugin, before its volume, pan and insert —
+// rendered to audio that plays in its place while the instrument is not loaded at all (its RAM and CPU are free). The
+// channel itself is untouched: its plugin and settings stay in the project as they were, so unfreezing brings back the
+// same sound. `stems`: pattern 0 = the whole song (what Song mode plays), and one loop pass per pattern the channel
+// plays in (what Pattern mode plays). `source` = what they were rendered from (sessionpack::freezeSource): another
+// value now = the notes, tempo or arrangement changed since, the audio is out of date. Saved only while frozen; a
+// LYNX SHARE that does not know the field plays the instrument live.
+struct FreezeState
+{
+    std::vector<StandIn> stems;
+    std::string source;
+    bool on() const noexcept { return ! stems.empty(); }
+    bool operator== (const FreezeState&) const = default;
+};
+
 struct ChannelDef
 {
     std::string name;
@@ -886,6 +901,7 @@ struct ChannelDef
     // whose it is) and the renders of its third-party plugin for computers without it
     std::uint64_t uid = 0;
     std::vector<StandIn> standIns;
+    FreezeState freeze; // (round 190ay) frozen: its stems play, its instrument is not loaded
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export

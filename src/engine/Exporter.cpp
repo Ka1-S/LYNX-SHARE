@@ -5,6 +5,7 @@
 #include "core/Dither.h"
 #include "core/Mp3Encoder.h"
 #include "engine/AudioEngine.h"
+#include "engine/SessionPack.h"
 #include "engine/Text.h"
 #include "ui/I18n.h"
 
@@ -105,13 +106,17 @@ ExportJob::ExportJob (const Song& song, const ExportSettings& s, const juce::Fil
 {
 }
 
-ExportJob::ExportJob (const Song& song, const Options& o, const juce::File& file)
+ExportJob::ExportJob (const Song& project, const Options& o, const juce::File& file)
     : engine (std::make_unique<AudioEngine> (false)),
       options (clamped (o)),
       output (file),
-      title (song.info.title),
-      artist (song.info.author)
+      title (project.info.title),
+      artist (project.info.author)
 {
+    // Freeze (round 190ay): a frozen channel whose audio is out of date renders live — never the old audio in a bounce
+    // (and where the render does not play the song's timeline as it is, every frozen channel does)
+    const auto timelineKept = options.range == Range::song && options.loops <= 1 && ! project.playlist.empty();
+    const auto song = sessionpack::freshForExport (project, timelineKept, &thawedForExport);
     // duration integrating tempo automation; the tail at the tempo of the song's end
     std::int64_t musicTicks = 0, loopTicks = 0;
     const auto tailTicks = tailTicksFor (song, options, musicTicks, loopTicks);

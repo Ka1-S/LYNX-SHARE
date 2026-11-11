@@ -62,6 +62,8 @@ public:
 
     // progress(0..1) returns false to cancel. On error or cancellation the file is deleted. With several formats
     // (Options::moreFormats) every file is written from the one render: `output`, then the same name per extension.
+    // The frozen channels this render plays live because their audio is out of date (sessionpack::freshForExport)
+    const std::vector<int>& channelsRenderedLive() const noexcept { return thawedForExport; }
     bool run (const std::function<bool (double)>& progress, juce::String& error);
 
     double getMusicSeconds() const noexcept { return musicSeconds; }
@@ -79,6 +81,7 @@ private:
     bool runRealtime (const std::function<bool (double)>& progress, juce::String& error);
 
     std::unique_ptr<AudioEngine> engine;
+    std::vector<int> thawedForExport; // frozen channels whose audio was out of date: they render live (round 190ay)
     AudioEngine* live = nullptr; // a real-time bounce
     double startTick = 0.0;
     juce::String notice, info;
