@@ -26,6 +26,7 @@
 #include "core/WorkerPool.h"
 #include "core/SerialJobs.h"
 #include "engine/MidiSyncIo.h"
+#include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
 #include "core/RtStats.h"
 #include "core/ScoreLog.h"
@@ -545,6 +546,18 @@ public:
     void setMidiPrefs (const prefs::MidiPrefs& prefs, bool save = true);
     // master sync out / external clock in / all notes off (round 165f)
     MidiSyncIo& getMidiSync() noexcept { return midiSync; }
+    // MIDI controller profiles (round 190aw, core/ControllerSession.h): the devices that run one, and LYNX as they see
+    // it (the main window's bridge; null when it closes).
+    ControllerIo& getControllers() noexcept { return controllerIo; }
+    const ControllerIo& getControllers() const noexcept { return controllerIo; }
+    void setControllerSurface (controller::Surface* surface);
+    // The user's controller profiles (*.lynxctl).
+    static juce::File controllerProfilesFolder();
+    // Reads the profiles again (Settings › MIDI "Refresh device list") and moves the devices to them.
+    void reloadControllerProfiles();
+    // Values for parameters as a MIDI link sets them: one edit outside the undo history; plugin parameters go to the
+    // plugin.
+    void applyTargetValues (const std::vector<std::pair<AutomationTarget, float>>& changes);
 
     // How many undo steps are kept (Settings › General).
     void setUndoLevels (int levels);
@@ -857,6 +870,7 @@ private:
     juce::AudioProcessorPlayer player;
     Transport transport;
     MidiSyncIo midiSync; // (before the MIDI callbacks and the audio callback use it)
+    ControllerIo controllerIo; // (before the MIDI callbacks use it)
     SampleLibrary samples;
     LiveEventQueue liveEvents;   // UI -> audio
     LiveEventQueue midiEvents;   // MIDI thread -> audio
@@ -885,6 +899,7 @@ private:
     AutomationTarget learning;
     std::optional<MultilinkSession> multilink;
     bool learningGlobal = false;
+    bool controllerLearnTick = false; // a MIDI learn was waiting at this tick's applyControllers (round 190aw)
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
     void applyControllers();
     std::atomic<int> pendingMarkerNote { -1 }; // MIDI thread -> timer: a "Song marker jump" note

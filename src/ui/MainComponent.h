@@ -376,6 +376,7 @@ private:
     void showPatternMenu();
 
     AudioEngine& engine;
+    std::unique_ptr<class ControllerBridge> controllerBridge; // (round 190aw)
 
     IconButton newButton { "new", Icon::newFile }, openButton { "open", Icon::open }, saveButton { "save", Icon::save },
         exportButton { "export", Icon::exportAudio }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo };

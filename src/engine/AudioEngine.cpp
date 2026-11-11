@@ -291,6 +291,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
         deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
+        controllerIo.loadProfiles (controllerProfilesFolder());
         recordingSettings = loadRecordingSettings();
         saveGlobalLinks = true;
 
@@ -2041,9 +2042,10 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     auto velocityCurve = prefs::VelocityCurve::linear;
     auto locked = -1; // a channel that "receives notes from" this device (FL's channel lock)
     auto jumpChannel = 0;
+    const auto deviceName = source != nullptr ? source->getName().toStdString() : std::string();
     {
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
-        const auto name = source != nullptr ? source->getName().toStdString() : std::string();
+        const auto& name = deviceName;
         device = midiPrefsShared.input (name);
         velocityCurve = midiPrefsShared.velocity;
         const auto midiChannel = m.getChannel();
@@ -2085,6 +2087,15 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         perf::Command c;
         if (performanceMidi.note (m.getNoteNumber(), m.isNoteOn(), c))
             performanceLive->midiCommands.push (c);
+        return;
+    }
+
+    // a controller profile's buttons, knobs and faders (round 190aw): to the message thread, not into the instruments.
+    // Controllers linked by hand stay with their links.
+    if (source != nullptr && controllerIo.take (deviceName, m.getRawData(), m.getRawDataSize(), linkedCcs))
+    {
+        if (m.isController()) // (still offered to MIDI learn)
+            controllerQueue.push ({ m.getControllerNumber(), m.getChannel() - 1, m.getControllerValue() });
         return;
     }
 
@@ -2273,6 +2284,24 @@ void AudioEngine::enableAllMidiInputs()
     lastMidiInputIds.clear();
     for (const auto& port : available)
         lastMidiInputIds.push_back (port.id);
+
+    // the devices that run a controller profile (round 190aw)
+    std::vector<std::string> names;
+    for (const auto& port : available)
+        names.push_back (port.name);
+    controllerIo.configure (midiPrefs, names, true);
+}
+
+void AudioEngine::setControllerSurface (controller::Surface* surface) { controllerIo.setSurface (surface); }
+
+juce::File AudioEngine::controllerProfilesFolder() { return PluginHost::settingsFolder().getChildFile ("Controllers"); }
+
+void AudioEngine::reloadControllerProfiles()
+{
+    controllerIo.loadProfiles (controllerProfilesFolder());
+    if (prefetcher != nullptr)
+        enableAllMidiInputs();
+    sendChangeMessage();
 }
 
 void AudioEngine::reconnectMidiInputs()
@@ -3923,6 +3952,7 @@ void AudioEngine::applyControllers()
 {
     ControllerEvent e;
     std::map<std::pair<int, int>, int> latest; // (cc, channel) -> latest value this frame
+    controllerLearnTick = learning.kind != AutomationTargetKind::none || multilink.has_value();
 
     while (controllerQueue.pop (e))
     {
@@ -4018,6 +4048,11 @@ void AudioEngine::applyControllers()
                 noteTweaked (t); // a linked controller's move is a tweak (Last tweaked, automation recording)
             }
 
+    applyTargetValues (changes);
+}
+
+void AudioEngine::applyTargetValues (const std::vector<std::pair<AutomationTarget, float>>& changes)
+{
     std::vector<std::pair<AutomationTarget, float>> pluginChanges;
 
     editSong ([&] (Song& s) {
@@ -4068,6 +4103,7 @@ void AudioEngine::timerCallback()
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     applyControllers();
+    controllerIo.pump (controllerLearnTick); // (controller profiles, round 190aw)
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
         releasedTargets.clear();
