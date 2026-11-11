@@ -8282,6 +8282,8 @@ countries: ru by kz
 "Reset fade in" = "Сбросить нарастание"
 "Reset fade out" = "Сбросить затухание"
 "Create crossfade" = "Создать кроссфейд"
+"Normalize selection individually" = "Нормализовать выделение по отдельности"
+"Normalize selection as a group" = "Нормализовать выделение как группу"
 "Convert to MIDI" = "Преобразовать в MIDI"
 "Melody to new pattern" = "Мелодия в новый паттерн"
 "Harmony to new pattern" = "Гармония в новый паттерн"

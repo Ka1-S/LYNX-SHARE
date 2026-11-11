@@ -720,4 +720,143 @@ inline void setManualFade (Clip& c, int side, bool on) noexcept
         (side == 0 ? c.fadeIn : c.fadeOut) = 0;
 }
 
+
+// --- FL's Create crossfade (fade handle menu Tag 100, round 189n; FLEngine 2026 [DECOMP] FUN_00d02580 -> per clip
+// FUN_00d02410, neighbour FUN_00d02310 / FUN_00cf9930, FUN_00cfd680 sets the fades, FUN_00cfaf80 clamps them; menu
+// state FUN_00cfc310 / FUN_00d023d0) ----
+
+// FL's FUN_00cf7580: `a` and `b` already crossfade — neither side manual, a's fade out == b's fade in, and a's fade out
+// starts where b starts. (Two touching clips without fades pass it too, as in FL.)
+inline bool flCrossfadePair (const Clip& a, const Clip& b) noexcept
+{
+    return ! manualFade (a, 1) && ! manualFade (b, 0) && a.fadeOut == b.fadeIn && a.end() - a.fadeOut == b.start;
+}
+
+// The clip that `index` would crossfade with on `side` (0 = before it / its fade in, 1 = after it / its fade out), or -1:
+// the nearest clip of the same track, in start order, that overlaps it or already crossfades with it (FL's search with
+// flags 2: any clip kind; FL's array is sorted by start). Before: every earlier clip is tried; after: the search stops
+// at the first clip that starts past this one's end.
+inline int crossfadeNeighbour (const std::vector<Clip>& clips, int index, int side)
+{
+    if (index < 0 || index >= (int) clips.size())
+        return -1;
+    const auto& c = clips[(std::size_t) index];
+    const auto before = [&clips] (int x, int y) {
+        const auto& a = clips[(std::size_t) x];
+        const auto& b = clips[(std::size_t) y];
+        return a.start != b.start ? a.start < b.start : x < y;
+    };
+    const auto end = [] (const Clip& k) { return k.start + std::max<std::int64_t> (1, k.length); };
+    if (side == 0)
+    {
+        int best = -1; // the latest-starting earlier clip that overlaps or crossfades
+        for (int i = 0; i < (int) clips.size(); ++i)
+        {
+            const auto& o = clips[(std::size_t) i];
+            if (i == index || o.track != c.track || ! before (i, index) || (best >= 0 && before (i, best)))
+                continue;
+            if (c.start < end (o) || flCrossfadePair (o, c))
+                best = i;
+        }
+        return best;
+    }
+    // after: walk the later clips nearest first, up to the first that starts past this clip's end
+    std::vector<int> later;
+    for (int i = 0; i < (int) clips.size(); ++i)
+        if (i != index && clips[(std::size_t) i].track == c.track && before (index, i))
+            later.push_back (i);
+    std::sort (later.begin(), later.end(), before);
+    for (auto i : later)
+    {
+        const auto& o = clips[(std::size_t) i];
+        if (end (c) < o.start)
+            break;
+        if (o.start < end (c) || flCrossfadePair (c, o))
+            return i;
+    }
+    return -1;
+}
+
+// FL's Create crossfade on one pair, `a` the earlier clip: when they overlap by 0 < overlap <= the shorter clip, a's fade
+// out and b's fade in become the overlap and stop being manual. Each clip keeps its other fade: a's fade in comes first
+// (FUN_00cfaf80 mode 1), b's fade out comes first (mode 2). Pattern clips get no fades. True if it changed them.
+inline bool createCrossfade (Clip& a, Clip& b) noexcept
+{
+    const auto overlap = a.start + std::max<std::int64_t> (1, a.length) - b.start;
+    if (overlap <= 0 || overlap > std::min (a.length, b.length))
+        return false;
+    a.flFadeFlags &= ~2u; // FUN_01065840 (a, 0): a's fade out is no longer manual
+    b.flFadeFlags &= ~1u; // FUN_01065830 (b, 0)
+    if (a.kind == ClipKind::pattern || b.kind == ClipKind::pattern)
+        return false;
+    a.fadeOut = overlap;
+    a.fadeIn = std::min (a.length, a.fadeIn);
+    a.fadeOut = std::max<std::int64_t> (0, std::min (a.fadeOut, a.length - a.fadeIn));
+    b.fadeIn = overlap;
+    b.fadeOut = std::min (b.length, b.fadeOut);
+    b.fadeIn = std::max<std::int64_t> (0, std::min (b.fadeIn, b.length - b.fadeOut));
+    return true;
+}
+
+// FL's Create crossfade from a fade handle of `clicked` on `side`. A clicked clip that is selected: every selected clip
+// crossfades with the clip after it, or else with the one before it. Not selected: only the clicked clip, with its
+// neighbour on that side. Returns how many pairs changed.
+inline int createCrossfades (std::vector<Clip>& clips, int clicked, int side, const std::vector<int>& selection)
+{
+    if (clicked < 0 || clicked >= (int) clips.size())
+        return 0;
+    const auto selected = std::find (selection.begin(), selection.end(), clicked) != selection.end();
+    int changed = 0;
+    const auto pair = [&] (int a, int b) {
+        if (a >= 0 && b >= 0 && createCrossfade (clips[(std::size_t) a], clips[(std::size_t) b]))
+            ++changed;
+    };
+    if (! selected)
+    {
+        const auto other = crossfadeNeighbour (clips, clicked, side);
+        side == 0 ? pair (other, clicked) : pair (clicked, other);
+        return changed;
+    }
+    for (auto i : selection)
+    {
+        if (i < 0 || i >= (int) clips.size())
+            continue;
+        if (const auto next = crossfadeNeighbour (clips, i, 1); next >= 0)
+            pair (i, next);
+        else
+            pair (crossfadeNeighbour (clips, i, 0), i);
+    }
+    return changed;
+}
+
+// The fade handle menu's "Create crossfade" is enabled (FUN_00d023d0) when one of the menu's clips has a neighbour on
+// that side that is as selected as it is (both selected or both not).
+inline bool canCreateCrossfade (const std::vector<Clip>& clips, const std::vector<int>& targets, int side, const std::vector<int>& selection)
+{
+    const auto isSelected = [&selection] (int i) { return std::find (selection.begin(), selection.end(), i) != selection.end(); };
+    for (auto i : targets)
+        if (const auto other = crossfadeNeighbour (clips, i, side); other >= 0 && isSelected (other) == isSelected (i))
+            return true;
+    return false;
+}
+
+// --- FL's Normalize on the gain handle (Tags 110 / 111, round 189n; [DECOMP] FUN_00d029b0) ----
+// Normalize (and "Normalize selection individually"): each audio clip's gain = 1 / its peak, kept in the gain handle's
+// range -96.1 ... +36 dB (FUN_01064dc0, FUN_010657d0). The peak is the largest |sample| of every channel of the file over
+// the part the clip plays (FUN_01064c60 / FUN_00692980). A silent clip keeps its gain.
+inline constexpr float normalizeGainMin = 1.5667499610572122e-05f, normalizeGainMax = 63.095699310302734f;
+inline float normalizeGain (float peak, float current) noexcept
+{
+    return peak == 0.0f ? current : std::clamp (1.0f / peak, normalizeGainMin, normalizeGainMax);
+}
+// "Normalize selection as a group" (FUN_00d026f0): every selected audio clip of the Playlist gets the same gain, 1 / the
+// largest of their peaks, with no range limit; all silent = no change.
+inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
+{
+    float top = 0.0f;
+    for (auto p : peaks)
+        top = std::max (top, p);
+    return top == 0.0f ? 0.0f : 1.0f / top;
+}
+
 } // namespace lynx::clipops

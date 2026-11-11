@@ -8282,6 +8282,8 @@ countries: tw hk mo
 "Reset fade in" = "重設淡入"
 "Reset fade out" = "重設淡出"
 "Create crossfade" = "建立交叉淡化"
+"Normalize selection individually" = "分別標準化所選內容"
+"Normalize selection as a group" = "將所選內容作為一組標準化"
 "Convert to MIDI" = "轉換為 MIDI"
 "Melody to new pattern" = "旋律到新 Pattern"
 "Harmony to new pattern" = "和聲到新 Pattern"

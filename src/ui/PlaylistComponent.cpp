@@ -3126,9 +3126,17 @@ juce::Rectangle<float> PlaylistComponent::gainHandle (int index) const
 
 void PlaylistComponent::showGainMenu (int index)
 {
-    const auto& song = engine.getSong();
-    if (index < 0 || index >= (int) song.playlist.size())
+    if (index < 0 || index >= (int) engine.getSong().playlist.size())
         return;
+    gainMenu (index).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu PlaylistComponent::gainMenu (int index)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.playlist.size())
+        return menu;
     std::vector<int> targets;
     for (auto i : isSelected (index) ? selection : std::vector<int> { index })
         if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
@@ -3144,10 +3152,14 @@ void PlaylistComponent::showGainMenu (int index)
     };
 
     // FL 2026's gain handle menu [SHOT round 166e]
-    juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Gain: {0}", { gainText (song.playlist[(std::size_t) index].gain) }));
     menu.addItem (tr ("Reset gain"), [setDb] { setDb (0.0); });
-    menu.addItem (tr ("Normalize"), [this, targets] { normalizeClips (targets); });
+    // FL's popup (FUN_00cfcdf0, handle kind 5): with two or more clips selected and the clicked one among them, Normalize
+    // reads "Normalize selection individually" and "Normalize selection as a group" appears (round 189n)
+    const auto many = selection.size() >= 2 && isSelected (index);
+    menu.addItem (many ? tr ("Normalize selection individually") : tr ("Normalize"), [this, targets] { normalizeClips (targets, false); });
+    if (many)
+        menu.addItem (tr ("Normalize selection as a group"), [this] { normalizeClips (selection, true); });
     menu.addSeparator();
     menu.addItem (tr ("Copy value"), [db] { copiedGainDb = db; hasCopiedGain = true; });
     menu.addItem (tr ("Paste value"), hasCopiedGain, false, [setDb] { setDb (copiedGainDb); });
@@ -3166,13 +3178,13 @@ void PlaylistComponent::showGainMenu (int index)
                                  }),
                                  true);
     });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 // FL's fade handle menu (EventEditForm PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d01bc0; checks from its
 // popup FUN_00cfcdf0, round 189i; FL 2026's own menu compared in round 189l): on the clicked clip, or on every selected
-// audio clip when it is selected; `side` 0 = the fade in, 1 = the fade out. Not built yet: Normalize, Normalize selection
-// as a group (not in FL's menu on a single clip), Create crossfade.
+// audio clip when it is selected; `side` 0 = the fade in, 1 = the fade out. Create crossfade: round 189n. (Normalize and
+// Normalize selection as a group belong to the gain handle's menu, showGainMenu.)
 void PlaylistComponent::showFadeHandleMenu (int index, int side)
 {
     if (index < 0 || index >= (int) engine.getSong().playlist.size())
@@ -3209,22 +3221,24 @@ juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side)
                 clipops::setManualFade (c, side, true); // a set fade is a manual one (FL's fade flags bit 0 / 1)
         });
     };
-    const auto crossfade = (side == 0 ? clip.crossfadeIn : clip.crossfadeOut) > 0;
-
-    // (FL 2026 GUI, round 189l: "Reset fade in" / "Reset fade out", then "Create crossfade", greyed on a clip with no
-    // neighbour to cross; "Reset crossfade tension" takes its place where the side already crossfades)
+    // FL 2026's fade handle menu (GUI, rounds 189l / 189n: shots FL-fade-in-menu-overlap.png): "Reset fade in" / "Reset fade
+    // out" even on a crossfaded side, then "Create crossfade", enabled when the side has a clip to cross (FUN_00d023d0).
+    // ("Reset ... tension" belongs to FL's tension handle, the circle in a fade, which LYNX's clip fades don't have.)
     menu.addItem (side == 0 ? tr ("Reset fade in") : tr ("Reset fade out"), [edit, side] {
         edit ([side] (Clip& c) {
             (side == 0 ? c.fadeIn : c.fadeOut) = 0;
             (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
         });
     });
-    if (crossfade)
-        menu.addItem (tr ("Reset crossfade tension"), [edit, side] {
-            edit ([side] (Clip& c) { (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f; });
-        });
-    else
-        menu.addItem (tr ("Create crossfade"), false, false, [] {}); // (FL's handler, Tag 100, not read yet)
+    std::vector<int> menuClips; // FL's FUN_00cf9770: the selection when the clicked clip is in it, else the clicked clip
+    for (auto i : isSelected (index) ? selection : std::vector<int> { index })
+        if (i >= 0 && i < (int) song.playlist.size())
+            menuClips.push_back (i);
+    menu.addItem (tr ("Create crossfade"), clipops::canCreateCrossfade (song.playlist, menuClips, side, selection), false,
+                  [this, index, side, chosen = selection] {
+                      engine.editSong ([index, side, chosen] (Song& s) { clipops::createCrossfades (s.playlist, index, side, chosen); });
+                      repaint();
+                  });
     menu.addItem (tr ("Copy value"), [lengthMs] { copiedFadeMs = lengthMs; hasCopiedFade = true; });
     menu.addItem (tr ("Paste value"), hasCopiedFade, false, [setMs] { setMs (copiedFadeMs); });
     menu.addItem (tr ("Type in value..."), [lengthMs, setMs] {
@@ -6519,9 +6533,10 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
     return menu;
 }
 
-void PlaylistComponent::normalizeClips (const std::vector<int>& targets)
+void PlaylistComponent::normalizeClips (const std::vector<int>& targets, bool asGroup)
 {
-    // clip gain so that the peak of the played segment reaches 0 dB (at most +24 dB)
+    // FL's Normalize (round 189n, clipops::normalizeGain / groupNormalizeGain): the clip gain that brings the peak of the
+    // played part to 0 dB, each clip on its own (-96.1 ... +36 dB) or one gain for the whole group
     const auto& song = engine.getSong();
     std::vector<std::pair<int, float>> gainsFor;
 
@@ -6560,9 +6575,23 @@ void PlaylistComponent::normalizeClips (const std::vector<int>& targets)
                 for (auto f = (std::size_t) from; f < (std::size_t) to; ++f)
                     peak = juce::jmax (peak, std::abs (data[f]));
 
-        if (peak > 1.0e-6f)
-            gainsFor.push_back ({ i, juce::jmin (1.0f / peak, juce::Decibels::decibelsToGain (24.0f)) });
+        gainsFor.push_back ({ i, peak });
     }
+
+    if (asGroup)
+    {
+        std::vector<float> peaks;
+        for (auto [i, peak] : gainsFor)
+            peaks.push_back (peak);
+        const auto g = clipops::groupNormalizeGain (peaks);
+        if (g == 0.0f)
+            return;
+        for (auto& entry : gainsFor)
+            entry.second = g;
+    }
+    else
+        for (auto& [i, peak] : gainsFor)
+            peak = clipops::normalizeGain (peak, song.playlist[(std::size_t) i].gain);
 
     if (! gainsFor.empty())
         engine.editSong ([gainsFor] (Song& s) {

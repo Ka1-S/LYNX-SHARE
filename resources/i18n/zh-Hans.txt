@@ -8282,6 +8282,8 @@ countries: cn sg
 "Reset fade in" = "重置淡入"
 "Reset fade out" = "重置淡出"
 "Create crossfade" = "创建交叉淡化"
+"Normalize selection individually" = "分别标准化所选内容"
+"Normalize selection as a group" = "将所选内容作为一组标准化"
 "Convert to MIDI" = "转换为 MIDI"
 "Melody to new pattern" = "旋律到新 Pattern"
 "Harmony to new pattern" = "和声到新 Pattern"

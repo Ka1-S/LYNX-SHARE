@@ -8282,6 +8282,8 @@ countries: id
 "Reset fade in" = "Atur ulang fade in"
 "Reset fade out" = "Atur ulang fade out"
 "Create crossfade" = "Buat crossfade"
+"Normalize selection individually" = "Normalisasi pilihan satu per satu"
+"Normalize selection as a group" = "Normalisasi pilihan sebagai grup"
 "Convert to MIDI" = "Konversi ke MIDI"
 "Melody to new pattern" = "Melodi ke pattern baru"
 "Harmony to new pattern" = "Harmoni ke pattern baru"

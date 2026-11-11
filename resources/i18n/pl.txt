@@ -8282,6 +8282,8 @@ countries: pl
 "Reset fade in" = "Resetuj narastanie"
 "Reset fade out" = "Resetuj wyciszanie"
 "Create crossfade" = "Utwórz przenikanie"
+"Normalize selection individually" = "Normalizuj zaznaczenie osobno"
+"Normalize selection as a group" = "Normalizuj zaznaczenie jako grupę"
 "Convert to MIDI" = "Konwertuj na MIDI"
 "Melody to new pattern" = "Melodia do nowego patternu"
 "Harmony to new pattern" = "Harmonia do nowego patternu"

@@ -8365,6 +8365,8 @@ countries: br
 "Reset fade in" = "Redefinir fade in"
 "Reset fade out" = "Redefinir fade out"
 "Create crossfade" = "Criar crossfade"
+"Normalize selection individually" = "Normalizar seleção individualmente"
+"Normalize selection as a group" = "Normalizar seleção como grupo"
 "Convert to MIDI" = "Converter para MIDI"
 "Melody to new pattern" = "Melodia para novo pattern"
 "Harmony to new pattern" = "Harmonia para novo pattern"

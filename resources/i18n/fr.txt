@@ -8282,6 +8282,8 @@ countries: fr be ch ca lu
 "Reset fade in" = "Réinitialiser le fondu d'entrée"
 "Reset fade out" = "Réinitialiser le fondu de sortie"
 "Create crossfade" = "Créer un fondu enchaîné"
+"Normalize selection individually" = "Normaliser la sélection individuellement"
+"Normalize selection as a group" = "Normaliser la sélection en groupe"
 "Convert to MIDI" = "Convertir en MIDI"
 "Melody to new pattern" = "Mélodie vers un nouveau pattern"
 "Harmony to new pattern" = "Harmonie vers un nouveau pattern"

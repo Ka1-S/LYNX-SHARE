@@ -117,6 +117,10 @@ public:
     juce::PopupMenu editMenu();
     // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
     juce::PopupMenu fadeHandleMenu (int index, int side);
+    // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
+    // --snapshot, which also sets the selection it reads (selectForSnapshot)
+    juce::PopupMenu gainMenu (int index);
+    void selectForSnapshot (std::vector<int> indices) { setSelection (std::move (indices)); }
     juce::PopupMenu selectMenu();
     // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
@@ -376,7 +380,7 @@ private:
     void deleteSelection();
     void copySelection();
     void pasteClips (std::int64_t at = -1);
-    void normalizeClips (const std::vector<int>& targets);
+    void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)

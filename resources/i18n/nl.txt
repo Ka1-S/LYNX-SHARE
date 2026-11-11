@@ -8282,6 +8282,8 @@ countries: nl be
 "Reset fade in" = "Fade-in herstellen"
 "Reset fade out" = "Fade-out herstellen"
 "Create crossfade" = "Crossfade maken"
+"Normalize selection individually" = "Selectie afzonderlijk normaliseren"
+"Normalize selection as a group" = "Selectie als groep normaliseren"
 "Convert to MIDI" = "Omzetten naar MIDI"
 "Melody to new pattern" = "Melodie naar nieuw pattern"
 "Harmony to new pattern" = "Harmonie naar nieuw pattern"

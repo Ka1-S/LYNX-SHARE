@@ -8282,6 +8282,8 @@ countries: tr
 "Reset fade in" = "Girişte açılmayı sıfırla"
 "Reset fade out" = "Çıkışta kapanmayı sıfırla"
 "Create crossfade" = "Çapraz geçiş oluştur"
+"Normalize selection individually" = "Seçimi tek tek normalleştir"
+"Normalize selection as a group" = "Seçimi grup olarak normalleştir"
 "Convert to MIDI" = "MIDI'ye dönüştür"
 "Melody to new pattern" = "Melodiyi yeni pattern'e"
 "Harmony to new pattern" = "Armoniyi yeni pattern'e"

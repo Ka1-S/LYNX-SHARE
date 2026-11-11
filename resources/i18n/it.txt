@@ -8282,6 +8282,8 @@ countries: it ch sm
 "Reset fade in" = "Reimposta dissolvenza in entrata"
 "Reset fade out" = "Reimposta dissolvenza in uscita"
 "Create crossfade" = "Crea dissolvenza incrociata"
+"Normalize selection individually" = "Normalizza la selezione singolarmente"
+"Normalize selection as a group" = "Normalizza la selezione come gruppo"
 "Convert to MIDI" = "Converti in MIDI"
 "Melody to new pattern" = "Melodia in nuovo pattern"
 "Harmony to new pattern" = "Armonia in nuovo pattern"
