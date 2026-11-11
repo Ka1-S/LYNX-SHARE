@@ -4839,7 +4839,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 void PlaylistComponent::postDragHint()
 {
     const auto& song = engine.getSong();
-    const auto count = juce::String ((int) juce::jmax<std::size_t> (1, dragIndices.size()));
+    const auto count = juce::String ((int) std::max<std::size_t> (1, dragIndices.size()));
     auto position = [&song] (std::int64_t tick) {
         const auto bar = song.barAt (juce::jmax<std::int64_t> (0, tick));
         const auto beat = (tick - bar.tick) / ppq + 1;

@@ -113,7 +113,7 @@ const natives::FlAccess& flStudioAccess()
             const auto folder = PluginHost::settingsFolder().getChildFile ("flp-embedded");
             folder.createDirectory();
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
-                juce::String::createStringFromData (wav.data(), (int) juce::jmin<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
+                juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
             if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
@@ -3358,7 +3358,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             const auto folder = PluginHost::settingsFolder().getChildFile ("flp-embedded");
             folder.createDirectory();
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
-                juce::String::createStringFromData (wav.data(), (int) juce::jmin<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
+                juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
 

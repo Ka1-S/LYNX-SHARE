@@ -2229,7 +2229,7 @@ public:
                     peaks.assign (count, 0.0f);
                     const auto* l = sample->leftData();
                     const auto* r = sample->rightData();
-                    const auto stride = juce::jmax<std::size_t> (1, frames / (count * 64)); // look at up to 64 points per peak
+                    const auto stride = std::max<std::size_t> (1, frames / (count * 64)); // look at up to 64 points per peak
 
                     for (std::size_t i = 0; i < count; ++i)
                     {

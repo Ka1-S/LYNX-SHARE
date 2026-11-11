@@ -2448,7 +2448,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 {
     const auto& notes = currentPattern (engine.getSong()).notes;
-    const auto count = juce::String ((int) juce::jmax<std::size_t> (1, dragIndices.size()));
+    const auto count = juce::String ((int) std::max<std::size_t> (1, dragIndices.size()));
     auto steps = [] (std::int64_t ticks) {
         const auto value = (double) ticks / ticksPerStep;
         return (value > 0 ? "+" : "") + juce::String (value, std::abs (value - std::round (value)) < 1e-9 ? 0 : 2);

@@ -6811,7 +6811,7 @@ private:
                 s2 = s1;
                 s1 = s0;
             }
-            const auto a = std::sqrt (juce::jmax (0.0, s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2)) * 2.0 / (double) juce::jmax<std::size_t> (1, x.size());
+            const auto a = std::sqrt (juce::jmax (0.0, s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2)) * 2.0 / (double) std::max<std::size_t> (1, x.size());
             return a > 1e-7 ? 20.0 * std::log10 (a) : -140.0;
         };
         auto ok = true;
