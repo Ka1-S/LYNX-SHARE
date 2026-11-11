@@ -8572,3 +8572,13 @@ countries: id
 "Save sample as" = "Simpan sampel sebagai"
 "Save sample as..." = "Simpan sampel sebagai..."
 "Zoom on selection" = "Zoom ke pilihan"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Tambah region..."
+"Select after current selection" = "Pilih setelah pilihan saat ini"
+"Select before current selection" = "Pilih sebelum pilihan saat ini"
+"Select next region" = "Pilih region berikutnya"
+"Select previous region" = "Pilih region sebelumnya"
+"Select zoomed part" = "Pilih bagian yang di-zoom"
+"Zoom on left of selection" = "Zoom ke kiri pilihan"
+"Zoom on right of selection" = "Zoom ke kanan pilihan"

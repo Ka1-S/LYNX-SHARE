@@ -28,6 +28,9 @@ struct DeckAudio
     std::int64_t frames = 0;
     double sampleRate = 44100.0;
     std::vector<WavRegion> regions;
+    // the sample's own beat count for a deck whose WAV is not in the state (the file's ACID beat count, else FL's
+    // guess from its length); 0 = unknown, the state's saved range is used as before (round 190aj)
+    double beats = 0.0;
 };
 // Regions for a sample that only has marker positions (its cue points): each runs to the next one
 std::vector<WavRegion> regionsFromMarkers (const std::vector<std::int64_t>& starts, std::int64_t frames);

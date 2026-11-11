@@ -81,6 +81,7 @@
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
 #include "ui/FlVoicePanel.h"
+#include "ui/SlicexEditor.h"
 #include "core/LynxBanks.h"
 #include "core/NativeEngines.h"
 #include "ui/ControllerEditors.h"
@@ -643,6 +644,18 @@ public:
                                         setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
                                         quit();
                                     });
+            return;
+        }
+
+        if (args.contains ("--slicexedittest"))
+        {
+            // LYNX --slicexedittest project script.txt report.txt [png-prefix] (round 190aj): the Slicex editor of the
+            // project's first Slicex channel, off screen, driven by the script's commands (ui/SlicexEditor.h; mouse
+            // gestures at fractions of the deck's width, the menu entries, shortcuts). The report holds each command
+            // and what the state held after it; "shot <name>" writes <png-prefix><name>.png.
+            const auto i = args.indexOf ("--slicexedittest");
+            runSlicexEditTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), juce::File (args[i + 3].unquoted()),
+                               args.size() > i + 4 ? args[i + 4].unquoted() : juce::String());
             return;
         }
 
@@ -6951,6 +6964,69 @@ private:
     }
 
     // --cliplooptest (round 167q): see the command line above.
+    // --slicexedittest (round 190aj): see the command line above
+    void runSlicexEditTest (const juce::File& project, const juce::File& script, const juce::File& report, const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray lines;
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (1280, 720);
+            ui.openFile (project);
+            offline.dispatchPendingMessages();
+            int channel = -1;
+            for (int c = 0; c < (int) offline.getSong().channels.size() && channel < 0; ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::slicex)
+                    channel = c;
+            if (channel < 0)
+                lines.add ("no Slicex channel in " + project.getFullPathName());
+            else
+            {
+                auto panel = lynx::makeChannelSettingsPanel (offline, channel);
+                juce::Component frame;
+                frame.setSize (panel->getWidth(), panel->getHeight());
+                frame.setOpaque (true);
+                frame.addAndMakeVisible (*panel);
+                panel->setTopLeftPosition (0, 0);
+                offline.dispatchPendingMessages();
+                juce::StringArray commands;
+                script.readLines (commands);
+                for (const auto& raw : commands)
+                {
+                    const auto command = raw.trim();
+                    if (command.isEmpty() || command.startsWith ("#"))
+                    {
+                        lines.add (command);
+                        continue;
+                    }
+                    if (command.startsWith ("shot "))
+                    {
+                        juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
+                        {
+                            juce::Graphics g (image);
+                            g.fillAll (lynx::theme::panel);
+                            frame.paintEntireComponent (g, false);
+                        }
+                        const juce::File file (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png");
+                        file.deleteFile();
+                        juce::PNGImageFormat png;
+                        if (auto out = file.createOutputStream())
+                            png.writeImageToStream (image, *out);
+                        lines.add (command + " -> " + file.getFileName());
+                        continue;
+                    }
+                    const auto result = lynx::slicexEditorTest (*panel, command);
+                    offline.dispatchPendingMessages();
+                    lines.add (command + " -> " + result);
+                }
+            }
+        }
+        report.replaceWithText (lines.joinIntoString ("\n") + "\nresult=DONE\n");
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+        quit();
+    }
+
     // --slicexkeytest (round 190ac): see the command line above
     void runSlicexKeyTest (const juce::File& report)
     {

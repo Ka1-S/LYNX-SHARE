@@ -8572,3 +8572,13 @@ countries: tr
 "Save sample as" = "Örneği farklı kaydet"
 "Save sample as..." = "Örneği farklı kaydet..."
 "Zoom on selection" = "Seçime yakınlaştır"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Bölge ekle..."
+"Select after current selection" = "Geçerli seçimden sonrasını seç"
+"Select before current selection" = "Geçerli seçimden öncesini seç"
+"Select next region" = "Sonraki bölgeyi seç"
+"Select previous region" = "Önceki bölgeyi seç"
+"Select zoomed part" = "Yakınlaştırılan bölümü seç"
+"Zoom on left of selection" = "Seçimin soluna yakınlaştır"
+"Zoom on right of selection" = "Seçimin sağına yakınlaştır"

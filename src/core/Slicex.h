@@ -131,6 +131,13 @@ struct Deck
     // the sample's beat count: the embedded WAV's own (FL writes it there, ACID chunk; also for a sample that came
     // without one), else the saved view range (a deck by reference, as LYNX writes one: its whole length)
     double beats() const noexcept;
+    // the editor's selection, in beats of the sample's grid like the shown range (start, end), −1 / −1 = none
+    // (round 190aj, FL's own saves: a drag over 160 px of a deck showing 0.576…7.421 beats saved 1.78309…3.31693)
+    double selectionStart() const noexcept;
+    double selectionEnd() const noexcept;
+    bool hasSelection() const noexcept;
+    // FL's View ▸ Loop (the loop points are drawn; "Set loop" switches it on)
+    bool showsLoop() const noexcept { return params[0x36] != 0; }
     bool operator== (const Deck&) const = default;
 };
 
@@ -187,6 +194,24 @@ State fresh();
 void setDeckFile (State& state, int deck, const std::string& path, int regions);
 // the deck's shown range in beats (Deck::beatStart / beatEnd); for a deck without an embedded WAV also its beat count
 void setDeckBeats (State& state, int deck, double start, double end);
+// The beat count a deck plays and shows its tempo with: the embedded WAV's own; for a deck by reference the sample
+// file's (`fileBeats`: SlicexInstrument's sampleBeats(), 0 = not known); else the saved range (round 190aj: the saved
+// range is the editor's zoom, so it only stands in when nothing else says the beat count)
+double deckBeats (const Deck& deck, double fileBeats) noexcept;
+// the editor's selection of a deck in beats, as FL keeps it: sorted; an empty one (from == to) is none, −1 / −1
+void setDeckSelection (State& state, int deck, double from, double to);
+// The frames a range in beats covers, as FL turns a selection into a region or a loop: [first, last + 1), each end
+// rounded to the nearest frame (round 190aj: 1.4117647…2.1960784 beats of a 44 100 frames-a-beat sample became the
+// region 62259…96846, and 2.5322129…3.6526611 the loop 111671…161081)
+struct FrameRange { std::int64_t first = 0, end = 0; };
+FrameRange framesOf (double fromBeats, double toBeats, double framesPerBeat, std::int64_t frames) noexcept;
+
+// One step of FL's "Zoom in" / "Zoom out": the shown length × 2^∓0.225 about its centre (round 190aj: two steps from
+// 0…8 beats saved 1.0718286…6.9281714)
+inline constexpr double zoomStep = 0.8555950256826;
+// "Zoom on left / right of selection": FL shows half a frame a pixel (357 frames across its 714 pixels) centred on
+// that edge of the selection
+inline constexpr double zoomEdgeFramesPerPixel = 0.5;
 
 // The beat count FL gives a loaded sample that carries no tempo (no ACID beat count): the power of two that puts its
 // tempo in 80 < BPM ≤ 160 (round 190ac, nine files loaded in FL: 3.000 s → 8 beats = 160 BPM, 2.981 s → 4 = 80.5,
@@ -221,6 +246,11 @@ std::vector<std::uint8_t> withRegionKeys (const std::vector<std::uint8_t>& wav, 
 // lays out as cue, LIST/adtl, tlst): what the editor's rename / delete / clone / move / add do. The regions are
 // written in the order given (sample order, as wavRegions() returns them). An empty result: `wav` is not a WAV.
 std::vector<std::uint8_t> withRegions (const std::vector<std::uint8_t>& wav, const std::vector<WavRegion>& regions);
+// The loop points of a WAV (its sampler chunk's first loop): first and last frame; false without one
+bool wavLoop (const std::vector<std::uint8_t>& wav, std::int64_t& first, std::int64_t& last);
+// The WAV with its loop set (FL's "Set loop"): the sampler chunk's loop rewritten, or a sampler chunk with one loop
+// added after the audio when the file has none. An empty result: `wav` is not a WAV with audio.
+std::vector<std::uint8_t> withLoop (const std::vector<std::uint8_t>& wav, std::int64_t first, std::int64_t last);
 // FL's name for a region without one: "Marker #n" / "Region #n"
 std::string regionName (const WavRegion& r, int index);
 

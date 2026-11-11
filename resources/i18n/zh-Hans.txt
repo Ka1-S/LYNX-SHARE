@@ -8572,3 +8572,13 @@ countries: cn sg
 "Save sample as" = "采样另存为"
 "Save sample as..." = "采样另存为..."
 "Zoom on selection" = "缩放到选区"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "添加区域..."
+"Select after current selection" = "选择当前选区之后"
+"Select before current selection" = "选择当前选区之前"
+"Select next region" = "选择下一个区域"
+"Select previous region" = "选择上一个区域"
+"Select zoomed part" = "选择缩放部分"
+"Zoom on left of selection" = "缩放到选区左侧"
+"Zoom on right of selection" = "缩放到选区右侧"

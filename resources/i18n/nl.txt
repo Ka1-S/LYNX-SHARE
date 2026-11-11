@@ -8572,3 +8572,13 @@ countries: nl be
 "Save sample as" = "Sample opslaan als"
 "Save sample as..." = "Sample opslaan als..."
 "Zoom on selection" = "Zoomen op selectie"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Regio toevoegen..."
+"Select after current selection" = "Na huidige selectie selecteren"
+"Select before current selection" = "Voor huidige selectie selecteren"
+"Select next region" = "Volgende regio selecteren"
+"Select previous region" = "Vorige regio selecteren"
+"Select zoomed part" = "Ingezoomd deel selecteren"
+"Zoom on left of selection" = "Zoomen op linkerkant van selectie"
+"Zoom on right of selection" = "Zoomen op rechterkant van selectie"

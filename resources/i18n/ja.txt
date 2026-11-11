@@ -8572,3 +8572,13 @@ countries: jp
 "Save sample as" = "サンプルに名前を付けて保存"
 "Save sample as..." = "サンプルに名前を付けて保存..."
 "Zoom on selection" = "選択範囲にズーム"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "リージョンを追加..."
+"Select after current selection" = "現在の選択範囲より後を選択"
+"Select before current selection" = "現在の選択範囲より前を選択"
+"Select next region" = "次のリージョンを選択"
+"Select previous region" = "前のリージョンを選択"
+"Select zoomed part" = "ズーム部分を選択"
+"Zoom on left of selection" = "選択範囲の左端にズーム"
+"Zoom on right of selection" = "選択範囲の右端にズーム"

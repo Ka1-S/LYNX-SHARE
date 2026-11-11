@@ -8572,3 +8572,13 @@ countries: tw hk mo
 "Save sample as" = "取樣另存為"
 "Save sample as..." = "取樣另存為..."
 "Zoom on selection" = "縮放至選取範圍"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "新增區域..."
+"Select after current selection" = "選取目前選取範圍之後"
+"Select before current selection" = "選取目前選取範圍之前"
+"Select next region" = "選取下一個區域"
+"Select previous region" = "選取上一個區域"
+"Select zoomed part" = "選取縮放部分"
+"Zoom on left of selection" = "縮放至選取範圍左側"
+"Zoom on right of selection" = "縮放至選取範圍右側"

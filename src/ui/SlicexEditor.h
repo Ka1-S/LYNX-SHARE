@@ -18,4 +18,8 @@ struct Song;
 
 // `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)
 std::unique_ptr<juce::Component> makeSlicexEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel);
+
+// The editor test (LYNX --slicexedittest, round 190aj): one command for the Slicex editor inside `root` (the channel's
+// settings panel), on its current deck; the result as text. The commands are listed at SlicexEditor::test.
+juce::String slicexEditorTest (juce::Component& root, const juce::String& command);
 } // namespace lynx

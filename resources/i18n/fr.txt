@@ -8572,3 +8572,13 @@ countries: fr be ch ca lu
 "Save sample as" = "Enregistrer l'échantillon sous"
 "Save sample as..." = "Enregistrer l'échantillon sous..."
 "Zoom on selection" = "Zoomer sur la sélection"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Ajouter une région..."
+"Select after current selection" = "Sélectionner après la sélection actuelle"
+"Select before current selection" = "Sélectionner avant la sélection actuelle"
+"Select next region" = "Sélectionner la région suivante"
+"Select previous region" = "Sélectionner la région précédente"
+"Select zoomed part" = "Sélectionner la partie zoomée"
+"Zoom on left of selection" = "Zoomer sur la gauche de la sélection"
+"Zoom on right of selection" = "Zoomer sur la droite de la sélection"

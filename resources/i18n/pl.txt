@@ -8572,3 +8572,13 @@ countries: pl
 "Save sample as" = "Zapisz próbkę jako"
 "Save sample as..." = "Zapisz próbkę jako..."
 "Zoom on selection" = "Powiększ zaznaczenie"
+
+# --- Slicex editor (round 190aj)
+"Add region..." = "Dodaj region..."
+"Select after current selection" = "Zaznacz za bieżącym zaznaczeniem"
+"Select before current selection" = "Zaznacz przed bieżącym zaznaczeniem"
+"Select next region" = "Zaznacz następny region"
+"Select previous region" = "Zaznacz poprzedni region"
+"Select zoomed part" = "Zaznacz powiększoną część"
+"Zoom on left of selection" = "Powiększ lewy brzeg zaznaczenia"
+"Zoom on right of selection" = "Powiększ prawy brzeg zaznaczenia"
