@@ -2193,6 +2193,39 @@ voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8,
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
 
+## Round 190ar, part 2: Apex Limiter, the levelling stage
+
+Measured black-box (public parameters only) on a limiter that has a threshold under its ceiling (round trial190k's
+probes: 1 kHz stairs, tone bursts and the recovery after them). Apex could only be a brickwall: with the threshold
+matched by its ceiling it clamped every transient, and came out 8 … 11 dB lower in peak and 2 … 4 dB lower in level
+on programme. What the reference does:
+
+- above the threshold (default −12 dB) the steady level is held at the threshold, with a slow attack — about 9 ms in
+  its transparent style, under 1 ms in the other — and an exponential release that is the release control;
+- the ceiling only catches what the slow attack lets through.
+
+`Level threshold` and `Level attack` (new parameters; the threshold is **off by default**: every existing project and
+new instance sounds as before) add that stage in front of the limiter: the linked peak after the input gain, over the
+threshold (0 … −36 dB), ∞ : 1 with a 6 dB knee, one-pole attack (0.1 … 100 ms, default 9 ms), released with the
+limiter's Release. No extra latency; the gain reduction meter shows both. Render time of a 35 s file 0.52 … 0.57 s
+before, 0.52 … 0.55 s with the stage off, 0.55 … 0.62 s with it on.
+
+Scores with matched settings (the setting map of round 190ar fitted again on the probes with the two new parameters;
+before = the brickwall's own best map):
+
+| Reference kind | Bank | Files | Before → after | Null | Level error | Up / same / down |
+|---|---|---|---|---|---|---|
+| Limiter with threshold and ceiling | tp172c | 16 | 3.25 → 4.94 | −11.8 → −17.0 dB | 2.4 → 0.9 dB | 14 / 1 / 1 |
+| | programme 182 | 20 | 3.35 → 5.65 | −11.3 → −21.5 dB | 2.5 → 0.5 dB | 17 / 3 / 0 |
+
+One file went down (the fast style on tone bursts, 5 → 3). With the stage off, 28 of 28 renders of the round's Apex
+maps are byte-identical to before.
+
+Not done: the stage has no control in Apex's editor yet (the parameters are there for automation, presets and the
+plugin substitutes; the editor needs a place for them and a look at the shots). The fit's first run stayed in the
+brickwall solution (ceiling = threshold, stage off: 3.12 / 3.35); the map above starts from ceiling near 0 dB and the
+threshold at −12 dB. Not modelled: the reference's fast style shapes bursts differently in the first milliseconds.
+
 ## Round 180c: Merge similar pattern clips, Merge automation clips (issue #74)
 
 FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.
