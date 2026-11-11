@@ -167,7 +167,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Drumaxx engine | Drumaxx | Exact | all 133 states on random notes; its pattern sequencer and separate outputs are not played |
 | Slayer engine † | FL Slayer | Exact | 64 presets and 340 random parameter sets; the engine's 5 ms control-grid phase depends on FL's history |
 | MiniSynth engine † | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB |
-| Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo falls back to the synth |
+| Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo's "Kepler-2" states run on the same port |
 | PoiZone engine | PoiZone | Near-exact | 384/385 presets bit-identical with the delay off; delay filters median −79 dB |
 | Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; needs the oscillator cycles of FL's `engine_x64.dll` (FL 2025 and 2026 builds; before 0.1.24 only FL 2026's) |
 | Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
@@ -187,7 +187,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | LYNX Soundfont | Fruity Soundfont Player (SoundFont Player) | Close | own SF2 / SF3 player (TinySoundFont parsing, LYNX SHARE voices): FL's state read (font, preset, envelope / LFO / cut-off overrides, send levels, options; REA_rodada158); preset search over all SoundFonts in the user's folders; "send to" a mixer insert, mod-wheel knob and FL's built-in reverb / chorus sound not reproduced (LYNX SHARE's own reverb / chorus) |
 | Built-in synth | FLEX | Approximate | FLEX packs are encrypted and never opened: a synth patch chosen by preset name |
 | Silent channel | Wasp / Wasp XT | Placeholder | silent in FL Studio 2026 (64-bit placeholder); state kept |
-| Silent channel | Fruity Dance | Placeholder | a visual plugin; state kept |
+| LYNX Dance | Fruity Dance | LYNX SHARE original | no sound, as in FL: LYNX SHARE's own animated dancer, its moves picked by the channel's notes; FL's saved state is read on import |
 
 ## Effects
 

@@ -378,7 +378,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 
 | ID | LYNX | Where / note |
 |---|---|---|
-| G1 | **Done** | F5 Playlist, F6 Channel Rack, F7 Piano Roll, F9 Mixer, Alt+F8 Browser **toggle and focus** floating panels (`ui/Workspace.*`, `core/Workspace.cpp` `Layout::toggle`). **F8 opens the quick-add palette** (`ui/QuickAddPalette.*`, P2). Keys checked on [DOC][sc] |
+| G1 | **Done** | F5 Playlist, F6 Channel Rack, F7 Piano Roll, F9 Mixer, Alt+F8 Browser **toggle and focus** floating panels (`ui/Workspace.*`, `core/Workspace.cpp` `Layout::toggle`). **F8 opens the Plugin picker** (`ui/PluginPickerView.*`, round 171c); the quick-add palette (`ui/QuickAddPalette.*`, P2) has no default key since then: `Edit › Quick-add palette...`, or a right-click on the toolbar's plugin-picker button. Keys checked on [DOC][sc] |
 | G2 | No | No F12 family; Esc only deselects inside the editors |
 | G3 | **Done** (shell + P2) | Workspace desktop: panels move by their title strip, resize by their edges, overlap, maximise (button or double-click on the title) and **detach** into a native window and back. Snapping to other panels and the edges (`workspace::snap`); Alt while dragging turns it off, as on [DOC][iface]. **Detached windows snap too** (to the screen, the main window and each other; `SnapConstrainer` in `ui/Workspace.cpp`). Plugin, settings and automation windows stay native windows |
 | G4 | **Done** | View → Reset layout, Save layout as…, Load layout (`%APPDATA%\LYNX\layouts\*.txt`), Bring back off-screen panels. The current layout is saved in the user settings (`workspace.txt`), not the project |
@@ -540,7 +540,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | B6 | **Done** | **Search box (Ctrl+F)** under the folder list: searches the current folder and below in the background (up to 500 results), words AND-ed, OR, NOT / -word, "exact phrase", * and ? wildcards (`core/SearchQuery`); Esc clears. No F2/F3 stepping |
 | B7 | Partial | Root-folder combo (`BrowserComponent.cpp:80-91`); no tabs, user folders, tags or favourites |
 | B8 | No | — |
-| B9 | **Done** | **Quick-add palette (F8)**: instruments (built-in and scanned plugins) and effects side by side, filtered as you type, Enter/double-click adds an instrument as a new channel or an effect into the selected insert; opened from the Mixer it starts on the effects |
+| B9 | **Done** | **Quick-add palette** (`Edit › Quick-add palette...`, or right-click the toolbar's plugin-picker button; F8 opens the Plugin picker since round 171c): instruments (built-in and scanned plugins) and effects side by side, filtered as you type, Enter/double-click adds an instrument as a new channel or an effect into the selected insert; opened from the Mixer it starts on the effects |
 | B10 | Partial | Fixed left panel (detachable as a workspace panel); **user folders through "Add folder…" in the folder list** (kept in `browser-folders.txt`). No back/forward |
 
 **Plugin windows**
@@ -706,9 +706,9 @@ search stepping, instrument drops on mixer inserts, record filters for automatio
   - User folders.
   - **Status:** Done (effect presets drop on the effects panel, generators on a strip or its effect slots). Plain Up/Down
     preview, Shift+Up/Down load into the selected channel (checked on [DOC][br]).
-- **Quick-add palette (B9).** A searchable plugin list (F8 in LYNX) with instruments and effects. Double-click
+- **Quick-add palette (B9).** A searchable plugin list with instruments and effects. Double-click
   adds it to a new channel or to the selected insert, depending on which panel is focused.
-  - **Status:** Done (F8 and the toolbar's plugin-picker icon; the Browser moved to Alt+F8).
+  - **Status:** Done (`Edit › Quick-add palette...` and a right-click on the toolbar's plugin-picker icon; F8 opens the Plugin picker since round 171c; the Browser moved to Alt+F8).
 - **History panel (G13).** A list of undo steps with names (the action labels already passed to `editSong`).
   Clicking a step jumps there. Keep conventional undo (Ctrl+Z back, Ctrl+Y/Ctrl+Shift+Z forward). FL's
   toggle-style undo is deliberately *not* copied.
