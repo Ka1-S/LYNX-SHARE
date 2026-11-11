@@ -468,6 +468,10 @@ enum Param
     // Auto (its editor moves Output −1.6 dB per Drive unit, as the reference's; no audio effect) and the Classic law
     // (1 = Punish's measured law; projects saved before round 165 keep round 136's +9.75 dB)
     classicAuto, classicLaw,
+    // round 190ar (appended; on for new instances): the Classic voicing's high-drive tables with the coupling ahead of
+    // the curve (core/EmberClassic.h: styles driven hard hold the reference's uneven square wave). Off = round
+    // trial187b's tables: what a project saved before loads with (upgradeLoadedEffectParams). Drives up to 5 ignore it.
+    classicHot,
     count
 };
 // round 165: an editor edit of `param` with the Classic voicing's Auto on also moves Output (the reference's link);
