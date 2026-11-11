@@ -1992,6 +1992,8 @@ Layout compressorLayout()
     // round 135w: the reference's ARC / Manual, Electro / Opto and Warm / Smooth switches (the vintage voicing's), and
     // its output limiter with the activity pill
     v.push_back (when (tabs (314, 108, 94, 20, "Release mode", TR_NOOP ("ARC|Manual")), "Voicing", 0.5f, 1.0f));
+    // round 190ar: the classic voicing's law (clean, or the FET-style knee and program-dependent release)
+    v.push_back (when (tabs (314, 108, 94, 20, "Classic law", TR_NOOP ("Clean|FET")), "Voicing", 0.0f, 0.5f));
     v.push_back (when (tabs (314, 132, 94, 20, "Release curve", TR_NOOP ("Electro|Opto")), "Voicing", 0.5f, 1.0f));
     v.push_back (when (tabs (314, 156, 94, 20, "Character", TR_NOOP ("Warm|Smooth")), "Voicing", 0.5f, 1.0f));
     v.push_back (toggle (314, 182, 94, 20, "Limiter", TR_NOOP ("Limiter")));

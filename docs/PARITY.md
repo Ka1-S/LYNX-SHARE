@@ -2167,6 +2167,37 @@ Sources (web): [Decapitator guide (B&H copy)](https://static.bhphoto.com/lit_fil
 
 ---
 
+## Round 190ar, part 2: Compressor, the classic voicing's FET law
+
+Measured black-box (public parameters only) on four FET-style compressor references' probe renders (round trial190k:
+1 kHz stairs, tone bursts of 10 ms … 2 s and the recovery after them). What the classic voicing could not do:
+
+- the recovery is not one time constant. Read off the gain after a 2 s burst, the reduction G (dB) falls per second by
+  about a · G + b · G²: a = 0.35 … 0.8 / s (a tail of 1.3 … 2.7 s whatever the release control says), b = 0 … 0.08 / (dB s)
+  growing with the release control. Deep reduction comes back fast, the last decibels slowly;
+- the knee is about 5 dB wide (0.6 dB of reduction at the threshold).
+
+`Classic law` (new parameter, **off by default**: every existing project and new instance sounds as before; the panel
+shows `Clean | FET` under the voicing tabs) adds that law to the classic voicing: a 5 dB knee, and per second the
+reduction falls by G / tail + G² / (10 dB · release), tail = the release time, at most 2.7 s. For small reductions that
+is the classic exponential release; at 10 dB it is twice as fast, at 20 dB three times. No latency, same CPU (render
+time of a 35 s file 0.16 … 0.18 s with the law off or on, as before). The vintage voicing and the upward expansion
+(ratio under 1) do not have it.
+
+Scores with matched settings (the setting maps of round 190ar fitted again on the probes, with the law on and the wide
+ranges; programme bank of round 182, 5 settings × 5 signals; before = the classic law's own best map):
+
+| Reference kind | Before → after | Null | Level error | Files up / same / down |
+|---|---|---|---|---|
+| FET compressor | 2.76 → 4.80 | −6.5 → −15.8 dB | 3.9 → 1.5 dB | 20 / 4 / 1 |
+| FET compressor, modern revision | 3.52 → 4.08 | −11.8 → −12.5 dB | 2.1 → 1.9 dB | 10 / 15 / 0 |
+| FET compressor, vintage revision | 3.08 → 5.00 | −8.2 → −16.4 dB | 3.2 → 1.3 dB | 17 / 7 / 1 |
+| FET compressor, all-buttons style | 3.60 → 4.28 | −10.3 → −13.2 dB | 1.9 → 1.2 dB | 14 / 7 / 4 |
+
+Not modelled: the faster recovery after bursts shorter than about 50 ms at the fastest release, the modern revision's
+two-stage attack (5 … 20 ms), the all-buttons style's overshoot in the first 100 ms. The law is not yet selected by the
+plugin substitutes (a project that used such a compressor still loads the classic law).
+
 ## Round tp172c: SSL Native Channel Strip 2 (Ridge Strip's Modern voicing)
 Sources: the official SSL trial (Native Channel Strip 2 v2.10, black-box only): its parameter table and read-outs, 30
 programme renders (defaults + 5 settings × drums / music / vocal / sweep / stair), 224 + 224 impulse renders on a dense

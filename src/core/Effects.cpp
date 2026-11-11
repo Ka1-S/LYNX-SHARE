@@ -306,6 +306,17 @@ public:
         const bool expand = ratio < 1.0f;
         const auto slope = expand ? 1.0f / ratio - 1.0f : 1.0f - 1.0f / ratio; // dB of change per dB over the threshold
         const auto thresholdGain = dbToGain (threshold);
+        // round 190ar: the classic voicing's FET law (off by default: nothing changes for existing projects). Measured
+        // black-box on FET-style compressors' tone-burst probes: a 5 dB knee, and a recovery that is not one time
+        // constant — deep reduction comes back fast, the last decibels slowly. Per second the reduction G (dB) falls by
+        // G / tail + G² / (10 dB · release), tail = the release time (at most 2.7 s): the classic exponential for
+        // small reductions, 2 × as fast at 10 dB, 3 × at 20 dB.
+        const bool fet = params[19] >= 0.5f && ! expand;
+        const auto fetReleaseS = (rc ? rcReleaseMs (params[17]) : compReleaseMs (params[3])) * 0.001;
+        const auto fetTail = (float) (1.0 / (std::min (fetReleaseS, 2.7) * sampleRate));
+        const auto fetDeep = (float) (1.0 / (10.0 * fetReleaseS * sampleRate));
+        constexpr float fetKnee = 5.0f;
+        const auto fetKneeGain = dbToGain (threshold - 0.5f * fetKnee);
         const auto sidechain = useSidechain;
         useSidechain = false;
         float peakIn = 0.0f, peakOut = 0.0f, maxGr = 0.0f;
@@ -321,11 +332,28 @@ public:
             // With sidechain, the detector listens to the other track (kick ducking)
             const auto peak = sidechain ? (sideL != nullptr ? std::max (std::abs (sideL[i]), std::abs (sideR[i])) : 0.0f)
                                         : std::max (std::abs (l[i]), std::abs (r[i]));
-            const auto reductionDb = peak > thresholdGain ? (gainToDb (peak) - threshold) * slope : 0.0f; // the change (≥ 0)
+            float reductionDb;
+            if (fet)
+            {
+                reductionDb = 0.0f;
+                if (peak > fetKneeGain)
+                {
+                    const auto over = gainToDb (peak) - threshold;
+                    reductionDb = slope * (over >= 0.5f * fetKnee ? over : (over + 0.5f * fetKnee) * (over + 0.5f * fetKnee) / (2.0f * fetKnee));
+                }
+                if (reductionDb > envelopeDb)
+                    envelopeDb = reductionDb + attack * (envelopeDb - reductionDb);
+                else
+                    envelopeDb = std::max (reductionDb, envelopeDb - envelopeDb * (fetTail + envelopeDb * fetDeep));
+            }
+            else
+            {
+                reductionDb = peak > thresholdGain ? (gainToDb (peak) - threshold) * slope : 0.0f; // the change (≥ 0)
 
-            // the envelope rises with the attack and falls with the release
-            const auto coeff = reductionDb > envelopeDb ? attack : release;
-            envelopeDb = reductionDb + coeff * (envelopeDb - reductionDb);
+                // the envelope rises with the attack and falls with the release
+                const auto coeff = reductionDb > envelopeDb ? attack : release;
+                envelopeDb = reductionDb + coeff * (envelopeDb - reductionDb);
+            }
 
             if (envelopeDb < 1.0e-4f)
                 envelopeDb = 0.0f; // no audible reduction: skip the pow
@@ -2628,7 +2656,10 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                   { "Ranges", 0.0f }, { "RC ratio", 0.625f }, { "RC gain", 0.5f }, { "RC attack", 0.5f }, { "RC release", 0.5f },
                                                   // round 152: the vintage voicing's static curve measured at every ratio (on for new
                                                   // instances; projects saved before keep the round-150 curve: upgradeLoadedEffectParams)
-                                                  { "Vintage curve", 1.0f } } };
+                                                  { "Vintage curve", 1.0f },
+                                                  // round 190ar: the classic voicing's law — clean (as before) or FET
+                                                  // (5 dB knee, program-dependent release); off: every project unchanged
+                                                  { "Classic law", 0.0f } } };
     static const EffectInfo delay { "Delay", { { "Time", 0.3f }, { "Feedback", 0.42f }, { "Mix", 0.3f }, { "Ping-pong", 0.0f }, { "Damping", 0.3f } } };
     static const EffectInfo reverb { "Reverb", { { "Room", 0.6f }, { "Damping", 0.5f }, { "Width", 1.0f }, { "Mix", 0.25f }, { "Dry", 1.0f },
                                                  { "Low cut", 0.0f }, { "High cut", 1.0f }, { "Predelay", 0.0f } } };
@@ -3485,6 +3516,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                 case 16: std::snprintf (text, sizeof (text), rcAttackMs (v) < 10.0f ? "%.2f ms" : "%.1f ms", rcAttackMs (v)); break;
                 case 17: std::snprintf (text, sizeof (text), rcReleaseMs (v) < 100.0f ? "%.1f ms" : "%.0f ms", rcReleaseMs (v)); break;
                 case 18: return v >= 0.5f ? "measured" : "round 150";
+                case 19: return v >= 0.5f ? "FET" : "clean";
                 default: std::snprintf (text, sizeof (text), "+%.1f dB", compMakeupDb (v)); break;
             }
             return text;
