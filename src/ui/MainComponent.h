@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ProjectKey.h"
 #include "core/Preferences.h"
 #include "core/ChordReadout.h"
 
@@ -10,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/UndoKeys.h"
 #include "core/LayoutStyle.h"
 #include "core/Performance.h"
 #include "ui/UiTrace.h"
@@ -108,6 +110,7 @@ public:
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -214,6 +217,7 @@ private:
     keys::TypingKey typingKey (const keys::Chord& chord) const; // what the typing keyboard does with it (nothing when off)
     void releaseTypingLaunches (bool all); // the released keys' launches (all: every one)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
+    int lastLinkedChannel = -1;  // (Auto select linked modules, round 187a)
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
     juce::String shortcutText (const char* actionId) const; // "\tF5" for menus ("" when unbound)
@@ -296,6 +300,10 @@ private:
     // FL's Edit › Undo (Ctrl+Z, round 167k): undoes the last step, or redoes one when something is undone (FL's
     // FUN_010173a0: history position 0 → 1, else position − 1); with "Alternate undo mode" a plain multi-level undo
     void flUndo();
+    // FL's Edit › Undo backwards (Ctrl+Alt+Z): one more step back; with "Alternate undo mode" the two shortcuts swap, so
+    // it undoes, or redoes when something is undone (round 190b, issue #140; core/UndoKeys.h)
+    void flUndoBackwards();
+    void runUndoStep (undokeys::Step step);
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
@@ -567,6 +575,14 @@ private:
     std::uint32_t chordNearHintUntil = 0;
     void updateChordPanel();
     void showChordPanelMenu();
+    // The project key (round 184a S11): the toolbar's Key panel and its menu. The Simple and Clip-launch workflows show the
+    // panel until the user shows or hides it by hand (then the toolbar layout decides, in every workflow).
+    toolbar::KeyPanel keyPanel;
+    bool keyPanelFollowsStyle = true;
+    void showKeyMenu();
+    juce::PopupMenu makeKeyMenu();
+    void refreshKeyPanel();
+    void setProjectKey (std::optional<projectkey::Key> key);
     void showChordText();
     void addAudioLoggerMenu (juce::PopupMenu& menu);
     void dumpAudioLog();

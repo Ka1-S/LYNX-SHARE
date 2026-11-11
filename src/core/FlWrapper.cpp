@@ -171,6 +171,8 @@ void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
         ref.sendLoopPosition = (w.wrapperFlags & 0x800u) != 0;
         ref.modXAftertouch = (w.wrapperFlags & 0x20000u) != 0;
         ref.resetOnFlush = (w.wrapperFlags & 0x02000000u) == 0;
+        // the window's Typing keyboard priority button off [DATA round 187a: kb-on.flp / kb-off2.flp, 0xB4007D8C -> 0xB5007D8C]
+        ref.hostKeysFirst = (w.wrapperFlags & 0x01000000u) != 0;
         if (w.hasWrapperFlags2)
         {
             ref.allNotesOffOnStop = (w.wrapperFlags2 & 0x1000u) == 0;
@@ -378,5 +380,35 @@ const std::vector<WrapperOption>& wrapperOptions()
         { "Compatibility", "Use maximum buffer size from host", "With fixed size buffers: prepare the plugin for the host's largest block", &PluginRef::hostMaxBuffer, true, true },
     };
     return options;
+}
+
+void trimOutputRoutes (std::vector<PluginOutputRoute>& routes)
+{
+    while (! routes.empty() && routes.back() == PluginOutputRoute {})
+        routes.pop_back();
+}
+
+void autoMapOutputs (std::vector<PluginOutputRoute>& routes, int count)
+{
+    if (count <= 0)
+        return;
+    if ((int) routes.size() < count)
+        routes.resize ((std::size_t) count);
+    const auto first = routes.front().offset;
+    for (int k = 0; k < count; ++k)
+        routes[(std::size_t) k].offset = std::clamp (first + k, -999, 999);
+    trimOutputRoutes (routes);
+}
+
+void resetOutputOffsets (std::vector<PluginOutputRoute>& routes, int count)
+{
+    for (int k = 0; k < std::min (count, (int) routes.size()); ++k)
+        routes[(std::size_t) k].offset = 0;
+    trimOutputRoutes (routes);
+}
+
+int outputTargetTrack (int channelTrack, const PluginOutputRoute& route, bool pluginDefault) noexcept
+{
+    return route.isActive (pluginDefault) ? channelTrack + route.offset : -1;
 }
 } // namespace lynx

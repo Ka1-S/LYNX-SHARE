@@ -2156,6 +2156,37 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     {
         const auto cc = m.getControllerNumber();
         controllerQueue.push ({ cc, m.getChannel() - 1, m.getControllerValue() });
+        // FL's "Foot pedal controls note off" (round 187a [DECOMP FUN_00fdb260]): with it on, CC 64 / CC 66 hold the
+        // played channels' notes and don't reach the plugins
+        if (const auto mode = PedalHold::modeFor (cc, m.getControllerValue()); mode >= 0 && footPedalNoteOff.load (std::memory_order_relaxed))
+        {
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto stamped = m.getTimeStamp() * 1000.0;
+            const auto tick = recordTickFor (std::abs (stamped - now) < 1000.0 ? stamped : now);
+            const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+            auto pedal = [&] (int channel) {
+                pedalHold.setMode (channel, mode, [&] (int key) {
+                    NoteEvent e;
+                    e.type = NoteEvent::Type::off;
+                    e.channel = channel;
+                    e.key = key;
+                    midiEvents.push (e);
+                    logPlayedNote (channel, key, 0.0f, false, transport.playing.load() ? tick : -1.0, taking);
+                    if (taking) // (the recorded note lasts until the pedal comes up, as in FL)
+                        midiRecordQueue.push ({ tick, channel, key, 0.0f, false });
+                });
+            };
+            if (device.target >= 0)
+                pedal (device.target);
+            else
+            {
+                const auto extra = juce::jlimit (0, maxLiveChannels, extraLiveCount.load());
+                for (int i = -1; i < extra; ++i)
+                    if (const auto channel = i < 0 ? liveChannel.load() : extraLiveChannels[(std::size_t) i].load(); channel >= 0)
+                        pedal (channel);
+            }
+            return;
+        }
         // (120…127 are channel mode messages: All Sound / Notes Off, reset…)
         if (cc >= 0 && cc < 120 && (linkedCcs[(std::size_t) (cc >> 6)].load (std::memory_order_relaxed) >> (cc & 63) & 1u) == 0)
             playControl (cc, (float) m.getControllerValue() / 127.0f);
@@ -2238,7 +2269,14 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         push (stale[i], false, 0.0f);
 
     for (int i = 0; i < count; ++i)
+    {
+        // the foot pedal (round 187a): a held note struck again is released first; a note-off it holds waits for it
+        if (on && pedalHold.noteOn (targets[i].channel, targets[i].key))
+            push (targets[i], false, 0.0f);
+        if (! on && pedalHold.noteOff (targets[i].channel, targets[i].key))
+            continue;
         push (targets[i], on, on ? prefs::mapVelocity (m.getFloatVelocity(), velocityCurve) : 0.0f);
+    }
 }
 
 void AudioEngine::enableAllMidiInputs()
@@ -2285,6 +2323,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         midiPrefsShared = p;
     }
     performanceMidiChannel.store (p.performanceChannel);
+    footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
         pickups.clear();
     if (prefetcher != nullptr) // (only with an audio device: the real app)
@@ -3507,6 +3546,24 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 
 void AudioEngine::publishSong()
 {
+    // Issue #134: a hosted plugin may run the message loop while it is created (a licence or trial box, COM, a splash
+    // window), and what that loop dispatches can ask for a publish while this one is still building its rack: the
+    // engine's own timer (after a device change to another sample rate it sees the old rate until this publish ends, so
+    // it started a second rebuild of every plugin inside the first one's, and another inside each of those, as deep as
+    // the plugins kept running the loop), or an edit. The nested one waits: when this publish is done, one more runs
+    // with the song as it then is.
+    if (publishing)
+    {
+        publishAgain = true;
+        ++nestedPublishes;
+        return;
+    }
+    publishing = true;
+    const juce::ScopeGuard published { [this] {
+        publishing = false;
+        if (std::exchange (publishAgain, false))
+            publishSong();
+    } };
     ++songStamp;
     ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
@@ -3590,8 +3647,16 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_stretch");
         return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
     };
-    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
-    factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
+    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeInstrument (ref, sr);
+    };
+    factories.pluginEffects = [this] (const PluginRef& ref, double sr) {
+        if (duringPluginCreation)
+            duringPluginCreation();
+        return plugins.makeEffect (ref, sr);
+    };
     factories.freshInstances = std::exchange (remoteFreshInstances, {});
 
     const auto buildStart = juce::Time::getMillisecondCounterHiRes();
@@ -4164,8 +4229,12 @@ void AudioEngine::timerCallback()
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.
     const auto rateChanged = std::abs (transport.sampleRate.load() - lastPublishedShape.sampleRate) > 0.5;
     const auto latencies = lastPublishedShape.currentLatencies();
-    if (rateChanged || latencies != lastPublishedShape.latencies)
+    if (! publishing && (rateChanged || latencies != lastPublishedShape.latencies)) // (not inside a publish: see publishSong)
     {
+        // the plugins made for the new rate start from what the running ones hold now (issue #134: they started from
+        // the state of the last save or export, so a device at another rate undid every change made in their windows)
+        if (rateChanged)
+            capturePluginStates();
         // (diagnostics: which unit's latency moved)
         if (! rateChanged)
             for (std::size_t i = 0; i < latencies.size() && i < lastPublishedShape.latencies.size(); ++i)

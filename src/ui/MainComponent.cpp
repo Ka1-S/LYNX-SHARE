@@ -8,6 +8,8 @@
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
+#include "core/KeyGuess.h"
+#include "core/ProjectKey.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
 #include "ui/UiTrace.h"
@@ -560,7 +562,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
-                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
+                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &keyPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
                                                              &multilinkButton })
     {
         addAndMakeVisible (c);
@@ -668,6 +670,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
+    keyPanel.onClick = [this] { showKeyMenu(); };
+    refreshKeyPanel();
     PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
         if (! chordPanel.isVisible())
             return;
@@ -759,6 +763,21 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     });
 
     // the keys a secondary window (tool, plugin, channel window) leaves unused run the global shortcuts, as in FL
+    // FL's Auto select linked modules [DECOMP FUN_00f5c340] (round 187a): a focused channel / plugin window selects its
+    // channel and that channel's mixer track; a mixer effect's window selects its track
+    setLinkedWindowFocusHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (int channel, int insert) {
+        if (safe == nullptr || ! ChannelRackComponent::autoSelectLinked)
+            return;
+        const auto& song = safe->engine.getSong();
+        if (channel >= 0 && channel < (int) song.channels.size())
+        {
+            if (safe->engine.getSelectedChannel() != channel || safe->engine.getSelectedChannels().size() != 1)
+                safe->engine.setSelectedChannel (channel);
+            insert = song.channels[(std::size_t) channel].mixerTrack;
+        }
+        if (insert >= 0 && insert < (int) song.mixer.size())
+            safe->mixer.selectTrack (insert);
+    });
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
@@ -785,6 +804,7 @@ MainComponent::~MainComponent()
     live.reset(); // (a session still on ends: the others are told)
     setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
     setSecondaryWindowKeyHandler (nullptr);
+    setLinkedWindowFocusHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
@@ -948,6 +968,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
     widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
+    widths[(std::size_t) Group::key] = 112; // "Key" over "C# harmonic minor" (round 184a S11; the name shrinks to fit)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -1136,6 +1157,7 @@ void MainComponent::resized()
                 case Group::output: hide ({ &output }); break;
                 case Group::chord: hide ({ &chordPanel }); break;
                 case Group::multilink: hide ({ &multilinkButton }); break;
+                case Group::key: hide ({ &keyPanel }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1237,6 +1259,7 @@ void MainComponent::resized()
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::multilink: put (multilinkButton, panel.withY (row1).withHeight (h)); break;
+            case Group::key: put (keyPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::count_: break;
         }
     }
@@ -1295,6 +1318,8 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
 void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool save)
 {
     const auto scaleChanged = layout.uiScale != toolbarLayout.uiScale;
+    if (save && layout.isShown (toolbarlayout::Group::key) != toolbarLayout.isShown (toolbarlayout::Group::key))
+        keyPanelFollowsStyle = false; // shown or hidden by hand (round 184a S11): the layout decides from now on
     toolbarLayout = layout;
     applyIconSizing (toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()));
 
@@ -1439,12 +1464,24 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::runUndoStep (undokeys::Step step)
+{
+    if (step != undokeys::Step::none)
+        undoRedo (step == undokeys::Step::redo);
+}
+
 void MainComponent::flUndo()
 {
-    if (alternateUndo)
-        undoRedo (false);
-    else
-        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+    // FL's default: undo, or redo when something is undone ("undo/redo on the same shortcut"); "Alternate undo mode":
+    // every press one more step back (core/UndoKeys.h)
+    runUndoStep (undokeys::undoKey (alternateUndo, engine.canUndo(), engine.canRedo()));
+}
+
+void MainComponent::flUndoBackwards()
+{
+    // FL's Undo backwards: one more step back; "Alternate undo mode" swaps the two shortcuts, so there it is the
+    // undo/redo key (round 190b)
+    runUndoStep (undokeys::backwardsKey (alternateUndo, engine.canUndo(), engine.canRedo()));
 }
 
 void MainComponent::undoRedo (bool redo)
@@ -1828,7 +1865,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
     else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
-    else if (is ("edit.undoBackwards")) undoRedo (false);
+    else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts"))
     {
@@ -2056,6 +2093,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "autoSelectLinked")
+            ChannelRackComponent::autoSelectLinked = on;
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
@@ -2104,6 +2143,9 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
+            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
+                                                                                                                  : pianokeys::Style::flat;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2124,10 +2166,14 @@ void MainComponent::loadUiSettings()
         }
         else if (key == "chordNearHint")
             chordShowNearHint = on;
+        else if (key == "keyPanelFollowsStyle")
+            keyPanelFollowsStyle = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
             autoclipplace::setAtPlayback (on);
+        else if (key == "disableTypingPriority")
+            pluginkeys::newPluginsHostFirst() = on;
         else if (key == "clipLaunchWorkflow") // (round 181a; applied when the window is ready; "layoutStyle" wins)
             startStyle.legacyFlag (on);
         else if (key == "layoutStyle") // (round 184a)
@@ -2287,6 +2333,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
@@ -2311,14 +2358,17 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
                                       + "\nchordDelayMs=" + juce::String ((std::int64_t) chordReadout.getDelayMs())
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
+                                      + "\nkeyPanelFollowsStyle=" + juce::String (keyPanelFollowsStyle ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
+                                      + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
                                       + "\nclipLaunchWorkflow=" + juce::String (layoutstyle::legacyClipLaunchFlag (layoutStyle) ? 1 : 0)
                                       + "\nlayoutStyle=" + layoutstyle::id (layoutStyle)
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
@@ -2646,8 +2696,18 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (findToolWindow ("sampleBrowser") == nullptr)
                 toggleSampleBrowser();
         };
-        host.trackAdded = [this] (int) { playlist.repaint(); };
+        host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+        // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
+        playlist.onTrackEffects = [this] (int insert) {
+            workspace.show (Panel::mixer);
+            mixer.selectTrack (insert);
+            refreshPanelButtons();
+        };
+        playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
+            if (simpleWorkflow != nullptr)
+                simpleWorkflow->dropFiles (files, tick);
+        };
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->left();
@@ -2703,8 +2763,20 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             flip->show (PlaylistArea::GridView::beside);
         workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
     }
+    // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
+    playlist.setSimpleHeaders (style == Style::simple);
+    playlistArea.setPickerHidden (style == Style::simple);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
+
+    // round 184a S11 (D15): the Key panel shows in the Simple and Clip-launch workflows, not in FL's Pattern workflow,
+    // until the user shows or hides it by hand
+    if (keyPanelFollowsStyle && toolbarLayout.isShown (toolbarlayout::Group::key) != (style != Style::pattern))
+    {
+        toolbarLayout.setShown (toolbarlayout::Group::key, style != Style::pattern);
+        resized();
+        repaint();
+    }
 }
 
 void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
@@ -4110,6 +4182,16 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    // FL's Auto select linked modules [DECOMP FUN_00ffe510 -> FUN_011e84e0] (round 187a): selecting one channel selects
+    // its mixer track
+    if (const auto selected = engine.getSelectedChannel(); selected != lastLinkedChannel)
+    {
+        lastLinkedChannel = selected;
+        if (ChannelRackComponent::autoSelectLinked && selected >= 0 && selected < (int) song.channels.size() && engine.getSelectedChannels().size() == 1)
+            if (const auto insert = song.channels[(std::size_t) selected].mixerTrack; insert >= 0 && insert < (int) song.mixer.size()
+                                                                                       && insert != mixer.getStripsForSnapshot().getSelectedTrack())
+                mixer.selectTrack (insert);
+    }
     if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->songChanged(); // (an empty project opens on the New track chooser)
     // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
@@ -4143,6 +4225,7 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     if ((int) song.channels.size() != fittedChannelCount && fittedChannelCount >= 0) // a row was added or removed
         fitChannelRack (false);
 
+    refreshKeyPanel(); // (undo, another project; cheap: it repaints only on a change)
     if (namesChanged || patternBox.getSelectedItemIndex() != song.currentPattern || std::abs (swingSlider.getValue() - song.swing) > 1e-6)
         refreshToolbar();
     else
@@ -4635,6 +4718,81 @@ void MainComponent::showChordPanelMenu()
     delayItem (tr ("5 seconds"), 5);
     delayItem (tr ("Show forever"), chordread::foreverSeconds);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&chordPanel));
+}
+
+namespace
+{
+// "A minor", "C# Dorian": the root and the short scale name (round 184a S11)
+juce::String keyLabel (const projectkey::Key& key)
+{
+    return juce::String (projectkey::rootName (key.root)) + " " + tr (juce::String (projectkey::shortScaleName (key.flScale)));
+}
+} // namespace
+
+void MainComponent::refreshKeyPanel()
+{
+    const auto key = projectkey::get (engine.getSong());
+    keyPanel.setText (key ? keyLabel (*key) : juce::String());
+}
+
+void MainComponent::setProjectKey (std::optional<projectkey::Key> key)
+{
+    if (projectkey::get (engine.getSong()) == key)
+        return;
+    engine.editSong ([key] (Song& s) { projectkey::set (s, key); }); // one undo step; no note moves
+    refreshKeyPanel();
+    pianoRoll.repaint(); // (its scale highlight is this key)
+}
+
+// The Key menu (round 184a S11, design §3.1): the best guesses from the song's notes, the root, the scale (the common ones,
+// then "More scales"), and None. Every choice writes the one stored key, FL's project scale (.flp 0xF3).
+void MainComponent::showKeyMenu()
+{
+    makeKeyMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyPanel));
+}
+
+juce::PopupMenu MainComponent::makeKeyMenu()
+{
+    const auto current = projectkey::get (engine.getSong());
+    juce::PopupMenu menu;
+
+    menu.addSectionHeader (tr ("Guess from notes"));
+    const auto guesses = keyguess::guess (engine.getSong(), 3);
+    if (guesses.empty())
+        menu.addItem (tr ("No notes to guess from yet"), false, false, [] {});
+    for (const auto& g : guesses)
+        menu.addItem (keyLabel (g.key) + "   (" + tr ("{0} of {1} notes in scale", { juce::String (g.notesInScale), juce::String (g.notes) }) + ")",
+                      true, current == g.key, [this, key = g.key] { setProjectKey (key); });
+
+    const auto root = current ? current->root : 0;
+    const auto scale = current ? current->flScale : projectkey::commonFirst().front(); // (no key yet: Major)
+    menu.addSectionHeader (tr ("Root"));
+    juce::PopupMenu roots;
+    for (int r = 0; r < 12; ++r)
+        roots.addItem (juce::String (projectkey::rootName (r)), true, current && current->root == r,
+                       [this, r, scale] { setProjectKey (projectkey::Key { r, scale }); });
+    menu.addSubMenu (current ? juce::String (projectkey::rootName (root)) : tr ("Choose the root"), roots);
+
+    menu.addSectionHeader (tr ("Scale"));
+    const auto order = projectkey::commonFirst();
+    juce::PopupMenu more;
+    for (std::size_t i = 0; i < order.size(); ++i)
+    {
+        const auto flScale = order[i];
+        const auto ticked = current && current->flScale == flScale;
+        auto choose = [this, root, flScale] { setProjectKey (projectkey::Key { root, flScale }); };
+        if ((int) i < keyguess::commonScales)
+        {
+            const auto name = tr (juce::String (projectkey::shortScaleName (flScale))); // ("minor" in "A minor"; "Minor" in the list)
+            menu.addItem (name.substring (0, 1).toUpperCase() + name.substring (1), true, ticked, choose);
+        }
+        else // FL's own scale names (its Reference scales folder), as its Piano roll lists them
+            more.addItem (juce::String (notetools::flReferenceScales()[(std::size_t) flScale].name), true, ticked, choose);
+    }
+    menu.addSubMenu (tr ("More scales"), more);
+    menu.addSeparator();
+    menu.addItem (tr ("None"), true, ! current, [this] { setProjectKey (std::nullopt); });
+    return menu;
 }
 
 void MainComponent::addAudioLoggerMenu (juce::PopupMenu& menu)
@@ -5971,10 +6129,12 @@ void MainComponent::openSettings (int page)
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
         o.autoClipsAtPlayback = autoclipplace::atPlayback();
+        o.disableTypingPriority = pluginkeys::newPluginsHostFirst().load();
         o.layoutStyle = (int) safe->layoutStyle;
         o.alsSessionOnPlaylist = AudioEngine::alsSessionOnPlaylist.load();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
@@ -6059,9 +6219,11 @@ void MainComponent::openSettings (int page)
         remoteui::setEnabled (o.remoteControl);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         autoclipplace::setAtPlayback (o.autoClipsAtPlayback);
+        pluginkeys::newPluginsHostFirst() = o.disableTypingPriority;
         self.setLayoutStyle ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, o.layoutStyle));
         AudioEngine::alsSessionOnPlaylist = o.alsSessionOnPlaylist;
         if (o.stretchedClipsLoop != stretchedClipsLoop())
@@ -6886,9 +7048,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     else if (index == 1)
     {
         // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
-        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
-        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
-                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
+        // ("Alternate undo mode" swaps the two shortcuts, as FL's menu does: round 190b)
+        const auto backwardsId = alternateUndo ? "edit.undo" : "edit.undoBackwards";
+        const auto toggleId = alternateUndo ? "edit.undoBackwards" : "edit.undo";
+        menu.addItem (tr ("Undo backwards") + shortcutText (backwardsId), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((engine.canRedo() ? tr ("Undo (redo)") : tr ("Undo")) + shortcutText (toggleId), engine.canUndo() || engine.canRedo(), false,
+                      [this] { runUndoStep (undokeys::toggle (engine.canUndo(), engine.canRedo())); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });

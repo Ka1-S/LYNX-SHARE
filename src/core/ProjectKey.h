@@ -10,10 +10,15 @@
 #include <array>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/NoteTools.h"
 #include "core/Song.h"
+
+#ifndef TR_NOOP
+#define TR_NOOP(text) text // marks the names for translation (ui/I18n.h defines the same)
+#endif
 
 namespace lynx::projectkey
 {
@@ -76,6 +81,23 @@ inline std::string rootName (int root)
 inline std::string name (const Key& key)
 {
     return validFlScale (key.flScale) ? rootName (key.root) + " " + notetools::flReferenceScales()[(std::size_t) key.flScale].name : std::string();
+}
+
+// The Key button's short scale name (English, for tr(); round 184a S11): "major", "minor", "blues"... for the scales the
+// menu lists first; FL's own name for the rest. Empty for an invalid index.
+inline std::string shortScaleName (int flScale)
+{
+    if (! validFlScale (flScale))
+        return {};
+    static const std::array<std::pair<const char*, const char*>, 10> shortNames { {
+        { "Major (Ionian)", TR_NOOP ("major") }, { "Minor Natural (Aeolian)", TR_NOOP ("minor") }, { "Major Pentatonic", TR_NOOP ("major pentatonic") },
+        { "Minor Pentatonic", TR_NOOP ("minor pentatonic") }, { "Other Blues", TR_NOOP ("blues") }, { "Minor Harmonic", TR_NOOP ("harmonic minor") },
+        { "Other Dorian", TR_NOOP ("Dorian") }, { "Other Mixolydian", TR_NOOP ("Mixolydian") }, { "Other Phrygian", TR_NOOP ("Phrygian") }, { "Other Lydian", TR_NOOP ("Lydian") } } };
+    const std::string full = notetools::flReferenceScales()[(std::size_t) flScale].name;
+    for (const auto& [fl, shortName] : shortNames)
+        if (full == fl)
+            return shortName;
+    return full;
 }
 
 // The Key menu's order: the common scales first (Major, Minor, the pentatonics, Blues, Harmonic minor, the modes), then

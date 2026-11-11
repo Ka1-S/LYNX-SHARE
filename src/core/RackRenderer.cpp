@@ -176,6 +176,8 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
 
         if (factories.pluginInstruments && ! channel.plugin.id.empty())
             instrument = factories.pluginInstruments (channel.plugin, sampleRate);
+        if (instrument != nullptr)
+            instrument->configure (channel, bpm); // (its outputs' routes, wrapper Processing › Connections, round 188d)
 
         return instrument != nullptr ? instrument : std::make_shared<SilentInstrument>();
     }
@@ -362,6 +364,20 @@ std::shared_ptr<Effect> buildEffect (const EffectSlot& slot, double sampleRate, 
     }
 
     return effect;
+}
+
+// Issue #134: hosted plugins are prepared when they are made, for the rate they are made at. A Patcher built again
+// for another sample rate (the audio device changed) keeps the running nodes of its old graph, and LYNX's own units
+// follow the new rate, but a hosted plugin kept that way went on running at the old one (out of tune, its delays and
+// envelopes off). A Patcher that holds one, nested ones included, is built from nothing at a new rate.
+bool hostsPlugins (const PatcherDoc& doc) noexcept
+{
+    for (const auto& n : doc.nodes)
+        if (n.generator ? n.channel.instrument == InstrumentKind::plugin
+                              || (n.channel.instrument == InstrumentKind::patcher && hostsPlugins (n.channel.patcher))
+                        : n.effect.kind == EffectKind::plugin || (n.effect.kind == EffectKind::patcher && hostsPlugins (n.effect.patcher)))
+            return true;
+    return false;
 }
 
 // What a Patcher builds its nodes with: the same builders as the rack's channels and slots
@@ -566,7 +582,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 state->instruments.back()->configure (channel, song.bpm);
                 continue;
             }
-            state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), old));
+            const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (channel.patcher) ? nullptr : old;
+            state->instruments.push_back (patcher::makeInstrument (channel, sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept));
             state->instruments.back()->configure (channel, song.bpm);
             continue;
         }
@@ -676,7 +693,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     state->effects[t].push_back (previous->effects[pt][pi]);
                     continue;
                 }
-                std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), old);
+                const auto* kept = old != nullptr && previous->sampleRate != sampleRate && hostsPlugins (slots[i].patcher) ? nullptr : old;
+                std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), kept);
                 effect->prepare (sampleRate);
                 state->effects[t].push_back (std::move (effect));
                 continue;
@@ -745,7 +763,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     // FL's cut groups cut its Sampler / audio clip channels (REA_rodada167h) but not its plugin generators: Kepler
     // keeps sounding when its group cuts it (REA_rodada165g-flbeta165k §3), and so do the 26 FL generators of
-    // REA_rodada170i3 §2 (FL's renders with and without "cut itself" are the same; Ogun's tail in 169l's project)
+    // REA_rodada170i3 §2 (FL's renders with and without "cut itself" are the same; Ogun's tail in 169l's project).
+    // Nor its wrapped third-party plugins (issue #143, REA_rodada190x): Surge XT (VST3) renders the same in FL with
+    // and without "cut itself" — the group FL's default template gives every new channel (0x84 = 0x10001) — while
+    // LYNX's choke, landing after the note on at the same sample, ended every note as it started: silent channels.
     const auto flCutsIt = [] (InstrumentKind k) {
         switch (k)
         {
@@ -760,6 +781,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
             case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
             case InstrumentKind::wavetraveller:
+            case InstrumentKind::plugin:
                 return false;
             default:
                 return true;
@@ -3200,6 +3222,20 @@ void RackRenderer::applyLiveControl (const RackState& state, const NoteEvent& e)
     // a controller's pitch wheel, mod wheel (CC 1), other CCs and channel pressure played into a channel (round 162,
     // issue #9): hosted plugins (and the SoundFont player) get the MIDI message; LYNX's own instruments bend by the
     // channel's pitch range (FL's Misc › Pitch range, default ±2 semitones) and take the CCs they know
+    // A Layer makes no sound: what is played into it goes to its children, as its notes do (issue #141: the sustain
+    // pedal, the wheels and the other controllers stopped at the Layer)
+    if (const auto& channels = state.song.channels; (std::size_t) e.channel < channels.size() && channels[(std::size_t) e.channel].instrument == InstrumentKind::layer)
+    {
+        for (const auto c : channels[(std::size_t) e.channel].layer.children)
+            if (c >= 0 && c < (int) channels.size() && c < (int) state.instruments.size() && c != e.channel
+                && channels[(std::size_t) c].instrument != InstrumentKind::layer)
+            {
+                auto child = e;
+                child.channel = c;
+                applyLiveControl (state, child);
+            }
+        return;
+    }
     auto* instrument = state.instruments[(std::size_t) e.channel].get();
     if (instrument == nullptr)
         return;

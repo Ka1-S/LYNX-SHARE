@@ -67,6 +67,7 @@ const std::vector<Allowed>& allowed()
         { "Fruity Delay Bank", "B8 Unused", "inert", "hidden-slot: FL's unused slot (bank 8 has no send to next); no control in the editor" },
         { "Fruity WaveShaper", "Unipolar", "inert", "not-in-programme: mirrors a non-symmetric drawn curve; the default curve is a straight line (identical either way)" },
         { "Fruity WaveShaper", "HQ", "inert", "not-in-programme: oversamples the curve; a straight line makes no harmonics to alias" },
+        { "Sentry Gate", "Law", "inert", "not-in-programme: the Vocal style's noise reduction acts on hiss-like sound that starts after a pause (60 ms under -60 dBFS); the programme plays without one (tests/Parity190vTests.inc renders it)" },
         { "LYNX Tune", "Humanize", "inert", "not-in-programme: slows the retune only on a steady note held 0.3 s that then moves; the pad has constant vibrato" },
         { "LYNX Tune", "C# bypass", "inert", "not-in-programme: leaves notes sung near C# alone; the programme sings none there" },
         { "LYNX Tune", "Key map *", "inert", "not-in-programme: a per-key override (8 keys each, C1…B8); the programme sings only a few keys" },
@@ -89,6 +90,11 @@ const std::vector<Allowed>& allowed()
         { "Transmitter", "", "click", "behaviour: FL's Transmitter, a new section effect starts on the running part (exact engine)" },
         { "Transmitter", "", "dc", "behaviour: FL's Transmitter, Bounce's 32 taps of the kicks' tails (exact engine)" },
         { "Fruity Love Philter", "Unit 1 on", "silent", "behaviour: FL's Love Philter outputs the sum of its units; its default has unit 1 on only, so unit 1 off is silence (exact engine)" },
+        // round 190g: FL Studio Mobile's own behaviours, kept by the Pocket engines (REA specs of round 189h)
+        { "Pocket Compressor", "RMS", "inert", "fl-inert: FLM's setter always clears the RMS flag (its RMS mode is unreachable), so the control does nothing there either" },
+        { "Pocket Compressor", "Auto gain", "clip", "behaviour: with Auto gain off FLM's Level runs 0…+40 dB instead of −20…+20 dB, so the default Level is +20 dB" },
+        { "Pocket Tremolo", "Stereo offset", "inert", "not-in-programme: the audit only tries the knob's end, 360°, a whole cycle = the same phase; 90° and 180° move the right channel (FlmImport189hBTests.inc)" },
+        { "Pocket Wow & Flutter", "Random rate", "inert", "not-in-programme: FLM writes the sync length after the free rate, so a loaded state takes its random interval from the sync length; the free rate acts when it is moved while playing" },
     };
     return a;
 }

@@ -34,9 +34,11 @@ struct GeneralOptions
     int layoutStyle = 0; // Settings › General › Workflow (rounds 181a, 184a): layoutstyle::Style, 0 = Pattern workflow, the default
     bool alsSessionOnPlaylist = false; // Settings › General › Workflow (round 181c): a Live set's Session clips → the clip grid (default) or the Playlist
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
+    bool disableTypingPriority = false; // FL's General › "Disable typing keyboard priority by default" (off, round 187a)
     bool autoClipsAtPlayback = true; // FL's General › "Create automation clips at the playback position" (on, round 177b)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
+    bool autoSelectLinked = true; // FL's General › "Auto select linked modules" (on, round 187a)
     // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the
     // control under the mouse also shows next to the cursor
     bool hoverValues = false;
