@@ -176,6 +176,8 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
 
         if (factories.pluginInstruments && ! channel.plugin.id.empty())
             instrument = factories.pluginInstruments (channel.plugin, sampleRate);
+        if (instrument != nullptr)
+            instrument->configure (channel, bpm); // (its outputs' routes, wrapper Processing › Connections, round 188d)
 
         return instrument != nullptr ? instrument : std::make_shared<SilentInstrument>();
     }
@@ -757,7 +759,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     // FL's cut groups cut its Sampler / audio clip channels (REA_rodada167h) but not its plugin generators: Kepler
     // keeps sounding when its group cuts it (REA_rodada165g-flbeta165k §3), and so do the 26 FL generators of
-    // REA_rodada170i3 §2 (FL's renders with and without "cut itself" are the same; Ogun's tail in 169l's project)
+    // REA_rodada170i3 §2 (FL's renders with and without "cut itself" are the same; Ogun's tail in 169l's project).
+    // Nor its wrapped third-party plugins (issue #143, REA_rodada190x): Surge XT (VST3) renders the same in FL with
+    // and without "cut itself" — the group FL's default template gives every new channel (0x84 = 0x10001) — while
+    // LYNX's choke, landing after the note on at the same sample, ended every note as it started: silent channels.
     const auto flCutsIt = [] (InstrumentKind k) {
         switch (k)
         {
@@ -772,6 +777,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
             case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
             case InstrumentKind::wavetraveller:
+            case InstrumentKind::plugin:
                 return false;
             default:
                 return true;

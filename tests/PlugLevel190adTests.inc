@@ -235,7 +235,9 @@ TEST (plug190ad_flp_import_and_export_keep_the_plugin_level)
         CHECK (again.channels.size() >= 2);
         if (again.channels.size() >= 2)
         {
-            CHECK (again.channels[0].instrument == InstrumentKind::plugin);
+            // (the import keeps the wrapper's plugin as `foreign`; the app makes the channel a hosted plugin when it
+            // finds that plugin installed)
+            CHECK (again.channels[0].plugin.foreign.format == ForeignPlugin::Format::vst2 && again.channels[0].plugin.foreign.vst2Id == 0x4B455953u);
             CHECK (std::abs (again.channels[0].volume - 0.78f) < 1.0e-4f);
             CHECK (std::abs (again.channels[1].volume - 0.6f) < 1.0e-4f);
         }
