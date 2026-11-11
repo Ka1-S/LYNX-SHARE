@@ -6,9 +6,10 @@
 //   - at 100 / 150 / 200 / 300 % (the picture is made at the target's scale),
 //   - into a native image (Windows: Direct2D, what a window drawn with the GPU is) and into a software image (what a
 //     window drawn without the GPU is: JUCE's software renderer reads the picture's pixels),
-//   - both ways round: the picture filled while drawing to one kind of target, then only shown on the other. That
-//     second step is 0.1.25's fault: the picture was painted on the GPU, its software copy never written, and a
-//     software target showed that copy.
+//   - both ways round: the picture filled while drawing to one kind of target (by a small repaint, as the playhead's
+//     or a meter's, after the view has been still), then shown whole on that kind and on the other. Shown on a
+//     software target is 0.1.25's fault: the picture was painted on the GPU, its software copy never written, and
+//     a software target showed that copy.
 // A case fails when what the picture shows is black where the straight paint is not, or differs from it by more than
 // two renderers do. No window is made.
 
@@ -87,7 +88,8 @@ inline juce::Rectangle<int> shownPart (juce::Component& c)
     return visible;
 }
 
-inline juce::Image draw (juce::Component& c, juce::Rectangle<int> part, float scale, bool softwareTarget, bool throughPicture)
+// `clip` (not empty): only that part is drawn, as a window does for a small repaint (the playhead, a meter)
+inline juce::Image draw (juce::Component& c, juce::Rectangle<int> part, float scale, bool softwareTarget, bool throughPicture, juce::Rectangle<int> clip = {})
 {
     const auto w = juce::jmax (1, juce::roundToInt ((float) part.getWidth() * scale)), h = juce::jmax (1, juce::roundToInt ((float) part.getHeight() * scale));
     auto target = softwareTarget ? juce::Image (juce::Image::RGB, w, h, true, juce::SoftwareImageType()) : juce::Image (juce::Image::RGB, w, h, true);
@@ -95,6 +97,8 @@ inline juce::Image draw (juce::Component& c, juce::Rectangle<int> part, float sc
         juce::Graphics g (target);
         g.addTransform (juce::AffineTransform::scale (scale));
         g.setOrigin (-part.getX(), -part.getY());
+        if (! clip.isEmpty())
+            g.reduceClipRegion (clip);
         if (throughPicture)
             c.getCachedComponentImage()->paint (g);
         else
@@ -135,7 +139,14 @@ inline juce::String run (juce::Component& root, const juce::String& label, const
                                       Step { "shown, native target", false, false } })
             {
                 if (step.refill)
+                {
+                    // everything invalid, then a small repaint once the view has been still: the Playlist paints
+                    // large repaints straight to the window and (re)builds its picture at the next small one (the
+                    // playhead's), 300 ms after the last large one. From then on a whole-window paint shows the picture.
                     c->repaint();
+                    juce::Thread::sleep (350);
+                    draw (*c, part, scale, step.software, true, part.withWidth (juce::jmin (8, part.getWidth())));
+                }
                 const auto viaPicture = draw (*c, part, scale, step.software, true);
                 const auto straight = draw (*c, part, scale, step.software, false);
                 const auto a = statsOf (viaPicture), b = statsOf (straight);
