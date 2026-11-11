@@ -8422,7 +8422,7 @@ countries: tr
 "Moves every note of the clip onto the project's key" = "Klibin her notasını projenin tonuna taşır"
 "The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "Projenin tonu: Piano roll onu vurgular ve Gama uydur onu kullanır (LYNX SHARE'de proje başına bir ton vardır)"
 "Keyboard style" = "Klavye stili"
-"Flat keys (FL Studio style)" = "Düz tuşlar (FL Studio stili)"
+"Flat keys" = "Düz tuşlar"
 "Piano keys (lines between the white keys)" = "Piyano tuşları (beyaz tuşlar arasında çizgiler)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
@@ -8666,3 +8666,5 @@ countries: tr
 "Upper row: the part plays or is a gap. Lower row: the part lasts as long as Stretch says" = "Üst sıra: parça çalar ya da boşluktur. Alt sıra: parça Stretch'in belirttiği kadar sürer"
 "Drag a breakpoint: sideways for its time, up or down for its speed" = "Bir kırılma noktasını sürükleyin: yana zamanı, yukarı ya da aşağı hızı değiştirir"
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Bir noktayı sürükleyin; eklemek için tıklayın, kaldırmak için çift tıklayın; Alt + bir çizgiyi sürükleyerek bükün"
+"Zoom level {0}" = "Yakınlaştırma düzeyi {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tuş yüksekliği: yukarı / aşağı sürükleyin veya tekerleği çevirin  [Ctrl] ince"

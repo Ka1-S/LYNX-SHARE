@@ -388,6 +388,11 @@ private:
     gesture::HeightZoomDrag keyZoomDrag;
     gesture::SpanZoomDrag timeZoomDrag;
     void beginKeyZoom (const juce::MouseEvent&);
+    // round 190j: the zoom wheel (FL's VZoomSelect) at the right end of the overview strip
+    static constexpr int zoomWheelSize = 16;
+    juce::Rectangle<int> zoomWheelArea() const;
+    int zoomAnchorKey() const; // the key whose centre stays put: the middle of the notes in view, else of the view
+    void setRowHeightAround (int height, int key, int centreY);
     void beginTimeZoom (const juce::MouseEvent&);
 
     // smooth wheel scrolling

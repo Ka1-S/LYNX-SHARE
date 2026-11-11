@@ -8422,7 +8422,7 @@ countries: it ch sm
 "Moves every note of the clip onto the project's key" = "Sposta ogni nota della clip nella tonalità del progetto"
 "The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "La tonalità del progetto: il Piano roll la evidenzia e Adatta alla scala la usa (LYNX SHARE ha una tonalità per progetto)"
 "Keyboard style" = "Stile della tastiera"
-"Flat keys (FL Studio style)" = "Tasti piatti (stile FL Studio)"
+"Flat keys" = "Tasti piatti"
 "Piano keys (lines between the white keys)" = "Tasti di pianoforte (linee tra i tasti bianchi)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
@@ -8666,3 +8666,5 @@ countries: it ch sm
 "Upper row: the part plays or is a gap. Lower row: the part lasts as long as Stretch says" = "Riga in alto: la parte suona o è una pausa. Riga in basso: la parte dura quanto indica Stretch"
 "Drag a breakpoint: sideways for its time, up or down for its speed" = "Trascina un punto: di lato per il suo tempo, in alto o in basso per la sua velocità"
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Trascina un punto; clic per aggiungerne uno, doppio clic per rimuoverlo; Alt + trascina una linea per curvarla"
+"Zoom level {0}" = "Livello di zoom {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Altezza dei tasti: trascina su / giù o gira la rotella  [Ctrl] fine"

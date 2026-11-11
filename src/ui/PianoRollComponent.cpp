@@ -547,7 +547,7 @@ void PianoRollComponent::resized()
     place (moreButton, h);
     place (chordLabel, 84, true);
     laneBox.setBounds (2, velocityArea().getY() + 4, keyboardWidth - 4, 20);
-    overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - scrollBarSize, overviewHeight);
+    overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - zoomWheelSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - velocityHeight);
     updateScrollBars();
 }
@@ -1375,6 +1375,18 @@ void PianoRollComponent::paint (juce::Graphics& g)
         juce::ignoreUnused (lane); // the property combo sits here
     }
 
+    // the zoom wheel (round 190j): FL's small square with a mark in its middle, at the end of the time scroll bar
+    {
+        const auto wheel = zoomWheelArea().toFloat().reduced (1.0f);
+        const auto over = drag == Drag::keyZoom;
+        g.setColour (bg2);
+        g.fillRect (zoomWheelArea());
+        g.setColour (over ? bg5 : bg4);
+        g.fillRoundedRectangle (wheel, 2.0f);
+        g.setColour (over ? textPrimary : textSecondary);
+        g.fillRect (juce::Rectangle<float> (4.0f, 5.0f).withCentre (wheel.getCentre()));
+    }
+
     // top-left corner: channel name
     g.setColour (bg3);
     g.fillRect (0, 0, keyboardWidth, toolbarHeight);
@@ -1621,10 +1633,37 @@ void PianoRollComponent::paintNoteAt (std::int64_t start, int key, bool monophon
     });
 }
 
+juce::Rectangle<int> PianoRollComponent::zoomWheelArea() const
+{
+    // FL's VZoomSelect: the small square at the right end of the time scroll bar, over the vertical scroll bar
+    return { getWidth() - zoomWheelSize, toolbarHeight, zoomWheelSize, overviewHeight };
+}
+
+int PianoRollComponent::zoomAnchorKey() const
+{
+    // FL (FUN_00e83850, REA round 167t): the middle of the notes in view, or the middle of the view
+    const auto grid = gridArea();
+    const auto top = yToKey (grid.getY()), bottom = yToKey (grid.getBottom() - 1);
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    std::vector<int> keys;
+    for (auto i : channelNotes())
+        if (const auto key = notes[(std::size_t) i].key; key <= top && key >= bottom)
+            keys.push_back (key);
+    return gesture::zoomWheelAnchor (keys, top, bottom);
+}
+
+void PianoRollComponent::setRowHeightAround (int height, int key, int centreY)
+{
+    rowHeight = juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, height);
+    scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()), rowFor (key) * rowHeight + rowHeight / 2 - (centreY - headerHeight));
+    updateScrollBars();
+    repaint();
+}
+
 void PianoRollComponent::beginKeyZoom (const juce::MouseEvent& e)
 {
     drag = Drag::keyZoom;
-    keyZoomKey = yToKey (e.y);
+    keyZoomKey = zoomWheelArea().contains (e.getPosition()) ? zoomAnchorKey() : yToKey (e.y);
     keyZoomStartRow = rowHeight;
     keyZoomCentreY = keyToY (keyZoomKey) + rowHeight / 2;
     keyZoomDrag.begin (e.y);
@@ -1650,6 +1689,15 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     const auto onKeyboard = e.x < keyboardWidth && e.y >= headerHeight && e.y < gridArea().getBottom();
     hover = {};
     gliding = false;
+
+    // the zoom wheel (round 190j, discussion #10; FL's VZoomSelect): drag up = taller keys, one level (2 px) per 4 px of
+    // travel, per 16 px with Ctrl
+    if (zoomWheelArea().contains (e.getPosition()))
+    {
+        if (e.mods.isLeftButtonDown() || e.mods.isMiddleButtonDown())
+            beginKeyZoom (e);
+        return;
+    }
 
     if (e.mods.isMiddleButtonDown())
     {
@@ -2463,7 +2511,7 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             hint.value = "x" + juce::String ((double) (to - stretchAnchor) / (double) juce::jmax<std::int64_t> (1, stretchEnd - stretchAnchor), 2);
             break;
         }
-        case Drag::keyZoom: hint.text = tr ("Key height"); hint.value = juce::String (rowHeight) + " px"; break;
+        case Drag::keyZoom: hint.text = tr ("Key height"); hint.value = tr ("Zoom level {0}", { juce::String (gesture::zoomLevel (rowHeight)) }) + "  " + juce::String (rowHeight) + " px"; break;
         case Drag::timeZoom: hint.text = tr ("Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only"); break;
         case Drag::keyboard:
             hint.text = tr ("Hearing the key: further right on a key = louder");
@@ -2661,6 +2709,8 @@ void PianoRollComponent::updateCursor (juce::ModifierKeys mods)
     }
     else if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth && flmods::ctrl (mods))
         cursor = gesture::Cursor::select;
+    else if (zoomWheelArea().contains (p))
+        cursor = gesture::Cursor::resizeV; // (FL: crSizeNS)
 
     setMouseCursor (editorCursor (cursor));
 }
@@ -2671,6 +2721,12 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
     const auto mods = juce::ModifierKeys::currentModifiers;
     const auto& song = engine.getSong();
     const auto& notes = currentPattern (song).notes;
+    if (zoomWheelArea().contains (p))
+    {
+        hint.text = tr ("Key height: drag up / down or turn the wheel  [Ctrl] fine");
+        hint.value = tr ("Zoom level {0}", { juce::String (gesture::zoomLevel (rowHeight)) });
+        return hint;
+    }
     const auto h = hoverAt (p);
     auto noteValue = [&] (int i) {
         const auto& n = notes[(std::size_t) i];
@@ -3874,6 +3930,17 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 
+    // the wheel over the zoom wheel: one zoom level a notch (FL: the only wheel gesture of the vertical zoom)
+    if (zoomWheelArea().contains (e.getPosition()))
+    {
+        if (wheel.deltaY != 0.0f)
+        {
+            const auto key = zoomAnchorKey();
+            setRowHeightAround (rowHeight + (wheel.deltaY > 0 ? 2 : -2), key, keyToY (key) + rowHeight / 2);
+        }
+        return;
+    }
+
     // Alt+wheel: the velocity (or the lane's property) of the selected notes wherever the mouse is, with nothing
     // selected of the note nearest to the mouse (FL 2026, round 166e); Ctrl+Alt: fine steps
     if (alt && ! shift && overGrid && wheel.deltaY != 0.0f)
@@ -4915,12 +4982,13 @@ juce::PopupMenu PianoRollComponent::viewMenu()
                   [this] { runAction ("pianoRoll.backgroundWave"); });
     menu.addItem (tr ("Ruler: song bars (LYNX)") + keyText ("pianoRoll.songBarsRuler"), true, songBarsRuler, [this] { runAction ("pianoRoll.songBarsRuler"); });
     {
-        // round 190j (discussion #136): LYNX's own; flat = FL's keyboard, the default
+        // round 190j (discussion #136): flat = LYNX's keyboard so far, the default. (FL 2026's own keyboard has the white
+        // keys meeting behind the black ones, with lines only between B / C and E / F: flshots/fl-pr-keys-x3.png.)
         juce::PopupMenu style;
         const auto add = [this, &style] (const juce::String& name, pianokeys::Style value) {
             style.addItem (name, true, keyStyle == value, [this, value] { setKeyStyle (value); });
         };
-        add (tr ("Flat keys (FL Studio style)"), pianokeys::Style::flat);
+        add (tr ("Flat keys"), pianokeys::Style::flat);
         add (tr ("Piano keys (lines between the white keys)"), pianokeys::Style::piano);
         menu.addSubMenu (tr ("Keyboard style"), style);
     }

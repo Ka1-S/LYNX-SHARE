@@ -8422,7 +8422,7 @@ countries: id
 "Moves every note of the clip onto the project's key" = "Memindahkan setiap not klip ke kunci proyek"
 "The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)" = "Kunci proyek: Piano roll menyorotnya dan Sesuaikan ke tangga nada memakainya (LYNX SHARE punya satu kunci per proyek)"
 "Keyboard style" = "Gaya keyboard"
-"Flat keys (FL Studio style)" = "Tuts datar (gaya FL Studio)"
+"Flat keys" = "Tuts datar"
 "Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
@@ -8666,3 +8666,5 @@ countries: id
 "Upper row: the part plays or is a gap. Lower row: the part lasts as long as Stretch says" = "Baris atas: bagian berbunyi atau berupa jeda. Baris bawah: bagian berlangsung selama yang ditentukan Stretch"
 "Drag a breakpoint: sideways for its time, up or down for its speed" = "Seret titik patah: ke samping untuk waktunya, ke atas atau bawah untuk kecepatannya"
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Seret titik; klik untuk menambah, klik dua kali untuk menghapus; Alt + seret garis untuk melengkungkannya"
+"Zoom level {0}" = "Tingkat zoom {0}"
+"Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tinggi tuts: seret ke atas / bawah atau putar roda  [Ctrl] halus"
