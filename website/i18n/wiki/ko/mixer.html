@@ -1,0 +1,37 @@
+<figure><a class="shot" href="/assets/img/mixer.webp"><img src="/assets/img/mixer.webp" alt="믹서" loading="lazy" width="1920" height="1080"></a></figure>
+<p>모든 채널은 믹서 인서트를 거쳐 재생됩니다. 인서트마다 페이더, 팬, 뮤트, 솔로, 피크 미터, 각각 드라이/웻 양이 있는 이펙트 슬롯 열 개, 내장 EQ가 있습니다. 다른 곳으로 라우팅하지 않으면 모든 인서트는 마스터로 모입니다. <code>F9</code>를 누르면 믹서를 표시하거나 숨깁니다.</p>
+<p>프로젝트에는 인서트를 최대 127개까지 둘 수 있습니다. 믹서에는 새 인서트를 만드는 추가 스트립이 있습니다. 믹서 제목 표시줄의 상자에서 <code>컴팩트</code>부터 <code>특대</code>까지 여덟 가지 스트립 레이아웃 중 하나를 고릅니다.</p>
+<h2 id="put-an-effect-on-a-channel">채널에 이펙트 걸기</h2>
+<ol><li><a href="/wiki/channel-rack/">채널 랙</a>에서 채널을 선택하고 <code>Ctrl+L</code>을 누릅니다. 채널이 빈 인서트로 가고, 인서트는 채널의 이름과 색상을 이어받습니다.</li><li><code>F9</code>를 눌러 믹서를 표시하고 그 인서트의 스트립을 클릭합니다.</li><li>이펙트 패널에서 빈 슬롯을 클릭하고 이펙트를 고릅니다.</li><li>슬롯의 이름을 클릭하면 이펙트 창이 표시되거나 숨겨집니다.</li><li>슬롯의 램프를 클릭하면 이펙트가 바이패스되어 비교해 볼 수 있습니다.</li></ol>
+<h2 id="send-a-channel-to-an-insert">채널을 인서트로 보내기</h2>
+<p>채널 랙에서 채널의 라우트 상자를 드래그하거나(또는 휠을 돌려) 인서트 번호를 고릅니다. 상자를 더블 클릭하면 그 인서트가 믹서에 표시됩니다.</p>
+<p>채널 랙의 <code>Ctrl+L</code>은 선택한 여러 채널에 한꺼번에 적용됩니다. 각 채널이 자기만의 빈 인서트로 갑니다.</p>
+<p>믹서에 포커스가 있을 때 <code>Ctrl+L</code>은 선택한 채널을 선택한 인서트에 연결하고, <code>Ctrl+Shift+L</code>은 선택한 인서트부터 시작해 연속된 인서트에 연결합니다.</p>
+<h2 id="select-and-move-inserts">인서트 선택하고 옮기기</h2>
+<ul><li>스트립을 클릭하면 선택됩니다.</li><li><code>Ctrl</code>+클릭이나 스트립 위를 가로지르는 드래그로 범위를 선택합니다. <code>Ctrl+Shift</code>+클릭은 하나를 추가하거나 제외합니다.</li><li>스트립을 옆으로 드래그하거나 <code>Alt+Left</code>와 <code>Alt+Right</code>를 누르면 선택한 인서트가 이동합니다.</li><li>스트립을 우클릭하면 인서트 메뉴가 나옵니다. <code>F2</code>는 선택한 인서트의 이름과 색상을 바꿉니다.</li><li><code>Del</code> 또는 인서트 메뉴의 <code>Delete</code>는 선택한 인서트를 삭제합니다. LYNX SHARE가 먼저 확인을 묻습니다. 다음부터 묻지 않게 하려면 <code>선택 기억하기</code>를 체크하세요.</li></ul>
+<p>인서트를 옮기거나, 삽입하거나, 삭제해도 센드, 사이드체인, 오토메이션은 그 인서트를 따라갑니다.</p>
+<p>인서트 메뉴의 <code>믹서</code> 섹션과 <code>옵션 › 믹서</code>에는 명령이 두 개 더 있습니다. <code>플레이리스트처럼 인서트 정렬</code>는 Playlist 트랙에 연결된 인서트를 Playlist의 순서대로 앞으로 옮깁니다. <code>삭제된 인서트로 가는 링크를 회색으로 유지(LYNX)</code>를 켜면 삭제된 인서트로 들어가던 센드가 회색으로 남아, 다시 연결할 수 있습니다.</p>
+<h2 id="mute-and-solo">뮤트와 솔로</h2>
+<p>뮤트 램프를 클릭하면 인서트가 뮤트됩니다. 우클릭하거나 <code>Ctrl</code>+클릭하면 솔로가 됩니다. <code>S</code>는 선택한 인서트를 솔로로 하고, <code>Alt+S</code>는 선택한 인서트와 그것을 먹여 주는 인서트를 함께 솔로로 합니다.</p>
+<p>뮤트된 인서트도 미터는 계속 움직입니다. 새 프로젝트와 가져온 FL Studio 프로젝트에서는 이펙트도 계속 실행되며, 마스터로 가는 출력과 센드만 끊깁니다. 뮤트된 인서트의 처리를 멈추려면 인서트 메뉴의 <code>믹서</code> 섹션이나 <code>옵션 › 믹서</code>에서 <code>음소거된 인서트는 처리하지 않음 (LYNX, CPU 절약, 이 프로젝트)</code>를 켜세요. 그러면 미터가 멈추고, 뮤트를 풀 때 이펙트가 처음 상태에서 시작합니다.</p>
+<h2 id="effects">이펙트</h2>
+<p>이펙트 패널에는 선택한 인서트의 슬롯 열 개가 표시됩니다.</p>
+<ul><li>슬롯을 드래그하거나 그 위에서 휠을 돌리면 위아래로 이동합니다.</li><li>슬롯을 우클릭하면 옵션(교체, 이동, 삭제)이 나옵니다.</li><li>슬롯의 메뉴가 열려 있는 동안 <code>Del</code>은 그 슬롯의 플러그인을 삭제합니다.</li><li>슬롯 메뉴의 <code>오디오 이펙트 랙으로 그룹화</code>은 이펙트를 새 랙에 넣고, <code>모두 오디오 이펙트 랙으로 그룹화</code>은 체인 전체에 대해 같은 일을 합니다. <code>그룹 해제</code>은 체인이 하나인 랙의 이펙트를 다시 슬롯에 돌려놓습니다.</li><li>패널 헤더의 스위치는 그 인서트의 모든 이펙트를 켜거나 끕니다.</li><li><a href="/wiki/browser/">브라우저</a>의 플러그인 데이터베이스에서 이펙트를 인서트나 이펙트 슬롯으로 드래그할 수 있습니다.</li></ul>
+<h2 id="insert-eq">인서트 EQ</h2>
+<p>인서트마다 자체 EQ가 있습니다. 밴드를 드래그해 주파수와 레벨을 정하고, 휠로 폭을 조절하며, 밴드를 더블 클릭하면 0 dB로 돌아갑니다. EQ 제목을 우클릭하면 바이패스됩니다. 내장 EQ가 없는 믹서를 원하면 새 프로젝트가 깨끗한 믹서로 시작하도록 설정할 수 있습니다.</p>
+<h2 id="routing-sends-and-sidechain">라우팅, 센드, 사이드체인</h2>
+<figure><a class="shot" href="/assets/img/wiki/mixer-sends.webp"><img src="/assets/img/wiki/mixer-sends.webp" alt="Kick 인서트가 선택되어 스트립 아래에 센드가 케이블로 그려지고 오른쪽에 이펙트 패널이 있는 믹서" loading="lazy" width="1600" height="900"></a></figure>
+<p>라우팅할 인서트를 선택합니다. 그러면 다른 모든 스트립에 라우트 스위치가 나타납니다.</p>
+<ul><li>다른 스트립의 스위치를 클릭하면 선택한 인서트가 그리로 보내집니다. 켠 뒤에 드래그하면 센드 레벨이 정해집니다.</li><li><code>Ctrl</code>+클릭은 그 인서트로만 라우팅합니다.</li><li><code>Shift</code>+클릭은 사이드체인 센드를 만듭니다. <code>Ctrl+Shift</code>+클릭은 사이드체인 전용으로 만듭니다.</li><li>우클릭하면 같은 선택지가 메뉴로 나옵니다.</li><li>프리 페이더 센드를 만들려면 라우트 스위치나 센드의 레벨 노브를 오른쪽 클릭하고 <code>프리 페이더 센드 (이 트랙의 페이더에 영향받지 않음)</code>를 체크하세요. 그러면 센드에 <code>PRE</code> 표시가 붙습니다.</li></ul>
+<p>컴프레서처럼 사이드 입력이 있는 이펙트에는 들을 인서트 목록을 보여 주는 <code>사이드체인 소스</code> 선택기가 있습니다. 하나를 고르면 라우트가 자동으로 만들어집니다.</p>
+<h2 id="groups-and-vca-faders">그룹과 VCA 페이더</h2>
+<p>믹서 그룹은 화살표로 접습니다(모든 그룹을 접으려면 <code>Alt</code>+클릭). VCA 페이더는 소속 인서트의 레벨을 움직이며, 소속 인서트는 자기 페이더를 그대로 유지합니다. 인서트 메뉴의 그룹 항목에서 <code>VCA › 선택한 항목으로 새 VCA</code>를 선택해 만듭니다.</p>
+<h2 id="recording">녹음</h2>
+<p>인서트마다 녹음 대기 버튼이 있습니다. 인서트를 녹음 대기로 두고 녹음과 재생을 누르면 그 오디오 입력이 플레이리스트 클립으로 녹음됩니다. <code>Shift+R</code>은 선택한 인서트를 녹음 대기로 만들고 녹음을 한 번에 시작합니다. <a href="/wiki/recording/">녹음</a>을 참고하세요.</p>
+<h2 id="keys">키</h2>
+<p><code>Ctrl+L</code>과 <code>Ctrl+Shift+L</code>은 믹서에 포커스가 있을 때만 이 의미를 가집니다.</p>
+<div class="tablewrap"><table><thead><tr><th>명령</th><th>키</th><th>기능</th></tr></thead><tbody><tr><td>채널 연결</td><td><code>Ctrl+L</code></td><td>선택한 채널을 선택한 인서트에 연결합니다</td></tr><tr><td>연속된 인서트에 연결</td><td><code>Ctrl+Shift+L</code></td><td>선택한 채널을 선택한 인서트부터 시작해 인서트에 연결합니다</td></tr><tr><td>인서트 이동</td><td><code>Alt+Left</code> / <code>Alt+Right</code></td><td>선택한 인서트를 옮깁니다</td></tr><tr><td>이름 및 색상 변경</td><td><code>F2</code></td><td>선택한 인서트의 이름과 색상을 바꿉니다</td></tr><tr><td>솔로</td><td><code>S</code></td><td>선택한 인서트를 솔로로 합니다</td></tr><tr><td>소스와 함께 솔로</td><td><code>Alt+S</code></td><td>선택한 인서트와 그것을 먹여 주는 인서트를 솔로로 합니다</td></tr><tr><td>인서트 삭제</td><td><code>Del</code></td><td>선택한 인서트를 확인 후 삭제합니다</td></tr><tr><td>녹음 대기 및 녹음</td><td><code>Shift+R</code></td><td>선택한 인서트를 녹음 대기로 만들고 녹음을 시작합니다</td></tr></tbody></table></div>
+<h2 id="good-to-know">알아 두기</h2>
+<ul><li><code>옵션 › 믹서</code>의 <code>마스터 옆에 라우드니스 미터(LYNX)</code>는 마스터 출력의 단기 라우드니스와 통합 라우드니스(LUFS), 트루 피크를 <code>초기화</code> 버튼과 함께 보여 줍니다.</li><li>출력이 여러 개인 악기 플러그인은 출력마다 자기 인서트로 재생할 수 있습니다. <a href="/wiki/plugins/">서드파티 플러그인</a>을 참고하세요.</li><li><code>Ctrl+L</code>은 채널 랙과 믹서에서 하는 일이 다릅니다. 채널 랙에서는 빈 인서트를 고르고, 믹서에서는 선택한 인서트를 씁니다.</li><li>라우트 스위치는 선택한 스트립이 아니라 다른 스트립에 나타납니다.</li><li>한도는 프로젝트당 인서트 127개, 인서트당 이펙트 슬롯 열 개입니다.</li></ul>
+<h2 id="related">관련 문서</h2>
+<ul><li><a href="/wiki/channel-rack/">채널 랙</a></li><li><a href="/wiki/recording/">녹음</a></li><li><a href="/wiki/automation/">오토메이션</a></li><li><a href="/wiki/plugins/">서드파티 플러그인</a></li><li><a href="/instruments-and-effects/">악기와 이펙트</a></li></ul>

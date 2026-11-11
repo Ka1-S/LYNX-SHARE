@@ -8918,3 +8918,16 @@ countries: tr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Seviyeleme: seviyeyi yavaş bir atakla tavanın altındaki bir eşikte tutar, gerisini tavan yakalar (varsayılan olarak kapalı)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Seviyeleme eşiği: tavanın altında tutulan seviye (Off: seviyeleme yok)"
 "Levelling attack: how much of a transient passes before the level is held" = "Seviyeleme atağı: seviye tutulmadan önce bir geçicinin ne kadarının geçtiği"
+"Frozen, out of date (changed since the freeze): the old audio plays.  [RMB] Re-freeze" = "Dondurulmuş, güncel değil (dondurmadan sonra değişti): eski ses çalar.  [RMB] Yeniden dondur"
+"@channel: Freeze" = "Dondur"
+"More plugins... (1 instrument)" = "Daha fazla plugin... (1 enstrüman)"
+"More plugins... (1 effect)" = "Daha fazla plugin... (1 efekt)"
+"My scripts (old folder)" = "Betiklerim (eski klasör)"
+"Can't freeze {0}" = "{0} dondurulamaz"
+"Some selected channels can't be frozen" = "Seçili kanalların bazıları dondurulamaz"
+"The other selected channels are frozen." = "Diğer seçili kanallar donduruluyor."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."
+"Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"

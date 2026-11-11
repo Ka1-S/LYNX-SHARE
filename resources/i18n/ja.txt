@@ -8918,3 +8918,16 @@ countries: jp
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "レベリング: 遅いアタックでシーリングより下のスレッショルドにレベルを保ち、残りはシーリングが抑えます（既定ではオフ）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "レベリングのスレッショルド: シーリングより下に保つレベル（Off: レベリングなし）"
 "Levelling attack: how much of a transient passes before the level is held" = "レベリングのアタック: レベルが保たれる前にトランジェントがどれだけ通るか"
+"Frozen, out of date (changed since the freeze): the old audio plays.  [RMB] Re-freeze" = "フリーズ済み・古い状態（フリーズ後に変更あり）：以前のオーディオを再生します。  [RMB] 再フリーズ"
+"@channel: Freeze" = "フリーズ"
+"More plugins... (1 instrument)" = "その他のプラグイン... (インストゥルメント1個)"
+"More plugins... (1 effect)" = "その他のプラグイン... (エフェクト1個)"
+"My scripts (old folder)" = "マイスクリプト（旧フォルダー）"
+"Can't freeze {0}" = "{0} はフリーズできません"
+"Some selected channels can't be frozen" = "選択したチャンネルの一部はフリーズできません"
+"The other selected channels are frozen." = "選択したほかのチャンネルはフリーズされます。"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"
+"Show complete piano roll preview" = "ピアノロールのプレビュー全体を表示"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "チャンネルラック: パターンがラックの表示幅より長くても、チャンネルのノートプレビューにパターン全体を表示します。オフの場合はステップと一緒にスクロールします"

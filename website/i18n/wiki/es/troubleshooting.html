@@ -1,0 +1,53 @@
+<p>Cada título de abajo es un problema. Si el tuyo no está, infórmalo como se describe al final.</p>
+<h2 id="starting-the-program">Al iniciar el programa</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: SmartScreen avisa en el primer arranque</h3>
+<p>El ejecutable aún no está firmado, así que SmartScreen puede mostrar un aviso la primera vez que lo ejecutas.</p>
+<ol><li>Haz clic en <code>More info</code>.</li><li>Haz clic en <code>Run anyway</code>.</li></ol>
+<p>El instalador no necesita derechos de administrador.</p>
+<h3 id="macos-cannot-be-opened">macOS: &quot;no se puede abrir&quot;</h3>
+<p>Apple no ha notarizado la app y no tiene firma de Developer ID, así que el primer arranque necesita un paso extra.</p>
+<ol><li>Arrastra LYNX SHARE a <code>Applications</code>.</li><li>Haz clic derecho (Control-clic) y elige <code>Abrir</code>.</li><li>Haz clic en <code>Abrir</code> otra vez.</li></ol>
+<p>En macOS 15 Sequoia o más reciente, intenta abrirla una vez, ve a <code>System Settings › Privacy &amp; Security</code> y haz clic en <code>Open Anyway</code>. O, en el Terminal:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS pide acceso al micrófono la primera vez que grabas.</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: el AppImage no arranca</h3>
+<p>LYNX SHARE necesita un sistema x86_64 con glibc 2.35 o más reciente (Ubuntu 22.04, Debian 12, Fedora 36, Arch o Manjaro actuales) y X11 o XWayland.</p>
+<ol><li>Haz el archivo ejecutable y lánzalo, con los dos comandos de abajo.</li><li>Si sigue sin arrancar, instala libfuse2. El paquete es <code>libfuse2</code> en Ubuntu 22.04, <code>libfuse2t64</code> en Ubuntu 24.04, <code>fuse2</code> en Arch y <code>fuse-libs</code> en Fedora.</li><li>Si prefieres no instalarlo, descarga en su lugar el <code>.tar.gz</code>, extráelo y ejecuta <code>./install.sh</code>.</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> instala LYNX SHARE para tu usuario en <code>~/.local</code> con una entrada de menú. <code>./install.sh --uninstall</code> lo quita.</p>
+<h2 id="sound">Sonido</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">No hay sonido, o el dispositivo de audio es el equivocado</h3>
+<ol><li>Abre <code>Opciones › Configuración de audio...</code>.</li><li>Elige un driver.</li><li>Elige un dispositivo de salida.</li></ol>
+<div class="tablewrap"><table><thead><tr><th>Sistema</th><th>Drivers</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO y el driver LYNX ASIO integrado</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (nativo), JACK y ALSA. En el primer arranque, LYNX SHARE abre el primero de estos que tenga dispositivos</td></tr></tbody></table></div>
+<p>ASIO es un modelo de driver de Windows y existe solo en Windows. <code>Opciones › Asistente de configuración (idioma, audio, carpetas de plugins)...</code> también prueba el dispositivo de audio. Consulta <a href="/wiki/audio-setup/">Configuración de audio</a>.</p>
+<h3 id="linux-the-sound-breaks-up">Linux: el sonido se corta</h3>
+<p>El hilo de audio debería ejecutarse con prioridad de tiempo real.</p>
+<ol><li>Abre <code>Opciones › Configuración de audio...</code> y lee <code>Estado</code>. Muestra si el hilo obtuvo prioridad de tiempo real.</li><li>Si no la obtuvo, instala rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> o <code>sudo pacman -S rtkit</code>), o añádete al grupo <code>audio</code> con un límite de tiempo real, como en las configuraciones de JACK.</li><li>Cierra sesión y vuelve a iniciarla.</li></ol>
+<p>Los detalles están en <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h2 id="plugins">Plugins</h2>
+<h3 id="a-plugin-crashes">Un plugin falla</h3>
+<p>Ejecútalo en su propio proceso, para que solo se detenga el plugin.</p>
+<ol><li>Abre <code>Opciones › Configuración general...</code>.</li><li>Activa <code>Ejecutar plugins en un proceso aparte (protege a LYNX SHARE de los cierres inesperados)</code>.</li><li>Vuelve a abrir el proyecto.</li></ol>
+<p>Un plugin que falló o dejó de responder en su propio proceso queda silenciado. Guarda el proyecto y ábrelo de nuevo para cargar otra vez el plugin. Consulta <a href="/wiki/plugins/">Plugins de terceros</a>.</p>
+<h3 id="a-plugin-is-not-in-the-list">Un plugin no está en la lista</h3>
+<ol><li>Elige <code>Opciones › Buscar plugins</code>.</li><li>Si sigue sin aparecer, abre <code>Opciones › Gestor de plugins...</code>, haz clic en <code>Carpetas de plugins...</code> y añade la carpeta del plugin.</li><li>Mira la pestaña <code>Con errores</code>. Un archivo de plugin que falla en el escaneo se omite. En Windows, el motivo está en <code>%APPDATA%\LYNX\scan-failures.log</code>.</li><li>Haz clic en <code>Reescanear todo...</code> para volver a intentarlo con los archivos que fallaron.</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">Un proyecto usa un plugin que no está instalado</h3>
+<p>Un efecto se sustituye por un efecto de LYNX SHARE con la misma función, y sus ajustes se conservan en el proyecto. <code>Ayuda › Archivos que faltan...</code> lista lo que falta. Consulta <a href="/wiki/built-in/">Instrumentos y efectos integrados</a>.</p>
+<h3 id="video-does-not-work-on-linux">El vídeo no funciona en Linux</h3>
+<p>Las pistas de vídeo y <code>Export with video</code> necesitan FFmpeg. LYNX SHARE indica cómo instalarlo.</p>
+<h2 id="crash-reports">Informaciónrmes de fallos</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="La pregunta del informe de fallos que aparece en el siguiente arranque, con Enviar, Mostrar lo que se enviará y No enviar" loading="lazy" width="640" height="244"></a></figure>
+<p>Los informes de fallos son opcionales. Tras un fallo o un bloqueo, el siguiente arranque pregunta si quieres enviar un informe.</p>
+<div class="tablewrap"><table><thead><tr><th>Comando</th><th>Qué hace</th></tr></thead><tbody><tr><td><code>Mostrar lo que se enviará</code></td><td>Muestra el texto exacto</td></tr><tr><td><code>Informar en GitHub en su lugar</code></td><td>Abre el formulario de incidencias de GitHub, ya rellenado. Los archivos los adjuntas tú</td></tr><tr><td><code>Abrir la carpeta con el informe</code></td><td>Muestra los archivos del informe en tu ordenador</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>Desactivado, solo se envía la extensión de cada archivo</td></tr><tr><td><code>Enviar siempre sin preguntar</code></td><td>Envía los informes futuros sin preguntar</td></tr></tbody></table></div>
+<p><code>Informes de fallos</code> en <code>Opciones › Configuración general...</code> fija <code>Ask</code> (el valor por defecto), <code>Enviar siempre</code> o <code>No enviar nunca</code>.</p>
+<p>Un informe contiene la versión de LYNX SHARE, el sistema operativo, la CPU, las tarjetas gráficas y sus drivers, el tamaño de pantalla, el driver y dispositivo de audio, el archivo del fallo o bloqueo, los últimos 60 pasos de la sesión y los nombres y versiones de los plugins de terceros que se cargaron.</p>
+<p>No contiene audio, proyectos, samples, el nombre de tu ordenador ni tu nombre de usuario. El servidor no guarda ninguna dirección IP. Los ids enviados se listan en <code>crash-reports\sent.log</code> en la carpeta de configuración. Para que se borre un informe, abre una incidencia con su id. El texto completo está en la <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">política de privacidad</a>.</p>
+<h2 id="report-a-problem">Informaciónrmar de un problema</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="La ventana Informar de un problema: un cuadro de descripción, una dirección de correo opcional y el botón Enviar" loading="lazy" width="640" height="364"></a></figure>
+<ol><li>Elige <code>Ayuda › Informar de un problema...</code>.</li><li>Describe lo que pasó. La dirección de correo es opcional, por si quieres una respuesta.</li><li>Deja marcado <code>Adjuntar los archivos de fallo / bloqueo más recientes y los pasos de esta sesión</code> si el problema fue un fallo.</li><li>Haz clic en <code>Mostrar lo que se enviará</code> para revisar el texto.</li><li>Haz clic en <code>Enviar</code>. No se envía nada antes de eso.</li></ol>
+<p>También puedes abrir una incidencia en <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>.</p>
+<h2 id="good-to-know">Conviene saber</h2>
+<ul><li>Tras un fallo, las copias de seguridad de tu proyecto están en la carpeta de autoguardado de LYNX SHARE.</li><li>Cuando un plugin intervino en el fallo, la pregunta ofrece ejecutar ese plugin en un proceso aparte a partir de ahora.</li><li>La carpeta de configuración es <code>%APPDATA%\LYNX</code> en Windows, <code>~/Library/Application Support/LYNX</code> en macOS y <code>~/.config/LYNX</code> en Linux.</li></ul>
+<h2 id="related">Relacionado</h2>
+<ul><li><a href="/wiki/audio-setup/">Configuración de audio</a></li><li><a href="/wiki/plugins/">Plugins de terceros</a></li><li><a href="/wiki/install/">Instalar</a></li><li><a href="/faq/">Preguntas frecuentes</a></li><li><a href="/why/#crash">Protección contra fallos</a></li></ul>

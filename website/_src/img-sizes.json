@@ -1,0 +1,178 @@
+{
+"/assets/img/automation.webp": [
+760,
+300
+],
+"/assets/img/cliplaunch.webp": [
+1920,
+1080
+],
+"/assets/img/eq.webp": [
+960,
+560
+],
+"/assets/img/favicon.png": [
+64,
+64
+],
+"/assets/img/hero.webp": [
+1920,
+1080
+],
+"/assets/img/logo.png": [
+256,
+256
+],
+"/assets/img/mixer.webp": [
+1920,
+1080
+],
+"/assets/img/pianoroll.webp": [
+1920,
+1080
+],
+"/assets/img/playlist.webp": [
+1920,
+1080
+],
+"/assets/img/rack.webp": [
+1074,
+420
+],
+"/assets/img/synth.webp": [
+720,
+510
+],
+"/assets/img/wiki/automation-lfo.webp": [
+760,
+346
+],
+"/assets/img/wiki/automation.webp": [
+760,
+300
+],
+"/assets/img/wiki/browser-plugins.webp": [
+1600,
+900
+],
+"/assets/img/wiki/browser-tree.webp": [
+1600,
+900
+],
+"/assets/img/wiki/crash-report.webp": [
+640,
+244
+],
+"/assets/img/wiki/desktop.webp": [
+1600,
+900
+],
+"/assets/img/wiki/eventeditor.webp": [
+980,
+400
+],
+"/assets/img/wiki/export-flac-stems.webp": [
+620,
+462
+],
+"/assets/img/wiki/export.webp": [
+620,
+462
+],
+"/assets/img/wiki/history.webp": [
+340,
+420
+],
+"/assets/img/wiki/midi-import-dialog.webp": [
+550,
+373
+],
+"/assets/img/wiki/missing-files.webp": [
+760,
+560
+],
+"/assets/img/wiki/mixer-input.webp": [
+1600,
+900
+],
+"/assets/img/wiki/mixer-sends.webp": [
+1600,
+900
+],
+"/assets/img/wiki/pianoroll-tools.webp": [
+900,
+40
+],
+"/assets/img/wiki/playlist-tools.webp": [
+900,
+40
+],
+"/assets/img/wiki/plugin-manager-scan.webp": [
+980,
+270
+],
+"/assets/img/wiki/plugin-monitor.webp": [
+720,
+380
+],
+"/assets/img/wiki/quickadd.webp": [
+640,
+420
+],
+"/assets/img/wiki/rack-graph.webp": [
+1600,
+900
+],
+"/assets/img/wiki/record-dialog.webp": [
+475,
+389
+],
+"/assets/img/wiki/report-problem.webp": [
+640,
+364
+],
+"/assets/img/wiki/session-chat.webp": [
+436,
+419
+],
+"/assets/img/wiki/session-send.webp": [
+395,
+343
+],
+"/assets/img/wiki/session-start.webp": [
+474,
+294
+],
+"/assets/img/wiki/session-windows.webp": [
+1418,
+560
+],
+"/assets/img/wiki/settings-audio.webp": [
+680,
+620
+],
+"/assets/img/wiki/settings-general.webp": [
+680,
+620
+],
+"/assets/img/wiki/settings-midi.webp": [
+680,
+620
+],
+"/assets/img/wiki/settings-project.webp": [
+680,
+620
+],
+"/assets/img/wiki/shortcuts.webp": [
+860,
+620
+],
+"/assets/img/wiki/toolbar-1920.webp": [
+1600,
+62
+],
+"/assets/img/wiki/touch-keyboard.webp": [
+820,
+210
+]
+}

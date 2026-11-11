@@ -14,6 +14,7 @@
 #include "ui/PluginSkin.h"
 #include "ui/ProEditors.h"
 #include "ui/QuickPick.h"
+#include "ui/ShotScale.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/VisualEditors.h"
 #include "core/FlExtraFx.h"
@@ -259,11 +260,10 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
 
 // the editor's drawn part: the frame of the window / channel page around it is often wider than its controls (a
 // generator's page is at least the channel window's width), so the borders of the background's own colour are cut,
-// keeping a small margin; a very tall editor (Control Surface's column) keeps its top part, at most 1.3 × its width
-juce::Image trimToContent (const juce::Image& image)
+// keeping a small margin; a very tall editor (Control Surface's column) keeps its top part, at most 1.3 × its width.
+// `full` (round 190bi, a whole-editor picture): the height is kept whole.
+juce::Rectangle<int> contentArea (const juce::Image& image, bool full)
 {
-    if (! image.isValid())
-        return image;
     const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
     const auto w = image.getWidth(), h = image.getHeight();
     const auto bg = data.getPixelColour (juce::jmin (3, w - 1), juce::jmin (3, h - 1));
@@ -283,15 +283,28 @@ juce::Image trimToContent (const juce::Image& image)
                 bottom = juce::jmax (bottom, y);
             }
     if (right < left || bottom < top)
-        return image;
+        return image.getBounds();
     auto area = juce::Rectangle<int>::leftTopRightBottom (left, top, right + 2, bottom + 2).expanded (10).getIntersection (image.getBounds());
     if (area.getWidth() < w / 4 || area.getHeight() < h / 6) // (a stray mark: keep it whole)
         area = image.getBounds();
-    if (area.getHeight() > area.getWidth() * 13 / 10)
+    if (! full && area.getHeight() > area.getWidth() * 13 / 10)
         area.setHeight (area.getWidth() * 13 / 10);
+    return area;
+}
+
+// `area` of `image` as a picture of its own
+juce::Image cropped (const juce::Image& image, juce::Rectangle<int> area)
+{
+    if (! image.isValid())
+        return image;
     juce::Image out (juce::Image::ARGB, area.getWidth(), area.getHeight(), true);
     juce::Graphics (out).drawImageAt (image.getClippedImage (area), 0, 0);
     return out;
+}
+
+juce::Image trimToContent (const juce::Image& image)
+{
+    return image.isValid() ? cropped (image, contentArea (image, false)) : image;
 }
 
 std::unique_ptr<juce::ChildProcess>& child()
@@ -350,7 +363,7 @@ juce::Image shrink (const juce::Image& image, float pixelsPerUnit)
     return from.rescaled (w, h, juce::Graphics::highResamplingQuality);
 }
 
-int renderNative (const juce::File& folder, const juce::StringArray& only, const std::function<void (const juce::String&)>& progress)
+int renderNative (const juce::File& folder, const juce::StringArray& only, const std::function<void (const juce::String&)>& progress, float fullScale)
 {
     folder.createDirectory();
     // one drawing process at a time for this folder (two LYNX windows open the picker together)
@@ -362,7 +375,7 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
     AudioEngine engine (false);
     int drawn = 0;
     auto shoot = [&] (const std::string& key, std::unique_ptr<juce::Component> editor, int cropTop) {
-        const auto file = folder.getChildFile (fileNameFor (key));
+        const auto file = shot::file (folder.getChildFile (fileNameFor (key)));
         if (editor == nullptr || editor->getWidth() <= 0 || editor->getHeight() <= cropTop)
         {
             if (progress)
@@ -371,7 +384,17 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
         }
         const auto t0 = juce::Time::getMillisecondCounterHiRes();
         const auto area = editor->getLocalBounds().withTrimmedTop (cropTop);
-        const auto picture = shrink (trimToContent (editor->createComponentSnapshot (area, true, 1.0f)));
+        juce::Image picture;
+        if (fullScale > 0.0f)
+        {
+            // (the drawn part found at 100 %, then cut from the picture at the scale: every scale gets the same layout box,
+            // so the 2x file is exactly twice the 1x one)
+            const auto box = contentArea (editor->createComponentSnapshot (area, true, 1.0f), true);
+            const auto big = editor->createComponentSnapshot (area, true, fullScale);
+            picture = cropped (big, (box.toFloat() * fullScale).toNearestInt().getIntersection (big.getBounds()));
+        }
+        else
+            picture = shrink (trimToContent (editor->createComponentSnapshot (area, true, 1.0f)));
         if (savePng (picture, file))
             ++drawn;
         if (progress)
@@ -381,38 +404,55 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
     auto wanted = [&] (const std::string& key) {
         if (! only.isEmpty() && ! only.contains (juce::String::fromUTF8 (key.c_str())))
             return false;
-        return ! folder.getChildFile (fileNameFor (key)).existsAsFile();
+        return ! shot::file (folder.getChildFile (fileNameFor (key))).existsAsFile();
     };
 
+    // round 190bi: one plugin that throws (the Linux build: std::bad_function_call) is reported and skipped instead of
+    // ending the whole run with the pictures after it undrawn
+    auto guarded = [&] (const std::string& key, const std::function<void()>& draw) {
+        try
+        {
+            draw();
+        }
+        catch (const std::exception& e)
+        {
+            if (progress)
+                progress (juce::String::fromUTF8 (key.c_str()) + ": failed (" + e.what() + ")");
+        }
+    };
     for (const auto& g : quickpick::generatorEntries (engine))
     {
         if (g.folder == 3 || ! g.available || ! g.make || ! wanted (g.key))
             continue;
-        auto channel = g.make();
-        if (! channel.has_value())
-            continue;
-        if (channel->instrument == InstrumentKind::patcher) // (its window is its node graph, as the Channel Rack opens it)
-        {
-            auto frame = generatorEditor (engine, std::move (*channel));
-            shoot (g.key, PatcherWindows::makeChannelEditor (engine, 0), 0);
-            continue;
-        }
-        addDemoContent (*channel);
-        const auto video = channel->instrument == InstrumentKind::videoplayer;
-        auto editor = generatorEditor (engine, std::move (*channel));
-        if (video && editor != nullptr)
-            showVideoStill (*editor, demoVideoFrame());
-        shoot (g.key, std::move (editor), channelFrameHeaderHeight());
+        guarded (g.key, [&] {
+            auto channel = g.make();
+            if (! channel.has_value())
+                return;
+            if (channel->instrument == InstrumentKind::patcher) // (its window is its node graph, as the Channel Rack opens it)
+            {
+                auto frame = generatorEditor (engine, std::move (*channel));
+                shoot (g.key, PatcherWindows::makeChannelEditor (engine, 0), 0);
+                return;
+            }
+            addDemoContent (*channel);
+            const auto video = channel->instrument == InstrumentKind::videoplayer;
+            auto editor = generatorEditor (engine, std::move (*channel));
+            if (video && editor != nullptr)
+                showVideoStill (*editor, demoVideoFrame());
+            shoot (g.key, std::move (editor), channelFrameHeaderHeight());
+        });
     }
     for (const auto& f : quickpick::effectEntries (engine))
     {
         if (f.folder == 3 || ! f.make || ! wanted (f.key))
             continue;
-        auto slot = f.make();
-        if (! slot.has_value())
-            continue;
-        addDemoContent (*slot, folder);
-        shoot (f.key, effectEditor (engine, std::move (*slot)), 0);
+        guarded (f.key, [&] {
+            auto slot = f.make();
+            if (! slot.has_value())
+                return;
+            addDemoContent (*slot, folder);
+            shoot (f.key, effectEditor (engine, std::move (*slot)), 0);
+        });
     }
     engine.setSong (Song {});
     folder.getChildFile ("demo-voice.wav").deleteFile();

@@ -656,6 +656,25 @@ std::vector<std::string> sheetMoveNames (const std::vector<std::string>& names)
     return moves;
 }
 
+std::vector<SheetKey> sheetKeys (const std::vector<std::string>& names)
+{
+    std::vector<SheetKey> out;
+    const auto moves = sheetMoveNames (names);
+    for (int m = 0; m < (int) moves.size() && firstMoveKey + m <= 127; ++m)
+        out.push_back ({ firstMoveKey + m, moves[(std::size_t) m] });
+    return out;
+}
+
+std::string sheetHeldName (const std::vector<std::string>& names)
+{
+    return names.empty() ? std::string() : names.back();
+}
+
+SheetFrame danceFrame (SheetAnimator& animator, double cycles, int rows, const Settings& settings, bool playing, bool held) noexcept
+{
+    return animator.advance (cycles, rows, settings.move, settings.mirrored, playing, settings.blend, held, settings.sync);
+}
+
 SheetAnimator::SheetAnimator (std::uint32_t seed) noexcept : random (seed != 0 ? seed : 1) {}
 
 void SheetAnimator::draw (int rows) noexcept

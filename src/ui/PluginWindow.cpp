@@ -2444,7 +2444,8 @@ void addPluginItems (juce::PopupMenu& menu, AudioEngine& engine, bool instrument
     if (kind == 0 && ! onBuiltIn)
         menu.addItem (tr ("(no plugins found; use \"Scan for plugins\")"), false, false, [] {});
     else
-        menu.addItem (instruments ? tr ("More plugins... ({0} instruments)", { juce::String (kind) }) : tr ("More plugins... ({0} effects)", { juce::String (kind) }),
+        menu.addItem (kind == 1 ? (instruments ? tr ("More plugins... (1 instrument)") : tr ("More plugins... (1 effect)")) // (round 190bj)
+                      : instruments ? tr ("More plugins... ({0} instruments)", { juce::String (kind) }) : tr ("More plugins... ({0} effects)", { juce::String (kind) }),
                       [&engine, instruments, onChosen, onBuiltIn, safe = juce::Component::SafePointer<juce::Component> (owner), hasOwner = owner != nullptr] {
                           showPluginPicker (
                               engine, instruments,

@@ -1552,6 +1552,14 @@ AudioEngine::RecordingSettings loadRecordingSettings()
 
 void AudioEngine::setRecordingSettings (const RecordingSettings& settings)
 {
+    // round 190bj (issue B3): takes whose files are ready but empty (made when the previous take ended, the track still
+    // armed) take the new sample format too; one that has samples keeps its own
+    if (settings.format != recordingSettings.format)
+        for (auto& take : openTakes)
+        {
+            const juce::ScopedLock lock (take->drainMutex);
+            take->writer.changeFormat (settings.format);
+        }
     recordingSettings = settings;
     juce::String text;
     text << "format=" << (settings.format == takes::SampleFormat::float32 ? "float32" : settings.format == takes::SampleFormat::pcm16 ? "pcm16" : "pcm24") << "\n"

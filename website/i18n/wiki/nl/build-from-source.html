@@ -1,0 +1,36 @@
+<p>LYNX SHARE is geschreven in C++20 met JUCE 8 en wordt gebouwd met CMake. De broncode staat op <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a> onder de GNU Affero General Public License v3.0. De releasebestanden worden door GitHub Actions gebouwd uit de getagde broncode, dus je hebt deze pagina alleen nodig om de code te wijzigen of voor jezelf te bouwen.</p>
+<h2 id="build-on-linux">Bouwen op Linux</h2>
+<ol><li>Installeer de afhankelijkheden die hieronder staan.</li><li>Haal de broncode op met <code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code> en ga naar de map <code>lynx</code>.</li><li>Configureer met <code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code>.</li><li>Bouw met <code>cmake --build build</code>.</li></ol>
+<p>De afhankelijkheden op Ubuntu 24.04:</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">Bouwen op Windows met Visual Studio</h2>
+<p>Vereist Visual Studio 2022 Build Tools met &quot;Desktop development with C++&quot;, CMake 3.22 of nieuwer en Git.</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">Voor Windows bouwen vanuit WSL of Linux</h2>
+<p>Zo wordt het project zelf ontwikkeld: het Windows-programma wordt met Zig gecrosscompileerd, zonder Visual Studio.</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>Het resultaat is <code>build-win/LYNX.exe</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>Vereiste</th><th>Versie</th><th>Standaardlocatie</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE haal je op met:</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>Stel de omgevingsvariabelen <code>ZIG</code> en <code>JUCE_DIR</code> in als jouw paden anders zijn.</p>
+<h2 id="build-on-macos">Bouwen op macOS</h2>
+<p>Je hebt de Xcode-opdrachtregeltools nodig (<code>xcode-select --install</code>), CMake en Ninja, bijvoorbeeld met <code>brew install cmake ninja</code>.</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code> levert een universele app op. Laat het weg om alleen voor de huidige Mac te bouwen.</p>
+<h2 id="run-the-core-tests">De kerntests draaien</h2>
+<p>De kern (model, sequencer, instrumenten, effecten en <code>.flp</code>-import) is gewone C++ en wordt zonder JUCE getest, met elke C++20-compiler.</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>De run moet eindigen met <code>N checks, 0 failures</code>. Krijgt het script de map <code>Data</code> van een FL Studio 2026-installatie, dan leest het ook de <code>.flp</code>-projecten die met FL Studio meekomen. Het script bouwt ook twee kleine tools: <code>build-local/flpdump</code>, dat een <code>.flp</code> dumpt, en <code>build-local/renderwav</code>.</p>
+<p>Na een build kan het programma zichzelf controleren zonder audioapparaat:</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>Het rapport eindigt met <code>result=OK</code>. Meer opties staan op de pagina <a href="/wiki/command-line/">Opdrachtregel</a>.</p>
+<h2 id="the-source-tree">De broncodeboom</h2>
+<div class="tablewrap"><table><thead><tr><th>Map</th><th>Wat erin zit</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>Model, sequencer, instrumenten, effecten en <code>.flp</code>-import. Gewone C++, testbaar zonder JUCE</td></tr><tr><td><code>src/flp/</code></td><td>De lezer van het <code>.flp</code>-formaat</td></tr><tr><td><code>src/engine/</code></td><td>De audio-engine: apparaat, graph, samples, plugins, projectbestanden</td></tr><tr><td><code>src/ui/</code></td><td>De interface: Channel Rack, Piano Roll, Playlist, Mixer, vensters</td></tr><tr><td><code>third_party/</code></td><td>CLAP en de WavPack-decoder</td></tr><tr><td><code>tests/</code></td><td>De kerntests</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>Architectuur, status, roadmap en de gedragsanalyse van FL Studio</td></tr></tbody></table></div>
+<h2 id="good-to-know">Goed om te weten</h2>
+<ul><li>JUCE 8 ondersteunt MinGW niet officieel. Het Zig-buildscript omzeilt de verschillen. De fixes staan in <code>cmake/mingw/</code> en <code>src/platform/MingwFixes.cpp</code>.</li><li>Draai maar één <code>build-windows-zig.sh</code> tegelijk. Twee Zig-builds tegelijk kunnen vastlopen. Geef bij parallelle builds in aparte worktrees elk een eigen cache met <code>ZIG_GLOBAL_CACHE_DIR</code> en <code>ZIG_LOCAL_CACHE_DIR</code>.</li><li>Sommige engines lezen ingebouwde geluiden en tabellen uit jouw eigen FL Studio-installatie. Er zit niets van FL Studio in de repository.</li><li>Een deel van de documentatie in <code>docs/</code> is nog in het Portugees. Het wordt vertaald.</li><li>Verspreid je een aangepaste versie, ook als netwerkdienst, dan verplicht de licentie je de broncode ervan onder dezelfde licentie te publiceren.</li></ul>
+<h2 id="related">Gerelateerd</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">De volledige ontwikkelomgeving (SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LYNX SHARE op Linux (LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">De repository en de README</a></li><li><a href="/wiki/command-line/">Opdrachtregel</a></li><li><a href="/wiki/file-formats/">Bestandsformaten</a></li></ul>

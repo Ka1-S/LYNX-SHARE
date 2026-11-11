@@ -688,8 +688,8 @@ bool PianoRollComponent::refuseFrozenEdit()
     const auto channel = engine.getSelectedChannel();
     if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
         return false;
-    ui::postHint ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
-                  4000);
+    ui::postNotice ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
+                    3000);
     return true;
 }
 
@@ -4611,8 +4611,14 @@ bool PianoRollComponent::playheadFrame (double)
 
         // Follow: a page further when the playhead leaves the view (off: the view stays where it is)
         const auto grid = gridArea();
-        const auto newStart = transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
-                                                              20.0 / pixelsPerTick);
+        // (Pattern mode loops the pattern: the view holds still at its end and comes back in one jump at the wrap;
+        // a take with Loop record off, and Song mode, go on past it: plain paging)
+        const auto& followSong = engine.getSong();
+        const auto loops = followSong.mode == PlayMode::pattern && engine.patternLinearOrigin() < 0.0 && followSong.currentPattern >= 0
+                           && followSong.currentPattern < (int) followSong.patterns.size();
+        const auto loopTicks = loops ? (double) followSong.patterns[(std::size_t) followSong.currentPattern].effectiveLength (followSong.beatsPerBar) : 0.0;
+        const auto newStart = transportedit::followViewStartInLoop (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
+                                                                    20.0 / pixelsPerTick, loopTicks);
 
         if (EditorGlobals::get().isFollowing (true) && tick >= 0.0 && newStart != scrollTicks && drag == Drag::none)
         {

@@ -1,0 +1,53 @@
+<p>Каждый заголовок ниже — отдельная проблема. Если вашей здесь нет, сообщите о ней так, как описано в конце.</p>
+<h2 id="starting-the-program">Запуск программы</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: SmartScreen предупреждает при первом запуске</h3>
+<p>Исполняемый файл пока не подписан цифровой подписью, поэтому при первом запуске SmartScreen может выдать предупреждение.</p>
+<ol><li>Нажмите <code>More info</code>.</li><li>Нажмите <code>Run anyway</code>.</li></ol>
+<p>Для установщика не нужны права администратора.</p>
+<h3 id="macos-cannot-be-opened">macOS: «не удается открыть»</h3>
+<p>Приложение не нотаризовано Apple и не имеет подписи Developer ID, поэтому при первом запуске нужен один дополнительный шаг.</p>
+<ol><li>Перетащите LYNX SHARE в <code>Applications</code>.</li><li>Щелкните его правой кнопкой (или с Control) и выберите <code>Открыть</code>.</li><li>Нажмите <code>Открыть</code> еще раз.</li></ol>
+<p>В macOS 15 Sequoia или новее попробуйте открыть программу один раз, затем перейдите в <code>System Settings › Privacy &amp; Security</code> и нажмите <code>Open Anyway</code>. Или в Терминале:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS запрашивает доступ к микрофону при первой записи.</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: AppImage не запускается</h3>
+<p>LYNX SHARE нужна система x86_64 с glibc 2.35 или новее (Ubuntu 22.04, Debian 12, Fedora 36, актуальный Arch или Manjaro) и X11 или XWayland.</p>
+<ol><li>Сделайте файл исполняемым и запустите его двумя командами ниже.</li><li>Если он по-прежнему не запускается, установите libfuse2. Пакет называется <code>libfuse2</code> в Ubuntu 22.04, <code>libfuse2t64</code> в Ubuntu 24.04, <code>fuse2</code> в Arch и <code>fuse-libs</code> в Fedora.</li><li>Если вы не хотите его устанавливать, скачайте вместо этого <code>.tar.gz</code>, распакуйте его и запустите <code>./install.sh</code>.</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> устанавливает LYNX SHARE для вашего пользователя в <code>~/.local</code> с пунктом меню. <code>./install.sh --uninstall</code> удаляет его.</p>
+<h2 id="sound">Звук</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">Нет звука или выбрано не то аудиоустройство</h3>
+<ol><li>Откройте <code>Опции › Настройки аудио...</code>.</li><li>Выберите драйвер.</li><li>Выберите устройство вывода.</li></ol>
+<div class="tablewrap"><table><thead><tr><th>Система</th><th>Драйверы</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO и встроенный драйвер LYNX ASIO</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (нативный), JACK и ALSA. При первом запуске LYNX SHARE открывает первый из них, у которого есть устройства</td></tr></tbody></table></div>
+<p>ASIO — модель драйверов Windows и существует только в Windows. <code>Опции › Мастер настройки (язык, аудио, папки плагинов)...</code> тоже проверяет аудиоустройство. См. <a href="/wiki/audio-setup/">Настройка звука</a>.</p>
+<h3 id="linux-the-sound-breaks-up">Linux: звук прерывается</h3>
+<p>Аудиопоток должен работать с приоритетом реального времени.</p>
+<ol><li>Откройте <code>Опции › Настройки аудио...</code> и прочитайте <code>Статус</code>. Там видно, получил ли поток приоритет реального времени.</li><li>Если нет, установите rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> или <code>sudo pacman -S rtkit</code>) либо добавьте себя в группу <code>audio</code> с лимитом реального времени, как в конфигурациях JACK.</li><li>Выйдите из системы и войдите снова.</li></ol>
+<p>Подробности есть в <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h2 id="plugins">Плагины</h2>
+<h3 id="a-plugin-crashes">Плагин падает</h3>
+<p>Запустите его в собственном процессе, чтобы останавливался только плагин.</p>
+<ol><li>Откройте <code>Опции › Общие настройки...</code>.</li><li>Включите <code>Запускать плагины в отдельном процессе (защищает LYNX SHARE от сбоев)</code>.</li><li>Откройте проект заново.</li></ol>
+<p>Плагин, который упал или перестал отвечать в собственном процессе, заглушается. Сохраните проект и откройте его снова, чтобы загрузить плагин заново. См. <a href="/wiki/plugins/">Сторонние плагины</a>.</p>
+<h3 id="a-plugin-is-not-in-the-list">Плагина нет в списке</h3>
+<ol><li>Выберите <code>Опции › Поиск плагинов</code>.</li><li>Если его все равно нет, откройте <code>Опции › Менеджер плагинов...</code>, нажмите <code>Папки плагинов...</code> и добавьте папку плагина.</li><li>Посмотрите вкладку <code>С ошибкой</code>. Файл плагина, не прошедший сканирование, пропускается. В Windows причина записана в <code>%APPDATA%\LYNX\scan-failures.log</code>.</li><li>Нажмите <code>Сканировать все...</code>, чтобы попробовать неудачные файлы еще раз.</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">Проект использует плагин, который не установлен</h3>
+<p>Эффект заменяется эффектом LYNX SHARE с той же ролью, а его настройки остаются в проекте. <code>Справка › Отсутствующие файлы...</code> перечисляет, чего не хватает. См. <a href="/wiki/built-in/">Встроенные инструменты и эффекты</a>.</p>
+<h3 id="video-does-not-work-on-linux">Видео не работает в Linux</h3>
+<p>Для видеодорожек и <code>Export with video</code> нужен FFmpeg. LYNX SHARE подскажет, как его установить.</p>
+<h2 id="crash-reports">Отчеты о сбоях</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="Вопрос об отчете о сбое при следующем запуске, с кнопками отправки, показа отправляемого и отказа" loading="lazy" width="640" height="244"></a></figure>
+<p>Отчеты о сбоях отправляются только по вашему согласию. После сбоя или зависания при следующем запуске программа спрашивает, отправлять ли отчет.</p>
+<div class="tablewrap"><table><thead><tr><th>Команда</th><th>Что делает</th></tr></thead><tbody><tr><td><code>Показать, что будет отправлено</code></td><td>Показывает точный текст</td></tr><tr><td><code>Сообщить на GitHub</code></td><td>Открывает форму issue на GitHub, уже заполненную. Файлы вы прикладываете сами</td></tr><tr><td><code>Открыть папку с отчетом</code></td><td>Показывает файлы отчета на вашем компьютере</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>Если выключено, отправляется только расширение каждого файла</td></tr><tr><td><code>Всегда отправлять без вопросов</code></td><td>Отправляет будущие отчеты без вопроса</td></tr></tbody></table></div>
+<p><code>Отчеты о сбоях</code> в <code>Опции › Общие настройки...</code> задает <code>Ask</code> (по умолчанию), <code>Всегда отправлять</code> или <code>Никогда не отправлять</code>.</p>
+<p>Отчет содержит версию LYNX SHARE, операционную систему, процессор, видеокарты и их драйверы, размер экрана, аудиодрайвер и устройство, файл сбоя или зависания, последние 60 шагов сеанса, а также имена и версии загруженных сторонних плагинов.</p>
+<p>В нем нет аудио, проектов, сэмплов, имени вашего компьютера и имени пользователя. Сервер не хранит IP-адреса. Отправленные идентификаторы перечислены в <code>crash-reports\sent.log</code> в папке настроек. Чтобы отчет удалили, откройте issue с его идентификатором. Полный текст находится в <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">политике конфиденциальности</a>.</p>
+<h2 id="report-a-problem">Сообщение о проблеме</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="Окно сообщения о проблеме: поле описания, необязательный адрес e-mail и кнопка отправки" loading="lazy" width="640" height="364"></a></figure>
+<ol><li>Выберите <code>Справка › Сообщить о проблеме...</code>.</li><li>Опишите, что произошло. Адрес e-mail указывать необязательно, он нужен, если вы хотите получить ответ.</li><li>Оставьте флажок <code>Приложить последние файлы сбоев / зависаний и шаги этого сеанса</code> отмеченным, если проблема была в сбое.</li><li>Нажмите <code>Показать, что будет отправлено</code>, чтобы проверить текст.</li><li>Нажмите <code>Отправить</code>. До этого ничего не отправляется.</li></ol>
+<p>Можно также открыть issue на <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>.</p>
+<h2 id="good-to-know">Что стоит знать</h2>
+<ul><li>После сбоя резервные копии вашего проекта лежат в папке автосохранений LYNX SHARE.</li><li>Если в сбое участвовал плагин, в вопросе предлагается запускать этот плагин в отдельном процессе в дальнейшем.</li><li>Папка настроек — <code>%APPDATA%\LYNX</code> в Windows, <code>~/Library/Application Support/LYNX</code> в macOS и <code>~/.config/LYNX</code> в Linux.</li></ul>
+<h2 id="related">См. также</h2>
+<ul><li><a href="/wiki/audio-setup/">Настройка звука</a></li><li><a href="/wiki/plugins/">Сторонние плагины</a></li><li><a href="/wiki/install/">Установка</a></li><li><a href="/faq/">FAQ</a></li><li><a href="/why/#crash">Защита от сбоев</a></li></ul>

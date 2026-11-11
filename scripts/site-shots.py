@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""Turn the renders of scripts/site-shots.sh into the pictures the website and the README use, at 1x and 2x (Pillow).
+
+    python3 scripts/site-shots.py RENDERS [--site website] [--docs docs/img] [--dry-run]
+
+RENDERS is what site-shots.sh wrote: x1/ and x2/ (one folder per pixel scale, the same file names in each: snap/,
+snap1600/, grid/, grid1600/, plugui/, extra/, thumbs/, dance/) and art/ (--artshot draws 100 % and 200 % itself).
+
+Writes (names as website/_src/build.py reads them):
+  website/assets/img/<name>.webp + <name>@2x.webp           the Home / Features pictures (TOP below)
+  website/assets/img/plugins/<id>.webp + <id>@2x.webp       every entry of _src/catalog.json (its "img" names the render)
+  website/assets/img/wiki/<name>.webp + <name>@2x.webp      every /assets/img/wiki/<name>.webp a page or article uses
+  website/_src/catalog-img.json, website/_src/img-sizes.json the 1x sizes (build.py writes width/height from them;
+                                                             a catalog entry [w, h, 2] has an @2x file for srcset)
+  docs/img/<name>.png + <name>@2x.png                        the README's pictures (README_PICTURES below)
+The @2x file is always exactly twice the 1x file's size and is drawn by the program at 2x (never an upscale). A 2x
+render missing for a picture: no @2x file is written (and an old one is removed), the table says so.
+Pictures larger than the page shows are fitted (plugins 960 px wide, wiki 1600 px) with the same factor at both scales.
+WebP: lossless when that costs little (flat interface pictures), else quality 92 (1x) / 88 (2x). Prints a table.
+"""
+import argparse
+import io
+import json
+import re
+import sys
+from pathlib import Path
+
+from PIL import Image
+
+# Home / Features pictures: name -> (render, crop box at 1x or None)
+TOP = {
+    "hero": ("snap/s-desktop.png", None),
+    "playlist": ("snap/s-playlist.png", None),
+    "pianoroll": ("snap/s-pianoroll.png", None),
+    "mixer": ("snap/s-mixer.png", None),
+    "rack": ("snap/s-rack.png", (0, 0, 1074, 420)),
+    "automation": ("snap/s-automation.png", None),
+    "synth": ("snap/s-synth.png", None),
+    "eq": ("art/facet-eq-after", None),
+    "cliplaunch": ("grid/g-both.png", None),
+}
+# the README's pictures (docs/img/<name>.png): the 1600 x 900 window for the wide ones, as the README had them
+README_PICTURES = {
+    "workspace": ("snap1600/s-desktop.png", None),
+    "playlist": ("snap/s-playlist.png", (150, 75, 1920, 800)),
+    "channel-rack": ("snap/s-rack.png", (0, 0, 1074, 420)),
+    "piano-roll": ("snap1600/s-pianoroll.png", None),
+    "mixer": ("snap1600/s-mixer.png", None),
+    "synth": ("snap/s-synth.png", None),
+    "eq": ("art/facet-eq-after", None),
+    "automation": ("snap/s-automation.png", None),
+    "clip-launch": ("grid1600/g-both.png", None),
+}
+# wiki pictures that are a part of a snapshot: name -> (snapshot, box at 1x). The Plugin manager's sample rows name
+# other makers' plugins, so the site shows only the part below them (same as website/_src/import-shots.py).
+CROPS = {"plugin-manager-scan": ("plugin-manager", (0, 330, 980, 600))}
+
+
+def render(root, ref, scale):
+    """The file of render `ref` at `scale` (1 or 2), or None. art/<name>-after: --artshot's own -100 / -200 files."""
+    if ref.startswith("art/"):
+        name = re.sub(r"-(100|200)\.png$", "", ref)
+        f = root / ("%s-%d.png" % (name, 100 * scale))
+    else:
+        f = root / ("x%d" % scale) / ref
+    return f if f.is_file() else None
+
+
+def webp(im, quality):
+    im = im.convert("RGB")
+    lossy, exact = io.BytesIO(), io.BytesIO()
+    im.save(lossy, "WEBP", quality=quality, method=6)
+    im.save(exact, "WEBP", lossless=True, method=4)
+    return exact.getvalue() if exact.tell() <= 1.35 * lossy.tell() else lossy.getvalue()
+
+
+def png(im):
+    out = io.BytesIO()
+    im.convert("RGB").save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
+class Writer:
+    def __init__(self, dry):
+        self.dry, self.rows = dry, []
+
+    def put(self, dest, data, size, source):
+        if not self.dry:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists() or dest.read_bytes() != data:
+                dest.write_bytes(data)
+        self.rows.append((str(dest), "%dx%d" % size, len(data), source))
+
+    def drop(self, dest):
+        if dest.exists() and not self.dry:
+            dest.unlink()
+
+    def pair(self, root, ref, box, dest1, dest2, maxw=None, fmt="webp"):
+        """One picture at 1x and 2x. Returns the 1x size [w, h] (+ [2] when the @2x file exists), or None."""
+        f1, f2 = render(root, ref, 1), render(root, ref, 2)
+        if f1 is None:
+            self.rows.append((str(dest1), "-", 0, "MISSING " + ref))
+            return None
+        one = Image.open(f1)
+        if box:
+            one = one.crop(box)
+        k = 1.0 if not maxw or one.width <= maxw else maxw / one.width
+        if k != 1.0:
+            one = one.resize((maxw, round(one.height * k)), Image.LANCZOS)
+        enc = (lambda im, q: webp(im, q)) if fmt == "webp" else (lambda im, q: png(im))
+        self.put(dest1, enc(one, 92), one.size, str(f1))
+        dims = [one.width, one.height]
+        if f2 is None:
+            self.drop(dest2)
+            self.rows.append((str(dest2), "-", 0, "no 2x render of " + ref))
+            return dims
+        two = Image.open(f2)
+        if box:
+            two = two.crop(tuple(2 * v for v in box))
+        want = (2 * one.width, 2 * one.height)
+        if two.size != want:
+            # (a fitted picture, or a render a pixel off from rounding: scaled to exactly twice the 1x file)
+            if abs(two.width - want[0]) > max(2, want[0] // 100) and k == 1.0:
+                self.rows.append((str(dest2), "%dx%d" % two.size, 0, "SIZE MISMATCH, expected %dx%d: not written" % want))
+                self.drop(dest2)
+                return dims
+            two = two.resize(want, Image.LANCZOS)
+        self.put(dest2, enc(two, 88), two.size, str(f2))
+        return dims + [2]
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("renders")
+    ap.add_argument("--site", default="website")
+    ap.add_argument("--docs", default="docs/img")
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
+    root, site, docs = Path(a.renders), Path(a.site), Path(a.docs)
+    img, src = site / "assets/img", site / "_src"
+    w = Writer(a.dry_run)
+
+    sizes = {}
+    for name, (ref, box) in TOP.items():
+        d = w.pair(root, ref, box, img / (name + ".webp"), img / (name + "@2x.webp"))
+        if d:
+            sizes["/assets/img/%s.webp" % name] = d[:2]
+
+    for name, (ref, box) in README_PICTURES.items():
+        w.pair(root, ref, box, docs / (name + ".png"), docs / (name + "@2x.png"), fmt="png")
+
+    catalog = src / "catalog.json"
+    if catalog.is_file():
+        dims = {}
+        for p in json.loads(catalog.read_text(encoding="utf-8")):
+            if not p.get("img"):
+                continue
+            d = w.pair(root, p["img"], None, img / "plugins" / (p["id"] + ".webp"), img / "plugins" / (p["id"] + "@2x.webp"), maxw=960)
+            if d:
+                dims[p["id"]] = d
+        if not a.dry_run:
+            (src / "catalog-img.json").write_text(json.dumps(dims, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+        used = set()
+        for f in list((src / "wiki").glob("*.md")) + list((src / "pages").glob("*.html")):
+            used |= set(re.findall(r"/assets/img/wiki/([\w.-]+)\.webp", f.read_text(encoding="utf-8")))
+        for name in sorted(used):
+            snap, box = CROPS.get(name, (name, None))
+            if render(root, "snap/s-%s.png" % snap, 1) is None and (img / "wiki" / (name + ".webp")).is_file():
+                w.rows.append((str(img / "wiki" / (name + ".webp")), "-", 0, "kept: no render (a picture made by hand)"))
+                continue
+            d = w.pair(root, "snap/s-%s.png" % snap, box, img / "wiki" / (name + ".webp"), img / "wiki" / (name + "@2x.webp"), maxw=1600)
+            if d:
+                sizes["/assets/img/wiki/%s.webp" % name] = d[:2]
+        old = src / "img-sizes.json"
+        if old.is_file():
+            merged = json.loads(old.read_text(encoding="utf-8"))
+            merged.update(sizes)
+            sizes = merged
+        if not a.dry_run:
+            old.write_text(json.dumps(sizes, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+    else:
+        print("note: %s not found (the site generator's data): only the Home pictures and the README's were written" % catalog)
+
+    width = max(len(r[0]) for r in w.rows) if w.rows else 10
+    print("%-*s  %-11s %9s  %s" % (width, "file", "pixels", "bytes", "from"))
+    for f, px, n, s in w.rows:
+        print("%-*s  %-11s %9s  %s" % (width, f, px, n or "-", s))
+    written = [r for r in w.rows if r[2]]
+    problems = [r for r in w.rows if not r[2]]
+    print("site-shots: %d files %s, %d with a note (missing render or no 2x)%s"
+          % (len(written), "checked (dry run)" if a.dry_run else "written", len(problems), "" if problems else ""))
+    return 1 if any(r[3].startswith(("MISSING", "SIZE")) for r in problems) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

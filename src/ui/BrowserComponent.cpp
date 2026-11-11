@@ -4,6 +4,8 @@
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
 
+#include "core/PluginDbFolder.h"
+
 #include "ui/AudioClipboard.h"
 #include "ui/SpeechDialog.h"
 #include "ui/UiTrace.h"
@@ -427,6 +429,10 @@ public:
         // Generators' (-1 the other database folders); userFolder = the user's folder path ("" = Effects / Generators)
         int folderKind = -1;
         std::string userFolder;
+        // round 190bj (issue B4): LYNX's own groups under Effects / Generators — the format folder of their Installed
+        // entries ("LYNX", "FL engines", "VFX"; "" = Installed itself), core/PluginDbFolder.h groupFolder()
+        std::string group;
+        bool isGroup = false;
     };
 
     // tree mode: the given top-level nodes
@@ -564,6 +570,12 @@ public:
             auto installed = folder (gens.get(), tr ("Installed"), Icon::folder);
             Node* folders[] = { lynxGens.get(), flGens.get(), vfxGens.get(), installed.get() };
             gens->folderKind = 1;
+            for (auto [node, group] : { std::pair { folders[0], "LYNX" }, std::pair { folders[1], "FL engines" }, std::pair { folders[2], "VFX" },
+                                        std::pair { folders[3], "" } })
+            {
+                node->group = group;
+                node->isGroup = true;
+            }
             const auto mine = userFolderNodes (*gens, true, folder, engine); // round 166f: the user's folders first
             for (auto& e : quickpick::generatorEntries (engine))
             {
@@ -590,6 +602,11 @@ public:
             auto installed = folder (fxs.get(), tr ("Installed"), Icon::folder);
             Node* folders[] = { lynxFx.get(), flFx.get(), installed.get(), installed.get() };
             fxs->folderKind = 0;
+            for (auto [node, group] : { std::pair { folders[0], "LYNX" }, std::pair { folders[1], "FL engines" }, std::pair { folders[2], "" } })
+            {
+                node->group = group;
+                node->isGroup = true;
+            }
             const auto mine = userFolderNodes (*fxs, false, folder, engine); // round 166f: the user's folders first
             for (auto& e : quickpick::effectEntries (engine))
             {
@@ -1961,8 +1978,8 @@ private:
                 juce::File dir = quickpick::pluginDatabaseFolder();
                 if (n.folderKind >= 0)
                     dir = quickpick::pluginDatabaseFolder (n.folderKind == 1, n.userFolder);
-                else if (n.parent != nullptr && n.parent->kind == Kind::plugins && n.parent->folderKind >= 0)
-                    dir = dir.getChildFile ("Installed").getChildFile (n.parent->folderKind == 1 ? "Generators" : "Effects");
+                else if (n.isGroup && n.parent != nullptr && n.parent->kind == Kind::plugins && n.parent->folderKind >= 0)
+                    dir = juce::File (juce::String::fromUTF8 (plugindb::groupFolder (dir.getFullPathName().toStdString(), n.parent->folderKind == 1, n.group).c_str()));
                 databaseDir = dir;
             }
             if ((n.kind == Kind::project || n.kind == Kind::plugins) && n.parent == nullptr && browser.tab == allTab) // round 163
@@ -3215,13 +3232,11 @@ void BrowserComponent::rebuildRoots()
     rootAlso.clear();
     using browserview::RootKind;
 
-    // FL folders (if installed) and user folders
-    const auto programs = juce::File::getSpecialLocation (juce::File::globalApplicationsDirectory);
-    juce::File fl;
-
-    for (const auto& dir : programs.getChildFile ("Image-Line").findChildFiles (juce::File::findDirectories, false, "FL Studio*"))
-        if (dir.getChildFile ("Data").isDirectory() && dir.getFileName() > fl.getFileName()) // "FL Studio ASIO" is the driver
-            fl = dir;
+    // FL folders (if installed) and user folders. Round 190bj (QA: the FL folders were listed with LYNX_NO_FL=1): the
+    // installation comes from findFlStudio, as everywhere else (FL's own install path, Program Files\Image-Line, Wine,
+    // LYNX_FL_INSTALL; none with LYNX_NO_FL)
+    const auto flInstall = findFlStudio();
+    const auto fl = flInstall.installDir;
 
     auto add = [this] (const juce::String& name, const juce::File& folder, RootKind kind) {
         if (folder.isDirectory() && ! allRoots.contains (folder))
@@ -3246,7 +3261,7 @@ void BrowserComponent::rebuildRoots()
     const auto data = fl.getChildFile ("Data");
     add (tr ("FL samples (Packs)"), data.getChildFile ("Patches").getChildFile ("Packs"), RootKind::flSamples);
     add (tr ("FL demo projects"), data.getChildFile ("Demo projects"), RootKind::flDemos);
-    const auto userData = findFlStudio().userData;
+    const auto userData = flInstall.userData;
     auto userPresets = [&userData] (const char* folder) {
         return userData.isDirectory() ? userData.getChildFile ("Presets").getChildFile (folder) : juce::File();
     };

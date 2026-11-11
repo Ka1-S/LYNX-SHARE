@@ -28,6 +28,7 @@
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "flp/Flp.h"
+#include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
@@ -71,6 +72,7 @@
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PictureCheck.h"
 #include "ui/PatternBlocksView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
@@ -162,6 +164,7 @@
 #include "ui/Updater.h"
 #include "ui/StemExtract.h"
 #include "ui/AudioToMidi.h"
+#include "ui/ShotScale.h"
 
 #include <atomic>
 #include <chrono>
@@ -543,7 +546,9 @@ public:
             return;
         }
 
-        const auto args = juce::StringArray::fromTokens (commandLine, true);
+        // --shot-scale <v> / --shot-suffix <text> (round 190bi, ui/ShotScale.h): the pixel scale and file-name suffix of every
+        // picture route, taken out here so the routes' own arguments keep their places
+        const auto args = lynx::shot::takeArguments (juce::StringArray::fromTokens (commandLine, true));
 
         // interface language: saved in %APPDATA%\LYNX\language.txt; --lang pt-BR overrides it for this run
         lynx::i18n::initialise (args);
@@ -760,6 +765,17 @@ public:
             const auto i = args.indexOf ("--cachetest");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             runCacheTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--picturetest"))
+        {
+            // LYNX --picturetest report.txt [project.(flp|lynx)] (round 190bm): the Playlist and the Mixer drawn through
+            // their cached pictures at 100-300 %, into native and software targets, against straight paints; off
+            // screen (no window)
+            const auto i = args.indexOf ("--picturetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runPictureTest (juce::File (args[i + 1].unquoted()), i + 2 < args.size() ? juce::File (args[i + 2].unquoted()) : juce::File());
             return;
         }
 
@@ -1425,7 +1441,7 @@ public:
                     return false;
                 if (c->getWidth() <= 0)
                     c->setSize (520, 600);
-                savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + name);
+                savePng (lynx::shot::snapshot (*c), prefix + name);
                 return true;
             };
             ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
@@ -1447,10 +1463,14 @@ public:
             if (i + 2 < args.size() && ! args[i + 2].startsWith ("--"))
                 only.addTokens (args[i + 2].unquoted(), ",", "");
             const auto t0 = juce::Time::getMillisecondCounterHiRes();
-            const auto drawn = lynx::pluginthumbs::renderNative (juce::File (args[i + 1].unquoted()), only, [] (const juce::String& line) {
+            // round 190bi: with --shot-scale / LYNX_SHOT_SCALE each plugin's whole editor at that scale, not the picker's
+            // small thumbnail (never for the picker's own cache folder, whatever the environment says)
+            const juce::File folder (args[i + 1].unquoted());
+            const auto full = lynx::shot::given() && folder != lynx::pluginthumbs::nativeFolder() ? lynx::shot::scale() : 0.0f;
+            const auto drawn = lynx::pluginthumbs::renderNative (folder, only, [] (const juce::String& line) {
                 std::printf ("%s\n", line.toRawUTF8());
                 std::fflush (stdout);
-            });
+            }, full);
             std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
             setApplicationReturnValue (0);
             quit();
@@ -3895,8 +3915,30 @@ private:
         auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
+        // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
+        // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
+        juce::String picturesResult = "OK";
+        {
+            lynx::AudioEngine pictureEngine (false);
+            auto pictureFailures = 0;
+            juce::String lines;
+            {
+                lynx::PlaylistComponent playlist (pictureEngine);
+                playlist.setBounds (0, 0, 1200, 700);
+                playlist.setVisible (true);
+                lines << lynx::ui::picturecheck::run (playlist, "Playlist 1200 x 700", { 1.0f, 1.5f }, pictureFailures, {});
+            }
+            {
+                lynx::MixerComponent mixer (pictureEngine);
+                mixer.setBounds (0, 0, 1200, 500);
+                mixer.setVisible (true);
+                lines << lynx::ui::picturecheck::run (mixer, "Mixer 1200 x 500", { 1.0f, 1.5f }, pictureFailures, {});
+            }
+            if (pictureFailures > 0 || ! lines.contains (": ok"))
+                picturesResult = "ERROR " + lines.trim().replace ("\n", "; ");
+        }
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
@@ -3926,6 +3968,7 @@ private:
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
                << "fonts=" << fontsResult << "\n"
+               << "cached_pictures=" << picturesResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
@@ -7053,194 +7096,9 @@ private:
 
     void runShowcase (const juce::String& outputPath, int currentPattern)
     {
-        using namespace lynx;
-        Song song;
-        song.bpm = 124.0;
-        song.mixer = Song::defaultMixer();
-        const auto presets = synthPresets();
-        auto preset = [&] (const char* name) {
-            for (const auto& [n, sset] : presets)
-                if (n == name)
-                    return sset;
-            return SynthSettings {};
-        };
-        auto channel = [&] (const char* name, InstrumentKind kind, float volume, int track, std::uint32_t colour) {
-            ChannelDef c;
-            c.name = name;
-            c.instrument = kind;
-            c.volume = volume;
-            c.mixerTrack = track;
-            c.colour = colour;
-            song.channels.push_back (c);
-            return (int) song.channels.size() - 1;
-        };
-        const auto kick = channel ("Kick", InstrumentKind::kick, 0.9f, 1, 0xffd9534f);
-        const auto clap = channel ("Clap", InstrumentKind::clap, 0.75f, 2, 0xfff0ad4e);
-        const auto hat = channel ("Hat", InstrumentKind::hat, 0.6f, 3, 0xfff7d774);
-        const auto snare = channel ("Snare", InstrumentKind::snare, 0.7f, 4, 0xffe8835a);
-        const auto bass = channel ("Reese Bass", InstrumentKind::synth, 0.8f, 5, 0xff5bc0de);
-        song.channels[(std::size_t) bass].synth = preset ("Reese Bass"); // preset name as defined in core/SynthPresets
-        const auto pad = channel ("Pad", InstrumentKind::synth, 0.7f, 6, 0xff9b7fd6);
-        song.channels[(std::size_t) pad].synth = preset ("Pad");
-        const auto pluck = channel ("Pluck", InstrumentKind::synth, 0.72f, 7, 0xff5cb85c);
-        song.channels[(std::size_t) pluck].synth = preset ("Pluck");
-        const auto lead = channel ("Supersaw", InstrumentKind::synth, 0.6f, 8, 0xff4fc3a1);
-        song.channels[(std::size_t) lead].synth = preset ("Supersaw");
-
-        auto addPattern = [&] (const char* name, std::uint32_t colour) {
-            auto& p = song.patterns.emplace_back();
-            p.name = name;
-            p.colour = colour;
-            return (int) song.patterns.size() - 1;
-        };
-        auto note = [&] (int pattern, int ch, double beat, double beats, int key, float velocity = 0.8f) {
-            Note n;
-            n.channel = ch;
-            n.start = (std::int64_t) (beat * ppq);
-            n.length = (std::int64_t) (beats * ppq);
-            n.key = key;
-            n.velocity = velocity;
-            song.patterns[(std::size_t) pattern].notes.push_back (n);
-        };
-
-        const auto beat = addPattern ("Beat", 0xffd9534f);
-        for (int s = 0; s < 16; s += 4)
-            song.patterns[(std::size_t) beat].toggleStep (kick, s);
-        for (int s : { 4, 12 })
-            song.patterns[(std::size_t) beat].toggleStep (clap, s);
-        for (int s = 2; s < 16; s += 4)
-            song.patterns[(std::size_t) beat].toggleStep (hat, s);
-        for (int s : { 7, 15 })
-            song.patterns[(std::size_t) beat].toggleStep (snare, s);
-
-        const auto groove = addPattern ("Groove", 0xfff0ad4e);
-        for (int s = 0; s < 16; ++s)
-            song.patterns[(std::size_t) groove].toggleStep (hat, s);
-        for (int s : { 4, 12 })
-            song.patterns[(std::size_t) groove].toggleStep (clap, s);
-
-        // Am – F – C – G, one bar each
-        const int roots[4] = { 45, 41, 48, 43 };
-        const int chords[4][3] = { { 57, 60, 64 }, { 53, 57, 60 }, { 55, 60, 64 }, { 55, 59, 62 } };
-        const auto bassline = addPattern ("Bass", 0xff5bc0de);
-        for (int bar = 0; bar < 4; ++bar)
-            for (int e = 0; e < 8; ++e)
-                if (e != 3)
-                    note (bassline, bass, bar * 4 + e * 0.5, 0.4, roots[bar] - 12 + (e == 6 ? 12 : 0), e % 2 == 0 ? 0.9f : 0.65f);
-        const auto chordsPattern = addPattern ("Chords", 0xff9b7fd6);
-        for (int bar = 0; bar < 4; ++bar)
-            for (int k = 0; k < 3; ++k)
-                note (chordsPattern, pad, bar * 4, 3.9, chords[bar][k], 0.7f);
-        const auto melody = addPattern ("Melody", 0xff5cb85c);
-        const int line[] = { 69, 72, 76, 74, 72, 69, 67, 69, 65, 69, 72, 74, 72, 69, 67, 64,
-                             72, 76, 79, 76, 74, 72, 74, 76, 71, 74, 79, 78, 76, 74, 71, 67 };
-        for (int k = 0; k < 32; ++k)
-            if (k % 8 != 7)
-                note (melody, pluck, k * 0.5, k % 4 == 3 ? 0.9 : 0.4, line[k], k % 2 == 0 ? 0.85f : 0.65f);
-        const auto hook = addPattern ("Hook", 0xff4fc3a1);
-        for (int bar = 0; bar < 4; ++bar)
-            for (int k = 0; k < 3; ++k)
-                note (hook, lead, bar * 4 + k * 1.5, k == 2 ? 1.0 : 1.4, chords[bar][2] + 12 - k * 3, 0.8f);
-
-        // Playlist: intro, verse, drop, breakdown, final drop
-        song.playlistTracks = { { "Drums" }, { "Groove" }, { "Bass" }, { "Chords" }, { "Melody" }, { "Hook" }, { "Automation" } };
-        const auto bar = (std::int64_t) ppq * 4;
-        auto clip = [&] (int pattern, int track, int fromBar, int bars) {
-            const auto length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
-            for (int b = fromBar; b < fromBar + bars;)
-            {
-                Clip c;
-                c.pattern = pattern;
-                c.track = track;
-                c.start = b * bar;
-                c.length = length;
-                song.playlist.push_back (c);
-                b += (int) std::max<std::int64_t> (1, length / bar);
-            }
-        };
-        clip (chordsPattern, 3, 0, 8);
-        clip (melody, 4, 4, 4);
-        clip (beat, 0, 8, 16);
-        clip (groove, 1, 12, 12);
-        clip (bassline, 2, 8, 8);
-        clip (melody, 4, 8, 8);
-        clip (chordsPattern, 3, 16, 4);
-        clip (bassline, 2, 20, 4);
-        clip (hook, 5, 20, 4);
-        clip (melody, 4, 20, 4);
-        song.addMarker ({ 0, "Intro" });
-        song.addMarker ({ 8 * bar, "Drop" });
-        song.addMarker ({ 16 * bar, "Breakdown" });
-        song.addMarker ({ 20 * bar, "Final" });
-
-        // automation: the pad volume opens up during the intro
-        Automation a;
-        a.name = "Pad Volume";
-        a.target = { AutomationTargetKind::mixerVolume, 6, 0, 0 };
-        a.points = { { 0, 0.15f, 0.4f }, { 8 * bar, 0.8f, 0.0f } };
-        song.automations.push_back (a);
-        Clip ac;
-        ac.kind = ClipKind::automation;
-        ac.automation = 0;
-        ac.track = 6;
-        ac.start = 0;
-        ac.length = 8 * bar;
-        song.playlist.push_back (ac);
-
-        // mixer: names, colours and effects (bass compressor sidechained to the kick)
-        const char* names[] = { "Master", "Kick", "Clap", "Hat", "Snare", "Bass", "Pad", "Pluck", "Lead" };
-        for (int t = 0; t < 9; ++t)
-        {
-            song.mixer[(std::size_t) t].name = names[t];
-            if (t > 0)
-                song.mixer[(std::size_t) t].colour = song.channels[(std::size_t) t - 1].colour;
-        }
-        auto fx = [&] (int track, EffectKind kind) -> EffectSlot& {
-            song.mixer[(std::size_t) track].effects.push_back (makeEffectSlot (kind));
-            return song.mixer[(std::size_t) track].effects.back();
-        };
-        {
-            // kick EQ: cut below 30 Hz, weight at 60 Hz, remove the "boxiness" at 350 Hz, brightness at 4 kHz
-            auto& eq = fx (1, EffectKind::parametricEq);
-            auto band = [&] (int b, peq::BandType type, double hz, double db, double q) {
-                eq.params[(std::size_t) peq::param (b, 0)] = peq::typeValue (type);
-                eq.params[(std::size_t) peq::param (b, 1)] = peq::hzValue (hz);
-                eq.params[(std::size_t) peq::param (b, 2)] = peq::gainValue (db);
-                eq.params[(std::size_t) peq::param (b, 3)] = peq::qValue (q);
-            };
-            band (0, peq::BandType::lowCut, 30.0, 0.0, 0.7);
-            band (1, peq::BandType::peak, 62.0, 5.0, 1.2);
-            band (2, peq::BandType::peak, 350.0, -6.0, 2.0);
-            band (3, peq::BandType::peak, 4200.0, 3.5, 1.5);
-            band (4, peq::BandType::highCut, 14000.0, 0.0, 0.7);
-            for (int b = 5; b < peq::bands; ++b)
-                eq.params[(std::size_t) peq::param (b, 0)] = peq::typeValue (peq::BandType::off);
-        }
-        fx (1, EffectKind::distortion).mix = 0.3f;
-        auto& comp = fx (5, EffectKind::compressor);
-        comp.params[0] = 0.55f;
-        comp.params[1] = 0.8f;
-        comp.sidechain = 1;
-        fx (5, EffectKind::parametricEq);
-        fx (6, EffectKind::chorus);
-        fx (6, EffectKind::reverb);
-        fx (7, EffectKind::delay);
-        fx (7, EffectKind::reverb).mix = 0.4f;
-        fx (8, EffectKind::effector);
-        fx (8, EffectKind::delay);
-        fx (0, EffectKind::parametricEq);
-        auto& limiter = fx (0, EffectKind::limiter);
-        limiter.params = { 11.7f / 12.0f, 0.1f, 0.5f };
-        song.mixer[1].volume = 0.78f;
-        song.mixer[5].volume = 0.72f;
-        song.mixer[6].volume = 0.6f;
-        song.mixer[6].pan = -0.2f;
-        song.mixer[7].pan = 0.25f;
-
-        song.mode = PlayMode::song;
-        song.currentPattern = std::clamp (currentPattern, 0, (int) song.patterns.size() - 1);
+        const auto song = lynx::makeShowcaseSong (currentPattern);
         juce::String error;
-        const auto ok = ProjectFile::save (song, juce::File (outputPath), error);
+        const auto ok = lynx::ProjectFile::save (song, juce::File (outputPath), error);
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }
@@ -7536,6 +7394,63 @@ private:
             text << "result=ERROR " << error << "\n";
         report.replaceWithText (text);
         setApplicationReturnValue (ok && text.contains ("result=OK") ? 0 : 1);
+        quit();
+    }
+
+    // --picturetest (round 190bm): ui/PictureCheck.h on the Playlist and the Mixer, at a window's usual size, at a 4K
+    // screen's, and wider than a GPU bitmap can be (16384 px)
+    void runPictureTest (const juce::File& report, const juce::File& project)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        juce::String error, text;
+        if (project != juce::File())
+        {
+            auto ok = false;
+            if (project.hasFileExtension ("flp"))
+                ok = engine->importFlpFile (project, error);
+            else if (auto song = lynx::ProjectFile::load (project, error))
+            {
+                engine->setSong (std::move (*song));
+                ok = true;
+            }
+            text << "project: " << project.getFullPathName() << (ok ? "" : " (not loaded: " + error + ")") << "\n";
+        }
+       #if JUCE_WINDOWS
+        text << "native image: " << juce::NativeImageType().create (juce::Image::RGB, 8, 8, true)->createType()->getTypeID()
+             << " (software = " << juce::SoftwareImageType().getTypeID() << ")\n";
+       #endif
+        auto failures = 0;
+        struct Size
+        {
+            int width, height;
+            std::vector<float> scales;
+        };
+        const auto folder = report.getParentDirectory();
+        for (const auto& size : { Size { 1466, 930, { 1.0f, 1.5f, 2.0f, 3.0f } }, Size { 3840, 2040, { 1.0f, 2.0f } }, Size { 17000, 700, { 1.0f } } })
+        {
+            const auto label = [&size] (const char* name) { return juce::String (name) + " " + juce::String (size.width) + " x " + juce::String (size.height); };
+            {
+                auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
+                playlist->setBounds (0, 0, size.width, size.height);
+                playlist->setVisible (true);
+                {
+                    juce::Image warm (juce::Image::RGB, 64, 64, true); // (one paint asks for the waveforms, then they are waited for)
+                    juce::Graphics g (warm);
+                    playlist->paintEntireComponent (g, true);
+                }
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+                text << lynx::ui::picturecheck::run (*playlist, label ("Playlist"), size.scales, failures, folder);
+            }
+            {
+                auto mixer = std::make_unique<lynx::MixerComponent> (*engine);
+                mixer->setBounds (0, 0, size.width, juce::jmin (size.height, 700));
+                mixer->setVisible (true);
+                text << lynx::ui::picturecheck::run (*mixer, label ("Mixer"), size.scales, failures, folder);
+            }
+        }
+        text << "failures: " << failures << "\nresult=" << (failures == 0 ? "OK" : "FAIL") << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
         quit();
     }
 
@@ -9697,7 +9612,7 @@ private:
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto shoot = [&prefix] (juce::Component& c, const char* name) {
-            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+            savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png");
         };
 
         // ---- the Versions panel, on files in a temporary folder
@@ -9837,13 +9752,13 @@ private:
         {
             lynx::AudioEngine engine (false);
             auto hints = lynx::makeGamepadHints();
-            savePng (hints->createComponentSnapshot (hints->getLocalBounds()), prefix + "-hints.png");
+            savePng (lynx::shot::snapshot (*hints), prefix + "-hints.png");
             auto prefs = engine.getMidiPrefs();
             prefs.gamepad = true;
             engine.setMidiPrefs (prefs, false);
             auto page = lynx::makeMidiPage (engine, {}, false);
             page->setSize (760, 1400);
-            savePng (page->createComponentSnapshot (page->getLocalBounds()), prefix + "-settings.png");
+            savePng (lynx::shot::snapshot (*page), prefix + "-settings.png");
 
             // the poller with fake states: what the handler gets
             using namespace lynx::gamepad;
@@ -9917,7 +9832,7 @@ private:
                 const auto name = input.getFileNameWithoutExtension();
                 const auto shot = [&shotPrefix] (juce::Component& c, const juce::String& suffix) {
                     if (shotPrefix.isNotEmpty())
-                        savePng (c.createComponentSnapshot (c.getLocalBounds()), shotPrefix + suffix);
+                        savePng (lynx::shot::snapshot (c), shotPrefix + suffix);
                 };
                 if (auto panel = lynx::makeOtherAppsExportPanel (loader, name))
                     shot (*panel, "-panel.png");
@@ -10347,8 +10262,9 @@ private:
             parityShow->window = std::move (window);
             return;
         }
-        // round 190ar: LYNX_PARITYSHOT_SCALE=2 draws the same editor at twice the pixel density (as on a 200 % display)
-        const auto shotScale = juce::jlimit (1.0f, 4.0f, juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_SCALE", "1").getFloatValue());
+        // round 190ar: LYNX_PARITYSHOT_SCALE=2 draws the same editor at twice the pixel density (as on a 200 % display);
+        // round 190bi: the shared shot scale (--shot-scale, LYNX_SHOT_SCALE, LYNX_PARITYSHOT_SCALE as before)
+        const auto shotScale = lynx::shot::scale();
         juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) editor->getWidth() * shotScale), juce::roundToInt ((float) editor->getHeight() * shotScale), true);
         {
             juce::Graphics g (image);
@@ -10356,7 +10272,7 @@ private:
             g.addTransform (juce::AffineTransform::scale (shotScale));
             editor->paintEntireComponent (g, false);
         }
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
         if (auto stream = file.createOutputStream())
@@ -10421,13 +10337,8 @@ private:
         out.createDirectory();
         lynx::AudioEngine offline (false);
         auto save = [&] (juce::Component& c, const juce::String& name) {
-            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
-            {
-                juce::Graphics g (image);
-                g.fillAll (lynx::theme::panel);
-                c.paintEntireComponent (g, false);
-            }
-            const auto f = out.getChildFile (name);
+            auto image = lynx::shot::paint (c, lynx::theme::panel);
+            const auto f = lynx::shot::file (out.getChildFile (name));
             f.deleteFile();
             juce::PNGImageFormat png;
             if (auto stream = f.createOutputStream())
@@ -10528,13 +10439,8 @@ private:
         out.createDirectory();
         lynx::AudioEngine offline (false);
         auto save = [&] (juce::Component& editor, const juce::String& name) {
-            juce::Image image (juce::Image::ARGB, editor.getWidth(), editor.getHeight(), true);
-            {
-                juce::Graphics g (image);
-                g.fillAll (lynx::theme::panel);
-                editor.paintEntireComponent (g, false);
-            }
-            const auto f = out.getChildFile (name);
+            auto image = lynx::shot::paint (editor, lynx::theme::panel);
+            const auto f = lynx::shot::file (out.getChildFile (name));
             f.deleteFile();
             juce::PNGImageFormat png;
             if (auto stream = f.createOutputStream())
@@ -10902,7 +10808,7 @@ private:
                 editor->setSize (smallest.x, smallest.y);
                 const auto file = folder.getChildFile (juce::String (p.file) + "-" + (before ? "before" : "after") + "-min.png");
                 lynx::skin::resetTitleFit();
-                savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f), file.getFullPathName());
+                savePng (lynx::shot::snapshot (*editor), file.getFullPathName());
                 fit ("min");
             }
         }
@@ -11142,12 +11048,8 @@ private:
                 if (lynx::ProEditorWindows::handles (kind)) // round 114: the display-first editors, with a demo signal
                 {
                     auto editor = lynx::makeProEditor (offline, 1, 0, true);
-                    juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                    {
-                        juce::Graphics g (image);
-                        editor->paintEntireComponent (g, false);
-                    }
-                    const auto file = out.getChildFile (name + ".png");
+                    auto image = lynx::shot::paint (*editor);
+                    const auto file = lynx::shot::file (out.getChildFile (name + ".png"));
                     file.deleteFile();
                     juce::PNGImageFormat png;
                     if (auto stream = file.createOutputStream())
@@ -11168,13 +11070,8 @@ private:
                 for (const auto page : pageList)
                 {
                     auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, page);
-                    juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                    {
-                        juce::Graphics g (image);
-                        g.fillAll (lynx::theme::panel);
-                        editor->paintEntireComponent (g, false);
-                    }
-                    const auto file = out.getChildFile (name + (page > 0 ? "-p" + juce::String (page + 1) : juce::String()) + ".png");
+                    auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                    const auto file = lynx::shot::file (out.getChildFile (name + (page > 0 ? "-p" + juce::String (page + 1) : juce::String()) + ".png"));
                     file.deleteFile();
                     juce::PNGImageFormat png;
                     if (auto stream = file.createOutputStream())
@@ -11203,13 +11100,8 @@ private:
                 offline.setSong (std::move (song));
                 offline.dispatchPendingMessages();
                 auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
-                juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    editor->paintEntireComponent (g, false);
-                }
-                const auto file = out.getChildFile ("Echoform-rhythm.png");
+                auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                const auto file = lynx::shot::file (out.getChildFile ("Echoform-rhythm.png"));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto stream = file.createOutputStream())
@@ -11230,13 +11122,8 @@ private:
                 offline.setSong (std::move (song));
                 offline.dispatchPendingMessages();
                 auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
-                juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    editor->paintEntireComponent (g, false);
-                }
-                const auto file = out.getChildFile ("Echoform-voicing.png");
+                auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                const auto file = lynx::shot::file (out.getChildFile ("Echoform-voicing.png"));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto stream = file.createOutputStream())
@@ -11256,13 +11143,8 @@ private:
                 offline.setSong (std::move (song));
                 offline.dispatchPendingMessages();
                 auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
-                juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    editor->paintEntireComponent (g, false);
-                }
-                const auto file = out.getChildFile ("Auto-pan-tweak.png");
+                auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                const auto file = lynx::shot::file (out.getChildFile ("Auto-pan-tweak.png"));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto stream = file.createOutputStream())
@@ -11283,13 +11165,8 @@ private:
                 offline.setSong (std::move (song));
                 offline.dispatchPendingMessages();
                 auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
-                juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    editor->paintEntireComponent (g, false);
-                }
-                const auto file = out.getChildFile ("Ember Saturator-classic.png");
+                auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                const auto file = lynx::shot::file (out.getChildFile ("Ember Saturator-classic.png"));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto stream = file.createOutputStream())
@@ -11309,13 +11186,8 @@ private:
                 offline.setSong (std::move (song));
                 offline.dispatchPendingMessages();
                 auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
-                juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    editor->paintEntireComponent (g, false);
-                }
-                const auto file = out.getChildFile ("Foil Plate-plate.png");
+                auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                const auto file = lynx::shot::file (out.getChildFile ("Foil Plate-plate.png"));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto stream = file.createOutputStream())
@@ -11351,13 +11223,8 @@ private:
                     offline.setSong (std::move (song));
                     offline.dispatchPendingMessages();
                     auto editor = facetEditor ? lynx::makeFacetEqEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.25f, page);
-                    juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
-                    {
-                        juce::Graphics g (image);
-                        g.fillAll (lynx::theme::panel);
-                        editor->paintEntireComponent (g, false);
-                    }
-                    const auto f = out.getChildFile (file);
+                    auto image = lynx::shot::paint (*editor, lynx::theme::panel);
+                    const auto f = lynx::shot::file (out.getChildFile (file));
                     f.deleteFile();
                     juce::PNGImageFormat png;
                     if (auto stream = f.createOutputStream())
@@ -11463,13 +11330,8 @@ private:
                     if (offline.getSong().channels.empty())
                         continue;
                     auto panel = lynx::makeChannelSettingsPanel (offline, 0);
-                    juce::Image image (juce::Image::ARGB, panel->getWidth(), panel->getHeight(), true);
-                    {
-                        juce::Graphics g (image);
-                        g.fillAll (lynx::theme::panel);
-                        panel->paintEntireComponent (g, false);
-                    }
-                    const auto out2 = out.getChildFile (juce::String (folder) + ".png");
+                    auto image = lynx::shot::paint (*panel, lynx::theme::panel);
+                    const auto out2 = lynx::shot::file (out.getChildFile (juce::String (folder) + ".png"));
                     out2.deleteFile();
                     juce::PNGImageFormat png;
                     if (auto stream = out2.createOutputStream())
@@ -11503,7 +11365,7 @@ private:
                 static constexpr double times[] = { 0.0, 1.5, 3.25 };
                 constexpr int typeInStep = (int) std::size (times) + 1;
                 if (step > 0 && step < typeInStep && editor != nullptr)
-                    savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-" + juce::String (step - 1) + ".png");
+                    savePng (lynx::shot::snapshot (*editor), prefix + "-" + juce::String (step - 1) + ".png");
                 if (editor != nullptr && step == (int) std::size (times))
                 {
                     // round 174d: FL's in-place type-in of the current time (a right click on it)
@@ -11512,7 +11374,7 @@ private:
                     return;
                 }
                 if (editor != nullptr && step == typeInStep)
-                    savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-typein.png");
+                    savePng (lynx::shot::snapshot (*editor), prefix + "-typein.png");
                 if (editor == nullptr || step >= typeInStep)
                 {
                     stopTimer();
@@ -11616,12 +11478,12 @@ private:
                     report << "song " << juce::String (times[(std::size_t) step - 1], 3) << " s: wanted file time " << juce::String (want, 4)
                            << ", frame shown at " << juce::String (ft, 4) << " (expected " << juce::String (expected, 4) << ")"
                            << (want < 0.0 ? "  [before the clip]" : std::abs (ft - expected) < 1e-3 ? "  OK" : "  MISMATCH") << "\n";
-                    savePng (playlist->createComponentSnapshot (playlist->getLocalBounds()), prefix + "-playlist-" + juce::String (step - 1) + ".png");
+                    savePng (lynx::shot::snapshot (*playlist), prefix + "-playlist-" + juce::String (step - 1) + ".png");
                     if (img.isValid())
                         savePng (img, prefix + "-frame-" + juce::String (step - 1) + ".png");
                     for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
                         if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
-                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-window-" + juce::String (step - 1) + ".png");
+                            savePng (lynx::shot::snapshot (*c), prefix + "-window-" + juce::String (step - 1) + ".png");
                 }
                 if (step >= (int) times.size() && adrStep == 0)
                 {
@@ -11667,10 +11529,10 @@ private:
                 if (adrStep == 1)
                 {
                     adrStep = 2;
-                    savePng (adrPanel->createComponentSnapshot (adrPanel->getLocalBounds()), prefix + "-adr.png");
+                    savePng (lynx::shot::snapshot (*adrPanel), prefix + "-adr.png");
                     for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
                         if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
-                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-adr-window.png");
+                            savePng (lynx::shot::snapshot (*c), prefix + "-adr-window.png");
                     offline.getTransport().positionTicks.store (4.5 * offline.getSong().bpm / 60.0 * lynx::ppq);
                     decoder->request (3.5, false);
                     return;
@@ -11679,7 +11541,7 @@ private:
                 {
                     for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
                         if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
-                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-adr-window-line.png");
+                            savePng (lynx::shot::snapshot (*c), prefix + "-adr-window-line.png");
                     adrPanel.reset();
                     // export with video: a 3 s mix under the picture, re-encoded (the clip starts at 1 s) and copied (from 1 s)
                     {
@@ -11775,10 +11637,11 @@ private:
         // the moves: one row each, eight moments of a cycle (both facings for Spinning; Pose ends the sheet)
         {
             constexpr int cell = 120, cols = 8;
-            juce::Image sheet (juce::Image::ARGB, 130 + cols * cell, lynx::dance::moveCount * cell + 10, true);
+            auto sheet = lynx::shot::canvas (130 + cols * cell, lynx::dance::moveCount * cell + 10);
             {
                 // (the picture is complete when its Graphics is gone: round 190ba, the file was blank on Windows)
                 juce::Graphics g (sheet);
+                lynx::shot::logical (g);
                 g.fillAll (lynx::theme::colour::bg0);
                 for (int m = 0; m < lynx::dance::moveCount; ++m)
                 {
@@ -11862,10 +11725,11 @@ private:
                 ok = ok && loaded->layout.rows == (int) rows.size() && loaded->layout.frameWidth == fw && loaded->layout.frameHeight == fh;
                 // the animation as the stage draws it: a row of moments of the move "Wave" (blending on), then mirrored,
                 // then the row shown while the dancer is held
-                juce::Image strip (juce::Image::ARGB, fw * 12, fh * 3 + 20, true);
+                auto strip = lynx::shot::canvas (fw * 12, fh * 3 + 20);
                 int solid = 0;
                 {
                     juce::Graphics g (strip);
+                    lynx::shot::logical (g);
                     g.fillAll (lynx::theme::colour::bg0);
                     for (int line = 0; line < 3; ++line)
                     {
@@ -11942,20 +11806,21 @@ private:
         offline.setSong (std::move (song));
         offline.dispatchPendingMessages();
         if (auto editor = lynx::makeChannelSettingsPanel (offline, 0))
-            savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-editor.png");
+            savePng (lynx::shot::snapshot (*editor), prefix + "-editor.png");
         if (auto frame = lynx::makeChannelFrame (offline, 1, 0))
-            savePng (frame->createComponentSnapshot (frame->getLocalBounds()), prefix + "-frame.png");
+            savePng (lynx::shot::snapshot (*frame), prefix + "-frame.png");
         if (auto editor = lynx::makeChannelSettingsPanel (offline, 2))
-            savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-sheet-editor.png");
+            savePng (lynx::shot::snapshot (*editor), prefix + "-sheet-editor.png");
         {
             // the stage with the three dancers (the third from the sheet)
             lynx::DanceStage stage (offline);
             stage.setSize (1280, 640);
             stage.update();
             sheetReport << "stage_dancers=" << stage.dancerCount() << "\n";
-            juce::Image picture (juce::Image::ARGB, 1280, 640, true);
+            auto picture = lynx::shot::canvas (1280, 640);
             {
                 juce::Graphics g (picture);
+                lynx::shot::logical (g);
                 g.fillAll (lynx::theme::colour::bg0);
                 stage.paintEntireComponent (g, true);
             }
@@ -12082,7 +11947,7 @@ private:
         auto shoot = [&] (std::unique_ptr<juce::Component> c, const juce::String& name) {
             if (c == nullptr)
                 return;
-            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + name);
+            savePng (lynx::shot::snapshot (*c), prefix + name);
         };
         shoot (lynx::makeChannelSettingsPanel (offline, 0), "-envelope-controller.png");
         shoot (lynx::makeChannelSettingsPanel (offline, 1), "-midi-out.png");
@@ -12141,13 +12006,13 @@ private:
                 for (auto* child : ec->getChildren())
                     if (auto* box = dynamic_cast<juce::ComboBox*> (child))
                         box->setSelectedItemIndex (part, juce::sendNotificationSync);
-                savePng (ec->createComponentSnapshot (ec->getLocalBounds()), prefix + "-ec-part" + juce::String (part) + ".png");
+                savePng (lynx::shot::snapshot (*ec), prefix + "-ec-part" + juce::String (part) + ".png");
             }
         lynx::FormulaControllerWindows::open (offline, 1, 0);
         for (int k = 0; k < juce::TopLevelWindow::getNumTopLevelWindows(); ++k)
             if (auto* w = dynamic_cast<juce::DocumentWindow*> (juce::TopLevelWindow::getTopLevelWindow (k)))
                 if (w->getName().startsWith ("Formula") && w->getContentComponent() != nullptr)
-                    savePng (w->getContentComponent()->createComponentSnapshot (w->getContentComponent()->getLocalBounds()), prefix + "-formula-controller.png");
+                    savePng (lynx::shot::snapshot (*w->getContentComponent()), prefix + "-formula-controller.png");
         lynx::FormulaControllerWindows::closeAll();
     }
 
@@ -12207,12 +12072,7 @@ private:
         d.volumeEnvelope.points = { { 0.0, 0.0, 0.0f }, { 0.12, 0.5, 0.4f }, { 0.55, 0.5, 0.0f }, { 0.62, 0.25, 0.0f }, { 0.7, 0.5, 0.0f }, { 1.0, 0.5, 0.0f } };
         auto editor = lynx::makeAudioEditorForSnapshot (offline, d, false);
         auto shot = [&prefix] (juce::Component& c, const juce::String& name) {
-            juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
-            {
-                juce::Graphics g (image);
-                g.fillAll (lynx::theme::panel);
-                c.paintEntireComponent (g, false);
-            }
+            auto image = lynx::shot::paint (c, lynx::theme::panel);
             savePng (image, prefix + name);
         };
         editor->setSize (1120, 600);
@@ -12253,7 +12113,7 @@ private:
             if (auto* b = findButton (panel, lynx::tr (tab)); b != nullptr && b->onClick)
             {
                 b->onClick();
-                savePng (panel.createComponentSnapshot (panel.getLocalBounds()), name + "-tab-" + file + ".png");
+                savePng (lynx::shot::snapshot (panel), name + "-tab-" + file + ".png");
             }
         engine.editSong ([&] (lynx::Song& s) {
             auto st = *lynx::vfx::readState (s.channels[(std::size_t) index].pluginState);
@@ -12269,7 +12129,7 @@ private:
             engine.dispatchPendingMessages();
             if (auto* b = findButton (*broken, lynx::tr ("Script")); b != nullptr && b->onClick)
                 b->onClick();
-            savePng (broken->createComponentSnapshot (broken->getLocalBounds()), name + "-error.png");
+            savePng (lynx::shot::snapshot (*broken), name + "-error.png");
         }
     }
 
@@ -12329,7 +12189,7 @@ private:
             if (auto panel = lynx::makeChannelSettingsPanel (offline, c))
             {
                 offline.dispatchPendingMessages();
-                savePng (panel->createComponentSnapshot (panel->getLocalBounds()),
+                savePng (lynx::shot::snapshot (*panel),
                          prefix + "-" + juce::String (lynx::vfx::flName (*lynx::vfx::kindOf (offline.getSong().channels[(std::size_t) c]))).replaceCharacter (' ', '-').toLowerCase() + ".png");
             }
         // with FL Studio installed: the Sequencer with FL's factory bank (to compare with FL's own editor) and
@@ -12364,7 +12224,7 @@ private:
                 {
                     offline.dispatchPendingMessages();
                     const auto name = prefix + "-" + juce::String (lynx::vfx::flName (kind)).replaceCharacter (' ', '-').toLowerCase();
-                    savePng (panel->createComponentSnapshot (panel->getLocalBounds()), name + "-fl.png");
+                    savePng (lynx::shot::snapshot (*panel), name + "-fl.png");
                     if (kind == lynx::vfx::Kind::script) // the editor's other tabs (round 165d)
                         shootScriptTabs (*panel, offline, index, name);
                 }
@@ -12376,7 +12236,7 @@ private:
                 if (w->getName().startsWith (lynx::tr ("Patcher")) && w->getContentComponent() != nullptr)
                 {
                     auto* content = w->getContentComponent();
-                    savePng (content->createComponentSnapshot (content->getLocalBounds()), prefix + "-patcher.png");
+                    savePng (lynx::shot::snapshot (*content), prefix + "-patcher.png");
                     delete w;
                     break;
                 }
@@ -12403,12 +12263,12 @@ private:
                 targets.addInstrument = [] (lynx::ChannelDef) {};
                 targets.addEffect = [] (lynx::EffectSlot) {};
                 auto palette = lynx::makeQuickAddPalette (offline, std::move (targets));
-                savePng (palette->createComponentSnapshot (palette->getLocalBounds()), prefix + "-quickadd-renamed.png");
+                savePng (lynx::shot::snapshot (*palette), prefix + "-quickadd-renamed.png");
             }
             ui.selectTabForSnapshot (3);
             ui.getMixerForSnapshot().selectTrack (1);
             offline.dispatchPendingMessages();
-            savePng (ui.createComponentSnapshot (ui.getLocalBounds()), prefix + "-mixer-renamed.png");
+            savePng (lynx::shot::snapshot (ui), prefix + "-mixer-renamed.png");
             offline.getPluginHost().setPluginName (key, "");
         }
     }
@@ -12711,10 +12571,10 @@ private:
         const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
         ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
         const auto write = [&prefix, &ui] (const char* name) {
-            const auto file = juce::File (prefix + "-" + name + ".png");
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
             file.deleteFile();
             juce::FileOutputStream out (file);
-            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
         };
         juce::String report;
         int failures = 0;
@@ -13221,10 +13081,10 @@ private:
         const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
         ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
         const auto write = [&prefix, &ui] (const char* name) {
-            const auto file = juce::File (prefix + "-" + name + ".png");
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
             file.deleteFile();
             juce::FileOutputStream out (file);
-            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
         };
         ui.selectTabForSnapshot (2); // the Playlist panel, maximized
         if (projectPath.isNotEmpty())
@@ -13308,12 +13168,12 @@ private:
         const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
         ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
         const auto writeImage = [&prefix] (const juce::Image& image, const char* name) {
-            const auto file = juce::File (prefix + "-" + name + ".png");
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
             file.deleteFile();
             juce::FileOutputStream out (file);
             juce::PNGImageFormat().writeImageToStream (image, out);
         };
-        const auto write = [&ui, &writeImage] (const char* name) { writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), name); };
+        const auto write = [&ui, &writeImage] (const char* name) { writeImage (lynx::shot::snapshot (ui), name); };
 
         // View › Layout style, with its submenu, as it is with `style` chosen
         const auto viewMenu = [&ui] {
@@ -13344,12 +13204,7 @@ private:
                 return o;
             };
             auto page = lynx::makeSettingsPanel (offline, lynx::SettingsPage::general, false, hooks);
-            juce::Image image (juce::Image::ARGB, page->getWidth(), juce::jmin (page->getHeight(), 420), true);
-            {
-                juce::Graphics g (image);
-                g.fillAll (lynx::theme::panel);
-                page->paintEntireComponent (g, false);
-            }
+            const auto image = lynx::shot::paint (*page, lynx::theme::panel, -1, juce::jmin (page->getHeight(), 420));
             writeImage (image, name);
             std::function<juce::ComboBox* (juce::Component&)> find = [&find] (juce::Component& c) -> juce::ComboBox* {
                 if (c.getComponentID() == "layoutStyle")
@@ -13510,7 +13365,7 @@ private:
                     simple->setStatusForSnapshot (text);
                     offline.dispatchPendingMessages();
                     states << n << ": " << text << "\n";
-                    writeImage (ui.createComponentSnapshot (ui.getLocalBounds().withTop (juce::jmin (ui.getHeight() - 1, 70)).withHeight (juce::jmin (ui.getHeight(), 44)), true, 1.0f),
+                    writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withTop (juce::jmin (ui.getHeight() - 1, 70)).withHeight (juce::jmin (ui.getHeight(), 44))),
                                 ("status-" + juce::String (n++)).toRawUTF8());
                 }
                 juce::File (prefix + "-status.txt").replaceWithText (states);
@@ -13532,7 +13387,7 @@ private:
         saveSettings (lynx::layoutstyle::Style::simple, "settings-simple");
         // round 184a S11: the Key panel (no key, then an A minor riff and its guesses) and its menu
         const auto toolbarShot = [&] (const char* name) {
-            writeImage (ui.createComponentSnapshot (ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80)), true, 1.0f), name);
+            writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80))), name);
         };
         toolbarShot ("key-none");
         saveMenus (juce::StringArray { lynx::tr ("Key") }, std::vector<juce::PopupMenu> { ui.getKeyMenuForSnapshot() }, prefix + "-key-menu-empty.png");
@@ -13573,11 +13428,7 @@ private:
         for (int style : { 0, 2 })
         {
             auto wizard = lynx::makeSetupWizardContent (offline, {}, {}, style, {});
-            juce::Image image (juce::Image::ARGB, wizard->getWidth(), wizard->getHeight(), true);
-            {
-                juce::Graphics g (image);
-                wizard->paintEntireComponent (g, false);
-            }
+            auto image = lynx::shot::paint (*wizard);
             writeImage (image, style == 0 ? "wizard-pattern" : "wizard-simple");
         }
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
@@ -13593,10 +13444,10 @@ private:
         const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
         ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
         const auto write = [&prefix, &ui] (const char* name) {
-            const auto file = juce::File (prefix + "-" + name + ".png");
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
             file.deleteFile();
             juce::FileOutputStream out (file);
-            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
         };
         ui.setVisible (true); // (not on the desktop: only so the Clip page sees itself shown and docks the Piano roll)
         lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
@@ -13765,11 +13616,11 @@ private:
             ui.selectTabForSnapshot (2);
             offline.dispatchPendingMessages();
             auto& playlist = ui.getPlaylistForSnapshot();
-            savePng (playlist.createComponentSnapshot (playlist.getLocalBounds()), prefix + "-playlist-song.png");
+            savePng (lynx::shot::snapshot (playlist), prefix + "-playlist-song.png");
             playlist.runAction ("playlist.zoomPerformance"); // as FL opens these demos: the zone fills the view
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-playlist.png");
-            savePng (playlist.createComponentSnapshot (playlist.getLocalBounds()), prefix + "-playlist-only.png");
+            savePng (lynx::shot::snapshot (playlist), prefix + "-playlist-only.png");
 
             // patcherize: the first insert with effects (all of them) and the first channel that can be
             auto patched = offline.getSong();
@@ -13981,7 +13832,7 @@ private:
                         if (w->getName().startsWith (lynx::tr ("Patcher")) && w->getContentComponent() != nullptr)
                         {
                             auto* c = w->getContentComponent();
-                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + name);
+                            savePng (lynx::shot::snapshot (*c), prefix + name);
                             delete w;
                             return;
                         }
@@ -14163,7 +14014,7 @@ private:
             {
                 shot = true;
                 log.add ("built-in dialog shown after " + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - started)) + " ms");
-                const auto image = box->createComponentSnapshot (box->getLocalBounds());
+                const auto image = lynx::shot::snapshot (*box);
                 juce::FileOutputStream png (out.getSiblingFile (out.getFileName() + ".png"));
                 if (png.openedOk())
                 {
@@ -14643,13 +14494,8 @@ private:
                 frame.addAndMakeVisible (*c);
                 c->setTopLeftPosition (0, 0);
                 checkTextFit (*c, name.fromFirstOccurrenceOf ("-", false, false).upToLastOccurrenceOf (".", false, false));
-                juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
-                {
-                    juce::Graphics g (image);
-                    g.fillAll (lynx::theme::panel);
-                    frame.paintEntireComponent (g, false);
-                }
-                const juce::File file (prefix + name);
+                auto image = lynx::shot::paint (frame, lynx::theme::panel);
+                const auto file = lynx::shot::file (juce::File (prefix + name));
                 file.deleteFile();
                 juce::PNGImageFormat png;
                 if (auto out = file.createOutputStream())
@@ -14945,6 +14791,26 @@ private:
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::extras), "-settings-extras.png"); // round 190am
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::audio), "-settings-audio.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi), "-settings-midi.png");
+                {
+                    // round 190bj (QA): the MIDI page in a small window keeps each row's switch and device name
+                    auto small = lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi);
+                    small->setSize (390, 390);
+                    saveWindow (std::move (small), "-settings-midi-small.png");
+                }
+                {
+                    // round 190bj (QA): the Apex Limiter's window content at its default size, as sized before (JUCE's ratio
+                    // on the whole window: the status row cut off) and now
+                    lynx::AudioEngine apexEngine (false);
+                    lynx::Song song;
+                    song.mixer.resize (2);
+                    song.mixer[0].name = "Master";
+                    song.mixer[1].name = "Insert 1";
+                    song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::apexLimiter));
+                    apexEngine.setSong (std::move (song));
+                    apexEngine.dispatchPendingMessages();
+                    savePng (lynx::ProEditorWindows::windowContentForSnapshot (apexEngine, 1, 0, true), prefix + "-apex-window-before190bj.png");
+                    savePng (lynx::ProEditorWindows::windowContentForSnapshot (apexEngine, 1, 0, false), prefix + "-apex-window.png");
+                }
                 saveWindow (lynx::makePluginManagerPanel (offline, false), "-plugin-manager.png");
                 saveWindow (lynx::makeShortcutManagerPanel (false), "-shortcuts.png");
             }
@@ -15912,9 +15778,10 @@ private:
             totalHeight = juce::jmax (totalHeight, l.height + 32);
         }
 
-        juce::Image image (juce::Image::ARGB, totalWidth, totalHeight, true);
+        auto image = lynx::shot::canvas (totalWidth, totalHeight);
         {
             juce::Graphics g (image);
+            lynx::shot::logical (g);
             g.fillAll (lynx::theme::colour::bg1);
             int x = 16;
 
@@ -15959,7 +15826,7 @@ private:
             }
         }
 
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
         if (auto out = file.createOutputStream())
@@ -15968,7 +15835,7 @@ private:
 
     static void writePng (const juce::Image& image, const juce::String& path)
     {
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
 
@@ -15982,19 +15849,20 @@ private:
         lynx::SplashScreen splash;
         splash.setStatus (lynx::tr ("Loading the workspace..."));
         splash.setTimeForSnapshot (1.6);
-        writePng (splash.createComponentSnapshot (splash.getLocalBounds()), prefix + "-splash.png");
+        writePng (lynx::shot::snapshot (splash), prefix + "-splash.png");
 
         const double times[] = { 0.10, 0.22, 0.29, 0.40, 0.58, 0.75, 1.00, 1.30 };
         const auto w = lynx::SplashScreen::width / 2, h = lynx::SplashScreen::height / 2;
-        juce::Image strip (juce::Image::ARGB, 4 * (w + 8) + 8, 2 * (h + 8) + 8, true);
+        auto strip = lynx::shot::canvas (4 * (w + 8) + 8, 2 * (h + 8) + 8);
         {
             juce::Graphics g (strip);
+            lynx::shot::logical (g);
             g.fillAll (lynx::theme::colour::bg1);
 
             for (int i = 0; i < 8; ++i)
             {
                 splash.setTimeForSnapshot (times[i]);
-                const auto frame = splash.createComponentSnapshot (splash.getLocalBounds());
+                const auto frame = lynx::shot::snapshot (splash);
                 g.drawImage (frame, 8 + (i % 4) * (w + 8), 8 + (i / 4) * (h + 8), w, h, 0, 0, frame.getWidth(), frame.getHeight());
             }
         }
@@ -16005,6 +15873,7 @@ private:
     // colours: at rest, hovered and switched on
     static void saveIconSheet (const juce::String& path, float scale)
     {
+        scale *= lynx::shot::scale();
         const int sizes[] = { 16, 20, 24 };
         const int cell = 34, columns = 3 * 3, labelWidth = 110;
         const auto w = labelWidth + columns * cell + 16, h = lynx::iconCount * cell + 16;
@@ -16041,16 +15910,16 @@ private:
     // a part of a component (e.g. the main toolbar)
     static void saveArea (juce::Component& c, juce::Rectangle<int> area, const juce::String& path)
     {
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
         if (auto out = file.createOutputStream())
-            png.writeImageToStream (c.createComponentSnapshot (area), *out);
+            png.writeImageToStream (lynx::shot::snapshot (c, area), *out);
     }
 
     static void savePng (const juce::Image& image, const juce::String& path)
     {
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
         if (auto out = file.createOutputStream())
@@ -16063,9 +15932,10 @@ private:
     {
         const auto tips = ui.getQuickTipsForSnapshot();
         const auto top = juce::Rectangle<int> (0, 0, ui.getWidth(), juce::jmin (ui.getHeight(), ui.getToolbarBoundsForSnapshot().getHeight() + 72));
-        auto image = ui.createComponentSnapshot (top);
+        auto image = lynx::shot::snapshot (ui, top);
         {
             juce::Graphics g (image);
+            lynx::shot::logical (g);
             const juce::String shown[] = { lynx::tr ("Pattern mode"), lynx::tr ("Play"), lynx::tr ("Metronome"), lynx::tr ("Mixer"), lynx::tr ("Save project"),
                                            lynx::tr ("Window options"), lynx::tr ("Close") };
             std::vector<juce::Rectangle<int>> used;
@@ -16100,9 +15970,10 @@ private:
             placed.emplace_back (r.withPosition (x, y), tip);
             x += r.getWidth() + 10;
         }
-        juce::Image sheet (juce::Image::ARGB, width, y + 20 + 12, true);
+        auto sheet = lynx::shot::canvas (width, y + 20 + 12);
         {
             juce::Graphics g (sheet);
+            lynx::shot::logical (g);
             g.fillAll (lynx::theme::colour::bg3);
             for (const auto& [r, tip] : placed)
                 lynx::ui::paintQuickTip (g, r.toFloat(), tip);
@@ -16183,12 +16054,12 @@ private:
     static void saveSnapshot (juce::Component& c, const juce::String& path)
     {
         checkTextFit (c, juce::File (path).getFileNameWithoutExtension());
-        const juce::File file (path);
+        const auto file = lynx::shot::file (juce::File (path));
         file.deleteFile();
         juce::PNGImageFormat png;
 
         if (auto out = file.createOutputStream())
-            png.writeImageToStream (c.createComponentSnapshot (c.getLocalBounds()), *out);
+            png.writeImageToStream (lynx::shot::snapshot (c), *out);
     }
 
     class MainWindow final : public juce::DocumentWindow

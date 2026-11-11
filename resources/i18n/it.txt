@@ -8918,3 +8918,16 @@ countries: it ch sm
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Livellamento: tiene il livello a una soglia sotto il tetto con un attacco lento, il tetto ferma il resto (disattivato per impostazione predefinita)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Soglia di livellamento: il livello tenuto sotto il tetto (Off: nessun livellamento)"
 "Levelling attack: how much of a transient passes before the level is held" = "Attacco del livellamento: quanta parte di un transiente passa prima che il livello venga tenuto"
+"Frozen, out of date (changed since the freeze): the old audio plays.  [RMB] Re-freeze" = "Congelato, non aggiornato (modificato dopo il congelamento): suona l'audio precedente.  [RMB] Ricongela"
+"@channel: Freeze" = "Congela"
+"More plugins... (1 instrument)" = "Altri plugin... (1 strumento)"
+"More plugins... (1 effect)" = "Altri plugin... (1 effetto)"
+"My scripts (old folder)" = "I miei script (cartella precedente)"
+"Can't freeze {0}" = "Impossibile congelare {0}"
+"Some selected channels can't be frozen" = "Alcuni canali selezionati non possono essere congelati"
+"The other selected channels are frozen." = "Gli altri canali selezionati vengono congelati."
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (l'ultima riga del foglio) viene mostrata mentre il ballerino è tenuto con il mouse."
+"Show complete piano roll preview" = "Mostra l'anteprima completa del Piano Roll"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: l'anteprima delle note di un canale mostra l'intero pattern anche quando è più lungo della parte visibile del rack; disattivata, scorre con gli step"

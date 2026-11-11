@@ -18,6 +18,9 @@ bool handles (EffectKind kind) noexcept;
 void open (AudioEngine& engine, int track, int slot);
 void close (int track, int slot); // round tp172d: the slot's window, if open (Ember's Classic / multiband swap)
 void closeAll();
+// What the window's content shows at its default size (round 190bj, --snapshot), drawn off-screen with a native
+// Windows frame: `juceAspect` = the sizing before round 190bj (JUCE's ratio on the whole window: the editor cut off).
+juce::Image windowContentForSnapshot (AudioEngine& engine, int track, int slot, bool juceAspect);
 } // namespace ProEditorWindows
 
 // The editor alone (for --plugui); `demo` fills the displays with a synthetic signal.

@@ -141,6 +141,15 @@ int sheetMoveCount (int rows) noexcept;
 // The move list as FL shows it: "Freestyle", then the names without the last one
 std::vector<std::string> sheetMoveNames (const std::vector<std::string>& names);
 int sheetHeldRow (int rows) noexcept; // rows - 1
+// The keys of a sheet's moves as the key help lists them (round 190bj, issue B9): Freestyle on B4, then each move (the
+// names but the last) on the next key, up to key 127; the last name is the held row, which has no key (FL)
+struct SheetKey
+{
+    int key = 0;
+    std::string name;
+};
+std::vector<SheetKey> sheetKeys (const std::vector<std::string>& names);
+std::string sheetHeldName (const std::vector<std::string>& names); // "" with no names
 
 // What to draw at a moment: a frame, and the next one over it at `mix` (0 = none)
 struct SheetFrame
@@ -156,6 +165,13 @@ struct SheetFrame
 // changes", FL's default): not playing = row 0 (FL's "Waiting"); Freestyle = a random row from the second to the
 // one before the last, drawn again every cycle; else the move's row. Inside a frame the last `blend` part fades to
 // the next frame (which is already the coming row's first frame at the end of a cycle).
+struct Settings;
+class SheetAnimator;
+// The frame a dancer with a sheet shows (round 190bj, issue B8: the editor's preview and the stage both draw this one,
+// so they agree; FL: the first row while the song is stopped, the move's row while it plays)
+struct SheetFrame;
+SheetFrame danceFrame (SheetAnimator& animator, double cycles, int rows, const Settings& settings, bool playing, bool held = false) noexcept;
+
 class SheetAnimator
 {
 public:

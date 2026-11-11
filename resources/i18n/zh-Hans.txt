@@ -8918,3 +8918,16 @@ countries: cn sg
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "电平平衡：以较慢的起音把电平保持在上限以下的阈值，其余由上限拦住（默认关闭）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "电平平衡阈值：保持在上限以下的电平（Off：不做电平平衡）"
 "Levelling attack: how much of a transient passes before the level is held" = "电平平衡起音：电平被保持之前有多少瞬态通过"
+"Frozen, out of date (changed since the freeze): the old audio plays.  [RMB] Re-freeze" = "已冻结，已过期（冻结后有改动）：播放旧的音频。  [RMB] 重新冻结"
+"@channel: Freeze" = "冻结"
+"More plugins... (1 instrument)" = "更多插件...（1个乐器）"
+"More plugins... (1 effect)" = "更多插件...（1个效果器）"
+"My scripts (old folder)" = "我的脚本（旧文件夹）"
+"Can't freeze {0}" = "无法冻结 {0}"
+"Some selected channels can't be frozen" = "部分所选通道无法冻结"
+"The other selected channels are frozen." = "其他所选通道将被冻结。"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表单的最后一行）在用鼠标按住舞者时显示。"
+"Show complete piano roll preview" = "显示完整的钢琴卷帘预览"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道机架：即使样式比机架显示的范围长，通道的音符预览也会显示整个样式；关闭时，预览会随步进一起滚动"

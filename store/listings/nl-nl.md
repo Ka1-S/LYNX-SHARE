@@ -8,34 +8,46 @@ LYNX SHARE
 
 ## Short description
 
-Gratis, open-source DAW met een patroongebaseerde workflow: Channel Rack, Piano Roll, Playlist en Mixer. Opent .flp-projecten.
+Gratis, opensource DAW met een pattern- en een clip-launchworkflow: Channel Rack, Piano Roll, Playlist, Mixer en een clipraster. Opent .flp-, .als- en .flm-projecten.
 
 ## Description
 
-LYNX SHARE is een gratis, open-source digital audio workstation (DAW) om beats en nummers te maken. Het volgt de patroongebaseerde workflow waar beatmakers dol op zijn — een Channel Rack met stepsequencer, patronen, een Piano Roll, een Playlist met arrangementen en een Mixer met inserts, sends en sidechain — en is gebouwd om licht en snel te blijven op elke pc.
+LYNX SHARE is een gratis, opensource digital audio workstation om beats en nummers te maken. Hij brengt twee manieren
+van werken samen: een patternworkflow in FL Studio-stijl (een Channel Rack met stepsequencer, patterns, een Piano
+Roll, een Playlist met arrangementen en een Mixer met inserts, sends en sidechain) als standaard, en een clipraster
+met scènes in Ableton Live-stijl, één instelling verderop. Hij is gebouwd om licht en snel te blijven op elke pc.
 
 • Licht: een lock-free audio-engine die kanalen en mixertracks over je processorkernen verdeelt, inactieve kanalen overslaat en lange audiobestanden rechtstreeks van schijf streamt.
 • Compleet: meer dan 100 ingebouwde instrumenten en effecten — synths, drumcomputers, samplers, EQ's, compressors, limiters, reverbs, delays, toonhoogtecorrectie, visualizers en meer.
 • Je eigen plugins: host VST3-, CLAP- en VST2-instrumenten en -effecten, elk optioneel in een eigen sandboxproces, zodat een crashende plugin je sessie niet onderuit haalt.
-• Opent FL Studio-projecten (.flp) met hun patronen, noten, mixer, automatisering en samples, en importeert MIDI-bestanden.
+• Je projecten: opent FL Studio-projecten (.flp) met patterns, noten, mixer, automatisering en samples; opent en
+bewaart Ableton Live 11/12-sets (.als), inclusief Session-clips; exporteert .flp terug naar FL Studio; importeert FL
+Studio Mobile-projecten (.flm, gedeeltelijk) en MIDI-bestanden.
+• Makkelijk beginnen: een Eenvoudige werkwijze geeft beginners één venster met de tracks en de tijdlijn, startbeats en
+instrumenten die met één klik spelen.
 • Lage latency: ASIO (inclusief de eigen ASIO-driver van LYNX SHARE voor elk apparaat), WASAPI in gedeelde en exclusieve modus.
 • Neem audio en MIDI op, bewerk audio, automatiseer alles en exporteer naar WAV, FLAC, MP3, OGG of stems.
 • Interface in 15 talen, waaronder Nederlands, Engels, Portugees, Spaans, Frans, Duits, Italiaans, Pools, Russisch, Turks, Japans, Koreaans en Chinees.
 
 Geen account, geen abonnement, geen advertenties en geen telemetrie. LYNX SHARE is vrije software (GNU AGPL-3.0); de broncode staat op GitHub.
 
-LYNX SHARE is een onafhankelijk project dat niet gelieerd is aan of onderschreven wordt door Image-Line. FL Studio is een handelsmerk van Image-Line Software. Andere productnamen zijn handelsmerken van hun respectieve eigenaren.
+LYNX SHARE is een onafhankelijk project, niet verbonden aan of goedgekeurd door Image-Line of Ableton. FL Studio en FL
+Studio Mobile zijn handelsmerken van Image-Line Software; Ableton en Live zijn handelsmerken van Ableton AG. Andere
+productnamen zijn handelsmerken van hun respectieve eigenaars.
 
 LYNX SHARE is in alfa: verwacht nog wat ruwe randjes en meld problemen alsjeblieft op GitHub.
 
 ## What's new
 
-LYNX SHARE 0.1.20: eerste release in de Microsoft Store. Puntbewerking in FL-stijl voor Fruity WaveShaper en automatiseringsclips, nog vijf FL-effecten die bit-identiek zijn aan FL, Dashboard-bedieningselementen die MIDI versturen en veel bugfixes.
+LYNX SHARE 0.1.26: een Eenvoudige werkwijze voor beginners; een Clipweergave, racks en kans per noot voor het
+clipraster; de instrumenten Slicex en FPC; FL Studio Mobile-projecten met instrumenten, effecten en automatisering;
+Bevriezen voor kanalen; gedockte pluginvensters; MIDI-controllerprofielen en een eerste stap van MPE; gedeelde plugins
+in online sessies; en veel fixes.
 
 ## Features
 
-1. Patroongebaseerde workflow: Channel Rack-stepsequencer, Piano Roll, Playlist met arrangementen en een volledige Mixer
-2. Opent FL Studio-projecten (.flp) en MIDI-bestanden
+1. Drie workflows: op patterns gebaseerd (Channel Rack, Piano Roll, Playlist, Mixer) als standaard, een clipraster met scènes, of een Eenvoudige werkwijze voor beginners
+2. Opent FL Studio- (.flp), Ableton Live- (.als) en FL Studio Mobile-projecten (.flm) en MIDI-bestanden; bewaart .als en .flp
 3. Meer dan 100 ingebouwde instrumenten en effecten
 4. Host VST3-, CLAP- en VST2-plugins, optioneel gesandboxt in een eigen proces
 5. Audio met lage latency: ASIO, WASAPI gedeeld en exclusief

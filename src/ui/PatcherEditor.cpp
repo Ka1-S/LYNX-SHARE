@@ -45,6 +45,7 @@
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 #include "ui/VfxEditors.h"
+#include "ui/ShotScale.h"
 
 namespace lynx
 {
@@ -2530,7 +2531,7 @@ void shootMenus (AudioEngine& engine, bool channel, int index, int slot, std::fu
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ 20, 20, 1, 1 }));
         for (int k = 0; k < desktop.getNumComponents(); ++k)
             if (auto* c = desktop.getComponent (k); std::find (before.begin(), before.end(), c) == before.end() && c->getWidth() > 0)
-                save (c->createComponentSnapshot (c->getLocalBounds()), name);
+                save (shot::snapshot (*c), name);
         juce::PopupMenu::dismissAllActiveMenus();
     }
 }
@@ -2551,7 +2552,7 @@ void shootNodeEditors (AudioEngine& engine, bool channel, int index, int slot, s
         if (auto* w = findToolWindow (target.key() + "-node-" + juce::String (n)))
         {
             if (auto* c = w->getContentComponent())
-                save (c->createComponentSnapshot (c->getLocalBounds()), n);
+                save (shot::snapshot (*c), n);
             delete w;
         }
     }

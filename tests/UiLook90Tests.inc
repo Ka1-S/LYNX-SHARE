@@ -1,5 +1,33 @@
 // Round 90 (docs/analise/UI_STUDY_round90.md): Channel Rack note preview rule, FLP playlist track colours.
 
+TEST (fb190bm_rack_complete_preview_span)
+{
+    using lynx::notePreviewSpan;
+    const int step = 22;
+    // a 2-bar pattern in a rack that shows 32 steps: step-aligned, as before
+    auto s = notePreviewSpan (32 * step, 32 * step, 0, true);
+    CHECK (s.x == 0 && s.width == 32 * step && ! s.fitted);
+    // 4 and 8 bars in the same rack: the whole pattern in the visible width, wherever the steps are scrolled to
+    for (int steps : { 64, 128, 512 })
+        for (int scroll : { 0, 5 * step, (steps - 32) * step })
+        {
+            s = notePreviewSpan (steps * step, 32 * step, scroll, true);
+            CHECK (s.fitted);
+            CHECK (s.x == scroll); // (drawn at the visible left edge)
+            CHECK (s.width == 32 * step);
+            CHECK (s.x + s.width <= steps * step); // inside the rack
+        }
+    // a wider rack than the pattern: nothing to fit
+    s = notePreviewSpan (64 * step, 80 * step, 0, true);
+    CHECK (s.width == 64 * step && ! s.fitted);
+    // the option off: step-aligned at any length (the miniature scrolls with the steps)
+    s = notePreviewSpan (128 * step, 32 * step, 10 * step, false);
+    CHECK (s.x == 0 && s.width == 128 * step && ! s.fitted);
+    // no view yet
+    s = notePreviewSpan (128 * step, 0, 0, true);
+    CHECK (s.width == 128 * step && ! s.fitted);
+}
+
 TEST (uilook90_rack_note_preview_rule)
 {
     lynx::Pattern p;

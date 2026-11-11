@@ -183,7 +183,9 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | GMS engine † | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
 | Morphine engine † | Morphine | Close | model within −60 dB on 7/7 demo channels; release loops and unison not modelled |
 | Sakura / Drumpad models | Sakura, Drumpad | Close | physical models rebuilt from the engines; Sakura's resonators within −72 dB; no CC sources |
-| Sampler (FL voice) | Channel sampler, FPC, Slicex, Fruity Slicer | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
+| Sampler (FL voice) | Channel sampler, Fruity Slicer | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
+| Slicex engine | Slicex | Near-exact | FL's state read and written byte for byte; regions on keys, layering, articulators, group filter and declick, compared with FL's renders of plain and edited states; editor in FL's layout (Snap and View menus not there yet) |
+| FPC engine | FPC | Near-exact | one channel per kit; pads, layers, volume / pan envelopes, layer pan, Scale Vol, trigger modes and choke within about 1 LSB of FL's renders; `.fst` kits load onto a channel; editor in FL's layout |
 | LYNX Soundfont | Fruity Soundfont Player (SoundFont Player) | Close | own SF2 / SF3 player (TinySoundFont parsing, LYNX SHARE voices): FL's state read (font, preset, envelope / LFO / cut-off overrides, send levels, options; REA_rodada158); preset search over all SoundFonts in the user's folders; "send to" a mixer insert, mod-wheel knob and FL's built-in reverb / chorus sound not reproduced (LYNX SHARE's own reverb / chorus) |
 | Built-in synth | FLEX | Approximate | FLEX packs are encrypted and never opened: a synth patch chosen by preset name |
 | Silent channel | Wasp / Wasp XT | Placeholder | silent in FL Studio 2026 (64-bit placeholder); state kept |

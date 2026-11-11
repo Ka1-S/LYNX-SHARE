@@ -1,0 +1,33 @@
+<p>每个版本都在<a href="https://github.com/Ka1-S/LYNX-SHARE/releases">发布页面</a>提供 Windows、macOS 和 Linux 的构建。这些文件由 GitHub Actions 根据带标签的源代码构建，并连同它们的 SHA-256 一起列在 <code>SHA256SUMS.txt</code> 中。<a href="/download/">下载</a>页面链接到当前版本。</p>
+<h2 id="install-on-windows">在 Windows 上安装</h2>
+<p>Windows 10 或 11，64 位。</p>
+<ol><li>下载 <code>LYNX-&lt;version&gt;-setup-x64.exe</code>。</li><li>运行它。它只为你的用户安装，不需要管理员权限。</li><li>SmartScreen 可能会发出警告，因为这个可执行文件尚未进行代码签名。选择 <code>More info</code>，然后选择 <code>Run anyway</code>。</li><li>从开始菜单或桌面快捷方式启动 LYNX SHARE。</li></ol>
+<p>安装程序会让 LYNX SHARE 成为打开 <code>.lynx</code> 工程的程序。它还会在 <code>.flp</code> 文件的 <em>打开方式</em> 中提供 LYNX SHARE，同时不更改 FL Studio 的默认设置。</p>
+<p>还有另外两种方式：</p>
+<div class="tablewrap"><table><thead><tr><th>方式</th><th>文件或位置</th><th>作用</th></tr></thead><tbody><tr><td>便携 zip</td><td><code>LYNX-&lt;version&gt;-windows-x64.zip</code></td><td>解压到任意位置并运行 <code>LYNX.exe</code>。不会安装任何东西。</td></tr><tr><td>Microsoft Store</td><td><a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N">Store 上的 LYNX SHARE</a></td><td>由 Store 安装并保持更新。</td></tr></tbody></table></div>
+<h2 id="install-on-macos">在 macOS 上安装</h2>
+<p>macOS 11 Big Sur 或更新版本。一个通用的 <code>LYNX-&lt;version&gt;-macos-universal.dmg</code> 同时适用于 Intel 和 Apple 芯片。</p>
+<ol><li>打开 <code>.dmg</code>，把 LYNX SHARE 拖到 <em>应用程序</em> 中。</li><li>这个应用没有经过 Apple 公证，也没有 Developer ID 签名，所以首次启动需要多一步操作。在 <em>应用程序</em> 中右键单击（或按住 Control 单击）LYNX SHARE，选择 <em>打开</em>，然后再次选择 <em>打开</em>。</li><li>在 macOS 15 Sequoia 或更新版本上，先尝试打开一次，然后进入 <em>系统设置 › 隐私与安全性</em>，单击 <em>仍要打开</em>。</li></ol>
+<p>用终端的替代方法：</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>你第一次录音时，macOS 会请求麦克风权限。</p>
+<h2 id="install-on-linux">在 Linux 上安装</h2>
+<p>x86_64，glibc 2.35 或更新（Ubuntu 22.04+、Debian 12+、Fedora 36+、当前的 Arch 或 Manjaro）。LYNX SHARE 需要 X11 或 XWayland。音频通过 PipeWire、JACK 或 ALSA 输出，为此不需要额外安装任何东西。</p>
+<p>AppImage（<code>LYNX-&lt;version&gt;-x86_64.AppImage</code>）：</p>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p>有些发行版需要 libfuse2 才能运行 AppImage（Ubuntu 22.04 上是 <code>libfuse2</code>，24.04 上是 <code>libfuse2t64</code>，Arch 上是 <code>fuse2</code>，Fedora 上是 <code>fuse-libs</code>）。首次启动时，设置向导会提议把 LYNX SHARE 添加到应用程序菜单，并用它打开 <code>.lynx</code> 文件。之后你可以在 <code>选项 › 常规设置...</code> 中切换，或者在终端中用 <code>./LYNX-*.AppImage --menu-entry on</code>（或 <code>关</code>）切换。</p>
+<p>如果你不想安装 libfuse2，请使用 <code>LYNX-&lt;version&gt;-linux-x86_64.tar.gz</code>：解压后运行 <code>./install.sh</code>。这会为你的用户把 LYNX SHARE 安装到 <code>~/.local</code> 下，并带有菜单项、图标和 <code>.lynx</code> 文件类型。</p>
+<h2 id="where-settings-are-kept">设置保存在哪里</h2>
+<div class="tablewrap"><table><thead><tr><th>系统</th><th>设置文件夹</th></tr></thead><tbody><tr><td>Windows</td><td><code>%APPDATA%\LYNX</code></td></tr><tr><td>macOS</td><td><code>~/Library/Application Support/LYNX</code></td></tr><tr><td>Linux</td><td><code>~/.config/LYNX</code>（或在 <code>$XDG_CONFIG_HOME</code> 之下）</td></tr></tbody></table></div>
+<p>该文件夹保存你的选项、所选语言（<code>language.txt</code>）、你的快捷键（<code>keys.json</code>）、你的插件文件夹（<code>plugin-folders.txt</code>）以及已扫描插件的列表（<code>plugins.xml</code>）。</p>
+<h2 id="update">更新</h2>
+<p>启动时，LYNX SHARE 会向 GitHub 询问最新的版本号。不会发送任何关于你的信息。有新版本发布时，会出现一个提示栏，显示 <code>LYNX SHARE &lt;version&gt; is available</code>，带有 <code>新功能</code> 按钮和一个更新按钮。<code>帮助 › 检查更新...</code> 可随时查询。</p>
+<div class="tablewrap"><table><thead><tr><th>构建</th><th>如何更新</th></tr></thead><tbody><tr><td>Windows 安装程序</td><td><code>更新</code> 下载新的安装程序，询问是否保存未保存的更改，然后安装并重启</td></tr><tr><td>Windows 便携 zip、macOS</td><td><code>更新</code> 下载新文件并在其所在文件夹中显示</td></tr><tr><td>Linux AppImage</td><td><code>更新</code> 就地更新 AppImage 文件。Gear Lever 和 AppImageUpdate 也能从外部做到同样的事</td></tr><tr><td>Linux <code>.tar.gz</code></td><td><code>下载...</code> 打开下载页面</td></tr><tr><td>Microsoft Store</td><td>由 Store 更新。这个构建自己没有更新检查</td></tr></tbody></table></div>
+<p>要关闭检查，请打开 <code>选项 › 常规设置...</code>，取消勾选 <code>自动检查更新</code>。</p>
+<h2 id="remove">卸载</h2>
+<ul><li>Windows 安装程序：在 Windows 的 <em>应用和功能</em> 列表中卸载 LYNX SHARE。</li><li>便携 zip：删除你解压出来的文件夹。</li><li>Linux <code>.tar.gz</code>：运行 <code>./install.sh --uninstall</code>。</li></ul>
+<h2 id="good-to-know">须知</h2>
+<ul><li>在项目的代码签名申请获批之前，Windows 构建都是未签名的。macOS 应用只有临时签名（ad-hoc）。Linux 软件包没有签名。</li><li>要校验下载的文件，请把它的 SHA-256 与发布页面上 <code>SHA256SUMS.txt</code> 中对应的那一行比较。</li><li>安装程序、zip、<code>.dmg</code> 和 <code>.tar.gz</code> 都包含演示工程 <code>Demo.lynx</code>。</li><li>用关闭按钮关闭更新提示栏，会跳过该版本。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/getting-started/">从这里开始</a></li><li><a href="/wiki/audio-setup/">音频设置</a></li><li><a href="/wiki/troubleshooting/">故障排除</a></li><li><a href="/download/">下载</a></li><li><a href="/updates/">更新</a></li></ul>

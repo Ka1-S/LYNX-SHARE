@@ -1,0 +1,57 @@
+<div class="phead"><div class="wrap">
+  <h1 data-i18n="dlp.h1">Download</h1>
+  <p data-i18n="dlp.sub">Free, with no account, for Windows, macOS and Linux.</p>
+  <p><span data-i18n="fact.ver">Version</span>: <span class="ver-line">{{VER_LINE}}</span> (<a class="tlink" href="/updates/" data-i18n="fact.verL">what changed</a>)</p>
+</div></div>
+
+<section class="sec" id="download">
+  <div class="wrap">
+    <div class="dlgrid">
+      <div class="dlos" data-os="win">
+        <h2>{{IC_WIN}}Windows<em data-yours></em></h2>
+        <div class="btns">
+          <a class="btn btn-red" data-dl="win.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fInstaller">Installer</span><small>.exe</small></a>
+          <a class="btn btn-ghost" id="dlPort" data-dl="win.alt" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fPortable">Portable</span><small>.zip</small></a>
+        </div>
+        <p data-i18n="dl.hwin"><b>Windows 10 or 11, 64-bit.</b> The installer needs no admin rights. The executable is not code-signed yet: if SmartScreen warns, choose <i>More info</i> → <i>Run anyway</i>.</p>
+        <p data-i18n="dl.portWinP">Unzip to any folder and open <code>LYNX.exe</code>.</p>
+        <div class="dl-store"><a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N" target="_blank" rel="noopener"><img id="storeBadge" src="https://get.microsoft.com/images/en-us%20light.svg" alt="Get it from Microsoft" data-i18n-alt="dl.storeAlt" width="132" height="36" loading="lazy"></a><span data-i18n="dl.store"><b>Windows 10 / 11:</b> also on the Microsoft Store, with automatic updates.</span></div>
+      </div>
+      <div class="dlos" data-os="mac">
+        <h2>{{IC_MAC}}macOS<em data-yours></em></h2>
+        <div class="btns">
+          <a class="btn btn-red" data-dl="mac.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fUniversal">Universal</span><small>.dmg</small></a>
+        </div>
+        <p data-i18n="dl.hmac"><b>macOS 11 or newer, Apple Silicon or Intel.</b> The app is not notarized by Apple yet: drag LYNX SHARE to Applications, then the first time right-click it → <i>Open</i> → <i>Open</i> (on macOS 15 or newer: try to open it once, then <i>System Settings → Privacy &amp; Security → Open Anyway</i>). Or in Terminal: <code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></p>
+      </div>
+      <div class="dlos" data-os="linux">
+        <h2>{{IC_LINUX}}Linux<em data-yours></em></h2>
+        <div class="btns">
+          <a class="btn btn-red" data-dl="linux.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fAppImage">AppImage</span><small>x86_64</small></a>
+          <a class="btn btn-ghost" data-dl="linux.alt" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fArchive">Archive</span><small>.tar.gz</small></a>
+        </div>
+        <p data-i18n="dl.hlinux"><b>Linux x86_64 with glibc 2.35 or newer</b> (Ubuntu 22.04, Debian 12, Fedora 36 or newer). AppImage: <code>chmod +x LYNX-*.AppImage</code>, then run it (some distros need libfuse2). The .tar.gz has an <code>install.sh</code> that installs for your user with a menu entry.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:22px"><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases" data-i18n="dlp.all">All releases and checksums on GitHub</a></p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap split">
+    <div class="prose">
+      <h2 data-i18n="dlp.knowT">Before you install</h2>
+      <p data-i18n="dlp.know1">LYNX SHARE is an alpha. It opens, plays and exports whole projects, but it has bugs. Save often, and keep a copy of anything you import from another program.</p>
+      <p data-i18n="dlp.know2">Installed versions offer new releases through an Update bar under the toolbar. The Microsoft Store version updates through the Store, and the AppImage through AppImageUpdate or Gear Lever.</p>
+      <p data-i18n="dlp.know3">Plugin formats differ per system: VST3 and CLAP everywhere, Audio Units on macOS, LV2 on Linux, VST2 on Windows and Linux. ASIO and the 32-bit plugin bridge are Windows-only.</p>
+      <p><a class="tlink" href="/wiki/getting-started/" data-i18n="dlp.next">Getting started: first run and first sound</a><br><a class="tlink" href="/wiki/troubleshooting/" data-i18n="dlp.trouble">Troubleshooting: SmartScreen, Gatekeeper, no sound</a></p>
+    </div>
+    <dl class="facts">
+      <div><dt>Windows</dt><dd data-i18n="dlp.reqWin">10 or 11, 64-bit</dd></div>
+      <div><dt>macOS</dt><dd data-i18n="dlp.reqMac">11 or newer, Apple Silicon or Intel</dd></div>
+      <div><dt>Linux</dt><dd data-i18n="dlp.reqLin">x86_64, glibc 2.35 or newer</dd></div>
+      <div><dt data-i18n="fact.lic">Licence</dt><dd>AGPL-3.0</dd></div>
+      <div><dt data-i18n="dlp.privT">Privacy</dt><dd data-i18n="dlp.priv">No telemetry and no account. Crash reports are sent only if you agree. <a href="/#signing">Details</a></dd></div>
+    </dl>
+  </div>
+</section>

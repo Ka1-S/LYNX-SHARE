@@ -632,6 +632,19 @@ Report refresh (const std::string& root, const std::vector<Plugin>& plugins, Sta
     return r;
 }
 
+std::string groupFolder (const std::string& root, bool instruments, const std::string& group)
+{
+    std::error_code ec;
+    const auto installed = u8path (root) / "Installed" / (instruments ? "Generators" : "Effects");
+    if (group == "LYNX")
+        if (const auto own = u8path (folderOnDisk (root, instruments, plugincatalog::lynxCategory)); fs::is_directory (own, ec))
+            return utf8 (own);
+    if (! group.empty())
+        if (const auto format = installed / u8path (safeFileName (group)); fs::is_directory (format, ec))
+            return utf8 (format);
+    return fs::is_directory (installed, ec) ? utf8 (installed) : root;
+}
+
 std::string entryFile (const std::string& root, const std::string& key, bool instrument)
 {
     if (root.empty() || key.empty())

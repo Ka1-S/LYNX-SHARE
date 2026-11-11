@@ -693,6 +693,18 @@ bool WavTakeWriter::open (const std::string& path, double sampleRate, int channe
     return true;
 }
 
+bool WavTakeWriter::changeFormat (SampleFormat newFormat)
+{
+    if (file == nullptr)
+        return false;
+    if (newFormat == format)
+        return true;
+    if (written != 0)
+        return false;
+    format = newFormat;
+    return writeHeader();
+}
+
 bool WavTakeWriter::writeHeader()
 {
     const auto bytes = bytesPerSample (format);

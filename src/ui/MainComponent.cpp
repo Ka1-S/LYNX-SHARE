@@ -1675,7 +1675,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     const auto chord = chordFromKeyPress (key);
 
     // 1. the typing piano: the keys its layout takes (notes, FL's LOCK) win over the shortcuts; FL's FREE keys don't
-    const auto typed = typingKey (chord);
+    const auto typed = typingKey (key);
     if (typed.taken)
     {
         const auto code = key.getKeyCode();
@@ -1725,9 +1725,13 @@ bool MainComponent::isPlainKey (const keys::Chord& chord) noexcept
     return (chord.mods & (keys::ctrl | keys::alt | keys::shift)) == 0;
 }
 
-keys::TypingKey MainComponent::typingKey (const keys::Chord& chord) const
+keys::TypingKey MainComponent::typingKey (const juce::KeyPress& key) const
 {
-    return typingPiano && isPlainKey (chord) ? keys::typingPianoKey (chord.key, typingOctave, typingRoot, typingLayout) : keys::TypingKey {};
+    if (! typingPiano || ! isPlainKey (chordFromKeyPress (key)))
+        return {};
+    // the key's place (FL's table goes by scan code): a German keyboard's Y, left of X, is the Z row's first key
+    const auto place = keys::typingpiano::physicalKey (key.getKeyCode(), [] (int code) { return scanCodeOfKeyCode (code); });
+    return keys::typingPianoKey (keys::letterOfKeyCode (place), typingOctave, typingRoot, typingLayout);
 }
 
 void MainComponent::releaseTypingLaunches (bool all)
@@ -1750,9 +1754,9 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);
     // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
-    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (chord).taken, typingIntoText))
+    if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (key).taken, typingIntoText))
         return keyPressed (key);
-    const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
+    const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (key).taken));
     return ! action.empty() && runAction (action);
 }
 
@@ -1760,7 +1764,7 @@ bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
 {
     // the typing piano as over the main window (its release is polled, MainComponent::keyStateChanged). With the
     // plugin's "Typing keyboard priority" off (LYNX first) the shortcuts run too; keys that do nothing here stay the plugin's.
-    if (typingKey (chordFromKeyPress (key)).taken)
+    if (typingKey (key).taken)
         return keyPressed (key);
     return optionOn && keyFromSecondaryWindow (key);
 }
@@ -2249,6 +2253,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::playheadColumn.store (on);
         else if (key == "rackStepsChannelColour")
             ChannelRackComponent::stepsChannelColour.store (on);
+        else if (key == "rackCompletePreview")
+            ChannelRackComponent::completePreview.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -2493,6 +2499,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
+                                      + "\nrackCompletePreview=" + juce::String (ChannelRackComponent::completePreview.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
                                       + "\nuiAnimations=" + juce::String (ui::motion::enabled() ? 1 : 0)
@@ -6536,6 +6543,7 @@ void MainComponent::openSettings (int page)
         o.noteNamesEveryKey = notenames::everyKey.load();
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
+        o.rackCompletePreview = ChannelRackComponent::completePreview.load();
         o.reducedEffects = skin::reducedEffects();
         o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
@@ -6608,8 +6616,10 @@ void MainComponent::openSettings (int page)
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
         if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load()
-            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load())
+            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load()
+            || o.rackCompletePreview != ChannelRackComponent::completePreview.load())
         {
+            ChannelRackComponent::completePreview.store (o.rackCompletePreview);
             ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
             ChannelRackComponent::stepsChannelColour.store (o.rackStepsChannelColour);
             self.rack.repaint();

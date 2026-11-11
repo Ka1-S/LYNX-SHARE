@@ -131,6 +131,23 @@ bool showsNotePreview (const Pattern& pattern, int channel) noexcept;
 // its notes as a miniature, step patterns included; otherwise only the rows with piano-roll notes do.
 bool showsNotePreview (const Pattern& pattern, int channel, bool pianoRollView) noexcept;
 
+// Where a row's miniature is drawn (feedback 190bm; FL's Channel rack option "Show complete piano roll preview"):
+// `x` from the left edge of the step grid and `width`, in pixels. The step grid is `gridWidth` wide (the pattern's
+// steps at their fixed width), the rack shows `visibleWidth` of it from `scrollX`. Complete: a pattern wider than the
+// view is drawn whole in the visible width and stays there while the steps scroll under it, so a long melody is seen
+// without scrolling; a pattern that fits is step-aligned as before. Not complete: always step-aligned (it scrolls).
+struct PreviewSpan
+{
+    int x = 0, width = 0;
+    bool fitted = false; // narrower than the step grid: times are scaled, not step-aligned
+};
+constexpr PreviewSpan notePreviewSpan (int gridWidth, int visibleWidth, int scrollX, bool complete) noexcept
+{
+    if (! complete || visibleWidth <= 0 || gridWidth <= visibleWidth)
+        return { 0, gridWidth, false };
+    return { scrollX < 0 ? 0 : scrollX, visibleWidth, true };
+}
+
 // The key range of the channel's notes in the pattern (lowest, highest); {60, 60} without notes.
 std::pair<int, int> channelKeyRange (const Pattern& pattern, int channel) noexcept;
 

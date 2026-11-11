@@ -20,7 +20,15 @@ namespace
 {
 const char* const scriptWindowKey = "pianoroll-script";
 
+// Documents/LYNX/Piano roll scripts, beside LYNX's other user folders (Projects, Templates, Mixer states, Plugin
+// database), as the docs say (round 190bj: the first builds of round 190as used Documents/Piano roll scripts)
 juce::File myScriptsFolder()
+{
+    return platform::documentsFolder().getChildFile ("LYNX").getChildFile ("Piano roll scripts");
+}
+
+// that first folder, still read (listed when it holds scripts) so no one's scripts go missing
+juce::File oldScriptsFolder()
 {
     return platform::documentsFolder().getChildFile ("Piano roll scripts");
 }
@@ -48,6 +56,8 @@ std::vector<std::pair<juce::String, juce::File>> scriptFolders()
     }();
     std::vector<std::pair<juce::String, juce::File>> out;
     out.emplace_back (tr ("My scripts"), myScriptsFolder());
+    if (oldScriptsFolder().isDirectory())
+        out.emplace_back (tr ("My scripts (old folder)"), oldScriptsFolder());
     out.insert (out.end(), fl.begin(), fl.end());
     return out;
 }

@@ -24,6 +24,12 @@ Posted& posted()
     return p;
 }
 
+Posted& notice() // round 190bj: postNotice's message, which a gesture's end or a hover does not replace
+{
+    static Posted p;
+    return p;
+}
+
 // one drawable piece of a hint line
 struct Item
 {
@@ -239,6 +245,12 @@ void postHint (const Hint& hint, int holdMs)
     posted().until = juce::Time::getMillisecondCounterHiRes() + holdMs;
 }
 
+void postNotice (const Hint& hint, int holdMs)
+{
+    notice().hint = hint;
+    notice().until = juce::Time::getMillisecondCounterHiRes() + holdMs;
+}
+
 void clearPostedHint()
 {
     posted() = {};
@@ -246,6 +258,9 @@ void clearPostedHint()
 
 std::optional<Hint> postedHint()
 {
+    if (notice().until > 0.0 && juce::Time::getMillisecondCounterHiRes() < notice().until && ! notice().hint.isEmpty())
+        return notice().hint;
+
     if (posted().until > 0.0 && juce::Time::getMillisecondCounterHiRes() < posted().until && ! posted().hint.isEmpty())
         return posted().hint;
 
