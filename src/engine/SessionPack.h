@@ -76,6 +76,16 @@ bool render (const Song& song, const std::vector<RenderItem>& items, double samp
 // Puts the renders on the song (by uid for channels).
 void apply (Song& song, const std::vector<Rendered>& rendered);
 
+// Freeze (round 190ay; core/StandIns.h, lynx::freeze): renders `channel` alone, before its volume, pan and insert, with
+// a private engine holding only that channel's instrument — the whole song (the Song-mode stem) and one loop pass per
+// pattern it plays in (the Pattern-mode stems) — into 32-bit float WAVs in `folder`. Same threads as render().
+bool renderFreeze (const Song& song, int channel, double sampleRate, const juce::File& folder, std::vector<StandIn>& stems,
+                   const std::function<bool (double)>& progress, juce::String& error);
+// What a channel's freeze depends on (its instrument and settings, its notes, where its patterns play, the tempo, the
+// sample rate): a FreezeState::source with another value is out of date. The plugin's saved state counts by its size only
+// (a frozen plugin is not loaded: nothing can change it).
+std::string freezeSource (const Song& song, int channel, double sampleRate);
+
 struct WriteResult
 {
     int media = 0;              // files stored (after dedupe)

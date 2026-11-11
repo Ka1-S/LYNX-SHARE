@@ -2997,6 +2997,11 @@ void RackRenderer::process (const RackState* state,
                 applyLiveControl (*state, e);
                 continue;
             }
+            // Freeze (round 190ay): a frozen channel plays its rendered audio as a clip. A key played on it (the typing
+            // keyboard, a MIDI input, a preview) has no instrument to play, and must not stop or restart that audio
+            if ((e.type == NoteEvent::Type::on || e.type == NoteEvent::Type::off) && (std::size_t) e.channel < state->song.channels.size()
+                && state->song.channels[(std::size_t) e.channel].freeze.on())
+                continue;
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
 

@@ -150,6 +150,7 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
 
     static std::int64_t processMemoryBytes(); // working set of this process (0 if unknown)
+    static std::int64_t processPrivateBytes(); // memory only this process holds (Windows: private bytes; else the working set)
 
 private:
     std::uint64_t overDeadline = 0, lateCalls = 0, underruns = 0;

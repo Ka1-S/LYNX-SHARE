@@ -1,7 +1,7 @@
 language: Русский
 countries: ru by kz
 
-# LYNX SHARE interface in Русский (JUCE LocalisedStrings format).
+# LYNX interface in Русский (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/ru-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4558,6 +4558,7 @@ countries: ru by kz
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "Не удалось отправить отчет ({0}); LYNX SHARE попробует снова при следующем запуске"
 "Report a problem" = "Сообщить о проблеме"
 "Report a problem..." = "Сообщить о проблеме..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Проверить обновления..."
 "Check for updates automatically" = "Автоматически проверять обновления"
@@ -5281,6 +5282,27 @@ countries: ru by kz
 "RPN..." = "RPN..."
 "Send MIDI" = "Отправлять MIDI"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboard отправляет свои ноты, программу и элементы с «Отправлять MIDI» плагинам, у которых порт MIDI-входа — этот порт (окно плагина > Настройки > MIDI > Входной порт)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "Цикл маркера"
+"Marker skip" = "Пропуск маркера"
+"Marker pause" = "Пауза маркера"
+"Pattern length" = "Длина паттерна"
+"Bar override" = "Переопределение такта"
+"Key/Scale" = "Тон/гамма"
+"Loop length" = "Длина цикла"
+"Add one every" = "Добавлять один каждые"
+"8 bars" = "8 тактов"
+"Bars" = "Такты"
+"Add jump to next bar" = "Добавить переход к следующему такту"
+"Change to marker loop" = "Сделать циклом маркера"
+"Time markers" = "Маркеры времени"
+"Quantize song jumps" = "Квантизация переходов песни"
+"Place loop (from this marker to the next)" = "Создать цикл (от этого маркера до следующего)"
+"Song marker jump" = "Переход к маркеру песни"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Ноты на этом канале переводят песню к маркеру вместо звучания: нота 0 — к первому маркеру, следующая — ко второму... (Playlist › Квантизация переходов песни действует во время воспроизведения)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "Перейти к следующему маркеру песни (Квантизация переходов песни во время воспроизведения)"
+"Jump to the previous song marker" = "Перейти к предыдущему маркеру песни"
 "MUTE" = "ЗАГЛУШИТЬ"
 "CHANNEL" = "КАНАЛ"
 "Bar:Beat:Tick" = "Такт:Доля:Тик"
@@ -5693,6 +5715,62 @@ countries: ru by kz
 "Black notes" = "Черные клавиши"
 "Sharps (#)" = "Диезы (#)"
 "Flats (b)" = "Бемоли (b)"
+"Advanced looping" = "Расширенный цикл"
+"Burn" = "Записать"
+"Burn MIDI to" = "Записать MIDI в"
+"Burn all looping channels" = "Записать все зацикленные каналы"
+"Burn selected channels" = "Записать выбранные каналы"
+"Burn to pattern" = "Записать в паттерн"
+"Channel looping" = "Цикл каналов"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Цикл каналов: каналы короче паттерна повторяются до его конца (полиритмы)  [LMB] вкл. / выкл.  [RMB] тип цикла (шаговые каналы, все каналы, расширенный) и Записать в паттерн"
+"Channel looping: {0}" = "Цикл каналов: {0}"
+"Don't loop" = "Без цикла"
+"Echo delay" = "Эхо-дилей"
+"Every {0} steps" = "Каждые {0} шагов"
+"Loop all channels" = "Цикл всех каналов"
+"Loop point" = "Точка цикла"
+"Loop point ({0} steps)" = "Точка цикла (шагов: {0})"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Точка цикла: [LMB] перетащить или [Wheel] задаёт её в шагах  [2xLMB] следующий такт  [RMB] Без цикла / Шаг / Доля / Такт, Записать в паттерн"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Повтор цикла (после точки цикла): [LMB] правит шаг, который он повторяет"
+"Loop step channels" = "Цикл шаговых каналов"
+"Loop type" = "Тип цикла"
+"Looping on" = "Цикл вкл."
+"Nothing to burn" = "Нечего записывать"
+"Reset after burning to MIDI" = "Сбросить после записи в MIDI"
+"Select what you want to reset:" = "Выберите, что сбросить:"
+"Set to next bar" = "Поставить на следующий такт"
+"Set to next beat" = "Поставить на следующую долю"
+"The selected channel doesn't contain any notes to burn." = "В выбранном канале нет нот для записи."
+"Time (shift and gate)" = "Время (сдвиг и гейт)"
+"loop at the next bar" = "цикл со следующего такта"
+"loop at the next beat" = "цикл со следующей доли"
+"loop at the next step" = "цикл со следующего шага"
+"Receive notes from" = "Принимать ноты от"
+"Unlock" = "Разблокировать"
+"not connected" = "не подключено"
+"No MIDI input device" = "Нет устройства MIDI-входа"
+"(locked: receives the notes of {0})" = "(заблокировано: принимает ноты {0})"
+"Create sampled instrument..." = "Создать сэмплированный инструмент..."
+"Create sampled instrument" = "Создать сэмплированный инструмент"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "Играет {0} клавишу за клавишей и создаёт из записей канал Sampler."
+"Sampling the instrument..." = "Сэмплирование инструмента..."
+"Writing the samples..." = "Запись сэмплов..."
+"Could not sample the instrument" = "Не удалось сэмплировать инструмент"
+"Low note" = "Нижняя нота"
+"High note" = "Верхняя нота"
+"Keys per zone" = "Клавиш на зону"
+"Root offset" = "Сдвиг тоники"
+"Velocity layers" = "Слои velocity"
+"Max velocity" = "Макс. velocity"
+"Release after (seconds)" = "Отпустить через (секунды)"
+"Max length after release (seconds)" = "Макс. длина после отпускания (секунды)"
+"Stop on" = "Остановить при"
+"Max length" = "Макс. длина"
+"16-bit integer" = "16 бит integer"
+"Mono (merged)" = "Моно (сведено)"
+"Enable insert effects" = "Включить эффекты инсерта"
+"Enable master effects" = "Включить эффекты мастера"
+"could not read {0}" = "не удалось прочитать {0}"
 "Key to" = "Клавиши для"
 "Percent" = "Проценты"
 "Use regions" = "Использовать регионы"
@@ -5707,7 +5785,6 @@ countries: ru by kz
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Вставляет пустые столбцы перед песней для запускаемых клипов, по маркеру на каждом и маркер Start там, где начинается песня; режим выступления включается."
 "Marker count" = "Число маркеров"
 "2 steps" = "2 шага"
-"8 bars" = "8 тактов"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5833,7 +5910,6 @@ countries: ru by kz
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "Длина паттерна в тактах: [LMB] перетаскивание или [Wheel] — изменить  [2xLMB] авто (по нотам)  [RMB] меню"
 "Pattern length: {0} (automatic, from the notes)" = "Длина паттерна: {0} (авто, по нотам)"
 "Pattern length (bars, 0 = automatic)" = "Длина паттерна (такты, 0 = авто)"
-"Pattern length" = "Длина паттерна"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "Следование: паттерн длиннее Channel Rack листается вместе с играющим шагом; если выкл., остается там, куда вы прокрутили"
 "Follow the playhead (page along with the playing step) on/off" = "Следовать за курсором (листать вместе с играющим шагом) вкл./выкл."
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "Следование: вид листается вместе с позицией воспроизведения; если выкл., остается там, куда вы прокрутили"
@@ -5900,9 +5976,6 @@ countries: ru by kz
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Инвертированное стерео"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Режим резки (C): щелчок по ноте разрезает её в этом месте; Ctrl+щелчок по ноте склеивает её с предыдущей"
 "Score" = "Партитура"
@@ -5945,7 +6018,6 @@ countries: ru by kz
 "Set image wallpaper..." = "Установить фоновое изображение..."
 "Remove image wallpaper" = "Убрать фоновое изображение"
 "Set background color..." = "Установить цвет фона..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Дорожка метронома"
 "Metronome target mixer track" = "Целевая дорожка микшера для метронома"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "Дорожка микшера, через которую звучит метроном (--- — это Мастер). Щелчок никогда не попадает в экспорт."
@@ -5981,8 +6053,6 @@ countries: ru by kz
 "Ghost channels" = "Ghost-каналы"
 "Add multiple..." = "Добавить несколько..."
 "You can add a maximum of {0} inserts." = "Можно добавить не более {0} инсертов."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Усиление клипа: [LMB] тянуть вверх / вниз (выделенные клипы вместе)  [RMB] меню"
 "Automatic crossfades (current project) on/off" = "Автоматические кроссфейды (текущий проект) вкл/выкл"
 "Automatic crossfades (current project)" = "Автоматические кроссфейды (текущий проект)"
@@ -5997,14 +6067,11 @@ countries: ru by kz
 "Yes" = "Да"
 "Make clip unique?" = "Сделать клип уникальным?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "Клип \"{0}\" также используется на другой аудиодорожке.\n\nСделать этот экземпляр уникальным и затем направить его на эту аудиодорожку?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "ГОРТАНЬ"
 "Scale steps" = "Ступени лада"
 "In scale" = "В ладу"
 "AMPLITUDE" = "АМПЛИТУДА"
 "VARIATION" = "ВАРИАЦИЯ"
-
-# round 167f: FL Emphasis
 "Delta" = "Дельта"
 "Envelope order" = "Порядок огибающей"
 "Linking" = "Связь каналов"
@@ -6159,6 +6226,7 @@ countries: ru by kz
 "Load preset..." = "Загрузить пресет..."
 "Save preset as..." = "Сохранить пресет как..."
 "Page {0}" = "Страница {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Плавный (косинус)"
 "Bezier" = "Безье"
@@ -6248,7 +6316,6 @@ countries: ru by kz
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Инструмент SFZ: [LMB] прослушать  [2xLMB] новый канал LYNX Soundfont (или в выбранный)  перетащите в Channel Rack"
 "Open a .sf2 / .sf3 / .sfz file" = "Открыть файл .sf2 / .sf3 / .sfz"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: играет банки SoundFont 2 / 3 и инструменты SFZ. Ищите пресеты по всем своим SoundFont, клик — прослушать, двойной клик — загрузить."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "УРОВНИ"
 "Loop A" = "Петля A"
 "Loop B" = "Петля B"
@@ -6305,6 +6372,22 @@ countries: ru by kz
 "Expand all grouped tracks" = "Развернуть все сгруппированные дорожки"
 "Purge unused audio clips" = "Удалить неиспользуемые аудиоклипы"
 "Create variants when stretching audio clips" = "Создавать варианты при растяжении аудиоклипов"
+"Extract stems from sample" = "Извлечь стемы из сэмпла"
+"Extracting stems..." = "Извлечение стемов..."
+"Downloading the stem model..." = "Загрузка модели для стемов..."
+"Checking the stem model..." = "Проверка модели для стемов..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "Не удалось загрузить ONNX Runtime. Для извлечения стемов нужна macOS 13.4 или новее."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "Не удалось загрузить ONNX Runtime. Установите Microsoft Visual C++ Redistributable (x64) с https://aka.ms/vs/17/release/vc_redist.x64.exe и попробуйте снова."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "Не удалось загрузить ONNX Runtime. Для извлечения стемов нужна системная libstdc++."
+"The model returned an unexpected result." = "Модель вернула неожиданный результат."
+"The sample is empty." = "Сэмпл пуст."
+"The downloaded model failed its checksum, so it was not used." = "Загруженная модель не прошла проверку контрольной суммы и не была использована."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Для извлечения стемов нужна модель HT-Demucs. Она не входит в LYNX SHARE: загружается один раз ({0} МБ) и хранится в {1}."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Источник: {0} (ONNX-экспорт Demucs v4 от Meta AI Research)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Лицензия: код Demucs распространяется под MIT. Лицензия обученных весов неясна, как говорят сами авторы: в обучающие данные входит MUSDB18-HQ, часть которого предназначалась только для исследований. Решите сами, подходит ли это для вашего использования, особенно коммерческого."
+"Download" = "Загрузить"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Для извлечения стемов нужен ONNX Runtime ({0}), который входит в установщик и zip LYNX SHARE, но рядом с программой его нет. Установите LYNX SHARE через установщик или распакуйте весь zip."
+"Stems are still being extracted. Try again when that has finished." = "Стемы ещё извлекаются. Попробуйте снова, когда это закончится."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Свести выделение Playlist (от начала выделения)"
@@ -6353,6 +6436,7 @@ countries: ru by kz
 "The project has no mixer states, effects or notes to export." = "В проекте нет состояний микшера, эффектов или нот для экспорта."
 "Some files could not be written:" = "Некоторые файлы не удалось записать:"
 "Project bones..." = "«Кости» проекта..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "Мужской"
 "Female" = "Женский"
@@ -6446,8 +6530,6 @@ countries: ru by kz
 "Pattern time markers: Add time signature change..." = "Маркеры времени паттерна: Добавить смену размера..."
 "Delete all markers" = "Удалить все маркеры"
 "Colour group" = "Цветовая группа"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "Всегда|Удерж."
 "Arpeggio" = "Арпеджио"
 "Auto|Man" = "Авто|Ручн."
@@ -6520,22 +6602,6 @@ countries: ru by kz
 "Set as time signature" = "Задать как размер"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "Деление времени: исходная система FL Studio (долей в такте, шагов на долю). Размер: традиционные музыкальные размеры (числитель / знаменатель)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "Знаменатель: {0} (сетка шагов Channel Rack — {1} шага на долю)."
-"Extract stems from sample" = "Извлечь стемы из сэмпла"
-"Extracting stems..." = "Извлечение стемов..."
-"Downloading the stem model..." = "Загрузка модели для стемов..."
-"Checking the stem model..." = "Проверка модели для стемов..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "Не удалось загрузить ONNX Runtime. Для извлечения стемов нужна macOS 13.4 или новее."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "Не удалось загрузить ONNX Runtime. Установите Microsoft Visual C++ Redistributable (x64) с https://aka.ms/vs/17/release/vc_redist.x64.exe и попробуйте снова."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "Не удалось загрузить ONNX Runtime. Для извлечения стемов нужна системная libstdc++."
-"The model returned an unexpected result." = "Модель вернула неожиданный результат."
-"The sample is empty." = "Сэмпл пуст."
-"The downloaded model failed its checksum, so it was not used." = "Загруженная модель не прошла проверку контрольной суммы и не была использована."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Для извлечения стемов нужна модель HT-Demucs. Она не входит в LYNX SHARE: загружается один раз ({0} МБ) и хранится в {1}."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Источник: {0} (ONNX-экспорт Demucs v4 от Meta AI Research)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Лицензия: код Demucs распространяется под MIT. Лицензия обученных весов неясна, как говорят сами авторы: в обучающие данные входит MUSDB18-HQ, часть которого предназначалась только для исследований. Решите сами, подходит ли это для вашего использования, особенно коммерческого."
-"Download" = "Загрузить"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Для извлечения стемов нужен ONNX Runtime ({0}), который входит в установщик и zip LYNX SHARE, но рядом с программой его нет. Установите LYNX SHARE через установщик или распакуйте весь zip."
-"Stems are still being extracted. Try again when that has finished." = "Стемы ещё извлекаются. Попробуйте снова, когда это закончится."
 "Configuration" = "Конфигурация"
 "Transp." = "Трансп."
 "Master envelope" = "Мастер-огибающая"
@@ -6571,8 +6637,6 @@ countries: ru by kz
 "sequencer on" = "секвенсор вкл."
 "sequencer off" = "секвенсор выкл."
 "transpose {0}" = "транспозиция {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} долей назад"
 "Beat {0}" = "Доля {0}"
 "The first point of the envelope can't be removed." = "Первую точку огибающей нельзя удалить."
@@ -6609,6 +6673,7 @@ countries: ru by kz
 "now" = "сейчас"
 "1 bar back" = "1 такт назад"
 "2 bars back" = "2 такта назад"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Заменить сэмпл"
 "Generate steps" = "Сгенерировать шаги"
@@ -6684,7 +6749,6 @@ countries: ru by kz
 "Morph to" = "Морф в"
 "Harm" = "Гарм."
 "Lvl" = "Ур."
-"Hi-cut" = "Срез ВЧ"
 "Lo-cut" = "Срез НЧ"
 "String 1" = "Струна 1"
 "String 2" = "Струна 2"
@@ -6767,7 +6831,6 @@ countries: ru by kz
 "MODULE 2" = "МОДУЛЬ 2"
 "MODULE 3" = "МОДУЛЬ 3"
 "MODULE 4" = "МОДУЛЬ 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Линейка: [LMB] позиция песни  [RMB] или [Ctrl][LMB] или [2xLMB] перетаскивание: выделение времени (цикл)  [Shift][LMB] перетаскивание: сдвиг  [Ctrl][RMB] перетаскивание: масштаб  [RMB] щелчок: меню  [Alt] без привязки"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Линейка: [LMB] позиция  [Alt] без привязки  [Ctrl][LMB], [RMB] или [2xLMB] перетаскивание выделяет ноты в диапазоне времени  [Ctrl][Wheel] масштаб  [Shift][Wheel] прокрутка"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "Маркер: [LMB] перейти к нему (при воспроизведении: на следующем шаге квантования переходов)  [Ctrl][LMB] выделить до следующего маркера  [RMB] действие, переименовать, удалить"
@@ -6790,8 +6853,6 @@ countries: ru by kz
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Готовность к записи: Rec + Play записывает этот insert в клип Playlist  [RMB] запись в файл"
 "Recording: {0}" = "Запись: {0}"
 "dry input" = "сухой вход"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "Адапт"
 "Alt" = "Альт"
 "Amplifier" = "Усилитель"
@@ -6818,6 +6879,7 @@ countries: ru by kz
 "HC" = "ВЧ"
 "HD" = "ВД"
 "Harmonic mask" = "Маска гармоник"
+"Hi-cut" = "Срез ВЧ"
 "Kb" = "Клав"
 "Kbd" = "Клав"
 "LC" = "НЧ"
@@ -6849,8 +6911,6 @@ countries: ru by kz
 "Vel sens" = "Чувств скор"
 "Vib" = "Виб"
 "Voice mode" = "Режим голосов"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Замена: плагин не установлен на этом ПК, играет рендер этой партии (настройки плагина сохранены)"
 "Send project..." = "Отправить проект..."
 "Send my part back..." = "Отправить мою партию обратно..."
@@ -6944,8 +7004,8 @@ countries: ru by kz
 "Lock" = "Замок"
 "Mute the selected clips (all when none is selected)" = "Заглушить выбранные клипы (все, если ничего не выбрано)"
 "Unmute the selected clips (all when none is selected)" = "Включить звук выбранных клипов (всех, если ничего не выбрано)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "Глушить удалённые шаги"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Воспроизвести / приостановить паттерн  [RMB] остановить и вернуться туда, где началось воспроизведение (ещё раз: к началу паттерна)"
 "Live sessions need a newer libcurl on this computer ({0})" = "Для live-сессий нужна более новая libcurl на этом компьютере ({0})"
 "Opening the session..." = "Открытие сессии..."
 "Too many sessions were opened from this connection. Try again in a while." = "С этого подключения открыто слишком много сессий. Попробуйте позже."
@@ -7015,8 +7075,6 @@ countries: ru by kz
 "{0} files arriving" = "Поступает файлов: {0}"
 "Live session with {0}" = "Live-сессия с {0}"
 "Undo left alone what someone else changed since: {0}" = "Отмена не затронула то, что с тех пор изменил кто-то другой: {0}"
-"Mute removed steps" = "Глушить удалённые шаги"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Воспроизвести / приостановить паттерн  [RMB] остановить и вернуться туда, где началось воспроизведение (ещё раз: к началу паттерна)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "Не удалось возобновить live-сессию: соединение не восстановилось."
@@ -7100,8 +7158,6 @@ countries: ru by kz
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
 "no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"
 "arrows step, click for the list, drag or mouse wheel to change" = "стрелки — шаг, щелчок — список значений, перетаскивание или колесо мыши — изменить"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Основная: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "Последний изменённый параметр: элемент, который вы двигали последним, и его значение. Щелчок — его меню (клип автоматизации, связь с контроллером, события, значение)"
 "LAST TWEAKED" = "ПОСЛЕДНИЙ ИЗМЕНЁННЫЙ"
@@ -7118,8 +7174,6 @@ countries: ru by kz
 "Playlist snap" = "Привязка Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Линейка: [LMB] позиция  [Alt] без привязки  [Ctrl][LMB], [RMB] или [2xLMB] перетаскивание выделяет ноты в диапазоне времени  [Ctrl][Wheel] / щипок масштаб  [Shift][Wheel] прокрутка"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Линейка: [LMB] позиция песни  [RMB] или [Ctrl][LMB] или [2xLMB] перетаскивание: выделение времени (цикл)  [Shift][LMB] перетаскивание: сдвиг  [Ctrl][RMB] перетаскивание, [Ctrl][Wheel] / щипок: масштаб  [RMB] щелчок: меню  [Alt] без привязки"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "Выкл. (сохранять реальное время)"
 "1/32 note" = "Нота 1/32"
 "1/16 note" = "Нота 1/16"
@@ -7134,8 +7188,6 @@ countries: ru by kz
 "Number of steps" = "Число шагов"
 "Dual" = "Двойной"
 "Align all channel editors" = "Выровнять все редакторы каналов"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Выбор плагинов: каждый плагин в виде картинки; перетащите его в Channel Rack или микшер (правый клик: палитра быстрого добавления)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "двойной клик, правый клик или Enter: новый канал; перетащите в Channel Rack (на канал: заменяет его инструмент)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "двойной клик, правый клик или Enter: в выбранную вставку микшера; перетащите на вставку микшера или один из её слотов"
@@ -7147,14 +7199,11 @@ countries: ru by kz
 "Last tweaked ({0})" = "Последний изменённый ({0})"
 "Deactivate" = "Деактивировать"
 "Automate Patcher parameter" = "Автоматизировать параметр Patcher"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
 "Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
 "Blend recorded notes" = "Смешивать записанные ноты"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "Смешивать записанные ноты вкл./выкл. (выкл.: заменять)"
 "Loop record on/off" = "Запись по кругу вкл./выкл."
 "Step edit on/off" = "Пошаговый ввод вкл./выкл."
@@ -7171,9 +7220,8 @@ countries: ru by kz
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Пошаговый ввод: при остановленном транспорте сыгранные ноты попадают в текущий паттерн в позицию, длиной в шаг сетки; отпустите клавиши, и позиция сдвинется на шаг (аккорды: держите вместе)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: аудиозапись сохраняет только зону цикла (воспроизведение проходит сквозь неё; пре- и пост-ролл в параметрах записи)"
 "Punch in/out" = "Punch in/out"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Наведите на что угодно для подсказки  [F1] клавиши  [F5]-[F9] окна  [Space] пуск/стоп"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Вырезать шаги выбранных каналов"
 "Copy the selected channels' steps" = "Копировать шаги выбранных каналов"
@@ -7182,16 +7230,12 @@ countries: ru by kz
 "Note names on every Piano roll key" = "Названия нот на всех клавишах Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] тянуть вверх / вниз: листать паттерны"
 "Playhead column in the Channel Rack" = "Столбец позиции воспроизведения в Channel Rack"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Запись по кругу: вкл. (запись повторяется: область цикла в режиме Song, один дубль за проход; паттерн в режиме Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Запись по кругу: выкл. (запись идёт дальше: через область цикла или за конец паттерна, который удлиняется)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Запись по кругу: вкл., запись повторяется (режим Song: область цикла, один дубль за проход; режим Pattern: паттерн); выкл., идёт дальше, через область цикла или за конец паттерна, и оставляет всё там, где было сыграно (паттерн удлиняется)"
 "Echo time" = "Время эха"
 "Prime numbers" = "Простые числа"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Панель Classic: аппаратный сатуратор на одном экране (Drive, Punish, пять стилей)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} сохранён."
 "Everything went over as FL Studio's own data." = "Всё перенесено как собственные данные FL Studio."
 "Export to FL Studio" = "Экспорт в FL Studio"
@@ -7214,11 +7258,9 @@ countries: ru by kz
 "Worth knowing" = "Полезно знать"
 "Samples not on this PC" = "Сэмплы, которых нет на этом ПК"
 "Steps use channel colour" = "Шаги в цвете канала"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "Основное|Подстройка"
 "E type|G type" = "Тип E|Тип G"
 "Modern console" = "Современная консоль"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Сатурация|Консоль E|Консоль G|Консоль A|Консоль N|Консоль Y|Лампа|Гитарный усил.|Басовый усил."
 "Switches the drive section on: saturation at the end of the strip, before the output" = "Включает секцию драйва: сатурация в конце линейки, перед выходом"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Вид сатурации: мягкий клиппер, пять консольных каналов, ламповый каскад или гитарный / басовый усилитель"
@@ -7226,8 +7268,6 @@ countries: ru by kz
 "Level into the drive: more distortion without changing the drive" = "Уровень на входе драйва: больше искажений без изменения драйва"
 "Level after the drive" = "Уровень после драйва"
 "Blends the clean signal back in" = "Подмешивает обратно чистый сигнал"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Пространство"
 "Modern|Vintage|Plate" = "Модерн|Винтаж|Пластина"
 "Distance" = "Дистанция"
@@ -7236,80 +7276,7 @@ countries: ru by kz
 "Low decay" = "Затухание НЧ"
 "High decay" = "Затухание ВЧ"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "Цикл маркера"
-"Marker skip" = "Пропуск маркера"
-"Marker pause" = "Пауза маркера"
-"Bar override" = "Переопределение такта"
-"Key/Scale" = "Тон/гамма"
-"Loop length" = "Длина цикла"
-"Add one every" = "Добавлять один каждые"
-"Bars" = "Такты"
-"Add jump to next bar" = "Добавить переход к следующему такту"
-"Change to marker loop" = "Сделать циклом маркера"
-"Time markers" = "Маркеры времени"
-"Quantize song jumps" = "Квантизация переходов песни"
-"Place loop (from this marker to the next)" = "Создать цикл (от этого маркера до следующего)"
-"Song marker jump" = "Переход к маркеру песни"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Ноты на этом канале переводят песню к маркеру вместо звучания: нота 0 — к первому маркеру, следующая — ко второму... (Playlist › Квантизация переходов песни действует во время воспроизведения)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "Перейти к следующему маркеру песни (Квантизация переходов песни во время воспроизведения)"
-"Jump to the previous song marker" = "Перейти к предыдущему маркеру песни"
-"Advanced looping" = "Расширенный цикл"
-"Burn" = "Записать"
-"Burn MIDI to" = "Записать MIDI в"
-"Burn all looping channels" = "Записать все зацикленные каналы"
-"Burn selected channels" = "Записать выбранные каналы"
-"Burn to pattern" = "Записать в паттерн"
-"Channel looping" = "Цикл каналов"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Цикл каналов: каналы короче паттерна повторяются до его конца (полиритмы)  [LMB] вкл. / выкл.  [RMB] тип цикла (шаговые каналы, все каналы, расширенный) и Записать в паттерн"
-"Channel looping: {0}" = "Цикл каналов: {0}"
-"Don't loop" = "Без цикла"
-"Echo delay" = "Эхо-дилей"
-"Every {0} steps" = "Каждые {0} шагов"
-"Loop all channels" = "Цикл всех каналов"
-"Loop point" = "Точка цикла"
-"Loop point ({0} steps)" = "Точка цикла (шагов: {0})"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Точка цикла: [LMB] перетащить или [Wheel] задаёт её в шагах  [2xLMB] следующий такт  [RMB] Без цикла / Шаг / Доля / Такт, Записать в паттерн"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Повтор цикла (после точки цикла): [LMB] правит шаг, который он повторяет"
-"Loop step channels" = "Цикл шаговых каналов"
-"Loop type" = "Тип цикла"
-"Looping on" = "Цикл вкл."
-"Nothing to burn" = "Нечего записывать"
-"Reset after burning to MIDI" = "Сбросить после записи в MIDI"
-"Select what you want to reset:" = "Выберите, что сбросить:"
-"Set to next bar" = "Поставить на следующий такт"
-"Set to next beat" = "Поставить на следующую долю"
-"The selected channel doesn't contain any notes to burn." = "В выбранном канале нет нот для записи."
-"Time (shift and gate)" = "Время (сдвиг и гейт)"
-"loop at the next bar" = "цикл со следующего такта"
-"loop at the next beat" = "цикл со следующей доли"
-"loop at the next step" = "цикл со следующего шага"
-"Receive notes from" = "Принимать ноты от"
-"Unlock" = "Разблокировать"
-"not connected" = "не подключено"
-"No MIDI input device" = "Нет устройства MIDI-входа"
-"(locked: receives the notes of {0})" = "(заблокировано: принимает ноты {0})"
-"Create sampled instrument..." = "Создать сэмплированный инструмент..."
-"Create sampled instrument" = "Создать сэмплированный инструмент"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "Играет {0} клавишу за клавишей и создаёт из записей канал Sampler."
-"Sampling the instrument..." = "Сэмплирование инструмента..."
-"Writing the samples..." = "Запись сэмплов..."
-"Could not sample the instrument" = "Не удалось сэмплировать инструмент"
-"Low note" = "Нижняя нота"
-"High note" = "Верхняя нота"
-"Keys per zone" = "Клавиш на зону"
-"Root offset" = "Сдвиг тоники"
-"Velocity layers" = "Слои velocity"
-"Max velocity" = "Макс. velocity"
-"Release after (seconds)" = "Отпустить через (секунды)"
-"Max length after release (seconds)" = "Макс. длина после отпускания (секунды)"
-"Stop on" = "Остановить при"
-"Max length" = "Макс. длина"
-"16-bit integer" = "16 бит integer"
-"Mono (merged)" = "Моно (сведено)"
-"Enable insert effects" = "Включить эффекты инсерта"
-"Enable master effects" = "Включить эффекты мастера"
-"could not read {0}" = "не удалось прочитать {0}"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "Паттерн {0}"
 "a pattern" = "паттерн"
 "a channel" = "канал"
@@ -7321,7 +7288,6 @@ countries: ru by kz
 "{0} in {1}" = "{0} в {1}"
 "Playlist clip" = "Клип Playlist"
 "ON" = "ON"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Нет|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Ещё три характера компрессора вместо стиля: мягкий, оптоэлектронный или мастеринг"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0}: сбой. Сохраните проект сейчас (надёжнее всего — как новый файл)."
@@ -7474,7 +7440,6 @@ countries: ru by kz
 "Start time (H:M:S:Frame)" = "Время начала (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "Время конца (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "Текущее время (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "Шумоподавление"
 "Group bypass" = "Обход группы"
@@ -7573,7 +7538,6 @@ countries: ru by kz
 "HighCut" = "Срез ВЧ"
 "Rushin" = "Спеша"
 "Draggin" = "Затягивая"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Уровень на входе цепочки"
 "Level out of the strip, after the output mix" = "Уровень на выходе цепочки, после выходного микса"
 "Blend of the processed strip with the dry input" = "Баланс обработанного сигнала с сухим входом"
@@ -7730,8 +7694,6 @@ countries: ru by kz
 "Auto listen" = "Автопрослушка"
 "Auto\nlisten" = "Авто-\nпрослушка"
 "EQ auto listen" = "Автопрослушка EQ"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "Нативный"
 "32 bit" = "32 бит"
 "64 bit" = "64 бит"
@@ -7751,12 +7713,11 @@ countries: ru by kz
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Анимация: панели плавно появляются и исчезают, кнопки мягко подсвечиваются, колесо прокручивает плавно"
 "{0} minutes" = "{0} мин"
 "Longest wait between backups" = "Наибольший интервал между копиями"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "Собрать комп из этих дублей"
 "After loop recording, only the last pass plays" = "После записи по циклу играет только последний проход"
 "Loop-recorded audio: every pass plays" = "Аудио, записанное по циклу: играют все проходы"
 "Loop-recorded audio: every pass is muted" = "Аудио, записанное по циклу: все проходы заглушены"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Сетка клипов"
 "Stop all clips" = "Остановить все клипы"
@@ -7859,8 +7820,6 @@ countries: ru by kz
 "That track is fed by this one: the link would make a loop." = "Эта дорожка получает сигнал от этой: связь создала бы петлю."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Вход сайдчейна: инсерт, который слушает этот эффект. Выбор направляет его сюда с уровнем 0; свои выходы сохраняются  [LMB] выбрать"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Вход сайдчейна: инсерт, который слушает боковой вход этого плагина. Выбор направляет его сюда с уровнем 0; свои выходы сохраняются"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "Загрузите сэмпл (меню Sample) или перетащите его сюда"
 "Open a sample to slice (or drop one here)" = "Открыть сэмпл для нарезки (или перетащите его сюда)"
 "Slicing" = "Нарезка"
@@ -7965,8 +7924,6 @@ countries: ru by kz
 "Adds the file's time signature to the pattern's markers" = "Добавляет размер из файла в маркеры паттерна"
 "Scores" = "Партитуры"
 "Folders" = "Папки"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "Мультипривязка к контроллерам"
 "Please tweak the controls you want to link..." = "Покрутите регуляторы, которые хотите привязать..."
 "Multilink to controllers on/off" = "Мультипривязка к контроллерам вкл/выкл"
@@ -8032,6 +7989,7 @@ countries: ru by kz
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Громкость дорожки: [LMB] щелчок или перетаскивание  [Shift] точно  [2xLMB] 0 дБ"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Панорама дорожки: [LMB] тянуть вверх / вниз  [Shift] точно  [2xLMB] центр"
 "Track effects: [LMB] open the effects of its mixer track" = "Эффекты дорожки: [LMB] открыть эффекты её дорожки микшера"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Добавить эффект в этот инсерт (или перетащить его из браузера)"
 "Channel on / off (its mute)" = "Канал вкл. / выкл. (его заглушение)"
@@ -8139,6 +8097,7 @@ countries: ru by kz
 "Mixer track offset for output {0}" = "Смещение дорожки микшера для выхода {0}"
 "Deactivate output {0}" = "Отключить выход {0}"
 "Activate output {0}" = "Включить выход {0}"
+
 # --- Game controller (round 184a, S16)
 "Game controller" = "Геймпад"
 "Use a game controller" = "Использовать геймпад"
@@ -8162,6 +8121,7 @@ countries: ru by kz
 "D-pad down" = "Крестовина вниз"
 "D-pad left" = "Крестовина влево"
 "D-pad right" = "Крестовина вправо"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "Удалить дорожки"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "Будет |удалено| выбранных дорожек микшера: {0}. Продолжить?"
@@ -8215,6 +8175,7 @@ countries: ru by kz
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Насколько вероятно, что нота прозвучит при каждом проходе (LYNX; Chance нот в Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "При каждом звучании велосити выбирается случайно между велосити ноты и велосити + этот диапазон (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Велосити отпускания: передаётся с концом ноты инструментам, которые её используют (плагины, Patcher)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Шаблон по умолчанию не найден; вместо него открыт проект LYNX SHARE по умолчанию"
 "{0} could not be opened." = "Не удалось открыть {0}."
@@ -8234,6 +8195,7 @@ countries: ru by kz
 "Empty project" = "Пустой проект"
 "Last used project" = "Последний проект"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Шаблон по умолчанию открывается по Файл › Новый, а при запуске — если в «Проект при запуске» выбран «Шаблон по умолчанию», как новый проект без имени, поэтому сам шаблон никогда не перезаписывается. Файл › Сохранить как шаблон... добавляет ваши."
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Для других приложений..."
 "Export for other apps" = "Экспорт для других приложений"
@@ -8263,6 +8225,7 @@ countries: ru by kz
 "Send to {0} (deleted)" = "Посыл на {0} (удалён)"
 "Disconnected links" = "Разорванные связи"
 "Keep links to deleted inserts, greyed (LYNX)" = "Сохранять связи с удалёнными инсертами серыми (LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8334,6 +8297,7 @@ countries: ru by kz
 "side" = "боковой"
 "Output M/S" = "Выход M/S"
 "Input M/S" = "Вход M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8353,6 +8317,7 @@ countries: ru by kz
 "Amount min" = "Мин. глубина"
 "Stereo offset" = "Стерео-сдвиг"
 "16 bars" = "16 тактов"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8369,3 +8334,32 @@ countries: ru by kz
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Измеренный: модель, подогнанная под эталон; классический: модель проектов, сохранённых ранее"
+"{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)" = "{0} заморожен: разморозьте для редактирования ([RMB] на канале, Разморозить)"
+"There is no such channel." = "Такого канала нет."
+"An audio clip is audio already: there is nothing to freeze." = "Аудиоклип уже является аудио: замораживать нечего."
+"This channel makes no sound of its own: there is nothing to freeze." = "Этот канал не издаёт собственного звука: замораживать нечего."
+"This channel's plugin is not loaded: there is nothing to render." = "Плагин этого канала не загружен: рендерить нечего."
+"This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart." = "Этот плагин отправляет выходы на другие вставки микшера (Обработка > Соединения): один замороженный аудиофайл не сможет сохранить их раздельными."
+"This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart." = "Этот Patcher отправляет выходы на другие вставки микшера: один замороженный аудиофайл не сможет сохранить их раздельными."
+"A Layer channel plays this channel: remove it from the Layer to freeze it." = "Канал Layer воспроизводит этот канал: уберите его из Layer, чтобы заморозить."
+"Performance mode launches clips live: a frozen channel could not follow them." = "Режим Performance запускает клипы вживую: замороженный канал не сможет за ними следовать."
+"This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them." = "Этот канал играет в клипах сетки клипов, запускаемых вживую: замороженный канал не сможет за ними следовать."
+"Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze" = "Заморожен, но его аудиофайлы отсутствуют: вместо них играет инструмент.  [RMB] Заморозить заново или Разморозить"
+"Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it" = "Заморожен, устарел: ноты, темп или аранжировка изменились после заморозки, прежнее аудио продолжает играть.  [RMB] Заморозить заново — обновить"
+"Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit" = "Заморожен: играет его отрендеренное аудио, а инструмент выгружен (без CPU, без RAM).  [RMB] Разморозить для редактирования"
+"Freeze selected channels" = "Заморозить выбранные каналы"
+"Unfreeze selected channels" = "Разморозить выбранные каналы"
+"Unfreeze" = "Разморозить"
+"Re-freeze selected channels" = "Заморозить заново выбранные каналы"
+"Re-freeze" = "Заморозить заново"
+"The plugin {0} is not installed on this PC: there is nothing to render." = "Плагин {0} не установлен на этом ПК: рендерить нечего."
+"Freezing {0}..." = "Заморозка {0}..."
+"{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it." = "{0} заморожен: его аудио играет, а инструмент выгружен. Щёлкните канал правой кнопкой мыши, чтобы разморозить."
+"Could not freeze" = "Не удалось заморозить"
+"Can't freeze this channel" = "Этот канал нельзя заморозить"
+"Frozen: Unfreeze to edit" = "Заморожен: разморозьте для редактирования"
+"A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Контроллер привязан к ручкам этого инструмента и двигает их вживую: замороженное аудио не сможет за ним следовать."
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

@@ -675,8 +675,21 @@ void PianoRollComponent::selectAll()
     setSelection (channelNotes());
 }
 
+bool PianoRollComponent::refuseFrozenEdit()
+{
+    const auto& song = engine.getSong();
+    const auto channel = engine.getSelectedChannel();
+    if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
+        return false;
+    ui::postHint ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
+                  4000);
+    return true;
+}
+
 void PianoRollComponent::editNotes (const std::function<void (Pattern&)>& edit, bool undoable)
 {
+    if (refuseFrozenEdit())
+        return;
     engine.editSong ([&edit] (Song& s) { edit (currentPattern (s)); }, undoable);
     knownNoteCount = currentPattern (engine.getSong()).notes.size();
 }
@@ -1391,6 +1404,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
         g.setFont (theme::font (theme::type::caption, true));
         textcache::drawFittedText (g, juce::String::fromUTF8 (ch.name.c_str()), 11, toolbarHeight, keyboardWidth - 14, headerHeight - toolbarHeight,
                           juce::Justification::centredLeft, 2, 0.8f);
+        // Freeze (round 190ay): the frozen mark over the notes' top right corner, with what to do
+        if (ch.freeze.on())
+        {
+            const auto text = tr ("Frozen: Unfreeze to edit");
+            g.setFont (theme::font (theme::type::caption, true));
+            const auto grid = gridArea();
+            const auto width = juce::jmin (grid.getWidth() - 8, 34 + juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text));
+            if (width > 40)
+            {
+                const auto pill = juce::Rectangle<float> ((float) grid.getRight() - (float) width - 6.0f, (float) grid.getY() + 6.0f, (float) width, 20.0f);
+                theme::fillRoundRect (g, pill, theme::radius::md, bg1.withAlpha (0.88f));
+                theme::drawFrozenTag (g, juce::Rectangle<float> (pill.getX() + 4.0f, pill.getCentreY() - 6.5f, 14.0f, 13.0f), info.withAlpha (0.85f), bg1);
+                g.setColour (textSecondary);
+                g.drawText (text, pill.withTrimmedLeft (24.0f).withTrimmedRight (6.0f), juce::Justification::centredLeft, true);
+            }
+        }
     }
 }
 
@@ -1726,6 +1755,11 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         seekAt (e.x, ! e.mods.isAltDown());
         return;
     }
+
+    // Freeze (round 190ay): a frozen channel's notes and their lane are read-only (the keyboard, the ruler and the
+    // view gestures above still work)
+    if ((velocityArea().contains (e.getPosition()) || gridArea().contains (e.getPosition())) && refuseFrozenEdit())
+        return;
 
     if (velocityArea().contains (e.getPosition()) && eventLaneTarget())
     {

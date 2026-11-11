@@ -5,6 +5,12 @@
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
 #include "core/QuickRender.h"
+#include "core/StandIns.h"
+#include "engine/SessionPack.h"
+#include "engine/PluginHost.h"
+#include "ui/ChannelSettings.h"
+#include "ui/PatcherEditor.h"
+#include "ui/PluginWindow.h"
 #include "core/Mastering.h"
 #include "core/EffectPresets.h"
 #include "core/PluginPresets.h"
@@ -1100,6 +1106,156 @@ void bounceInsertToAudio (AudioEngine& engine, int track)
 
         engineRef->editSong ([&] (Song& s) { applyBounce (s, track, file.getFullPathName().toStdString(), length); });
     }, tr ("Rendering insert to audio...")))->launchThread();
+}
+
+// --- Freeze (round 190ay) ---------------------------------------------------------------------------------------------
+namespace
+{
+struct FreezePlan
+{
+    Song song;               // the song as it was when the freeze started
+    int channel = 0;
+    std::uint64_t uid = 0;   // (the channel may have moved by the time the render ends)
+    double rate = 44100.0;
+    juce::File folder;
+    juce::String name;
+};
+
+// what stops a freeze before any render, as a sentence for the user; empty = go
+juce::String freezeRefusal (AudioEngine& engine, int channel)
+{
+    const auto& song = engine.getSong();
+    if (const auto* why = freeze::whyNot (song, channel))
+        return tr (why);
+    std::vector<const PluginRef*> refs;
+    standins::pluginsOf (song.channels[(std::size_t) channel], refs);
+    for (const auto* r : refs)
+        if (! engine.getPluginHost().isInstalled (*r))
+            return tr ("The plugin {0} is not installed on this PC: there is nothing to render.", { juce::String::fromUTF8 (r->name.c_str()) });
+    return {};
+}
+
+FreezePlan planFreeze (AudioEngine& engine, int channel)
+{
+    engine.capturePluginStates(); // the plugin as it sounds now is what is rendered, and what Unfreeze brings back
+    // the channel's windows go: a plugin window holds its plugin, which could then not be unloaded
+    if (auto* plugin = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (channel).get()))
+        PluginWindows::close (plugin->getInstance());
+    closeChannelSettings (channel);
+    if (PatcherWindows::isChannelOpen (channel))
+        PatcherWindows::closeChannel (channel);
+    FreezePlan plan;
+    plan.song = engine.getSong();
+    plan.channel = channel;
+    plan.uid = plan.song.channels[(std::size_t) channel].uid;
+    plan.rate = engine.getTransport().sampleRate.load();
+    plan.folder = engine.getFreezeFolder();
+    plan.name = juce::String::fromUTF8 (plan.song.channels[(std::size_t) channel].name.c_str());
+    return plan;
+}
+
+void deleteStems (const std::vector<StandIn>& stems)
+{
+    for (const auto& s : stems)
+        juce::File (juce::String::fromUTF8 (s.path.c_str())).deleteFile();
+}
+
+// the rendered stems onto the channel (found by its uid); the audio of an earlier freeze goes
+void finishFreeze (AudioEngine& engine, const FreezePlan& plan, std::vector<StandIn> stems)
+{
+    std::vector<StandIn> old;
+    bool found = false;
+    for (const auto& c : engine.getSong().channels)
+        if (c.uid == plan.uid && plan.uid != 0)
+        {
+            old = c.freeze.stems;
+            found = true;
+        }
+    if (! found) // the channel was deleted meanwhile
+    {
+        deleteStems (stems);
+        return;
+    }
+    const auto source = sessionpack::freezeSource (plan.song, plan.channel, plan.rate);
+    engine.editSong ([&] (Song& s) { freeze::apply (s, plan.uid, stems, source); });
+    for (const auto& o : old)
+        if (std::none_of (stems.begin(), stems.end(), [&o] (const StandIn& n) { return n.path == o.path; }))
+            juce::File (juce::String::fromUTF8 (o.path.c_str())).deleteFile();
+}
+
+class FreezeThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    FreezeThread (AudioEngine& e, FreezePlan p, std::function<void (bool)> done)
+        : juce::ThreadWithProgressWindow (tr ("Freezing {0}...", { p.name }), true, true), engine (e), plan (std::move (p)), onDone (std::move (done))
+    {
+    }
+
+    void run() override
+    {
+        ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, [this] (double p) {
+            setProgress (p);
+            return ! threadShouldExit();
+        }, error);
+    }
+
+    void threadComplete (bool userPressedCancel) override
+    {
+        if (ok)
+        {
+            finishFreeze (engine, plan, std::move (stems));
+            ui::postHint ({ tr ("{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it.", { plan.name }), {} }, 8000);
+        }
+        else if (! userPressedCancel)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not freeze"), error);
+        if (onDone)
+            onDone (ok);
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    AudioEngine& engine;
+    FreezePlan plan;
+    std::function<void (bool)> onDone;
+    std::vector<StandIn> stems;
+    juce::String error;
+    bool ok = false;
+};
+} // namespace
+
+void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done)
+{
+    if (const auto refusal = freezeRefusal (engine, channel); refusal.isNotEmpty())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't freeze this channel"), refusal);
+        if (done)
+            done (false);
+        return;
+    }
+    (new FreezeThread (engine, planFreeze (engine, channel), std::move (done)))->launchThread();
+}
+
+juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress)
+{
+    if (const auto refusal = freezeRefusal (engine, channel); refusal.isNotEmpty())
+        return refusal;
+    const auto plan = planFreeze (engine, channel);
+    std::vector<StandIn> stems;
+    juce::String error;
+    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error))
+        return error.isEmpty() ? juce::String ("cancelled") : error;
+    finishFreeze (engine, plan, std::move (stems));
+    return {};
+}
+
+void unfreezeChannel (AudioEngine& engine, int channel)
+{
+    const auto& song = engine.getSong();
+    if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
+        return;
+    const auto stems = song.channels[(std::size_t) channel].freeze.stems;
+    engine.editSong ([channel] (Song& s) { freeze::clear (s, channel); });
+    deleteStems (stems);
 }
 
 namespace

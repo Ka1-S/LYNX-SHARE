@@ -1,7 +1,7 @@
 language: 繁體中文
 countries: tw hk mo
 
-# LYNX SHARE interface in 繁體中文 (JUCE LocalisedStrings format).
+# LYNX interface in 繁體中文 (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/zh-Hant-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4558,6 +4558,7 @@ countries: tw hk mo
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "無法傳送報告（{0}）；LYNX SHARE會在下次啟動時重試"
 "Report a problem" = "報告問題"
 "Report a problem..." = "報告問題..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "檢查更新..."
 "Check for updates automatically" = "自動檢查更新"
@@ -5281,6 +5282,27 @@ countries: tw hk mo
 "RPN..." = "RPN..."
 "Send MIDI" = "傳送MIDI"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboard會將其音符、程式以及設為「傳送MIDI」的控制項傳送給MIDI輸入連接埠為此連接埠的外掛（外掛視窗 > 設定 > MIDI > 輸入連接埠）。"
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "標記循環"
+"Marker skip" = "標記跳過"
+"Marker pause" = "標記暫停"
+"Pattern length" = "樣式長度"
+"Bar override" = "小節覆寫"
+"Key/Scale" = "調/音階"
+"Loop length" = "循環長度"
+"Add one every" = "每隔多少新增一個"
+"8 bars" = "8小節"
+"Bars" = "小節"
+"Add jump to next bar" = "新增跳轉到下一小節"
+"Change to marker loop" = "改為標記循環"
+"Time markers" = "時間標記"
+"Quantize song jumps" = "量化歌曲跳轉"
+"Place loop (from this marker to the next)" = "放置循環（從此標記到下一個）"
+"Song marker jump" = "歌曲標記跳轉"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "此通道的音符不發聲，而是把歌曲移到標記：音符 0 到第一個標記，下一個到第二個……（播放時適用 Playlist › 量化歌曲跳轉）。"
+"Jump to the next song marker (Quantize song jumps while playing)" = "跳到下一個歌曲標記（播放時量化歌曲跳轉）"
+"Jump to the previous song marker" = "跳到上一個歌曲標記"
 "MUTE" = "靜音"
 "CHANNEL" = "通道"
 "Bar:Beat:Tick" = "小節:拍:tick"
@@ -5693,6 +5715,62 @@ countries: tw hk mo
 "Black notes" = "黑鍵"
 "Sharps (#)" = "升記號 (#)"
 "Flats (b)" = "降記號 (b)"
+"Advanced looping" = "進階循環"
+"Burn" = "寫入"
+"Burn MIDI to" = "MIDI 寫入到"
+"Burn all looping channels" = "寫入所有循環通道"
+"Burn selected channels" = "寫入所選通道"
+"Burn to pattern" = "寫入樣式"
+"Channel looping" = "通道循環"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "通道循環：比樣式短的通道重複到樣式結尾（複節奏）  [LMB] 開 / 關  [RMB] 循環類型（步進通道、所有通道、進階）和寫入樣式"
+"Channel looping: {0}" = "通道循環：{0}"
+"Don't loop" = "不循環"
+"Echo delay" = "回聲延時"
+"Every {0} steps" = "每 {0} 步"
+"Loop all channels" = "循環所有通道"
+"Loop point" = "循環點"
+"Loop point ({0} steps)" = "循環點（{0} 步）"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "循環點：[LMB] 拖曳或 [Wheel] 以步為單位設定  [2xLMB] 下一小節  [RMB] 不循環 / 步 / 拍 / 小節，寫入樣式"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "循環重複（循環點之後）：[LMB] 編輯它重複的步"
+"Loop step channels" = "循環步進通道"
+"Loop type" = "循環類型"
+"Looping on" = "循環開啟"
+"Nothing to burn" = "沒有可寫入的內容"
+"Reset after burning to MIDI" = "寫入 MIDI 後重設"
+"Select what you want to reset:" = "選擇要重設的內容："
+"Set to next bar" = "設為下一小節"
+"Set to next beat" = "設為下一拍"
+"The selected channel doesn't contain any notes to burn." = "所選通道沒有可寫入的音符。"
+"Time (shift and gate)" = "時間（偏移和門限）"
+"loop at the next bar" = "在下一小節循環"
+"loop at the next beat" = "在下一拍循環"
+"loop at the next step" = "在下一步循環"
+"Receive notes from" = "接收音符來源"
+"Unlock" = "解鎖"
+"not connected" = "未連線"
+"No MIDI input device" = "沒有 MIDI 輸入裝置"
+"(locked: receives the notes of {0})" = "（已鎖定：接收 {0} 的音符）"
+"Create sampled instrument..." = "建立取樣樂器..."
+"Create sampled instrument" = "建立取樣樂器"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "逐鍵演奏 {0}，並用錄音建立一個 Sampler 通道。"
+"Sampling the instrument..." = "正在取樣樂器..."
+"Writing the samples..." = "正在寫入取樣..."
+"Could not sample the instrument" = "無法取樣該樂器"
+"Low note" = "最低音"
+"High note" = "最高音"
+"Keys per zone" = "每個區域的鍵數"
+"Root offset" = "根音偏移"
+"Velocity layers" = "力度層"
+"Max velocity" = "最大力度"
+"Release after (seconds)" = "釋放前時長（秒）"
+"Max length after release (seconds)" = "釋放後最大長度（秒）"
+"Stop on" = "停止條件"
+"Max length" = "最大長度"
+"16-bit integer" = "16 位元整數"
+"Mono (merged)" = "單聲道（合併）"
+"Enable insert effects" = "啟用插入軌效果"
+"Enable master effects" = "啟用主控效果"
+"could not read {0}" = "無法讀取 {0}"
 "Key to" = "按鍵用於"
 "Percent" = "百分比"
 "Use regions" = "使用區域"
@@ -5707,7 +5785,6 @@ countries: tw hk mo
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "在歌曲之前插入空白欄位以放置要觸發的片段，每欄放一個標記，並在歌曲開始處放置Start標記；同時開啟表演模式。"
 "Marker count" = "標記數量"
 "2 steps" = "2步"
-"8 bars" = "8小節"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "軌道：[LMB] 選取  [Ctrl][LMB] 加入 / 移除  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5833,7 +5910,6 @@ countries: tw hk mo
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "樣式長度（小節）：[LMB] 拖曳或[Wheel]變更  [2xLMB] 自動（依據音符）  [RMB] 選單"
 "Pattern length: {0} (automatic, from the notes)" = "樣式長度：{0}（自動，依據音符）"
 "Pattern length (bars, 0 = automatic)" = "樣式長度（小節，0 = 自動）"
-"Pattern length" = "樣式長度"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "跟隨：比通道機架長的樣式會隨正在播放的步翻頁；關閉時停留在你捲動到的位置"
 "Follow the playhead (page along with the playing step) on/off" = "跟隨播放頭（隨正在播放的步翻頁）開/關"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "跟隨：檢視隨播放位置翻頁；關閉時停留在你捲動到的位置"
@@ -5900,9 +5976,6 @@ countries: tw hk mo
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "反相立體聲"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "切割模式 (C)：按一下音符在該處切開；Ctrl+按一下音符將其與前一個音符黏合"
 "Score" = "樂譜"
@@ -5945,7 +6018,6 @@ countries: tw hk mo
 "Set image wallpaper..." = "設定背景圖片..."
 "Remove image wallpaper" = "移除背景圖片"
 "Set background color..." = "設定背景顏色..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "節拍器軌道"
 "Metronome target mixer track" = "節拍器的目標混音器軌道"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "節拍器經由的混音器軌道（--- 為主控）。節拍聲永遠不會進入匯出。"
@@ -5981,8 +6053,6 @@ countries: tw hk mo
 "Ghost channels" = "幽靈通道"
 "Add multiple..." = "新增多個..."
 "You can add a maximum of {0} inserts." = "最多可以新增 {0} 個插入軌。"
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "片段增益：[LMB] 上下拖曳（選取的片段一起）  [RMB] 選單"
 "Automatic crossfades (current project) on/off" = "自動交叉淡化（目前專案）開/關"
 "Automatic crossfades (current project)" = "自動交叉淡化（目前專案）"
@@ -5997,14 +6067,11 @@ countries: tw hk mo
 "Yes" = "是"
 "Make clip unique?" = "將片段設為唯一？"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "片段 \"{0}\" 也用於另一條音訊軌道。\n\n是否將此實例設為唯一，然後路由到此音訊軌道？"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "喉部"
 "Scale steps" = "音階級數"
 "In scale" = "按音階"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "變化"
-
-# round 167f: FL Emphasis
 "Delta" = "差值"
 "Envelope order" = "包絡階數"
 "Linking" = "聯動"
@@ -6159,6 +6226,7 @@ countries: tw hk mo
 "Load preset..." = "載入預設..."
 "Save preset as..." = "預設另存為..."
 "Page {0}" = "第 {0} 頁"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "平滑（餘弦）"
 "Bezier" = "貝茲"
@@ -6248,7 +6316,6 @@ countries: tw hk mo
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ 樂器：[LMB] 預覽  [2xLMB] 新增LYNX Soundfont通道（或載入所選通道）  拖到通道機架"
 "Open a .sf2 / .sf3 / .sfz file" = "開啟.sf2 / .sf3 / .sfz檔案"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont：播放SoundFont 2 / 3音色庫和SFZ樂器。在所有SoundFont中搜尋預設集，點擊預覽，雙擊載入。"
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "電平"
 "Loop A" = "循環 A"
 "Loop B" = "循環 B"
@@ -6305,6 +6372,22 @@ countries: tw hk mo
 "Expand all grouped tracks" = "展開所有群組軌道"
 "Purge unused audio clips" = "清除未使用的音訊片段"
 "Create variants when stretching audio clips" = "伸縮音訊片段時建立變體"
+"Extract stems from sample" = "從取樣中提取分軌"
+"Extracting stems..." = "正在提取分軌..."
+"Downloading the stem model..." = "正在下載分軌模型..."
+"Checking the stem model..." = "正在驗證分軌模型..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "無法載入 ONNX Runtime。提取分軌需要 macOS 13.4 或更新版本。"
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "無法載入 ONNX Runtime。請從 https://aka.ms/vs/17/release/vc_redist.x64.exe 安裝 Microsoft Visual C++ Redistributable (x64) 後再試一次。"
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "無法載入 ONNX Runtime。提取分軌需要系統的 libstdc++。"
+"The model returned an unexpected result." = "模型傳回了非預期的結果。"
+"The sample is empty." = "取樣是空的。"
+"The downloaded model failed its checksum, so it was not used." = "下載的模型未通過總和檢查碼驗證，因此未使用。"
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "提取分軌需要 HT-Demucs 模型。它不屬於 LYNX SHARE：只下載一次（{0} MB），存放在 {1}。"
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "來源：{0}（Meta AI Research 的 Demucs v4 的 ONNX 匯出版）"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "授權：Demucs 的程式碼採用 MIT 授權。正如作者所說，訓練權重的授權並不明確：訓練資料包含 MUSDB18-HQ，其中部分僅限研究使用。是否適合你的用途（尤其是商業用途），請自行判斷。"
+"Download" = "下載"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "提取分軌需要 ONNX Runtime（{0}），它隨 LYNX SHARE 的安裝程式和 zip 提供，但程式旁邊找不到它。請用安裝程式安裝 LYNX SHARE，或完整解壓縮 zip。"
+"Stems are still being extracted. Try again when that has finished." = "分軌仍在提取中。請在完成後再試一次。"
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "合併 Playlist 選取範圍 (從選取範圍開頭)"
@@ -6353,6 +6436,7 @@ countries: tw hk mo
 "The project has no mixer states, effects or notes to export." = "專案中沒有可匯出的混音器狀態、效果或音符。"
 "Some files could not be written:" = "部分檔案無法寫入:"
 "Project bones..." = "專案骨架..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "男聲"
 "Female" = "女聲"
@@ -6446,8 +6530,6 @@ countries: tw hk mo
 "Pattern time markers: Add time signature change..." = "樣式時間標記：新增拍號變更..."
 "Delete all markers" = "刪除所有標記"
 "Colour group" = "顏色群組"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "始終|按住"
 "Arpeggio" = "琶音"
 "Auto|Man" = "自動|手動"
@@ -6520,22 +6602,6 @@ countries: tw hk mo
 "Set as time signature" = "設為拍號"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "時間劃分：FL Studio 原有的方式（每小節拍數、每拍步數）。拍號：傳統拍號（分子 / 分母）。"
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "分母：{0}（Channel Rack 的步進格線為每拍 {1} 步）。"
-"Extract stems from sample" = "從取樣中提取分軌"
-"Extracting stems..." = "正在提取分軌..."
-"Downloading the stem model..." = "正在下載分軌模型..."
-"Checking the stem model..." = "正在驗證分軌模型..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "無法載入 ONNX Runtime。提取分軌需要 macOS 13.4 或更新版本。"
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "無法載入 ONNX Runtime。請從 https://aka.ms/vs/17/release/vc_redist.x64.exe 安裝 Microsoft Visual C++ Redistributable (x64) 後再試一次。"
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "無法載入 ONNX Runtime。提取分軌需要系統的 libstdc++。"
-"The model returned an unexpected result." = "模型傳回了非預期的結果。"
-"The sample is empty." = "取樣是空的。"
-"The downloaded model failed its checksum, so it was not used." = "下載的模型未通過總和檢查碼驗證，因此未使用。"
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "提取分軌需要 HT-Demucs 模型。它不屬於 LYNX SHARE：只下載一次（{0} MB），存放在 {1}。"
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "來源：{0}（Meta AI Research 的 Demucs v4 的 ONNX 匯出版）"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "授權：Demucs 的程式碼採用 MIT 授權。正如作者所說，訓練權重的授權並不明確：訓練資料包含 MUSDB18-HQ，其中部分僅限研究使用。是否適合你的用途（尤其是商業用途），請自行判斷。"
-"Download" = "下載"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "提取分軌需要 ONNX Runtime（{0}），它隨 LYNX SHARE 的安裝程式和 zip 提供，但程式旁邊找不到它。請用安裝程式安裝 LYNX SHARE，或完整解壓縮 zip。"
-"Stems are still being extracted. Try again when that has finished." = "分軌仍在提取中。請在完成後再試一次。"
 "Configuration" = "設定"
 "Transp." = "移調"
 "Master envelope" = "主包絡"
@@ -6571,8 +6637,6 @@ countries: tw hk mo
 "sequencer on" = "音序器開"
 "sequencer off" = "音序器關"
 "transpose {0}" = "移調 {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} 拍之前"
 "Beat {0}" = "第 {0} 拍"
 "The first point of the envelope can't be removed." = "包絡的第一個點不能刪除。"
@@ -6609,6 +6673,7 @@ countries: tw hk mo
 "now" = "現在"
 "1 bar back" = "1 小節之前"
 "2 bars back" = "2 小節之前"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "替換取樣"
 "Generate steps" = "產生步進"
@@ -6684,7 +6749,6 @@ countries: tw hk mo
 "Morph to" = "變形到"
 "Harm" = "諧波"
 "Lvl" = "電平"
-"Hi-cut" = "高切"
 "Lo-cut" = "低切"
 "String 1" = "弦 1"
 "String 2" = "弦 2"
@@ -6767,7 +6831,6 @@ countries: tw hk mo
 "MODULE 2" = "模組 2"
 "MODULE 3" = "模組 3"
 "MODULE 4" = "模組 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "標尺：[LMB] 歌曲位置  [RMB] 或 [Ctrl][LMB] 或 [2xLMB] 拖曳：時間選取範圍（循環）  [Shift][LMB] 拖曳：移動選取範圍  [Ctrl][RMB] 拖曳：縮放  [RMB] 按一下：選單  [Alt] 不貼齊"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "標尺：[LMB] 位置  [Alt] 不貼齊  [Ctrl][LMB]、[RMB] 或 [2xLMB] 拖曳選取時間範圍內的音符  [Ctrl][Wheel] 縮放  [Shift][Wheel] 捲動"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "標記：[LMB] 跳到此處（播放時：在下一個跳轉量化步）  [Ctrl][LMB] 選取到下一個標記  [RMB] 動作、重新命名、刪除"
@@ -6790,8 +6853,6 @@ countries: tw hk mo
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "錄音預備：Rec + Play 將此 insert 錄入 Playlist 片段  [RMB] 錄到檔案"
 "Recording: {0}" = "錄音：{0}"
 "dry input" = "乾輸入"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "自適應"
 "Alt" = "替代"
 "Amplifier" = "放大器"
@@ -6818,6 +6879,7 @@ countries: tw hk mo
 "HC" = "高切"
 "HD" = "高阻"
 "Harmonic mask" = "諧波遮罩"
+"Hi-cut" = "高切"
 "Kb" = "鍵盤"
 "Kbd" = "鍵盤"
 "LC" = "低切"
@@ -6849,8 +6911,6 @@ countries: tw hk mo
 "Vel sens" = "力度靈敏"
 "Vib" = "顫音"
 "Voice mode" = "發音模式"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "替身：此外掛未安裝在這台電腦上，將播放此部分的渲染音訊（外掛設定會保留）"
 "Send project..." = "傳送專案..."
 "Send my part back..." = "傳回我的部分..."
@@ -6944,8 +7004,8 @@ countries: tw hk mo
 "Lock" = "鎖"
 "Mute the selected clips (all when none is selected)" = "將選取的片段靜音 (未選取時為全部)"
 "Unmute the selected clips (all when none is selected)" = "取消選取片段的靜音 (未選取時為全部)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "將移除的步靜音"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "播放 / 暫停樣式  [RMB] 停止並回到開始播放的位置 (再按一次: 回到樣式開頭)"
 "Live sessions need a newer libcurl on this computer ({0})" = "即時工作階段需要此電腦上較新版本的 libcurl（{0}）"
 "Opening the session..." = "正在開啟工作階段..."
 "Too many sessions were opened from this connection. Try again in a while." = "從此連線開啟的工作階段過多。請稍後再試。"
@@ -7015,8 +7075,6 @@ countries: tw hk mo
 "{0} files arriving" = "{0} 個檔案正在傳入"
 "Live session with {0}" = "與{0}的即時工作階段"
 "Undo left alone what someone else changed since: {0}" = "復原未變動其他人此後修改的內容：{0}"
-"Mute removed steps" = "將移除的步靜音"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "播放 / 暫停樣式  [RMB] 停止並回到開始播放的位置 (再按一次: 回到樣式開頭)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "無法恢復即時工作階段：連線沒有恢復。"
@@ -7100,8 +7158,6 @@ countries: tw hk mo
 "click to step, drag or mouse wheel to change" = "按一下切換，拖曳或捲動滑鼠滾輪變更"
 "no effect with the current mode (another engine is in use)" = "在目前模式下無效（正在使用另一個引擎）"
 "arrows step, click for the list, drag or mouse wheel to change" = "箭頭逐步切換，按一下顯示清單，拖曳或捲動滑鼠滾輪變更"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "主要：{0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "最近調整的參數：你最後移動的控制項及其數值。按一下開啟其選單（自動化片段、連結到控制器、事件、數值）"
 "LAST TWEAKED" = "最近調整"
@@ -7118,8 +7174,6 @@ countries: tw hk mo
 "Playlist snap" = "播放清單貼齊"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "標尺：[LMB] 位置  [Alt] 不貼齊  [Ctrl][LMB]、[RMB] 或 [2xLMB] 拖曳選取時間範圍內的音符  [Ctrl][Wheel] / 雙指捏合 縮放  [Shift][Wheel] 捲動"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "標尺：[LMB] 歌曲位置  [RMB] 或 [Ctrl][LMB] 或 [2xLMB] 拖曳：時間選取範圍（循環）  [Shift][LMB] 拖曳：移動選取範圍  [Ctrl][RMB] 拖曳, [Ctrl][Wheel] / 雙指捏合：縮放  [RMB] 按一下：選單  [Alt] 不貼齊"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "關（保留實際時間）"
 "1/32 note" = "32 分音符"
 "1/16 note" = "16 分音符"
@@ -7134,8 +7188,6 @@ countries: tw hk mo
 "Number of steps" = "步數"
 "Dual" = "雙軌"
 "Align all channel editors" = "對齊所有通道編輯器"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "外掛選擇器：每個外掛顯示為圖片；拖到 Channel Rack 或混音台（右鍵：快速新增面板）"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "雙擊、右鍵或 Enter：新增通道；拖到 Channel Rack（拖到通道上：取代其樂器）"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "雙擊、右鍵或 Enter：加入所選混音插入軌；拖到混音插入軌或其插槽"
@@ -7147,14 +7199,11 @@ countries: tw hk mo
 "Last tweaked ({0})" = "最近調整 ({0})"
 "Deactivate" = "停用"
 "Automate Patcher parameter" = "自動化 Patcher 參數"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "混合錄製的音符：開（新音符加入圖樣中的音符）"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合錄製的音符：關（取代已錄製通道的舊音符）"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合錄製的音符：開啟時，一次錄製會把音符加入圖樣（疊錄）；關閉時，取代已錄製通道的舊音符"
 "Tempo tapper: tap the beat to set the tempo" = "節拍速度敲擊器：敲擊節拍來設定速度"
 "Blend recorded notes" = "混合錄製的音符"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "混合錄製的音符 開/關（關：取代）"
 "Loop record on/off" = "循環錄音 開/關"
 "Step edit on/off" = "步進輸入 開/關"
@@ -7171,9 +7220,8 @@ countries: tw hk mo
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "步進輸入：走帶停止時，彈奏的音符寫入目前樣式的目前位置，長度為一個吸附步長；放開琴鍵後位置前進一步（和弦：同時按住）"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "插入錄音：音訊錄音只保留循環區域（播放會穿過它；預捲和後捲在錄音選項中）"
 "Punch in/out" = "插入錄音"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "指向任何內容查看說明  [F1] 快捷鍵  [F5]-[F9] 視窗  [Space] 播放/停止"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "剪下所選通道的步進"
 "Copy the selected channels' steps" = "複製所選通道的步進"
@@ -7182,16 +7230,12 @@ countries: tw hk mo
 "Note names on every Piano roll key" = "在 Piano Roll 的每個琴鍵上顯示音名"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 上下拖曳：逐一切換 pattern"
 "Playhead column in the Channel Rack" = "通道機架中的播放位置欄"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "循環錄音：開（錄音循環：Song 模式下為循環區域，每遍一個錄音；Pattern 模式下為樣式）"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "循環錄音：關（錄音一直向前：穿過循環區域，或越過樣式末尾，樣式隨之變長）"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "循環錄音：開，錄音循環（Song 模式：循環區域，每遍一個錄音；Pattern 模式：樣式）；關，一直向前，穿過循環區域或越過樣式末尾，並把一切保留在演奏的位置（樣式變長）"
 "Echo time" = "回聲時間"
 "Prime numbers" = "質數"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic 面板：單屏硬體飽和器（Drive、Punish、五種風格）"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "已儲存 {0}。"
 "Everything went over as FL Studio's own data." = "全部以 FL Studio 本身的資料匯出。"
 "Export to FL Studio" = "匯出到 FL Studio"
@@ -7214,11 +7258,9 @@ countries: tw hk mo
 "Worth knowing" = "須知"
 "Samples not on this PC" = "不在此電腦上的取樣"
 "Steps use channel colour" = "步進使用通道顏色"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "主要|微調"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "現代調音台"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "飽和|控制台 E|控制台 G|控制台 A|控制台 N|控制台 Y|真空管|吉他音箱|貝斯音箱"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "開啟驅動部分：在通道條末端、輸出之前的飽和"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "飽和類型：軟削波器、五種控制台通道、真空管級或吉他 / 貝斯音箱"
@@ -7226,8 +7268,6 @@ countries: tw hk mo
 "Level into the drive: more distortion without changing the drive" = "進入驅動的電平：在不改變驅動的情況下得到更多失真"
 "Level after the drive" = "驅動之後的電平"
 "Blends the clean signal back in" = "把乾淨訊號混回來"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|空間"
 "Modern|Vintage|Plate" = "現代|復古|板式"
 "Distance" = "距離"
@@ -7236,80 +7276,7 @@ countries: tw hk mo
 "Low decay" = "低頻衰減"
 "High decay" = "高頻衰減"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "標記循環"
-"Marker skip" = "標記跳過"
-"Marker pause" = "標記暫停"
-"Bar override" = "小節覆寫"
-"Key/Scale" = "調/音階"
-"Loop length" = "循環長度"
-"Add one every" = "每隔多少新增一個"
-"Bars" = "小節"
-"Add jump to next bar" = "新增跳轉到下一小節"
-"Change to marker loop" = "改為標記循環"
-"Time markers" = "時間標記"
-"Quantize song jumps" = "量化歌曲跳轉"
-"Place loop (from this marker to the next)" = "放置循環（從此標記到下一個）"
-"Song marker jump" = "歌曲標記跳轉"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "此通道的音符不發聲，而是把歌曲移到標記：音符 0 到第一個標記，下一個到第二個……（播放時適用 Playlist › 量化歌曲跳轉）。"
-"Jump to the next song marker (Quantize song jumps while playing)" = "跳到下一個歌曲標記（播放時量化歌曲跳轉）"
-"Jump to the previous song marker" = "跳到上一個歌曲標記"
-"Advanced looping" = "進階循環"
-"Burn" = "寫入"
-"Burn MIDI to" = "MIDI 寫入到"
-"Burn all looping channels" = "寫入所有循環通道"
-"Burn selected channels" = "寫入所選通道"
-"Burn to pattern" = "寫入樣式"
-"Channel looping" = "通道循環"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "通道循環：比樣式短的通道重複到樣式結尾（複節奏）  [LMB] 開 / 關  [RMB] 循環類型（步進通道、所有通道、進階）和寫入樣式"
-"Channel looping: {0}" = "通道循環：{0}"
-"Don't loop" = "不循環"
-"Echo delay" = "回聲延時"
-"Every {0} steps" = "每 {0} 步"
-"Loop all channels" = "循環所有通道"
-"Loop point" = "循環點"
-"Loop point ({0} steps)" = "循環點（{0} 步）"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "循環點：[LMB] 拖曳或 [Wheel] 以步為單位設定  [2xLMB] 下一小節  [RMB] 不循環 / 步 / 拍 / 小節，寫入樣式"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "循環重複（循環點之後）：[LMB] 編輯它重複的步"
-"Loop step channels" = "循環步進通道"
-"Loop type" = "循環類型"
-"Looping on" = "循環開啟"
-"Nothing to burn" = "沒有可寫入的內容"
-"Reset after burning to MIDI" = "寫入 MIDI 後重設"
-"Select what you want to reset:" = "選擇要重設的內容："
-"Set to next bar" = "設為下一小節"
-"Set to next beat" = "設為下一拍"
-"The selected channel doesn't contain any notes to burn." = "所選通道沒有可寫入的音符。"
-"Time (shift and gate)" = "時間（偏移和門限）"
-"loop at the next bar" = "在下一小節循環"
-"loop at the next beat" = "在下一拍循環"
-"loop at the next step" = "在下一步循環"
-"Receive notes from" = "接收音符來源"
-"Unlock" = "解鎖"
-"not connected" = "未連線"
-"No MIDI input device" = "沒有 MIDI 輸入裝置"
-"(locked: receives the notes of {0})" = "（已鎖定：接收 {0} 的音符）"
-"Create sampled instrument..." = "建立取樣樂器..."
-"Create sampled instrument" = "建立取樣樂器"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "逐鍵演奏 {0}，並用錄音建立一個 Sampler 通道。"
-"Sampling the instrument..." = "正在取樣樂器..."
-"Writing the samples..." = "正在寫入取樣..."
-"Could not sample the instrument" = "無法取樣該樂器"
-"Low note" = "最低音"
-"High note" = "最高音"
-"Keys per zone" = "每個區域的鍵數"
-"Root offset" = "根音偏移"
-"Velocity layers" = "力度層"
-"Max velocity" = "最大力度"
-"Release after (seconds)" = "釋放前時長（秒）"
-"Max length after release (seconds)" = "釋放後最大長度（秒）"
-"Stop on" = "停止條件"
-"Max length" = "最大長度"
-"16-bit integer" = "16 位元整數"
-"Mono (merged)" = "單聲道（合併）"
-"Enable insert effects" = "啟用插入軌效果"
-"Enable master effects" = "啟用主控效果"
-"could not read {0}" = "無法讀取 {0}"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "樣式 {0}"
 "a pattern" = "一個樣式"
 "a channel" = "一個通道"
@@ -7321,7 +7288,6 @@ countries: tw hk mo
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "開"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "無|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "另外三種壓縮器特性，代替風格使用：平滑、光電或母帶"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} 崩潰了。請立即儲存專案（另存為新檔案最安全）。"
@@ -7474,7 +7440,6 @@ countries: tw hk mo
 "Start time (H:M:S:Frame)" = "開始時間（H:M:S:Frame）"
 "End time (H:M:S:Frame)" = "結束時間（H:M:S:Frame）"
 "Current time (H:M:S:Frame)" = "目前時間（H:M:S:Frame）"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "降噪"
 "Group bypass" = "編組旁通"
@@ -7573,7 +7538,6 @@ countries: tw hk mo
 "HighCut" = "高切"
 "Rushin" = "搶拍"
 "Draggin" = "拖拍"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "進入通道條的電平"
 "Level out of the strip, after the output mix" = "離開通道條的電平(在輸出混合之後)"
 "Blend of the processed strip with the dry input" = "處理後訊號與乾輸入的混合比例"
@@ -7730,8 +7694,6 @@ countries: tw hk mo
 "Auto listen" = "自動偵聽"
 "Auto\nlisten" = "自動\n偵聽"
 "EQ auto listen" = "EQ 自動偵聽"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "原生"
 "32 bit" = "32 位元"
 "64 bit" = "64 位元"
@@ -7751,12 +7713,11 @@ countries: tw hk mo
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "動畫：面板淡入淡出，按鈕柔和亮起，滾輪平滑捲動"
 "{0} minutes" = "{0} 分鐘"
 "Longest wait between backups" = "備份之間的最長間隔"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "用這些錄音合成"
 "After loop recording, only the last pass plays" = "循環錄音後僅播放最後一遍"
 "Loop-recorded audio: every pass plays" = "循環錄製的音訊:播放每一遍"
 "Loop-recorded audio: every pass is muted" = "循環錄製的音訊:每一遍都靜音"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "片段格線"
 "Stop all clips" = "停止所有片段"
@@ -7859,8 +7820,6 @@ countries: tw hk mo
 "That track is fed by this one: the link would make a loop." = "該軌道由本軌道供給訊號：此連結會形成迴路。"
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "側鏈輸入：此效果器監聽的插入軌。選擇後會以電平 0 路由到這裡；它保留自身的輸出  [LMB] 選擇"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "側鏈輸入：此外掛的側鏈輸入監聽的插入軌。選擇後會以電平 0 路由到這裡；它保留自身的輸出"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "載入取樣（Sample 選單）或拖放到這裡"
 "Open a sample to slice (or drop one here)" = "開啟要切片的取樣（或拖放到這裡）"
 "Slicing" = "切片"
@@ -7965,8 +7924,6 @@ countries: tw hk mo
 "Adds the file's time signature to the pattern's markers" = "將檔案的拍號加入模式的標記"
 "Scores" = "樂譜"
 "Folders" = "資料夾"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "多重連結到控制器"
 "Please tweak the controls you want to link..." = "請調整你要連結的控制項..."
 "Multilink to controllers on/off" = "多重連結到控制器 開/關"
@@ -8032,6 +7989,7 @@ countries: tw hk mo
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "音軌音量：[LMB] 點擊或拖曳  [Shift] 微調  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "音軌聲像：[LMB] 上下拖曳  [Shift] 微調  [2xLMB] 置中"
 "Track effects: [LMB] open the effects of its mixer track" = "音軌效果：[LMB] 開啟其混音器軌道的效果"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "為此插入通道新增效果（或從瀏覽器拖入）"
 "Channel on / off (its mute)" = "通道開 / 關（靜音）"
@@ -8139,6 +8097,7 @@ countries: tw hk mo
 "Mixer track offset for output {0}" = "輸出 {0} 的混音器軌道位移"
 "Deactivate output {0}" = "停用輸出 {0}"
 "Activate output {0}" = "啟用輸出 {0}"
+
 # --- Game controller (round 184a, S16)
 "Game controller" = "遊戲手把"
 "Use a game controller" = "使用遊戲手把"
@@ -8162,6 +8121,7 @@ countries: tw hk mo
 "D-pad down" = "方向鍵下"
 "D-pad left" = "方向鍵左"
 "D-pad right" = "方向鍵右"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "刪除軌道"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "這將|刪除| {0} 條選取的混音器軌道。確定嗎？"
@@ -8215,6 +8175,7 @@ countries: tw hk mo
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "每次輪到該音符時它發聲的機率（LYNX；Live 的音符 Chance）"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "每次發聲時，力度在音符力度與力度 + 此範圍之間隨機抽取（LYNX）"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "釋放力度：隨音符結束傳送給使用它的樂器（外掛、Patcher）"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "找不到預設範本；已改為開啟 LYNX SHARE 的預設專案"
 "{0} could not be opened." = "無法開啟 {0}。"
@@ -8234,6 +8195,7 @@ countries: tw hk mo
 "Empty project" = "空白專案"
 "Last used project" = "上次使用的專案"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "預設範本在「檔案 › 新增」時開啟，當「啟動專案」為「預設範本」時也在啟動時開啟，皆為未命名的新專案，因此範本本身不會被覆寫。「檔案 › 另存為範本...」可加入你自己的範本。"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "用於其他應用程式..."
 "Export for other apps" = "匯出給其他應用程式"
@@ -8263,6 +8225,7 @@ countries: tw hk mo
 "Send to {0} (deleted)" = "傳送到 {0}（已刪除）"
 "Disconnected links" = "中斷的連結"
 "Keep links to deleted inserts, greyed (LYNX)" = "保留指向已刪除插入軌的連結（灰色，LYNX）"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8334,6 +8297,7 @@ countries: tw hk mo
 "side" = "側"
 "Output M/S" = "輸出 M/S"
 "Input M/S" = "輸入 M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8353,6 +8317,7 @@ countries: tw hk mo
 "Amount min" = "最小程度"
 "Stereo offset" = "立體聲偏移"
 "16 bars" = "16小節"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8369,3 +8334,32 @@ countries: tw hk mo
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "實測：依參考擬合的模型；經典：此前儲存的專案所用的模型"
+"{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)" = "{0} 已凍結：解凍後才能編輯（在通道上 [RMB]，解凍）"
+"There is no such channel." = "沒有這個通道。"
+"An audio clip is audio already: there is nothing to freeze." = "音訊剪輯本身就是音訊：沒有可凍結的內容。"
+"This channel makes no sound of its own: there is nothing to freeze." = "此通道本身不發聲：沒有可凍結的內容。"
+"This channel's plugin is not loaded: there is nothing to render." = "此通道的外掛未載入：沒有可算繪的內容。"
+"This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart." = "此外掛將輸出傳送到其他混音器插槽（處理 > 連接）：單一凍結的音訊檔案無法將它們分開保存。"
+"This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart." = "此 Patcher 將輸出傳送到其他混音器插槽：單一凍結的音訊檔案無法將它們分開保存。"
+"A Layer channel plays this channel: remove it from the Layer to freeze it." = "有 Layer 通道正在播放此通道：請先將其從 Layer 中移除再凍結。"
+"Performance mode launches clips live: a frozen channel could not follow them." = "Performance 模式會即時觸發剪輯：凍結的通道無法跟隨。"
+"This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them." = "此通道在剪輯網格的剪輯中播放，並被即時觸發：凍結的通道無法跟隨。"
+"Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze" = "已凍結，但音訊檔案遺失：改為由樂器播放。  [RMB] 重新凍結或解凍"
+"Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it" = "已凍結，已過期：凍結後音符、速度或編排已變更，先前產生的音訊仍在播放。  [RMB] 重新凍結即可更新"
+"Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit" = "已凍結：播放其算繪的音訊，樂器已卸載（不佔用 CPU 和 RAM）。  [RMB] 解凍以編輯"
+"Freeze selected channels" = "凍結所選通道"
+"Unfreeze selected channels" = "解凍所選通道"
+"Unfreeze" = "解凍"
+"Re-freeze selected channels" = "重新凍結所選通道"
+"Re-freeze" = "重新凍結"
+"The plugin {0} is not installed on this PC: there is nothing to render." = "此電腦上未安裝外掛 {0}：沒有可算繪的內容。"
+"Freezing {0}..." = "正在凍結 {0}..."
+"{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it." = "{0} 已凍結：播放其音訊，樂器已卸載。在通道上按右鍵即可解凍。"
+"Could not freeze" = "無法凍結"
+"Can't freeze this channel" = "無法凍結此通道"
+"Frozen: Unfreeze to edit" = "已凍結：解凍以編輯"
+"A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "有控制器連結到此樂器的旋鈕並即時移動它們：凍結的音訊無法跟隨。"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

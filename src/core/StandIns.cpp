@@ -4,6 +4,7 @@
 #include <cmath>
 #include <map>
 
+#include "core/PatternBlocks.h"
 #include "core/Scheduler.h"
 #include "core/SessionIds.h"
 
@@ -71,7 +72,10 @@ void neutralise (Song& s)
         if (! m.isSignature())
             m.action = Marker::none;
     for (auto& c : s.channels)
+    {
         c.standIns.clear();
+        c.freeze = {}; // (a stem is rendered from the instruments themselves)
+    }
     for (auto& t : s.mixer)
     {
         t.solo = false;
@@ -160,6 +164,7 @@ ChannelDef standInChannel (const ChannelDef& c, const std::string& path)
     f.soloLock = c.soloLock;
     f.uid = c.uid;
     f.standIns = c.standIns;
+    f.freeze = c.freeze;
     return f;
 }
 } // namespace
@@ -304,7 +309,7 @@ Song insertTimelineRender (const Song& song, int track)
 
 bool hasAny (const Song& song) noexcept
 {
-    return std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return ! c.standIns.empty(); })
+    return std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return ! c.standIns.empty() || c.freeze.on(); })
            || std::any_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& t) { return ! t.standIns.empty(); });
 }
 
@@ -386,23 +391,55 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
                                         pattern.channelLoops.end());
         }
     };
+    // what drove the instrument's own parameters (automation, pattern events, modulators: a pitch bend plays on any
+    // instrument, an audio clip too) is in the stem already: it must not play a second time on the audio (round 190ay)
+    auto dropParamDrivers = [&] (int channel) {
+        auto own = [channel] (const AutomationTarget& t) { return t.kind == AutomationTargetKind::channelParam && t.index == channel; };
+        for (auto& a : out.automations)
+            if (own (a.target))
+                a.target = {};
+        for (auto& p : out.patterns)
+            for (auto& lane : p.events)
+                if (own (lane.target))
+                    lane.target = {};
+        out.initialValues.erase (std::remove_if (out.initialValues.begin(), out.initialValues.end(),
+                                                 [&] (const Song::InitialValue& v) { return own (v.target); }),
+                                 out.initialValues.end());
+        for (auto& m : out.modulators)
+            m.routes.erase (std::remove_if (m.routes.begin(), m.routes.end(), [&] (const ModRoute& r) { return own (r.target); }), m.routes.end());
+    };
     for (int c = 0; c < (int) song.channels.size(); ++c)
     {
         const auto& channel = song.channels[(std::size_t) c];
-        if (channel.standIns.empty() || ! channelUsesPlugin (channel))
-            continue;
-        std::vector<const PluginRef*> list;
-        pluginsOf (channel, list);
-        if (! anyMissing (list, missing))
-            continue;
+        // a frozen channel (round 190ay) plays its own stems, whatever its instrument and installed or not
+        const bool frozen = channel.freeze.on();
+        const auto& stems = frozen ? channel.freeze.stems : channel.standIns;
+        if (! frozen)
+        {
+            if (channel.standIns.empty() || ! channelUsesPlugin (channel))
+                continue;
+            std::vector<const PluginRef*> list;
+            pluginsOf (channel, list);
+            if (! anyMissing (list, missing))
+                continue;
+        }
         // (a channel routed into an insert that plays its own stand-in is in that stem already: it stays muted)
         const bool intoStem = out.channels[(std::size_t) c].muted && ! channel.muted;
         bool played = false;
+        dropParamDrivers (c);
+        // Song mode with nothing arranged plays nothing (it only loops over the current pattern's length): a frozen
+        // channel is silent there too, and adds no clip (a stem clip would become the arrangement)
+        const bool unarranged = frozen && songMode && song.playlist.empty() && patternblocks::end (song) <= 0;
 
-        if (songMode)
+        if (unarranged)
         {
-            const auto* timeline = find (channel.standIns, 0, false);
-            const bool patternStems = std::any_of (channel.standIns.begin(), channel.standIns.end(), [] (const StandIn& s) { return s.pattern != 0 && ! s.loop; });
+            dropNotes (c);
+            out.channels[(std::size_t) c] = standInChannel (channel, {});
+        }
+        else if (songMode)
+        {
+            const auto* timeline = find (stems, 0, false);
+            const bool patternStems = std::any_of (stems.begin(), stems.end(), [] (const StandIn& s) { return s.pattern != 0 && ! s.loop; });
             dropNotes (c);
             if (timeline != nullptr && (needsTimeline (song, c) || ! patternStems))
             {
@@ -418,7 +455,7 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
                 {
                     if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) song.patterns.size())
                         continue;
-                    const auto* stem = find (channel.standIns, song.patterns[(std::size_t) clip.pattern].uid, false);
+                    const auto* stem = find (stems, song.patterns[(std::size_t) clip.pattern].uid, false);
                     if (stem == nullptr || clip.offset >= stem->lengthTicks)
                         continue;
                     const auto length = lengths[(std::size_t) clip.pattern];
@@ -473,7 +510,7 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
         else
         {
             const auto p = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
-            const auto* loop = song.patterns.empty() ? nullptr : find (channel.standIns, song.patterns[(std::size_t) p].uid, true);
+            const auto* loop = song.patterns.empty() ? nullptr : find (stems, song.patterns[(std::size_t) p].uid, true);
             dropNotes (c);
             out.channels[(std::size_t) c] = standInChannel (channel, loop != nullptr ? loop->path : std::string());
             if (loop != nullptr)
@@ -495,9 +532,135 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
         if (intoStem)
             out.channels[(std::size_t) c].muted = true;
         (void) played; // (listed either way: its plugin is missing here and it stands in — silent where no stem fits)
-        if (projected != nullptr)
+        if (projected != nullptr && ! frozen)
             projected->channels.push_back (c);
     }
     return out;
 }
 } // namespace lynx::standins
+
+namespace lynx::freeze
+{
+#ifndef TR_NOOP
+ #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
+#endif
+const char* whyNot (const Song& song, int channel) noexcept
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return TR_NOOP ("There is no such channel.");
+    const auto& c = song.channels[(std::size_t) channel];
+    switch (c.instrument)
+    {
+        case InstrumentKind::audioClip:
+            return TR_NOOP ("An audio clip is audio already: there is nothing to freeze.");
+        case InstrumentKind::controller:
+        case InstrumentKind::midiOut:
+        case InstrumentKind::layer:
+        case InstrumentKind::dashboard:
+        case InstrumentKind::voltage:
+        case InstrumentKind::vfx:
+        case InstrumentKind::fruitydance:
+        case InstrumentKind::wasp:
+        case InstrumentKind::videoplayer:
+            return TR_NOOP ("This channel makes no sound of its own: there is nothing to freeze.");
+        default:
+            break;
+    }
+    if (c.instrument == InstrumentKind::plugin && c.plugin.id.empty())
+        return TR_NOOP ("This channel's plugin is not loaded: there is nothing to render.");
+    // audio that leaves the channel on other inserts would be folded into the one stem
+    if (c.instrument == InstrumentKind::plugin
+        && std::any_of (c.plugin.outputs.begin(), c.plugin.outputs.end(), [] (const PluginOutputRoute& r) { return r.offset != 0; }))
+        return TR_NOOP ("This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart.");
+    if (c.instrument == InstrumentKind::patcher && ! c.patcher.outputTracks.empty())
+        return TR_NOOP ("This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart.");
+    for (const auto& other : song.channels)
+        if (other.instrument == InstrumentKind::layer
+            && std::find (other.layer.children.begin(), other.layer.children.end(), channel) != other.layer.children.end())
+            return TR_NOOP ("A Layer channel plays this channel: remove it from the Layer to freeze it.");
+    // a controller link (Peak Controller, Envelope Controller...) moves the instrument's own knobs from what plays
+    // around it: the render of this channel alone would not hear that, and the frozen audio would differ
+    for (const auto& a : song.automations)
+        if (a.isLive() && a.target.kind == AutomationTargetKind::channelParam && a.target.index == channel)
+            return TR_NOOP ("A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it.");
+    // launched clips have no place on the timeline: a stem cannot follow them
+    if (song.performanceMode)
+        return TR_NOOP ("Performance mode launches clips live: a frozen channel could not follow them.");
+    if (song.clipGrid)
+        for (const auto& clip : song.clipGrid->clips)
+            if (clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size()
+                && std::any_of (song.patterns[(std::size_t) clip.pattern].notes.begin(), song.patterns[(std::size_t) clip.pattern].notes.end(),
+                                [channel] (const Note& n) { return n.channel == channel; }))
+                return TR_NOOP ("This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them.");
+    return nullptr;
+}
+
+void apply (Song& song, std::uint64_t channelUid, std::vector<StandIn> stems, std::string source)
+{
+    if (channelUid == 0)
+        return;
+    for (auto& c : song.channels)
+        if (c.uid == channelUid)
+        {
+            c.freeze.stems = std::move (stems);
+            c.freeze.source = std::move (source);
+            return;
+        }
+}
+
+void clear (Song& song, int channel)
+{
+    if (channel >= 0 && channel < (int) song.channels.size())
+        song.channels[(std::size_t) channel].freeze = {};
+}
+
+bool any (const Song& song) noexcept
+{
+    return std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.freeze.on(); });
+}
+
+Song thawed (Song song)
+{
+    for (auto& c : song.channels)
+        c.freeze = {};
+    return song;
+}
+
+void lighten (Song& s, int channel)
+{
+    for (int j = 0; j < (int) s.channels.size(); ++j)
+    {
+        if (j == channel)
+            continue;
+        const auto& old = s.channels[(std::size_t) j];
+        ChannelDef quiet;
+        quiet.name = old.name;
+        quiet.uid = old.uid;
+        quiet.muted = true;
+        s.channels[(std::size_t) j] = std::move (quiet);
+    }
+    for (auto& t : s.mixer)
+        for (auto& e : t.effects)
+        {
+            EffectSlot idle;
+            idle.kind = EffectKind::utility;
+            idle.enabled = false;
+            e = std::move (idle);
+        }
+    // what drove the swapped units has nothing to drive
+    auto gone = [channel] (const AutomationTarget& t) {
+        const bool ofChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                               || t.kind == AutomationTargetKind::channelParam;
+        return (ofChannel && t.index != channel) || refs::targetsInsert (t);
+    };
+    for (auto& a : s.automations)
+        if (gone (a.target))
+            a.target = {};
+    for (auto& p : s.patterns)
+        for (auto& lane : p.events)
+            if (gone (lane.target))
+                lane.target = {};
+    s.initialValues.erase (std::remove_if (s.initialValues.begin(), s.initialValues.end(), [&] (const Song::InitialValue& v) { return gone (v.target); }),
+                           s.initialValues.end());
+}
+} // namespace lynx::freeze

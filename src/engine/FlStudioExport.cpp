@@ -1,3 +1,4 @@
+#include "core/StandIns.h"
 #include "engine/FlStudioExport.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -60,10 +61,12 @@ flpexport::Options optionsFor (PluginHost* host, flpexport::LynxOnly mode, const
     return o;
 }
 
-bool exportProject (const Song& song, const flpexport::Options& options, const juce::File& target, bool zip,
+bool exportProject (const Song& project, const flpexport::Options& options, const juce::File& target, bool zip,
                     const juce::File& renderDir, double sampleRate, const RenderFn& render,
                     const std::function<bool (double, const juce::String&)>& progress, Written& written, juce::String& error)
 {
+    // Freeze (round 190ay) is LYNX's own: FL gets the project unfrozen, every channel with its plugin
+    const auto song = freeze::thawed (project);
     const auto plan = flpexport::planRenders (song, options);
     Song out = song;
     flpexport::Report rendered;

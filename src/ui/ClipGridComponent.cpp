@@ -5,6 +5,8 @@
 #include <cmath>
 
 #include "core/ClipLauncher.h"
+#include "core/DetailChain.h"
+#include "ui/ExportDialog.h"
 #include "engine/AudioEngine.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -146,7 +148,9 @@ public:
         const auto hit = hitTestCell (e.getPosition());
         if (e.mods.isPopupMenu())
         {
-            if (hit.scene >= 0 && hit.track < 0)
+            if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // (round 190ay: the track's own menu)
+                showHeaderMenu (t);
+            else if (hit.scene >= 0 && hit.track < 0)
                 showSceneMenu (hit.scene);
             else if (hit.track >= 0 && hit.scene >= 0)
                 showSlotMenu (hit.track, hit.scene);
@@ -378,7 +382,15 @@ private:
         g.setColour (c::textPrimary);
         g.setFont (theme::font (theme::type::small));
         const auto name = info != nullptr && ! info->name.empty() ? utf8 (info->name) : tr ("Track {0}", { juce::String (t + 1) });
-        g.drawText (name, r.reduced (6, 0).withTrimmedRight (taken ? 18 : 0), juce::Justification::centredLeft, true);
+        // Freeze (round 190ay): the track's instrument is frozen — the snowflake tag, the name dimmed
+        const auto frozen = frozenChannelOf (song, t) >= 0;
+        if (frozen)
+        {
+            g.setColour (c::textSecondary);
+            theme::drawFrozenTag (g, juce::Rectangle<float> ((float) r.getRight() - (taken ? 40.0f : 20.0f), (float) r.getCentreY() - 6.5f, 14.0f, 13.0f),
+                                  c::info.withAlpha (0.85f), c::bg1);
+        }
+        g.drawText (name, r.reduced (6, 0).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, true);
         if (taken)
         {
             // the Playlist's clips on this track are silent: a struck-out timeline mark
@@ -585,6 +597,42 @@ private:
         }
         menu.addSubMenu (tr ("After"), after);
         return menu;
+    }
+
+    // Freeze (round 190ay): a column is a Playlist track; its instrument is the channel its chain shows (core/DetailChain.h)
+    static int frozenChannelOf (const Song& song, int track)
+    {
+        const auto channel = detailchain::forTrack (song, track).channel;
+        return channel >= 0 && channel < (int) song.channels.size() && song.channels[(std::size_t) channel].freeze.on() ? channel : -1;
+    }
+
+    void showHeaderMenu (int track)
+    {
+        const auto& song = engine.getSong();
+        const auto channel = detailchain::forTrack (song, track).channel;
+        const auto valid = channel >= 0 && channel < (int) song.channels.size();
+        juce::PopupMenu menu;
+        if (! valid || ! song.channels[(std::size_t) channel].freeze.on())
+            menu.addItem (tr ("Freeze"), valid, false, [this, channel] {
+                freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
+                    if (safe != nullptr)
+                        safe->repaint();
+                });
+            });
+        else
+        {
+            menu.addItem (tr ("Unfreeze"), [this, channel] {
+                unfreezeChannel (engine, channel);
+                repaint();
+            });
+            menu.addItem (tr ("Re-freeze"), [this, channel] {
+                freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
+                    if (safe != nullptr)
+                        safe->repaint();
+                });
+            });
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
     void showSceneMenu (int scene)

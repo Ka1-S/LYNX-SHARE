@@ -202,6 +202,9 @@ inline juce::String caps (const juce::String& text)
 // g.setColour (colour) + g.fillRoundedRectangle, faster where the frame is drawn on the CPU (Linux): nothing outside the
 // clip, a plain rectangle when the clip misses the corners, the shape (or a big one's corners) from a cached sprite.
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour);
+// The frozen mark (round 190ay, Freeze): a small tag with a six-armed snowflake, in the shape of the stand-in tag. `tag`
+// is the tag's fill (the info colour while the frozen audio is up to date, the warning colour when it needs attention).
+void drawFrozenTag (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour tag, juce::Colour flake);
 
 // FL's number wheel ("digiwheel": channel RANGE / TRACK, the rack's insert box) in the LYNX skin: a dark inset display,
 // red only while hovered or dragged. Draws the box (with FL's small up / down marks at its right when `marks`); returns

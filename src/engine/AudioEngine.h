@@ -105,6 +105,17 @@ public:
         return std::find (standInInserts.begin(), standInInserts.end(), track) != standInInserts.end();
     }
 
+    // Freeze (round 190ay, core/StandIns.h lynx::freeze): a frozen channel plays its rendered audio and its instrument is
+    // not loaded. frozenAudioMissing: its audio is not on disk (as of the last publish), so it plays its instrument
+    // instead — never silence. freezeOutOfDate: the notes, tempo or arrangement it was rendered from changed since
+    // (worked out on demand, once per edit of the song). Where the audio goes: next to the project's recordings. UI thread.
+    bool frozenAudioMissing (int channel) const noexcept
+    {
+        return std::find (frozenMissing.begin(), frozenMissing.end(), channel) != frozenMissing.end();
+    }
+    bool freezeOutOfDate (int channel);
+    juce::File getFreezeFolder() const { return recordingFolder.getSiblingFile ("Frozen"); }
+
     // Third-party plugins from the last imported .flp that were not found among the scanned ones.
     const juce::StringArray& getMissingPlugins() const noexcept { return missingPlugins; }
     // "plugin → file (how it was found)" for the plugins of the last imported .flp
@@ -1129,6 +1140,13 @@ private:
     std::function<std::shared_ptr<Effect>()> externalEffect;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
+    std::vector<int> frozenMissing;                    // (frozenAudioMissing)
+    struct FreezeCheck
+    {
+        std::uint64_t stamp = 0;
+        bool outOfDate = false;
+    };
+    std::vector<FreezeCheck> freezeChecks;             // [channel] (freezeOutOfDate)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
     // audio thread let go of are freed from a message of their own, not inside the timer callback that collected them.
     // A plugin whose editor is open dies when its window goes (the window closes the editor first). Declared after the

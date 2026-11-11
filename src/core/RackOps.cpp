@@ -842,6 +842,7 @@ int cloneChannel (Song& song, int index)
         return -1;
 
     auto copy = song.channels[(std::size_t) index];
+    copy.freeze = {}; // (round 190ay: the clone plays its own instrument; the frozen audio is the original's)
     const auto base = copy.name;
 
     for (int n = 2;; ++n)
