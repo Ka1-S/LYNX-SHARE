@@ -246,6 +246,8 @@ cc 70 = channel.volume selected
 note 36-43 ch 10 = pad.step
 note 60-67 ch 10 = pad.note key=36
 cc 9 ch 16 value 2 = transport.record
+note 98 ch 1 = ignore               # a shift key
+cc 0-127 ch 16 = ignore             # everything else on the control channel
 
 [feedback]
 mixer.solo = cc 32-39 ch 1
@@ -290,7 +292,7 @@ TEST (controller190aw_profile_file_parses_and_reports_errors_by_line)
     // the knob box: any channel, a value filter, 'selected', inline comments, LED values
     const auto knobs = parseProfile (knobProfile, "knobs");
     CHECK (knobs.ok());
-    CHECK (knobs.profile.bindings.size() == 10 && knobs.profile.group.empty());
+    CHECK (knobs.profile.bindings.size() == 12 && knobs.profile.group.empty());
     CHECK (knobs.profile.bindings[0].pickup && knobs.profile.bindings[0].mode == ValueMode::absolute);
     CHECK (knobs.profile.bindings[6].message.channel == -1 && knobs.profile.bindings[6].strip == selectedStrip);
     CHECK (knobs.profile.bindings[8].key == 36 && knobs.profile.bindings[9].value == 2 && knobs.profile.bindings[9].message.channel == 15);
@@ -644,6 +646,10 @@ TEST (controller190aw_soft_takeover_for_knobs_and_sliders_without_motors)
     CHECK (feed (s, lynx, shared, { 0x99, 36 + 4, 90 }) && feed (s, lynx, shared, { 0x89, 36 + 4, 0 }) && lynx.did ("step 4 on") && lynx.stepsOn[4]);
     CHECK (feed (s, lynx, shared, { 0x99, 62, 127 }) && lynx.did ("note on 38 1.000") && feed (s, lynx, shared, { 0x89, 62, 0 }) && lynx.did ("note off 38 0.000"));
     CHECK (feed (s, lynx, shared, { 0xBF, 9, 1 }) && ! lynx.recording && feed (s, lynx, shared, { 0xBF, 9, 2 }) && lynx.recording);
+    // ignored controls are taken (they do not play) and do nothing; the first matching line wins
+    lynx.log.clear();
+    CHECK (feed (s, lynx, shared, { 0x90, 98, 127 }) && feed (s, lynx, shared, { 0xBF, 74, 127 }) && lynx.log.empty());
+    CHECK (Claims (s.profile()).has (std::array<std::uint8_t, 3> { 0x90, 98, 127 }.data(), 3) && ! feed (s, lynx, shared, { 0x91, 98, 127 }));
     s.refresh (lynx, shared, wire.send());
     CHECK (wire.has ("B0 29 7F") && wire.has ("99 28 03") && wire.messages.size() == 2);
 }

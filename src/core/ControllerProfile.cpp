@@ -131,6 +131,7 @@ const Named actions[] = {
     { "pad.note", (int) Action::padNote, 0 },
     { "pad.step", (int) Action::padStep, 0 },
     { "layer", (int) Action::layer, 0 },
+    { "ignore", (int) Action::none, 0 },
 };
 
 const Named feedbacks[] = {

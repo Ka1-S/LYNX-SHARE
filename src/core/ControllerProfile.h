@@ -48,7 +48,7 @@ enum class ValueMode : std::uint8_t
 
 enum class Action : std::uint8_t
 {
-    none,
+    none,             // "ignore": the message is taken and does nothing (a button LYNX has no use for must not play a note)
     command,          // arg = Command
     jog,              // relative: the song position
     mixerVolume, mixerPan, mixerMute, mixerSolo, mixerArm, mixerSelect, mixerTouch, // strip

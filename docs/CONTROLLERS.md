@@ -136,6 +136,7 @@ first element's.
 | `pad.note` | Plays a note on the selected channels: `key=` is the first element's note. |
 | `pad.step` | Toggles a step of the selected channel in the current pattern. |
 | `layer <name>` | Switches to a layer. |
+| `ignore` | Takes the message and does nothing. For buttons LYNX has no use for: without a line they would play as notes or controllers. Lines are read top to bottom and the first match wins, so a catch-all such as `cc 0-127 ch 16 = ignore` goes last. |
 
 Options:
 
