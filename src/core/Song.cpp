@@ -1166,7 +1166,10 @@ void set (SamplerSettings& s, int param, float value) noexcept
     }
     // like editing the knob by hand: the envelope / filter replace FL's imported voice (REA_rodada69 §3, REA_rodada76)
     if (param <= release)
+    {
         s.flVolumeEnvelope.clear();
+        s.flmPad.clear();
+    }
     if (param <= resonance)
         s.flChannel.clear();
 }

@@ -10,6 +10,9 @@
 
 #include "core/DirectWave.h"
 #include "core/FlmEffects.h"
+#include "core/FlmNoteFx.h"
+#include "core/FlmPad.h"
+#include "core/SoundFont.h"
 #include "core/GmsMobile.h"
 #include "core/MiniSynth.h"
 #include "core/TransistorBass.h"
@@ -69,6 +72,7 @@ struct Ctx
     Song song;
     std::map<std::string, int> audioChannels; // resolved path | pitch | insert → audioClip channel
     std::set<std::string> missingSeen;
+    int cutGroups = 0;    // cut-group ids handed out (drum pads, round 190bs)
     int stepsPerBeat = 4; // TDIV's second byte (the song's +0xa9): the grid's steps per beat, and 384 / it = the modules' tick rate
 
     explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report) {}
@@ -201,6 +205,18 @@ float flmGain (float v) noexcept
     return (float) std::pow (10.0, 3.3 * std::pow ((double) v, 0.6) - 3.0);
 }
 
+// LYNX's channel volume for a linear gain up to 1: the inverse of channelGain, (11^v − 1) / 10
+float channelVolumeFor (double gain) noexcept
+{
+    return (float) std::clamp (std::log (10.0 * std::max (0.0, gain) + 1.0) / std::log (11.0), 0.0, 1.0);
+}
+
+// A sample slot's parameter with the app's default for a file that stores fewer (FLM_FORMAT §6.1)
+float slotParam (const flm::SampleRef& s, int index) noexcept
+{
+    return std::clamp (s.param (index, flm::samplepad::defaults[index]), 0.0f, 1.0f);
+}
+
 // FLM's 3x Osc against LYNX's 3x Osc at the same velocity (A/B inside FL, round 190u): the level is the same
 // (0.00 dB on the default patch) and FLM sounds one octave below the desktop plugin (key 60 with coarse 0 = 261.6 Hz,
 // the desktop's 523.3 Hz), so the channel's pitch carries −12 semitones
@@ -228,8 +244,11 @@ float panOf (const flm::Event& e) noexcept
 // - slide (byte 19, note lanes only: a drum lane plays it as a hit): no note-on; the held note (the highest plain note
 //   sounding at the slide's start) glides to the slide's key over the slide's length — LYNX's slide note. A slide
 //   with no held note plays nothing in FLM and is dropped. Not converted: FLM also glides the velocity and the pan.
+// Round 190bs: `fx` = the rack's note effects, run over a note lane's notes before `channelFor` (core/FlmNoteFx.h);
+// `shifts` = a drum lane's time shift per kit sample, in beats (a note never starts before the clip does).
 template <typename ChannelFor>
-int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool drums, double swing, ChannelFor channelFor)
+int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool drums, double swing, ChannelFor channelFor,
+                flmnotefx::Chain* fx = nullptr, const std::vector<double>* shifts = nullptr)
 {
     Pattern p;
     p.name = name;
@@ -242,10 +261,17 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool d
                 return true;
         return false;
     };
-    int repeats = 0, slides = 0, orphans = 0, pans = 0, pitches = 0;
+    int repeats = 0, slides = 0, orphans = 0, pans = 0, pitches = 0, held_back = 0, shifted = 0;
     for (const auto& e : clip.events)
     {
-        const auto [channel, key] = channelFor (e.key);
+        flmnotefx::Note played { e.key, velocityOf (e), e.pan == 127 ? 0.5f : (float) e.pan / 255.0f };
+        const auto effects = fx != nullptr && ! drums && e.key >= 0 && ! fx->empty();
+        if (effects && ! fx->apply (played))
+        {
+            ++held_back;
+            continue;
+        }
+        const auto [channel, key] = channelFor (effects ? played.key : e.key);
         if (channel < 0)
             continue;
         const auto slide = ! drums && e.slide != 0;
@@ -257,12 +283,18 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool d
         Note n;
         n.channel = channel;
         n.key = std::clamp (key, 0, 127);
-        n.start = ticksOf ((double) e.tick / flm::ticksPerBeat);
+        auto startBeat = (double) e.tick / flm::ticksPerBeat;
+        if (drums && shifts != nullptr && e.key >= 0 && e.key < (int) shifts->size() && (*shifts)[(std::size_t) e.key] != 0.0)
+        {
+            startBeat = std::max (0.0, startBeat + (*shifts)[(std::size_t) e.key]);
+            ++shifted;
+        }
+        n.start = ticksOf (startBeat);
         if (n.start >= p.lengthTicks)
             continue;
         n.length = std::clamp<std::int64_t> (ticksOf (e.length), 1, p.lengthTicks - n.start);
-        n.velocity = velocityOf (e);
-        n.pan = panOf (e);
+        n.velocity = effects ? played.velocity : velocityOf (e);
+        n.pan = effects && played.pan != (e.pan == 127 ? 0.5f : (float) e.pan / 255.0f) ? std::clamp (2.0f * played.pan - 1.0f, -1.0f, 1.0f) : panOf (e);
         pans += n.pan != 0.0f ? 1 : 0;
         n.slide = slide;
         slides += slide ? 1 : 0;
@@ -277,7 +309,7 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool d
         p.notes.push_back (n);
         if (e.repeat > 0 && ! slide)
         {
-            const auto startBeats = (double) e.tick / flm::ticksPerBeat;
+            const auto startBeats = startBeat;
             const auto odd = ((int) (startBeats * 4.0) & 1) != 0;
             const auto step = odd ? 0.25 - swing * 0.125 : 0.25 + swing * 0.125;
             const auto end = n.start + n.length;
@@ -305,6 +337,8 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool d
     count (pitches, "FL Studio Mobile: drum note pitch");
     count (repeats, "FL Studio Mobile: note repeat (extra hits)");
     count (slides, "FL Studio Mobile: slide note");
+    count (shifted, "FL Studio Mobile: drum pad time shift");
+    count (held_back, "FL Studio Mobile: notes a note effect holds back (silent in FLM too)");
     if (orphans > 0 && ctx.report != nullptr)
         ctx.report->unsupported["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] += orphans;
     return (int) ctx.song.patterns.size() - 1;
@@ -654,16 +688,99 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
-// The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
-// generator → the built-in synth, listed in the report until its engine is mapped, F4).
-ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
+// FLM's SoundFont Player (type 52) → LYNX Soundfont (round 190bs; FLM_FORMAT §7.3, PROVEN-REA unless noted). The
+// module's own state (CSTM) is one chunk "SF2D": the font's path (u32 length + text) and the chosen preset's index in
+// the font (i32). Parameters: 1 Attack, 2 Decay, 3 Sustain, 4 Release, 5 Envelope (above 0.5 = Custom: the four knobs
+// replace the font's envelope; else Original).
+// Custom times: T = max(0.005, (0.95·v + 0.05)³ · 10) seconds. FLM's attack reaches the top after T; its decay and
+// release are exponential and fall 40 dB in T. LYNX Soundfont's decay and release knobs are SoundFont times (100 dB),
+// so they get 2.5·T: the same slope, an approximation where LYNX's envelope shape differs. Sustain: the gain
+// 10^(−5 + 5·(n / 127)^0.2), n = round(127·v) kept in 1…127. FLM plays velocities linearly: the linear velocity curve.
+bool soundFontState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    const auto& o = ctx.options.common;
+    const auto& b = m.custom;
+    const auto u32 = [&b] (std::size_t at) {
+        std::uint32_t v = 0;
+        for (int k = 0; k < 4; ++k)
+            v |= (std::uint32_t) b[at + (std::size_t) k] << (8 * k);
+        return v;
+    };
+    std::string saved;
+    int patch = 0;
+    if (b.size() >= 12 && std::memcmp (b.data(), "SF2D", 4) == 0)
+    {
+        const auto length = (std::size_t) u32 (8);
+        if (length <= b.size() - 12)
+        {
+            saved.assign ((const char*) b.data() + 12, length);
+            if (const auto zero = saved.find ('\0'); zero != std::string::npos)
+                saved.resize (zero);
+            if (12 + length + 4 <= b.size())
+                patch = (int) u32 (12 + length);
+        }
+    }
+    if (saved.empty())
+        saved = m.presetFile;
+    if (saved.empty())
+        return false;
+    std::vector<std::string> candidates = ctx.deviceCandidates (saved);
+    const auto file = pathFileName (saved);
+    if (! ctx.options.resourceRoot.empty())
+    {
+        candidates.push_back (joinPath (ctx.options.resourceRoot, saved));
+        candidates.push_back (joinPath (joinPath (ctx.options.resourceRoot, "SoundFonts"), file));
+    }
+    candidates.push_back (joinPath (o.projectFolder, file));
+    candidates.push_back (saved);
+    const auto name = c.name;
+    const auto font = ctx.resolve (candidates, name);
+    // the preset: FLM stores its place in the font's preset list (the list's order = the file's: INFERRED)
+    int bank = 0, program = 0;
+    bool presetFound = patch == 0;
+    if (! font.empty() && o.readFile)
+        if (const auto info = sf::scanFont (o.readFile (font)); info.valid && patch >= 0 && patch < (int) info.presets.size())
+        {
+            bank = info.presets[(std::size_t) patch].bank;
+            program = info.presets[(std::size_t) patch].program;
+            presetFound = true;
+        }
+    const auto mixer = c.mixerTrack;
+    c = sf::makeChannel (font, bank, program);
+    c.name = name;
+    c.mixerTrack = mixer;
+    c.volume = 1.0f;
+    const auto v = [&m] (std::size_t i, float fallback) { return i < m.params.size() ? std::clamp (m.params[i], 0.0f, 1.0f) : fallback; };
+    c.modelParams[sf::pVelocityCurve] = 1.0f;
+    if (v (5, 0.0f) > 0.5f)
+    {
+        const auto seconds = [&v] (std::size_t i, float fallback) {
+            const auto t = 0.95 * (double) v (i, fallback) + 0.05;
+            return std::max (0.005, t * t * t * 10.0);
+        };
+        const auto knob = [] (double s) { return (float) std::clamp (std::log (s / 0.001) / std::log (20000.0), 1.0e-4, 1.0); };
+        c.modelParams[sf::pAttack] = knob (seconds (1, 0.0f));
+        c.modelParams[sf::pDecay] = knob (2.5 * seconds (2, 0.0f));
+        c.modelParams[sf::pRelease] = knob (2.5 * seconds (4, 0.0f));
+        const auto n = std::clamp ((int) std::lround (127.0 * (double) v (3, 1.0f)), 1, 127);
+        c.modelParams[sf::pSustain] = (float) std::max (1.0e-4, std::pow (10.0, -5.0 + 5.0 * std::pow (n / 127.0, 0.2)));
+    }
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: SoundFont Player (LYNX Soundfont)");
+    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: SoundFont Player (level and envelope shape approximated)");
+    if (! presetFound)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: SoundFont Player preset not found in the font (first preset used)");
+    return true;
+}
+
+// The channel playing one of a rack's generators (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
+// generator → its LYNX engine, or the built-in synth listed in the report until its engine is mapped, F4).
+ChannelDef instrumentChannel (Ctx& ctx, const flm::Module* gen, const flm::Channel& ch, int insert)
 {
     ChannelDef c;
     c.name = ch.name.empty() ? ch.typeName : ch.name;
     c.mixerTrack = insert;
     c.volume = 1.0f; // 0 dB: FLM's level is the rack's, on the channel's insert (F2)
-    const auto gen = std::find_if (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) { return flm::isGenerator (m.type); });
-    if (gen == rack.modules.end())
+    if (gen == nullptr)
     {
         ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: channel without an instrument");
         return c;
@@ -698,28 +815,49 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
         return c;
     if (gen->type == flm::module::gmSynth && gmSynthState (ctx, *gen, c))
         return c;
+    if (gen->type == flm::module::soundFont && soundFontState (ctx, *gen, c))
+        return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;
 }
 
-int audioChannelFor (Ctx& ctx, const std::string& path, int insert, const std::string& name)
+// The channel an audio clip plays on: one per file, insert and `variant` (the clip's Speed in semitones on the channel's
+// pitch, which resamples as FLM's Speed does; a channel that keeps the pitch for stretched clips; a channel of its own
+// for a clip with a level or pan envelope)
+int audioChannelFor (Ctx& ctx, const std::string& path, int insert, const std::string& name, const std::string& variant = {},
+                     float semitones = 0.0f, bool keepPitch = false)
 {
-    const auto key = path + "|" + std::to_string (insert);
+    const auto key = path + "|" + std::to_string (insert) + variant;
     if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
         return it->second;
     ChannelDef c;
     c.name = name.empty() ? fileStem (path) : name;
     c.instrument = InstrumentKind::audioClip;
     c.samplePath = path;
-    c.volume = 10000.0f / 12800.0f; // a Playlist audio clip at unity (as the .als import, Instruments.cpp audioClipUnity)
+    c.volume = audioClipUnityVolume; // a Playlist audio clip at unity (as the .als import, Instruments.cpp audioClipUnity)
     c.mixerTrack = insert;
+    c.sampler.pitch = semitones;
+    c.sampler.keepPitch = keepPitch;
     ctx.song.channels.push_back (std::move (c));
     const auto index = (int) ctx.song.channels.size() - 1;
     ctx.audioChannels[key] = index;
     return index;
 }
 
-void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const std::string& user)
+void addAutomationClips (Ctx& ctx, const flm::Lane& lane, AutomationTarget target, const std::function<float (std::uint16_t)>& valueOf, int rowIndex,
+                         const std::string& name);
+
+// An audio clip (round 190bs: FLM_FORMAT §6.1, PROVEN-REA). The clip's sample is a slot like a drum pad's, with the
+// same eleven parameters, and the clip's own events move them (|key| − 1 = the parameter, value u16 / 65534):
+// - Level → the clip's gain; a Level that moves → the clip's gain is its top and LYNX automates the volume of a
+//   channel the clip has to itself; Pan likewise;
+// - Speed (whole semitones, a resampling) → the channel's pitch; the sample's own pitch (whole semitones, the length
+//   stays) → the clip's pitch; its stretch (a length ratio, used only with a stretch mode other than 0) → the clip's
+//   stretch on a channel that keeps the pitch;
+// - Mute, reverse → the clip's;
+// - a clip longer than its loop starts the sample again at every loop length: one LYNX clip per pass.
+// `envelopeRow` = the Playlist row of this lane's clip envelopes (−1 until one is needed).
+void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const std::string& user, int& envelopeRow)
 {
     if (! clip.sample)
         return;
@@ -730,22 +868,186 @@ void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const s
     const auto length = clip.timelineLength();
     if (length <= 1e-9)
         return;
+    namespace sp = flm::samplepad;
+    const auto unit = [] (const flm::Event& e) { return std::min ((float) e.value / 65534.0f, 1.0f); };
+
+    std::vector<flm::Event> levelEvents, panEvents;
+    auto speed = slotParam (s, sp::speed);
+    bool haveSpeed = false, speedMoves = false, others = false;
+    for (const auto& e : clip.events)
+    {
+        const auto index = std::abs (e.key) - 1;
+        if (index == sp::level)
+            levelEvents.push_back (e);
+        else if (index == sp::pan)
+            panEvents.push_back (e);
+        else if (index == sp::speed)
+        {
+            speedMoves = speedMoves || (haveSpeed && unit (e) != speed);
+            if (! haveSpeed)
+                speed = unit (e);
+            haveSpeed = true;
+        }
+        else
+            others = true;
+    }
+    double gain = flmpad::levelGain (slotParam (s, sp::level)), peak = 0.0;
+    bool levelMoves = false;
+    if (! levelEvents.empty())
+    {
+        for (const auto& e : levelEvents)
+        {
+            peak = std::max (peak, (double) flmpad::levelGain (unit (e)));
+            levelMoves = levelMoves || unit (e) != unit (levelEvents.front());
+        }
+        gain = levelMoves ? peak : (double) flmpad::levelGain (unit (levelEvents.front()));
+    }
+    auto pan = std::clamp (2.0f * slotParam (s, sp::pan) - 1.0f, -1.0f, 1.0f);
+    bool panMoves = false;
+    if (! panEvents.empty())
+    {
+        for (const auto& e : panEvents)
+            panMoves = panMoves || unit (e) != unit (panEvents.front());
+        pan = panMoves ? 0.0f : std::clamp (2.0f * unit (panEvents.front()) - 1.0f, -1.0f, 1.0f);
+    }
+    const auto semitones = flmpad::speedSemitones (speed);
+    const auto stretched = s.stretchMode != 0 && s.stretch > 0.0 && std::abs (s.stretch - 1.0) > 1e-6;
+    auto variant = semitones != 0 ? "|p" + std::to_string (semitones) : std::string();
+    if (stretched)
+        variant += "|k";
+    if (levelMoves || panMoves)
+        variant += "|e" + std::to_string (ctx.song.channels.size());
+    const auto channel = audioChannelFor (ctx, path, insert, fileStem (path), variant, (float) semitones, stretched);
+
     Clip c;
     c.kind = ClipKind::audio;
-    c.channel = audioChannelFor (ctx, path, insert, fileStem (path));
+    c.channel = channel;
     c.track = row;
-    c.start = ticksOf ((double) clip.startTick / flm::ticksPerBeat);
-    c.length = std::max<std::int64_t> (1, ticksOf (length));
-    c.offset = std::max<std::int64_t> (0, ticksOf (clip.offset));
-    if (std::abs (s.pitch) > 1e-9)
+    c.gain = std::abs (gain - 1.0) < 1.0e-4 ? 1.0f : (float) gain;
+    c.pan = pan;
+    c.muted = slotParam (s, sp::mute) > 0.5f;
+    c.reversed = s.reverse;
+    if (const auto pitch = std::round (s.pitch); pitch != 0.0) // (FLM shifts by whole semitones)
     {
-        c.pitch = (float) std::clamp (s.pitch, -12.0, 12.0);
-        if (std::abs (s.pitch) > 12.0)
+        c.pitch = (float) std::clamp (pitch, -12.0, 12.0);
+        if (std::abs (pitch) > 12.0)
             ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip pitch beyond ±12 semitones");
     }
-    if (std::abs (s.stretch - 1.0) > 1e-6)
-        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip time-stretch (played unstretched)");
-    ctx.song.playlist.push_back (c);
+    if (stretched)
+    {
+        c.stretch = s.stretch;
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip time-stretch (LYNX's stretcher, approximated)");
+    }
+    const auto start = (double) clip.startTick / flm::ticksPerBeat;
+    const auto passes = passesOf (clip);
+    for (const auto& pass : passes)
+    {
+        auto one = c;
+        one.start = ticksOf (start + pass.at);
+        one.length = std::max<std::int64_t> (1, ticksOf (pass.length));
+        one.offset = std::max<std::int64_t> (0, ticksOf (pass.from));
+        ctx.song.playlist.push_back (one);
+    }
+    if (passes.size() > 1)
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: looped audio clip");
+
+    if (c.gain != 1.0f || levelMoves)
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: audio clip level");
+    if (c.pan != 0.0f || panMoves)
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: audio clip pan");
+    if (semitones != 0)
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: audio clip speed");
+    if (levelMoves || panMoves)
+    {
+        if (envelopeRow < 0)
+        {
+            PlaylistTrack t;
+            t.name = user + " (clip envelope)";
+            ctx.song.playlistTracks.push_back (t);
+            envelopeRow = (int) ctx.song.playlistTracks.size() - 1;
+        }
+        flm::Lane lane;
+        lane.clips.push_back (clip);
+        lane.clips.front().sample.reset();
+        const auto& rowName = ctx.song.playlistTracks[(std::size_t) envelopeRow].name;
+        if (levelMoves)
+        {
+            lane.clips.front().events = levelEvents;
+            const auto unity = (double) channelGain (audioClipUnityVolume);
+            addAutomationClips (ctx, lane, AutomationTarget { AutomationTargetKind::channelVolume, channel, 0, 0 }, [peak, unity] (std::uint16_t raw) {
+                const auto g = (double) flmpad::levelGain (std::min ((float) raw / 65534.0f, 1.0f));
+                return channelVolumeFor (unity * g / std::max (peak, 1.0e-9));
+            }, envelopeRow, rowName);
+        }
+        if (panMoves)
+        {
+            lane.clips.front().events = panEvents;
+            addAutomationClips (ctx, lane, AutomationTarget { AutomationTargetKind::channelPan, channel, 0, 0 },
+                                [] (std::uint16_t raw) { return std::min ((float) raw / 65534.0f, 1.0f); }, envelopeRow, rowName);
+        }
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: audio clip envelope (automation)");
+    }
+    if (speedMoves)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip Speed automation (the first value is used)");
+    if (others)
+        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: audio clip automation of other sample settings (not imported)");
+    if (slotParam (s, sp::solo) > 0.5f)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip Solo (not imported)");
+    if (slotParam (s, sp::egAttack) >= 0.001f || slotParam (s, sp::egSustain) < 1.0f || slotParam (s, sp::length) > 0.0f
+        || std::abs (slotParam (s, sp::start) - 0.5f) > 1.0e-6f)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip envelope, Length or Sample Start (not imported)");
+}
+
+// A drum pad's own settings on its sampler channel (round 190bs; the laws: core/FlmPad.h, FLM_FORMAT §6.1). Level → the
+// channel's volume (above 0 dB: the sampler's gain), Pan → its pan, Speed → the sampler's pitch, Mute / another pad's
+// Solo → muted, reverse → reversed; EG A/D/S/R, Length and Sample Start → FLM's own pad envelope in the sampler
+// (SamplerSettings::flmPad), kept only when one of them does something. `hold` = the kit's lane holds its notes.
+void applyPad (Ctx& ctx, const flm::SampleRef& s, ChannelDef& c, bool soloElsewhere, bool hold)
+{
+    namespace sp = flm::samplepad;
+    bool changed = false;
+    if (const auto gain = (double) flmpad::levelGain (slotParam (s, sp::level)); std::abs (gain - 1.0) >= 1.0e-4)
+    {
+        if (gain < 1.0)
+            c.volume = channelVolumeFor (gain);
+        else
+            c.sampler.gainDb = (float) (20.0 * std::log10 (gain));
+        changed = true;
+    }
+    if (const auto pan = std::clamp (2.0f * slotParam (s, sp::pan) - 1.0f, -1.0f, 1.0f); pan != 0.0f)
+    {
+        c.pan = pan;
+        changed = true;
+    }
+    if (const auto semitones = flmpad::speedSemitones (slotParam (s, sp::speed)); semitones != 0)
+    {
+        c.sampler.pitch = (float) semitones;
+        changed = true;
+    }
+    const auto solo = slotParam (s, sp::solo) > 0.5f;
+    if (slotParam (s, sp::mute) > 0.5f || (soloElsewhere && ! solo))
+    {
+        c.muted = true;
+        changed = true;
+    }
+    if (s.reverse)
+    {
+        c.sampler.reverse = true;
+        changed = true;
+    }
+    const auto attack = slotParam (s, sp::egAttack), sustain = slotParam (s, sp::egSustain), length = slotParam (s, sp::length),
+               start = slotParam (s, sp::start);
+    if (attack >= 0.001f || sustain < 1.0f || length > 0.0f || std::abs (start - 0.5f) > 1.0e-6f || hold)
+    {
+        c.sampler.flmPad = { attack, slotParam (s, sp::egDecay), sustain, slotParam (s, sp::egRelease), length, start, hold ? 1.0f : 0.0f };
+        changed = true;
+    }
+    if (changed)
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum pad settings (level, pan, speed, mute, envelope)");
+    if (s.outputChannel >= 0)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum pad sent to another channel (plays in its own)");
+    if ((s.stretchMode != 0 && std::abs (s.stretch - 1.0) > 1e-6) || std::abs (std::round (s.pitch)) >= 1.0)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum pad time-stretch or pitch shift (played as recorded)");
 }
 // An automation lane on the rack itself (module 0) that LYNX has a target for: Level, Pan and the send levels
 // (FLM_FORMAT §3, the rack's parameter names PROVEN-REA 0x18059eb20). A module's parameters wait for their engines
@@ -993,14 +1295,29 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         // effects (F5): the mapped ones on the insert, in the rack's order (core/FlmEffects.h); the others are listed.
         // Generators past the first are not imported yet; analysis-only modules change nothing.
         std::map<std::uint32_t, MappedModule> mappedModules; // instance id → its slots
-        bool firstGenerator = true;
+        // Round 190bs (PROVEN-REA: the rack's note dispatch 0x18059bfa0 and render 0x18059d3b0). Every generator of the
+        // rack plays every note inside its key range: they all become channels, under a Layer when there are two or
+        // more. The rack's note effects run over its notes first, wherever they sit (core/FlmNoteFx.h). The rack's audio
+        // is one buffer the modules work on in order, so an effect only hears the generators before it: on a LYNX
+        // insert it hears them all, which is listed.
+        std::vector<const flm::Module*> generators;
+        flmnotefx::Chain noteFx;
+        bool effectSeen = false, generatorAfterEffect = false;
         for (const auto& m : rack.modules)
         {
             if (flm::isGenerator (m.type))
             {
-                if (! firstGenerator)
-                    ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (m.type) + " (second instrument in a rack)");
-                firstGenerator = false;
+                generators.push_back (&m);
+                generatorAfterEffect = generatorAfterEffect || effectSeen;
+                continue;
+            }
+            if (flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect)
+            {
+                const auto on = m.params.empty() || m.params[0] >= 0.5f;
+                if (noteFx.add (m.type, m.params))
+                    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: " + moduleLabel (m.type) + " (note effect)");
+                else if (on)
+                    ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (note effect, not converted)");
                 continue;
             }
             if (m.type == flm::module::tuner || m.type == flm::module::analyzer)
@@ -1020,6 +1337,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (the insert's effect slots are full)");
                 continue;
             }
+            effectSeen = true;
             mappedModules[m.instanceId] = { &m, insert, (int) effects.size(), (int) mapped.slots.size() };
             for (auto& slot : mapped.slots)
                 effects.push_back (std::move (slot));
@@ -1027,6 +1345,11 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             for (const auto& what : mapped.partial)
                 ctx.note (&FlpImportReport::partialEffects, what);
         }
+
+        if (generatorAfterEffect)
+            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: an instrument placed after an effect in its rack (the effect processes it too)");
+        if (noteFx.random())
+            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: Randomizer (drawn once at import; FLM draws at every playback)");
 
         // the rack's held pitch bend on a channel it creates
         const auto bend = [&] (ChannelDef& c) {
@@ -1040,20 +1363,51 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             else
                 ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: channel pitch bend on an instrument other than a sampler (not imported)");
         };
-        int instrument = -1;          // this channel's instrument (note lanes)
+        int instrument = -1;          // this channel's instrument (note lanes): a Layer when the rack has several
+        int keyLow = 0, keyHigh = 127; // a single instrument's key range (a Layer's children have their own)
         std::vector<int> kitChannels; // this channel's drum kit (drum lanes)
         const auto instrumentIndex = [&] {
-            if (instrument < 0)
+            if (instrument >= 0)
+                return instrument;
+            if (generators.size() <= 1)
             {
-                song.channels.push_back (instrumentChannel (ctx, rack, ch, insert));
+                song.channels.push_back (instrumentChannel (ctx, generators.empty() ? nullptr : generators.front(), ch, insert));
                 instrument = (int) song.channels.size() - 1;
                 bend (song.channels.back());
+                if (! generators.empty())
+                {
+                    keyLow = song.channels.back().keyLow = generators.front()->keyLow;
+                    keyHigh = song.channels.back().keyHigh = generators.front()->keyHigh;
+                }
+                return instrument;
             }
+            ChannelDef layer;
+            layer.name = name;
+            layer.instrument = InstrumentKind::layer;
+            layer.mixerTrack = insert;
+            layer.volume = 1.0f; // (a Layer multiplies its children by its own volume: 0 dB)
+            song.channels.push_back (std::move (layer));
+            instrument = (int) song.channels.size() - 1;
+            for (const auto* g : generators)
+            {
+                auto c = instrumentChannel (ctx, g, ch, insert);
+                c.name = name + " (" + moduleLabel (g->type) + ")";
+                c.keyLow = g->keyLow;
+                c.keyHigh = g->keyHigh;
+                bend (c);
+                song.channels.push_back (std::move (c));
+                song.channels[(std::size_t) instrument].layer.children.push_back ((int) song.channels.size() - 1);
+            }
+            ctx.note (&FlpImportReport::converted, "FL Studio Mobile: rack with several instruments (Layer)");
             return instrument;
         };
         const auto kitIndex = [&] {
             if (kitChannels.empty())
             {
+                const auto soloed = std::any_of (rack.kit.begin(), rack.kit.end(), [] (const flm::SampleRef& s) { return slotParam (s, flm::samplepad::solo) > 0.5f; });
+                const auto holds = std::any_of (ch.lanes.begin(), ch.lanes.end(), [] (const flm::Lane& l) {
+                    return l.kind() == flm::LaneKind::drums && l.holdsNotes() && ! l.clips.empty();
+                });
                 for (std::size_t k = 0; k < rack.kit.size(); ++k)
                 {
                     const auto& s = rack.kit[k];
@@ -1065,9 +1419,45 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     c.samplePath = ctx.resolveSample (s, name + ": " + c.name);
                     c.mixerTrack = insert;
                     c.volume = 1.0f;
+                    applyPad (ctx, s, c, soloed, holds);
+                    if (! s.polyphonic)
+                        c.sampler.cut = true; // a new hit silences the pad's own voices
                     bend (c);
                     song.channels.push_back (std::move (c));
                     kitChannels.push_back ((int) song.channels.size() - 1);
+                }
+                // cut groups A / B / C: a hit silences the group's other pads (FLM_FORMAT §6.1). LYNX's cut groups
+                // also cut the channel that plays: exact for a pair (two one-way links), listed for bigger groups
+                // whose pads are polyphonic
+                for (int group = 1; group <= 3; ++group)
+                {
+                    std::vector<int> members;
+                    for (std::size_t k = 0; k < rack.kit.size(); ++k)
+                        if (rack.kit[k].cutGroup == group)
+                            members.push_back (kitChannels[k]);
+                    if (members.size() < 2)
+                        continue;
+                    if (members.size() == 2)
+                    {
+                        auto& a = song.channels[(std::size_t) members[0]];
+                        auto& b = song.channels[(std::size_t) members[1]];
+                        a.cutGroup = b.cutBy = ++ctx.cutGroups;
+                        b.cutGroup = a.cutBy = ++ctx.cutGroups;
+                    }
+                    else
+                    {
+                        const auto id = ++ctx.cutGroups;
+                        bool selfCut = false;
+                        for (const auto m : members)
+                        {
+                            auto& c = song.channels[(std::size_t) m];
+                            c.cutGroup = c.cutBy = id;
+                            selfCut = selfCut || ! c.sampler.cut;
+                        }
+                        if (selfCut)
+                            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: cut group of three or more pads (a hit also cuts its own pad)");
+                    }
+                    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum pad cut group");
                 }
                 if (! rack.kit.empty())
                     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum kit (one sampler channel per sample)");
@@ -1076,11 +1466,14 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         };
 
         // the channel's instruments exist even without clips (an empty track, a new-song template's kit)
+        std::vector<double> kitShifts; // each kit sample's time shift, beats
+        for (const auto& s : rack.kit)
+            kitShifts.push_back (s.timeShift);
         if (ch.kind == flm::kindNormal)
         {
             if (! rack.kit.empty())
                 kitIndex();
-            if (std::any_of (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) { return flm::isGenerator (m.type); })
+            if (! generators.empty()
                 || std::any_of (ch.lanes.begin(), ch.lanes.end(), [] (const flm::Lane& l) { return l.kind() == flm::LaneKind::notes && ! l.clips.empty(); }))
                 instrumentIndex();
         }
@@ -1137,14 +1530,15 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
 
             if (kind == flm::LaneKind::audio)
             {
+                int envelopeRow = -1;
                 for (const auto& clip : lane.clips)
-                    addAudioClip (ctx, clip, rowIndex, insert, row.name);
+                    addAudioClip (ctx, clip, rowIndex, insert, row.name, envelopeRow);
                 continue;
             }
 
             // note / drum lanes: one pattern per content id, each clip's loop passes on the Playlist
             std::map<std::uint32_t, int> patternOf;
-            int dropped = 0;
+            int dropped = 0, outside = 0;
             for (const auto& clip : lane.clips)
             {
                 auto it = patternOf.find (clip.contentId);
@@ -1162,13 +1556,21 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                                 return { -1, 0 };
                             }
                             return { kit[(std::size_t) key], 60 };
-                        });
+                        }, nullptr, &kitShifts);
                     }
                     else
                     {
                         const auto channel = instrumentIndex();
-                        pattern = addPattern (ctx, clip, pname, false, std::clamp (lane.swing, 0.0, 1.0),
-                                              [channel] (int key) -> std::pair<int, int> { return { key < 0 ? -1 : channel, key }; });
+                        pattern = addPattern (ctx, clip, pname, false, std::clamp (lane.swing, 0.0, 1.0), [&] (int key) -> std::pair<int, int> {
+                            if (key < 0)
+                                return { -1, 0 };
+                            if (key < keyLow || key > keyHigh) // (FLM hands the instrument only the notes of its key range)
+                            {
+                                ++outside;
+                                return { -1, 0 };
+                            }
+                            return { channel, key };
+                        }, &noteFx);
                     }
                     it = patternOf.emplace (clip.contentId, pattern).first;
                 }
@@ -1181,7 +1583,11 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum notes without a kit sample (dropped)");
             }
             else
+            {
                 song.playlistTracks[(std::size_t) rowIndex].channel = instrument;
+                if (outside > 0 && ctx.report != nullptr)
+                    ctx.report->converted["FL Studio Mobile: notes outside the instrument's key range (silent in FLM too)"] += outside;
+            }
         }
     }
     // routing (F2): a SEND is (target channel id, …, linear gain capped at 1, …, …, level 0…1 on FLM's fader law)

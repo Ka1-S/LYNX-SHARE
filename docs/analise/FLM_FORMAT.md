@@ -180,7 +180,9 @@ channels then use the default route.
 
 `DESc` comes first. PROVEN-REA writer 0x180757d80, with the offsets PROVEN-FILE:
 - 0: u32 **lane kind**: 0 = note track (piano roll), 1 = **automation**, 2 = **audio**, 3 = **drum/step track**.
-  The 259 = 0x103 seen once is kind 3 with a flag in the high byte.
+  The 259 = 0x103 seen once is kind 3 with bit 0 of the second byte set: **the lane holds its notes** (round 190bs,
+  PROVEN-REA: the song scheduler hands a drum note's end to the pad only when the lane's flag is set; that this flag is
+  the second byte of `DESc`'s kind is INFERRED from the one file). Without it every hit is a one-shot.
 - 4: i32 automation target **module instance id**. 0 = the rack itself ("Level", "Pitch Bend"); −1 = none.
 - 8: i32 automation target **parameter index**.
 - 12: f64 **swing** 0…1 of a drum/step track (PROVEN-REA, round 190ab: the lane field the clip compiler reads for a
@@ -240,7 +242,18 @@ Bytes 15–19 at playback (PROVEN-REA, round 190ab: clip compiler 0x18075d6b0, s
   note's to the slide's, tick by tick, and sends the offsets to every voice of the module. No held note: nothing.
   Imported as LYNX's slide note (the key glide; the velocity and pan glides are not converted).
 
-On audio lanes `EVN2` holds the clip's envelope points (volume/pan/pitch of the wave editor). INFERRED.
+On audio lanes `EVN2` holds the clip's own automation of its sample slot (round 190bs, PROVEN-REA: the scheduler
+0x180770330). |key| − 1 is the slot parameter of §6.1 (key ±1 = Level, ±2 = Pan, ±3 = Speed …), the sign as on
+automation lanes (positive = a point the user placed, negative = a sample of the curve), the value u16 / 65534. In
+FL's 20 sample projects 26 of 261 audio clips have such points: 25 Level, 1 Speed. LYNX imports a constant Level /
+Pan / Speed as the clip's own; a Level or Pan that moves becomes automation of a channel the clip has to itself.
+
+**Audio clips loop** (round 190bs, PROVEN-REA): a clip longer than what is left of its loop starts its sample again
+at clip start − offset + k · loop length. (That each new pass starts at the sample's first frame is INFERRED.) One
+clip of the 20 sample projects does (length 96, loop 16). LYNX imports one clip per pass.
+
+**On automation lanes too, |key| − 1 is a parameter index** in the scheduler's eyes (the lane's `DESc` names the
+target; the observation below, that |key| stays the same within a segment, is PROVEN-FILE).
 
 **Automation points (round 187d; PROVEN-FILE over the 20 sample projects, about 50 000 points).** An automation
 clip's `EVN2` is its curve *already sampled*, not a list of control points to interpolate:
@@ -268,21 +281,68 @@ shape maths; it must keep every point, the two-on-one-tick jumps included.
 
 ## 6. Sample body (SMPl / SMPL / CLSm, magic `20LS`)
 
-PROVEN-REA writer 0x18074a1c0:
+PROVEN-REA writer 0x18074a1c0 (the tail of `MAIN` and `LINk`: round 190bs, the drum sampler's trigger 0x1807503a0
+and the clip compiler 0x18075d6b0):
 - `MAIN`:
   - u32 −1;
   - f64 (−1.0);
   - char[512] **sample name**;
   - char[512] folder/category;
-  - u8, f64, u32, u8, u8;
+  - u8 **reverse** (the slot plays its sample backwards);
+  - f64 **time shift** in beats, added to the start of every drum note of the slot (never before the clip's start);
+  - f32 (0.5 in every file; not used by the playback code that was read);
+  - u8 **cut group**: 0 = none, 1…3 = "A", "B", "C". Any trigger of a slot fades out (about 2 ms) the voices of the
+    *other* slots of its group, not its own;
+  - u8 **polyphonic** (1 in almost every file): 0 = a new hit fades out the slot's own voices;
   - optional lp16.
-- `LINk`: u32, u32, u16, u32 (INFERRED: link/choke group).
-- `STRC`: u8 mode, f64 **time-stretch ratio**, f64 pitch ratio 2^(st/12), f32 normalized pitch (st/48 + 0.5), f32.
-- `STR1`: u8 **stretch mode**, f64 stretch ratio, f64 **pitch in semitones**.
+- `LINk`: i32 **slot id** inside the drum set; i32; u16 pad key (−1 = by order); i32 **output link** (−1 = the slot
+  mixes into its own rack; another value sends it elsewhere — not imported, listed in the report).
+- `STRC` (legacy, still read): u8 mode, f64 **time-stretch ratio**, f64 pitch ratio 2^(st/12), f32 normalized pitch
+  (st/48 + 0.5), f32.
+- `STR1`: u8 **stretch mode**, f64 stretch ratio, f64 **pitch in semitones**. PROVEN-REA (round 190bs, the loader
+  0x180747a50 / 0x180740330): FLM renders a stretched copy of the file when it loads it. The copy has
+  frames × ratio frames — the ratio is a **length** ratio (2 = twice as long) — and is used only when the mode is
+  not 0; the pitch is rounded to whole semitones and shifts without changing the length.
+- `PATH` (legacy, still read): char[2048] absolute path.
 - `PTH1`: path (section 5).
 - `PRST`: lp32 absolute path + lp32 relative name.
-- `PRMS`: 11 × f32 sample params. In the user file: 0.946, 0.5, 0.5, 0, 0, 0, 0, 1, 1, 1, 0.5. INFERRED:
-  volume, pan, …, envelope.
+- `PRMS`: 11 × f32, the slot's parameters (§6.1). A file may hold fewer: the rest are at their defaults.
+
+### 6.1 The sample slot's parameters (round 190bs)
+
+A drum pad and an audio clip's sample are the same object, with eleven parameters. Names PROVEN-REA 0x180748680,
+defaults 0x180748120, laws from the setter 0x180748390, the voice start 0x18074bf40 and the voice render 0x18074c070
+(all in the FL-hosted "FL Studio Mobile_x64.dll"). `v` = the stored 0…1 value. LYNX's code: `core/FlmPad.h`.
+
+| # | Name | Default | Law |
+|---|---|---|---|
+| 0 | Level | 0.853125 | gain = 10^(3.3·v^0.6 − 3): the fader law of §3 without its silent bottom (v = 0 is −60 dB, shown "-inf."); default = 0 dB, 1 = +6 dB |
+| 1 | Pan | 0.5 | p = 2v − 1, a balance: the far side × (1 − \|p\|), the near side unchanged |
+| 2 | Speed | 0.5 | whole semitones, (int)(48v − 24) truncated towards 0, ±24: a resampling (pitch and length together) |
+| 3 | Mute | 0 | on above 0.5 |
+| 4 | Solo | 0 | on above 0.5: every slot of the rack whose Solo is off is silent |
+| 5 | Length | 0 | not 0: the release starts (int)(frames × v) output samples after the voice's start. Unused in the samples |
+| 6 | EG A | 0 | attack: below 0.001 immediate; else rate = 0.0002 / ((0.95v + 0.05)^4 · 500) |
+| 7 | EG D | 1 | decay rate = 0.0002 / ((0.95v + 0.05)^4 · 50) |
+| 8 | EG S | 1 | sustain level, linear |
+| 9 | EG R | 1 | release rate, as EG D |
+| 10 | Sample Start | 0.5 | ±0.5·(2v − 1)² seconds: positive = that far into the file, negative = silence first |
+
+The envelope is one level stepped once per output sample, `level += (target − level) · rate`: the attack goes
+towards 5 and is clipped at 1; from there the decay goes towards EG S; the release goes towards 0 and the voice ends
+below 0.0001. A release happens only (a) at a note's end on a lane that holds its notes (§4, `DESc`), (b) at
+Length. The step comes before the sample is output. The rates are per output sample whatever the device's rate;
+LYNX takes them at 44.1 kHz (an assumption: FL's default and the rate of the factory content).
+
+Level and Pan apply to the slot's summed voices. A voice's own gain is its velocity; its note pan is the balance of
+§4 (left = w·min(1, 2(1 − p)), right = w·min(1, 2p)); its speed is the note's pitch × Speed × file rate / output rate,
+read with linear interpolation.
+
+Use in FL's 20 sample projects (272 kit samples, 261 audio clips): Level 262, Speed 45, EG D 58, EG S 57, EG R 38,
+EG A 10, Pan 8, cut group 5, Sample Start 3, Mute 2; Length, reverse and time shift 0.
+
+A rack renders its drum slots first, then its modules in order on the same buffer: an effect processes only the
+generators before it (PROVEN-REA 0x18059d3b0; LYNX's insert processes them all, which the import report lists).
 
 ## 7. Module type registry (complete)
 
@@ -299,7 +359,7 @@ word of the registrar's flag value: 1 generator, 2 delay/reverb, 3 dynamics/driv
 | 23 | SuperSaw | gen | 60 |
 | 33 | Slicer | gen | 7 |
 | 39 | 3x Osc | gen | 149 |
-| 52 | SoundFont Player | gen | ? |
+| 52 | SoundFont Player | gen | 6 * |
 | 3 | Equalizer ("Param EQ") | EQ | 17 / 21 |
 | 4 | MultiFX | mod | 7 |
 | 5 | Limiter (legacy) | dyn | 4 |
@@ -317,31 +377,32 @@ word of the registrar's flag value: 1 generator, 2 delay/reverb, 3 dynamics/driv
 | 18 | Tape Delay | rev | 5 |
 | 20 | Leveller | dyn | 3 |
 | 24 | Tuner | mod | 1 |
-| 25 | Pitcher | mod | ? |
+| 25 | Pitcher | mod | 23 * |
 | 26 | Analyzer | mod | 1 |
 | 27 | Gate | dyn | 9 |
 | 28 | Limiter | dyn | 5 |
 | 29 | Autoduck | dyn | 5 / 8 |
-| 30 | Tuned EQ | EQ | ? |
-| 32 | Reverb | rev | ? |
+| 30 | Tuned EQ | EQ | 11 * |
+| 32 | Reverb | rev | 16 * |
 | 34 | Spacer | EQ | 7 / 8 |
 | 35 | Reverb 2 | rev | 19 |
 | 36 | Multiband Compressor | dyn | 27 / 31 |
 | 40 | Comb Filter | EQ | 12 |
 | 41 | Waveshaper | dyn | 21 |
-| 42 | Tape Stop | mod | ? |
+| 42 | Tape Stop | mod | 8 * |
 | 43 | Wow & Flutter | mod | 11 |
 | 44 | Spreader | EQ | 5 |
-| 45 | Pitcher 2 | mod | ? |
+| 45 | Pitcher 2 | mod | 27 * |
 | 46 | Tremolo | mod | 12 |
-| 47 | Note Echo | note | ? |
-| 48 | Transpose | note | ? |
-| 49 | Randomizer | note | ? |
-| 50 | Scale | note | ? |
-| 51 | Arpeggiator | note | 31 |
+| 47 | Note Echo | note | 16 * |
+| 48 | Transpose | note | 3 * |
+| 49 | Randomizer | note | 5 * |
+| 50 | Scale | note | 16 * |
+| 51 | Arpeggiator | note | 31 (33 allocated *) |
 
 Ids 17, 21, 22, 31, 37 and 38 are not registered: retired modules. A file that holds one makes FLM itself log
-"Unknown module type". "?" = the parameter count is not seen in any sample. Known parameter indices, from automation
+"Unknown module type". "*" = the count is not seen in any sample: it is the number the module's constructor allocates
+(round 190bn, read in the Android 5.0.3 build; the Arpeggiator saves 31 of its 33). Known parameter indices, from automation
 lane names (PROVEN-FILE):
 - MiniSynth: 9 = FLT Freq, 25 = AMP Rel;
 - DW Sampler: 3 = Pitch;
@@ -376,7 +437,7 @@ shapes the extraction didn't read. The complete list is in `/mnt/e/lynx-work/flm
 | 2 GMSynth | 0x180647390 | 1=Level | 2=Pan | 3=Level Attack | 4=Level Decay | 5=Level Sustain | 6=Level Release | 11=Osc B Pitch | 12=Osc B Detune | 13=Osc B Mix | 14=Osc B Phase | 15=OSc Mod | 16=Osc Mod Kind | 17=Osc Mod Attack | 18=Osc Mod Decay | 19=Osc Mod Contour | 20=Osc Noise | 21=Cutoff | 22=Resonance | 23=Filter Kind | 24=Filter Kbd. Scl. | 25=Filter Attack | 26=Filter Decay | 27=Filter Contour | 28=Transpose | 29=Slide Time | 30=Single Voice | 31=Auto Portamento | 32=LFO Rate | 33=LFO Shape | 34=LFO Ampl. | 35=LFO Dest | 36=EG Attack | 37=EG Decay | 38=EG Sustain | 39=EG Release | 40=EG Contour | 41=EG Dest | … |
 | 3 Equalizer | 0x18061b5a0 | 1=Gain 1 | 2=Frequency 1 | 3=Bandwidth 1 | 4=Kind 1 | 5=Gain 2 | 6=Frequency 2 | 7=Bandwidth 2 | 8=Kind 2 | 9=Gain 3 | 10=Frequency 3 | 11=Bandwidth 3 | 12=Kind 3 | 13=Gain 4 | 14=Frequency 4 | 15=Bandwidth 4 | 16=Kind 4 | 17=Channel 1 | 18=Channel 2 | 19=Channel 3 | 20=Channel 4 |
 | 4 MultiFX | 0x18062cd50 | 1=FX Kind | 2=Axis X | 3=Axis Y | 4=LFO Rate | 5=LFO Amount | 6=LFO Shape |
-| 5 Limiter (legacy)? | 0x180625ce0 | 1=Threshold | 2=Release Time |
+| 5 Limiter (legacy) | 0x180625ce0 | 1=Threshold | 2=Release Time | 3=Output Gain |
 | 6 Distortion | 0x180618700 | 1=Drive | 2=BitCrush | 3=Gain | 4=Stereo | 5=Kind | 6=Bias |
 | 7 Graphic EQ | 0x1806192b0 | 1=80 Hz | 2=160 Hz | 3=375 Hz | 4=750 Hz | 5=1.5 kHz | 6=3 kHz | 7=6 kHz | 8=12 kHz |
 | 8 Compressor | 0x180615bc0 | 1=Thresh | 2=Ratio | 3=Attack | 4=Release | 5=Level | 6=Hold | 7=Auto gain | 8=Input gain | 9=RMS |
@@ -389,7 +450,8 @@ shapes the extraction didn't read. The complete list is in `/mnt/e/lynx-work/flm
 | 16 Trance Delay? | 0x18063ef40 | 3=Mix |
 | 18 Tape Delay? | 0x18063df50 | 3=Async. |
 | 19 Transistor Bass | 0x180585070 | 1=Waveform | 2=Cutoff | 3=Reso | 4=Env Mod | 5=Decay | 6=Accent |
-| 20 Leveller | 0x180626690 | 1=In Gain | 2=Out Gain | 3=Release Time |
+| 20 Leveller | (round 190bn) | 1=Gain | 2=Pan |
+| 28 Limiter | 0x180626690 | 1=In Gain | 2=Out Gain | 3=Release Time | 4=Threshold |
 | 23 SuperSaw | 0x1807f6b90 | 2=Osc. Pulse Mode | 3=Osc. Sub Level | 4=Osc. Unisono | 5=Osc. Unisono Detune | 6=Osc. Unisono Pan | 7=Osc. Unisono Detune Curve | 8=Osc. Re-trig Phases | 9=Osc. Phases Offset | 10=SuperSync Mode | 11=Osc. Sync | 12=Osc. Pulse Width | 13=Osc. Sync Attack | 14=Osc. Sync Decay | 15=Osc. Sync Sustain | 16=Osc. Sync Release | 17=Osc. Sync EG Amount | 18=Osc. Sync Kbd Dir. | 19=Filter Cutoff | 20=Filter Resonance | 21=Filter KBD | 22=Filter EG Attack | 23=Filter EG Decay | 24=Filter EG Sustain | 25=Filter EG Release | 26=Filter EG Amount | 27=Filter VEL | 28=Level EG Attack | 29=Level EG Decay | 30 … |
 | 25/45 Pitcher (2)? | 0x180465280 | 1=Note C | 2=Note Db | 3=Note D | 4=Note Eb | 5=Note E | 6=Note F | 7=Note Gb | 8=Note G | 9=Note Ab | 10=Note A | 11=Note Bb | 12=Note B | 13=Speed | 16=Formant Mode | 17=Formant Ratio | 18=Ref. Channel | 19=Stability | 20=Humanization | 21=Snapping | 22=Mix | 23=Sensitivity | 24=Vibrato | 25=Latency | 26=Process Sibilants |
 | 27 Gate | 0x180624300 | 1=Threshold | 2=Asymmetry | 3=Attack | 4=A. Curve | 5=Release | 6=R. Curve | 7=Mix | 8=Hold |
@@ -406,11 +468,57 @@ shapes the extraction didn't read. The complete list is in `/mnt/e/lynx-work/flm
 | 44 Spreader | 0x18046f780 | 1=Width | 2=Low Bypass | 3=Mono Bass |
 | 46 Tremolo | 0x18047d750 | 1=Rate Free | 2=Rate Sync | 3=Amount Max | 4=Amount Min | 5=Phase Offset | 6=Stereo Offset | 7=Sync | 8=Shape | 9=Smooth | 10=Skew | 11=Width |
 | 47 Note Echo | 0x18045f2c0 | 1=Repetitions | 2=Delay | 3=Delay (sync) | 4=Sync | 5=Pitch Offset | 6=Vel. Offset | 7=Velocity | 8=Pitch | 9=Time Drift | 10=Length Drift | 11=Delay Rand. | 12=Pan Offset | 13=Pan Drift | 14=Ping-Pong | 15=Stop |
-| 48 Transpose | 0x18047a830 | 1=Octave |
-| 49 Randomizer | 0x180468390 | 1=Pitch | 2=Velocity | 3=Pan |
+| 48 Transpose | 0x18047a830 | 1=Octave | 2=Semitone |
+| 49 Randomizer | 0x180468390 | 1=Pitch | 2=Velocity | 3=Pan | 4=Gate |
+| 50 Scale | (round 190bn) | 1=Key | 2=Scale | 3=Snap | 4…15=Note C … Note B |
 | 51 Arpeggiator | 0x180453a40 | 1=Rate | 2=Rate (ms) | 3=Sync | 4=Swing | 5=Swing rate | 6=Latch | 7=Velocity 1 | 8=Velocity 2 |
 | ? (ATTACK, SUST…) | 0x1807d4d30 | 3=ATTACK | 5=SUST |
-| ? (Attack, Decay, Sustain, Release) | 0x1807eff80 | 1=Attack | 2=Decay | 3=Sustain | 4=Release |
+| 52 SoundFont Player | 0x1807eff80 | 1=Attack | 2=Decay | 3=Sustain | 4=Release | 5=Envelope |
+
+(Round 190bs corrected this table: until then it listed Limiter's names under Leveller, and Limiter (legacy) without
+its Output Gain. LYNX's engines always used the right lists, `core/PocketFx.h`.)
+
+### 7.2 Note effects (round 190bs)
+
+PROVEN-REA in the FL-hosted build: the rack's note pass 0x18059c400, Transpose 0x18047abe0 / 0x18047a970, Scale
+0x180469f80 / 0x18046a470, Randomizer 0x180468b60 / 0x180468550. LYNX's code: `core/FlmNoteFx.h`.
+
+Before a rack hands its notes to its generators it runs them through every note-effect module, in the rack's module
+order, wherever those modules sit among the instruments. Only note events pass through them: drum lanes are not
+touched. A module whose Enable (parameter 0) is below 0.5 passes everything on. Then every generator plays every note
+inside its key range (`ADD1`), so a rack with two generators is a layer or a keyboard split.
+
+- **Transpose**: Octave = round(8v − 4), Semitone = round(24v − 12); the key moves by semitone + 12·octave and is
+  kept inside 0…127. A note's end uses the key its start was given.
+- **Scale**: Key = round(11v) (the root), Scale = round(33v) (33 named scales, the last value "Custom"), Snap above
+  0.5, parameters 4…15 one switch per pitch class C…B. The switches are the scale that is used. A note outside it
+  moves to the nearest key inside when Snap is on, and is *not played* when Snap is off. "Nearest" looks one semitone
+  further each turn: upwards first for the major-like scales (Major, Major Bebop, Major Bulgarian, Major Pentatonic,
+  Major Persian, Major Polymode, Enigmatic, Lydian, Whole Tone), downwards first for the others, upwards first for a
+  custom set. The list, in order: Chromatic, Major, Major Bebop, Major Bulgarian, Major Pentatonic, Major Persian,
+  Major Polymode, Minor Harmonic, Minor Hungarian, Minor Melodic, Minor Natural, Minor Neapolitan, Minor Pentatonic,
+  Minor Polymode, Minor Romanian, Arabic, Blues, Diminished, Dominant Bebop, Dorian, Egyptian, Enigmatic, Hirajoshi,
+  Iwato, Japanese Insen, Locrian, Locrian Super, Lydian, Mixolydian, Neapolitan, Phrygian, Phrygian Dominant, Whole
+  Tone.
+- **Randomizer**: Pitch = round(24v) semitones either way (a whole number, drawn evenly), Velocity ± v, Pan ± v of the
+  whole width, Gate = the chance a note plays (0 = none). Defaults 0, 0, 0, 1: nothing. FLM draws at every playback;
+  LYNX draws once at import (listed in the report).
+- **Note Echo** and **Arpeggiator** are not converted (listed in the report).
+
+### 7.3 SoundFont Player (round 190bs)
+
+PROVEN-REA (class CSoundFontPlayer: names 0x1807eff80, defaults 0x1807eff30, envelope rates 0x1807f23a0, render
+0x1807f0820). `CSTM` holds one chunk `SF2D`: lp32 the font's path, i32 the chosen preset's index in the font (that the
+index follows the file's preset order is INFERRED; no sample project uses the module).
+- Envelope (parameter 5) above 0.5 = "Custom": the four knobs replace the font's volume envelope; else "Original".
+- Custom times: T = max(0.005, (0.95v + 0.05)³ · 10) seconds. The attack reaches the top after T (a one-pole towards
+  5, clipped at 1). Decay and release are exponential and fall 40 dB in T. Sustain: gain 10^(−5 + 5·(n/127)^0.2), n =
+  round(127v) kept in 1…127 — the desktop Fruity Soundfont Player's law.
+- Original: T = max(0.005, 2^(timecents / 1200)) with a rate 8.82 / (T · sample rate); sustain 10^(−0.005 · cB).
+- The level is the zone's attenuation (10^(−0.005 · cB)) × the velocity, linear. 32 voices, linear interpolation.
+
+LYNX imports it as LYNX Soundfont: the font and preset, the linear velocity curve, and for Custom the four overrides
+(decay and release as 2.5·T on LYNX's 100 dB time knobs). The level and the envelope's exact shape are approximations.
 
 ## 8. Relation to FLM-exported .flp (issue #88)
 
@@ -433,5 +541,10 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    Round 188h added MultiFX, Trance Delay, Distortion, both Limiters, Leveller, Gate and Tape Delay (the Pocket
    engines) and proved how the module wrapper applies Mix (linear dry/wet), Post Gain (40g − 20 dB on the output) and
    Wet Pan (a balance of the wet). Left: Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
-   Stereoizer, Flanger, Autoduck (29), Tremolo and the note effects.
+   Stereoizer, Flanger, Autoduck (29), Tremolo, Note Echo and the Arpeggiator (Transpose, Scale and Randomizer:
+   round 190bs, §7.2).
 5. HEAD 272/280 (loop range).
+6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
+   an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher); how a kit sample's legacy `STRC`
+   stretch sounds (two samples of one demo song; LYNX plays them as recorded and says so); the module's octave shift
+   and the second dispatch switch next to the key range (0x420 / 0x42c in the module object: not found in the file).

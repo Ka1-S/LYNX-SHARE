@@ -1882,6 +1882,13 @@ juce::var channelToVar (const ChannelDef& c)
                 env.add ((int) v);
             sampler->setProperty ("flVolumeEnvelope", env);
         }
+        if (! c.sampler.flmPad.empty())
+        {
+            juce::Array<juce::var> pad;
+            for (auto v : c.sampler.flmPad)
+                pad.add ((double) v);
+            sampler->setProperty ("flmPad", pad);
+        }
         if (! c.sampler.flChannel.empty())
         {
             juce::Array<juce::var> fl;
@@ -2215,6 +2222,10 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)
             for (const auto& v : *env)
                 def.sampler.flVolumeEnvelope.push_back ((std::int32_t) (int) v);
+
+        if (auto* pad = s["flmPad"].getArray(); pad != nullptr && pad->size() == 7)
+            for (const auto& v : *pad)
+                def.sampler.flmPad.push_back (juce::jlimit (0.0f, 1.0f, (float) (double) v));
 
         if (auto* fl = s["flChannel"].getArray(); fl != nullptr && (fl->size() == 89 || fl->size() == 90))
             for (const auto& v : *fl)
