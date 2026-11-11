@@ -93,7 +93,7 @@ CORE="$CORE src/core/CrashReport.cpp"
 # in-app update check: versions, release list, flavours, checksums, release notes (round 166b)
 CORE="$CORE src/core/UpdateCheck.cpp"
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
-CORE="$CORE src/core/Python.cpp src/core/VfxScript.cpp src/core/EdisonScript.cpp"
+CORE="$CORE src/core/Python.cpp src/core/VfxScript.cpp src/core/EdisonScript.cpp src/core/ScriptDialog.cpp src/core/PianoRollScript.cpp"
 # WavPack decoder (C)
 if [[ -z "${CC:-}" ]]; then
     case "$CXX" in

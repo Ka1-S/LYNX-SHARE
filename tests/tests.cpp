@@ -17251,6 +17251,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Emphasis167fTests.inc"
 #include "Dvs167Tests.inc"
 #include "EdisonScript167Tests.inc"
+#include "PianoRollScript190Tests.inc"
 #include "Deverb167Tests.inc"
 #include "Score167Tests.inc"
 #include "Ntt167Tests.inc"

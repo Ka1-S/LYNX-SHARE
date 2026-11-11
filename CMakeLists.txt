@@ -294,7 +294,9 @@ target_sources(lynx_core PRIVATE
 target_sources(lynx_core PRIVATE
     src/core/Python.cpp
     src/core/VfxScript.cpp
-    src/core/EdisonScript.cpp)
+    src/core/EdisonScript.cpp
+    src/core/ScriptDialog.cpp
+    src/core/PianoRollScript.cpp)
 
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
