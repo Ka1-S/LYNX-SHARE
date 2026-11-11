@@ -127,7 +127,7 @@ struct Project
 {
     std::string title;
     double tempo = 120.0;
-    int numerator = 4, denominator = 4;
+    int numerator = 4, denominator = 4; // TDIV: beats per bar, the grid's steps per beat (also the modules' tick rate, 384 / it)
     std::uint32_t scale = 0, root = 0; // the "key locker" (FLM_FORMAT §2)
     std::string appVersion; // "5.0.4"
     std::string created, saved, author, originalName;
