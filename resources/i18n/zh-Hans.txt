@@ -8918,3 +8918,6 @@ countries: cn sg
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "电平平衡：以较慢的起音把电平保持在上限以下的阈值，其余由上限拦住（默认关闭）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "电平平衡阈值：保持在上限以下的电平（Off：不做电平平衡）"
 "Levelling attack: how much of a transient passes before the level is held" = "电平平衡起音：电平被保持之前有多少瞬态通过"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表单的最后一行）在用鼠标按住舞者时显示。"

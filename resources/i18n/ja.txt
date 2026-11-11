@@ -8918,3 +8918,6 @@ countries: jp
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "レベリング: 遅いアタックでシーリングより下のスレッショルドにレベルを保ち、残りはシーリングが抑えます（既定ではオフ）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "レベリングのスレッショルド: シーリングより下に保つレベル（Off: レベリングなし）"
 "Levelling attack: how much of a transient passes before the level is held" = "レベリングのアタック: レベルが保たれる前にトランジェントがどれだけ通るか"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"

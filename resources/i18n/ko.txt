@@ -8918,3 +8918,6 @@ countries: kr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "레벨링: 느린 어택으로 실링 아래의 스레숄드에 레벨을 유지하고 나머지는 실링이 잡습니다 (기본값은 꺼짐)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "레벨링 스레숄드: 실링 아래에 유지되는 레벨 (Off: 레벨링 없음)"
 "Levelling attack: how much of a transient passes before the level is held" = "레벨링 어택: 레벨이 유지되기 전에 트랜지언트가 얼마나 통과하는지"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}(시트의 마지막 행)은 댄서를 마우스로 잡고 있는 동안 표시됩니다."

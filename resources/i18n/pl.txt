@@ -8918,3 +8918,6 @@ countries: pl
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Poziomowanie: utrzymuje poziom na progu poniżej sufitu z wolnym atakiem, sufit zatrzymuje resztę (domyślnie wyłączone)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Próg poziomowania: poziom utrzymywany poniżej sufitu (Off: bez poziomowania)"
 "Levelling attack: how much of a transient passes before the level is held" = "Atak poziomowania: jaka część transjentu przechodzi, zanim poziom zostanie utrzymany"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (ostatni wiersz arkusza) jest pokazywany, gdy tancerz jest trzymany myszą."

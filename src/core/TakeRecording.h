@@ -220,6 +220,11 @@ public:
     ~WavTakeWriter();
     bool open (const std::string& path, double sampleRate, int channels, SampleFormat format, double syncSeconds = 1.0);
     bool write (const float* const* data, int n); // planar
+    // Another sample format for a file opened but not written to yet (round 190bj, issue B3: the next take's files are
+    // made when the previous take ends, with the format of that moment; a change made before its first sample now
+    // reaches it). False once samples were written (the format then stays) or when no file is open.
+    bool changeFormat (SampleFormat newFormat);
+    SampleFormat sampleFormat() const noexcept { return format; }
     bool close();                                 // final header; the file is complete
     void abandon();                               // tests: closes the file as a crash would leave it (no final header)
     bool isOpen() const noexcept { return file != nullptr; }

@@ -8918,3 +8918,6 @@ countries: de at ch li lu
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Pegelung: hält den Pegel mit langsamem Attack an einem Schwellwert unter der Obergrenze, die Obergrenze fängt den Rest ab (standardmäßig aus)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Pegelungs-Schwellwert: der unter der Obergrenze gehaltene Pegel (Off: keine Pegelung)"
 "Levelling attack: how much of a transient passes before the level is held" = "Pegelungs-Attack: wie viel von einer Transiente durchkommt, bevor der Pegel gehalten wird"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (die letzte Zeile des Blatts) wird gezeigt, solange der Tänzer mit der Maus gehalten wird."

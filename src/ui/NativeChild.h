@@ -31,6 +31,11 @@ juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component& 
 // After the main window's native window was made again, or `area` moved inside it: attached again if needed, and put
 // back at the same place in `area`.
 void refresh (juce::Component& c, juce::Component& area);
+// Only the first half of refresh(): attached again when the main window's native window was made again (true then; the
+// caller places it). Nothing is moved otherwise. (Round 190bj: refresh() places the window from JUCE's own idea of its
+// bounds, which on Windows is relative to the parent's WINDOW rectangle while the placement is relative to its client
+// area: every call moved a dancer by the frame's width, and each move dismissed an open menu, issue B1.)
+bool reattachIfNeeded (juce::Component& c, juce::Component& area);
 
 // Stacking among the attached siblings without disturbing the others: if `c` is not above `below` it goes just above it
 // (under whatever was right above `below`); `below` == nullptr: nothing. Elsewhere than Windows: `c` comes to the front

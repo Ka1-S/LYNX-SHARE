@@ -94,6 +94,7 @@ private:
         dance::SheetFrame frame;
         std::int64_t lastCycle = 0; // (FL's "Sync changes": LYNX's dancer changes its move when a cycle starts)
         bool floating = false;      // its window is kept in front (FL's "Keep in front")
+        juce::Rectangle<int> placedArea; // where its window was put, in the stage (round 190bj: the only place counted)
     };
     class Window;
 
@@ -106,6 +107,7 @@ private:
     static void drawDancer (juce::Graphics& g, const Dancer& d);
     static float reflectionDepth (const Dancer& d); // FL's "Reflect": how far the mirror image reaches under the feet
     bool windowed() const;                                // the dancers have windows of their own now
+    static bool modalOpen(); // a pop-up menu or a dialog is open: the dancers' windows are not moved meanwhile
     void syncWindow (Dancer& d, bool windows);            // made, placed, shown / hidden as the dancer is
     void invalidate (Dancer& d, juce::Rectangle<float> r); // its window, or the stage's area r
     void showMenu (Dancer& d);

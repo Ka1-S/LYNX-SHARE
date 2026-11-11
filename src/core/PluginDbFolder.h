@@ -101,6 +101,12 @@ Report apply (const std::string& root, const std::vector<Plugin>& plugins, const
 // entry, FL's System items): its place under Effects / Generators (the first A-Z), else its Installed entry; "" = none.
 std::string entryFile (const std::string& root, const std::string& key, bool instrument);
 
+// The folder on disk of one of the Browser's own groups under Effects / Generators (round 190bj, issue B4): "LYNX" =
+// LYNX SHARE (its built-in plugins' default folder, root/<kind>/LYNX SHARE, when it is there; else their Installed
+// entries), "FL engines" / "VFX" = their Installed format folder, "" = Installed/<kind>. A folder that is not there
+// gives the nearest one that is (Installed/<kind>, else the root).
+std::string groupFolder (const std::string& root, bool instruments, const std::string& group);
+
 // One entry file's text / what it says (tests, tools)
 struct Entry
 {

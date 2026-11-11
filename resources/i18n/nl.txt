@@ -8918,3 +8918,6 @@ countries: nl be
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivellering: houdt het niveau met een trage attack op een drempel onder het plafond, het plafond vangt de rest op (standaard uit)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Drempel van de nivellering: het niveau dat onder het plafond wordt gehouden (Off: geen nivellering)"
 "Levelling attack: how much of a transient passes before the level is held" = "Attack van de nivellering: hoeveel van een transiënt doorkomt voordat het niveau wordt vastgehouden"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (de laatste rij van het blad) wordt getoond zolang de danser met de muis wordt vastgehouden."

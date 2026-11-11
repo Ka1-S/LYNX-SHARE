@@ -293,6 +293,21 @@ juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component&)
     return isAttached (c) ? c.getBounds() - placedOrigin (c) : c.getBounds();
 }
 
+bool reattachIfNeeded (juce::Component& c, juce::Component& area)
+{
+    if (! isAttached (c))
+        return false;
+    const auto parent = (juce::pointer_sized_int) (juce::int64) c.getProperties().getWithDefault ("lynxNativeParent", (juce::int64) 0);
+    if (parent == (juce::pointer_sized_int) topHandle (area))
+        return false;
+    const auto visible = c.isVisible();
+    detach (c);
+    if (! attach (c, area))
+        return false;
+    c.setVisible (visible);
+    return true;
+}
+
 void refresh (juce::Component& c, juce::Component& area)
 {
     if (! isAttached (c))

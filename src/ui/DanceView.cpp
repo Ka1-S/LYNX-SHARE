@@ -499,8 +499,14 @@ public:
 
     ~Window() override { nativechild::removeFloater (*this); }
 
-    // its top-left in the stage
-    juce::Point<int> origin() const { return nativechild::boundsIn (*this, stage).getTopLeft(); }
+    // its top-left in the stage: where the stage put it (round 190bj: not read back from the native window, whose
+    // position JUCE reports relative to the main window's frame, not its client area: the dancer was drawn shifted and
+    // cut, and the clicks on it missed it)
+    juce::Point<int> origin() const
+    {
+        const auto it = stage.dancers.find (channel);
+        return it != stage.dancers.end() ? it->second.placedArea.getTopLeft() : juce::Point<int>();
+    }
 
     void paint (juce::Graphics& g) override
     {
@@ -526,6 +532,11 @@ private:
     const int channel;
 };
 
+bool DanceStage::modalOpen()
+{
+    return juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0;
+}
+
 bool DanceStage::windowed() const
 {
     return nativechild::dockingEnabled() && nativechild::supportsFloaters() && getPeer() != nullptr && isVisible();
@@ -548,6 +559,7 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
         w->setBounds (area);
         if (! nativechild::attach (*w, *this))
             return; // (the stage draws it meanwhile)
+        d.placedArea = area;
         if (d.now.keepInFront) // FL's "Keep in front": kept in front of the panels and docked plugins
             nativechild::addFloater (*w);
         d.floating = d.now.keepInFront;
@@ -568,9 +580,13 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
         d.floating = d.now.keepInFront;
         nativechild::raiseOverlays();
     }
-    if (nativechild::boundsIn (w, *this) != area)
+    // moved only when its place changes, and never while a menu or a dialog is open (round 190bj, issue B1: JUCE closes
+    // an open pop-up menu when one of its windows is moved or resized natively, unless the mouse is over the menu; the
+    // dancer used to be moved on every frame, so the menu bar's and the combo boxes' menus closed as they opened)
+    if (d.placedArea != area && ! modalOpen())
     {
         nativechild::place (w, *this, area);
+        d.placedArea = area;
         w.repaint();
     }
     if (! w.isVisible())
@@ -720,8 +736,8 @@ void DanceStage::timerCallback()
         if (windows)
         {
             for (auto& [channel, d] : dancers)
-                if (d.window != nullptr)
-                    nativechild::refresh (*d.window, *this); // (the main window's native window made again)
+                if (d.window != nullptr && nativechild::reattachIfNeeded (*d.window, *this)) // (the main window's native window made again)
+                    nativechild::place (*d.window, *this, d.placedArea);
             nativechild::keepFloatersInFront();
         }
     }
@@ -765,7 +781,7 @@ void DanceStage::timerCallback()
             // FL's rules: the row changes at a cycle's start, the first row while the song is stopped, the last one
             // while the dancer is held with the mouse
             const auto before = d.frame;
-            d.frame = d.animator.advance (cycles, d.sheet->layout.rows, d.now.move, d.now.mirrored, playing, d.now.blend, dragging == channel, d.now.sync);
+            d.frame = dance::danceFrame (d.animator, cycles, d.sheet->layout.rows, d.now, playing, dragging == channel);
             d.lastMove = d.now.move;
             d.blendStart = -1.0;
             const auto box = d.now.visible ? boxOf (d) : juce::Rectangle<float>();
@@ -1278,20 +1294,25 @@ private:
 
     juce::String keyHelp() const
     {
-        juce::String moves;
+        juce::String moves, held;
         if (sheet != nullptr)
         {
-            // the sheet's moves (the first ones: a long sheet's keys go on in the same order)
-            for (int m = 0; m < juce::jmin (moveBox.getNumItems(), 12); ++m)
-                moves << (m > 0 ? ", " : "") << keyName (dance::firstMoveKey + m) << " " << moveBox.getItemText (m);
-            if (moveBox.getNumItems() > 12)
+            // the sheet's moves (the first ones: a long sheet's keys go on in the same order); its last row is not a move
+            // but the dancer held with the mouse (FL), said after the keys (round 190bj, issue B9)
+            const auto keys = dance::sheetKeys (sheet->names);
+            for (int m = 0; m < juce::jmin ((int) keys.size(), 12); ++m)
+                moves << (m > 0 ? ", " : "") << keyName (keys[(std::size_t) m].key) << " " << moveBox.getItemText (m);
+            if (keys.size() > 12)
                 moves << ", ...";
+            if (const auto last = dance::sheetHeldName (sheet->names); ! last.empty())
+                held = " " + tr ("{0} (the sheet's last row) shows while the dancer is held with the mouse.", { juce::String::fromUTF8 (last.c_str()) });
         }
         else
             for (int m = 0; m < dance::moveCount; ++m)
                 moves << (m > 0 ? ", " : "") << keyName (dance::firstMoveKey + m) << " " << tr (dance::moveName (m));
         return tr ("Keys (as in FL's Fruity Dance): {0}. From {1} down: the same moves mirrored. {2} hides the dancer, {3} shows it.",
-                   { moves, keyName (dance::firstMirrorKey), keyName (dance::hideKey), keyName (dance::showKey) });
+                   { moves, keyName (dance::firstMirrorKey), keyName (dance::hideKey), keyName (dance::showKey) })
+               + held;
     }
 
     void timerCallback() override
@@ -1316,8 +1337,8 @@ private:
         }
         const auto beats = clock.beats (engine);
         const auto cycles = beats * 0.5 * settings.speed;
-        if (sheet != nullptr) // (the preview always dances the chosen move; on the stage FL's rules apply)
-            shownFrame = animator.advance (cycles, sheet->layout.rows, settings.move, settings.mirrored, true, settings.blend, false, settings.sync);
+        if (sheet != nullptr) // (the stage's frame: FL's first row while the song is stopped; round 190bj, issue B8)
+            shownFrame = dance::danceFrame (animator, cycles, sheet->layout.rows, settings, engine.getTransport().playing.load());
         else
             shownPose = dance::pose (juce::jmin (settings.move, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
         repaint (stage);

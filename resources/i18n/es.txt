@@ -8918,3 +8918,6 @@ countries: es mx ar co cl pe ve
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelación: mantiene el nivel en un umbral bajo el techo con un ataque lento, el techo atrapa el resto (desactivada por defecto)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Umbral de nivelación: el nivel que se mantiene bajo el techo (Off: sin nivelación)"
 "Levelling attack: how much of a transient passes before the level is held" = "Ataque de nivelación: cuánto de un transitorio pasa antes de que se mantenga el nivel"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (la última fila de la hoja) se muestra mientras el bailarín se sujeta con el ratón."

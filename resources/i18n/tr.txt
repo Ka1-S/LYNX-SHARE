@@ -8918,3 +8918,6 @@ countries: tr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Seviyeleme: seviyeyi yavaş bir atakla tavanın altındaki bir eşikte tutar, gerisini tavan yakalar (varsayılan olarak kapalı)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Seviyeleme eşiği: tavanın altında tutulan seviye (Off: seviyeleme yok)"
 "Levelling attack: how much of a transient passes before the level is held" = "Seviyeleme atağı: seviye tutulmadan önce bir geçicinin ne kadarının geçtiği"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."

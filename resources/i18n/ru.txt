@@ -8918,3 +8918,6 @@ countries: ru by kz
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Выравнивание: удерживает уровень на пороге ниже потолка с медленной атакой, остальное ловит потолок (по умолчанию выключено)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Порог выравнивания: уровень, удерживаемый ниже потолка (Off: без выравнивания)"
 "Levelling attack: how much of a transient passes before the level is held" = "Атака выравнивания: какая часть транзиента проходит, прежде чем уровень удерживается"
+
+# --- Round 190bj: QA fixes
+"{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (последняя строка листа) показывается, пока танцора держат мышью."
