@@ -8714,3 +8714,23 @@ countries: kr
 "Attached" = "도킹됨"
 "Snap notes to the scale on/off" = "노트를 스케일에 스냅 켜기/끄기"
 "Create automation clip for the last tweaked control" = "마지막으로 조작한 컨트롤의 오토메이션 클립 만들기"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "마스터 옆에 라우드니스 미터(LYNX)"
+"Start the loudness measurement again" = "라우드니스 측정 다시 시작"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "마스터 라우드니스: S = 단기(3초), I = 마지막 초기화 이후 통합(LUFS), TP = 트루 피크(dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "마스터 출력의 단기 및 통합 라우드니스(LUFS)와 트루 피크를 초기화 버튼과 함께 표시합니다. 믹서 메뉴에도 있습니다."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "아무것도 사용하지 않는 인서트를 숨깁니다. 마스터, 선택한 인서트, 오디오를 받는 인서트는 항상 남습니다. 믹서 메뉴에도 있습니다."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "인서트를 삭제해도 그 인서트로 들어가던 링크를 회색으로 남겨 다시 연결할 수 있게 합니다. 믹서 메뉴에도 있습니다."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "변경할 때마다 믹서 그룹이 플레이리스트의 트랙 그룹을 그대로 따릅니다. 믹서 메뉴에도 있습니다."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "오토메이션을 플레이리스트 트랙 아래의 레인에 둘 수 있습니다. 오토메이션 클립은 이전처럼 동작합니다. 플레이리스트 메뉴에도 있습니다."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "피아노 롤의 눈금자에 패턴이 곡에서 재생되는 위치의 마디 번호를 표시합니다. 피아노 롤의 보기 메뉴에도 있습니다."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "마우스 아래에 있는 노브나 페이더의 값을 힌트 바뿐 아니라 커서 옆에도 표시합니다. 일반 페이지에도 있습니다."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "이전 패스는 음소거된 채 그 아래에 남아 고를 수 있습니다. 녹음 옵션 메뉴에도 있습니다."
+"A key for the selected device's own window. Also in the Device view's options menu." = "선택한 장치의 자체 창을 여닫는 키입니다. 장치 보기의 옵션 메뉴에도 있습니다."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "장치 보기에서 고른 장치를 믹서가 따라갑니다. 장치 보기의 옵션 메뉴에도 있습니다."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "게임 컨트롤러로 트랜스포트를 조작하고 MIDI 컨트롤러처럼 어떤 컨트롤에도 연결할 수 있습니다. MIDI 페이지에도 있습니다."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX만의 개선 기능입니다. 모두 기본적으로 꺼져 있어, 하나를 켜기 전까지 LYNX SHARE는 FL Studio처럼 보이고 동작합니다. 각 스위치는 해당 줄에 적힌 곳에 있는 설정과 같은 설정입니다."
+"LYNX extras..." = "LYNX 추가 기능..."

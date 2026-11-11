@@ -359,6 +359,15 @@ bool insertTrack (Song& song, int at)
     return insertTracks (song, at, 1) == 1;
 }
 
+std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep)
+{
+    const auto tracks = (int) song.mixer.size();
+    std::vector<bool> hidden ((std::size_t) tracks + 1, false);
+    for (int t = 1; t < tracks; ++t)
+        hidden[(std::size_t) t] = keep.count (t) == 0 && ! song.insertInUse (t);
+    return hidden;
+}
+
 int removeUnusedTrailingInserts (Song& song, int keep)
 {
     int removed = 0;

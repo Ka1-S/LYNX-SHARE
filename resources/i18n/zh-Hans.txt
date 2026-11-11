@@ -8714,3 +8714,23 @@ countries: cn sg
 "Attached" = "已停靠"
 "Snap notes to the scale on/off" = "音符吸附到音阶 开/关"
 "Create automation clip for the last tweaked control" = "为最后调整的控件创建自动化片段"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "在 Master 旁显示响度表（LYNX）"
+"Start the loudness measurement again" = "重新开始响度测量"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Master 的响度：S = 短期（3 秒），I = 自上次重置以来的综合响度（LUFS），TP = 真峰值（dBTP）"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Master 输出的短期响度和综合响度（LUFS）以及真峰值，带重置按钮。混音器菜单中也有。"
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "隐藏没有任何用途的插入轨。Master、选中的插入轨以及任何接收音频的插入轨始终保留。混音器菜单中也有。"
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "删除插入轨时，原先进入它的链接会以灰色保留，以便重新连接。混音器菜单中也有。"
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "每次更改后，混音器的分组都与 Playlist 的轨道分组保持一致。混音器菜单中也有。"
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "自动化可以放在 Playlist 轨道下方的通道里；自动化片段照常使用。Playlist 菜单中也有。"
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "钢琴卷帘的标尺显示该样式在歌曲中播放位置的小节号。钢琴卷帘的视图菜单中也有。"
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "鼠标下方旋钮或推子的数值会显示在光标旁，而不只是在提示栏里。常规页面中也有。"
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "之前的各遍会静音保留在其下方，可供挑选。录音选项菜单中也有。"
+"A key for the selected device's own window. Also in the Device view's options menu." = "用于显示或隐藏所选设备自身窗口的按键。设备视图的选项菜单中也有。"
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "混音器跟随在设备视图中选中的设备。设备视图的选项菜单中也有。"
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "游戏手柄可以控制走带，并能像 MIDI 控制器一样链接到任何控件。MIDI 页面中也有。"
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改进。它们默认全部关闭，因此在你打开其中一项之前，LYNX SHARE 的外观和行为都与 FL Studio 相同。每个开关与其所在行指明位置的设置是同一个设置。"
+"LYNX extras..." = "LYNX 附加功能..."

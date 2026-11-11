@@ -4,6 +4,7 @@
 // sidechain gestures, linking channels, effect slot reordering). Pure functions over the Song model:
 // no JUCE, unit-tested in tests/WorkflowP2Tests.inc.
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,17 @@ std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int
 // Removes the unused inserts (Song::insertInUse) at the end of the mixer, keeping at least `keep` inserts (round 163,
 // Mixer › "Remove unused inserts at the end"). Returns how many were removed.
 int removeUnusedTrailingInserts (Song& song, int keep = 0);
+
+// Mixer menu › "Show only used inserts" (round 163; the rule made exact in round 190am): which strips take no room.
+// An insert is hidden only when ALL of these hold:
+//  - it is not the Master;
+//  - it is not in `keep` (the selected inserts, those brought back with "+", and those whose meter moved: an insert
+//    that receives audio always shows);
+//  - nothing uses it (Song::insertInUse): no channel plays into it, no insert sends to it and it sends nowhere but
+//    the Master, no effect slot, no audio input, no Playlist track link, no effect's sidechain or extra output points
+//    at it, its name, fader, pan, separation, mute, solo, colour, EQ and output are the defaults, nothing automates it.
+// Returns one flag per insert plus one for the "+" button (never hidden). Nothing in the song changes.
+std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep);
 
 // Channels whose output goes to `track`.
 std::vector<int> channelsOn (const Song& song, int track);

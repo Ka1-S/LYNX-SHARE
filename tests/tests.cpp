@@ -17442,3 +17442,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicex190acTests.inc"
 #include "Slicex190ajTests.inc"
 #include "ScaleSnap190anTests.inc"
+#include "TruePeak190amTests.inc"
+#include "Loudness190amTests.inc"
+#include "UsedOnly190amTests.inc"
+#include "Extras190amTests.inc"

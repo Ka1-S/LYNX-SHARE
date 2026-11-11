@@ -8714,3 +8714,23 @@ countries: tr
 "Attached" = "Yerleşik"
 "Snap notes to the scale on/off" = "Notaları gama yapıştır aç/kapat"
 "Create automation clip for the last tweaked control" = "Son oynatılan kontrol için otomasyon klibi oluştur"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Master'ın yanında ses yüksekliği ölçer (LYNX)"
+"Start the loudness measurement again" = "Ses yüksekliği ölçümünü yeniden başlat"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Master'ın ses yüksekliği: S = kısa süreli (3 sn), I = son sıfırlamadan beri entegre (LUFS), TP = gerçek tepe (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Master çıkışının kısa süreli ve entegre ses yüksekliği (LUFS) ile gerçek tepe değeri, bir Sıfırla düğmesiyle. Mikser menüsünde de var."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Hiçbir şeyin kullanmadığı insert'leri gizler. Master, seçili insert ve ses alan her insert her zaman kalır. Mikser menüsünde de var."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Bir insert silindiğinde ona giren bağlantılar gri olarak kalır, böylece yeniden bağlanabilir. Mikser menüsünde de var."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "Mikser grupları her değişiklikten sonra Playlist'in kanal gruplarını yansıtır. Mikser menüsünde de var."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Otomasyon bir Playlist kanalının altındaki şeritlerde durabilir; otomasyon klipleri eskisi gibi çalışır. Playlist menüsünde de var."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Piano Roll cetveli, pattern'in şarkıda çaldığı yerin ölçü numaralarını gösterir. Piano Roll'un Görünüm menüsünde de var."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Farenin altındaki düğmenin veya fader'ın değeri yalnızca ipucu çubuğunda değil, imlecin yanında da görünür. Genel sayfasında da var."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "Önceki geçişler altında, sessize alınmış olarak, seçmek için kalır. Kayıt seçenekleri menüsünde de var."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Seçili cihazın kendi penceresi için bir tuş. Cihaz görünümünün seçenekler menüsünde de var."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Mikser, Cihaz görünümünde seçilen cihazı izler. Cihaz görünümünün seçenekler menüsünde de var."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Bir oyun kumandası transportu yönetir ve bir MIDI denetleyicisi gibi herhangi bir kontrole bağlanabilir. MIDI sayfasında da var."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX'in kendi iyileştirmeleri. Hepsi varsayılan olarak kapalıdır; birini açana kadar LYNX SHARE, FL Studio gibi görünür ve davranır. Her anahtar, satırında adı geçen yerdeki ayarın aynısıdır."
+"LYNX extras..." = "LYNX ekstraları..."

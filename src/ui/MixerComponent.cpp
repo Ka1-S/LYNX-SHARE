@@ -255,8 +255,12 @@ void MixerStrips::layoutStrips()
     // insert shows; selecting another strip doesn't move the strips under the mouse)
     hidden.assign ((std::size_t) tracks + 1, false);
     if (showUsedOnly)
-        for (int t = 1; t < tracks; ++t)
-            hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    {
+        // round 190am: the selected inserts stay, and stay after the selection moves on (no strip jumps under the mouse)
+        revealed.insert (selected);
+        revealed.insert (selection.begin(), selection.end());
+        hidden = mixerops::hiddenUnusedInserts (song, revealed);
+    }
     // folded groups (round 177a): nothing is computed unless a group is folded
     foldShow.clear();
     tabOf.clear();
@@ -290,6 +294,7 @@ void MixerStrips::layoutStrips()
     dockGaps.clear();
     separatorLines.clear();
     vcaXs.clear();
+    loudnessX = hiddenX;
 
     int x = 4;
     bool any = false, afterMaster = false;
@@ -333,6 +338,11 @@ void MixerStrips::layoutStrips()
             }
             stripXs[(std::size_t) t] = x;
             x += stripWidthOf (t);
+            if (t == 0 && showLoudness) // the loudness panel: right of the Master, in its dock (round 190am)
+            {
+                loudnessX = x;
+                x += loudnessWidth;
+            }
             any = true;
             first = false;
             afterMaster = t == 0;
@@ -1229,12 +1239,19 @@ void MixerStrips::mouseMove (const juce::MouseEvent& e)
         setHover (vcaPartAt (i, e.getPosition()), vcaStrip (i));
         return;
     }
+    if (const auto over = showLoudness && loudnessResetArea().contains (e.getPosition()); over != loudnessResetHovered)
+    {
+        loudnessResetHovered = over;
+        repaint (loudnessResetArea().expanded (2));
+    }
     const auto t = trackAt (e.x);
     setHover (t >= 0 ? partAt (t, e.getPosition()) : Part::none, t);
 }
 
 void MixerStrips::mouseExit (const juce::MouseEvent&)
 {
+    if (std::exchange (loudnessResetHovered, false))
+        repaint (loudnessResetArea().expanded (2));
     setHover (Part::none, -1);
 }
 
@@ -1649,8 +1666,16 @@ void MixerStrips::paint (juce::Graphics& g)
         }
     }
     if (pass == dockOf (0))
+    {
         for (int i = 0; i < (int) vcaXs.size(); ++i)
             paintVcaStrip (g, i);
+        if (showLoudness && g.clipRegionIntersects (loudnessArea().expanded (3)))
+        {
+            paintLoudnessPanel (g);
+            if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+                paintLoudnessValues (g);
+        }
+    }
     paintDividers (pass);
     }
 
@@ -1704,6 +1729,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         vcaMouseDown (e, i);
+        return;
+    }
+    if (showLoudness && loudnessArea().contains (e.getPosition())) // round 190am: Reset, or the panel's menu
+    {
+        if (flmods::popup (e.mods))
+            showLoudnessMenu();
+        else if (loudnessResetArea().contains (e.getPosition()))
+            resetLoudness();
         return;
     }
 
@@ -2226,6 +2259,7 @@ void MixerStrips::setSelection (std::vector<int> tracks, int primary)
     selection = tracks;
     const auto changed = primary != selected;
     selected = primary;
+    keepSelectionShown();
     repaint();
 
     if (changed && onSelectionChanged)
@@ -2428,6 +2462,20 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         return vcaHint (dragVca, p);
     if (const auto i = vcaAt (p.x); i >= 0 && dragPart == Part::none)
         return vcaHint (i, p);
+    if (showLoudness && dragPart == Part::none && loudnessArea().contains (p))
+    {
+        ui::Hint h;
+        h.hasMenu = true;
+        if (loudnessResetArea().contains (p))
+            h.text = tr ("Start the loudness measurement again");
+        else
+        {
+            h.text = tr ("Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)");
+            h.value = "S " + juce::String (formatLoudness (loudnessShown.shortTerm)) + "  I " + juce::String (formatLoudness (loudnessShown.integrated))
+                      + "  TP " + juce::String (formatLoudness (loudnessShown.truePeak));
+        }
+        return h;
+    }
     const auto active = dragPart == Part::pan || dragPart == Part::fader || dragPart == Part::stereo || dragPart == Part::send;
     const auto t = active ? dragTrack : trackAt (p.x);
     const auto& song = engine.getSong();
@@ -2559,10 +2607,21 @@ void MixerStrips::mouseDoubleClick (const juce::MouseEvent& e)
     }
 }
 
+void MixerStrips::keepSelectionShown()
+{
+    if (! showUsedOnly)
+        return;
+    const auto wasHidden = std::any_of (selection.begin(), selection.end(), [this] (int t) { return revealed.count (t) == 0 && isHidden (t); })
+                           || (revealed.count (selected) == 0 && isHidden (selected));
+    if (wasHidden) // (selected from the Channel Rack, a menu or the keyboard: its strip comes back)
+        updateSize();
+}
+
 void MixerStrips::selectTrack (int track)
 {
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), track);
     selection = { selected };
+    keepSelectionShown();
     repaint();
 
     if (onSelectionChanged)
@@ -3658,6 +3717,148 @@ bool MixerStrips::isSilenced (int t) const
     return (std::size_t) t < audible.size() && ! audible[(std::size_t) t];
 }
 
+// --- the loudness panel beside the Master (round 190am, LYNX's own; Mixer menu, off by default) -----------------------
+namespace
+{
+constexpr float loudnessBarTop = 0.0f, loudnessBarBottom = -42.0f; // LUFS at the bar's ends
+float loudnessBarPosition (float lufs) noexcept
+{
+    return juce::jlimit (0.0f, 1.0f, (lufs - loudnessBarBottom) / (loudnessBarTop - loudnessBarBottom));
+}
+constexpr int loudnessRowsTop = 24, loudnessRowHeight = 16;
+} // namespace
+
+void MixerStrips::setShowLoudness (bool on)
+{
+    showLoudness = on;
+    engine.getMeters().loudness.setEnabled (on); // (off: the audio thread measures nothing)
+    loudnessShown = {};
+    updateSize();
+    repaint();
+}
+
+void MixerStrips::resetLoudness()
+{
+    engine.getMeters().loudness.reset();
+    loudnessShown = {};
+    repaint (loudnessArea());
+}
+
+juce::Rectangle<int> MixerStrips::loudnessArea() const noexcept
+{
+    if (! showLoudness || loudnessX == hiddenX)
+        return {};
+    return { loudnessX + pinOffset (dockOf (0)), 2, loudnessWidth - spec().gap, laneTop() - 2 };
+}
+
+juce::Rectangle<int> MixerStrips::loudnessResetArea() const noexcept
+{
+    const auto area = loudnessArea();
+    if (area.isEmpty())
+        return {};
+    return { area.getX() + 4, rows().faderBottom + 3, area.getWidth() - 8, 15 };
+}
+
+juce::Rectangle<int> MixerStrips::loudnessBarArea() const noexcept
+{
+    const auto area = loudnessArea();
+    const auto r = rows();
+    return { area.getX() + 6, r.faderTop, 8, r.faderBottom - r.faderTop };
+}
+
+void MixerStrips::paintLoudnessPanel (juce::Graphics& g) const
+{
+    using namespace theme;
+    const auto area = loudnessArea();
+    theme::fillRoundRect (g, area.toFloat(), radius::md, colour::bg2);
+    g.setColour (colour::border);
+    g.drawRoundedRectangle (area.toFloat().reduced (0.5f), radius::md, 1.0f);
+
+    g.setColour (colour::textSecondary);
+    g.setFont (font (type::caption, true));
+    textcache::drawFittedText (g, "LUFS", juce::Rectangle<int> (area.getX(), 4, area.getWidth(), 13), juce::Justification::centred, 1, 0.7f);
+
+    // the captions of the three values (EBU R 128's letters; the hint bar spells them out)
+    g.setFont (font (9.0f, true));
+    const char* captions[] = { "S", "I", "TP" };
+    for (int i = 0; i < 3; ++i)
+        textcache::drawText (g, captions[i], juce::Rectangle<int> (area.getX() + 5, loudnessRowsTop + i * loudnessRowHeight, 14, loudnessRowHeight),
+                             juce::Justification::centredLeft, false);
+
+    // the short-term bar's well and scale (LUFS, 6 LU apart, as many as fit)
+    const auto bar = loudnessBarArea();
+    theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
+    g.setFont (font (9.0f));
+    const auto textHeight = 10.0f;
+    auto lastY = -100.0f;
+    for (int lufs = 0; lufs >= (int) loudnessBarBottom; lufs -= 6)
+    {
+        const auto y = (float) bar.getBottom() - loudnessBarPosition ((float) lufs) * (float) bar.getHeight();
+        if (y - lastY < textHeight + 1.0f)
+            continue;
+        lastY = y;
+        g.setColour (colour::textSecondary);
+        g.fillRect (juce::Rectangle<float> ((float) bar.getRight() + 1.0f, y - 0.5f, 3.0f, 1.0f));
+        const auto box = juce::Rectangle<float> ((float) bar.getRight() + 5.0f, y - textHeight * 0.5f, (float) (area.getRight() - bar.getRight()) - 9.0f, textHeight)
+                             .withY (juce::jlimit ((float) bar.getY(), (float) bar.getBottom() - textHeight, y - textHeight * 0.5f));
+        textcache::drawText (g, juce::String (lufs), box, juce::Justification::centredRight, false);
+    }
+
+    // Reset
+    const auto reset = loudnessResetArea().toFloat();
+    theme::fillRoundRect (g, reset, radius::sm, loudnessResetHovered ? colour::bg5 : colour::bg0);
+    g.setColour (loudnessResetHovered ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (type::caption));
+    textcache::drawFittedText (g, tr ("Reset"), reset.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.6f);
+}
+
+void MixerStrips::paintLoudnessValues (juce::Graphics& g) const
+{
+    using namespace theme;
+    const auto area = loudnessArea();
+    const auto& v = loudnessShown;
+    const float values[] = { v.shortTerm, v.integrated, v.truePeak };
+    g.setFont (font (type::small, true));
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto known = MasterLoudness::measured (values[i]);
+        // the true peak warns like the peak meters: amber from -1 dBTP, red above 0 dBTP
+        g.setColour (! known ? colour::textDisabled
+                             : i == 2 && values[i] > 0.0f ? colour::meterClip : i == 2 && values[i] > -1.0f ? colour::meterMid : colour::textPrimary);
+        textcache::drawFittedText (g, juce::String (formatLoudness (values[i])),
+                                   juce::Rectangle<int> (area.getX() + 18, loudnessRowsTop + i * loudnessRowHeight, area.getWidth() - 23, loudnessRowHeight),
+                                   juce::Justification::centredRight, 1, 0.7f);
+    }
+
+    const auto bar = loudnessBarArea();
+    if (MasterLoudness::measured (v.shortTerm))
+    {
+        const auto h = juce::roundToInt (loudnessBarPosition (v.shortTerm) * (float) bar.getHeight());
+        g.setColour (colour::meterLow);
+        g.fillRect (bar.withTop (bar.getBottom() - h).reduced (1, 0));
+    }
+    if (MasterLoudness::measured (v.integrated)) // the integrated loudness: a line across the bar
+    {
+        const auto y = (float) bar.getBottom() - loudnessBarPosition (v.integrated) * (float) bar.getHeight();
+        g.setColour (colour::textPrimary);
+        g.fillRect (juce::Rectangle<float> ((float) bar.getX() - 2.0f, y - 1.0f, (float) bar.getWidth() + 4.0f, 2.0f));
+    }
+}
+
+void MixerStrips::showLoudnessMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Reset"), [this] { resetLoudness(); });
+    menu.addSeparator();
+    menu.addItem (tr ("Loudness meter beside the Master (LYNX)"), true, true, [] {
+        if (mixeroptions::setShowLoudness)
+            mixeroptions::setShowLoudness (false);
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
 // One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
 void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Rectangle<int> bar) const
 {
@@ -3749,6 +3950,14 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
                     g.excludeClipRegion (r);
             paintVcaMeter (g, i);
         }
+    if (showLoudness && loudnessArea().intersects (clip))
+    {
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (0) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        paintLoudnessValues (g);
+    }
 }
 
 bool MixerStrips::liveFrame (double nowMs)
@@ -3797,11 +4006,16 @@ bool MixerStrips::liveFrame (double nowMs)
     // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
+    int woken = -1;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
         const auto before = m;
-        m.advance (meters.takePeak ((int) (i / 2), (int) (i % 2)), elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
+        m.advance (peak, elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
+        if (showUsedOnly && peak > 1.0e-4f && i >= 2 && revealed.count ((int) (i / 2)) == 0 && isHidden ((int) (i / 2)))
+            woken = (int) (i / 2);
         if (m.level != before.level || m.peak != before.peak)
             moving = true;
         if (! showing)
@@ -3855,11 +4069,31 @@ bool MixerStrips::liveFrame (double nowMs)
                 was = level;
             }
     }
+    // the loudness panel (round 190am; nothing while it is off): repainted when a shown number or the bar changes
+    if (showLoudness && showing)
+        if (const auto now = meters.loudness.read(); ! (now == loudnessShown))
+        {
+            const auto same = [] (float a, float b) { return formatLoudness (a) == formatLoudness (b); };
+            const auto changed = ! same (now.shortTerm, loudnessShown.shortTerm) || ! same (now.integrated, loudnessShown.integrated)
+                                 || ! same (now.truePeak, loudnessShown.truePeak);
+            loudnessShown = now;
+            if (changed)
+            {
+                const auto area = loudnessArea();
+                dirty = dirty.isEmpty() ? area : dirty.getUnion (area);
+            }
+        }
     if (! dirty.isEmpty())
     {
         meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
         repaint (dirty);
         meterRepaintOnly = false;
+    }
+    if (woken > 0) // (one per frame is enough: the next frame brings the next)
+    {
+        revealed.insert (woken);
+        updateSize();
+        repaint();
     }
     return moving;
 }
@@ -4429,6 +4663,7 @@ namespace mixeroptions
 {
 std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
+std::function<void (bool)> setShowLoudness;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 
 namespace
@@ -4469,6 +4704,15 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             setShowUsedOnly (on);
         else
             MixerStrips::showUsedOnly = on;
+        notifyChanged();
+    });
+    // LYNX's own (round 190am; off = FL's mixer): the Master's loudness in LUFS and its true peak, beside the Master
+    menu.addItem (tr ("Loudness meter beside the Master (LYNX)"), true, MixerStrips::showLoudness, [] {
+        const auto on = ! MixerStrips::showLoudness;
+        if (setShowLoudness)
+            setShowLoudness (on);
+        else
+            MixerStrips::showLoudness = on;
         notifyChanged();
     });
     menu.addItem (tr ("Remove unused inserts at the end"), song.mixer.size() > 1 && ! song.insertInUse ((int) song.mixer.size() - 1), false, [&engine] {

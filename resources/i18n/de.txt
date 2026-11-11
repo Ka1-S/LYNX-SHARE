@@ -8714,3 +8714,23 @@ countries: de at ch li lu
 "Attached" = "Angedockt"
 "Snap notes to the scale on/off" = "Noten an der Skala einrasten ein/aus"
 "Create automation clip for the last tweaked control" = "Automationsclip für das zuletzt bewegte Bedienelement erstellen"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Lautheitsanzeige neben dem Master (LYNX)"
+"Start the loudness measurement again" = "Lautheitsmessung neu starten"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Lautheit des Masters: S = Kurzzeit (3 s), I = integriert seit dem letzten Reset (LUFS), TP = True Peak (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Kurzzeit- und integrierte Lautheit (LUFS) und der True Peak des Master-Ausgangs, mit einer Reset-Taste. Auch im Mixer-Menü."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Blendet Inserts aus, die nichts benutzt. Der Master, der gewählte Insert und jeder Insert, der Audio empfängt, bleiben immer. Auch im Mixer-Menü."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Beim Löschen eines Inserts bleiben die Verbindungen dorthin ausgegraut erhalten und lassen sich wieder anschließen. Auch im Mixer-Menü."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "Die Gruppen des Mixers spiegeln nach jeder Änderung die Spurgruppen der Playlist. Auch im Mixer-Menü."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Automation kann in Spuren unter einer Playlist-Spur liegen; Automationsclips funktionieren wie bisher. Auch im Playlist-Menü."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Das Lineal der Piano Roll zeigt die Taktnummern der Stelle im Song, an der das Pattern spielt. Auch im Ansicht-Menü der Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Der Wert des Reglers unter der Maus erscheint neben dem Mauszeiger, nicht nur in der Hinweisleiste. Auch auf der Seite Allgemein."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "Die früheren Durchgänge bleiben stummgeschaltet darunter zur Auswahl. Auch im Menü der Aufnahmeoptionen."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Eine Taste für das eigene Fenster des gewählten Geräts. Auch im Optionsmenü der Geräte-Ansicht."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Der Mixer folgt dem in der Geräte-Ansicht gewählten Gerät. Auch im Optionsmenü der Geräte-Ansicht."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Ein Gamecontroller steuert den Transport und lässt sich wie ein MIDI-Controller mit jedem Regler verknüpfen. Auch auf der MIDI-Seite."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX-eigene Verbesserungen. Alle sind standardmäßig aus, sodass LYNX SHARE wie FL Studio aussieht und sich so verhält, bis du eine einschaltest. Jeder Schalter ist dieselbe Einstellung wie an dem Ort, den seine Zeile nennt."
+"LYNX extras..." = "LYNX-Extras..."

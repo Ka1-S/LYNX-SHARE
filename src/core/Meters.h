@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "core/AudioCapture.h"
+#include "core/MasterLoudness.h"
 #include "core/RollingAudioLog.h"
 #include "core/Song.h"
 
@@ -42,6 +43,8 @@ public:
     // the real-time bounce's tap (round 165c): the Master while the song plays, during Export › "Render through the
     // hardware in real time"
     AudioCapture bounceTap;
+    // the Master's loudness readout (round 190am): Mixer menu > "Loudness meter beside the Master", off by default
+    MasterLoudness loudness;
 
 private:
     static void raise (std::atomic<float>& slot, float value) noexcept
