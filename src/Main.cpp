@@ -4105,7 +4105,8 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 9; // (the last one reports dock_result)
+            const int dockSteps = 2 * 4 + 12; // (the last one reports dock_result)
+            int danceChannel = -1;            // issue #116 slice 4: a dance channel's dancer over the docked plugin
             lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
             struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
             {
@@ -4251,6 +4252,83 @@ private:
                     expect ("detached_stays_above_clicked_panels", plug != nullptr && lynx::nativechild::ownerOf (plug) == main
                                                                        && lynx::nativechild::parentOf (plug) != main && lynx::PluginWindows::isOpen (*instance));
                     lynx::PluginWindows::setDetached (*instance, false);
+                }
+                else if (at == 16)
+                {
+                    // issue #116 slice 4: a Fruity Dance dancer standing on the docked plugin window, in front of it
+                    auto* stage = dynamic_cast<lynx::DanceStage*> (ui->danceStageForTest());
+                    juce::Rectangle<int> over;
+                    for (auto* c : lynx::nativechild::attachedChildren (main))
+                        if (c->getWindowHandle() == plug)
+                            over = ui->getLocalArea (nullptr, c->getScreenBounds());
+                    expect ("dance_stage", stage != nullptr && ! over.isEmpty());
+                    lynx::dance::Settings s;
+                    s.move = lynx::dance::held; // (a still pose: the pixels tested below stay where they are)
+                    s.x = over.getCentreX();
+                    s.y = over.getCentreY() + 70;
+                    const auto state = lynx::dance::toState (s);
+                    engine->editSongStructural ([this, state] (lynx::Song& song) {
+                        lynx::ChannelDef c;
+                        c.name = "Fruity Dance";
+                        c.instrument = lynx::InstrumentKind::fruitydance;
+                        c.pluginState = state;
+                        danceChannel = (int) song.channels.size();
+                        song.channels.push_back (c);
+                    });
+                    engine->dispatchPendingMessages();
+                    if (stage != nullptr)
+                        stage->update();
+                }
+                else if (at == 17)
+                {
+                    auto* stage = dynamic_cast<lynx::DanceStage*> (ui->danceStageForTest());
+                    auto* w = stage != nullptr ? stage->windowOf (danceChannel) : nullptr;
+                    auto* h = w != nullptr ? w->getWindowHandle() : nullptr;
+                    expect ("dancer_window_native_child", h != nullptr && h != main && lynx::nativechild::parentOf (h) == main);
+                    expect ("dancer_window_layered", lynx::nativechild::isLayered (h));
+                    expect ("dancer_above_plugin", lynx::nativechild::isAbove (h, plug));
+                    for (auto p : dockPanels)
+                        expect ("dancer_above_" + id (p), lynx::nativechild::isAbove (h, panelHandle (p)));
+                    // panels and the plugin brought in front (clicks, keys): the dancer stays in front of them
+                    workspace->activate (Panel::mixer);
+                    workspace->show (Panel::pianoRoll);
+                    lynx::PluginWindows::open ({}, *instance, {});
+                    expect ("dancer_stays_in_front", lynx::nativechild::isAbove (h, plug) && lynx::nativechild::isAbove (h, panelHandle (Panel::mixer))
+                                                         && lynx::nativechild::isAbove (h, panelHandle (Panel::pianoRoll)));
+                    // the mouse: the dancer's body takes it, its window's transparent pixels let it through
+                    if (w != nullptr)
+                    {
+                        const auto picture = w->createComponentSnapshot (w->getLocalBounds(), true, 1.0f);
+                        const auto body = stage->bodyOf (danceChannel) - (w->getScreenPosition() - stage->getScreenPosition());
+                        juce::Point<int> solid { -1, -1 }, clear { -1, -1 };
+                        for (int y = body.getCentreY() - 10; y < body.getBottom() && solid.x < 0; ++y)
+                            for (int x = body.getX(); x < body.getRight() && solid.x < 0; ++x)
+                                if (picture.getBounds().contains (x, y) && picture.getPixelAt (x, y).getAlpha() == 255)
+                                    solid = { x, y };
+                        for (int y = 0; y < picture.getHeight() && clear.x < 0; y += 2)
+                            for (int x = 0; x < picture.getWidth() && clear.x < 0; x += 2)
+                                if (picture.getPixelAt (x, y).getAlpha() == 0 && ! body.expanded (8).contains (x, y))
+                                    clear = { x, y };
+                        step ("dancer_window=" + w->getBounds().toString() + " solid=" + solid.toString() + " clear=" + clear.toString());
+                        auto* atSolid = lynx::nativechild::windowAt (*w, solid);
+                        auto* atClear = lynx::nativechild::windowAt (*w, clear);
+                        expect ("dancer_takes_its_body_clicks", solid.x >= 0 && atSolid == h);
+                        expect ("dancer_lets_clicks_through", clear.x >= 0 && atClear != nullptr && atClear != h);
+                        expect ("stage_leaves_the_mouse", ! stage->hitTest (stage->bodyOf (danceChannel).getCentreX(), stage->bodyOf (danceChannel).getCentreY()));
+                    }
+                }
+                else if (at == 18)
+                {
+                    // no dance channel: no dancer window (nothing drawn, no cost)
+                    auto* stage = dynamic_cast<lynx::DanceStage*> (ui->danceStageForTest());
+                    engine->editSongStructural ([this] (lynx::Song& song) {
+                        if (danceChannel >= 0 && danceChannel < (int) song.channels.size())
+                            song.channels.erase (song.channels.begin() + danceChannel);
+                    });
+                    engine->dispatchPendingMessages();
+                    if (stage != nullptr)
+                        stage->update();
+                    expect ("dancer_window_gone", stage != nullptr && stage->windowCount() == 0);
                 }
                 else
                 {

@@ -114,6 +114,7 @@ public:
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
+    juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
