@@ -2330,6 +2330,14 @@ std::vector<int> insertOutputList (const Song& song, int track);
 // a clip resized or cut by hand keeps its length). `before` = patternLengths (song) before the edit.
 // (Issue #4: a pattern set to 2 bars still looped 1 bar in Song mode.)
 std::vector<std::int64_t> patternLengths (const Song& song);
+
+// FL's General › "Detach all new plugins" (issue #116): how many fresh hosted plugins (Channel rack instruments and
+// mixer effects with no saved state yet that are still docked: just added, not loaded or cloned) of each id the song
+// has, and, after an edit, marking the ones the edit added (an id the song has more fresh ones of than before; the
+// newest of them) as Detached. Returns how many. A clone or a loaded plugin is never counted, so adding one leaves
+// the fresh plugins that were already there (docked again by the user) alone.
+std::map<std::string, int> freshPluginCounts (const Song& song);
+int detachNewPlugins (const std::map<std::string, int>& before, Song& song);
 void followPatternLengths (const std::vector<std::int64_t>& before, Song& song);
 
 // Copy of the song ready for export: always in song mode (the current pattern becomes a clip

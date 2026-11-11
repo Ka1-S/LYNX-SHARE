@@ -617,9 +617,15 @@ private:
 // --- the desktop -------------------------------------------------------------------------------
 
 // Issue #116: native child frames follow the main window's native window (made again) and the desktop's place in it
-struct Workspace::PeerWatch final : juce::ComponentMovementWatcher
+// and the main window's scale (moved to a display with another scale: they are placed again and the docked editors told)
+struct Workspace::PeerWatch final : juce::ComponentMovementWatcher, juce::ComponentPeer::ScaleFactorListener
 {
-    explicit PeerWatch (Workspace& w) : juce::ComponentMovementWatcher (&w), owner (w) {}
+    explicit PeerWatch (Workspace& w) : juce::ComponentMovementWatcher (&w), owner (w) { watchScale(); }
+    ~PeerWatch() override
+    {
+        if (peer != nullptr && juce::ComponentPeer::isValidPeer (peer))
+            peer->removeScaleFactorListener (this);
+    }
     void componentMovedOrResized (bool wasMoved, bool) override
     {
         if (wasMoved)
@@ -627,11 +633,29 @@ struct Workspace::PeerWatch final : juce::ComponentMovementWatcher
     }
     void componentPeerChanged() override
     {
+        watchScale();
         owner.rehostNativeFrames();
         owner.applyLayout(); // (a panel left plain while there was no native window yet)
     }
     void componentVisibilityChanged() override { owner.applyLayout(); }
+    void nativeScaleFactorChanged (double) override
+    {
+        // (after JUCE has resized the main window for the new scale)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<Workspace> (&owner)] {
+            if (safe != nullptr)
+                nativechild::followParentScale (*safe);
+        });
+    }
+    void watchScale()
+    {
+        if (peer != nullptr && juce::ComponentPeer::isValidPeer (peer))
+            peer->removeScaleFactorListener (this);
+        peer = owner.getPeer();
+        if (peer != nullptr)
+            peer->addScaleFactorListener (this);
+    }
     Workspace& owner;
+    juce::ComponentPeer* peer = nullptr;
 };
 
 Workspace::Workspace()
@@ -721,6 +745,7 @@ void Workspace::nativeToFront (Panel panel)
     // click on it does (applyLayout keeps them where they were among the panels)
     if (auto& frame = *frames[(std::size_t) panel]; isNativePanel (panel) && nativechild::isAttached (frame) && frame.isVisible())
         frame.toFront (false);
+    nativechild::raiseOverlays();
 }
 
 void Workspace::hide (Panel panel)
@@ -768,6 +793,7 @@ void Workspace::activate (Panel panel)
 
     if (! layout[panel].detached && ! isBackgroundPanel (panel))
         frames[(std::size_t) panel]->toFront (false);
+    nativechild::raiseOverlays();
 
     setFocusedPanel (panel);
 }
@@ -1060,6 +1086,7 @@ void Workspace::applyLayout (bool fadePanels)
         });
     }
 
+    nativechild::raiseOverlays();
     setFocusedPanel (layout.focused);
     repaint();
 }

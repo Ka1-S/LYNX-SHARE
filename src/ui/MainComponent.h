@@ -113,6 +113,7 @@ public:
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
+    juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
@@ -314,6 +315,7 @@ private:
     int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
+    void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off

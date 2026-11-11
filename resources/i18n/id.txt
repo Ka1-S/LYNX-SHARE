@@ -8396,6 +8396,10 @@ countries: id
 "Empty project" = "Proyek kosong"
 "Last used project" = "Proyek terakhir digunakan"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Template bawaan terbuka dengan File › Baru, dan saat mulai bila Proyek saat mulai adalah \"Template bawaan\", sebagai proyek baru tanpa nama, jadi template itu sendiri tidak pernah tertimpa. File › Simpan sebagai template... menambahkan milik Anda."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Lepaskan semua plugin baru"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Aktif: jendela plugin yang ditambahkan terbuka terlepas, di atas panel. Nonaktif: terbuka tertambat di desktop, di belakang panel yang diklik. Menu jendela setiap plugin › Terlepas mengubahnya untuk plugin itu"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Untuk aplikasi lain..."
 "Export for other apps" = "Ekspor untuk aplikasi lain"

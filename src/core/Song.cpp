@@ -132,6 +132,64 @@ void followPatternLengths (const std::vector<std::int64_t>& before, Song& song)
     }
 }
 
+namespace
+{
+template <typename Song_, typename Fn>
+void forEachHostedPlugin (Song_& song, Fn&& fn)
+{
+    for (auto& c : song.channels)
+        if (c.instrument == InstrumentKind::plugin && ! c.plugin.id.empty())
+            fn (c.plugin);
+    for (auto& track : song.mixer)
+        for (auto& slot : track.effects)
+            if (slot.kind == EffectKind::plugin && ! slot.plugin.id.empty())
+                fn (slot.plugin);
+}
+} // namespace
+
+namespace
+{
+// a plugin an edit may have just added: no saved state yet (not loaded with a project, not a clone) and still docked
+bool looksJustAdded (const PluginRef& ref) { return ref.state.empty() && ! ref.detached; }
+} // namespace
+
+std::map<std::string, int> freshPluginCounts (const Song& song)
+{
+    std::map<std::string, int> counts;
+    forEachHostedPlugin (song, [&counts] (const PluginRef& ref) {
+        if (looksJustAdded (ref))
+            ++counts[ref.id];
+    });
+    return counts;
+}
+
+int detachNewPlugins (const std::map<std::string, int>& before, Song& song)
+{
+    // only fresh plugins count on both sides, so a clone or a loaded plugin (with a state) that raises the number of
+    // an id never gets an older fresh plugin of that id (one the user docked again) marked in its place
+    auto added = freshPluginCounts (song);
+    for (auto& [id, n] : added)
+        if (const auto it = before.find (id); it != before.end())
+            n -= it->second;
+
+    // the newest of an id are the last ones: skip the fresh plugins that were already there
+    std::map<std::string, int> seen;
+    const auto now = freshPluginCounts (song);
+    int marked = 0;
+    forEachHostedPlugin (song, [&] (PluginRef& ref) {
+        if (! looksJustAdded (ref))
+            return;
+        const auto index = seen[ref.id]++;
+        const auto left = added[ref.id];
+        if (left > 0 && index >= now.at (ref.id) - left)
+        {
+            ref.detached = true;
+            ++marked;
+        }
+    });
+    return marked;
+}
+
 std::vector<std::int64_t> patternLengths (const Song& song)
 {
     std::vector<std::int64_t> lengths;

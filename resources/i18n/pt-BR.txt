@@ -8479,6 +8479,10 @@ countries: br
 "Empty project" = "Projeto vazio"
 "Last used project" = "Último projeto usado"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "O modelo padrão abre com Arquivo › Novo, e ao iniciar quando Projeto ao iniciar é \"Modelo padrão\", como um projeto novo sem nome, então o próprio modelo nunca é sobrescrito. Arquivo › Salvar como modelo... adiciona os seus."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Destacar todos os plugins novos"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Ligado: a janela de um plugin adicionado abre destacada, por cima dos painéis. Desligado: abre acoplada na área de trabalho, atrás de um painel clicado. O menu da janela de cada plugin › Destacada muda isso para aquele plugin"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Para outros apps..."
 "Export for other apps" = "Exportar para outros apps"

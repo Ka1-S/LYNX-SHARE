@@ -1353,6 +1353,7 @@ public:
         useClassicRendering();
         setVisible (true);
         toFront (false);
+        nativechild::raiseOverlays();
         startHost();
     }
 
@@ -1392,6 +1393,7 @@ public:
         if (minimised)
             setMinimisedFrame (false);
         toFront (true);
+        nativechild::raiseOverlays();
         lastUsed() = key();
         editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
@@ -1400,6 +1402,7 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         toFront (false);
+        nativechild::raiseOverlays();
         lastUsed() = key();
         editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();

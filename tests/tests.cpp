@@ -16402,6 +16402,7 @@ TEST (level_audit_demo_imports_round89)
 #include "UiLook90Tests.inc"
 #include "UiFl104Tests.inc"
 #include "DialogsTests84.inc"
+#include "DockTests188.inc"
 #include "SubstituteTests.inc"
 #include "MixSuiteTests96.inc"
 #include "PanelsTests105.inc"

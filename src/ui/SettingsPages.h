@@ -39,6 +39,8 @@ struct GeneralOptions
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
     bool monophonicPainting = false; // FL's "Monophonic painting in piano roll" (round 189o)
+    // FL's General › "Detach all new plugins" (issue #116, off as in FL): new plugin windows open detached
+    bool detachNewPlugins = false;
     bool autoSelectLinked = true; // FL's General › "Auto select linked modules" (on, round 187a)
     // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the
     // control under the mouse also shows next to the cursor

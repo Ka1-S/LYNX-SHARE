@@ -8396,6 +8396,10 @@ countries: nl be
 "Empty project" = "Leeg project"
 "Last used project" = "Laatst gebruikt project"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Het standaardsjabloon opent met Bestand › Nieuw, en bij het starten als Project bij het starten op \"Standaardsjabloon\" staat, als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Alle nieuwe plug-ins losmaken"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Aan: het venster van een toegevoegde plug-in opent losgemaakt, boven de panelen. Uit: het opent gedockt in het bureaublad, achter een paneel waarop je klikt. Het venstermenu van elke plug-in › Losgemaakt wijzigt dit per plug-in"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Voor andere apps..."
 "Export for other apps" = "Exporteren voor andere apps"

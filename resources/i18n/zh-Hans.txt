@@ -8396,6 +8396,10 @@ countries: cn sg
 "Empty project" = "空工程"
 "Last used project" = "上次使用的工程"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "默认模板在“文件 › 新建”时打开，当“启动工程”为“默认模板”时也在启动时打开，均作为未命名的新工程，因此模板本身不会被覆盖。“文件 › 另存为模板...”可添加你自己的模板。"
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "分离所有新插件"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "开：添加的插件窗口以分离方式打开，位于面板之上。关：在桌面中停靠打开，位于所点击的面板之后。每个插件的窗口菜单 › 已分离 可为该插件单独更改"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "用于其他应用..."
 "Export for other apps" = "导出给其他应用"

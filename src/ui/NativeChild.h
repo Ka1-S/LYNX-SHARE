@@ -2,6 +2,8 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <vector>
+
 namespace lynx::nativechild
 {
 // Issue #116 (FL's docked plugin windows; design: docs/analise/REA_rodada181c.md): a third-party editor is a native child
@@ -10,8 +12,9 @@ namespace lynx::nativechild
 // too, siblings whose stacking order the system keeps (as FL's MDI children). These helpers host a component that way
 // inside `area` (the Workspace), in `area`'s coordinates.
 
-// The developer switch (LYNX_DOCKED_PLUGINS=1 in the environment): until every panel is a native child, docking stays
-// off by default and plugin windows are FL's "Detached" (LYNX's behaviour so far).
+// FL's docked plugin windows are the default (slice 3: every floating panel is a native child, overlays and DPI changes
+// follow them). LYNX_DOCKED_PLUGINS=0 in the environment turns docking off: every plugin window is then FL's "Detached"
+// and the panels are plain components (LYNX's behaviour before issue #116).
 bool dockingEnabled();
 
 // Makes `c` a native child window of `area`'s top-level window (it must not have a parent component). False when that
@@ -34,6 +37,21 @@ void refresh (juce::Component& c, juce::Component& area);
 // when it has to move.
 void keepAbove (juce::Component& c, juce::Component* below);
 
+// The main window moved to a display with another scale (issue #116): the attached children of `area`'s top-level
+// window are placed again in its new physical pixels, and what hosts a plugin editor in them is told the new scale
+// (JUCE tells a child window's listeners nothing by itself: only top-level windows get WM_DPICHANGED).
+void followParentScale (juce::Component& area);
+
+// An overlay of the main window (the setup wizard) in front of the native panels and docked plugin windows: an opaque
+// native child window of `over`'s top-level window covering `over`, that shows a picture of what is under it (the
+// lightweight components and the native children, taken when it opens and when it is resized) with `content` on top.
+// Nullptr when `over` has no native window yet (the caller keeps `content` as a plain overlay then). It stays in front
+// of the native children (raiseOverlays).
+std::unique_ptr<juce::Component> makeOverlayHost (std::unique_ptr<juce::Component>& content, juce::Component& over);
+void raiseOverlays();
+// The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
+std::vector<juce::Component*> attachedChildren (void* parentWindow);
+
 // Keys nothing in an attached component used: they don't travel up to the main window by themselves (it is another
 // native window), so `c` hands them to the main window's shortcuts (the secondary windows' route, ui/WindowOwner.h).
 void forwardUnusedKeys (juce::Component& c);
@@ -41,6 +59,10 @@ void forwardUnusedKeys (juce::Component& c);
 // Tests (Windows; elsewhere false / nullptr): `a` is above its sibling `b` in the native stacking order; a native window's
 // parent window (a child window) and owner (a top-level window kept above another).
 bool isAbove (void* a, void* b);
+// `c` (attached) is at its bounds in its parent's physical pixels (within a pixel); the main window's scale listeners
+// called as on a display change (so the desktop's native children follow it).
+bool placedPhysically (const juce::Component& c);
+void notifyScaleListenersForTest (juce::Component& top);
 void* parentOf (void* window);
 void* ownerOf (void* window);
 } // namespace lynx::nativechild

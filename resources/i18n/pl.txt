@@ -8396,6 +8396,10 @@ countries: pl
 "Empty project" = "Pusty projekt"
 "Last used project" = "Ostatnio używany projekt"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Domyślny szablon otwiera się przez Plik › Nowy, a przy starcie, gdy Projekt przy starcie to „Domyślny szablon\", jako nowy projekt bez nazwy, więc sam szablon nigdy nie zostaje nadpisany. Plik › Zapisz jako szablon... dodaje własne."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "Odłączaj wszystkie nowe wtyczki"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Wł.: okno dodanej wtyczki otwiera się odłączone, nad panelami. Wył.: otwiera się zadokowane na pulpicie, za klikniętym panelem. Menu okna każdej wtyczki › Odłączony zmienia to dla tej wtyczki"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Dla innych aplikacji..."
 "Export for other apps" = "Eksport dla innych aplikacji"

@@ -8396,6 +8396,10 @@ countries: kr
 "Empty project" = "빈 프로젝트"
 "Last used project" = "마지막으로 사용한 프로젝트"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "기본 템플릿은 파일 › 새로 만들기에서, 그리고 시작 프로젝트가 \"기본 템플릿\"일 때 시작할 때 이름 없는 새 프로젝트로 열리므로 템플릿 자체는 덮어쓰지 않습니다. 파일 › 템플릿으로 저장...으로 직접 만든 템플릿을 추가합니다."
+
+# --- Detach all new plugins (issue #116, round 188a)
+"Detach all new plugins" = "새 플러그인 모두 분리"
+"On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "켜짐: 추가한 플러그인의 창이 분리된 상태로 패널 위에 열립니다. 꺼짐: 데스크톱에 도킹되어 열리며 클릭한 패널 뒤로 갑니다. 각 플러그인 창 메뉴 › 분리됨에서 플러그인별로 바꿀 수 있습니다"
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "다른 앱용..."
 "Export for other apps" = "다른 앱용으로 내보내기"

@@ -16,6 +16,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "ui/NativeChild.h"
 #include "core/PlaylistOps.h"
 #include "core/Performance.h"
 
@@ -1283,9 +1284,26 @@ void MainComponent::resized()
     }
     if (setupOverlay != nullptr)
     {
-        setupOverlay->setBounds (getLocalBounds());
+        hostSetupOverlayNatively();
+        nativechild::place (*setupOverlay, *this, getLocalBounds());
         setupOverlay->toFront (false);
     }
+}
+
+void MainComponent::hostSetupOverlayNatively()
+{
+    // issue #116: in front of the native panels and docked plugin windows too (a native child window of its own, showing
+    // what is under it); without a native window yet, a plain overlay until there is one
+    if (setupOverlay == nullptr || ! nativechild::dockingEnabled() || nativechild::isAttached (*setupOverlay) || getPeer() == nullptr)
+        return;
+    removeChildComponent (setupOverlay.get());
+    if (auto host = nativechild::makeOverlayHost (setupOverlay, *this))
+    {
+        nativechild::forwardUnusedKeys (*host);
+        setupOverlay = std::move (host);
+        return;
+    }
+    addAndMakeVisible (*setupOverlay);
 }
 
 // --- toolbar layout ------------------------------------------------------------------------------
@@ -2095,6 +2113,8 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::monophonicPainting = on;
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
             editorlimit::enabled() = on;
+        else if (key == "detachNewPlugins") // FL's General › "Detach all new plugins" (issue #116)
+            engine.setDetachNewPlugins (on);
         else if (key == "autoSelectLinked")
             ChannelRackComponent::autoSelectLinked = on;
         else if (key == "muteRemovedSteps")
@@ -2356,6 +2376,7 @@ void MainComponent::saveUiSettings()
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
                                       + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
+                                      + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
@@ -6176,6 +6197,7 @@ void MainComponent::openSettings (int page)
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
         o.monophonicPainting = PianoRollComponent::monophonicPainting;
+        o.detachNewPlugins = safe->engine.detachesNewPlugins();
         o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
@@ -6267,6 +6289,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         PianoRollComponent::monophonicPainting = o.monophonicPainting;
+        self.engine.setDetachNewPlugins (o.detachNewPlugins);
         ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
@@ -7595,6 +7618,7 @@ void MainComponent::showSetupWizard()
     addAndMakeVisible (*setupOverlay);
     setupOverlay->setBounds (getLocalBounds());
     setupOverlay->toFront (true);
+    hostSetupOverlayNatively();
 }
 
 void MainComponent::showImportReport()
