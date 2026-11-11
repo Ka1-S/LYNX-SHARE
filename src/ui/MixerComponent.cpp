@@ -1640,11 +1640,15 @@ void MixerStrips::paint (juce::Graphics& g)
                 // a pre-fader send (LYNX's switch, round 190aq) is marked beside its knob
                 if (on && t > 0 && song.sendPre (selected, t))
                 {
+                    // (its whole text, ending at the knob's left edge: the strip's margin is narrower than "PRE")
                     const auto area = sendArea (t);
+                    const auto mark = compactLayout ? juce::String ("P") : tr ("PRE");
                     g.setColour (colour::accentHover);
                     g.setFont (font (8.0f, true));
-                    textcache::drawText (g, compactLayout ? juce::String ("P") : tr ("PRE"),
-                                         area.withWidth (juce::jmax (8, (area.getWidth() - (compactLayout ? 16 : 22)) / 2)), juce::Justification::centred);
+                    const auto width = juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), mark) + 2;
+                    const auto knobLeft = area.getCentreX() - (compactLayout ? 8 : 11);
+                    textcache::drawText (g, mark, juce::Rectangle<int> (knobLeft - width - 1, area.getY(), width, area.getHeight()),
+                                         juce::Justification::centredRight, false);
                 }
             }
             else if (feedsSelected) // this insert sends into the selected one

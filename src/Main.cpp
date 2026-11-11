@@ -10238,7 +10238,7 @@ private:
             ui.getMixerForSnapshot().selectTrack (1);
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-lowlat-on.png");
-            saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getRecordMenuForSnapshot() }, prefix + "-lowlat-menu.png");
+            saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getFullRecordMenuForSnapshot() }, prefix + "-lowlat-menu.png");
             juce::String report;
             report << "latency_with_option=" << offline.getLatencySamples() << " bypassed_slots=" << offline.lowLatencyBypassedCount() << "\n";
             options.lowLatencyRecording = false;

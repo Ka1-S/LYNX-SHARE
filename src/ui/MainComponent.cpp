@@ -3624,6 +3624,12 @@ void MainComponent::openAudioEditorForSelection()
 
 void MainComponent::showRecordMenu()
 {
+    buildRecordMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (recordMenuButton.isVisible() ? (juce::Component*) &recordMenuButton
+                                                                                                                  : (juce::Component*) &recordButton));
+}
+
+juce::PopupMenu MainComponent::buildRecordMenu()
+{
     const auto o = engine.getRecordOptions();
     auto set = [this] (std::function<void (AudioEngine::RecordOptions&)> change) {
         auto options = engine.getRecordOptions();
@@ -3674,8 +3680,7 @@ void MainComponent::showRecordMenu()
     menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
     menu.addSeparator();
     addRecordOptions (menu);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (recordMenuButton.isVisible() ? (juce::Component*) &recordMenuButton
-                                                                                                      : (juce::Component*) &recordButton));
+    return menu;
 }
 
 void MainComponent::refreshRecordOptionButtons()

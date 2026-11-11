@@ -120,6 +120,7 @@ public:
         addPanelMenuItems (panel, menu);
         return menu;
     }
+    juce::PopupMenu getFullRecordMenuForSnapshot() { return buildRecordMenu(); } // the record button's whole menu
     juce::PopupMenu getRecordMenuForSnapshot()
     {
         juce::PopupMenu menu;
@@ -400,6 +401,7 @@ private:
     void applyStepEdit();
     void refreshRecordOptionButtons();
     void showRecordMenu();
+    juce::PopupMenu buildRecordMenu(); // (what showRecordMenu shows)
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
     void showTypingPianoMenu();
