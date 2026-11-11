@@ -66,7 +66,7 @@ def inline(s):
 
 
 def _inline(s):
-    s = esc(s)
+    s = esc(s).replace("&#x27;", "'")
     s = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", r'<img src="\2" alt="\1" loading="lazy">', s)
     s = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
@@ -394,11 +394,11 @@ def render_wiki_index(index, pages):
 
 def render_faq():
     meta, body = front(SRC / "faq.md")
-    out = ['<div class="phead"><div class="wrap"><h1 data-i18n="faq.h1">%s</h1><p data-i18n="faq.sub">%s</p></div></div><div class="wrap faq" style="padding-bottom:80px">' % (T["faq.h1"], T["faq.sub"])]
+    out = ['<div class="phead"><div class="wrap"><h1 data-i18n="faq.h1">%s</h1><p data-i18n="faq.sub">%s</p></div></div><div class="wrap" style="padding-bottom:80px"><div class="faq prose">' % (T["faq.h1"], T["faq.sub"])]
     for n, sec in enumerate(re.split(r"^## ", body, flags=re.M)[1:], 1):
         q, _, a = sec.partition("\n")
         out.append('<section id="%s"><h2 data-i18n="faq.q%d">%s</h2><div data-i18n="faq.a%d">%s</div></section>' % (slug(q)[:48].strip("-"), n, inline(q.strip()), n, markdown(a).replace("\n", "")))
-    out.append("</div>")
+    out.append("</div></div>")
     return "".join(out)
 
 

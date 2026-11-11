@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -88,8 +88,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>Every channel plays through a Mixer insert. Each insert has a fader, pan, mute and solo, a peak meter, ten effect slots with a dry/wet amount each, and a built-in EQ. All inserts end up in the Master unless you route them elsewhere. Press <code>F9</code> to show or hide the Mixer.</p>
 <p>A project can have up to 127 inserts. The Mixer has an add strip for a new one.</p>
 <h2 id="send-a-channel-to-an-insert">Send a channel to an insert</h2>
-<p>In the <a href="/wiki/channel-rack/">Channel rack</a>, drag the channel&#x27;s route box (or use the wheel on it) to pick the insert number. Double-clicking the box shows that insert in the Mixer.</p>
-<p>To give several channels their own inserts in one go, select them in the Channel rack and press <code>Ctrl+L</code>. Each goes to a free insert, which takes the channel&#x27;s name and colour.</p>
+<p>In the <a href="/wiki/channel-rack/">Channel rack</a>, drag the channel's route box (or use the wheel on it) to pick the insert number. Double-clicking the box shows that insert in the Mixer.</p>
+<p>To give several channels their own inserts in one go, select them in the Channel rack and press <code>Ctrl+L</code>. Each goes to a free insert, which takes the channel's name and colour.</p>
 <p>With the Mixer focused, <code>Ctrl+L</code> links the selected channels to the selected insert, and <code>Ctrl+Shift+L</code> links them to consecutive inserts starting from it.</p>
 <h2 id="select-and-move-inserts">Select and move inserts</h2>
 <ul><li>Click a strip to select it.</li><li><code>Ctrl</code>+click, or drag across strips, selects a range. <code>Ctrl+Shift</code>+click adds or removes one.</li><li>Drag a strip sideways, or press <code>Alt+Left</code> and <code>Alt+Right</code>, to move the selected inserts.</li><li>Right-click a strip for the insert menu. <code>F2</code> renames and colours the selected insert.</li></ul>
@@ -98,11 +98,11 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>Click the mute light to mute an insert. Right-click or <code>Ctrl</code>+click it to solo. <code>S</code> solos the selected inserts, and <code>Alt+S</code> solos them together with the inserts that feed them.</p>
 <h2 id="effects">Effects</h2>
 <p>The effects panel shows the slots of the selected insert.</p>
-<ol><li>Click an empty slot and pick an effect.</li><li>Click the slot&#x27;s name to show or hide the effect&#x27;s window.</li><li>Use the slot&#x27;s light to bypass it.</li></ol>
-<p>Drag a slot, or use the wheel over it, to move it up or down. Right-click a slot for its options (replace, move, delete). <code>Del</code> deletes the plugin in the selected slot. The switch in the panel&#x27;s header turns all effects of the insert on or off.</p>
-<p>You can also drag an effect from the Browser&#x27;s Plugin database onto an insert or an effect slot.</p>
+<ol><li>Click an empty slot and pick an effect.</li><li>Click the slot's name to show or hide the effect's window.</li><li>Use the slot's light to bypass it.</li></ol>
+<p>Drag a slot, or use the wheel over it, to move it up or down. Right-click a slot for its options (replace, move, delete). <code>Del</code> deletes the plugin in the selected slot. The switch in the panel's header turns all effects of the insert on or off.</p>
+<p>You can also drag an effect from the Browser's Plugin database onto an insert or an effect slot.</p>
 <h2 id="insert-eq">Insert EQ</h2>
-<p>Each insert has its own EQ. Drag a band to set its frequency and level, use the wheel for the width, and double-click a band to put it back to 0 dB. Right-click the EQ&#x27;s title to bypass it. If you want a Mixer with no built-in EQ, new projects can be set to start with a clean mixer.</p>
+<p>Each insert has its own EQ. Drag a band to set its frequency and level, use the wheel for the width, and double-click a band to put it back to 0 dB. Right-click the EQ's title to bypass it. If you want a Mixer with no built-in EQ, new projects can be set to start with a clean mixer.</p>
 <h2 id="routing-sends-and-sidechain">Routing, sends and sidechain</h2>
 <p>Select the insert you want to route. Every other strip then has a route switch:</p>
 <ul><li>Click the switch on another strip to send the selected insert there. Dragging after enabling sets the send level.</li><li><code>Ctrl</code>+click routes to that insert only.</li><li><code>Shift</code>+click makes a sidechain send. <code>Ctrl+Shift</code>+click makes it sidechain only.</li><li>Right-click opens the same choices as a menu.</li></ul>
@@ -121,6 +121,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

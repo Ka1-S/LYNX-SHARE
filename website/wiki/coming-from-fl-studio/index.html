@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -90,26 +90,26 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <div class="tablewrap"><table><thead><tr><th>In FL Studio</th><th>In LYNX SHARE</th></tr></thead><tbody><tr><td>Playlist, Channel rack, Piano roll, Mixer</td><td>Same names, on <code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code></td></tr><tr><td>Plugin picker</td><td><code>F8</code></td></tr><tr><td>Browser</td><td><code>Alt+F8</code></td></tr><tr><td>Pattern / Song mode</td><td><code>L</code></td></tr><tr><td>Undo</td><td><code>Ctrl+Z</code> undoes, or redoes after an undo. <code>Ctrl+Alt+Z</code> undoes backwards</td></tr><tr><td>Save new version</td><td><code>Ctrl+Alt+S</code></td></tr><tr><td>Export</td><td><code>Ctrl+R</code>, MP3 on <code>Ctrl+Shift+R</code>, MIDI on <code>Ctrl+Shift+M</code></td></tr><tr><td>Fruity Wrapper</td><td>Third-party plugins are hosted directly, see <a href="/wiki/plugins/">Plugins</a></td></tr><tr><td><code>.flp</code> project file</td><td><code>.lynx</code> project file</td></tr></tbody></table></div>
 <p>The Mixer has inserts, sends, 10 effect slots per track and sidechain. <code>Help › Shortcuts</code> lists every key.</p>
 <h2 id="opening-a-flp">Opening a .flp</h2>
-<ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the <code>.flp</code>.</li><li>LYNX SHARE resolves the project&#x27;s plugins and samples, then opens it. The title shows &quot;(imported from FL Studio)&quot;.</li><li><code>File › Save</code> asks where to write a <code>.lynx</code> file. The <code>.flp</code> itself is never written.</li></ol>
+<ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the <code>.flp</code>.</li><li>LYNX SHARE resolves the project's plugins and samples, then opens it. The title shows &quot;(imported from FL Studio)&quot;.</li><li><code>File › Save</code> asks where to write a <code>.lynx</code> file. The <code>.flp</code> itself is never written.</li></ol>
 <p>What is imported:</p>
 <ul><li>Channels, samples, patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation and controller links.</li><li>The Mixer: routing, levels, sidechains, track EQ and native effects with their saved settings.</li><li>Third-party VST3, VST2 and CLAP plugins inside Fruity Wrapper: replaced by the same plugin installed on your computer, with its saved state.</li></ul>
 <h2 id="fl-studio-native-plugins">FL Studio native plugins</h2>
-<p>FL Studio&#x27;s own generators and effects are not loaded. LYNX SHARE plays them on engines it recreated, and each one has a quality level:</p>
+<p>FL Studio's own generators and effects are not loaded. LYNX SHARE plays them on engines it recreated, and each one has a quality level:</p>
 <div class="tablewrap"><table><thead><tr><th>Level</th><th>Meaning</th></tr></thead><tbody><tr><td>Exact</td><td>Bit-identical to the original on every state tested</td></tr><tr><td>Near-exact</td><td>Bit-identical on most states, the rest differ below about -100 dB</td></tr><tr><td>Close</td><td>The same algorithm, within -60 dB of the original on almost all tested states</td></tr><tr><td>Approximate</td><td>The saved settings are mapped onto a LYNX SHARE built-in synth or effect</td></tr><tr><td>Placeholder</td><td>The state is kept and the plugin is silent or passes audio through</td></tr></tbody></table></div>
 <p>The level of every engine, and what each one still lacks, is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">PLUGINS.md</a>.</p>
 <p>FLEX packs are encrypted and are never opened. A FLEX channel gets a synth patch chosen by its preset name.</p>
 <h2 id="what-needs-your-own-fl-studio-installation">What needs your own FL Studio installation</h2>
 <p>Opening a <code>.flp</code> works without FL Studio installed. An installation on the same computer adds two things:</p>
-<ul><li>FL Studio&#x27;s factory samples and its plugin database, so samples and plugins are found without a scan.</li><li>The built-in waves, samples, impulses and tables some engines need (FL Keys, Soundgoodizer, Maximus and the others marked with a dagger in PLUGINS.md). They are read from your installation at run time and are not shipped with LYNX SHARE.</li></ul>
+<ul><li>FL Studio's factory samples and its plugin database, so samples and plugins are found without a scan.</li><li>The built-in waves, samples, impulses and tables some engines need (FL Keys, Soundgoodizer, Maximus and the others marked with a dagger in PLUGINS.md). They are read from your installation at run time and are not shipped with LYNX SHARE.</li></ul>
 <p>On Linux, LYNX SHARE looks for a Windows FL Studio under Wine. On macOS the app bundle is looked for, but this is untested.</p>
 <h2 id="the-import-report">The import report</h2>
 <p><code>Help › Last FL Studio import report</code> lists what was approximated by the built-in synth, what had no equivalent, which plugins were found or are not installed, which effects were left out or partly reproduced, and how many samples are missing. <code>Help › Missing files...</code> lists the missing samples and plugins.</p>
 <h2 id="exporting-back-to-flp">Exporting back to .flp</h2>
 <ol><li>Choose <code>File › Export › FL Studio project...</code>.</li><li>Pick <code>FL Studio project (.flp)</code> or <code>Zipped loop package (.zip, with every sample)</code>.</li><li>Choose what happens to things FL Studio does not have: render them to audio (sounds the same), or use the nearest FL plugin (stays editable, may sound different, and LYNX-only instruments are left out).</li></ol>
-<p>The file is an FL Studio 2026 project. Samplers, audio clips, FL&#x27;s own generators and effects, third-party plugins (inside Fruity Wrapper), patterns, the Playlist, the Mixer and automation go over with their settings. Modulators are left out. A report lists what went over exactly and what was rendered, replaced or left out.</p>
+<p>The file is an FL Studio 2026 project. Samplers, audio clips, FL's own generators and effects, third-party plugins (inside Fruity Wrapper), patterns, the Playlist, the Mixer and automation go over with their settings. Modulators are left out. A report lists what went over exactly and what was rendered, replaced or left out.</p>
 <h2 id="fl-studio-mobile-flm">FL Studio Mobile (.flm)</h2>
 <p><code>File › Open...</code> also takes <code>.flm</code> projects. The import is partial.</p>
-<ul><li>Imported: tempo, time signature, one mixer insert per FLM channel, one Playlist track per lane, patterns (each loop pass as a clip), audio clips with offset and pitch, drum kits, DW Sampler samples (as samplers) and <code>.dwp</code> programs (in DirectWave).</li><li>Not imported: FLM&#x27;s effects and automation lanes. Other FLM generators play the built-in synth.</li><li>Samples are searched next to the <code>.flm</code> and in FL Studio&#x27;s copy of the FLM resources. A <code>.dwp</code> that is not found plays a stand-in.</li></ul></div><nav class="wpn"><a href="/wiki/browser/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.browser.t">Browser</b></a><a href="/wiki/coming-from-ableton/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</b></a></nav></article></div>
+<ul><li>Imported: tempo, time signature, one mixer insert per FLM channel, one Playlist track per lane, patterns (each loop pass as a clip), audio clips with offset and pitch, drum kits, DW Sampler samples (as samplers) and <code>.dwp</code> programs (in DirectWave).</li><li>Not imported: FLM's effects and automation lanes. Other FLM generators play the built-in synth.</li><li>Samples are searched next to the <code>.flm</code> and in FL Studio's copy of the FLM resources. A <code>.dwp</code> that is not found plays a stand-in.</li></ul></div><nav class="wpn"><a href="/wiki/browser/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.browser.t">Browser</b></a><a href="/wiki/coming-from-ableton/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
@@ -118,6 +118,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

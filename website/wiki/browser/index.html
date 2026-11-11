@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -95,19 +95,19 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="other-file-types">Other file types</h2>
 <ul><li><strong>Project</strong>: double-click opens it.</li><li><strong>MIDI file</strong>: double-click opens it as a project.</li><li><strong>SoundFont or SFZ</strong>: click previews it, double-click makes a LYNX Soundfont channel (or loads it into the selected one).</li><li><strong>Mixer preset</strong>: double-click loads it onto the selected Mixer inserts, or drag it onto an insert.</li><li><strong>Effect preset</strong>: drag it onto a Mixer insert.</li></ul>
 <h2 id="plugin-database">Plugin database</h2>
-<p>The Plugin database entry lists LYNX SHARE&#x27;s built-in instruments and effects and the installed plugins. <code>Shift+F8</code> jumps to it.</p>
+<p>The Plugin database entry lists LYNX SHARE's built-in instruments and effects and the installed plugins. <code>Shift+F8</code> jumps to it.</p>
 <ul><li>Double-click an instrument to add it as a new channel, or drag it onto the Channel rack.</li><li>Double-click an effect to add it to the selected Mixer insert, or drag it onto an insert or an effect slot.</li><li><code>F2</code> renames the selected plugin.</li></ul>
 <h2 id="the-project-tab">The PROJECT tab</h2>
 <p>Patterns listed here can be clicked to make them the current pattern, double-clicked to open them in the <a href="/wiki/piano-roll/">Piano roll</a>, or dragged into the <a href="/wiki/playlist/">Playlist</a>. The current project section also lists the undo history: click a step to go back to it.</p>
 <h2 id="search">Search</h2>
-<p>Press <code>Ctrl+F</code> to put the cursor in the search box. It searches the selected folder (or every folder) and below. In the PROJECT tab it searches the project&#x27;s items.</p>
+<p>Press <code>Ctrl+F</code> to put the cursor in the search box. It searches the selected folder (or every folder) and below. In the PROJECT tab it searches the project's items.</p>
 <p>All words must match. The box also takes <code>OR</code>, a minus sign to exclude a word, and <code>*</code> wildcards:</p>
 <pre><code>kick -loop
 snare OR clap
 hat*.wav</code></pre>
-<p>The folders are indexed in the background. <code>Refresh search index</code> in the Browser&#x27;s menu rebuilds the index.</p>
+<p>The folders are indexed in the background. <code>Refresh search index</code> in the Browser's menu rebuilds the index.</p>
 <h2 id="your-own-folders">Your own folders</h2>
-<p>Use <code>Add folder</code> in the Browser&#x27;s folder list to add a folder of samples, projects or SoundFonts. Removing a folder from the list does not delete it from the disk. <code>Options › File settings</code> has the search folders.</p></div><nav class="wpn"><a href="/wiki/mixer/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.mixer.t">Mixer</b></a><a href="/wiki/coming-from-fl-studio/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</b></a></nav></article></div>
+<p>Use <code>Add folder</code> in the Browser's folder list to add a folder of samples, projects or SoundFonts. Removing a folder from the list does not delete it from the disk. <code>Options › File settings</code> has the search folders.</p></div><nav class="wpn"><a href="/wiki/mixer/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.mixer.t">Mixer</b></a><a href="/wiki/coming-from-fl-studio/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
@@ -116,6 +116,6 @@ hat*.wav</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

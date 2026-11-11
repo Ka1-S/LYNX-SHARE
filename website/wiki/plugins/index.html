@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -99,19 +99,19 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="the-plugin-sandbox">The plugin sandbox</h2>
 <p>By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take the program down. The sandbox is optional and runs each plugin in its own process.</p>
 <ol><li>Open <code>Options › General settings...</code>.</li><li>Turn on <code>Run plugins in a separate process (protects LYNX SHARE from crashes)</code>.</li><li>Reopen the project to apply it to plugins that are already open.</li></ol>
-<p>If a sandboxed plugin crashes or stops answering, it goes silent, a notice appears and LYNX SHARE keeps running. Save the project and reopen it to reload the plugin. A sandboxed plugin&#x27;s editor opens in its own window.</p>
-<p>You can also turn it on for one plugin with <code>Always run in a separate process</code> in the plugin window&#x27;s wrapper menu.</p>
+<p>If a sandboxed plugin crashes or stops answering, it goes silent, a notice appears and LYNX SHARE keeps running. Save the project and reopen it to reload the plugin. A sandboxed plugin's editor opens in its own window.</p>
+<p>You can also turn it on for one plugin with <code>Always run in a separate process</code> in the plugin window's wrapper menu.</p>
 <p>The sandbox is available on Windows and Linux. The 0.1.25 release notes add macOS.</p>
 <h2 id="32-bit-plugins-windows-only">32-bit plugins (Windows only)</h2>
-<p>On Windows, 32-bit VST2 and VST3 plugins run through a bridge (<code>LYNX-bridge32.exe</code>). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. The Plugin manager has a <code>Bits</code> column (32, 64 or 32+64), and a bridged plugin&#x27;s editor opens in its own window.</p>
+<p>On Windows, 32-bit VST2 and VST3 plugins run through a bridge (<code>LYNX-bridge32.exe</code>). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. The Plugin manager has a <code>Bits</code> column (32, 64 or 32+64), and a bridged plugin's editor opens in its own window.</p>
 <h2 id="when-a-plugin-is-not-installed">When a plugin is not installed</h2>
 <p>LYNX SHARE first looks for the same plugin by its identifier, then by file, then by name. A project saved with the VST2 opens with the VST3 of the same product and the other way round, but then the plugin plays with its default settings.</p>
 <p>If an effect is not installed at all, a LYNX SHARE effect with the same role takes its slot (a reverb for a reverb, a delay for a delay):</p>
-<ul><li>The slot shows the original plugin&#x27;s name with a LYNX SHARE badge.</li><li>Where the saved state can be read, its settings are translated. Otherwise the stand-in starts from a default preset.</li><li>The original plugin and its settings stay in the project. Once the plugin is installed, the project opens with it again.</li><li>Automation of the original&#x27;s parameters is kept but does not drive the stand-in.</li></ul>
+<ul><li>The slot shows the original plugin's name with a LYNX SHARE badge.</li><li>Where the saved state can be read, its settings are translated. Otherwise the stand-in starts from a default preset.</li><li>The original plugin and its settings stay in the project. Once the plugin is installed, the project opens with it again.</li><li>Automation of the original's parameters is kept but does not drive the stand-in.</li></ul>
 <p><code>Help › Missing files...</code> lists the plugins that were replaced. The switch is <code>Substitute missing plugins with LYNX SHARE equivalents</code> in <code>Options › General settings...</code>, on by default.</p>
 <p>Missing instruments are not substituted yet. A missing instrument plugin becomes a built-in synth chosen by the channel name.</p>
 <h2 id="built-in-plugins">Built-in plugins</h2>
-<p>LYNX SHARE ships its own instruments and effects: a 3-oscillator synth, a sampler, a SoundFont player, drums, EQs, compressors, limiters, reverbs, delays and more, plus engines recreated from FL Studio&#x27;s native plugins that play when you open a <code>.flp</code>. The full list, with the status of each engine, is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">PLUGINS.md</a>.</p></div><nav class="wpn"><a href="/wiki/coming-from-ableton/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</b></a><a href="/wiki/online-sessions/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.online-sessions.t">Online sessions</b></a></nav></article></div>
+<p>LYNX SHARE ships its own instruments and effects: a 3-oscillator synth, a sampler, a SoundFont player, drums, EQs, compressors, limiters, reverbs, delays and more, plus engines recreated from FL Studio's native plugins that play when you open a <code>.flp</code>. The full list, with the status of each engine, is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">PLUGINS.md</a>.</p></div><nav class="wpn"><a href="/wiki/coming-from-ableton/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</b></a><a href="/wiki/online-sessions/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.online-sessions.t">Online sessions</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
@@ -120,6 +120,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

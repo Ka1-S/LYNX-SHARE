@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -136,7 +136,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="latest">
   <div class="wrap">
     <h2 data-i18n="home.latestT">Latest update</h2>
-    <div class="latest"><div><div class="ver">0.1.25-alpha</div><time datetime="2026-11-09">2026-11-09</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.25-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.25.t">Ableton Live sets, FL Studio Mobile import, 32-bit plugins</h3><p class="muted" data-i18n="u.0.1.25.s">LYNX SHARE opens and exports Ableton Live sets (.als), imports FL Studio Mobile projects (.flm) and loads 32-bit plugins on Windows. It also adds video tracks with ADR, VCA faders, automation lanes and modulators, loop-take comping and an optional Clip-launch layout.</p><ul style="margin-top:12px"><li data-i18n="u.0.1.25.n0"><strong>Ableton Live sets (.als)</strong>: File › Open reads Live 11 and 12 sets, and File › Export › Ableton Live set (.als) writes them for Live 11 or 12 with the samples copied into the set&#x27;s project folder. Import brings MIDI, audio, group and return tracks, tempo, locators, mixer settings with their automation and VST2 / VST3 plugins with their state; Simpler / Sampler and drum racks become LYNX SHARE samplers, and Live&#x27;s other devices are listed in the import report.</li><li data-i18n="u.0.1.25.n1"><strong>FL Studio Mobile (.flm)</strong>: File › Open imports the arrangement, samples, drum kits and DirectWave programs, with rack levels, pan and routes. Samples are searched next to the .flm and in FL Studio&#x27;s copy of the FLM resources; missing ones go to the Missing files window.</li><li data-i18n="u.0.1.25.n2"><strong>32-bit VST2 / VST3 plugins on Windows</strong>: they run through a bridge (<code>LYNX-bridge32.exe</code>) that adds no latency. A plugin that crashes in the bridge stops on its own while LYNX SHARE keeps playing.</li><li data-i18n="u.0.1.25.n3"><strong>Video tracks and ADR</strong>: video clips on the Playlist with a SMPTE ruler, frame-by-frame moves, Extract the sound and Export with video (needs FFmpeg). For dialogue replacement there is a cue list with streamers, beeps and take comping. (#83)</li></ul><p class="more"><a class="tlink" href="/updates/#v0.1.25-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
+    <div class="latest"><div><div class="ver">0.1.25-alpha</div><time datetime="2026-11-09">2026-11-09</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.25-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.25.t">Ableton Live sets, FL Studio Mobile import, 32-bit plugins</h3><p class="muted" data-i18n="u.0.1.25.s">LYNX SHARE opens and exports Ableton Live sets (.als), imports FL Studio Mobile projects (.flm) and loads 32-bit plugins on Windows. It also adds video tracks with ADR, VCA faders, automation lanes and modulators, loop-take comping and an optional Clip-launch layout.</p><ul style="margin-top:12px"><li data-i18n="u.0.1.25.n0"><strong>Ableton Live sets (.als)</strong>: File › Open reads Live 11 and 12 sets, and File › Export › Ableton Live set (.als) writes them for Live 11 or 12 with the samples copied into the set's project folder. Import brings MIDI, audio, group and return tracks, tempo, locators, mixer settings with their automation and VST2 / VST3 plugins with their state; Simpler / Sampler and drum racks become LYNX SHARE samplers, and Live's other devices are listed in the import report.</li><li data-i18n="u.0.1.25.n1"><strong>FL Studio Mobile (.flm)</strong>: File › Open imports the arrangement, samples, drum kits and DirectWave programs, with rack levels, pan and routes. Samples are searched next to the .flm and in FL Studio's copy of the FLM resources; missing ones go to the Missing files window.</li><li data-i18n="u.0.1.25.n2"><strong>32-bit VST2 / VST3 plugins on Windows</strong>: they run through a bridge (<code>LYNX-bridge32.exe</code>) that adds no latency. A plugin that crashes in the bridge stops on its own while LYNX SHARE keeps playing.</li><li data-i18n="u.0.1.25.n3"><strong>Video tracks and ADR</strong>: video clips on the Playlist with a SMPTE ruler, frame-by-frame moves, Extract the sound and Export with video (needs FFmpeg). For dialogue replacement there is a cue list with streamers, beeps and take comping. (#83)</li></ul><p class="more"><a class="tlink" href="/updates/#v0.1.25-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
   </div>
 </section>
 
@@ -194,6 +194,6 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

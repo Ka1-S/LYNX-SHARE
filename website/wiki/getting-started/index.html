@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -87,7 +87,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" aria-current="page" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.getting-started.t">Getting started</span></h1><p class="sub" data-i18n="wk.getting-started.s">Install LYNX SHARE, set up audio, make a first pattern and save it.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><p>LYNX SHARE is an alpha. Expect bugs, and save often. Downloads for every system are on the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases">releases page</a>, with checksums in <code>SHA256SUMS.txt</code>.</p>
 <h2 id="install-on-windows">Install on Windows</h2>
 <p>Windows 10 or 11, 64-bit. There are three ways:</p>
-<ul><li><strong>Installer</strong> (<code>LYNX-&lt;version&gt;-setup-x64.exe</code>): installs for your user only, needs no admin rights, adds Start menu and desktop shortcuts and opens <code>.lynx</code> projects. It offers LYNX SHARE under <em>Open with</em> for <code>.flp</code> files without changing FL Studio&#x27;s default.</li><li><strong>Portable zip</strong> (<code>LYNX-&lt;version&gt;-windows-x64.zip</code>): extract it anywhere and run <code>LYNX.exe</code>.</li><li><strong>Microsoft Store</strong>: <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N">LYNX SHARE on the Store</a>. The Store installs it and keeps it updated.</li></ul>
+<ul><li><strong>Installer</strong> (<code>LYNX-&lt;version&gt;-setup-x64.exe</code>): installs for your user only, needs no admin rights, adds Start menu and desktop shortcuts and opens <code>.lynx</code> projects. It offers LYNX SHARE under <em>Open with</em> for <code>.flp</code> files without changing FL Studio's default.</li><li><strong>Portable zip</strong> (<code>LYNX-&lt;version&gt;-windows-x64.zip</code>): extract it anywhere and run <code>LYNX.exe</code>.</li><li><strong>Microsoft Store</strong>: <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N">LYNX SHARE on the Store</a>. The Store installs it and keeps it updated.</li></ul>
 <p>The executable is not code-signed yet, so SmartScreen may warn on first launch. Choose <em>More info</em>, then <em>Run anyway</em>.</p>
 <h2 id="install-on-macos">Install on macOS</h2>
 <p>macOS 11 Big Sur or newer, Intel and Apple silicon (one universal <code>.dmg</code>).</p>
@@ -107,11 +107,11 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <div class="tablewrap"><table><thead><tr><th>System</th><th>Drivers</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO, built-in LYNX ASIO driver</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (native), JACK, ALSA</td></tr></tbody></table></div>
 <p>On Linux the first start picks the first of PipeWire, JACK and ALSA that has devices.</p>
 <h2 id="make-a-first-sound">Make a first sound</h2>
-<ol><li>Press <code>F6</code> to open the <a href="/wiki/channel-rack/">Channel rack</a>.</li><li>Click the <code>+ add channel</code> box under the last row and pick an instrument from the menu.</li><li>Click some steps on the channel&#x27;s row. Dragging draws several, right-drag erases.</li><li>Press <code>Space</code>. In Pattern mode the current pattern plays in a loop. Press <code>Space</code> again to stop.</li></ol>
+<ol><li>Press <code>F6</code> to open the <a href="/wiki/channel-rack/">Channel rack</a>.</li><li>Click the <code>+ add channel</code> box under the last row and pick an instrument from the menu.</li><li>Click some steps on the channel's row. Dragging draws several, right-drag erases.</li><li>Press <code>Space</code>. In Pattern mode the current pattern plays in a loop. Press <code>Space</code> again to stop.</li></ol>
 <p>To use a sample instead, open the <a href="/wiki/browser/">Browser</a> with <code>Alt+F8</code>, click an audio file to hear it, then double-click it to add it as a new channel. You can also drag it onto the Channel rack.</p>
 <p><code>File › New from template</code> has four starting points: Empty, Basic beat, Trap with 808 and House.</p>
 <h2 id="save">Save</h2>
-<p><code>Ctrl+S</code> saves, <code>Ctrl+Shift+S</code> saves under a new name, and <code>Ctrl+Alt+S</code> saves a new version (Song_2, Song_3 and so on). Projects use LYNX SHARE&#x27;s own <code>.lynx</code> format. There is an autosave, reachable from <code>File › Open autosave folder</code> and <code>File › Revert to last backup</code>.</p>
+<p><code>Ctrl+S</code> saves, <code>Ctrl+Shift+S</code> saves under a new name, and <code>Ctrl+Alt+S</code> saves a new version (Song_2, Song_3 and so on). Projects use LYNX SHARE's own <code>.lynx</code> format. There is an autosave, reachable from <code>File › Open autosave folder</code> and <code>File › Revert to last backup</code>.</p>
 <h2 id="the-demo-project">The demo project</h2>
 <p>The Windows installer and zip, the macOS <code>.dmg</code> and the Linux <code>.tar.gz</code> include a demo project, <code>Demo.lynx</code>. Open it with <code>File › Open</code> (<code>Ctrl+O</code>). On Windows it sits in the installation folder, next to <code>LYNX.exe</code>.</p>
 <p>You can also generate it from a terminal:</p>
@@ -125,6 +125,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>

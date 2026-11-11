@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+window.LYNX_LANG=lang;window.LYNX_V="029dc185";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+<link rel="stylesheet" href="/assets/site.css?v=029dc185">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -89,17 +89,17 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The transport has two modes. Pattern mode plays the current pattern in a loop. Song mode plays the Playlist. Press <code>L</code> to switch.</p>
 <h2 id="place-clips">Place clips</h2>
 <p>The Picker panel lists the patterns, audio and automation of the project. Click one to make it the clip source.</p>
-<ol><li>Pick the Pencil (<code>P</code>).</li><li>Click on a track to place the Picker&#x27;s clip, and drag to position it.</li><li>With the Brush (<code>B</code>), drag to paint clips end to end.</li></ol>
+<ol><li>Pick the Pencil (<code>P</code>).</li><li>Click on a track to place the Picker's clip, and drag to position it.</li><li>With the Brush (<code>B</code>), drag to paint clips end to end.</li></ol>
 <p>Audio files can be dragged from the <a href="/wiki/browser/">Browser</a> onto the Playlist.</p>
 <h2 id="tools">Tools</h2>
 <p>The letters work while the typing keyboard piano (<code>Ctrl+T</code>) is off.</p>
-<div class="tablewrap"><table><thead><tr><th>Tool</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Pencil</td><td><code>P</code></td><td>Click places the Picker&#x27;s clip</td></tr><tr><td>Brush</td><td><code>B</code></td><td>Drag paints clips end to end</td></tr><tr><td>Eraser</td><td><code>D</code></td><td>Click or drag deletes</td></tr><tr><td>Mute</td><td><code>T</code></td><td>Click or drag mutes or unmutes clips</td></tr><tr><td>Knife</td><td><code>C</code></td><td>Drag a line to cut across clips, click cuts at that point</td></tr><tr><td>Lasso</td><td><code>E</code></td><td>Drag draws a selection box. <code>Shift</code> adds</td></tr><tr><td>Zoom</td><td><code>Z</code></td><td>Click zooms in, drag a range to zoom to it, right-click zooms out</td></tr><tr><td>Listen</td><td><code>Y</code></td><td>Click or drag plays from that point</td></tr><tr><td>Slip</td><td><code>S</code></td><td>Drag slides the clip&#x27;s content inside the clip</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Tool</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Pencil</td><td><code>P</code></td><td>Click places the Picker's clip</td></tr><tr><td>Brush</td><td><code>B</code></td><td>Drag paints clips end to end</td></tr><tr><td>Eraser</td><td><code>D</code></td><td>Click or drag deletes</td></tr><tr><td>Mute</td><td><code>T</code></td><td>Click or drag mutes or unmutes clips</td></tr><tr><td>Knife</td><td><code>C</code></td><td>Drag a line to cut across clips, click cuts at that point</td></tr><tr><td>Lasso</td><td><code>E</code></td><td>Drag draws a selection box. <code>Shift</code> adds</td></tr><tr><td>Zoom</td><td><code>Z</code></td><td>Click zooms in, drag a range to zoom to it, right-click zooms out</td></tr><tr><td>Listen</td><td><code>Y</code></td><td>Click or drag plays from that point</td></tr><tr><td>Slip</td><td><code>S</code></td><td>Drag slides the clip's content inside the clip</td></tr></tbody></table></div>
 <h2 id="working-with-clips">Working with clips</h2>
-<ul><li>Drag a clip to move it. <code>Shift</code>+drag makes a copy.</li><li>Drag a clip&#x27;s end to resize it. Dragging the start trims it while the content stays in place.</li><li>Right-click deletes a clip. <code>Ctrl</code>+drag selects.</li><li>Double-click a clip to open it.</li><li>The button at a clip&#x27;s top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).</li><li>Hold <code>Alt</code> while dragging to ignore the snap.</li><li>Audio clips have fade handles and a clip gain you drag up or down.</li><li><code>Shift+M</code> switches Stretch: resizing an audio clip then stretches the audio instead of cutting it.</li></ul>
+<ul><li>Drag a clip to move it. <code>Shift</code>+drag makes a copy.</li><li>Drag a clip's end to resize it. Dragging the start trims it while the content stays in place.</li><li>Right-click deletes a clip. <code>Ctrl</code>+drag selects.</li><li>Double-click a clip to open it.</li><li>The button at a clip's top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).</li><li>Hold <code>Alt</code> while dragging to ignore the snap.</li><li>Audio clips have fade handles and a clip gain you drag up or down.</li><li><code>Shift+M</code> switches Stretch: resizing an audio clip then stretches the audio instead of cutting it.</li></ul>
 <h2 id="tracks">Tracks</h2>
-<p>In a track&#x27;s header, click selects, <code>Ctrl</code>+click adds or removes, <code>Shift</code>+click selects a range and right-click opens the track menu. <code>Shift</code>+wheel moves the track up or down. The track&#x27;s light mutes it (click) or solos it (<code>Ctrl</code>+click or right-click). Drag the divider between two tracks to resize one, or <code>Shift</code>+drag to resize all.</p>
+<p>In a track's header, click selects, <code>Ctrl</code>+click adds or removes, <code>Shift</code>+click selects a range and right-click opens the track menu. <code>Shift</code>+wheel moves the track up or down. The track's light mutes it (click) or solos it (<code>Ctrl</code>+click or right-click). Drag the divider between two tracks to resize one, or <code>Shift</code>+drag to resize all.</p>
 <h2 id="ruler-loop-and-markers">Ruler, loop and markers</h2>
-<ul><li>Click the ruler to set the song position.</li><li>Right-drag, <code>Ctrl</code>+drag or double-click-drag on the ruler makes a time selection, which is also the loop. <code>Shift</code>+drag moves it.</li><li><code>Ctrl+Ins</code> inserts the time selection&#x27;s length across all tracks, <code>Ctrl+Del</code> removes it.</li><li><code>Alt+T</code> adds a marker. Click a marker to jump to it.</li><li><code>Ctrl</code>+wheel zooms, <code>Alt</code>+wheel changes the track height.</li></ul>
+<ul><li>Click the ruler to set the song position.</li><li>Right-drag, <code>Ctrl</code>+drag or double-click-drag on the ruler makes a time selection, which is also the loop. <code>Shift</code>+drag moves it.</li><li><code>Ctrl+Ins</code> inserts the time selection's length across all tracks, <code>Ctrl+Del</code> removes it.</li><li><code>Alt+T</code> adds a marker. Click a marker to jump to it.</li><li><code>Ctrl</code>+wheel zooms, <code>Alt</code>+wheel changes the track height.</li></ul>
 <h2 id="automation">Automation</h2>
 <p>Right-click a knob or fader and choose <code>Create automation clip</code>. The clip appears on the Playlist. With the Pencil, drag its points, and click on the curve to add one. Automation lanes under tracks are optional and off by default.</p>
 <h2 id="arrangements">Arrangements</h2>
@@ -109,7 +109,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="keys">Keys</h2>
 <div class="tablewrap"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>Ctrl+A</code></td><td>Select all</td></tr><tr><td><code>Ctrl+C</code> / <code>Ctrl+X</code> / <code>Ctrl+V</code></td><td>Copy, cut, paste</td></tr><tr><td><code>Ctrl+B</code></td><td>Duplicate</td></tr><tr><td><code>Del</code></td><td>Delete the selected clips</td></tr><tr><td><code>Shift+Del</code></td><td>Delete the selected clips and close the gaps</td></tr><tr><td><code>Shift+S</code></td><td>Ripple editing on or off</td></tr><tr><td><code>Alt+M</code> / <code>Shift+Alt+M</code></td><td>Mute, unmute the selected clips</td></tr><tr><td><code>Ctrl+Shift+V</code></td><td>Make the selected clips unique</td></tr><tr><td><code>Ctrl+G</code></td><td>Merge pattern clips</td></tr><tr><td><code>PageUp</code> / <code>PageDown</code></td><td>Zoom in, out</td></tr><tr><td><code>Shift+4</code></td><td>Zoom to show everything</td></tr></tbody></table></div>
 <h2 id="known-limits">Known limits</h2>
-<p>From the 0.1.25 release notes: with several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio&#x27;s. A tempo moved by a linked MIDI controller does not resize audio clips. On Linux, video needs FFmpeg.</p></div><nav class="wpn"><a href="/wiki/piano-roll/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.piano-roll.t">Piano roll</b></a><a href="/wiki/mixer/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.mixer.t">Mixer</b></a></nav></article></div>
+<p>From the 0.1.25 release notes: with several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's. A tempo moved by a linked MIDI controller does not resize audio clips. On Linux, video needs FFmpeg.</p></div><nav class="wpn"><a href="/wiki/piano-roll/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.piano-roll.t">Piano roll</b></a><a href="/wiki/mixer/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.mixer.t">Mixer</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
@@ -118,6 +118,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=59e4b1d6" defer></script>
+<script src="/assets/site.js?v=029dc185" defer></script>
 </body>
 </html>
