@@ -2489,3 +2489,62 @@ All four are options that change nothing by default.
 | Pin on top | detached plugin windows stay above FL's main window; no pin among them | plugin windows have no pin; "Auto-Hide Plug-In Windows" is the opposite idea | a pin in the wrapper header and "Pin on top" in the plugin menu: the window stays above LYNX's other secondary windows (not above other applications, like every detached LYNX window). Saved per plugin instance (`pinnedOnTop`) |
 | Per-plugin velocity | none in the wrapper's MIDI group (MIDIInPortWheel, MIDIOutPortWheel, SendNoteOffVelocityBox, SendPitchBendRangeBox, SendPolyAftertouchBox, MidiEventBusCombo, SendAllNotesOffBox; REA 149 C7); the curve is global (MIDI settings) | Velocity MIDI effect per track | LYNX extra: Wrapper settings > MIDI > Velocity: Follow MIDI settings (default) / Linear / Soft / Hard / Fixed, with the fixed value. For notes from a MIDI device; replaces the global curve for that instrument. Saved only when changed (`velocityMode`, `fixedVelocity`) |
 | Note on preset load | none | Hot-Swap previews browser presets, not plugin programs | LYNX extra: "Play a note when a preset loads" in the plugin preset menu of an instrument (off by default, a user setting): a short C5 after a load while the song is stopped |
+## Round 190al: Crest's Two-way works in three bands
+
+Black-box, from round trial190k's reference renders of LYNX's own test signals (no reference plug-in ran in this round).
+Tools and tables: `/mnt/e/lynx-work/parity190al` (`crest/fit3.py`, `crest/tw.py`, `crest/final_TTM.txt`, `hash/hash.md`);
+bank and metrics are round 190v's.
+
+What the renders show (reference style 5, our Two-way):
+
+- Pink noise comes out with three different gains: one under about 90 Hz, one up to 2.5 kHz, one above (up to 4 dB
+  apart). The step between the upper two follows a fourth-order Linkwitz-Riley split at 2.5 kHz (within 0.02 of the
+  measured transition, averaged over 162 settings).
+- The output's phase turns 360 degrees around 88 Hz and again around 2.5 kHz (−57 / −145 / −205 / −257 degrees at 30 /
+  70 / 100 / 140 Hz; −480 / −534 / −587 at 1.8 / 2.5 / 3.5 kHz): two such splits in series.
+- An 8 kHz tone is turned down from 4.6 dB lower than a 1 kHz tone and along the ratio itself (slopes 0.50 / 0.76 /
+  0.92 at ratio 2 / 4 / 10, against 0.25 / 0.62 / 0.84); a 100 Hz tone behaves like a 1 kHz tone about 4 dB quieter,
+  which is the share of it each split passes (−4.1 dB to the mid band, −8.5 dB to the low band).
+
+Model: the signal is split at 88 Hz and 2.5 kHz, each band runs round 190v's law form with its own constants (fitted
+jointly on the 1 kHz, 100 Hz and 8 kHz stairs of 162 settings: 0.064 dB rms), and the bands are added. The fixed gain
+round 190v had to give the single band is gone: it was the high band's share of the 1 kHz tone. The pink-noise stairs
+were not part of the fit: through the engine their band gains land within 0.05 / 0.14 / 0.18 dB (low / mid / high).
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 60 | 2.18 | 0.34 | 0 | 5.05 | 7.32 | 53 / 7 / 0 |
+| 190k knee grid | 72 | 1.75 | 0.14 | 0 | 4.71 | 8.03 | 72 / 0 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 1.89 | 0.25 | 0 | 3.94 | 7.46 | 345 / 25 / 0 |
+| 190k T* | 4 | 1.72 | 0.12 | 0 | 4.75 | 8.00 | 4 / 0 / 0 |
+| All | 506 | 1.91 | 0.25 | 0 | 4.19 | 7.53 | 474 / 32 / 0 |
+
+("Before" is round 190v's single-band law; against 0.1.25 the gain error was 4.29 dB and the score 2.39.)
+
+- Only new instances of the Two-way style change (Law = Measured). A project saved before round 190v keeps the classic
+  law, one band, bit-identical (`hash/hash.md`: 36 of 36 legacy renders identical; every other style identical to
+  round 190v's build).
+- Cost: the measured Two-way runs three detectors and the splits: 0.65 → 1.31 s of CPU for 72 s of audio (about 0.8 %
+  → 1.7 % of one core at 48 kHz). Latency unchanged (0). The editor's curve is that of a 1 kHz tone, as before.
+- Open: the low band's law rests on the 100 Hz tone alone (it sits on the split); ratios under 2 and over 10 are
+  extrapolated; auto gain as in round 190v.
+
+### Vari-mu at slow attacks (same round)
+
+On the reference's −40 → −6 dBFS step at attack 100 ms the reduction starts at once and closes in like a smoothed
+gain (−2.1 / −4.8 / −6.3 / −7.0 dB after 15 / 30 / 45 / 60 ms, towards −7.8); ours smoothed the level, did nothing
+for 45 ms and settled 1 dB short. Above an attack of 30 ms Vari-mu now smooths the gain in part (a share of 0.6 at
+100 ms, by the logarithm of the attack in between). The share is the most that made no capture worse: with the full
+share the 30 ms programme captures and the pink-noise stairs at 100 ms lost 0.2 … 0.3 dB.
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 61 | 0.67 | 0.67 | 0 | 6.26 | 6.26 | 0 / 61 / 0 |
+| 190k knee grid | 72 | 0.23 | 0.23 | 0 | 6.93 | 6.93 | 0 / 72 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 0.57 | 0.33 | 0 | 6.03 | 6.48 | 85 / 284 / 1 |
+| All | 507 | 0.55 | 0.38 | 0 | 6.19 | 6.52 | 85 / 421 / 1 |
+
+The 100 ms stairs go from 1.28 to about 0.55 dB. One file loses a score step (pink noise at threshold −48, ratio 2,
+attack 100 ms: gain error 0.10 → 0.14 dB, level +0.20 → −0.20 dB). CPU: unchanged up to 30 ms, 0.49 → 0.55 s for 72 s of
+audio at 100 ms. Attacks of 30 ms and under, the classic law and every other style are bit-identical. Open: the step
+is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
