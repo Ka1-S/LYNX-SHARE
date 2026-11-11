@@ -117,6 +117,14 @@ public:
         return std::find (frozenMissing.begin(), frozenMissing.end(), channel) != frozenMissing.end();
     }
     bool freezeOutOfDate (int channel);
+    // Frees now what the engine retired (the racks replaced by an edit, with the instruments and hosted plugin
+    // instances only they still held) instead of on the next message: for the command-line modes, which run without
+    // a message loop, before they measure memory or count plugin instances. Message thread.
+    void freeRetiredRacks()
+    {
+        rackExchange.collectGarbage();
+        rackDisposer.flush();
+    }
     juce::File getFreezeFolder() const { return recordingFolder.getSiblingFile ("Frozen"); }
 
     // Third-party plugins from the last imported .flp that were not found among the scanned ones.

@@ -12307,6 +12307,7 @@ private:
         const auto hostedLine = [&] (const char* stage) {
             if (hostedChannel < 0)
                 return;
+            offline.freeRetiredRacks();
             report << "hosted, " << stage << ": instance on the channel "
                    << (dynamic_cast<lynx::PluginInstrument*> (offline.getChannelInstrument (hostedChannel).get()) != nullptr ? "yes" : "no")
                    << ", plugin instances alive in the process " << (hostedLog.isNotEmpty() ? juce::String (hostedAlive()) : juce::String ("(no log)")) << "\n";
@@ -12328,6 +12329,7 @@ private:
         const auto renderMix = [&] (const char* name, const lynx::Song* other = nullptr, std::vector<int>* renderedLive = nullptr, int range = 0) {
             Mix m;
             offline.dispatchPendingMessages();
+            offline.freeRetiredRacks(); // (what the message loop does in the app: this mode runs without one)
             m.workingSet = lynx::toolbar::PerformanceMeter::processMemoryBytes();
             m.privateBytes = lynx::toolbar::PerformanceMeter::processPrivateBytes();
             const juce::File file (prefix + "-" + name + ".wav");

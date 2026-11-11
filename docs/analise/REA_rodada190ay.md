@@ -67,11 +67,29 @@ in clips of the clip grid, instruments whose knobs a controller link moves live.
 ## 6. Measured (2026-11-11)
 - Core tests (`tests/Freeze190ayTests.inc`, 4 tests, 52 checks): frozen vs live, Song mode, through a live delay +
   reverb: -133.7 dB whole song, -130.7 dB in the tail after the last note, -133.7 dB over a repeated pattern; the
-  channel alone -128.7 dB; two frozen channels -130.2 dB; Pattern mode from the second pass -139.6 dB outside the
-  first 10 ticks of a pass.
+  channel alone -128.7 dB; two frozen channels -130.2 dB; Pattern mode from the second pass -139.6 dB (seam: §6b).
 - `LYNX.exe --freezetest` (Windows build, real engine, files and export): demo song, 4 channels frozen: -129.1 dB;
   Unfreeze: bit-identical mix (-200 dB) and the same saved project byte for byte.
 - FL's demo "Thief" (37 channels, 5 instruments frozen): the four 3x Osc / synth channels null at -94.5 dB.
+
+## 6b. Review round (2026-11-11, after lot 1 landed)
+- **Loop seam (Pattern mode), cause and fix.** The stand-in's clip voice gets its note-off exactly at its file's last
+  frame. Before lot 1 the sampler ended a clip voice there with its fade-out; the voice, already past its last frame,
+  held that frame's value (FL's DC hold) and faded it over 3 ms into the next pass: -24.6 dB in the first 10 ticks of
+  every pass. Round 189l (in lot 1) made a clip's end a sharp cut on channels that declick in mode 0 or 1, as FL
+  renders it; stand-in channels are mode 0, so the next pass now continues the stem sample for sample. `standInChannel`
+  pins `declickMode = 0` with the reason (mode 2 on the same stem: -13.3 dB at the seam), for Freeze and Online
+  Sessions alike. Measured: first 10 ticks of passes 2-4 -142.7 dB dry (rest of the pass -139.6 dB); through the
+  insert's delay + reverb -112.3 / -138.0 dB. The test asserts < -90 dB there; Online Sessions' stand-in tests
+  (`Session168aTests.inc`, `Render186bTests.inc`) pass in the same harness run (173 checks, 0 failures).
+- **Exports never use frozen audio that does not match** (`sessionpack::freshForExport`, called by `ExportJob`). The
+  safe option was taken — render live, no question asked — over a warning the user can click through:
+  a frozen channel that is out of date renders with its instrument; and when the export does not play the song's
+  timeline once (a selection, one pattern, a repeated range) every frozen channel does, because the frozen audio is
+  the whole song from its start and those renders cut and move the timeline (read from the code, not measured:
+  before this such an export would have played the stem from its start). The project itself stays frozen. Cost: the export loads those instruments.
+- **Hosted plugin** (`tools/testplugin/lynx_test_heavy_vst3.cpp`, `LYNX_FREEZETEST_PLUGIN`): see the table in the
+  HANDOFF / report.
 
 ## 7. Known limits
 - **Harmless does not null** (Thief's "Synth Bass": frozen vs live +1 dB from the first note after a 41 s rest). Not
@@ -80,11 +98,11 @@ in clips of the clip grid, instruments whose knobs a controller link moves live.
   size twice is bit-identical). Its plugin-wide phases and counters only run while the channel is processed, and how
   long it stays awake after a note depends on level and block partition. A frozen Harmless is one valid rendition; the
   engine needs its own fix (reproducer: `/mnt/e/lynx-work/freeze190ay/harness`, `MINI_DIAG=1`).
-- **Pattern mode, loop seam**: 3 ticks after each loop start the previous pass's audio-clip voice adds its held last
-  value, fading out over 3 ms (-24.6 dB re peak in the test song, on sustained material). Same in Online Sessions' loop
-  stems. The first pass of a loop already carries the previous pass's tail.
-- An export of a frozen project uses the frozen audio (playback quality, the channel's Max polyphony), also when
-  "HQ for all plugins" / "Disable max polyphony" are on, and also when the freeze is out of date.
+- **Pattern mode, first pass**: the loop stem is one pass of the pattern looping, so the first pass already carries
+  the previous pass's tail (as Online Sessions' loop stems do). From the second pass on it is exact, seam included.
+- An export of a frozen project uses the frozen audio of the channels that are up to date (playback quality, the
+  channel's Max polyphony), also when "HQ for all plugins" / "Disable max polyphony" are on. A real-time export
+  through hardware inserts records the live engine as it plays, frozen channels as they stand.
 - A stem's tail is capped at 4 bars and cut at the song's end; undoing a Freeze leaves its files on disk.
 - Memory: the frozen audio is memory-mapped (about 84 MB of file per 4 minutes of stereo at 44.1 kHz). Freezing pays
   off for instruments heavier than that (samplers, big hosted plugins); for light built-in synths it only saves CPU.
