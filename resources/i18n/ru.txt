@@ -8843,7 +8843,6 @@ countries: ru by kz
 "Saves the project under the next number (Song_2, Song_3...) and keeps working in it" = "Сохраняет проект под следующим номером (Song_2, Song_3...) и продолжает работу в нем"
 "{0} saved version(s), {1} backup(s)" = "Сохраненных версий: {0}, резервных копий: {1}"
 "Last backup: {0}" = "Последняя резервная копия: {0}"
-"Not saved yet" = "Еще не сохранено"
 "Label" = "Метка"
 "A short note for {0} (empty: no label)" = "Короткая заметка для {0} (пусто: без метки)"
 "The label could not be written next to the file." = "Не удалось записать метку рядом с файлом."

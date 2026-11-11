@@ -8843,7 +8843,6 @@ countries: kr
 "Saves the project under the next number (Song_2, Song_3...) and keeps working in it" = "프로젝트를 다음 번호(Song_2, Song_3...)로 저장하고 그 파일에서 계속 작업합니다"
 "{0} saved version(s), {1} backup(s)" = "저장된 버전 {0}개, 백업 {1}개"
 "Last backup: {0}" = "마지막 백업: {0}"
-"Not saved yet" = "아직 저장 안 됨"
 "Label" = "레이블"
 "A short note for {0} (empty: no label)" = "{0}에 붙일 짧은 메모(비워 두면 레이블 없음)"
 "The label could not be written next to the file." = "파일 옆에 레이블을 기록할 수 없습니다."
