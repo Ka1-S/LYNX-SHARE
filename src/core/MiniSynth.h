@@ -42,6 +42,12 @@ int miniSynthParamOffset (const std::vector<std::uint8_t>& state, int index);
 
 std::unique_ptr<Instrument> makeMiniSynthInstrument();
 
+// FL Studio Mobile's MiniSynth module is this engine with a few differences (REA spec of round 190n: the note's
+// velocity goes to the voice as it is, linear balance pan with centre gain 1, 5 voices, LFO → OSC Mod at 1/12 of the
+// desktop depth and clamped, the first note glides from its own key, the effects really stop 0.5 s after the last
+// voice). A channel imported from a .flm asks for it with modelParams = { 1 } (saved with the project).
+bool miniSynthIsFlm (const ChannelDef& channel) noexcept;
+
 namespace minisynth
 {
 // One note for the reference renderer (the verification harness drives the engine exactly like the Python model).
@@ -54,11 +60,11 @@ struct RefNote
 
 // Renders like msmodel.Plugin driven by r41/py/mcmp.py: host blocks of `block` samples split at every event, engine
 // calls of ≤ 512, tempo `bpm`, max-polyphony event value `maxPoly` (0 → 99), songPos ≥ 0 = the transport plays from that
-// song position (beats); panLawA = the host's ComputeLRVol cos/sin law (false: L = R = Final.Vol, like the harness'
+// song position (beats); flm = FL Studio Mobile's build (RefNote::initVol is then the voice velocity 0…1); panLawA = the host's ComputeLRVol cos/sin law (false: L = R = Final.Vol, like the harness'
 // default). The tables are built from `oscdataPath` (a missing file plays silent tables). Interleaved stereo float
 // samples (2·length); empty if the state is unusable.
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, const std::string& oscdataPath, int block = 512, double bpm = 120.0, int maxPoly = 0,
-                                    double songPos = -1.0, bool panLawA = false);
+                                    double songPos = -1.0, bool panLawA = false, bool flm = false);
 } // namespace minisynth
 } // namespace lynx

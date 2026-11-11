@@ -405,6 +405,26 @@ int PianoRollComponent::yToKey (int y) const
     return rows.keyOfRow[(std::size_t) row];
 }
 
+void PianoRollComponent::setKeyStyle (pianokeys::Style style)
+{
+    if (style == keyStyle)
+        return;
+    keyStyle = style;
+    if (EditorGlobals::get().onOptionsChanged)
+        EditorGlobals::get().onOptionsChanged(); // (the main window saves it and repaints the other editors)
+    repaint();
+}
+
+int PianoRollComponent::keyboardKeyAt (int x, int y) const
+{
+    const auto key = yToKey (y);
+    if (keyStyle != pianokeys::Style::piano || folded())
+        return key;
+    // "Piano keys": right of a black key the white keys above and below it meet in the middle of its row
+    const auto next = pianokeys::keyAt (keyStyle, key, y - keyToY (key), rowHeight, x, keyboardWidth * 3 / 5);
+    return juce::isPositiveAndBelow (next, 128) && rows.shown (next) ? next : key;
+}
+
 std::int64_t PianoRollComponent::gridTicks() const
 {
     const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
@@ -496,9 +516,12 @@ void PianoRollComponent::resized()
     const auto h = toolbarHeight - 6;
     auto bar = juce::Rectangle<int> (4 + titleInsetLeft, 3, juce::jmax (0, getWidth() - 8 - titleInsetLeft - titleInsetRight), h);
 
-    // groups that don't fit in a narrow window are hidden (the tools and the grid always show)
-    auto place = [&bar] (juce::Component& c, int width, bool optional = false) {
-        const auto fits = ! optional || width <= bar.getWidth();
+    // groups that don't fit in a narrow window are hidden (the tools and the grid always show). The menu button always
+    // keeps its place: the optional groups only take what is left beside it (round 190j: on a 1024 px screen the
+    // groups before it used up the bar and the Piano roll menu could not be opened).
+    const auto reserved = h + 6;
+    auto place = [&bar, reserved] (juce::Component& c, int width, bool optional = false) {
+        const auto fits = ! optional || width <= bar.getWidth() - reserved;
         c.setVisible (fits);
         c.setBounds (fits ? bar.removeFromLeft (juce::jmin (width, bar.getWidth())) : juce::Rectangle<int>());
         bar.removeFromLeft (juce::jmin (6, bar.getWidth()));
@@ -512,7 +535,8 @@ void PianoRollComponent::resized()
     place (followButton, h);
     place (slideButton, h, true);
     place (colourButton, h, true);
-    place (chordBox, 100, true);
+    // the chord stamp shrinks to its icon and arrow before it is hidden (discussion #10; FL's stamp is an icon button)
+    place (chordBox, 100 <= bar.getWidth() - reserved ? 100 : pianoroll::compactChordBoxWidth, true);
     place (scaleBox, 164, true);
     if (scaleBox.isVisible())
         place (scaleSnapButton, h);
@@ -524,6 +548,11 @@ void PianoRollComponent::resized()
     overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - scrollBarSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - velocityHeight);
     updateScrollBars();
+}
+
+void PianoRollComponent::squeezeToolbarForSnapshot (int pixels)
+{
+    setTitleBarInsets (titleInsetLeft, titleInsetRight + pixels);
 }
 
 void PianoRollComponent::scrollToNotes (bool fitPattern)
@@ -1238,6 +1267,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();
+        const auto piano = keyStyle == pianokeys::Style::piano && ! list;
+        const auto keyColour = [&] (int key) {
+            const auto black = isBlackKey (key) && ! list;
+            const auto pressed = key == previewKey || isLit (key);
+            auto colour = black ? keyBlack : keyWhite;
+            if (inScale (key))
+                colour = colour.interpolatedWith (info, black ? 0.18f : 0.12f);
+            if (key == hover.key && ! pressed)
+                colour = colour.interpolatedWith (accent, black ? 0.35f : 0.22f);
+            return pressed ? accent : colour;
+        };
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1248,19 +1288,53 @@ void PianoRollComponent::paint (juce::Graphics& g)
             const auto black = isBlackKey (key) && ! list;
             const auto pressed = key == previewKey || isLit (key);
             const auto hovered = key == hover.key && ! pressed;
-            auto colour = black ? keyBlack : keyWhite;
-            if (inScale (key))
-                colour = colour.interpolatedWith (info, black ? 0.18f : 0.12f);
-            if (hovered)
-                colour = colour.interpolatedWith (accent, black ? 0.35f : 0.22f);
-            if (pressed)
-                colour = accent;
-
+            const auto colour = keyColour (key);
             const auto width = black ? blackWidth : keyboardWidth - 1;
-            g.setColour (colour);
-            g.fillRect (0, y, width, rowHeight);
-            g.setColour (black ? bg0 : keyWhite.darker (0.3f));
-            g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
+
+            if (piano)
+            {
+                // "Piano keys" (round 190j, discussion #136): the white keys meet behind the black key, each in its own
+                // colour (hover, pressed, scale), with a dark line between every two white keys
+                const auto line = bg0.withAlpha (0.85f);
+                if (black)
+                {
+                    const auto upper = pianokeys::upperPart (rowHeight);
+                    g.setColour (keyColour (juce::jmin (127, key + 1)));
+                    g.fillRect (0, y, keyboardWidth - 1, upper);
+                    g.setColour (keyColour (juce::jmax (0, key - 1)));
+                    g.fillRect (0, y + upper, keyboardWidth - 1, rowHeight - upper);
+                    g.setColour (line);
+                    g.drawHorizontalLine (y + upper, (float) blackWidth, (float) (keyboardWidth - 1));
+                    // the black key: a little shorter than its row when there is room, so the white shows around it
+                    const auto inset = rowHeight >= 12 ? 1 : 0;
+                    g.setColour (bg0);
+                    g.fillRect (0, y + inset, blackWidth + 1, rowHeight - 2 * inset);
+                    g.setColour (colour);
+                    g.fillRect (0, y + inset, blackWidth, rowHeight - 2 * inset);
+                    if (! pressed && rowHeight >= 12) // a light edge along the top, as on a real black key
+                    {
+                        g.setColour (keyWhite.withAlpha (0.14f));
+                        g.drawHorizontalLine (y + inset, 0.0f, (float) blackWidth);
+                    }
+                }
+                else
+                {
+                    g.setColour (colour);
+                    g.fillRect (0, y, width, rowHeight);
+                    if (pianokeys::lineBelow (key))
+                    {
+                        g.setColour (line);
+                        g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
+                    }
+                }
+            }
+            else
+            {
+                g.setColour (colour);
+                g.fillRect (0, y, width, rowHeight);
+                g.setColour (black ? bg0 : keyWhite.darker (0.3f));
+                g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
+            }
 
             const auto isC = key % 12 == 0;
 
@@ -1612,14 +1686,14 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 
         if (e.mods.isRightButtonDown()) // key labels (FL 2026: right-click a key > Rename)
         {
-            showKeyMenu (yToKey (e.y));
+            showKeyMenu (keyboardKeyAt (e.x, e.y));
             return;
         }
 
         if (e.mods.isLeftButtonDown())
         {
             drag = Drag::keyboard;
-            previewOn (yToKey (e.y), keyVelocityAt (e.x, yToKey (e.y)));
+            previewOn (keyboardKeyAt (e.x, e.y), keyVelocityAt (e.x, keyboardKeyAt (e.x, e.y)));
         }
         return;
     }
@@ -1981,7 +2055,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 
         case Drag::keyboard:
         {
-            const auto key = yToKey (e.y);
+            const auto key = keyboardKeyAt (e.x, e.y);
             if (key != previewKey)
                 previewOn (key, keyVelocityAt (e.x, key));
             return;
@@ -2477,7 +2551,7 @@ PianoRollComponent::Hover PianoRollComponent::hoverAt (juce::Point<int> p) const
 
     if (p.x < keyboardWidth && p.y >= headerHeight && p.y < gridArea().getBottom())
     {
-        h.key = yToKey (p.y);
+        h.key = keyboardKeyAt (p.x, p.y);
         return h;
     }
 
@@ -2988,6 +3062,9 @@ void PianoRollComponent::showMoreMenu()
     menu.addItem (tr ("Fold to the scale (hide the other keys and their notes)"), scaleIndex() > 0, foldToScale,
                   [this] { setFoldToScale (! foldToScale); });
     menu.addItem (tr ("Chord stamp: the clicked key is the top note"), true, chordTopDown, [this] { chordTopDown = ! chordTopDown; });
+    // the chord stamp's list (round 190j, discussion #10): the toolbar's chord box is hidden in a narrow window, so
+    // the stamp is always in this menu too
+    menu.addSubMenu (tr ("Chord stamp"), stampMenu(), true, juce::Image(), chordBox.getSelectedId() > 1);
     menu.addItem (tr ("Stamp: none (single notes)") + keyText ("pianoRoll.stampNone"), chordBox.getSelectedId() != 1, false,
                   [this] { runAction ("pianoRoll.stampNone"); });
     menu.addItem (tr ("Move the notes onto the scale"), scaleIndex() > 0, false, [this] {
@@ -4777,6 +4854,19 @@ juce::PopupMenu PianoRollComponent::editMenu()
     return menu;
 }
 
+juce::PopupMenu PianoRollComponent::stampMenu()
+{
+    // the toolbar chord box's items, the chosen one ticked ("Note" = no stamp: single notes)
+    juce::PopupMenu menu;
+    for (int i = 0; i < chordBox.getNumItems(); ++i)
+    {
+        const auto id = chordBox.getItemId (i);
+        menu.addItem (chordBox.getItemText (i) + (id == 1 ? keyText ("pianoRoll.stampNone") : juce::String()), true, chordBox.getSelectedId() == id,
+                      [this, id] { chordBox.setSelectedId (id, juce::sendNotificationSync); });
+    }
+    return menu;
+}
+
 juce::PopupMenu PianoRollComponent::viewMenu()
 {
     // FL's EEViewMenu, its "Helpers" items (DFM)
@@ -4787,6 +4877,16 @@ juce::PopupMenu PianoRollComponent::viewMenu()
     menu.addItem (tr ("Background waveform") + keyText ("pianoRoll.backgroundWave"), true, isBackgroundWaveShown(),
                   [this] { runAction ("pianoRoll.backgroundWave"); });
     menu.addItem (tr ("Ruler: song bars (LYNX)") + keyText ("pianoRoll.songBarsRuler"), true, songBarsRuler, [this] { runAction ("pianoRoll.songBarsRuler"); });
+    {
+        // round 190j (discussion #136): LYNX's own; flat = FL's keyboard, the default
+        juce::PopupMenu style;
+        const auto add = [this, &style] (const juce::String& name, pianokeys::Style value) {
+            style.addItem (name, true, keyStyle == value, [this, value] { setKeyStyle (value); });
+        };
+        add (tr ("Flat keys (FL Studio style)"), pianokeys::Style::flat);
+        add (tr ("Piano keys (lines between the white keys)"), pianokeys::Style::piano);
+        menu.addSubMenu (tr ("Keyboard style"), style);
+    }
     if (const auto wave = backgroundWave())
         menu.addItem (tr ("Remove the background waveform ({0})", { wave->file.getFileName() }), [this] {
             backgroundWave().reset();

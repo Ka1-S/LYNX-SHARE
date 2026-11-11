@@ -147,6 +147,7 @@ juce::String channelName (const Song& song, int row)
 
 bool ChannelRackComponent::keepEditorsOpen = false;
 bool ChannelRackComponent::selectFirstChannelWithNotes = false;
+bool ChannelRackComponent::autoSelectLinked = true;
 bool ChannelRackComponent::muteRemovedSteps = false;
 
 ChannelRackComponent::ChannelRackComponent (AudioEngine& e)

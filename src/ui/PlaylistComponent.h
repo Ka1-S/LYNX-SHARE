@@ -140,6 +140,7 @@ public:
 
     // For snapshots: the tool in use and a time selection over [fromBar, toBar).
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    EditTool currentTool() const noexcept { return tools.getTool(); }
     void setTimeSelectionForSnapshot (int fromBar, int toBar);
     // the selected clips (indices into the Playlist), for Tools › Consolidate playlist selection (round 168e)
     const std::vector<int>& getSelectedClips() const noexcept { return selection; }
@@ -152,7 +153,10 @@ public:
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
 
-    static constexpr int headerWidth = 96;
+    // The track headers' width: FL's 96 px, or the Simple workflow's wider headers (round 184a). setSimpleHeaders sets
+    // it; everything else only reads it.
+    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232;
+    int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 24;
@@ -164,6 +168,15 @@ public:
     static constexpr int scrollBarSize = 12;
 
     static juce::Colour patternColour (const Song& song, int pattern);
+
+    // The Simple workflow's track headers (round 184a, slice S4; core/SimpleTracks.h): wider headers whose controls act
+    // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
+    // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
+    void setSimpleHeaders (bool on);
+    bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
+    std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
+    // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
+    std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
 
     // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
     // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
@@ -186,7 +199,8 @@ public:
     void showSongAfterOpen();
 
     // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
-    // click on its header does, without the menus (round 184a, S16: the game controller's D-pad).
+    // click on its header does, without the menus, and scrolls it into view (round 184a, S4: a new Simple track; S16:
+    // the game controller's D-pad).
     int getCurrentTrack() const noexcept { return currentTrack; }
     void selectTrack (int track);
 
@@ -363,7 +377,20 @@ private:
     void showTrackMenu (int track);
     juce::PopupMenu buildTrackMenu (int track);
     void openClipSource (int clip, bool other); // double click: the clip's pattern / automation (Alt: the other editor)
-    juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header
+    juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header (Simple headers: the M button)
+    // the Simple headers' controls (round 184a): empty with FL's headers, a row too short or a track without an insert
+    bool simpleHeaders = false;
+    static constexpr int simpleTrackHeight = 56, simpleTwoRows = 44; // the default row; the height that shows the second row
+    juce::Rectangle<int> trackSolo (int track) const;
+    juce::Rectangle<int> trackVolume (int track) const;
+    juce::Rectangle<int> trackPan (int track) const;
+    juce::Rectangle<int> trackFx (int track) const;
+    int simpleInsert (int track) const; // the insert a Simple header's controls act on, -1 none
+    void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
+    int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
+    // a level drag on a Simple header: 1 volume, 2 pan (0 none)
+    int levelDrag = 0, levelInsert = -1;
+    float levelStart = 0.0f;
     juce::Rectangle<int> trackArrow (int track) const; // a group header's fold arrow (empty for other tracks)
     // An audio track's buttons (FL 2026, issue #11), acting on its linked mixer track: "Arm/disarm recording" (left of
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.
@@ -476,11 +503,13 @@ private:
         int clip = -1, track = -1;
         gesture::Target target = gesture::Target::empty;
         bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
+        bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         bool operator== (const Hover& o) const
         {
             return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
-                   && arm == o.arm && input == o.input && divider == o.divider;
+                   && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
+                   && divider == o.divider;
         }
     };
     Hover hover;
@@ -635,6 +664,17 @@ public:
         resized();
     }
 
+    // The Simple workflow (round 184a) has no pattern picker beside the Playlist: its tracks hold their own clips.
+    void setPickerHidden (bool hidden)
+    {
+        if (hidden == pickerHidden)
+            return;
+        pickerHidden = hidden;
+        picker.setVisible (! hidden && (clipGrid == nullptr || gridView != GridView::grid));
+        resized();
+        repaint();
+    }
+
     // A component over everything under the toolbar band (round 184a: the Simple workflow's New track chooser); not
     // owned, nullptr = none.
     void setOverlay (juce::Component* c)
@@ -675,6 +715,12 @@ public:
         auto area = getLocalBounds();
         if (detailView != nullptr && detailView->isVisible() && detailHeightFor != nullptr)
             detailView->setBounds (area.removeFromBottom (detailHeightFor (area.getHeight())));
+        if (pickerHidden)
+        {
+            picker.setVisible (false);
+            playlist.setBounds (area);
+            return;
+        }
         if (clipGrid != nullptr && gridView != GridView::song)
         {
             // (under the band the title bar shares with the Playlist's toolbar)
@@ -702,6 +748,8 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        if (pickerHidden)
+            return; // (the Playlist fills the area)
         // the toolbar band above the picker (and above the grid, when one is beside the Playlist)
         const auto bandWidth = clipGrid != nullptr ? picker.getRight() : PatternPicker::width;
         g.setColour (theme::colour::bg3);
@@ -717,6 +765,7 @@ private:
     juce::Component* clipGrid = nullptr;
     GridView gridView = GridView::beside;
     juce::Component* overlay = nullptr;
+    bool pickerHidden = false;
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;
 };

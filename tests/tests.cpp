@@ -53,6 +53,7 @@
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
 #include "core/FlSamplers.h"
+#include "core/Fpc.h"
 #include "core/FlSynths.h"
 #include "core/Inflate.h"
 #include "core/WavPack.h"
@@ -60,6 +61,7 @@
 #include "core/FlWrapper.h"
 #include "core/FlPluginDb.h"
 #include "core/MissingFiles.h"
+#include "core/PianoKeys.h"
 #include "core/PianoRollTools.h"
 #include "core/EventEdit.h"
 #include "core/Preferences.h"
@@ -2934,7 +2936,7 @@ TEST (fl_fpc_cycle_layers_and_slicex_master_volume)
     state.push_back (5);
     for (char ch : std::string ("x.wav"))
         state.push_back ((std::uint8_t) ch);
-    const auto sliced = lynx::slicex (state);
+    const auto sliced = lynx::slicexSample (state);
     CHECK (sliced.has_value() && sliced->path == "x.wav");
     CHECK (sliced && std::abs (sliced->gain - (float) ((std::pow (11.0, 1.25) - 1.0) / 10.0)) < 1e-5f);
 }
@@ -17263,6 +17265,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "StemSplitTests.inc"
 #include "AudioToMidi189bTests.inc"
 #include "Zoom167tTests.inc"
+#include "PianoKeys190jTests.inc"
 #include "Proll168gTests.inc"
 #include "Rea168eTests.inc"
 #include "Design168nTests.inc"
@@ -17280,6 +17283,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Patterns177dTests.inc"
 #include "Issue32Tests.inc"
 #include "Keys117Tests.inc"
+#include "Pedal187aTests.inc"
 #include "Sc109Tests.inc"
 #include "WrapperMidi181cTests.inc"
 #include "Keys96Tests.inc"
@@ -17346,6 +17350,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlmImport187dTests.inc"
 #include "FlmImport188fTests.inc"
 #include "FlmImport188hTests.inc"
+#include "FlmImport189hTests.inc"
+#include "FlmImport189hATests.inc"
+#include "FlmImport189hBTests.inc"
+#include "FlmImport189hCTests.inc"
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
@@ -17355,6 +17363,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"
+#include "Fpc190mTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
@@ -17387,9 +17396,15 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Render186bTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
+#include "MultiOut188dTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
+#include "MidiTools190oTests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
 #include "Undo190bTests.inc"
 #include "TrackMeters190wTests.inc"
+#include "Bugs190cTests.inc"
+#include "Slicex190hTests.inc"
+#include "Parity190vTests.inc"
+#include "Surge190xTests.inc"

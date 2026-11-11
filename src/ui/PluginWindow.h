@@ -63,6 +63,11 @@ bool letsHostProcessKeys (juce::Component& window);
 bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
 } // namespace PluginWindows
 
+// The wrapper settings page of a hosted plugin drawn offscreen (round 188d: FL | LYNX shots of Processing ›
+// Connections, LYNX --wrappershot): `tab` 0 Settings, 1 Processing, 2 Troubleshooting; no window is opened.
+juce::Image wrapperSettingsSnapshot (AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
+                                     bool channel, int tab, float scale = 1.0f);
+
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.
 void scanPluginsWithProgress (AudioEngine& engine, std::function<void (int)> onDone);
 
