@@ -1,0 +1,34 @@
+<figure><a class="shot" href="/assets/img/wiki/browser-tree.webp"><img src="/assets/img/wiki/browser-tree.webp" alt="左侧的浏览器，带有三个标签页、搜索框、文件夹树和预览条" loading="lazy"></a></figure>
+<p>浏览器会列出你的采样文件夹、当前工程的内容，以及 LYNX SHARE 已知的插件。按 <code>Alt+F8</code> 显示或隐藏它。单独按 <code>F8</code> 会打开插件选择器，这是一个独立的全屏视图，列出所有乐器和效果器。</p>
+<h2 id="load-a-sample-into-the-project">把采样载入工程</h2>
+<ol><li>按 <code>Alt+F8</code> 显示浏览器。</li><li>在 <code>全部</code> 标签页中，单击文件夹将其打开。</li><li>单击音频文件即可试听。按 <code>Up</code> 和 <code>Down</code> 在文件间逐个切换并预听。</li><li>双击该文件，会在<a href="/wiki/channel-rack/">通道机架</a>中新建一个带有该采样的通道。</li><li>或者把文件拖到<a href="/wiki/playlist/">播放列表</a>上，得到一个音频片段。</li></ol>
+<h2 id="tabs">标签页</h2>
+<div class="tablewrap"><table><thead><tr><th>标签页</th><th>显示内容</th></tr></thead><tbody><tr><td>全部</td><td>当前工程、插件数据库和所有采样文件夹</td></tr><tr><td>工程</td><td>只显示当前工程用到的内容：样式、效果器、发生器、自动化、音频文件</td></tr><tr><td>星标</td><td>你加星标的文件和文件夹（右键单击，然后选 <code>已加星标</code>）</td></tr></tbody></table></div>
+<h2 id="browse-and-preview">浏览与预听</h2>
+<ul><li>单击文件夹可打开或关闭它。右键单击可打开菜单（全部折叠、在文件管理器中显示）。</li><li>单击音频文件即可试听。列表下方的预览条会显示它的波形。单击预览条可再听一遍，也可以从中拖出，就像拖动文件本身一样。</li><li>预览条上方的面板显示所选文件的日期、大小和路径。</li></ul>
+<h2 id="use-a-sample">使用采样</h2>
+<div class="tablewrap"><table><thead><tr><th>操作</th><th>作用</th></tr></thead><tbody><tr><td>双击</td><td>新建带有该采样的通道</td></tr><tr><td>拖到通道机架</td><td>新建通道；放到某一行上则载入到该行</td></tr><tr><td>拖到播放列表</td><td>音频片段</td></tr><tr><td><code>Enter</code></td><td>把文件载入所选通道</td></tr><tr><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>切换到上一个或下一个文件，并载入所选通道</td></tr></tbody></table></div>
+<p>最后一项可以让你在样式播放的同时，就地试听不同的采样。</p>
+<h2 id="other-file-types">其他文件类型</h2>
+<ul><li><strong>工程</strong>：双击即可打开。</li><li><strong>MIDI 文件</strong>：双击将其作为工程打开。</li><li><strong>SoundFont 或 SFZ</strong>：单击预听，双击创建 LYNX Soundfont 通道（或载入所选通道）。</li><li><strong>混音器预设</strong>：双击将其载入所选的混音台插入轨，或把它拖到某个插入轨上。</li><li><strong>效果器预设</strong>：把它拖到混音台插入轨上。</li></ul>
+<h2 id="plugin-database">插件数据库</h2>
+<p>插件数据库条目列出 LYNX SHARE 的内置乐器和效果器，以及已安装的插件。按 <code>Shift+F8</code> 可直接跳到它。</p>
+<ul><li>双击乐器可将其添加为新通道，也可以把它拖到通道机架上。</li><li>双击效果器可将其添加到所选的<a href="/wiki/mixer/">混音台</a>插入轨，也可以把它拖到插入轨或效果器插槽上。</li><li><code>F2</code> 重命名所选插件。</li><li>右键单击插件并选择 <code>移到文件夹</code>，可把插件分类到文件夹中。之后混音台的插槽菜单和通道机架的添加菜单会列出每个顶层文件夹。</li></ul>
+<h2 id="the-project-tab">工程标签页</h2>
+<p>这里列出的样式，单击可将其设为当前样式，双击可在<a href="/wiki/piano-roll/">钢琴卷帘</a>中打开，也可以拖入播放列表。当前工程部分还会列出撤销历史：单击某一步即可回到那一步。</p>
+<h2 id="search">搜索</h2>
+<p>按 <code>Ctrl+F</code> 把光标放入搜索框。它会搜索所选文件夹（或所有文件夹）及其下级内容。在工程标签页中，它搜索的是工程中的项目。</p>
+<p>所有词都必须匹配。搜索框还支持 <code>OR</code>、用来排除某个词的减号，以及 <code>*</code> 通配符：</p>
+<pre><code>kick -loop
+snare OR clap
+hat*.wav</code></pre>
+<p>文件夹会在后台建立索引。浏览器菜单中的 <code>刷新搜索索引</code> 会重建索引。</p>
+<h2 id="your-own-folders">你自己的文件夹</h2>
+<p>用浏览器文件夹列表中的 <code>添加文件夹</code> 可以添加存放采样、工程或 SoundFont 的文件夹。搜索文件夹在 <code>选项 › 文件设置（搜索文件夹）</code> 中。</p>
+<h2 id="keys">按键</h2>
+<p>方向键、<code>Enter</code> 和 <code>F2</code> 需要浏览器处于焦点状态才有效。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>显示浏览器</td><td><code>Alt+F8</code></td><td>显示或隐藏浏览器</td></tr><tr><td>插件选择器</td><td><code>F8</code></td><td>打开全屏的插件选择器</td></tr><tr><td>插件数据库</td><td><code>Shift+F8</code></td><td>跳到插件数据库条目</td></tr><tr><td>搜索</td><td><code>Ctrl+F</code></td><td>把光标放入搜索框</td></tr><tr><td>切换并预听</td><td><code>Up</code> / <code>Down</code></td><td>选择上一个或下一个文件并播放</td></tr><tr><td>关闭文件夹</td><td><code>Left</code></td><td>关闭文件夹，或转到其上级文件夹</td></tr><tr><td>打开文件夹</td><td><code>Right</code></td><td>打开文件夹</td></tr><tr><td>载入</td><td><code>Enter</code></td><td>把文件载入所选通道</td></tr><tr><td>切换并载入</td><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>切换到上一个或下一个文件，并载入所选通道</td></tr><tr><td>重命名插件</td><td><code>F2</code></td><td>重命名插件数据库中所选的插件</td></tr></tbody></table></div>
+<h2 id="good-to-know">须知</h2>
+<ul><li>从列表中移除文件夹不会把它从磁盘上删除。</li><li><code>F8</code> 和 <code>Alt+F8</code> 是两回事。<code>F8</code> 是插件选择器，<code>Alt+F8</code> 是浏览器。</li><li>搜索结果来自后台建立的索引。浏览器菜单中的 <code>刷新搜索索引</code> 会重建它。</li><li><code>Enter</code> 把文件载入所选通道。双击则新建通道。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/channel-rack/">通道机架</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/wiki/file-formats/">文件格式</a></li><li><a href="/wiki/undo-history/">撤销和历史</a></li><li><a href="/instruments-and-effects/">乐器和效果器</a></li></ul>

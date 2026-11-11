@@ -1,0 +1,53 @@
+<p>下面每个标题是一个问题。如果没有你的问题，请按末尾所述的方式报告。</p>
+<h2 id="starting-the-program">启动程序</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows：首次启动时 SmartScreen 发出警告</h3>
+<p>这个可执行文件尚未进行代码签名，所以你第一次运行时 SmartScreen 可能会发出警告。</p>
+<ol><li>单击 <code>More info</code>。</li><li>单击 <code>Run anyway</code>。</li></ol>
+<p>安装程序不需要管理员权限。</p>
+<h3 id="macos-cannot-be-opened">macOS：“无法打开”</h3>
+<p>这个应用没有经过 Apple 公证，也没有 Developer ID 签名，所以首次启动需要多一步操作。</p>
+<ol><li>把 LYNX SHARE 拖到 <code>Applications</code>。</li><li>右键单击（按住 Control 单击）它，选择 <code>打开</code>。</li><li>再次单击 <code>打开</code>。</li></ol>
+<p>在 macOS 15 Sequoia 或更新版本上，先尝试打开一次，然后进入 <code>System Settings › Privacy &amp; Security</code>，单击 <code>Open Anyway</code>。或者在终端中运行：</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>你第一次录音时，macOS 会请求麦克风权限。</p>
+<h3 id="linux-the-appimage-does-not-start">Linux：AppImage 无法启动</h3>
+<p>LYNX SHARE 需要 x86_64 系统，glibc 2.35 或更新（Ubuntu 22.04、Debian 12、Fedora 36、当前的 Arch 或 Manjaro），以及 X11 或 XWayland。</p>
+<ol><li>用下面的两条命令，让文件可执行并运行它。</li><li>如果仍然无法启动，请安装 libfuse2。该软件包在 Ubuntu 22.04 上是 <code>libfuse2</code>，在 Ubuntu 24.04 上是 <code>libfuse2t64</code>，在 Arch 上是 <code>fuse2</code>，在 Fedora 上是 <code>fuse-libs</code>。</li><li>如果你不想安装它，可以改为下载 <code>.tar.gz</code>，解压后运行 <code>./install.sh</code>。</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> 会为你的用户把 LYNX SHARE 安装到 <code>~/.local</code> 下，并带有菜单项。<code>./install.sh --uninstall</code> 则将其移除。</p>
+<h2 id="sound">声音</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">没有声音，或音频设备不对</h3>
+<ol><li>打开 <code>选项 › 音频设置...</code>。</li><li>选择一个驱动。</li><li>选择一个输出设备。</li></ol>
+<div class="tablewrap"><table><thead><tr><th>系统</th><th>驱动</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI)、DirectSound、ASIO 和内置的 LYNX ASIO 驱动</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire（原生）、JACK 和 ALSA。首次启动时，LYNX SHARE 会打开其中第一个有设备的驱动</td></tr></tbody></table></div>
+<p>ASIO 是 Windows 的驱动模型，只存在于 Windows 上。<code>选项 › 设置向导（语言、音频、插件文件夹）...</code> 也会测试音频设备。见<a href="/wiki/audio-setup/">音频设置</a>。</p>
+<h3 id="linux-the-sound-breaks-up">Linux：声音断断续续</h3>
+<p>音频线程应以实时优先级运行。</p>
+<ol><li>打开 <code>选项 › 音频设置...</code>，查看 <code>状态</code>。它显示线程是否获得了实时优先级。</li><li>如果没有，请安装 rtkit（<code>sudo apt install rtkit</code>、<code>sudo dnf install rtkit</code> 或 <code>sudo pacman -S rtkit</code>），或者像 JACK 的配置那样，把你自己加入带有实时限制的 <code>音频</code> 组。</li><li>注销后重新登录。</li></ol>
+<p>详情见 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>。</p>
+<h2 id="plugins">插件</h2>
+<h3 id="a-plugin-crashes">插件崩溃</h3>
+<p>让它在自己的进程中运行，这样停止的只是这个插件。</p>
+<ol><li>打开 <code>选项 › 常规设置...</code>。</li><li>打开 <code>在独立进程中运行插件（防止插件崩溃影响LYNX SHARE）</code>。</li><li>重新打开工程。</li></ol>
+<p>在自己进程中崩溃或停止响应的插件会被静音。保存工程并重新打开，即可再次加载该插件。见<a href="/wiki/plugins/">第三方插件</a>。</p>
+<h3 id="a-plugin-is-not-in-the-list">插件不在列表中</h3>
+<ol><li>选择 <code>选项 › 扫描插件</code>。</li><li>如果仍然缺失，请打开 <code>选项 › 插件管理器...</code>，单击 <code>插件文件夹...</code>，添加该插件所在的文件夹。</li><li>查看 <code>失败</code> 标签页。扫描失败的插件文件会被跳过。在 Windows 上，原因记录在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</li><li>单击 <code>全部重新扫描...</code> 可再次尝试失败的文件。</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">工程用到了未安装的插件</h3>
+<p>效果器会被作用相同的 LYNX SHARE 效果器替代，其设置会保留在工程中。<code>帮助 › 缺失的文件...</code> 会列出缺失的内容。见<a href="/wiki/built-in/">内置乐器和效果器</a>。</p>
+<h3 id="video-does-not-work-on-linux">视频在 Linux 上不工作</h3>
+<p>视频轨道和 <code>Export with video</code> 需要 FFmpeg。LYNX SHARE 会告诉你如何安装它。</p>
+<h2 id="crash-reports">崩溃报告</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="下次启动时显示的崩溃报告询问，带有 Send、Show what will be sent 和 Don't send" loading="lazy"></a></figure>
+<p>崩溃报告需要你主动选择加入。崩溃或卡死之后，下次启动时会询问是否发送报告。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>作用</th></tr></thead><tbody><tr><td><code>显示将要发送的内容</code></td><td>显示确切的文字</td></tr><tr><td><code>改为在GitHub上报告</code></td><td>打开 GitHub 的问题表单，内容已预先填好。文件需要你自己附上</td></tr><tr><td><code>打开报告所在的文件夹</code></td><td>在你的电脑上显示报告文件</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>关闭时，只发送每个文件的扩展名</td></tr><tr><td><code>始终发送，不再询问</code></td><td>以后发送报告时不再询问</td></tr></tbody></table></div>
+<p><code>选项 › 常规设置...</code> 中的 <code>崩溃报告</code> 可设为 <code>Ask</code>（默认）、<code>始终发送</code> 或 <code>从不发送</code>。</p>
+<p>报告包含 LYNX SHARE 版本、操作系统、CPU、显卡及其驱动、屏幕尺寸、音频驱动和设备、崩溃或卡死文件、本次会话的最后 60 步，以及所加载的第三方插件的名称和版本。</p>
+<p>它不包含音频、工程、采样、你的电脑名或你的用户名。服务器不保存 IP 地址。已发送的 id 列在设置文件夹里的 <code>crash-reports\sent.log</code> 中。要删除某份报告，请带上它的 id 提交一个 issue。完整文本见<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">隐私政策</a>。</p>
+<h2 id="report-a-problem">报告问题</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="报告问题窗口：一个描述框、一个可选的电子邮件地址和 Send 按钮" loading="lazy"></a></figure>
+<ol><li>选择 <code>帮助 › 报告问题...</code>。</li><li>描述发生了什么。电子邮件地址是可选的，想收到回复时再填。</li><li>如果问题是崩溃，请保持勾选 <code>附上最新的崩溃/卡死文件和本次会话的步骤</code>。</li><li>单击 <code>显示将要发送的内容</code> 检查文字。</li><li>单击 <code>发送</code>。在此之前不会发送任何内容。</li></ol>
+<p>你也可以在 <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a> 提交 issue。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>崩溃之后，你的工程备份副本在 LYNX SHARE 的自动保存文件夹中。</li><li>如果崩溃与某个插件有关，询问中会提议今后让该插件在独立进程中运行。</li><li>设置文件夹在 Windows 上是 <code>%APPDATA%\LYNX</code>，在 macOS 上是 <code>~/Library/Application Support/LYNX</code>，在 Linux 上是 <code>~/.config/LYNX</code>。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/audio-setup/">音频设置</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/wiki/install/">安装</a></li><li><a href="/faq/">常见问题</a></li><li><a href="/why/#crash">崩溃保护</a></li></ul>

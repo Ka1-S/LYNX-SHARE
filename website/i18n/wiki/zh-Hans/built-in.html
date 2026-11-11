@@ -1,0 +1,31 @@
+<figure><a class="shot" href="/assets/img/wiki/quickadd.webp"><img src="/assets/img/wiki/quickadd.webp" alt="快速添加面板：左侧是乐器，右侧是效果器，每个都标有内置或内置 FL 引擎" loading="lazy"></a></figure>
+<p>LYNX SHARE 自带乐器和效果器，所以工程不装任何第三方插件也能播放。它们分为三类：LYNX SHARE 原创的（合成器、采样器、SoundFont 播放器、鼓、均衡器、压缩器、限制器、混响、延时）、为播放 FL Studio 原生插件的设置而编写的引擎，以及替代知名第三方插件的效果器。</p>
+<p>每一个在<a href="/instruments-and-effects/">目录</a>里都有自己的页面。<code>帮助 › 内置插件（在线列表）...</code> 会打开列表，显示每个引擎的状态。</p>
+<h2 id="add-an-instrument-and-an-effect">添加乐器和效果器</h2>
+<ol><li>按 <code>F6</code> 显示通道机架。</li><li>单击最后一行下方的 <code>+ 添加通道</code> 框，选择一个乐器。菜单按类别分组。</li><li>按 <code>F9</code> 显示混音台，并选中该通道所输出到的插入轨。</li><li>单击效果器面板中的空插槽，选择一个效果器。它的窗口随即打开。</li><li>单击插槽的名称可再次隐藏或显示该窗口。</li></ol>
+<h2 id="the-plugin-picker">插件选择器</h2>
+<p>按 <code>F8</code> 打开插件选择器。它铺满屏幕，把每个发生器和效果器显示为各自编辑器的图片，类别以标签页的形式排在底部。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>搜索</td><td>输入文字</td><td>将不匹配的插件变暗</td></tr><tr><td>逐个切换插件</td><td><code>Up</code> / <code>Down</code></td><td>移动高亮</td></tr><tr><td>添加</td><td><code>Enter</code>、双击或右键单击</td><td>发生器变成新通道。效果器进入所选的混音台插入轨</td></tr><tr><td>拖动图片</td><td></td><td>拖到通道机架上得到新通道，拖到某个通道上替换它的乐器，或拖到混音台插入轨或插槽上</td></tr><tr><td>关闭</td><td><code>Esc</code> 或 <code>F8</code></td><td>关闭选择器，不添加任何内容</td></tr></tbody></table></div>
+<p>LYNX SHARE 自己的插件图片由 LYNX SHARE 在后台绘制。第三方插件在其编辑器被打开过一次之前，只显示带有厂商名称的普通磁贴。</p>
+<p><code>编辑 › 快速添加面板...</code> 会改为打开一个纯列表：左侧是乐器，右侧是效果器，随输入即时筛选。<code>Tab</code> 在两个列表间切换，<code>Enter</code> 添加高亮的项目。<a href="/wiki/browser/">浏览器</a>的插件数据库（<code>Shift+F8</code>）则以树状结构列出同样的插件。</p>
+<figure><a class="shot" href="/assets/img/wiki/browser-plugins.webp"><img src="/assets/img/wiki/browser-plugins.webp" alt="浏览器的插件数据库，FL engines 文件夹已展开" loading="lazy"></a></figure>
+<h2 id="presets">预设</h2>
+<p>内置效果器的窗口顶部有一个预设栏。</p>
+<div class="tablewrap"><table><thead><tr><th>控件</th><th>作用</th></tr></thead><tbody><tr><td>箭头</td><td>上一个和下一个预设</td></tr><tr><td>预设名称</td><td>打开菜单：<code>LYNX SHARE预设</code>、<code>你的预设</code>、<code>FL Studio预设</code>（如果有）、<code>保存预设...</code> 和 <code>显示预设文件夹</code></td></tr><tr><td><code>A</code> / <code>B</code></td><td>两组可供比较的设置。旁边的按钮把你正在听的那一组复制到另一组</td></tr></tbody></table></div>
+<p>预设名称以及 A、B 两组设置都会随工程一起保存。</p>
+<h2 id="what-opens-fl-s-settings-means">“打开 FL 的设置”是什么意思</h2>
+<p>FL Studio 的原生插件从不会被加载。LYNX SHARE 为每一个插件都有自己的引擎，由该引擎读取 FL 插件保存的设置。这在两个地方有效：</p>
+<ul><li><code>.flp</code> 工程。每个 FL 发生器和效果器都用对应的 LYNX SHARE 引擎和保存的设置打开，其控件仍可编辑，也可做自动化。</li><li><code>.fst</code> 预设。在浏览器中双击合成器预设即可得到新通道，或者把效果器预设拖到混音台插入轨上。右键单击已有效果器的插槽，选择 <code>FL预设</code>，会列出在你的 FL Studio 安装中找到的预设。</li></ul>
+<p>每个引擎与原版有多接近，都按引擎逐一标明，从精确（Exact）到占位（Placeholder）。各级别的含义见<a href="/wiki/coming-from-fl-studio/">从 FL Studio 转来</a>。</p>
+<h2 id="engines-that-need-your-fl-studio-installation">需要你的 FL Studio 安装的引擎</h2>
+<p>LYNX SHARE 不含任何 Image-Line 的代码、音频或波形数据。有些引擎需要原插件自带的波形、采样、脉冲响应或表格，运行时会从你自己的 FL Studio 安装中读取。</p>
+<div class="tablewrap"><table><thead><tr><th>类型</th><th>引擎</th></tr></thead><tbody><tr><td>乐器</td><td>FL Keys、DirectWave、BassDrum、Toxic Biohazard、FL Slayer、MiniSynth、Kepler、Transistor Bass、Sawer、Autogun、Fruity DrumSynth Live、BooBass、Harmor、Harmless、GMS、Morphine</td></tr><tr><td>效果器</td><td>Hardcore、Maximus、Soundgoodizer、Fruity Convolver、Distructor、Vocodex</td></tr></tbody></table></div>
+<p>如果找不到这些文件，添加此类引擎时可能会失败，并提示未找到 FL Studio 安装的数据文件，或无法读取这些文件。</p>
+<h2 id="stand-ins-for-third-party-plugins">第三方插件的替代插件</h2>
+<p>当工程用到一个未安装的第三方效果器时，一个作用相同的 LYNX SHARE 效果器会占据它的插槽：混响换混响，延时换延时。</p>
+<ul><li>插槽显示原插件的名称，并带有 LYNX SHARE 徽标。</li><li>如果能读取保存的状态，就会转换其设置。否则替代插件从默认预设开始。</li><li>原插件及其设置会保留在工程中。装上该插件后，工程会再次用它打开。</li><li>右键单击替代插件的插槽，选择 <code>旁通此工程的所有LYNX SHARE替代</code>，即可听到不带这些替代插件的工程。</li></ul>
+<p>开关是 <code>选项 › 常规设置...</code> 中的 <code>用LYNX SHARE对应插件替代缺失的插件</code>，默认开启。在新工程中，同样的效果器位于空插槽菜单的 <code>LYNX SHARE对应插件</code> 下。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>缺失的乐器目前不做替代。缺失的乐器插件会变成按通道名称选定的内置合成器。</li><li>原插件参数的自动化会保留，但不会驱动替代插件。</li><li>FLEX 包是加密的，永远不会被打开。FLEX 通道会得到一个按其预设名称选定的合成器音色。</li><li>一个插入轨有 10 个效果器插槽。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/instruments-and-effects/">乐器和效果器目录</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/wiki/channel-rack/">通道机架</a></li><li><a href="/wiki/mixer/">混音台</a></li><li><a href="/wiki/coming-from-fl-studio/">从 FL Studio 转来</a></li></ul>

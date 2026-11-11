@@ -1,0 +1,20 @@
+<p>本页带你完整走一遍：鼓点样式、旋律、编排、混音，直到导出文件。每一部分都链接到详细介绍对应窗口的页面。如果任何时候听不到声音，请见<a href="/wiki/audio-setup/">音频设置</a>。</p>
+<h2 id="make-a-drum-pattern">制作鼓点样式</h2>
+<ol><li>选择 <code>文件 › 从模板新建 › 空</code>。工程开始时有五个通道：底鼓、拍手、踩镲、军鼓和合成器，没有任何步。</li><li>如果<a href="/wiki/channel-rack/">通道机架</a>没有显示，按 <code>F6</code>。</li><li>在底鼓那一行上单击几个步。拖动可一次画出多个，右键单击则擦除。</li><li>按 <code>Space</code>。走带处于样式模式，所以样式会循环播放。再按一次 <code>Space</code> 停止。</li><li>给拍手、踩镲和军鼓各行也设上各自的步。</li><li>按 <code>F2</code> 为样式命名并设置颜色。</li></ol>
+<p>要添加现有通道里没有的声音，请单击最后一行下方的 <code>+ 添加通道</code> 框，并从菜单中选一个乐器。要使用你自己的采样，请按 <code>Alt+F8</code> 打开<a href="/wiki/browser/">浏览器</a>，单击音频文件试听，再双击它，将其添加为新通道。</p>
+<h2 id="write-a-melody">写一段旋律</h2>
+<ol><li>按 <code>F4</code>。LYNX SHARE 会转到下一个空样式并询问它的名称。</li><li>右键单击合成器通道的名称，选择 <code>钢琴卷帘</code>。</li><li>用铅笔（<code>P</code>）在网格中单击，添加一个音符。</li><li>拖动音符可移动它，拖动它的末端可改变长度。右键单击则删除音符。</li><li>编辑的同时按 <code>Space</code>，就能听到样式。</li></ol>
+<p><code>Ctrl+T</code> 会把打字键盘变成钢琴，所以你可以先用 <code>Z</code> 到 <code>M</code> 以及 <code>Q</code> 到 <code>P</code> 试弹几个音。在使用 <code>P</code> 这类字母快捷键之前，请先把它再关掉。</p>
+<h2 id="arrange-the-patterns">编排样式</h2>
+<ol><li>按 <code>F5</code> 显示<a href="/wiki/playlist/">播放列表</a>。</li><li>在播放列表左侧的选择面板中，单击鼓点样式。它现在就是片段来源。</li><li>用铅笔（<code>P</code>）在某条轨道上单击，放置样式。在更靠右的位置再单击一次可再放一个，或者使用画笔（<code>B</code>）拖动，把片段首尾相接地涂出来。</li><li>在选择面板中单击旋律样式，把它放到另一条轨道上。</li><li>按 <code>L</code> 切换到歌曲模式，然后按 <code>Space</code>。播放列表会从歌曲位置开始播放。单击标尺可以设定该位置。</li></ol>
+<h2 id="mix-it-and-add-an-effect">混音并添加效果器</h2>
+<ol><li>按 <code>F9</code> 显示<a href="/wiki/mixer/">混音台</a>。开头的五个通道已经分别经由插入轨 1 到 5 播放，而从 <code>+ 添加通道</code> 菜单添加的通道会占用一个空闲插入轨。通道机架中该通道路由框里的数字说明是哪一个。</li><li>要把通道移到各自独立的空闲插入轨上，请在通道机架中选中它们并按 <code>Ctrl+L</code>。每个插入轨会采用该通道的名称和颜色。</li><li>拖动插入轨的推子来设定电平。</li><li>单击某个插入轨将其选中。右侧的效果器面板会显示它的十个插槽。</li><li>单击一个空插槽并选择一个效果器。单击插槽的名称可显示或隐藏该效果器的窗口。插槽上的指示灯用于旁通该效果器。</li></ol>
+<h2 id="export-the-song">导出歌曲</h2>
+<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" alt="导出窗口：左侧是范围和尾音，右侧是格式、位深和采样率，下方是混音选项" loading="lazy"></a></figure>
+<ol><li>按 <code>Ctrl+S</code>，先保存工程。</li><li>选择 <code>文件 › 导出 › Wave文件...</code>。其他格式在同一个菜单中还有 <code>MP3文件...</code>、<code>OGG文件...</code> 和 <code>FLAC文件...</code>。</li><li>把 <code>范围</code> 设为 <code>歌曲（播放列表）</code>。其他选项是 <code>当前样式</code> 和 <code>播放列表选区</code>。</li><li>其他选项保持原样。</li><li>单击 <code>导出...</code>，选择文件名，然后等待渲染完成。</li></ol>
+<h2 id="what-each-key-did">各个按键的作用</h2>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>通道机架</td><td><code>F6</code></td><td>显示或隐藏通道机架</td></tr><tr><td>下一个空样式</td><td><code>F4</code></td><td>转到下一个空样式并为其命名</td></tr><tr><td>钢琴卷帘</td><td><code>F7</code></td><td>显示或隐藏钢琴卷帘</td></tr><tr><td>播放列表</td><td><code>F5</code></td><td>显示或隐藏播放列表</td></tr><tr><td>样式或歌曲模式</td><td><code>L</code></td><td>切换 <code>Space</code> 播放的内容</td></tr><tr><td>混音台</td><td><code>F9</code></td><td>显示或隐藏混音台</td></tr><tr><td>发送到空闲插入轨</td><td><code>Ctrl+L</code></td><td>给所选通道分配各自的混音台插入轨</td></tr><tr><td>保存</td><td><code>Ctrl+S</code></td><td>把工程保存为 <code>.lynx</code></td></tr><tr><td>导出</td><td><code>Ctrl+R</code></td><td>以上次使用的格式打开导出窗口</td></tr></tbody></table></div>
+<h2 id="good-to-know">须知</h2>
+<ul><li>在样式模式下，你只能听到当前样式。如果编排之后歌曲没有声音，请检查走带是否处于歌曲模式。</li><li>当走带处于歌曲模式且播放列表中有片段时，导出窗口会从 <code>歌曲（播放列表）</code> 开始。否则它从 <code>当前样式</code> 开始。</li><li>节拍器的咔嗒声从不会进入导出的文件。</li><li>导出窗口的底部显示歌曲的小节长度、总时间，以及文件所需的磁盘空间。</li><li>默认情况下，新工程的主控插入轨上有一个限制器。它是你所听到和所导出声音的一部分。</li><li>撤销是 <code>Ctrl+Z</code>。再按一次就会重做那一步。<code>Ctrl+Alt+Z</code> 可以回退得更远。</li></ul>
+<h2 id="related">相关</h2>
+<ul><li><a href="/wiki/tour/">窗口导览</a></li><li><a href="/wiki/exporting/">导出</a></li><li><a href="/wiki/automation/">自动化</a></li><li><a href="/wiki/recording/">录音</a></li><li><a href="/instruments-and-effects/">乐器和效果器</a></li></ul>
