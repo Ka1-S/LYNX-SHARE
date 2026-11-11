@@ -6114,6 +6114,8 @@ countries: tr
 "Allow the plugin to handle keystrokes before the host does" = "Eklentinin tuş basışlarını ana uygulamadan önce işlemesine izin ver"
 "Disable typing keyboard priority by default" = "Yazma klavyesi önceliğini varsayılan olarak kapat"
 "Disable typing keyboard priority for all newly added plugins by default" = "Yeni eklenen tüm eklentilerde yazma klavyesi önceliğini varsayılan olarak kapat"
+"Auto select linked modules" = "Bağlı modülleri otomatik seç"
+"Focusing plugin windows selects mixer tracks" = "Eklenti penceresine odaklanmak mikser kanalını seçer"
 "Mute / unmute" = "Sessize al / sesi aç"
 "Portamento / deselect" = "Portamento / seçimi kaldır"
 "Shift+arrows" = "Shift+oklar"

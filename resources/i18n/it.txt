@@ -6114,6 +6114,8 @@ countries: it ch sm
 "Allow the plugin to handle keystrokes before the host does" = "Consenti al plugin di gestire i tasti prima dell'host"
 "Disable typing keyboard priority by default" = "Disattiva per impostazione predefinita la priorità della tastiera di digitazione"
 "Disable typing keyboard priority for all newly added plugins by default" = "Disattiva per impostazione predefinita la priorità della tastiera di digitazione per tutti i plugin aggiunti"
+"Auto select linked modules" = "Seleziona automaticamente i moduli collegati"
+"Focusing plugin windows selects mixer tracks" = "Mettere a fuoco la finestra di un plugin seleziona la traccia del mixer"
 "Mute / unmute" = "Muta / riattiva"
 "Portamento / deselect" = "Portamento / deseleziona"
 "Shift+arrows" = "Maiusc+frecce"
