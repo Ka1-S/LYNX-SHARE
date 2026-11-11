@@ -71,4 +71,16 @@ std::vector<std::uint8_t> writeFx (const FxFile& file);
 
 // A 4-character id ('Syn1') as an int and back (VST2 unique ids are often printable).
 std::int32_t fourCC (const char* text) noexcept;
+
+// Round 190ao (pain point 13; LYNX's own, off by default): "Play a note when a preset loads". After a preset is loaded
+// into a hosted instrument while the song is stopped, a short C5 plays so the sound is heard at once. Never while the
+// song plays or records (the song is the audition then), never for an effect.
+constexpr int auditionKey = 60;                      // C5 in FL's octave numbering
+constexpr float auditionVelocity = 100.0f / 127.0f;  // FL's default note velocity
+constexpr int auditionDelayMs = 120;                 // after the load: plugins apply a preset over a few blocks
+constexpr int auditionLengthMs = 450;
+constexpr bool auditionPlays (bool option, bool instrument, bool playing, bool recording) noexcept
+{
+    return option && instrument && ! playing && ! recording;
+}
 } // namespace lynx::pluginpresets

@@ -43,6 +43,8 @@
 #include "core/VfxScript.h"
 #include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
+#include "engine/PluginSandbox.h"
+#include "core/PluginPresets.h"
 #include "flp/Flp.h"
 
 #if JUCE_WINDOWS
@@ -2238,6 +2240,16 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     for (int i = 0; i < staleCount; ++i)
         push (stale[i], false, 0.0f);
 
+    // round 190ao: a hosted instrument with its own velocity setting answers with it instead of the MIDI settings' curve
+    std::uint16_t ownVelocity[InputHeldNotes::maxTargets] {};
+    if (on)
+    {
+        const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
+        for (int i = 0; i < count; ++i)
+            if (targets[i].channel >= 0 && targets[i].channel < (int) channelVelocity.size())
+                ownVelocity[i] = channelVelocity[(std::size_t) targets[i].channel];
+    }
+
     for (int i = 0; i < count; ++i)
     {
         // the foot pedal (round 187a): a held note struck again is released first; a note-off it holds waits for it
@@ -2245,7 +2257,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
             push (targets[i], false, 0.0f);
         if (! on && pedalHold.noteOff (targets[i].channel, targets[i].key))
             continue;
-        push (targets[i], on, on ? prefs::mapVelocity (m.getFloatVelocity(), velocityCurve) : 0.0f);
+        push (targets[i], on, on ? prefs::mapPluginVelocity (m.getFloatVelocity(), ownVelocity[i] & 0xff, ownVelocity[i] >> 8, velocityCurve) : 0.0f);
     }
 }
 
@@ -3488,8 +3500,18 @@ void AudioEngine::publishSong()
         for (std::size_t c = 0; c < song.channels.size(); ++c)
             if (! song.channels[c].receiveFrom.empty())
                 locks.push_back ({ song.channels[c].receiveFrom, song.channels[c].receiveMidiChannel, (int) c });
+        // round 190ao: the hosted instruments with their own velocity setting
+        std::vector<std::uint16_t> velocities;
+        for (std::size_t c = 0; c < song.channels.size(); ++c)
+            if (song.channels[c].instrument == InstrumentKind::plugin && song.channels[c].plugin.velocityMode != prefs::pluginVelocityFollow)
+            {
+                velocities.resize (c + 1, 0);
+                velocities[c] = (std::uint16_t) (prefs::clampPluginVelocityMode (song.channels[c].plugin.velocityMode)
+                                                 | (prefs::clampFixedVelocity (song.channels[c].plugin.fixedVelocity) << 8));
+            }
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         noteLocks.swap (locks);
+        channelVelocity.swap (velocities);
     }
     transport.bpm.store (song.bpm);
     transport.beatsPerBar.store (song.beatsPerBar);
@@ -4085,6 +4107,7 @@ void AudioEngine::timerCallback()
         applyHardwareInsertPings();
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
+    updateAudition(); // (round 190ao: the preset audition's note starts and ends here)
     applyControllers();
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
@@ -4667,6 +4690,101 @@ void AudioEngine::capturePluginStates()
 
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+}
+
+bool AudioEngine::auditionPreset (const juce::AudioPluginInstance& plugin)
+{
+    auto channel = -1;
+    for (std::size_t i = 0; i < song.channels.size() && channel < 0; ++i)
+        if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()); p != nullptr && &p->getInstance() == &plugin && ! p->hasCrashed())
+            channel = (int) i;
+    if (! pluginpresets::auditionPlays (true, channel >= 0, transport.playing.load(), transport.recording.load()))
+        return false;
+    if (auditionChannel >= 0 && auditionSounding) // the last one still sounds: it ends now
+        sendLiveNote (auditionChannel, pluginpresets::auditionKey, 0.0f, false);
+    auditionChannel = channel;
+    auditionSounding = false;
+    auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionDelayMs;
+    return true;
+}
+
+void AudioEngine::updateAudition()
+{
+    if (auditionChannel < 0 || juce::Time::getMillisecondCounterHiRes() < auditionAtMs)
+        return;
+    if (auditionSounding)
+    {
+        sendLiveNote (auditionChannel, pluginpresets::auditionKey, 0.0f, false);
+        auditionChannel = -1;
+        auditionSounding = false;
+        return;
+    }
+    // (the song started in between, or the channel went: nothing plays)
+    if (transport.playing.load() || auditionChannel >= (int) song.channels.size())
+    {
+        auditionChannel = -1;
+        return;
+    }
+    sendLiveNote (auditionChannel, pluginpresets::auditionKey, pluginpresets::auditionVelocity, true);
+    auditionSounding = true;
+    auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionLengthMs;
+}
+
+namespace
+{
+bool pluginIsDown (Instrument* instrument)
+{
+    auto* p = dynamic_cast<PluginInstrument*> (instrument);
+    return p != nullptr && (p->hasCrashed() || isSandboxedPluginDead (p->getInstance()));
+}
+
+bool pluginIsDown (Effect* effect)
+{
+    auto* p = dynamic_cast<PluginEffect*> (effect);
+    return p != nullptr && (p->hasCrashed() || isSandboxedPluginDead (p->getInstance()));
+}
+} // namespace
+
+bool AudioEngine::hostedPluginDown (HostedSlot where) const
+{
+    return where.track < 0 ? pluginIsDown (getChannelInstrument (where.channel).get()) : pluginIsDown (getEffect (where.track, where.slot).get());
+}
+
+std::vector<AudioEngine::HostedSlot> AudioEngine::downHostedPlugins (const std::string& named) const
+{
+    std::vector<HostedSlot> out;
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+        if (song.channels[i].instrument == InstrumentKind::plugin && (named.empty() || song.channels[i].plugin.name == named)
+            && hostedPluginDown ({ (int) i, -1, -1 }))
+            out.push_back ({ (int) i, -1, -1 });
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
+            if (const auto& fx = song.mixer[t].effects[s];
+                fx.kind == EffectKind::plugin && (named.empty() || fx.plugin.name == named) && hostedPluginDown ({ -1, (int) t, (int) s }))
+                out.push_back ({ -1, (int) t, (int) s });
+    return out;
+}
+
+int AudioEngine::reloadHostedPlugins (const std::vector<HostedSlot>& which)
+{
+    // the running plugins' current settings (a reloaded one that still runs starts from them); this also brings the
+    // last published shape in line with the song
+    capturePluginStates();
+    std::vector<HostedSlot> asked;
+    for (const auto& w : which)
+        if (w.track < 0 ? forgetHostedPlugin (lastPublishedShape, w.channel) : forgetHostedPlugin (lastPublishedShape, w.track, w.slot))
+            asked.push_back (w);
+    if (asked.empty())
+        return 0;
+    publishSong();
+    auto running = 0;
+    for (const auto& w : asked)
+    {
+        const auto loaded = w.track < 0 ? dynamic_cast<PluginInstrument*> (getChannelInstrument (w.channel).get()) != nullptr
+                                        : dynamic_cast<PluginEffect*> (getEffect (w.track, w.slot).get()) != nullptr;
+        running += loaded && ! hostedPluginDown (w) ? 1 : 0;
+    }
+    return running;
 }
 
 void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,

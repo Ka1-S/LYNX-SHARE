@@ -578,6 +578,30 @@ ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampl
     return out;
 }
 
+// Round 190ao: the build keeps a hosted plugin's instance while the slot's plugin id is the same; an id no plugin has
+// makes it build that one again.
+namespace
+{
+constexpr const char* forgottenPluginId = "\x01reload";
+}
+
+bool forgetHostedPlugin (RackState& shape, int channel)
+{
+    if (channel < 0 || channel >= (int) shape.song.channels.size() || shape.song.channels[(std::size_t) channel].instrument != InstrumentKind::plugin)
+        return false;
+    shape.song.channels[(std::size_t) channel].plugin.id = forgottenPluginId;
+    return true;
+}
+
+bool forgetHostedPlugin (RackState& shape, int track, int slot)
+{
+    if (track < 0 || track >= (int) shape.song.mixer.size() || slot < 0 || slot >= (int) shape.song.mixer[(std::size_t) track].effects.size()
+        || shape.song.mixer[(std::size_t) track].effects[(std::size_t) slot].kind != EffectKind::plugin)
+        return false;
+    shape.song.mixer[(std::size_t) track].effects[(std::size_t) slot].plugin.id = forgottenPluginId;
+    return true;
+}
+
 std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const RackState* previous,
                                                    double sampleRate,

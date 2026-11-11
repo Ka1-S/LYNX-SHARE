@@ -322,6 +322,12 @@ ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampl
 
 class WorkerPool;
 
+// Round 190ao (reload a crashed plugin): the next RackState::build from `shape` makes this channel's / mixer slot's
+// hosted plugin again instead of keeping its running instance; nothing else in the shape changes and the song is not
+// touched. False when that channel / slot is not a hosted plugin of the shape.
+bool forgetHostedPlugin (RackState& shape, int channel);
+bool forgetHostedPlugin (RackState& shape, int track, int slot);
+
 // Whether a parallel container slot (FL's Patcher) can keep its built effect: same branches, children and links.
 bool sameContainer (const EffectSlot& a, const EffectSlot& b);
 // Time spent in each instrument and effect slot (the Plugin performance monitor, round 84). Counted only while

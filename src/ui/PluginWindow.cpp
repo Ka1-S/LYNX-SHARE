@@ -13,6 +13,8 @@
 
 #include "core/CrashReport.h"
 #include "core/EditorLimit.h"
+#include "core/PinOnTop.h"
+#include "core/Preferences.h"
 #include "core/FlWrapper.h"
 #include "core/MixerOps.h"
 #include "core/LastTweaked.h"
@@ -275,7 +277,7 @@ public:
 
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel, int track = -1,
                          int slot = -1)
-        : engine (e), find (std::move (f)), plugin (p), mixerTrack (track), mixerSlot (slot)
+        : engine (e), find (std::move (f)), plugin (p), instrumentChannel (channel), mixerTrack (track), mixerSlot (slot)
     {
         const char* tabNames[] = { TR_NOOP ("Settings"), TR_NOOP ("Processing"), TR_NOOP ("Troubleshooting") };
         for (int t = 0; t < 3; ++t)
@@ -324,6 +326,32 @@ public:
             });
         };
         addChildComponent (bendRange);
+        // round 190ao (pain point 12; LYNX's own, FL's wrapper has no velocity setting): how notes played into this
+        // instrument from MIDI devices reach it. The first item follows Settings › MIDI › Velocity (the default)
+        velocityMode.addItem (tr ("Follow the MIDI settings"), 1);
+        velocityMode.addItem (tr ("As played"), 2);
+        velocityMode.addItem (tr ("Soft (light playing sounds louder)"), 3);
+        velocityMode.addItem (tr ("Hard (needs harder playing)"), 4);
+        velocityMode.addItem (tr ("Fixed"), 5);
+        velocityMode.setTooltip (tr ("Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, "
+                                     "or this plugin's own curve or fixed velocity"));
+        velocityMode.onChange = [this] {
+            engine.editSong ([fn = find, mode = velocityMode.getSelectedId() - 1] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && mode >= 0)
+                    ref->velocityMode = prefs::clampPluginVelocityMode (mode);
+            });
+        };
+        addChildComponent (velocityMode);
+        for (int v = 1; v <= 127; ++v)
+            fixedVelocity.addItem (juce::String (v), v);
+        fixedVelocity.setTooltip (tr ("The velocity every played note gets (1 to 127)"));
+        fixedVelocity.onChange = [this] {
+            engine.editSong ([fn = find, v = fixedVelocity.getSelectedId()] (Song& song) {
+                if (auto* ref = fn (song); ref != nullptr && v > 0)
+                    ref->fixedVelocity = prefs::clampFixedVelocity (v);
+            });
+        };
+        addChildComponent (fixedVelocity);
         inPort.setTooltip (tr ("MIDI input port number"));
         inPort.onChange = [this] { setPort (inPort.getSelectedId() - 2, false); };
         // FL's Output port: the notes the plugin sends out play the plugins on that input port (instruments in the
@@ -452,7 +480,8 @@ public:
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
-    int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
+    // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
+    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + (instrumentChannel ? rowHeight : 0); }
     void selectTab (int t) { showTab (juce::jlimit (0, 2, t)); }
 
     void paint (juce::Graphics& g) override
@@ -560,7 +589,7 @@ public:
             int midiRows = 0;
             for (const auto& o : wrapperOptions())
                 midiRows += juce::String (o.section) == "MIDI" ? 1 : 0;
-            auto midi = group (area, headerHeight + (1 + midiRows) * rowHeight + 8, tr ("MIDI"));
+            auto midi = group (area, headerHeight + (1 + midiRows + (instrumentChannel ? 1 : 0)) * rowHeight + 8, tr ("MIDI"));
             auto line = midi.removeFromTop (rowHeight);
             label (line.removeFromLeft (80), tr ("Input port"));
             show (inPort, line.removeFromLeft (70).reduced (0, 2));
@@ -577,6 +606,14 @@ public:
                         show (bendRange, row.removeFromRight (70).reduced (0, 2));
                     show (*toggles[(int) i], row);
                 }
+            if (instrumentChannel) // LYNX's own per-plugin velocity, under FL's MIDI options (round 190ao)
+            {
+                auto row = midi.removeFromTop (rowHeight);
+                label (row.removeFromLeft (80), tr ("Velocity"));
+                show (velocityMode, row.removeFromLeft (250).reduced (0, 2));
+                row.removeFromLeft (8);
+                show (fixedVelocity, row.removeFromLeft (70).reduced (0, 2));
+            }
             if (bridge32Supported())
             {
                 auto options = group (area, headerHeight + rowHeight + 8, tr ("Options"));
@@ -796,6 +833,9 @@ private:
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
         outPort.setSelectedId (ref->midiOutPort + 2, juce::dontSendNotification);
+        velocityMode.setSelectedId (prefs::clampPluginVelocityMode (ref->velocityMode) + 1, juce::dontSendNotification);
+        fixedVelocity.setSelectedId (prefs::clampFixedVelocity (ref->fixedVelocity), juce::dontSendNotification);
+        fixedVelocity.setEnabled (ref->velocityMode == prefs::pluginVelocityFixed);
         outputRows.repaint();
         inputRows.repaint();
         const auto reported = plugin.getLatencySamples();
@@ -818,8 +858,9 @@ private:
     juce::AudioPluginInstance& plugin;
     juce::OwnedArray<juce::TextButton> tabs;
     juce::OwnedArray<juce::ToggleButton> toggles;
-    juce::ComboBox inPort, outPort, bendRange, bitSize;
+    juce::ComboBox inPort, outPort, bendRange, bitSize, velocityMode, fixedVelocity;
     juce::TextButton latency, locate;
+    const bool instrumentChannel; // a Channel rack instrument: the MIDI group has LYNX's Velocity row
     // Processing › Connections (round 188d)
     bool connections = false;
     int mixerTrack = -1, mixerSlot = -1; // an effect's insert and slot (−1: a channel's generator)
@@ -865,6 +906,83 @@ public:
     }
 };
 
+// Round 190ao (pain point 11, LYNX's own; FL has no pin): "Pin on top" at the right end of the wrapper header of a
+// detached plugin window. A pushpin: upright and in the accent colour while the window is pinned, tilted and dim when not.
+class PinButton final : public juce::Button
+{
+public:
+    PinButton() : juce::Button ("Pin on top") { setClickingTogglesState (false); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.5f);
+        if (over || down)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.drawRoundedRectangle (r, 4.0f, 1.2f);
+        }
+        const auto on = getToggleState() && isEnabled();
+        juce::Path pin; // in a 16 x 16 box: cap, body, flange, needle
+        pin.addRoundedRectangle (5.0f, 1.5f, 6.0f, 2.0f, 1.0f);
+        pin.addRectangle (6.0f, 3.5f, 4.0f, 5.0f);
+        pin.addRoundedRectangle (3.5f, 8.5f, 9.0f, 2.0f, 1.0f);
+        pin.addRectangle (7.4f, 10.5f, 1.2f, 4.5f);
+        const auto side = juce::jmin (r.getWidth(), r.getHeight()) * 0.78f;
+        auto place = juce::AffineTransform::translation (-8.0f, -8.0f);
+        if (! on)
+            place = place.rotated (juce::MathConstants<float>::pi * 0.25f);
+        place = place.scaled (side / 16.0f).translated (r.getCentreX(), r.getCentreY());
+        g.setColour (! isEnabled() ? theme::colour::textDisabled : on ? theme::colour::accent : theme::colour::textSecondary);
+        g.fillPath (pin, place);
+    }
+};
+
+// Round 190ao: what a plugin window shows in place of the editor when its plugin went down (Bitwig turns the plugin's
+// panel into a notice with "Reload plug-in"). Nothing reloads by itself: a plugin that crashes again shows this again.
+class CrashNotice final : public juce::Component
+{
+public:
+    CrashNotice()
+    {
+        reload.setButtonText (tr ("Reload"));
+        reload.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        reload.onClick = [this] {
+            if (onReload)
+                onReload();
+        };
+        addAndMakeVisible (reload);
+    }
+
+    void setPluginName (const juce::String& name)
+    {
+        title = tr ("{0} crashed and was switched off.", { name });
+        repaint();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg1);
+        auto r = getLocalBounds().reduced (16, 12);
+        r.removeFromBottom (40);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        g.drawFittedText (title, r.removeFromTop (r.getHeight() / 2), juce::Justification::centredBottom, 2);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::body));
+        g.drawFittedText (tr ("Reload starts it again with the settings from the last save or backup."), r.withTrimmedTop (4),
+                          juce::Justification::centredTop, 3);
+    }
+
+    void resized() override { reload.setBounds (getLocalBounds().reduced (16, 12).removeFromBottom (28).withSizeKeepingCentre (140, 28)); }
+
+    std::function<void()> onReload;
+
+private:
+    juce::String title;
+    juce::TextButton reload;
+};
+
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
 class WrappedEditor final : public juce::Component
 {
@@ -886,6 +1004,12 @@ public:
             refreshSidechain();
         }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
+        // round 190ao: the preset menu's "Play a note when a preset loads" (instruments of the Channel rack)
+        if (channel)
+            presets.onLoaded = [&engine, &plugin] {
+                if (pluginpresetui::auditionOnLoad())
+                    engine.auditionPreset (plugin);
+            };
         // FL's Typing keyboard priority, left of the presets (issue #96 slice 2). A plugin in another process has its
         // own keyboard (FL: bridged plugins always take it), so there it stays greyed.
         addAndMakeVisible (keyboardPriority);
@@ -895,6 +1019,12 @@ public:
             refreshKeyboardPriority();
         };
         refreshKeyboardPriority();
+        // round 190ao: "Pin on top" (the host turns it on when it is a detached window: setPin)
+        addChildComponent (pin);
+        pin.onClick = [this] {
+            if (onPin)
+                onPin (! pin.getToggleState());
+        };
         for (auto* b : { &pluginTab, &settingsTab })
         {
             b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
@@ -906,6 +1036,8 @@ public:
         settingsTab.onClick = [this] { show (true); };
         addAndMakeVisible (editor.get());
         addChildComponent (page);
+        addChildComponent (notice);
+        notice.setPluginName (plugin.getName());
         pluginTab.setToggleState (true, juce::dontSendNotification);
         fitEditor();
     }
@@ -918,6 +1050,31 @@ public:
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
     void showPage (bool showSettings) { show (showSettings); }
+    void openPresetMenu() { presets.openMenu(); } // (tests / shots)
+
+    // round 190ao: the pin of a detached window. `available` false: shown greyed (a plugin in a separate process: its
+    // editor is a window of that process)
+    void setPin (std::function<void (bool)> set, bool available)
+    {
+        onPin = std::move (set);
+        pin.setVisible (onPin != nullptr);
+        pin.setEnabled (available);
+        pin.setTooltip (available ? tr ("Pin on top: keep this window above LYNX SHARE's other windows")
+                                  : tr ("Pin on top is not available for a plugin in a separate process"));
+        resized();
+    }
+    void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
+
+    // round 190ao: the plugin went down (the window's timer): the notice with "Reload" takes the editor's place
+    void setDown (bool isDown, std::function<void()> reload)
+    {
+        if (isDown == down)
+            return;
+        down = isDown;
+        notice.onReload = std::move (reload);
+        show (settings);
+    }
+    bool isDown() const noexcept { return down; }
     void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
 
     void refreshKeyboardPriority()
@@ -966,6 +1123,11 @@ public:
         header.removeFromLeft (4);
         settingsTab.setBounds (header.removeFromLeft (130));
         header.removeFromLeft (8);
+        if (pin.isVisible())
+        {
+            pin.setBounds (header.removeFromRight (26));
+            header.removeFromRight (4);
+        }
         if (sidechain.isVisible())
         {
             sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
@@ -975,7 +1137,8 @@ public:
         header.removeFromLeft (4);
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
-        if (editor != nullptr && ! settings)
+        notice.setBounds (area);
+        if (editor != nullptr && ! settings && ! down)
         {
             const juce::ScopedValueSetter<bool> guard (laying, true);
             if (editor->isResizable())
@@ -987,7 +1150,7 @@ public:
 
     void childBoundsChanged (juce::Component* child) override
     {
-        if (child == editor.get() && ! laying && ! settings)
+        if (child == editor.get() && ! laying && ! settings && ! down)
             fitEditor();
     }
 
@@ -997,10 +1160,14 @@ private:
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
     KeyboardPriorityButton keyboardPriority;
+    PinButton pin;
+    std::function<void (bool)> onPin;
 
     void fitEditor()
     {
-        if (editor != nullptr)
+        if (down) // (the notice: at least a readable size, the editor's when that is larger)
+            setSize (juce::jmax (minWidth, getWidth()), juce::jmax (150 + headerHeight, getHeight()));
+        else if (editor != nullptr)
             setSize (juce::jmax (minWidth, editor->getWidth()), editor->getHeight() + headerHeight);
     }
 
@@ -1010,14 +1177,15 @@ private:
         pluginTab.setToggleState (! settings, juce::dontSendNotification);
         settingsTab.setToggleState (settings, juce::dontSendNotification);
         page.setVisible (settings);
+        notice.setVisible (down && ! settings);
         if (editor != nullptr)
         {
-            editor->setVisible (! settings);
+            editor->setVisible (! settings && ! down);
             // A plugin editor embedded as a native child window (VST3 / LV2 through JUCE's XEmbedComponent and CLAP /
             // VST2 through NativeEmbed on Linux) is not unmapped when its component is hidden: it stayed over the
             // Wrapper settings page and made it unreachable (issue #8). Moving it outside the window clips it away on
             // every platform; resized() puts it back.
-            if (settings)
+            if (settings || down)
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
@@ -1043,9 +1211,10 @@ private:
 
     std::unique_ptr<juce::AudioProcessorEditor> editor;
     WrapperSettingsPage page;
+    CrashNotice notice;
     pluginpresetui::PresetBar presets;
     juce::TextButton pluginTab { tr ("Plugin") }, settingsTab { juce::String::fromUTF8 ("\xe2\x9a\x99 ") + tr ("Wrapper settings") };
-    bool settings = false, laying = false;
+    bool settings = false, laying = false, down = false;
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -1104,8 +1273,12 @@ public:
         if (c.engine != nullptr && c.find) // FL's wrapper header and settings page (round 146a)
         {
             auto* wrapped = new WrappedEditor (editor, *c.engine, c.find, plugin, c.channel, c.track, c.slot);
-            if (canDock (plugin)) // FL's plugin menu ends with "Detached" (issue #116)
-                wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) { addDetachedItem (menu); });
+            // FL's plugin menu ends with "Detached" (issue #116); a detached window then has LYNX's "Pin on top"
+            wrapped->setMenuExtension ([this] (juce::PopupMenu& menu) {
+                if (canDock (this->plugin))
+                    addDetachedItem (menu);
+                addPinItem (menu);
+            });
             content.reset (wrapped);
         }
         else
@@ -1118,6 +1291,10 @@ public:
     virtual bool hostActive() = 0;
     virtual void bringToFront() = 0;
     virtual bool hostMinimised() { return false; }
+    // round 190ao: "Pin on top" (a detached window only)
+    virtual bool pinnedOnTop() const { return false; }
+    virtual void setPinnedOnTop (bool) {}
+    virtual void addPinItem (juce::PopupMenu&) {}
     void* nativeHandle() { return hostComponent().getWindowHandle(); }
 
     juce::AudioPluginInstance* key() const noexcept { return &plugin; }
@@ -1136,6 +1313,10 @@ public:
     std::shared_ptr<void> keepAlive() const { return owner; }
     const juce::String& hostTitle() const noexcept { return title; }
     const PluginWindows::WrapperContext& getContext() const noexcept { return context; }
+
+    // tests / shots: the periodic check now (the crash notice follows the plugin), and the window's content
+    void pollNow() { timerCallback(); }
+    juce::Component* contentForShot() const noexcept { return shownContent; }
 
     void addDetachedItem (juce::PopupMenu& menu)
     {
@@ -1201,6 +1382,9 @@ private:
         {
             wrapped->refreshSidechain();
             wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
+            // round 190ao: the plugin went down while its window is open: the notice with "Reload" (only on request)
+            if (context.reload && ! wrapped->isDown() && (isSandboxedPluginDead (plugin) || (context.down && context.down())))
+                wrapped->setDown (true, [reload = context.reload] { juce::MessageManager::callAsync (reload); });
         }
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
@@ -1232,6 +1416,7 @@ private:
 };
 
 void closeHostOf (const juce::AudioPluginInstance* plugin);
+void pinnedWindowsChanged();
 
 // FL's "Detached": the editor in a top-level window of its own, kept above the main window (LYNX's only kind so far).
 class PluginWindow final : public juce::DocumentWindow, public EditorHost
@@ -1252,6 +1437,50 @@ public:
         setVisible (true);
         keepAboveMainWindow (*this);
         startHost();
+        // round 190ao: LYNX's "Pin on top", remembered with the plugin in the project
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+        {
+            wrapped->setPin ([this] (bool on) { setPinned (on, true); }, pinnable());
+            const auto& c = getContext();
+            const auto* ref = c.engine != nullptr && c.find ? c.find (const_cast<Song&> (c.engine->getSong())) : nullptr;
+            if (ref != nullptr && ref->pinned && pinnable())
+                setPinned (true, false);
+        }
+    }
+
+    // A plugin in a separate process shows its editor in a window of that process: LYNX can't keep that one in front.
+    bool pinnable() const { return ! isSandboxedPlugin (*key()); }
+    bool pinnedOnTop() const override { return pinned; }
+    void setPinnedOnTop (bool on) override { setPinned (on, true); }
+
+    void setPinned (bool on, bool save)
+    {
+        pinned = on && pinnable();
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+            wrapped->showPinned (pinned);
+        if (const auto& c = getContext(); save && c.engine != nullptr && c.find)
+        {
+            c.engine->editSong ([find = c.find, on = pinned] (Song& song) {
+                if (auto* ref = find (song))
+                    ref->pinned = on;
+            }, false);
+            c.engine->markModified();
+        }
+       #if JUCE_LINUX || JUCE_BSD
+        // X11 has no owner windows and JUCE can only raise a window there by activating it, which would take the
+        // keyboard from the window being used: the window manager's "always on top" instead
+        setAlwaysOnTop (pinned);
+       #else
+        pinnedWindowsChanged();
+       #endif
+    }
+
+    void addPinItem (juce::PopupMenu& menu) override
+    {
+        menu.addItem (tr ("Pin on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
+            if (safe != nullptr)
+                safe->setPinned (! safe->pinned, true);
+        });
     }
 
     // round 157a: the window that holds a third-party editor draws LYNX's few pixels with GDI, not Direct2D (JUCE 8's
@@ -1303,6 +1532,9 @@ public:
             focusLinked();
         }
     }
+
+private:
+    bool pinned = false;
 };
 
 // FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
@@ -1568,6 +1800,59 @@ void closeHostOf (const juce::AudioPluginInstance* plugin)
     juce::MessageManager::callAsync ([plugin] { windows().erase (const_cast<juce::AudioPluginInstance*> (plugin)); });
 }
 
+// Round 190ao, "Pin on top": pinned plugin windows stay above LYNX's other secondary windows. Like them they are owned by
+// the main window (WindowOwner: above LYNX, not above other programs); when another of those windows is brought in
+// front of a pinned one, the pinned one is put back in front without being activated, so the keyboard stays where it
+// is. Checked a few times a second while a window is pinned. Not while a dialog is open (it must stay reachable) or
+// while LYNX is in the background.
+void raisePinnedWindows()
+{
+    if (juce::Component::getNumCurrentlyModalComponents() > 0 || ! juce::Process::isForegroundProcess())
+        return;
+    auto& desktop = juce::Desktop::getInstance();
+    std::vector<juce::Component*> order; // back to front
+    std::vector<bool> pinned;
+    for (int i = 0; i < desktop.getNumComponents(); ++i)
+    {
+        auto* c = desktop.getComponent (i);
+        if (dynamic_cast<juce::TopLevelWindow*> (c) == nullptr || ! c->isVisible() || c->isAlwaysOnTop() || ! isOwnedByMainWindow (*c))
+            continue;
+        if (auto* window = dynamic_cast<juce::ResizableWindow*> (c); window != nullptr && window->isMinimised())
+            continue;
+        auto isPinned = false;
+        for (const auto& [plugin, host] : windows())
+            isPinned = isPinned || (&host->hostComponent() == c && host->pinnedOnTop());
+        order.push_back (c);
+        pinned.push_back (isPinned);
+    }
+    for (const auto i : pinontop::toRaise (pinned))
+        order[(std::size_t) i]->toFront (false);
+}
+
+class PinKeeper final : public juce::Timer
+{
+public:
+    void timerCallback() override
+    {
+        auto any = false;
+        for (const auto& [plugin, host] : windows())
+            any = any || host->pinnedOnTop();
+        if (! any)
+        {
+            stopTimer();
+            return;
+        }
+        raisePinnedWindows();
+    }
+};
+
+void pinnedWindowsChanged()
+{
+    static auto* keeper = new PinKeeper(); // (never destroyed: a static Timer must not outlive the message manager)
+    if (! keeper->isTimerRunning())
+        keeper->startTimerHz (8);
+}
+
 std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title,
                                       PluginWindows::WrapperContext context)
 {
@@ -1798,6 +2083,24 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
     return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
 }
 
+bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    if (it == windows().end() || it->second->contentForShot() == nullptr)
+        return false;
+    it->second->pollNow();
+    auto* content = it->second->contentForShot();
+    auto* wrapped = dynamic_cast<WrappedEditor*> (content);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (true);
+    const auto image = content->createComponentSnapshot (content->getLocalBounds(), true, 1.0f);
+    if (wrapped != nullptr && settingsPage)
+        wrapped->showPage (false);
+    png.deleteFile();
+    juce::FileOutputStream out (png);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
@@ -1852,6 +2155,27 @@ void* hostWindowHandle (const juce::AudioPluginInstance& plugin)
     return it != windows().end() ? it->second->nativeHandle() : nullptr;
 }
 
+bool showPresetMenu (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    auto* wrapped = it != windows().end() ? dynamic_cast<WrappedEditor*> (it->second->contentForShot()) : nullptr;
+    if (wrapped != nullptr)
+        wrapped->openPresetMenu();
+    return wrapped != nullptr;
+}
+
+bool isPinnedOnTop (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    return it != windows().end() && it->second->pinnedOnTop();
+}
+
+void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned)
+{
+    if (const auto it = windows().find (&plugin); it != windows().end())
+        it->second->setPinnedOnTop (pinned);
+}
+
 void closeAll()
 {
     windows().clear();
@@ -1883,6 +2207,90 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 void close (const juce::AudioPluginInstance& plugin)
 {
     windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+}
+
+namespace
+{
+juce::AudioPluginInstance* instanceAt (AudioEngine& engine, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+    {
+        auto* p = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (where.channel).get());
+        return p != nullptr ? &p->getInstance() : nullptr;
+    }
+    auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (where.track, where.slot).get());
+    return p != nullptr ? &p->getInstance() : nullptr;
+}
+
+const PluginRef* refAt (const Song& song, AudioEngine::HostedSlot where)
+{
+    if (where.track < 0)
+        return where.channel >= 0 && where.channel < (int) song.channels.size() ? &song.channels[(std::size_t) where.channel].plugin : nullptr;
+    if (where.track >= (int) song.mixer.size() || where.slot < 0 || where.slot >= (int) song.mixer[(std::size_t) where.track].effects.size())
+        return nullptr;
+    return &song.mixer[(std::size_t) where.track].effects[(std::size_t) where.slot].plugin;
+}
+} // namespace
+
+int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& which)
+{
+    juce::StringArray names;
+    for (const auto& w : which)
+    {
+        if (auto* instance = instanceAt (engine, w)) // (a window keeps the old instance alive)
+            close (*instance);
+        if (const auto* ref = refAt (engine.getSong(), w))
+            names.add (juce::String::fromUTF8 (ref->name.c_str()));
+    }
+    const auto running = engine.reloadHostedPlugins (which);
+    if (running < (int) which.size())
+    {
+        juce::StringArray failed;
+        for (std::size_t i = 0; i < which.size(); ++i)
+            if (instanceAt (engine, which[i]) == nullptr || engine.hostedPluginDown (which[i]))
+                failed.addIfNotAlreadyThere (names[(int) i]);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
+                                                tr ("{0} could not be started again.", { failed.joinIntoString (", ") }));
+    }
+    return running;
+}
+
+void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen)
+{
+    const auto* ref = refAt (engine.getSong(), where);
+    auto* instance = instanceAt (engine, where);
+    if (ref == nullptr || instance == nullptr)
+        return;
+    const auto name = juce::String::fromUTF8 (ref->name.c_str());
+    // a plugin that ran inside LYNX can come back in a process of its own, where its next crash can't reach LYNX
+    const auto offerSeparate = ! isSandboxedPlugin (*instance) && ! pluginSandboxEnabled() && ! ref->separateProcess && ! pluginAlwaysSeparate (name);
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage (tr ("{0} crashed and was switched off.", { name }) + "\n\n"
+                                     + tr ("Reload starts it again with the settings from the last save or backup."))
+                       .withButton (tr ("Reload"));
+    if (offerSeparate)
+        options = options.withButton (tr ("Reload in a separate process"));
+    options = options.withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [&engine, where, offerSeparate, reopen = std::move (reopen)] (int result) {
+        // (JUCE: the first button is 1, the last one 0)
+        if (result == 2 && offerSeparate)
+        {
+            // FL's "Make bridged" for this plugin: the changed option makes it again, from the state captured last
+            if (auto* p = instanceAt (engine, where))
+                close (*p);
+            engine.capturePluginStates();
+            engine.editSong ([where] (Song& song) {
+                if (auto* r = const_cast<PluginRef*> (refAt (song, where)))
+                    r->separateProcess = true;
+            });
+            if (reopen && instanceAt (engine, where) != nullptr && ! engine.hostedPluginDown (where))
+                reopen();
+        }
+        else if (result == 1 && reload (engine, { where }) == 1 && reopen)
+            reopen();
+    });
 }
 
 int editorCrashCount()

@@ -2439,6 +2439,9 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     if (c.instrument == InstrumentKind::plugin)
     {
         menu.addItem (tr ("Open plugin editor"), [this, channel] { openPluginWindow (channel); });
+        // round 190ao: only while the plugin is down (it crashed, or its separate process died)
+        if (engine.hostedPluginDown ({ channel, -1, -1 }))
+            menu.addItem (tr ("Reload crashed plugin"), [this, channel] { PluginWindows::reload (engine, { { channel, -1, -1 } }); });
 
         auto* live = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (channel).get());
         menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, c.plugin, live != nullptr ? &live->getInstance() : nullptr,
@@ -2759,17 +2762,43 @@ void ChannelRackComponent::openPluginWindow (int channel)
 
     if (auto* plugin = dynamic_cast<PluginInstrument*> (instrument.get()))
     {
-        if (plugin->hasCrashed()) // (not called again: its window would call into it)
+        // round 190ao: the same channel's window again, after a reload (the channel is found again by its instance tag:
+        // channels may have moved since)
+        auto reopen = [safe = juce::Component::SafePointer<ChannelRackComponent> (this), tag = engine.getSong().channels[(std::size_t) channel].instance.id] {
+            if (safe == nullptr)
+                return;
+            const auto& channels = safe->engine.getSong().channels;
+            for (std::size_t i = 0; i < channels.size(); ++i)
+                if (channels[i].instance.id == tag && channels[i].instrument == InstrumentKind::plugin)
+                {
+                    if (safe->engine.hostedPluginDown ({ (int) i, -1, -1 }))
+                        PluginWindows::reload (safe->engine, { { (int) i, -1, -1 } });
+                    if (! safe->engine.hostedPluginDown ({ (int) i, -1, -1 }))
+                        safe->openPluginWindow ((int) i);
+                    return;
+                }
+        };
+        // crashed inside a call (not called again: its window would call into it), or its separate process died:
+        // "Reload" starts it again without reopening the project
+        if (engine.hostedPluginDown ({ channel, -1, -1 }))
         {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
-                                                    tr ("This plugin crashed and was switched off. Save the project and open it again to reload it."));
+            PluginWindows::promptReload (engine, { channel, -1, -1 }, [safe = juce::Component::SafePointer<ChannelRackComponent> (this), channel] {
+                if (safe != nullptr)
+                    safe->openPluginWindow (channel);
+            });
             return;
         }
+        PluginWindows::WrapperContext context { &engine, [channel] (Song& song) -> PluginRef* {
+                                                    return channel < (int) song.channels.size() ? &song.channels[(std::size_t) channel].plugin : nullptr;
+                                                }, true, -1, -1, {}, {} };
+        context.reload = reopen;
+        context.down = [weak = std::weak_ptr<Instrument> (instrument)] {
+            const auto held = weak.lock();
+            auto* p = dynamic_cast<PluginInstrument*> (held.get());
+            return p != nullptr && p->hasCrashed();
+        };
         PluginWindows::open (instrument, plugin->getInstance(),
-                             juce::String::fromUTF8 (engine.getSong().channels[(std::size_t) channel].name.c_str()),
-                             { &engine, [channel] (Song& song) -> PluginRef* {
-                                  return channel < (int) song.channels.size() ? &song.channels[(std::size_t) channel].plugin : nullptr;
-                              }, true });
+                             juce::String::fromUTF8 (engine.getSong().channels[(std::size_t) channel].name.c_str()), std::move (context));
         return;
     }
 

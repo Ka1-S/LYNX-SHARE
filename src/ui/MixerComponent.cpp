@@ -6545,20 +6545,38 @@ void EffectsPanel::openPluginWindow (int slot)
 
     if (auto* plugin = dynamic_cast<PluginEffect*> (effect.get()))
     {
-        if (plugin->hasCrashed()) // (not called again: its window would call into it)
+        // round 190ao: crashed inside a call (not called again: its window would call into it), or its separate process
+        // died: "Reload" starts it again without reopening the project
+        const AudioEngine::HostedSlot where { -1, track, slot };
+        auto reopen = [safe = juce::Component::SafePointer<EffectsPanel> (this), where] {
+            if (safe == nullptr || safe->track != where.track)
+                return;
+            if (safe->engine.hostedPluginDown (where))
+                PluginWindows::reload (safe->engine, { where });
+            if (! safe->engine.hostedPluginDown (where))
+                safe->openPluginWindow (where.slot);
+        };
+        if (engine.hostedPluginDown (where))
         {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
-                                                    tr ("This plugin crashed and was switched off. Save the project and open it again to reload it."));
+            PluginWindows::promptReload (engine, where, [safe = juce::Component::SafePointer<EffectsPanel> (this), where] {
+                if (safe != nullptr && safe->track == where.track)
+                    safe->openPluginWindow (where.slot);
+            });
             return;
         }
         const auto& s = engine.getSong().mixer[(std::size_t) track].effects[(std::size_t) slot];
-        PluginWindows::open (effect, plugin->getInstance(), quickpick::slotName (engine, s), // (its Plugin database name, round 165c)
-                            
-                             { &engine, [t = track, slot] (Song& song) -> PluginRef* {
-                                  if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
-                                      return nullptr;
-                                  return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
-                              }, false, track, slot });
+        PluginWindows::WrapperContext context { &engine, [t = track, slot] (Song& song) -> PluginRef* {
+                                                    if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
+                                                        return nullptr;
+                                                    return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
+                                                }, false, track, slot, {}, {} };
+        context.reload = reopen;
+        context.down = [weak = std::weak_ptr<Effect> (effect)] {
+            const auto held = weak.lock();
+            auto* p = dynamic_cast<PluginEffect*> (held.get());
+            return p != nullptr && p->hasCrashed();
+        };
+        PluginWindows::open (effect, plugin->getInstance(), quickpick::slotName (engine, s), std::move (context)); // (its Plugin database name, round 165c)
         return;
     }
 
@@ -6787,6 +6805,9 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Move down"), [move] { move (1); });
     if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
     {
+        // round 190ao: only while the plugin is down (it crashed, or its separate process died)
+        if (engine.hostedPluginDown ({ -1, track, slot }))
+            menu.addItem (tr ("Reload crashed plugin"), [this, t = track, slot] { PluginWindows::reload (engine, { { -1, t, slot } }); });
         auto* live = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
         menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, (*slots())[(std::size_t) slot].plugin, live != nullptr ? &live->getInstance() : nullptr,
                                                                 [t = track, slot] (Song& song) -> PluginRef* {

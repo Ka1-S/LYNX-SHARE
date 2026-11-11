@@ -35,6 +35,12 @@ juce::String saveWildcard (juce::AudioPluginInstance& plugin);
 // becomes a new channel with that plugin. `message` receives what happened when nothing could take it.
 bool applyFromBrowser (AudioEngine& engine, const juce::File& file, juce::String& message);
 
+// Round 190ao (pain point 13; LYNX's own): the preset menu's "Play a note when a preset loads" — a short C5 on the
+// instrument after a preset is loaded while the song is stopped. A user setting (preset-audition.txt in the settings
+// folder; off by default), the same for every plugin.
+bool auditionOnLoad();
+void setAuditionOnLoad (bool on);
+
 // The wrapper header's preset controls: ◀ ▶ and the preset name (click: the presets menu).
 class PresetBar final : public juce::Component, public juce::SettableTooltipClient
 {
@@ -48,6 +54,10 @@ public:
     int preferredWidth() const { return 250; }
     // Items the window adds at the end of the menu (issue #116: FL's "Detached", the last item of FL's plugin menu)
     std::function<void (juce::PopupMenu&)> extendMenu;
+    // Round 190ao: a preset was loaded (a program, a preset file). With it the menu of an instrument has "Play a note
+    // when a preset loads"; the window plays the note.
+    std::function<void()> onLoaded;
+    void openMenu() { showMenu(); } // (tests / shots)
 
 private:
     struct Entry

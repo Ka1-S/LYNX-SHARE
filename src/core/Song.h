@@ -277,6 +277,14 @@ struct PluginRef
     // the host applies. Both are cleared when the session ends.
     std::uint32_t playedBy = 0;
     std::vector<std::pair<int, float>> values;
+    // LYNX's own "Pin on top" of the plugin window (round 190ao, pain point 11; FL has none): the detached window stays
+    // above LYNX's other windows. Off for a new plugin and for projects saved before
+    bool pinned = false;
+    // LYNX's own per-plugin velocity (round 190ao, pain point 12; FL's wrapper has none): how notes played into this
+    // instrument from MIDI devices reach it. 0 = follow the MIDI settings' curve (the default, and projects saved
+    // before), 1 as played, 2 soft, 3 hard, 4 fixed at `fixedVelocity` (1…127). core/Preferences.h mapPluginVelocity
+    int velocityMode = 0;
+    int fixedVelocity = 100;
 
     bool operator== (const PluginRef& o) const
     {
@@ -289,7 +297,8 @@ struct PluginRef
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
                && processInactive == o.processInactive && inputs == o.inputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
-               && detached == o.detached && playedBy == o.playedBy && values == o.values;
+               && detached == o.detached && playedBy == o.playedBy && values == o.values
+               && pinned == o.pinned && velocityMode == o.velocityMode && fixedVelocity == o.fixedVelocity;
     }
 };
 

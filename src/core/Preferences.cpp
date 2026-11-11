@@ -302,6 +302,18 @@ float mapVelocity (float velocity, VelocityCurve curve) noexcept
     return v;
 }
 
+float mapPluginVelocity (float velocity, int mode, int fixedVelocity, VelocityCurve global) noexcept
+{
+    mode = clampPluginVelocityMode (mode);
+    if (mode == pluginVelocityFollow)
+        return mapVelocity (velocity, global);
+    if (velocity <= 0.0f)
+        return 0.0f;
+    if (mode == pluginVelocityFixed)
+        return (float) clampFixedVelocity (fixedVelocity) / 127.0f;
+    return mapVelocity (velocity, (VelocityCurve) (mode - 1));
+}
+
 MidiInputPlan planMidiInputs (const MidiPrefs& prefs, const std::vector<MidiPort>& available,
                               const std::vector<std::string>& previous, const std::vector<std::string>& openIds)
 {
