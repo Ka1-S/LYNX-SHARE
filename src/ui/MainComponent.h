@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ProjectKey.h"
 #include "core/Preferences.h"
 #include "core/ChordReadout.h"
 
@@ -107,6 +108,7 @@ public:
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
@@ -571,6 +573,14 @@ private:
     std::uint32_t chordNearHintUntil = 0;
     void updateChordPanel();
     void showChordPanelMenu();
+    // The project key (round 184a S11): the toolbar's Key panel and its menu. The Simple and Clip-launch workflows show the
+    // panel until the user shows or hides it by hand (then the toolbar layout decides, in every workflow).
+    toolbar::KeyPanel keyPanel;
+    bool keyPanelFollowsStyle = true;
+    void showKeyMenu();
+    juce::PopupMenu makeKeyMenu();
+    void refreshKeyPanel();
+    void setProjectKey (std::optional<projectkey::Key> key);
     void showChordText();
     void addAudioLoggerMenu (juce::PopupMenu& menu);
     void dumpAudioLog();

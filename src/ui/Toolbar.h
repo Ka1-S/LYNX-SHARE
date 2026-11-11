@@ -184,6 +184,27 @@ private:
     juce::String text { "---" };
 };
 
+// The project key (round 184a S11, design §3.1; LYNX's own panel): "Key" over the key's name ("A minor", "none"). A click
+// opens the Key menu (root, scale, None, Guess from notes). Hidden by default; the Simple and Clip-launch workflows show it.
+class KeyPanel final : public juce::Component,
+                       public ui::HintSource
+{
+public:
+    KeyPanel() { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void setText (const juce::String& keyName); // "" = no key
+    const juce::String& getText() const { return text; }
+    std::function<void()> onClick;
+
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    ui::Hint hintAt (juce::Point<int> position) override;
+
+private:
+    juce::String text;
+};
+
 // The chord near the hint bar (View › Toolbars): outlined text with no box, over whatever is below the bar, as in FL.
 class ChordHint final : public juce::Component
 {

@@ -8,6 +8,8 @@
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
+#include "core/KeyGuess.h"
+#include "core/ProjectKey.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
 #include "ui/UiTrace.h"
@@ -555,7 +557,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
-                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
+                                                             &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &keyPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
                                                              &multilinkButton })
     {
         addAndMakeVisible (c);
@@ -663,6 +665,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
+    keyPanel.onClick = [this] { showKeyMenu(); };
+    refreshKeyPanel();
     PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
         if (! chordPanel.isVisible())
             return;
@@ -959,6 +963,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
     widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
+    widths[(std::size_t) Group::key] = 112; // "Key" over "C# harmonic minor" (round 184a S11; the name shrinks to fit)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -1147,6 +1152,7 @@ void MainComponent::resized()
                 case Group::output: hide ({ &output }); break;
                 case Group::chord: hide ({ &chordPanel }); break;
                 case Group::multilink: hide ({ &multilinkButton }); break;
+                case Group::key: hide ({ &keyPanel }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1248,6 +1254,7 @@ void MainComponent::resized()
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::multilink: put (multilinkButton, panel.withY (row1).withHeight (h)); break;
+            case Group::key: put (keyPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::count_: break;
         }
     }
@@ -1304,6 +1311,8 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
 void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool save)
 {
     const auto scaleChanged = layout.uiScale != toolbarLayout.uiScale;
+    if (save && layout.isShown (toolbarlayout::Group::key) != toolbarLayout.isShown (toolbarlayout::Group::key))
+        keyPanelFollowsStyle = false; // shown or hidden by hand (round 184a S11): the layout decides from now on
     toolbarLayout = layout;
     applyIconSizing (toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()));
 
@@ -2150,6 +2159,8 @@ void MainComponent::loadUiSettings()
         }
         else if (key == "chordNearHint")
             chordShowNearHint = on;
+        else if (key == "keyPanelFollowsStyle")
+            keyPanelFollowsStyle = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
@@ -2347,6 +2358,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordDelayMs=" + juce::String ((std::int64_t) chordReadout.getDelayMs())
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
+                                      + "\nkeyPanelFollowsStyle=" + juce::String (keyPanelFollowsStyle ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
@@ -2749,6 +2761,15 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     playlistArea.setPickerHidden (style == Style::simple);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
+
+    // round 184a S11 (D15): the Key panel shows in the Simple and Clip-launch workflows, not in FL's Pattern workflow,
+    // until the user shows or hides it by hand
+    if (keyPanelFollowsStyle && toolbarLayout.isShown (toolbarlayout::Group::key) != (style != Style::pattern))
+    {
+        toolbarLayout.setShown (toolbarlayout::Group::key, style != Style::pattern);
+        resized();
+        repaint();
+    }
 }
 
 void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
@@ -4197,6 +4218,7 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     if ((int) song.channels.size() != fittedChannelCount && fittedChannelCount >= 0) // a row was added or removed
         fitChannelRack (false);
 
+    refreshKeyPanel(); // (undo, another project; cheap: it repaints only on a change)
     if (namesChanged || patternBox.getSelectedItemIndex() != song.currentPattern || std::abs (swingSlider.getValue() - song.swing) > 1e-6)
         refreshToolbar();
     else
@@ -4689,6 +4711,81 @@ void MainComponent::showChordPanelMenu()
     delayItem (tr ("5 seconds"), 5);
     delayItem (tr ("Show forever"), chordread::foreverSeconds);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&chordPanel));
+}
+
+namespace
+{
+// "A minor", "C# Dorian": the root and the short scale name (round 184a S11)
+juce::String keyLabel (const projectkey::Key& key)
+{
+    return juce::String (projectkey::rootName (key.root)) + " " + tr (juce::String (projectkey::shortScaleName (key.flScale)));
+}
+} // namespace
+
+void MainComponent::refreshKeyPanel()
+{
+    const auto key = projectkey::get (engine.getSong());
+    keyPanel.setText (key ? keyLabel (*key) : juce::String());
+}
+
+void MainComponent::setProjectKey (std::optional<projectkey::Key> key)
+{
+    if (projectkey::get (engine.getSong()) == key)
+        return;
+    engine.editSong ([key] (Song& s) { projectkey::set (s, key); }); // one undo step; no note moves
+    refreshKeyPanel();
+    pianoRoll.repaint(); // (its scale highlight is this key)
+}
+
+// The Key menu (round 184a S11, design §3.1): the best guesses from the song's notes, the root, the scale (the common ones,
+// then "More scales"), and None. Every choice writes the one stored key, FL's project scale (.flp 0xF3).
+void MainComponent::showKeyMenu()
+{
+    makeKeyMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyPanel));
+}
+
+juce::PopupMenu MainComponent::makeKeyMenu()
+{
+    const auto current = projectkey::get (engine.getSong());
+    juce::PopupMenu menu;
+
+    menu.addSectionHeader (tr ("Guess from notes"));
+    const auto guesses = keyguess::guess (engine.getSong(), 3);
+    if (guesses.empty())
+        menu.addItem (tr ("No notes to guess from yet"), false, false, [] {});
+    for (const auto& g : guesses)
+        menu.addItem (keyLabel (g.key) + "   (" + tr ("{0} of {1} notes in scale", { juce::String (g.notesInScale), juce::String (g.notes) }) + ")",
+                      true, current == g.key, [this, key = g.key] { setProjectKey (key); });
+
+    const auto root = current ? current->root : 0;
+    const auto scale = current ? current->flScale : projectkey::commonFirst().front(); // (no key yet: Major)
+    menu.addSectionHeader (tr ("Root"));
+    juce::PopupMenu roots;
+    for (int r = 0; r < 12; ++r)
+        roots.addItem (juce::String (projectkey::rootName (r)), true, current && current->root == r,
+                       [this, r, scale] { setProjectKey (projectkey::Key { r, scale }); });
+    menu.addSubMenu (current ? juce::String (projectkey::rootName (root)) : tr ("Choose the root"), roots);
+
+    menu.addSectionHeader (tr ("Scale"));
+    const auto order = projectkey::commonFirst();
+    juce::PopupMenu more;
+    for (std::size_t i = 0; i < order.size(); ++i)
+    {
+        const auto flScale = order[i];
+        const auto ticked = current && current->flScale == flScale;
+        auto choose = [this, root, flScale] { setProjectKey (projectkey::Key { root, flScale }); };
+        if ((int) i < keyguess::commonScales)
+        {
+            const auto name = tr (juce::String (projectkey::shortScaleName (flScale))); // ("minor" in "A minor"; "Minor" in the list)
+            menu.addItem (name.substring (0, 1).toUpperCase() + name.substring (1), true, ticked, choose);
+        }
+        else // FL's own scale names (its Reference scales folder), as its Piano roll lists them
+            more.addItem (juce::String (notetools::flReferenceScales()[(std::size_t) flScale].name), true, ticked, choose);
+    }
+    menu.addSubMenu (tr ("More scales"), more);
+    menu.addSeparator();
+    menu.addItem (tr ("None"), true, ! current, [this] { setProjectKey (std::nullopt); });
+    return menu;
 }
 
 void MainComponent::addAudioLoggerMenu (juce::PopupMenu& menu)
