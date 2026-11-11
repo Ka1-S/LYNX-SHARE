@@ -301,6 +301,7 @@ std::int64_t bitsOfFloat (float f)
 // The running instance
 
 std::atomic<bool> realtimeFlag { false };
+std::atomic<bool> serveHeld { false }; // tests only: the Python thread takes no jobs while this is set
 std::atomic<bool> songEndedFlag { false };
 
 constexpr int maxControls = 256, maxOutputs = 64, ringSize = 8, maxIn = 256, maxOut = 768, logCap = 64 * 1024;
@@ -524,6 +525,8 @@ public:
     // --- the Python thread --------------------------------------------------------------------------------------------
     void serve() noexcept override
     {
+        if (serveHeld.load (std::memory_order_acquire))
+            return;
         auto& r = *ring;
         while (r[(std::size_t) (serveIndex % ringSize)].state.load (std::memory_order_acquire) == 1)
         {
@@ -1554,6 +1557,12 @@ std::unique_ptr<Processor> makeProcessor (const std::vector<std::uint8_t>& flSta
 
 void setRealtime (bool on) noexcept { realtimeFlag.store (on); }
 void setSongEnded (bool ended) noexcept { songEndedFlag.store (ended); }
+void holdScriptThread (bool hold) noexcept
+{
+    serveHeld.store (hold, std::memory_order_release);
+    if (! hold)
+        python::wake();
+}
 
 const char* apiReference() noexcept
 {
