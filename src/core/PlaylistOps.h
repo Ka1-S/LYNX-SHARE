@@ -119,6 +119,17 @@ bool makeAudioTrack (Song& song, int track);
 // "Track mode › Instrument track": the track belongs to `channel` (an instrument, not an audio clip or automation
 // channel) and to its mixer track (a free one when the channel plays on the Master or on a track already linked).
 bool makeInstrumentTrack (Song& song, int track, int channel);
+// "Track mode › Audio track › N. <insert>" (FL 2026: the submenu lists the mixer tracks; issue #15's "route the track
+// itself to 14"): the track becomes an audio track linked to mixer track `mixer` (an instrument track too: its channel
+// stays where it is). The insert may already be in use (a vocal chain made for it) and is not changed; an unnamed
+// track takes its name (FL: "Track 1" › "6. Insert 6" renames the track "Insert 6"). The audio clips already on the
+// track follow it (followAudioTracks); the previous insert keeps its effects and name. False when
+// canLinkToMixerTrack says no; the insert the track already has changes nothing.
+bool linkToMixerTrack (Song& song, int track, int mixer);
+// Whether `track` can be linked to `mixer`: an existing insert (never the Master), not linked to another Playlist
+// track (one track per insert, as makeAudioTrack keeps it) and not reserved for another participant of an online
+// session.
+bool canLinkToMixerTrack (const Song& song, int track, int mixer);
 // "Track mode › Unassigned".
 void unassign (Song& song, int track);
 // The pattern the pencil places on an instrument track (REA round 151 [EXEC FL 2026: drawing on an instrument track

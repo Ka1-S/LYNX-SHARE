@@ -487,6 +487,35 @@ bool makeInstrumentTrack (Song& song, int track, int channel)
     return true;
 }
 
+bool canLinkToMixerTrack (const Song& song, int track, int mixer)
+{
+    return track >= 0 && track < 500 && mixer > 0 && mixer < (int) song.mixer.size() && ! linkedElsewhere (song, mixer, track)
+           && ! song.session.reservedForOther (true, mixer);
+}
+
+bool linkToMixerTrack (Song& song, int track, int mixer)
+{
+    if (! canLinkToMixerTrack (song, track, mixer))
+        return false;
+    auto* t = trackAt (song, track);
+    if (t->mode == PlaylistTrackMode::audio && t->mixerTrack == mixer)
+        return true;
+    t->mode = PlaylistTrackMode::audio;
+    t->mixerTrack = mixer;
+    t->channel = -1;
+    if (t->name.empty())
+    {
+        const auto& name = song.mixer[(std::size_t) mixer].name;
+        t->name = name.empty() ? "Insert " + std::to_string (mixer) : name;
+    }
+    std::vector<int> onTrack;
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+        if (song.playlist[(std::size_t) i].track == track)
+            onTrack.push_back (i);
+    followAudioTracks (song, onTrack);
+    return true;
+}
+
 int instrumentTrackPattern (Song& song, int track)
 {
     if (track < 0 || track >= (int) song.playlistTracks.size())
