@@ -38,6 +38,7 @@
 #include "ui/ShortcutManager.h"
 #include "ui/WaveformView.h"
 #include "ui/QuickAddPalette.h"
+#include "ui/QuickPick.h"
 #include "ui/PluginPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
@@ -135,6 +136,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 {
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
+    if (restoreUserSettings) // (issue #104: the Plugin database folder on disk; changes made in LYNX are written to it)
+        quickpick::installPluginDatabase (engine);
     addChildComponent (updateBar);
     updateBar.onVisibilityChanged = [this] { resized(); };
     if (restoreUserSettings) // (the real window: Update saves the project as on quit and reopens it)
@@ -5007,6 +5010,23 @@ void MainComponent::timerCallback()
             announceEditorCrash (all.back().plugin);
     }
 
+    // back from another app (the file manager, perhaps: issue #104): the Plugin database folder is read again
+    if (const auto foreground = juce::Process::isForegroundProcess(); foreground != wasForeground)
+    {
+        wasForeground = foreground;
+        if (foreground && persistent)
+        {
+            auto& host = engine.getPluginHost();
+            const auto folders = host.databaseFolders();
+            const auto names = host.pluginNames();
+            quickpick::refreshPluginDatabase (engine, true);
+            const auto& now = host.databaseFolders();
+            if (now.of != folders.of || now.effects != folders.effects || now.generators != folders.generators || now.hidden != folders.hidden
+                || host.pluginNames() != names)
+                browser.pluginDatabaseChanged();
+        }
+    }
+
     auto& transport = engine.getTransport();
 
     if (! heldKeys.empty())
@@ -6854,6 +6874,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         // FL's ADD menu: a channel (LYNX's instruments and the installed plugins), a pattern, the plugin tools
         menu.addSectionHeader (tr ("Channel"));
         rack.addInstrumentItems (menu, -1);
+        // the Channel Rack's and the mixer slots' view switch (Categories / Simple / Tree), so that the three menus are
+        // one (issue #104)
+        quickpick::addFolderViewItems (menu, engine);
         menu.addSectionHeader (tr ("Other"));
         // FL's "Automation for last tweaked parameter" (Add_AutoLastMenu → FUN_01231100, REA round 143)
         const auto last = engine.getLastTweaked (0);

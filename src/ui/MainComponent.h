@@ -661,6 +661,7 @@ private:
     juce::String importedSuffix; // " (imported from FL Studio)" in the title until saved as .lynx
     juce::String projectName; // suggested name for export (also from an imported .flp)
     HeldNotes heldKeys; // notes the typing piano is playing (tag: the key code)
+    bool wasForeground = true; // (the Plugin database folder is read again when LYNX comes back to the front: issue #104)
     // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
     std::unique_ptr<LiveSessionManager> live;
 

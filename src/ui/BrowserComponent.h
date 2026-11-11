@@ -97,6 +97,7 @@ public:
     // The sample preview volume slider on the preview strip (0..125%, engine.setPreviewVolume): follows the engine.
     void refreshPreviewVolume();
     void refreshRoots() { rebuildRoots(); } // (after Tools › Clipboard saved a file; round 181b)
+    void pluginDatabaseChanged() { rebuildTree(); } // (the Plugin database folder was changed in the file manager; round 190ba)
     void stopPreview(); // the strip's Play / Stop toggle beside it
     // F2 on a Plugin database entry: rename it (FL's renamed plugins, issue #11); false when no plugin is selected
     bool renameSelectedPlugin();

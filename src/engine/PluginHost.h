@@ -367,8 +367,16 @@ public:
 
     // The user's Plugin database folders (round 166f, issue #16; core/PluginCatalog.h): the slot / channel menus
     // list the plugins of each folder under its heading. Saved in %APPDATA%\LYNX\plugin-folders.txt. UI thread.
+    // Since round 190ba (issue #104) the folders, the places and the names live in the Plugin database folder on disk
+    // (core/PluginDbFolder.h, Documents/LYNX/Plugin database): a change made here (setDatabaseFolders, setPluginName)
+    // is written to that folder by `onDatabaseEdited` (set by the UI, which knows the plugins), and what the folder
+    // says is taken in with adoptDatabase. The settings keep a copy (plugin-database.txt, plugin-names.txt); until
+    // 0.1.25 the folders were saved in plugin-folders.txt, the file of the scan folders, and each wrote over the other.
     const plugincatalog::Folders& databaseFolders() const noexcept { return userFolders; }
     void setDatabaseFolders (const plugincatalog::Folders& folders);
+    void adoptDatabase (const plugincatalog::Folders& folders, const std::map<std::string, std::string>& names);
+    std::function<void()> onDatabaseEdited;
+    bool isPersistent() const noexcept { return persistent; }
 
     // How many scan child processes this host has started (--lv2scantest).
     int scanChildrenStarted() const noexcept { return scanChildren; }
