@@ -2172,6 +2172,11 @@ struct Song
     // clip's start (the clip trimmed or sliced into it) plays from the clip's start with what is left of its length
     // (FL FUN_010608a0); off = such notes are dropped (LYNX's behaviour before; projects saved before keep it off).
     bool playTruncatedNotes = false;
+    // FL 2026 (round 190y renders, issue #144): a muted insert keeps running its effects; only its mixer routes (to the
+    // Master and its sends) are cut, so a Fruity Send in it is still heard and its controllers still move. Off = LYNX's
+    // behaviour before (the insert skipped its effects); projects saved before keep it off, .flp imports and new
+    // projects turn it on. Saved with the project.
+    bool muteRunsEffects = false;
     // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3, .flp 0x28): a voice cut by a cut group or
     // by "cut itself" fades out in 2 ms instead of its channel's declicking time. Saved with the project.
     bool fastDeclick = false;

@@ -516,7 +516,7 @@ private:
                        float* left, float* right, MeterBank* meters) noexcept;
     void renderChannel (const RackState& state, int channel, int n) noexcept;
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
-    void meterSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank& meters) noexcept;
+    void runSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept;
     void pullInputs (const RackState& state, int track, int n) noexcept;
     void updatePdcBypass (const RackState& state, bool playing) noexcept;
     void deliverToEffects (const RackState& state, const NoteEvent& e) noexcept; // (round 162)

@@ -4389,14 +4389,17 @@ bool canMeterSilenced (const MixerTrack& track) noexcept
 } // namespace
 
 // Issue #144 (FL: a muted insert's meter keeps moving): the silenced insert's effects, EQ and fader without the mute,
-// into its meter only. The insert stays inactive, so nothing downstream hears it; the sends its effects make (Fruity
-// Send, Patcher, Transmitter...) are cut again. Effects that reach outside the insert never run here (canMeterSilenced).
-void RackRenderer::meterSilencedTrack (const RackState& state, int t, int n, const MixerMatrix& level, MeterBank& meters) noexcept
+// into its meter. The insert stays inactive, so its routes (Master, sends) carry nothing. `cutEffectSends` (projects
+// from before round 190y): the sends its effects make (Fruity Send, Patcher, Transmitter...) are cut again and only
+// effects that stay inside the insert run (canMeterSilenced). Without it (Song::muteRunsEffects, FL): they are heard.
+void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept
 {
     const auto& track = state.song.mixer[(std::size_t) t];
     auto* l = trackBuffer (t, 0);
     auto* r = trackBuffer (t, 1);
     auto& last = lastMeterGain[(std::size_t) t];
+    if (meters == nullptr && track.effects.empty()) // (nothing to run, nobody looks)
+        return;
     if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
     {
         last = level;
@@ -4404,13 +4407,15 @@ void RackRenderer::meterSilencedTrack (const RackState& state, int t, int n, con
     }
 
     runEffects (state, t, n);
-    if ((std::size_t) t < state.slotTap.size())
+    if (cutEffectSends && (std::size_t) t < state.slotTap.size())
         for (const auto tap : state.slotTap[(std::size_t) t])
             if (tap >= 0 && tap < RackState::maxSendTaps)
                 tapActive[(std::size_t) tap] = 0;
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
+    if (meters == nullptr)
+        return;
     last = applyMatrix (l, r, l, r, n, std::isnan (last.ll) ? level : last, level);
-    meters.accumulate (t, peakOf (l, n), peakOf (r, n));
+    meters->accumulate (t, peakOf (l, n), peakOf (r, n));
 }
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
@@ -4428,12 +4433,14 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
     // issue #144: a silenced insert keeps its meter (FL): metered without being heard, while the meters are on
     const auto meterSilenced = silent && meters != nullptr && canMeterSilenced (track);
+    // FL (round 190y renders): a muted insert keeps running its effects, live and in exports; only its routes are cut
+    const auto runSilenced = silent && state.song.muteRunsEffects;
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
     MixerMatrix level { 0.0f, 0.0f, 0.0f, 0.0f }; // the same without the mute (the "Post level and panning" tap)
 
-    if (! silent || meterSilenced || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
+    if (! silent || meterSilenced || runSilenced || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
         const auto fader = liveLevel (state, &LiveLevels::mixerVolume, t, track.volume);
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, t, track.pan);
@@ -4469,8 +4476,10 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
     {
-        if (meterSilenced)
-            meterSilencedTrack (state, t, n, level, *meters);
+        if (runSilenced)
+            runSilencedTrack (state, t, n, level, meters, false);
+        else if (meterSilenced)
+            runSilencedTrack (state, t, n, level, meters, true);
         else
             lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
         if (meters != nullptr)
