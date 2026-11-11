@@ -3604,6 +3604,12 @@ void MixerStrips::repaintAutomatedStrips()
     }
 }
 
+namespace
+{
+// issue #144: a silenced track's meter colours (FL draws them darker and greyer)
+juce::Colour silencedMeterColour (juce::Colour c) { return c.withMultipliedSaturation (0.55f).withMultipliedBrightness (0.62f); }
+} // namespace
+
 // The two thin level bars beside a vertical name (Wide layouts); empty when the layout has none
 juce::Rectangle<int> MixerStrips::nameBars (int t) const
 {
@@ -3628,9 +3634,28 @@ void MixerStrips::paintNameBars (juce::Graphics& g, int t) const
         const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
         if (h <= 0)
             continue;
-        g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+        const auto c = level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow;
+        g.setColour (isSilenced (t) ? silencedMeterColour (c) : c); // (issue #144: dimmed while silenced)
         g.fillRect (bar.withTop (bar.getBottom() - h));
     }
+}
+
+// Issue #144: a silenced track (its mute, a solo elsewhere, a muted VCA) keeps its meter, dimmed, as FL draws it
+bool MixerStrips::isSilenced (int t) const
+{
+    const auto& song = engine.getSong();
+    if (t < 0 || t >= (int) song.mixer.size())
+        return false;
+    if (song.mixer[(std::size_t) t].muted)
+        return true;
+    if (t == 0)
+        return false;
+    if (mixerops::vcaMuted (song, t))
+        return true;
+    if (std::none_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.solo; }))
+        return false;
+    const auto audible = song.soloAudible();
+    return (std::size_t) t < audible.size() && ! audible[(std::size_t) t];
 }
 
 // One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
@@ -3640,14 +3665,16 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     const auto index = (std::size_t) t * 2 + (std::size_t) ch;
     const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
     const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
+    const auto silenced = (h > 0 || meter.peak > 0.001f) && isSilenced (t);
+    const auto tone = [silenced] (juce::Colour c) { return silenced ? silencedMeterColour (c) : c; };
     if (h > 0)
     {
         const auto lit = bar.withTop (bar.getBottom() - h);
         // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
-        juce::ColourGradient gradient (colour::meterClip, 0.0f, (float) bar.getY(), colour::meterLow, 0.0f, (float) bar.getBottom(), false);
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
+        juce::ColourGradient gradient (tone (colour::meterClip), 0.0f, (float) bar.getY(), tone (colour::meterLow), 0.0f, (float) bar.getBottom(), false);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), tone (colour::meterClip)); // above 0 dB: clip zone
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), tone (colour::meterMid));
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), tone (colour::meterLow));
         g.setGradientFill (gradient);
         g.fillRect (lit);
     }
@@ -3655,7 +3682,7 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     if (meter.peak > 0.001f) // peak hold line
     {
         const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-        g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
+        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f)));
         g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
     }
 

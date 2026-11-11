@@ -26,6 +26,8 @@
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
 #include "core/Patcher.h"
+
+#include <optional>
 #include "core/LoadTrace.h"
 #include "core/DynamicsSuite.h"
 #include "core/MixSuite.h"
@@ -1981,6 +1983,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
+    lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -4018,6 +4021,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         meters->rollingLog.push (RollingAudioLog::Position::postEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
 
     MixerMatrix target; // without a mixer: unity
+    std::optional<MixerMatrix> mutedLevel; // issue #144: a muted Master's meter shows its level without the mute (FL)
 
     if (! song.mixer.empty())
     {
@@ -4026,8 +4030,24 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, 0, master.pan);
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], fader) : fader;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
-        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f }
-                              : mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        const auto level = mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : level;
+        if (master.muted && meters != nullptr)
+            mutedLevel = level;
+    }
+
+    if (mutedLevel) // (read before the buffers are scaled; nothing is written)
+    {
+        const auto& m = *mutedLevel;
+        const auto* a = trackBuffer (0, 0);
+        const auto* b = trackBuffer (0, 1);
+        float pl = 0.0f, pr = 0.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            pl = std::max (pl, std::abs (m.ll * a[i] + m.rl * b[i]));
+            pr = std::max (pr, std::abs (m.rr * b[i] + m.lr * a[i]));
+        }
+        meters->accumulate (0, pl, pr);
     }
 
     lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);
@@ -4341,7 +4361,57 @@ bool isSilentBlock (const float* l, const float* r, int n) noexcept
             return false;
     return true;
 }
+
+// Issue #144: a silenced insert (its mute, a solo elsewhere, a muted VCA) still shows its level, as in FL. Its effects
+// run for that only when nothing else can hear them: no slot reaches outside the insert (hardware I/O, controllers that
+// move other controls, sends into other inserts are cut below), so what comes out of LYNX stays the same.
+bool canMeterSilenced (const MixerTrack& track) noexcept
+{
+    for (const auto& slot : track.effects)
+        switch (slot.kind)
+        {
+            case EffectKind::hardwareInsert:
+            case EffectKind::formulaController:
+            case EffectKind::xyController:
+            case EffectKind::xyzController:
+            case EffectKind::controlSurface:
+            case EffectKind::peakController:
+                return false;
+            case EffectKind::patcher:
+                if (patcher::usesHardwareIo (slot.patcher))
+                    return false;
+                break;
+            default:
+                break;
+        }
+    return true;
+}
 } // namespace
+
+// Issue #144 (FL: a muted insert's meter keeps moving): the silenced insert's effects, EQ and fader without the mute,
+// into its meter only. The insert stays inactive, so nothing downstream hears it; the sends its effects make (Fruity
+// Send, Patcher, Transmitter...) are cut again. Effects that reach outside the insert never run here (canMeterSilenced).
+void RackRenderer::meterSilencedTrack (const RackState& state, int t, int n, const MixerMatrix& level, MeterBank& meters) noexcept
+{
+    const auto& track = state.song.mixer[(std::size_t) t];
+    auto* l = trackBuffer (t, 0);
+    auto* r = trackBuffer (t, 1);
+    auto& last = lastMeterGain[(std::size_t) t];
+    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
+    {
+        last = level;
+        return;
+    }
+
+    runEffects (state, t, n);
+    if ((std::size_t) t < state.slotTap.size())
+        for (const auto tap : state.slotTap[(std::size_t) t])
+            if (tap >= 0 && tap < RackState::maxSendTaps)
+                tapActive[(std::size_t) tap] = 0;
+    applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
+    last = applyMatrix (l, r, l, r, n, std::isnan (last.ll) ? level : last, level);
+    meters.accumulate (t, peakOf (l, n), peakOf (r, n));
+}
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
 {
@@ -4356,12 +4426,14 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     };
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
+    // issue #144: a silenced insert keeps its meter (FL): metered without being heard, while the meters are on
+    const auto meterSilenced = silent && meters != nullptr && canMeterSilenced (track);
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
     MixerMatrix level { 0.0f, 0.0f, 0.0f, 0.0f }; // the same without the mute (the "Post level and panning" tap)
 
-    if (! silent || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
+    if (! silent || meterSilenced || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
         const auto fader = liveLevel (state, &LiveLevels::mixerVolume, t, track.volume);
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, t, track.pan);
@@ -4397,10 +4469,15 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
     {
+        if (meterSilenced)
+            meterSilencedTrack (state, t, n, level, *meters);
+        else
+            lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
     }
+    lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
 
     tap (RecordSource::externalAndMixer, l, r);
 

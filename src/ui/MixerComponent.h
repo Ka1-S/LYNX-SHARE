@@ -292,6 +292,7 @@ private:
     bool cachePainting = false;    // paint() is filling the picture: wells without levels
     int pictureInvalidations = 0, pictureRefills = 0; // what --uiperf reports (see cacheCountersForPerf)
     void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
+    bool isSilenced (int track) const; // muted, or silenced by a solo / a muted VCA (issue #144)
     void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
     juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)
     void paintNameBars (juce::Graphics& g, int track) const;

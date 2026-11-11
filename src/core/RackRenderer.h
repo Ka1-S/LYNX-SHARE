@@ -516,6 +516,7 @@ private:
                        float* left, float* right, MeterBank* meters) noexcept;
     void renderChannel (const RackState& state, int channel, int n) noexcept;
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
+    void meterSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank& meters) noexcept;
     void pullInputs (const RackState& state, int track, int n) noexcept;
     void updatePdcBypass (const RackState& state, bool playing) noexcept;
     void deliverToEffects (const RackState& state, const NoteEvent& e) noexcept; // (round 162)
@@ -564,6 +565,8 @@ private:
     std::array<MixerMatrix, maxMixerTracks> lastTrackGain {}; // the level matrix of the previous block, for the ramp
     // round 168x: the "Post level and panning" recording tap's own ramp (the insert's level matrix without the mute)
     std::array<MixerMatrix, maxMixerTracks> lastTapGain {};
+    // issue #144: the fader ramp of a silenced insert's meter (NaN: none yet)
+    std::array<MixerMatrix, maxMixerTracks> lastMeterGain {};
     std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
     std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block
