@@ -360,7 +360,8 @@ public:
     // A hosted plugin's parameter values (PluginRef::values) put on a running instance (indices the plugin does not
     // have are ignored), and read back: every automatable parameter that is not at its default.
     static void applyValues (juce::AudioPluginInstance& plugin, const std::vector<std::pair<int, float>>& values);
-    static std::vector<std::pair<int, float>> readValues (juce::AudioPluginInstance& plugin);
+    // (`fresh`: the plugin as it was described for sharing — a value counts when it differs from a fresh instance's)
+    static std::vector<std::pair<int, float>> readValues (juce::AudioPluginInstance& plugin, const remoteplug::Shared* fresh = nullptr);
     // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
     // role (another format: its state may not carry over).
     std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);

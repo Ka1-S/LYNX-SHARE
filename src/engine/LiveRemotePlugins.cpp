@@ -402,7 +402,7 @@ void LiveSessionManager::captureHostedValuesAt (const remoteplug::Place& place)
     const auto running = runningAt (engine, place);
     if (running.plugin == nullptr)
         return;
-    auto values = PluginHost::readValues (*running.plugin);
+    auto values = PluginHost::readValues (*running.plugin, remoteplug::find (shared, ref->id));
     // (a value the plugin rounded a little is still the one the song has)
     for (auto& [index, value] : values)
         if (const auto had = remoteplug::valueOf (*ref, index, -1.0f); had >= 0.0f && std::abs (had - value) < sameValue)

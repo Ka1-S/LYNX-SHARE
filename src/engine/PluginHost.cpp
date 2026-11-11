@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <map>
 #include <cstdlib>
 #include <cstring>
 #include <thread>
@@ -1987,7 +1988,9 @@ std::optional<remoteplug::Shared> PluginHost::describeForSharing (const std::str
         out.index = i;
         out.name = p->getName (48).toStdString();
         out.unit = p->getLabel().substring (0, 12).toStdString();
-        out.def = juce::jlimit (0.0f, 1.0f, p->getDefaultValue());
+        // (what a fresh instance has — the sound is "a fresh instance plus the values" —, which is not always the
+        // default the plugin declares)
+        out.def = juce::jlimit (0.0f, 1.0f, p->getValue());
         out.low = p->getText (0.0f, 24).toStdString();
         out.high = p->getText (1.0f, 24).toStdString();
         const auto steps = p->getNumSteps();
@@ -2015,15 +2018,20 @@ void PluginHost::applyValues (juce::AudioPluginInstance& plugin, const std::vect
                 p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, value));
 }
 
-std::vector<std::pair<int, float>> PluginHost::readValues (juce::AudioPluginInstance& plugin)
+std::vector<std::pair<int, float>> PluginHost::readValues (juce::AudioPluginInstance& plugin, const remoteplug::Shared* fresh)
 {
     std::vector<std::pair<int, float>> out;
+    std::map<int, float> base;
+    if (fresh != nullptr)
+        for (const auto& param : fresh->params)
+            base[param.index] = param.def;
     const auto& params = plugin.getParameters();
     for (int i = 0; i < params.size() && out.size() < remoteplug::maxParams; ++i)
         if (auto* p = params.getUnchecked (i); p != nullptr && sharedParameter (*p))
         {
             const auto v = juce::jlimit (0.0f, 1.0f, p->getValue());
-            if (std::abs (v - juce::jlimit (0.0f, 1.0f, p->getDefaultValue())) > 1.0e-4f)
+            const auto it = base.find (i);
+            if (std::abs (v - (it != base.end() ? it->second : juce::jlimit (0.0f, 1.0f, p->getDefaultValue()))) > 1.0e-4f)
                 out.push_back ({ i, v });
         }
     return out;

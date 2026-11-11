@@ -358,8 +358,8 @@ TEST (remote190ai_a_tweak_survives_the_stems_landing)
     CHECK (remote190aiRef (net.authority->confirmed(), uid)->values.empty() && remote190aiRef (ana.working, uid)->values.empty());
     CHECK (ana.working.channels[(std::size_t) live169bChannel (ana.working, uid)].standIns.size() == 1);
     // the outbox still wants them: it writes again, and this time they stay
-    CHECK (outbox.showing (0) == 0.5f && write (400.0) == 0); // (not before the retry time)
-    CHECK (write (800.0) == 2);
+    CHECK (outbox.showing (0) == 0.5f && write (400.0) == 1); // (the move not written yet goes; the undone one waits)
+    CHECK (write (800.0) == 1);                               // (its retry time)
     net.poll (1);
     net.settle (rng);
     const auto* confirmed = remote190aiRef (net.authority->confirmed(), uid);

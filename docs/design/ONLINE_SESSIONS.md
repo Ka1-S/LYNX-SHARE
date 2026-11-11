@@ -783,7 +783,7 @@ records); the stems travel as media and the guest hears them. Playing the host's
   `ui/LiveRemoteUi` (the host's list, the guest's menus and parameter editor).
 - **The host shares** (*File › Online session › Share plugins with guests...*): a list of the host's plugins with a
   tick each, off by default, under the licence notice (below). Ticking one loads a fresh instance once to read its
-  parameter list (name, unit, the plugin's texts for 0 and 1, default, steps and the step names of a stepped
+  parameter list (name, unit, the plugin's texts for 0 and 1, the value a fresh instance has, steps and the step names of a stepped
   parameter up to 32 steps; at most 1024 parameters, JUCE's "MIDI CC" ones left out), then `shared {plugins}` goes to
   every guest who may edit ("listen only" guests get an empty list). At most 32 plugins at once. The list shows who
   uses each one ("Used by Rui: Glass Keys"). It is not written to the journal: a host that restarts shares nothing
@@ -807,7 +807,7 @@ records); the stems travel as media and the guest hears them. Playing the host's
   state (`PluginHost::instantiate`), so the render engines get them too; the source hash covers them (they are in the
   channel's JSON), so a changed value renders again like a changed note.
 - **The host is the authority**: what the host changes in the plugin's own window is read back when that window
-  closes (`captureHostedValues`: every automatable parameter that is not at its default; a value within 0.002 of
+  closes (`captureHostedValues`: every automatable parameter that differs from a fresh instance's; a value within 0.002 of
   the song's keeps the song's) and reaches the guests as values — the guest's sliders move. `AudioEngine::
   capturePluginStates` skips hosted references: no state is ever put in the song for them during a session.
 - **The state never leaves the host**: a hosted reference has no state on the host either; whatever a guest's
