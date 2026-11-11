@@ -22,6 +22,7 @@
 #include "ui/PluginSkin.h"
 #include "ui/SlotWatch.h"
 #include "ui/Theme.h"
+#include "ui/ShotScale.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
@@ -1390,8 +1391,8 @@ bool runFlExtraShots (AudioEngine& engine, const juce::File& folder)
     juce::String report;
     bool ok = true;
     auto save = [&] (juce::Component& c, const juce::String& name) {
-        const auto image = c.createComponentSnapshot (c.getLocalBounds(), true, 1.0f);
-        const auto file = folder.getChildFile (name + ".png");
+        const auto image = shot::snapshot (c); // (round 190bi: at the shot scale, ui/ShotScale.h)
+        const auto file = shot::file (folder.getChildFile (name + ".png"));
         file.deleteFile();
         juce::FileOutputStream out (file);
         juce::PNGImageFormat png;
