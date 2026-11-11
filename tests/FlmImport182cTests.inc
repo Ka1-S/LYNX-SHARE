@@ -154,6 +154,7 @@ struct Ev
     double beat, length;
     int key;
     int velocity = 200;
+    int pan = 127, pitch = 0x7FFF, repeat = 0, slide = 0; // bytes 15, 16–17, 18, 19
 };
 
 inline Bytes clip (double startBeat, double length, double loop, double offset, std::uint32_t id, const std::vector<Ev>& events,
@@ -178,10 +179,10 @@ inline Bytes clip (double startBeat, double length, double loop, double offset, 
         f64 (evn, e.length);
         u16 (evn, (std::uint16_t) (std::int16_t) e.key);
         u8 (evn, (std::uint8_t) e.velocity);
-        u8 (evn, 127);
-        u16 (evn, 0x7FFF);
-        u8 (evn, 0);
-        u8 (evn, 0);
+        u8 (evn, (std::uint8_t) e.pan);
+        u16 (evn, (std::uint16_t) e.pitch);
+        u8 (evn, (std::uint8_t) e.repeat);
+        u8 (evn, (std::uint8_t) e.slide);
     }
     auto body = cat ({ b, chunk ("CLHd", hd), chunk ("ZOOM", zoom) });
     if (! sampleBody.empty())
@@ -194,13 +195,14 @@ inline Bytes clip (double startBeat, double length, double loop, double offset, 
     return chunk ("CLIP", body);
 }
 
-inline Bytes lane (std::uint32_t kind, const std::string& name, std::initializer_list<Bytes> clips, int module = -1, int param = -1)
+inline Bytes lane (std::uint32_t kind, const std::string& name, std::initializer_list<Bytes> clips, int module = -1, int param = -1,
+                   double swing = 0.0)
 {
     Bytes d;
     u32 (d, kind);
     u32 (d, (std::uint32_t) module);
     u32 (d, (std::uint32_t) param);
-    f64 (d, 0);
+    f64 (d, swing);
     u32 (d, 0);
     u32 (d, 0);
     fixed (d, name, 1024);

@@ -880,3 +880,28 @@ interpolation, the 10 ms fade of an envelope-less release, FL's velocity trackin
 **Best way?** FL: FLM's own preset importer proves the two are one instrument, so playing LYNX's FL-exact 3x Osc
 keeps the patch editable on the page the user knows. Ableton: no FLM import. Verdict: desktop engine + FLM's level and
 octave rules; the channel shows PITCH −12 semitones, which is what FLM plays.
+
+### Note pan, drum pitch, repeat, slide (round 190ab, branch `feature/flm190ab-notes`, 0.1.26)
+
+The four note bytes round 190u found (EVN2 15–19) are imported; laws in FLM_FORMAT.md §4 (clip compiler 0x18075d6b0,
+song scheduler 0x180770330, drum pad voice start 0x18074bf40; evidence /mnt/e/lynx-work/flm190ab/rea).
+
+| Byte | FLM | LYNX |
+|---|---|---|
+| 15 pan | byte / 255 to the module's note-on; drum pads: balance | the note's pan (127 = centre); the song's pan law is set to triangular (= FLM's balance, also the rack's pan) |
+| 16–17 pitch | drum pads only: speed 2^(2p − 1) | the kit sampler note's key (60 ± 12) and fine pitch |
+| 18 repeat | n more note-ons inside the note's (swung) 1/16 step, one note-off | n more notes at FLM's own ticks; on note lanes they end with the note |
+| 19 slide | glides the held note (key, velocity, pan), no note-on; note lanes only | a slide note when a plain note sounds at its start; otherwise dropped and listed |
+
+The lane's swing (TRKH `DESc` +12) is read for the repeats only: the saved step ticks already hold it.
+In FLM's shipped songs: 40 panned drum notes (Permich Uplifting), 165 pitched drum notes (Goldhands Elvira, Jasmina),
+2 repeats (Parrik Initiated, swing 0.263), no slide.
+
+Not converted: the slide's velocity and pan glide; FLM applies one slide to every sounding voice of the module (LYNX
+slides the notes its own slide rule picks). No A/B render: FLM's own player (the only reader of these bytes) cannot be
+rendered headless; FLM-inside-FL takes its notes from FL. Tests: `flm190ab_note_pan_pitch_repeat_slide`.
+
+**Best way?** FL has per-note pan, slide notes and fine pitch, so each byte lands on the note property an FL user
+already edits in the piano roll; Ableton has neither note pan nor slides. Repeats become real notes (editable), not a
+hidden per-note counter. Verdict: as built.
+
