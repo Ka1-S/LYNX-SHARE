@@ -448,6 +448,7 @@ countries: jp
 "Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)" = "Ogun — FLのエンジンとエフェクト (Seed 2 Randomはチャンネルごとに固定の値)"
 "Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)" = "Autogun — FLのエンジンとエフェクト、Magic Dust (SG.datはFLのインストールから読み込み)"
 "Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)" = "Transistor Bass — FLのエンジンとシーケンサー、エフェクト (オシレーター波形はFLのインストールから読み込み)"
+"Transistor Bass — FL Studio Mobile's build of the engine" = "Transistor Bass — FL Studio Mobile 版のエンジン"
 "MiniSynth — FL's engine with its effects (wave tables read from your FL installation)" = "MiniSynth — FLのエンジンとエフェクト (ウェーブテーブルはFLのインストールから読み込み)"
 "SimSynth — FL's engine (new settings restart the voices)" = "SimSynth — FLのエンジン (設定を変えるとボイスがリスタート)"
 "Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL" = "Wasp — FL Studio 2026には64ビット版Waspがありません: FLと同様、チャンネルは設定を保持したまま無音になります"

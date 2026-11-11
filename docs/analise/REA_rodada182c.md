@@ -777,6 +777,12 @@ slides and accents are the instrument; keeping FLM's own rules (slide back, acce
 as written. Verdict: FLM-exact; the page shows the desktop Transistor Bass controls (its sequencer has no effect on a
 channel from a .flm).
 
+**The page on a .flm channel (round 190u, branch `feature/flm190u-tbpage`).** FLM's build has no sequencer, programs,
+delay, reverb or recorded 303 cycles, so the channel's Plugin page leaves those out (`transistorBassMobileLayout`:
+the desktop page's Voice, Tweaks and Distortion rows at the same places, 700 × 266) and its hint reads "Transistor
+Bass — FL Studio Mobile's build of the engine". The knobs FLM fixes but the engine still reads (Tune, HP, Min decay,
+Key follow, Clicks, Tone, Volume) stay: they work. A desktop channel's page is unchanged.
+
 ### F4 3x Osc (round 190u, branch `feature/flm190u-3xosc`, 0.1.26)
 
 FLM's "3x Osc" module (type 39, 149 parameters) is the desktop 3x Osc and FL's channel settings behind it (envelopes,

@@ -130,6 +130,8 @@ const std::vector<EffectKind>& ownLayoutKinds();
 // the knobs of the channel settings' model panel (their juce::Slider names); values are 0..1 over the knob's range.
 const Layout* instrumentLayout (InstrumentKind kind);
 const std::vector<InstrumentKind>& instrumentLayoutKinds();
+// Transistor Bass on a channel imported from a .flm (FL Studio Mobile's build: transistorBassIsFlm)
+const Layout* transistorBassFlmLayout();
 
 // Soundgoodizer slots (EffectKind::maximus with the Soundgoodizer build): its own page, edited in the slot's state.
 const Layout& soundgoodizerLayout();

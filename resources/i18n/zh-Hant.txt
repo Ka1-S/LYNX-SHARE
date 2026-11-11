@@ -448,6 +448,7 @@ countries: tw hk mo
 "Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)" = "Ogun——FL的引擎及其效果（Seed 2 Random對每個通道為固定抽取）"
 "Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)" = "Autogun——FL的引擎及其效果和Magic Dust（SG.dat讀取自你的FL安裝）"
 "Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)" = "Transistor Bass——FL的引擎及其音序器和效果（振盪器週期讀取自你的FL安裝）"
+"Transistor Bass — FL Studio Mobile's build of the engine" = "Transistor Bass — FL Studio Mobile 版本的引擎"
 "MiniSynth — FL's engine with its effects (wave tables read from your FL installation)" = "MiniSynth——FL的引擎及其效果（波表讀取自你的FL安裝）"
 "SimSynth — FL's engine (new settings restart the voices)" = "SimSynth——FL的引擎（新設定會重啟發聲）"
 "Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL" = "Wasp——FL Studio 2026沒有64位元Wasp：通道保留其設定並保持無聲，與FL一致"

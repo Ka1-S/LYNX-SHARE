@@ -448,6 +448,7 @@ countries: id
 "Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)" = "Ogun — engine FL dengan efeknya (Seed 2 Random adalah undian tetap per channel)"
 "Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)" = "Autogun — engine FL dengan efeknya dan Magic Dust (SG.dat dibaca dari instalasi FL Anda)"
 "Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)" = "Transistor Bass — engine FL dengan sequencer dan efeknya (siklus osilator dibaca dari instalasi FL Anda)"
+"Transistor Bass — FL Studio Mobile's build of the engine" = "Transistor Bass — mesin versi FL Studio Mobile"
 "MiniSynth — FL's engine with its effects (wave tables read from your FL installation)" = "MiniSynth — engine FL dengan efeknya (wavetable dibaca dari instalasi FL Anda)"
 "SimSynth — FL's engine (new settings restart the voices)" = "SimSynth — engine FL (pengaturan baru memulai ulang voice)"
 "Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL" = "Wasp — FL Studio 2026 tidak punya Wasp 64-bit: channel mempertahankan pengaturannya dan tetap senyap, seperti di FL"

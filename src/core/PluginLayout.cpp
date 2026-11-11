@@ -4474,6 +4474,12 @@ Layout poizoneMain()
 }
 } // namespace
 
+const Layout* transistorBassFlmLayout()
+{
+    static const Layout mobile = transistorBassMobileLayout();
+    return &mobile;
+}
+
 const Layout* instrumentLayout (InstrumentKind kind)
 {
     static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), toxic = toxicMain(), poizone = poizoneMain();

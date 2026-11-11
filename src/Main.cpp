@@ -136,6 +136,7 @@
 #include "core/PluginLayout.h"
 #include "core/EffectPresets.h"
 #include "core/Vfx.h"
+#include "core/TransistorBass.h"
 #include "ui/Splash.h"
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
@@ -8982,8 +8983,15 @@ private:
             const auto banked = which == "banks" && lynx::banks::hasBank (e.kind);
             if (! banked && ! wanted.contains (name))
                 continue;
-            auto channel = source == "fl" ? lynx::natives::makeChannel (e.kind, lynx::flStudioAccess())
+            auto channel = source == "fl" || source == "flm" ? lynx::natives::makeChannel (e.kind, lynx::flStudioAccess())
                                           : lynx::banks::defaultChannel (e.kind, e.name);
+            // (round 190u) source "flm": the channel as the .flm import makes it (Transistor Bass: FL Studio Mobile's build)
+            if (source == "flm" && channel && e.kind == lynx::InstrumentKind::transistorbass)
+            {
+                channel->pluginState = lynx::transistorBassFlmState ({ 1.0f, 0.0f, 1.0f, 1.0f, 0.1f, 1.0f, 0.1f, 0.0f, 0.0f, 0.3f, 0.5f, 0.0f, 0.0f, 0.0f }); // FLM's defaults
+                channel->modelParams = { 1.0f };
+                channel->samplePath.clear();
+            }
             if (! channel)
             {
                 std::fprintf (stderr, "%s: no %s channel\n", e.name, source.toRawUTF8());
