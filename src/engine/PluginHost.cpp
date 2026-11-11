@@ -1406,7 +1406,9 @@ PluginHost::PluginHost (bool keep)
             known.recreateFromXml (*xml);
         favouriteIds = prefs::parseFavourites (settingsFolder().getChildFile ("plugin-favourites.txt").loadFileAsString().toStdString());
         userNames = prefs::parsePluginNames (settingsFolder().getChildFile ("plugin-names.txt").loadFileAsString().toStdString());
-        userFolders = plugincatalog::parseFolders (settingsFolder().getChildFile ("plugin-folders.txt").loadFileAsString().toStdString());
+        // (plugin-database.txt since round 190ba; before, the folders shared plugin-folders.txt with the scan folders)
+        const auto databaseFile = settingsFolder().getChildFile ("plugin-database.txt");
+        userFolders = plugincatalog::parseFolders ((databaseFile.existsAsFile() ? databaseFile : settingsFolder().getChildFile ("plugin-folders.txt")).loadFileAsString().toStdString());
         // once: files marked as failed by scans before the class-count timeout (REA_rodada107 §2) get another try,
         // since a large bundle (Waves shell) was marked "hung" only for taking longer than 30 s
         const auto retried = settingsFolder().getChildFile ("scan-retry.txt");
@@ -1482,7 +1484,9 @@ juce::FileSearchPath PluginHost::pluginFolders() const
         for (const auto& line : lines)
             if (line.trim().isNotEmpty() && juce::File::isAbsolutePath (line.trim()))
                 paths.add (juce::File (line.trim()));
-        return paths;
+        // (a file holding only the Plugin database's folders, written there until 0.1.25, is not a list of scan folders)
+        if (paths.getNumPaths() > 0 || ! file.loadFileAsString().containsChar ('\t'))
+            return paths;
     }
     return const_cast<PluginHost*> (this)->suggestedFolders();
 }
@@ -1943,13 +1947,36 @@ void PluginHost::setPluginName (const std::string& key, const std::string& name)
         userNames[key] = clean;
     if (persistent)
         settingsFolder().getChildFile ("plugin-names.txt").replaceWithText (juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
+    if (onDatabaseEdited)
+        onDatabaseEdited();
 }
 
 void PluginHost::setDatabaseFolders (const plugincatalog::Folders& folders)
 {
+    const auto viewOnly = folders.of == userFolders.of && folders.effects == userFolders.effects && folders.generators == userFolders.generators
+                          && folders.hidden == userFolders.hidden;
     userFolders = folders;
     if (persistent)
-        settingsFolder().getChildFile ("plugin-folders.txt").replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
+        settingsFolder().getChildFile ("plugin-database.txt").replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
+    if (onDatabaseEdited && ! viewOnly)
+        onDatabaseEdited();
+}
+
+void PluginHost::adoptDatabase (const plugincatalog::Folders& folders, const std::map<std::string, std::string>& names)
+{
+    const auto view = userFolders.view;
+    const auto foldersChanged = folders.of != userFolders.of || folders.effects != userFolders.effects || folders.generators != userFolders.generators;
+    const auto namesChanged = names != userNames;
+    userFolders = folders;
+    userFolders.view = view;
+    userNames = names;
+    if (! persistent)
+        return;
+    const auto databaseFile = settingsFolder().getChildFile ("plugin-database.txt");
+    if (foldersChanged || ! databaseFile.existsAsFile())
+        databaseFile.replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
+    if (namesChanged)
+        settingsFolder().getChildFile ("plugin-names.txt").replaceWithText (juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
 }
 
 void PluginHost::startBackgroundScan (const juce::FileSearchPath& paths)

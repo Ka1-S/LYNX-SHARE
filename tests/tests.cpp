@@ -17222,6 +17222,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rack165Tests.inc"  // (round 165f-rack; likewise)
 #include "Visual164Tests.inc"
 #include "Visual165Tests.inc"
+#include "Dance190baTests.inc"
 #include "Patcher164fTests.inc"
 #include "Markers165Tests.inc"
 #include "PerfMode165Tests.inc"
@@ -17484,3 +17485,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190arTests.inc"
 #include "Mpe190bbTests.inc"
 #include "Mpe190bbLiveTests.inc"
+#include "PluginDb190baTests.inc"

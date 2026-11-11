@@ -11,12 +11,14 @@
 #include "core/SoundFont.h"
 #include "core/NativeEngines.h"
 #include "core/PluginCatalog.h"
+#include "core/PluginDbFolder.h"
 #include "core/Preferences.h"
 #include "core/ProjectContents.h"
 #include "core/VideoPlayer.h"
 #include "core/VoltageController.h"
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
+#include "platform/Paths.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
@@ -171,6 +173,45 @@ plugincatalog::BuiltinPlugin builtinOf (const EffectEntry& e)
     return { e.key, name, e.flPlugin, e.flPlugin };
 }
 
+// The plugins as the database folder knows them (core/PluginDbFolder.h): the key, the own name (English for the
+// built-in ones, so the files do not change with the language), where it comes from and a built-in one's default folder
+template <typename Entry>
+void addDatabasePlugins (std::vector<plugindb::Plugin>& out, const std::vector<Entry>& entries, bool instruments)
+{
+    static const char* const formats[] { "LYNX", "FL engines", "VFX" };
+    for (const auto& e : entries)
+    {
+        plugindb::Plugin p;
+        p.key = e.key;
+        p.instrument = instruments;
+        p.builtin = e.folder != 3;
+        if (p.builtin)
+        {
+            const auto b = builtinOf (e);
+            p.name = b.name;
+            p.format = formats[juce::jlimit (0, 2, e.folder)];
+            const auto placed = plugincatalog::withDefaultCategories ({}, instruments, { b });
+            if (const auto it = placed.of.find (e.key); it != placed.of.end())
+                p.defaultFolder = it->second;
+        }
+        else
+        {
+            p.name = e.label.toStdString();
+            p.format = e.detail.fromLastOccurrenceOf (juce::String::fromUTF8 (" \xc2\xb7 "), false, false).toStdString();
+        }
+        out.push_back (std::move (p));
+    }
+}
+std::vector<plugindb::Plugin> databasePlugins (AudioEngine& engine)
+{
+    std::vector<plugindb::Plugin> out;
+    addDatabasePlugins (out, effectEntries (engine, true), false);
+    addDatabasePlugins (out, generatorEntries (engine, true), true);
+    return out;
+}
+juce::uint32 lastDatabaseRefresh = 0;
+bool databaseBusy = false;
+
 // FL's plugin menu (REA_rodada166f §1, round 170b): a heading per folder with its subfolders as submenus and its plugins
 // A-Z (Categories), every folder a submenu (Tree) or one A-Z list (Simple); `item` adds entry i to a menu.
 template <typename Entry>
@@ -185,6 +226,7 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
         if (e.folder != 3) // (installed plugins only under a folder the user made)
             builtins.push_back (builtinOf (e));
     }
+    refreshPluginDatabase (engine); // (the folders as they are on disk now: issue #104)
     auto& host = engine.getPluginHost();
     const auto folders = plugincatalog::withDefaultCategories (host.databaseFolders(), instruments, builtins);
     const auto tree = plugincatalog::menuTree (folders, instruments, keys);
@@ -252,6 +294,49 @@ void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function
     });
     if (chooseSample)
         menu.addItem (tr ("Sampler (choose file)..."), chooseSample);
+}
+
+juce::File pluginDatabaseFolder()
+{
+    return platform::documentsFolder().getChildFile ("LYNX").getChildFile ("Plugin database");
+}
+
+juce::File pluginDatabaseFolder (bool instruments, const std::string& userFolder)
+{
+    return juce::File (juce::String::fromUTF8 (plugindb::folderOnDisk (pluginDatabaseFolder().getFullPathName().toStdString(), instruments, userFolder).c_str()));
+}
+
+void refreshPluginDatabase (AudioEngine& engine, bool force)
+{
+    auto& host = engine.getPluginHost();
+    if (! host.isPersistent() || databaseBusy)
+        return;
+    const auto now = juce::Time::getMillisecondCounter();
+    if (! force && lastDatabaseRefresh != 0 && now - lastDatabaseRefresh < 2000)
+        return;
+    const juce::ScopedValueSetter<bool> busy (databaseBusy, true);
+    plugindb::State state { host.databaseFolders(), host.pluginNames() };
+    if (plugindb::refresh (pluginDatabaseFolder().getFullPathName().toStdString(), databasePlugins (engine), state).ok)
+        host.adoptDatabase (state.folders, state.names);
+    lastDatabaseRefresh = juce::Time::getMillisecondCounter();
+}
+
+void installPluginDatabase (AudioEngine& engine)
+{
+    auto& host = engine.getPluginHost();
+    if (! host.isPersistent())
+        return;
+    refreshPluginDatabase (engine, true);
+    host.onDatabaseEdited = [&engine] {
+        auto& h = engine.getPluginHost();
+        if (databaseBusy)
+            return;
+        {
+            const juce::ScopedValueSetter<bool> busy (databaseBusy, true);
+            plugindb::apply (pluginDatabaseFolder().getFullPathName().toStdString(), databasePlugins (engine), { h.databaseFolders(), h.pluginNames() });
+        }
+        refreshPluginDatabase (engine, true); // (the folder has the last word, e.g. on a folder name it cannot hold)
+    };
 }
 
 juce::String shownName (AudioEngine& engine, const std::string& key, const juce::String& original)

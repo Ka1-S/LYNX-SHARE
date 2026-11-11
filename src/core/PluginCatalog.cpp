@@ -514,6 +514,8 @@ Folders withDefaultCategories (const Folders& user, bool instruments, const std:
     {
         if (const auto it = out.of.find (b.key); it != out.of.end() && out.kind (instruments).count (it->second))
             continue; // the user's folder wins
+        if (out.hidden.count (b.key))
+            continue; // taken out of the database by the user (round 190ba)
         auto folder = flCategory (b.name, instruments, b.fruityPrefix || b.flPlugin);
         if (folder.empty())
             folder = b.flPlugin ? "Misc" : lynxCategory;

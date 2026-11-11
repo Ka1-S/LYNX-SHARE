@@ -8892,3 +8892,11 @@ countries: tw hk mo
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 成員通道（低音區）：各承載一個音符的 MIDI 通道"
 # round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "氣聲"
+"Motion blending" = "動作混合"
+"Load sprite sheet..." = "載入精靈表..."
+"Load sprite sheet" = "載入精靈表"
+"LYNX's dancer" = "LYNX 的舞者"
+"Back to LYNX SHARE's own dancer" = "恢復為 LYNX SHARE 內建的舞者"
+"Bitmap size is incorrect." = "點陣圖尺寸不正確。"
+"A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance 格式的圖片 (PNG)：橫向 8 格，每個動作一列，另有一個同名文字檔，每行一個動作名稱"
+"The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "圖片寬度必須為 8 格，高度為名稱檔 ({0}) 每行一格。"

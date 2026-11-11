@@ -8859,3 +8859,11 @@ countries: nl be
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE-memberkanalen (onderste zone): de MIDI-kanalen die elk één noot dragen"
 # round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "ADEM"
+"Motion blending" = "Bewegingsovervloeiing"
+"Load sprite sheet..." = "Spritesheet laden..."
+"Load sprite sheet" = "Spritesheet laden"
+"LYNX's dancer" = "Danser van LYNX"
+"Back to LYNX SHARE's own dancer" = "Terug naar de eigen danser van LYNX SHARE"
+"Bitmap size is incorrect." = "De bitmapgrootte is onjuist."
+"A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Een afbeelding (PNG) in het formaat van Fruity Dance: 8 frames naast elkaar, één rij per beweging en een tekstbestand met dezelfde naam met één bewegingsnaam per regel"
+"The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "De breedte van de afbeelding moet 8 frames zijn en de hoogte één frame voor elke regel van het namenbestand ({0})."

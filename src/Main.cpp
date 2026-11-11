@@ -11759,17 +11759,20 @@ private:
         {
             constexpr int cell = 120, cols = 8;
             juce::Image sheet (juce::Image::ARGB, 130 + cols * cell, lynx::dance::moveCount * cell + 10, true);
-            juce::Graphics g (sheet);
-            g.fillAll (lynx::theme::colour::bg0);
-            for (int m = 0; m < lynx::dance::moveCount; ++m)
             {
-                g.setColour (lynx::theme::colour::textSecondary);
-                g.setFont (14.0f);
-                g.drawText (lynx::dance::moveName (m), 8, m * cell + 5, 118, cell, juce::Justification::centredLeft);
-                for (int k = 0; k < cols; ++k)
+                // (the picture is complete when its Graphics is gone: round 190ba, the file was blank on Windows)
+                juce::Graphics g (sheet);
+                g.fillAll (lynx::theme::colour::bg0);
+                for (int m = 0; m < lynx::dance::moveCount; ++m)
                 {
-                    const auto pose = lynx::dance::pose (m, k / (double) cols + (m == lynx::dance::freestyle ? k * 2 : 0), 1);
-                    lynx::dancer::draw (g, { 130.0f + (k + 0.5f) * cell, (float) (m + 1) * cell - 6.0f }, 92.0f, pose, false, juce::Colour (0xffff3048));
+                    g.setColour (lynx::theme::colour::textSecondary);
+                    g.setFont (14.0f);
+                    g.drawText (lynx::dance::moveName (m), 8, m * cell + 5, 118, cell, juce::Justification::centredLeft);
+                    for (int k = 0; k < cols; ++k)
+                    {
+                        const auto pose = lynx::dance::pose (m, k / (double) cols + (m == lynx::dance::freestyle ? k * 2 : 0), 1);
+                        lynx::dancer::draw (g, { 130.0f + (k + 0.5f) * cell, (float) (m + 1) * cell - 6.0f }, 92.0f, pose, false, juce::Colour (0xffff3048));
+                    }
                 }
             }
             savePng (sheet, prefix + "-moves.png");
@@ -11791,6 +11794,128 @@ private:
             c.pluginState = lynx::dance::toState (s);
             song.channels.push_back (c);
         }
+        // Issue #121 (round 190ba): a sprite sheet in FL's Fruity Dance format (8 frames across, a row per move, a names
+        // file beside it), made here from LYNX's own poses, loaded back as a user's sheet would be
+        juce::String sheetReport;
+        {
+            constexpr int fw = 120, fh = 150;
+            const std::vector<std::pair<const char*, int>> rows { { "Idle", lynx::dance::waiting },   { "Step", lynx::dance::stepping },
+                                                                  { "Jump", lynx::dance::jumping },   { "Wave", lynx::dance::waving },
+                                                                  { "Windmill", lynx::dance::windmill }, { "Held", lynx::dance::held } };
+            juce::Image sheet (juce::Image::ARGB, fw * lynx::dance::sheetColumns, fh * (int) rows.size(), true);
+            {
+                juce::Graphics g (sheet);
+                for (int r = 0; r < (int) rows.size(); ++r)
+                    for (int k = 0; k < lynx::dance::sheetColumns; ++k)
+                    {
+                        juce::Graphics::ScopedSaveState save (g);
+                        g.reduceClipRegion (k * fw, r * fh, fw, fh);
+                        lynx::dancer::draw (g, { (k + 0.5f) * fw, (float) (r + 1) * fh - 8.0f }, 96.0f,
+                                            lynx::dance::pose (rows[(std::size_t) r].second, k / (double) lynx::dance::sheetColumns, 1), false, juce::Colour (0xff35c46a));
+                    }
+            }
+            const juce::File picture (prefix + "-sheet.png");
+            savePng (sheet, picture.getFullPathName());
+            juce::String names;
+            for (const auto& [name, move] : rows)
+                names << (names.isEmpty() ? "" : "\r\n") << name;
+            picture.withFileExtension ("txt").replaceWithText (names, false, false, nullptr);
+            // a picture that is not a whole number of frames: FL's "Bitmap size is incorrect."
+            const juce::File wrong (prefix + "-sheet-wrong.png");
+            savePng (sheet.getClippedImage ({ 0, 0, sheet.getWidth() - 3, sheet.getHeight() }), wrong.getFullPathName());
+            wrong.withFileExtension ("txt").replaceWithText (names, false, false, nullptr);
+
+            auto error = lynx::dancer::SheetError::none;
+            const auto loaded = lynx::dancer::sheetFor (picture.getFullPathName().toStdString(), &error);
+            auto wrongError = lynx::dancer::SheetError::none;
+            const auto refused = lynx::dancer::sheetFor (wrong.getFullPathName().toStdString(), &wrongError);
+            auto missingError = lynx::dancer::SheetError::none;
+            const auto missing = lynx::dancer::sheetFor (juce::File (prefix + "-sheet-none.png").getFullPathName().toStdString(), &missingError);
+            sheetReport << "sheet_loaded=" << (loaded != nullptr ? 1 : 0) << "\n"
+                        << "sheet_wrong_size_refused=" << (refused == nullptr && wrongError == lynx::dancer::SheetError::size ? 1 : 0) << "\n"
+                        << "sheet_missing_refused=" << (missing == nullptr && missingError == lynx::dancer::SheetError::missing ? 1 : 0) << "\n";
+            bool ok = loaded != nullptr && refused == nullptr && missing == nullptr;
+            if (loaded != nullptr)
+            {
+                sheetReport << "sheet_rows=" << loaded->layout.rows << "\nsheet_frame=" << loaded->layout.frameWidth << "x" << loaded->layout.frameHeight
+                            << "\nsheet_moves=" << loaded->moves() << "\nsheet_names=";
+                for (const auto& n : loaded->names)
+                    sheetReport << juce::String::fromUTF8 (n.c_str()) << ";";
+                sheetReport << "\n";
+                ok = ok && loaded->layout.rows == (int) rows.size() && loaded->layout.frameWidth == fw && loaded->layout.frameHeight == fh;
+                // the animation as the stage draws it: a row of moments of the move "Wave" (blending on), then mirrored,
+                // then the row shown while the dancer is held
+                juce::Image strip (juce::Image::ARGB, fw * 12, fh * 3 + 20, true);
+                int solid = 0;
+                {
+                    juce::Graphics g (strip);
+                    g.fillAll (lynx::theme::colour::bg0);
+                    for (int line = 0; line < 3; ++line)
+                    {
+                        lynx::dance::SheetAnimator animator (3);
+                        for (int k = 0; k < 12; ++k)
+                        {
+                            const auto frame = animator.advance (k / 12.0 + 0.001, loaded->layout.rows, 4, line == 1, true, 0.5f, line == 2);
+                            const juce::Point<float> feet ((k + 0.5f) * fw, (float) (line + 1) * fh + 5.0f);
+                            lynx::dancer::drawSheet (g, *loaded, feet, 1.0f, frame);
+                            solid += lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (0.0f, -70.0f)) ? 1 : 0;
+                            ok = ok && ! lynx::dancer::sheetSolidAt (*loaded, feet, 1.0f, frame, feet.translated (-(float) fw * 0.5f + 1.0f, -(float) fh + 1.0f));
+                        }
+                    }
+                }
+                // mirrored = the same frame flipped left-right, on whatever renderer this build draws with
+                {
+                    lynx::dance::SheetFrame plain;
+                    plain.row = 3;
+                    plain.column = 2;
+                    auto turned = plain;
+                    turned.mirrored = true;
+                    juce::Image a (juce::Image::ARGB, fw, fh, true), b (juce::Image::ARGB, fw, fh, true);
+                    {
+                        juce::Graphics ga (a);
+                        lynx::dancer::drawSheet (ga, *loaded, { fw * 0.5f, (float) fh }, 1.0f, plain);
+                    }
+                    {
+                        juce::Graphics gb (b);
+                        lynx::dancer::drawSheet (gb, *loaded, { fw * 0.5f, (float) fh }, 1.0f, turned);
+                    }
+                    int same = 0, flippedSame = 0, solidPixels = 0;
+                    for (int y = 0; y < fh; ++y)
+                        for (int x = 0; x < fw; ++x)
+                        {
+                            const auto pa = a.getPixelAt (x, y);
+                            if (pa.getAlpha() < 200)
+                                continue;
+                            ++solidPixels;
+                            auto alike = [pa] (juce::Colour c) {
+                                return std::abs ((int) c.getRed() - (int) pa.getRed()) + std::abs ((int) c.getGreen() - (int) pa.getGreen())
+                                           + std::abs ((int) c.getBlue() - (int) pa.getBlue()) + std::abs ((int) c.getAlpha() - (int) pa.getAlpha()) < 12;
+                            };
+                            same += alike (b.getPixelAt (x, y)) ? 1 : 0;
+                            flippedSame += alike (b.getPixelAt (fw - 1 - x, y)) ? 1 : 0;
+                        }
+                    const auto flips = solidPixels > 500 && flippedSame >= solidPixels * 98 / 100 && same < solidPixels * 95 / 100;
+                    sheetReport << "sheet_mirror_flips=" << (flips ? 1 : 0) << " (" << flippedSame << " of " << solidPixels << " solid pixels match flipped, " << same
+                                << " unflipped)\n";
+                    ok = ok && flips;
+                }
+                sheetReport << "sheet_body_solid=" << solid << "/36\n";
+                ok = ok && solid >= 18;
+                savePng (strip, prefix + "-sheet-frames.png");
+            }
+            sheetReport << "sheet_result=" << (ok ? "OK" : "ERROR") << "\n";
+
+            lynx::ChannelDef c;
+            c.name = "Fruity Dance #3";
+            c.instrument = lynx::InstrumentKind::fruitydance;
+            lynx::dance::Settings s;
+            s.move = 2; // (the sheet's second row: "Step")
+            s.x = 1000;
+            s.y = 560;
+            s.sheet = picture.getFullPathName().toStdString();
+            c.pluginState = lynx::dance::toState (s);
+            song.channels.push_back (c);
+        }
         song.patterns.emplace_back();
         {
             const juce::File demo (prefix + "-demo.lynx");
@@ -11803,6 +11928,23 @@ private:
             savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-editor.png");
         if (auto frame = lynx::makeChannelFrame (offline, 1, 0))
             savePng (frame->createComponentSnapshot (frame->getLocalBounds()), prefix + "-frame.png");
+        if (auto editor = lynx::makeChannelSettingsPanel (offline, 2))
+            savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-sheet-editor.png");
+        {
+            // the stage with the three dancers (the third from the sheet)
+            lynx::DanceStage stage (offline);
+            stage.setSize (1280, 640);
+            stage.update();
+            sheetReport << "stage_dancers=" << stage.dancerCount() << "\n";
+            juce::Image picture (juce::Image::ARGB, 1280, 640, true);
+            {
+                juce::Graphics g (picture);
+                g.fillAll (lynx::theme::colour::bg0);
+                stage.paintEntireComponent (g, true);
+            }
+            savePng (picture, prefix + "-sheet-stage.png");
+        }
+        juce::File (prefix + "-sheetreport.txt").replaceWithText (sheetReport);
     }
 
     void runControllerShot (const juce::String& prefix)
