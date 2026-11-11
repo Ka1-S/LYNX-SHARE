@@ -31,6 +31,8 @@ CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/Note
 CORE="$CORE src/core/LoopStarter.cpp"
 # Simple workflow: adding a track (round 184a)
 CORE="$CORE src/core/SimpleTracks.cpp src/core/GamepadMap.cpp src/core/ExportBundle.cpp"
+# MIDI controller profiles and the controller layer (round 190aw)
+CORE="$CORE src/core/ControllerProfile.cpp src/core/ControllerSession.cpp"
 # start-up sound (procedural)
 CORE="$CORE src/core/StartupSound.cpp"
 # speech synthesizer: .speech files, LYNX voice (round 168b)

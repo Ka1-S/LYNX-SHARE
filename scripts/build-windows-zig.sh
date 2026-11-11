@@ -216,6 +216,7 @@ APP_SOURCES+=(src/core/ThemePalette.cpp src/ui/ThemeSettings.cpp src/ui/ColourPi
 APP_SOURCES+=(src/core/LoopStarter.cpp src/ui/LoopStarterWindow.cpp)
 APP_SOURCES+=(src/core/SimpleTracks.cpp src/ui/SimpleWorkflow.cpp) # Simple workflow: adding a track, chooser (round 184a)
 APP_SOURCES+=(src/core/GamepadMap.cpp src/ui/GamepadInput.cpp) # game controller control (round 184a, S16)
+APP_SOURCES+=(src/core/ControllerProfile.cpp src/core/ControllerSession.cpp src/engine/ControllerIo.cpp src/ui/ControllerBridge.cpp) # MIDI controller profiles (round 190aw)
 APP_SOURCES+=(src/core/ExportBundle.cpp src/ui/OtherAppsExport.cpp) # Simple workflow: Export for other apps (round 184a, S9)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 # spectral waveforms: band analysis, background cache and drawing

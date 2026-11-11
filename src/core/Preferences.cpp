@@ -413,6 +413,10 @@ std::string MidiPrefs::toText() const
     // input=<enabled>|<midi channel>|<target>|<device name>
     for (const auto& i : inputs)
         out += "input=" + std::string (i.enabled ? "1" : "0") + "|" + std::to_string (i.midiChannel) + "|" + std::to_string (i.target) + "|" + i.name + "\n";
+    // controller=<controller type>|<device name> (round 190aw; only the devices whose type is not "detect")
+    for (const auto& i : inputs)
+        if (! i.controller.empty())
+            out += "controller=" + i.controller + "|" + i.name + "\n";
     // output=<master sync>|<sync type>|<offset ms>|<all notes off>|<device name>
     for (const auto& o : outputs)
         out += "output=" + std::string (o.masterSync ? "1" : "0") + "|" + o.syncType + "|" + std::to_string (o.offsetMs) + "|"
@@ -468,6 +472,16 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             i.midiChannel = std::clamp (toInt (trim (parts[1]), 0), 0, 16);
             i.target = std::max (-1, toInt (trim (parts[2]), -1));
             i.name = parts[3];
+            i.controller = p.input (i.name).controller;
+            p.setInput (i);
+        }
+        else if (key == "controller")
+        {
+            const auto parts = split (value, '|', 2);
+            if (parts.size() != 2 || parts[1].empty())
+                continue;
+            auto i = p.input (parts[1]);
+            i.controller = trim (parts[0]);
             p.setInput (i);
         }
         else if (key == "output")

@@ -66,6 +66,7 @@
 #include "core/EventEdit.h"
 #include "core/Preferences.h"
 #include "core/MidiSync.h"
+#include "core/ControllerSession.h"
 #include "core/History.h"
 #include "core/Gms.h"
 #include "core/PoiZone.h"
@@ -17407,3 +17408,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicex190hTests.inc"
 #include "Parity190vTests.inc"
 #include "Surge190xTests.inc"
+#include "Controller190awTests.inc"
