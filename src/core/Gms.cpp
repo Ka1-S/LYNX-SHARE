@@ -1,4 +1,5 @@
 #include "core/Gms.h"
+#include "core/GmsMobile.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -2174,6 +2175,7 @@ struct Setup
 {
     std::array<float, paramCount> P {};
     std::shared_ptr<const Tables> tabs[3];
+    std::unique_ptr<gmsmobile::Player> mobile; // FL Studio Mobile's GMSynth plays this channel (core/GmsMobile.h)
 };
 
 class GmsInstrument final : public Instrument
@@ -2199,9 +2201,12 @@ public:
         take();
         (void) cutoffTable(); // (built here, not by the first render on the audio thread: it allocates)
         rate = sr;
+        knownRate.store (sr);
         plugin.init (sr, true);
         applySetup();
         lastTicks = -1.0;
+        if (setup->mobile != nullptr)
+            setup->mobile->prepare (sr);
     }
 
     void configure (const ChannelDef& channel, double bpm) noexcept override
@@ -2209,12 +2214,22 @@ public:
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         tempo.store (bpm > 0.0 ? (float) bpm : 140.0f);
-        if (channel.pluginState == state && channel.samplePath == wavesDir)
+        const auto variant = gmsIsFlm (channel);
+        if (channel.pluginState == state && channel.samplePath == wavesDir && variant == flmVariant)
             return;
         state = channel.pluginState;
         wavesDir = channel.samplePath;
+        flmVariant = variant;
         auto s = std::make_unique<Setup>();
-        if (auto p = parseState (state))
+        if (variant) // FL Studio Mobile's module: its own state and data files, the desktop engine stays silent
+        {
+            for (auto& t : s->tabs)
+                t = zeroTables();
+            s->mobile = std::make_unique<gmsmobile::Player>();
+            s->mobile->prepare (knownRate.load());
+            s->mobile->setPatch (gmsmobile::readState (state).value_or (gmsmobile::defaultPatch()), wavesDir);
+        }
+        else if (auto p = parseState (state))
         {
             s->P = p->P;
             for (int k = 0; k < 3; ++k)
@@ -2240,6 +2255,11 @@ public:
         if (index < 0 || index >= paramCount || ! std::isfinite (value))
             return;
         const auto v = std::clamp (value, 0.0f, 1.0f);
+        if (auto* m = setup->mobile.get())
+        {
+            m->setParam (index, v);
+            return;
+        }
         setup->P[(std::size_t) index] = v;
         plugin.eng.P[(std::size_t) index] = v;
     }
@@ -2248,6 +2268,8 @@ public:
     void setChannelPitchNow (float knob, float rest) noexcept override
     {
         live.set (knob, rest);
+        if (setup->mobile != nullptr) // (FLM's module takes the channel's pitch at each render, the notes their own offset)
+            return;
         for (auto& h : plugin.held)
             if (h.on)
                 h.slide.follow (live.now());
@@ -2257,6 +2279,8 @@ public:
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
+        if (setup->mobile != nullptr)
+            return;
         plugin.slideTo (100.0 * std::clamp (key, 0, 127) - 6000.0 + (double) pitchCents.load() + (double) cents, samples);
     }
 
@@ -2264,6 +2288,14 @@ public:
     {
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
+        if (auto* m = setup->mobile.get())
+        {
+            // FLM's note: the velocity as it is (0 would be a note off), pan 0…1, the note's own pitch offset
+            m->note (std::clamp (key, 0, 127), std::max ((float) vel, 1.0f / 255.0f), std::clamp (0.5f + 0.5f * nextPan, 0.0f, 1.0f), nextCents * 0.01f);
+            nextPan = 0.0f;
+            nextCents = 0.0f;
+            return;
+        }
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
         notePan[k] = nextPan;
@@ -2277,17 +2309,27 @@ public:
     void noteOff (int key) noexcept override
     {
         take();
+        if (auto* m = setup->mobile.get())
+        {
+            m->note (key, 0.0f);
+            return;
+        }
         plugin.noteOff (key);
     }
 
     void allNotesOff() noexcept override
     {
+        if (auto* m = setup->mobile.get())
+        {
+            m->allNotesOff();
+            return;
+        }
         for (int k = 0; k < 128; ++k)
             if (plugin.held[k].on)
                 plugin.noteOff (k);
     }
 
-    bool idle() const noexcept override { return plugin.idle(); }
+    bool idle() const noexcept override { return setup->mobile != nullptr ? setup->mobile->idle() : plugin.idle(); }
 
     void setSongPosition (double ticks) noexcept override
     {
@@ -2305,6 +2347,11 @@ public:
         auto pan = vol > 0.0 ? std::atan2 ((double) gr, (double) gl) * (4.0 / 3.141592653589793) - 1.0 : 0.0;
         if (std::fabs (pan) < 1e-9)
             pan = 0.0;
+        if (auto* m = setup->mobile.get())
+        {
+            renderMobile (*m, left, right, n, (float) vol, (float) pan);
+            return;
+        }
         if (vol != channelVol || pan != channelPan)
         {
             channelVol = vol, channelPan = pan;
@@ -2317,6 +2364,29 @@ public:
     }
 
 private:
+    // FL Studio Mobile's module: its output through the channel's volume and pan (a linear balance, centre 1 / 1)
+    void renderMobile (gmsmobile::Player& m, float* left, float* right, int n, float vol, float pan) noexcept
+    {
+        if (n <= 0 || m.sampleRate() != rate)
+            return;
+        m.setPitchOffset (pitchCents.load() * 0.01f);
+        const auto p = std::clamp (pan, -1.0f, 1.0f);
+        const auto cl = vol * (p > 0.0f ? 1.0f - p : 1.0f), cr = vol * (p < 0.0f ? 1.0f + p : 1.0f);
+        for (int c0 = 0; c0 < n; c0 += maxChunk)
+        {
+            const auto cn = std::min (maxChunk, n - c0);
+            std::fill (plugin.chunkL, plugin.chunkL + cn, 0.0f);
+            std::fill (plugin.chunkR, plugin.chunkR + cn, 0.0f);
+            const auto bpm = (double) tempo.load();
+            m.render (plugin.chunkL, plugin.chunkR, cn, bpm, playing ? songBeats + (double) c0 * bpm / (60.0 * rate) : -1.0);
+            for (int i = 0; i < cn; ++i)
+            {
+                left[c0 + i] += plugin.chunkL[i] * cl;
+                right[c0 + i] += plugin.chunkR[i] * cr;
+            }
+        }
+    }
+
     void applySetup() noexcept
     {
         plugin.eng.P = setup->P;
@@ -2342,6 +2412,8 @@ private:
     LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     std::string wavesDir;
+    bool flmVariant = false;
+    std::atomic<double> knownRate { 44100.0 }; // (the rate of the last prepare, for configure's thread)
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, lastTicks = -1.0, songBeats = 0.0;
     bool playing = false;
     float notePan[128] {};

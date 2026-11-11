@@ -39,6 +39,8 @@ CORE="$CORE src/core/StartupSound.cpp"
 CORE="$CORE src/core/Speech.cpp src/core/SpeechRules.cpp"
 # FL's 3x Osc engine (REA round 47)
 CORE="$CORE src/core/ThreeOsc.cpp"
+# FL Studio Mobile's GMSynth (round 190ab)
+CORE="$CORE src/core/GmsMobile.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)
 CORE="$CORE src/core/FlPluginDb.cpp"
 # missing files of an opened project: search and relocation (round 81)
@@ -230,7 +232,7 @@ $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(g
 $CXX $FLAGS $CORE $WAVPACK tools/fxrender.cpp -o build-local/fxrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/vocodexrender.cpp -o build-local/vocodexrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/Harmor.cpp src/core/HarmlessFx.cpp tools/harmorrender.cpp -o build-local/harmorrender 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Gms.cpp tools/gmsrender.cpp -o build-local/gmsrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Gms.cpp src/core/GmsMobile.cpp tools/gmsrender.cpp -o build-local/gmsrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/Morphine.cpp tools/morphinerender.cpp -o build-local/morphinerender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruitKick.cpp src/core/FlangusFastDist.cpp tools/fruitkickrender.cpp -o build-local/fruitkickrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/BassDrum.cpp tools/bassdrumrender.cpp -o build-local/bassdrumrender 2> >(grep -v 'glibc version' >&2)
