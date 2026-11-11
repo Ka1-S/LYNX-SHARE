@@ -8710,3 +8710,5 @@ countries: jp
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "点をドラッグ。クリックで追加、ダブルクリックで削除、Alt + 線をドラッグで曲げます"
 "Zoom level {0}" = "ズームレベル {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "鍵盤の高さ：上下にドラッグ、またはホイールを回す  [Ctrl] 微調整"
+"Switch all plugin editors to" = "すべてのプラグインエディターを切り替え"
+"Attached" = "ドッキング"

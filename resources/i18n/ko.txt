@@ -8710,3 +8710,5 @@ countries: kr
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "점을 드래그하세요. 클릭하면 추가, 더블 클릭하면 삭제, Alt + 선 드래그로 휘게 합니다"
 "Zoom level {0}" = "확대 수준 {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "건반 높이: 위 / 아래로 드래그하거나 휠을 돌리기  [Ctrl] 미세 조정"
+"Switch all plugin editors to" = "모든 플러그인 편집기 전환"
+"Attached" = "도킹됨"

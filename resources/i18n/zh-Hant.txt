@@ -8710,3 +8710,5 @@ countries: tw hk mo
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "拖曳點；按一下新增，按兩下刪除；按住 Alt 拖曳線條使其彎曲"
 "Zoom level {0}" = "縮放級別 {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "琴鍵高度：上下拖曳或滾動滾輪  [Ctrl] 微調"
+"Switch all plugin editors to" = "將所有外掛編輯器切換為"
+"Attached" = "已停靠"

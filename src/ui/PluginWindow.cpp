@@ -1071,7 +1071,7 @@ bool opensDetached (const juce::AudioPluginInstance& plugin, const PluginWindows
     return false;
 }
 
-void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached);
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, bool store = true);
 
 // What a plugin editor's host does, whether it is a window of its own (detached) or a frame docked in the desktop: it
 // keeps the plugin alive while it is open, makes the editor (with FL's wrapper header when there is an engine) and
@@ -1577,7 +1577,7 @@ std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPl
 
 // Issue #116: FL's plugin menu › Detached. The editor closes and opens again in the other host (never re-parented:
 // some editors break when their native view changes parent); the choice is saved with the plugin in the project.
-void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached)
+void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, bool store)
 {
     auto& open = windows();
     auto it = open.find (&plugin);
@@ -1587,7 +1587,7 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached)
     const auto title = it->second->hostTitle();
     const auto context = it->second->getContext();
     open.erase (it);
-    if (context.engine != nullptr && context.find)
+    if (store && context.engine != nullptr && context.find)
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
                 ref->detached = detached;
@@ -1827,6 +1827,16 @@ void setDockWorkspace (Workspace* workspace)
 void setDetached (juce::AudioPluginInstance& plugin, bool detached)
 {
     setDetachedAndReopen (plugin, detached);
+}
+
+void setAllDetached (AudioEngine& engine, bool detached)
+{
+    // FL's Tools › Macros › "Switch all plugin editors to" (round 190i): the flag of every hosted plugin in one edit,
+    // then each open editor that is in the other host opens again where it belongs now (those that can't dock stay)
+    engine.editSong ([detached] (Song& song) { setAllPluginsDetached (song, detached); });
+    for (auto* plugin : openPlugins())
+        if (plugin != nullptr && canDock (*plugin) && isDocked (*plugin) == detached)
+            setDetachedAndReopen (*plugin, detached, false);
 }
 
 bool isDocked (const juce::AudioPluginInstance& plugin)

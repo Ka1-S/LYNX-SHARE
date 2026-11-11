@@ -8710,3 +8710,5 @@ countries: ru by kz
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Перетащите точку; щелчок добавляет точку, двойной щелчок удаляет; Alt + перетаскивание линии изгибает её"
 "Zoom level {0}" = "Уровень масштаба {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Высота клавиш: тяните вверх / вниз или крутите колесо  [Ctrl] точно"
+"Switch all plugin editors to" = "Переключить все редакторы плагинов в режим"
+"Attached" = "Пристыкована"

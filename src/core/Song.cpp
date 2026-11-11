@@ -190,6 +190,19 @@ int detachNewPlugins (const std::map<std::string, int>& before, Song& song)
     return marked;
 }
 
+int setAllPluginsDetached (Song& song, bool detached)
+{
+    int changed = 0;
+    forEachHostedPlugin (song, [&] (PluginRef& ref) {
+        if (ref.detached != detached)
+        {
+            ref.detached = detached;
+            ++changed;
+        }
+    });
+    return changed;
+}
+
 std::vector<std::int64_t> patternLengths (const Song& song)
 {
     std::vector<std::int64_t> lengths;

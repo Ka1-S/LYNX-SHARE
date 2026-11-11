@@ -8710,3 +8710,5 @@ countries: de at ch li lu
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Punkt ziehen; klicken fügt einen hinzu, Doppelklick entfernt ihn; Alt + Ziehen einer Linie biegt sie"
 "Zoom level {0}" = "Zoomstufe {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tastenhöhe: nach oben / unten ziehen oder Mausrad drehen  [Ctrl] fein"
+"Switch all plugin editors to" = "Alle Plugin-Editoren umschalten auf"
+"Attached" = "Angedockt"

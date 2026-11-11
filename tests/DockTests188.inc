@@ -87,3 +87,31 @@ TEST (detach_new_plugins_leaves_loaded_detached_flags_alone)
     CHECK (! copy.channels[2].plugin.detached);
     CHECK (copy.channels[3].plugin.detached);
 }
+
+// Round 190i (issue #116): FL's Tools › Macros › "Switch all plugin editors to" › Attached / Detached
+TEST (switch_all_plugin_editors_sets_every_hosted_plugins_detached_flag)
+{
+    using namespace lynx;
+    Song song;
+    ChannelDef synth;
+    synth.instrument = InstrumentKind::plugin;
+    synth.plugin.id = "VST3-Synth-1";
+    song.channels.push_back (synth);
+    synth.plugin.detached = true; // (one already detached)
+    song.channels.push_back (synth);
+    ChannelDef builtIn;
+    builtIn.instrument = InstrumentKind::sampler;
+    song.channels.push_back (builtIn);
+    song.mixer = Song::defaultMixer (2);
+    EffectSlot fx;
+    fx.kind = EffectKind::plugin;
+    fx.plugin.id = "VST3-Delay-2";
+    song.mixer[1].effects.push_back (fx);
+
+    CHECK (setAllPluginsDetached (song, true) == 2);
+    CHECK (song.channels[0].plugin.detached && song.channels[1].plugin.detached && song.mixer[1].effects[0].plugin.detached);
+    CHECK (! song.channels[2].plugin.detached); // not a hosted plugin
+    CHECK (setAllPluginsDetached (song, true) == 0);
+    CHECK (setAllPluginsDetached (song, false) == 3);
+    CHECK (! song.channels[0].plugin.detached && ! song.channels[1].plugin.detached && ! song.mixer[1].effects[0].plugin.detached);
+}

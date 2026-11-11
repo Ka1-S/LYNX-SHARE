@@ -8710,3 +8710,5 @@ countries: es mx ar co cl pe ve
 "Drag a point; click to add one, double-click to remove it; Alt + drag a line to bend it" = "Arrastra un punto; haz clic para añadir uno, doble clic para quitarlo; Alt + arrastrar una línea la curva"
 "Zoom level {0}" = "Nivel de zoom {0}"
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Altura de las teclas: arrastra arriba / abajo o gira la rueda  [Ctrl] fino"
+"Switch all plugin editors to" = "Cambiar todos los editores de plugins a"
+"Attached" = "Acoplado"
