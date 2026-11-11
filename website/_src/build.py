@@ -52,13 +52,15 @@ STR = json.loads((SRC / "strings.json").read_text(encoding="utf-8"))
 T = {**STR["js"], **STR["text"]}          # English by key, for strings written from here
 
 
-def tr(key, *args, tag="span", cls=""):
+def tr(key, *args, tag="span", cls="", count=None):
     """An element carrying a translatable string: <span data-i18n="key" data-args='[...]'>English</span>."""
     text = T[key]
     for i, a in enumerate(args):
         text = text.replace("{%d}" % i, str(a))
     a = " data-args='%s'" % html.escape(json.dumps([str(x) for x in args], ensure_ascii=False), quote=True) if args else ""
     c = ' class="%s"' % cls if cls else ""
+    if count is not None:                              # assets/motion.js counts this number up once, when it scrolls in
+        a += ' data-count="%d"' % count
     return '<%s%s data-i18n="%s"%s>%s</%s>' % (tag, c, key, a, text, tag)
 
 
@@ -178,10 +180,21 @@ var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
 h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
 if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
 if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
 })();
 </script>""" % (json.dumps(LANGS, ensure_ascii=False, separators=(",", ":")), version)
+
+
+HERO_H1 = re.compile(r'(<h1 data-i18n-words="[^"]+">)(.*?)\s*<span class="grad">(.*?)</span></h1>', re.S)
+
+
+def hero_words(m):
+    """The headline word by word (site.css animates .w in turn; assets/site.js writes the same for other languages)."""
+    ws = m.group(2).split()
+    return "%s%s <span class=\"grad w\" style=\"--i:%d\">%s</span></h1>" % (
+        m.group(1), " ".join('<span class="w" style="--i:%d">%s</span>' % (i, w) for i, w in enumerate(ws)), len(ws), m.group(3))
 
 
 def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", home=False, wt=""):
@@ -195,7 +208,8 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
     ogl = "".join('<meta property="og:locale:alternate" content="%s">\n' % v for v in OGL.values())
     nav = "".join('<a href="%s"%s data-i18n="%s">%s</a>' % (h, ' aria-current="page"' if k == cur else "", key, en) for k, h, key, en in NAV if k != "download")
     attrs = (' data-title="%s"' % title_key if title_key else "") + ' data-desc="%s"' % desc_key + (' data-dict="%s"' % part if part else "") + (' data-home' if home else "") + (' data-wt="%s"' % wt if wt else "")
-    js = "".join('<script src="%s?v=%s" defer></script>\n' % (s, version) for s in ("/assets/site.js",) + tuple(scripts))
+    js = "".join('<script src="%s?v=%s" defer></script>\n' % (s, version) for s in ("/assets/site.js",) + tuple(scripts) + ("/assets/motion.js",))
+    body = HERO_H1.sub(hero_words, body)
     return f"""<!doctype html>
 <html lang="en" class="nojs"{attrs}>
 <head>
@@ -323,11 +337,11 @@ def plugin_img(p, lazy=True):
 
 def render_catalog(cat, version):
     n = lambda f: sum(1 for p in cat if f(p))
-    chips = ['<a href="#cat" data-f="all" class="on"><span data-i18n="cat.all">%s</span><b>%d</b></a>' % (T["cat.all"], len(cat))]
+    chips = ['<a href="#cat" data-f="all" class="on"><span data-i18n="cat.all">%s</span><b data-count="%d">%d</b></a>' % (T["cat.all"], len(cat), len(cat))]
     body = []
     for ty, cs in CATS:
-        chips.append('<a href="#t-%s" data-f="t:%s" class="ty"><span data-i18n="cat.g.%s">%s</span><b>%d</b></a>' % (ty, ty, ty, T["cat.g." + ty], n(lambda p: p["type"] == ty)))
-        body.append('<h2 class="ctype" id="t-%s" data-type="%s"><span data-i18n="cat.g.%s">%s</span> <small>%d</small></h2>' % (ty, ty, ty, T["cat.g." + ty], n(lambda p: p["type"] == ty)))
+        chips.append('<a href="#t-%s" data-f="t:%s" class="ty"><span data-i18n="cat.g.%s">%s</span><b data-count="%d">%d</b></a>' % (ty, ty, ty, T["cat.g." + ty], n(lambda p: p["type"] == ty), n(lambda p: p["type"] == ty)))
+        body.append('<h2 class="ctype" id="t-%s" data-type="%s"><span data-i18n="cat.g.%s">%s</span> <small data-count="%d">%d</small></h2>' % (ty, ty, ty, T["cat.g." + ty], n(lambda p: p["type"] == ty), n(lambda p: p["type"] == ty)))
         for c in cs:
             mine = [p for p in cat if p["cat"] == c]
             if not mine:
@@ -345,13 +359,13 @@ def render_catalog(cat, version):
                         % (c, ty, c, T["cat.c." + c], len(mine), "".join(cards)))
     return ('<div class="phead"><div class="wrap"><h1 data-i18n="cat.h1">%s</h1>%s<nav class="cfilter" id="cfilter" aria-label="Categories">%s</nav></div></div>'
             '<div class="wrap cat" id="cat">%s<p class="note" data-i18n="cat.tm">%s</p></div>'
-            % (T["cat.h1"], tr("cat.sub", len(cat), version, tag="p"), "".join(chips), "".join(body), T["cat.tm"]))
+            % (T["cat.h1"], tr("cat.sub", len(cat), version, tag="p", count=len(cat)), "".join(chips), "".join(body), T["cat.tm"]))
 
 
 def render_whyrow(cat):
     cells = "".join('<a class="wcell" href="/why/#%s"><b data-i18n="why.%s.t">%s</b><span data-i18n="why.%s.l">%s</span></a>' % (a, k, T["why.%s.t" % k], k, T["why.%s.l" % k])
                     for a, k in (("online", "online"), ("projects", "projects"), ("fl-settings", "fl"), ("workflows", "work"), ("crash", "crash"), ("free", "free")))
-    cells += '<a class="wcell hot" href="/instruments-and-effects/">%s<span data-i18n="home.catL">%s</span></a>' % (tr("home.catT", len(cat), tag="b"), T["home.catL"])
+    cells += '<a class="wcell hot" href="/instruments-and-effects/">%s<span data-i18n="home.catL">%s</span></a>' % (tr("home.catT", len(cat), tag="b", count=len(cat)), T["home.catL"])
     return '<div class="whyrow">%s</div>' % cells
 
 
@@ -530,7 +544,7 @@ def render_wiki_index(index, cat, pages):
             rows.append('<li><a href="/instruments-and-effects/">%s</a></li>' % tr("wiki.catLink", len(cat)))
         rows += ['<li><a href="%s" data-i18n="%s">%s</a></li>' % (h, k, en) for h, k, en in g.get("links", [])]
         cards.append('<section class="wcard"><h2 data-i18n="%s">%s</h2><p class="wn">%s</p><p data-i18n="%s.d">%s</p><ul class="wlist">%s</ul></section>'
-                     % (g["key"], esc(g["title"]), tr("wiki.pages", count), g["key"], T[g["key"] + ".d"], "".join(rows)))
+                     % (g["key"], esc(g["title"]), tr("wiki.pages", count, count=count), g["key"], T[g["key"] + ".d"], "".join(rows)))
     return ('<div class="phead"><div class="wrap"><h1 data-i18n="wiki.h1">%s</h1><p data-i18n="wiki.sub">%s</p>%s</div></div>'
             '<div class="wrap wikiidx">'
             '%s<div class="wcards">%s</div></div>' % (T["wiki.h1"], T["wiki.sub"], SEARCH % (T["ws.ph"], T["ws.ph"]), enonly("/wiki/"), "".join(cards)))
@@ -598,9 +612,9 @@ def main():
     collect((SRC / "pages/why.html").read_text(encoding="utf-8"), T, "why")      # Home's row reuses the Why page's headings
     sub = {"VER_UP": latest["version"].upper(), "VER_LINE": "v" + latest["version"], "LATEST": render_latest(latest),
            "IC_WIN": IC["win"], "IC_MAC": IC["mac"], "IC_LINUX": IC["linux"],
-           "OS_BTNS": "".join('<a class="btn btn-ghost" data-os="%s" data-dl="%s.main" href="%s/releases/latest">%s<span>%s</span><small data-i18n="%s">%s</small><em data-yours></em></a>'
+           "OS_BTNS": "".join('<a class="btn btn-ghost" data-os="%s" data-dl="%s.main" href="%s/releases/latest">%s<span>%s</span><small data-i18n="%s">%s</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a>'
                               % (o, o, REPO, IC[o], name, k, T[k]) for o, name, k in (("win", "Windows", "dl.fInstaller"), ("mac", "macOS", "dl.fUniversal"), ("linux", "Linux", "dl.fAppImage"))),
-           "WHYROW": render_whyrow(cat), "CAT_SUB": tr("cat.sub", len(cat), latest["version"].split("-")[0], tag="p"),
+           "WHYROW": render_whyrow(cat), "CAT_SUB": tr("cat.sub", len(cat), latest["version"].split("-")[0], tag="p", count=len(cat)),
            "WHY_FL_P1": T["why.fl.p1"], "WHY_FL_X2": T["why.fl.x2"]}
 
     def page(name):
@@ -644,7 +658,7 @@ def main():
     files["i18n/latest/en.json"] = dump({k: v for k, v in upd.items() if k.startswith(lk)})
     # one version stamp for css/js/json addresses: changes when any of them does
     stamp = hashlib.sha1()
-    for name in ("assets/site.css", "assets/site.js", "assets/features.js", "assets/catalog.js", "assets/wiki.js"):
+    for name in ("assets/site.css", "assets/site.js", "assets/features.js", "assets/catalog.js", "assets/wiki.js", "assets/motion.js"):
         stamp.update((OUT / name).read_bytes())
     for name in sorted(files):
         stamp.update(files[name].encode())

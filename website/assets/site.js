@@ -59,7 +59,10 @@ function applyLang(l, d){
     $$('[data-feat]').forEach(e => { if (FEAT[e.dataset.feat]) e.textContent = FEAT[e.dataset.feat]; else if (e.dataset.en) e.textContent = e.dataset.en; });
     $$('[data-insp]').forEach(e => { if (INSP[e.dataset.insp]) e.textContent = INSP[e.dataset.insp]; else if (e.dataset.en) e.textContent = e.dataset.en; });
     const h1 = $('[data-i18n-words]');
-    if (h1 && D[h1.dataset.i18nWords]){ const [a, b = ''] = t(h1.dataset.i18nWords).split('|'); h1.innerHTML = a + (b ? ' <span class="grad">' + b + '</span>' : ''); }
+    if (h1 && D[h1.dataset.i18nWords]){   // word by word, as _src/build.py writes the English (site.css animates .w in turn)
+      const [a, b = ''] = t(h1.dataset.i18nWords).split('|'), ws = a.split(' ');
+      h1.innerHTML = ws.map((w, i) => '<span class="w" style="--i:' + i + '">' + w + '</span>').join(' ') + (b ? ' <span class="grad w" style="--i:' + ws.length + '">' + b + '</span>' : '');
+    }
     if (D[html.dataset.title]) document.title = D[html.dataset.title] + ('home' in html.dataset ? '' : ' · LYNX SHARE');
     const md = $('meta[name=description]'); if (md && D[html.dataset.desc]) md.content = D[html.dataset.desc];
     const ot = $('meta[property="og:title"]'); if (ot) ot.content = document.title;
