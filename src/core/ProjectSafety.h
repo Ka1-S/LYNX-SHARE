@@ -103,6 +103,72 @@ inline bool savedByNewerVersion (const std::string& savedBy, const std::string& 
     return ! savedBy.empty() && compareVersions (savedBy, running) > 0;
 }
 
+// --- the Versions panel (round 190ap) -------------------------------------------------------------------------------
+// One list of a project's saved versions ("Save new version": Song, Song_2, Song_3... next to the project) and of its
+// backups (the timed autosaves and the copies a save replaced, in the backup folder). Nothing here changes how either
+// is named or stored; the optional labels live in a text file beside the files, never inside them.
+namespace versions
+{
+// The name the versions of one project share: "Song_3" -> "Song" (`number` 3), "Song" -> "Song" (1), "Mix_v2" -> "Mix_v2".
+std::string familyOf (const std::string& stem, int* number = nullptr);
+
+// A file as the panel needs it: its name without extension, modification time (ms) and size (bytes).
+struct FileInfo
+{
+    std::string name;
+    std::int64_t time = 0;
+    std::int64_t size = 0;
+};
+
+enum class Kind
+{
+    version,     // a file of the family next to the project
+    autosaved,   // a timed backup
+    overwritten  // the file a save replaced
+};
+
+struct Entry
+{
+    std::string name;       // without extension
+    Kind kind = Kind::version;
+    int number = 0;         // versions: 1 for the plain name, else the "_N"
+    std::int64_t time = 0, size = 0;
+    bool current = false;   // the open project's own file
+    std::string label;      // the user's note ("" = none)
+    bool operator== (const Entry&) const = default;
+};
+
+using Labels = std::map<std::string, std::string>; // file name without extension -> label
+
+// The list, newest first: the files of `projectFolder` that belong to the family of `currentStem`, and the files of
+// `backupFolder` that are backups of any member of that family (or of `currentStem` itself, for a project never
+// saved: its backups are filed under its name). `versionLabels` / `backupLabels`: the labels of each folder.
+std::vector<Entry> list (const std::vector<FileInfo>& projectFolder, const std::vector<FileInfo>& backupFolder, const std::string& currentStem,
+                         bool currentIsSaved, const Labels& versionLabels = {}, const Labels& backupLabels = {});
+
+// The labels file of a family in a folder: "<family>.version-labels.txt" (one per folder: the project's own folder
+// for its versions, the backup folder for its backups).
+std::string labelsFileName (const std::string& family);
+// A label as it is kept: one line, no tabs, trimmed, at most 80 characters.
+std::string cleanLabel (const std::string& text);
+// The file's text: "<file name><TAB><label>" lines (UTF-8), sorted by name; empty labels are left out.
+std::string labelsToText (const Labels& labels);
+Labels labelsFromText (const std::string& text);
+// `labels` without the entries whose file is gone (`exists`), so a rotated backup does not leave its label behind.
+Labels pruned (const Labels& labels, const std::function<bool (const std::string&)>& exists);
+
+// A labelled backup is one the user wants to find again: the rotation leaves it alone. `files` without them.
+std::vector<BackupFile> withoutLabelled (const std::vector<BackupFile>& files, const Labels& labels);
+
+// "Open as a copy": the name the copy opens under ("Song_2 (copy)"; a backup's stamp is dropped:
+// "Song (autosaved on 2026-10-20 at 14h19)" -> "Song (copy)").
+std::string copyName (const Entry& entry, const std::string& currentStem);
+
+// How long ago, in the two units the panel says ("just now" is 0 minutes): whole minutes under an hour, whole hours
+// under two days, else whole days. `unit`: 0 minutes, 1 hours, 2 days.
+int agoValue (std::int64_t seconds, int& unit) noexcept;
+} // namespace versions
+
 // --- opening files from outside LYNX (D#92, round 180a) ------------------------------------------------------------
 // `name` with `extension` (".lynx") added unless it already ends with it, in any case. A dot inside the name stays:
 // "beat.v2" -> "beat.v2.lynx", never "beat.lynx" (which could be another project).

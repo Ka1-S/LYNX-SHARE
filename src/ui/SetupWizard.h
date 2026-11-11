@@ -14,12 +14,17 @@ class AudioEngine;
 // It is shown as an overlay on top of the main window (`makeSetupWizardOverlay`: the caller adds it over its whole
 // area and deletes it, asynchronously, when `onClose` runs — after Skip, Finish or Escape).
 // `onLanguage(id)` runs when another language was chosen (the caller saves it and offers a restart).
+// Round 184a S17 (design D21): the wizard also offers the three layout styles (core/LayoutStyle.h), with `layoutStyle`
+// (the current one; Pattern workflow on a first start) selected; `onLayoutStyle(style)` runs on Finish when another
+// one was chosen. Skip changes nothing.
 std::unique_ptr<juce::Component> makeSetupWizardOverlay (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage,
-                                                         std::function<void()> onClose);
+                                                         std::function<void()> onClose, int layoutStyle = 0,
+                                                         std::function<void (int)> onLayoutStyle = {});
 
 // The wizard's panel alone (its natural size), for --snapshot mode.
 std::unique_ptr<juce::Component> makeSetupWizardContent (AudioEngine& engine, std::function<void (const juce::String&)> onLanguage,
-                                                         std::function<void()> onClose);
+                                                         std::function<void()> onClose, int layoutStyle = 0,
+                                                         std::function<void (int)> onLayoutStyle = {});
 
 // Whether the wizard was finished or skipped once (%APPDATA%\LYNX\setup-done.txt).
 bool setupWizardDone();

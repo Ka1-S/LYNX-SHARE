@@ -689,3 +689,219 @@ listed, not imported (LYNX's MiniSynth takes no automation clips on its knobs fr
 
 **Best way?** FL: FLM-in-FL is the reference, matched. Ableton: no FLM import. Users: FLM users ask for desktop
 continuity of their MiniSynth patches (FL's own answer is the FLM plugin). Verdict: FLM-exact, no alternative proposed.
+
+### F4 Transistor Bass (round 190u, branch `feature/flm190u-tbass`, 0.1.26)
+
+FLM's "Transistor Bass" module (type 19) is a compiled-in copy of the desktop plugin's **"V1 legacy" engine**
+(REA_rodada57 §2.5; PROVEN-REA in round 190n: the same per-sample routine, diode ladder, saw tables, distortion and
+decimators, constant for constant) at **1× oversampling**, inside its own note layer, with 13 knobs and none of the
+desktop's sequencer, programs, delay, reverb, V2 engines or recorded "303 Pulse" cycles. It reads no data file, so a
+channel imported from a .flm plays without an FL installation.
+
+**Mapping** (FLM parameter k → desktop patch parameter j; `transistorBassFlmState`): 1 Waveform → 1, 2 Cutoff → 2,
+3 Reso → 4, 4 Env Mod → 5, 5 Decay → 6, 6 Accent → 7, 7 distortion on → 27, 8 Drive HP → 28, 9 Drive → 29 as **√v**
+(the desktop squares its knob, FLM doesn't), 10 Drive Vol. → 31, 11 PW → 11, 12 LFO Speed → 12, 13 LFO->PW → 13; the
+same knob laws otherwise. FLM's fixed controls: tuning 1 (key 60 = 130.8 Hz), key follow 0, volume ⅓ (0.25 in the
+engine), high-pass 0.5 (205 Hz), minimum decay 0.5 (0.2775 s), tone 1, VCA smooth 0, reverb / delay / 303 Pulse off.
+FLM's 0 is the module's Enable. The state is written as the desktop plugin saves one (stream version 5, sequencer
+off, every program the patch, oversampling field 1, engine 0; `transistorBassWriteState`).
+
+**FLM's module around the engine** (`ChannelDef::modelParams = { 1 }`, `transistorBassIsFlm`; the desktop path is
+unchanged):
+
+| | Desktop Transistor Bass | FLM's module | LYNX |
+|---|---|---|---|
+| oversampling | 4× (the state's field is ignored, see below) | 1× | engine switch |
+| accent | MIDI velocity ≥ 110 | velocity ≥ 99 / 127 | engine switch |
+| velocity → level | none | none | same |
+| overlapping notes | slide; the last release ends the note | stack of 16 keys: slide to the new key, **slide back** to the key below when the top key is released | engine switch |
+| pan | √ law per note | balance (far side falls linearly), moving 1 % per process call, back to the centre between notes | engine switch (512 samples per call) |
+| channel volume | MIDI CC 7 | none in the module (the rack's level) | plain gain |
+| tail | until silent | the engine runs 0.25 s after the last key, then stands still (exact silence) | engine switch |
+| data | recorded cycles from engine_x64.dll | none | no file needed |
+
+**The desktop plugin ignores the state's oversampling field** (measured, round 190u): FL's render of FL's own
+"Sequencer off" preset with the field set to 1 has, note for note, the level pattern of LYNX's engine at 4× (constant
+offset 2.08 dB = the project's channel volume through CC 7) and not at 1× (−0.9 / +2.0 dB alternating between plain and
+accented notes). So LYNX applies 1× only to FLM's build; a desktop state plays at 4× as before, whatever the field says.
+
+**A/B inside FL (round 190u).** Projects made like 190n's (FL's render test `MiniSynth.flp`; only the channel's
+plugin events and the 7 notes changed): FL Studio Mobile Rack holding one Transistor Bass module (the rack preset's
+module made type 19 with 14 PRMS values) against LYNX's engine in FLM's build, 5 settings × 2 phrases (A: accent at
+velocity 80 / 100 / 120, an overlap with slide and slide back, a pair released bottom first; B: seven separate notes,
+keys 36…72, alternating plain / accented) and a pan phrase. Transistor Bass has no random source, so the renders are
+compared sample for sample: ESR per note segment (gain fixed at −5.08 dB for all, the level FL's channel gives the
+rack, the same as on MiniSynth in 190n; lag −1 sample).
+
+| Setting | phrase A: worst segment ESR | phrase B: worst segment ESR | level difference (max) |
+|---|---|---|---|
+| D default | −25 dB | −28 dB | 0.01 dB |
+| S1 saw, cutoff 0.5, reso 0.8, env mod 0.6, decay 0.4, accent 0.7 | −36 dB (one segment at −95 dBFS: −6 dB, FL gates it to exact silence) | −34 dB | 0.02 dB |
+| S2 distortion (Drive HP 0.3, Drive 0.6, Vol 0.4) | −33 dB | −31 dB | 0.01 dB |
+| S3 pulse width 0.6, LFO 0.5 → PW 0.8 | −38 dB | −35 dB | 0.02 dB |
+| S4 reso 1, env mod 1, accent 1, Drive 0.9 | −25 dB | −18 dB | 0.01 dB |
+| D, pan phrase | −37 dB (most segments −46…−53 dB) | | 0.02 dB |
+
+Reading: the octave (key 60 = 130.8 Hz, the same as the desktop plugin with tuning 1), the 13 knob laws, the accent
+threshold (FL's default note velocity 100 arrives as 99 and is an accent), the slide and the slide back, and the level
+all hold. Two host-dependent details were set in the harness to what happens inside FL, and are not what LYNX ships:
+(1) FLM counts its 0.25 s tail in host blocks, so inside FL (one block per tick) the engine stands still about 230
+samples before a note that follows exactly 0.25 s later; that only shifts the oscillator and LFO phase of the next
+note (with LYNX's sample-exact 0.25 s the levels still agree within 0.1 dB, except where the LFO phase decides the
+pulse width: up to 2.7 dB on single notes of S3). (2) FLM's FL plugin hands the module only pans right of centre
+(left pans arrive as "no pan"), and one process call is one tick; LYNX uses the module's own two-sided balance.
+Tools: /mnt/e/lynx-work/flm190u/ab (mkgen_tb.py, render.sh, score_tb.py, null2.py), tools/tbr.cpp; spec
+/mnt/e/lynx-work/flm190n/rea/spec-transistorbass.md.
+
+**End to end (follow-up, round 190u).** The A/B above drove the module through the reference renderer. Through the
+.flm import and the song renderer (tools/flmr.cpp) the first note nulled FL (−37 dB) but every later note came out
+3 dB down and rising: the instrument wrote the desktop's note pan gains (√ law, 0.707 at the centre) over the
+module's smoothed balance at each note-on. Fixed (FLM channels get only the module's balance); the song render now
+equals the reference render to −141 dB on every note of phrases A and B, and a test compares the instrument with
+the reference render over three notes. Against FL itself the song render is checked on a phrase whose notes
+stay clear of the 0.25 s tail (phrase E: seven notes 0.125 s apart, keys 36…72, plain / accented): every note nulls
+at −28…−37 dB (lags −3…0 samples), level within 0.02 dB. On phrases A and B (each note exactly 0.25 s after the
+last) only the first note nulls sample for sample, the levels agree within 0.03 dB: there FL's block-counted tail has
+stopped the engine about 230 samples early, which shifts the phase of the next note (the harness with FL's tail
+length nulls them, table above).
+
+Quality gate: the desktop path writes the same bytes as before on 36 renders (FL's three presets, each also as stream
+version 5 with engines 0 / 1 / 2 and with the oversampling field 1 and 2; 44.1 and 48 kHz; old against new object),
+same CPU time. Not modelled: FLM's un-clamped pitch below key 12, last-bit summation orders, Drive through √ and
+squaring (≤ 1 ulp). Parameter automation lanes of a .flm on the module are still listed, not imported. The velocity
+byte of a .flm note is w = byte / 255 (PROVEN-REA, FLM_FORMAT §EVN2), so the accent starts at byte 199: FLM's own
+piano-roll default (204) is an accent, as FL's default velocity is in FLM-in-FL.
+
+**Best way?** FL: FLM-in-FL is the reference, matched sample for sample. Ableton: no FLM import. Users: 303-style
+slides and accents are the instrument; keeping FLM's own rules (slide back, accent at 99) keeps the user's bass line
+as written. Verdict: FLM-exact; the page shows the desktop Transistor Bass controls (its sequencer has no effect on a
+channel from a .flm).
+
+**The page on a .flm channel (round 190u, branch `feature/flm190u-tbpage`).** FLM's build has no sequencer, programs,
+delay, reverb or recorded 303 cycles, so the channel's Plugin page leaves those out (`transistorBassMobileLayout`:
+the desktop page's Voice, Tweaks and Distortion rows at the same places, 700 × 266) and its hint reads "Transistor
+Bass — FL Studio Mobile's build of the engine". The knobs FLM fixes but the engine still reads (Tune, HP, Min decay,
+Key follow, Clicks, Tone, Volume) stay: they work. A desktop channel's page is unchanged.
+
+### F4 3x Osc (round 190u, branch `feature/flm190u-3xosc`, 0.1.26)
+
+FLM's "3x Osc" module (type 39, 149 parameters) is the desktop 3x Osc and FL's channel settings behind it (envelopes,
+LFOs, filter, polyphony, tracking, echo delay, arpeggiator) rebuilt in float. FLM carries its own importer of desktop
+3x Osc presets, with one converter "FL raw value → FLM 0…1" per parameter (PROVEN-REA, round 190n,
+/mnt/e/lynx-work/flm190n/rea/spec-3xosc.md), so every FLM parameter has an exact FL raw value. The .flm import runs
+that converter backwards and writes what a .flp would carry: a version 14 plugin state (21 parameters, invert × 3,
+AM, HQ and the 364-byte channel snapshot: five 17-int records pan / volume / Mod X / Mod Y / pitch, Mod X, Mod Y,
+filter type) plus the channel's own fields. LYNX's exact 3x Osc engine then plays it; nothing is read from an FL
+installation.
+
+**Mapping** (`threeOscState` in core/FlmImport.cpp; v = the saved value 0…1):
+
+| FLM | To | Law |
+|---|---|---|
+| 1–3 shape, 4–6 invert, 24 AM, 25 HQ | state | round(6v); v > 0.5 |
+| 7–9 phase, 10–12 detune, 13–15 coarse, 16–18 fine, 19–21 pan | state | round(128(v−½)), round(100(v−½)), round(48(v−½)), round(200(v−½)), round(128(v−½)) |
+| 22 / 23 mix, 26 phase randomness | state | round(128v); round(64v) |
+| 27–61 LFOs (global, tempo, shape, predelay, attack, amount, speed) | snapshot records 0…4 | flags; round(2v); times round(65536v); amount in the record's unit (pan 128, volume / Mod X / Mod Y 256, pitch 4800, all × (v−½)) |
+| 62–105 envelopes (on, tempo, predelay, attack, hold, decay, sustain, release, tensions) | snapshot records 1…4 | flags; times round(65536v) (attack raw 100 where FLM's time is 0); sustain round(128v); tensions round(256(v−½)) |
+| 107–109 envelope amounts | records 2…4 | Mod X, Mod Y: round(256(v−½)); pitch: round(4800(v−½)) = ±2400 cents (A/B, round 190ab, setting P1) |
+| 110 filter type, 111 cutoff, 112 resonance, 115 / 116 offsets | snapshot | round(7v); round(256(v + offset)) clamped to 0…256 |
+| 106 volume envelope amount, 114 volume multiplier | channel gain (modelParams[2]) | 2v · clamp(2(v106−½), 0, 1): plain factors, as in FLM |
+| 113 pan | channel pan | 2v − 1 |
+| 117 polyphony, 118 slide, 119 porta, 120 mono | channel | round(99v); FL's time knob law on int(1660v) |
+| 121–128 key / velocity tracking | channel misc | middle key 120 − 120v (key) / 120v (velocity) as LYNX stores them, pan 8(v−½) (the key's not clamped at ±1), Mod X / Y 2(v−½) |
+| 129 gate, 130–138 echo delay | channel misc | FL's time knob law on int(997v + 450); echoes round(9v + 1), feedback 2v, time 2v beats, pan 8v − 4 (A/B, round 190ab, setting G1; INFERRED from one point: FLM's converter reads 4v − 2), pitch 2400(v−½) cents, ping-pong, fat |
+| 139–145 arpeggiator | channel arp | direction {0,1,2,3,5,4}[round(5v)], time knob law, gate v, range round(6v) (1…4), repeat round(5v + 1), slide, chord k = round(90v) − 2 of FL's chord list (88 chords: the parameter's default 1/90 is "one above auto") |
+
+**FLM's module around the engine** (`ChannelDef::modelParams = { PPQ 96, 1, gain }`, `threeOscIsFlm`; the desktop
+path is unchanged): the note's velocity is the voice's level as it is (FLM's level is linear in the velocity; the
+desktop's Init.Vol curve (11^(1.28v) − 1)/10 is not applied), times the gain above; the channel's pitch carries
+**−12 semitones**: FLM plays key 60 with coarse 0 at 261.6 Hz, the desktop plugin at 523.3 Hz (measured, below).
+
+**A/B inside FL (round 190u).** Projects as for Transistor Bass (FL Studio Mobile Rack holding one 3x Osc module with
+the 149 PRMS values, seven notes), against LYNX's own .flm import and song render of the same values and notes
+(tools/flmr.cpp: a .flm written with the test builders, `importFlm`, the export renderer; LYNX at the fixed
+−5.08 dB FL's channel gives the rack). 3x Osc has no random source with phase randomness off, so the notes are compared
+sample for sample: FLM inside FL starts every note up to one 512 block late, so each note's first 150 ms is nulled at
+its own lag.
+
+| Setting | level FLM − LYNX | third-octave difference mean / max | worst note ESR |
+|---|---|---|---|
+| D default (sine / sine −12 / sine −24, no envelope, no filter) | −0.02 dB | 0.16 / 1.12 dB | −50 dB |
+
+The default patch settles the three open points of the spec: the octave (O1: one below the desktop), the level
+(the same structure, factor 1.00) and the linear velocity law (velocities 80 and 120 both land within 0.02 dB).
+Fourteen more settings (oscillators, envelopes, filters, LFOs, pan / tracking, mono / porta, echo, gate, arpeggiator,
+tempo-synced times, volume multiplier) are rendered and scored by /mnt/e/lynx-work/flm190u/ab/score_osc.py; their
+numbers are in the round's HANDOFF.
+
+All fourteen scored in round 190ab (FLM inside FL − LYNX; energy / third-octave mean, max dB): O2 +0.01 / 0.41, 2.49;
+E1 0.00 / 0.45, 3.26; F1 0.00 / 0.36, 3.27; F2 0.00 / 0.36, 3.19; F3 +0.66 / 0.40, 3.01; L1 +0.02 / 0.41, 2.73;
+P1 −0.01 / 0.29, 2.71; M1 +0.01 / 0.39, 3.30; K1 −0.06 / 0.42, 3.07; G1 +0.01 / 0.50, 3.25; A1 +0.19 / 0.61, 3.59;
+T1 +0.11 / 0.49, 3.47; V1 +0.01 / 0.94, 1.55. Three mapping errors showed and are fixed: the pitch envelope's amount
+(P1: FLM started 288 cents up, LYNX 15: the record's unit is 4800(v−½)), the echo's pan (G1: twice as far per echo),
+the key tracking's pan (V1: not clamped at ±1). Left open:
+- F3 (square through filter type 3): FLM is 0.66 dB louder. The main partials agree within 0.1 dB; FLM's shape tables
+  carry 1…4 dB more above 5 kHz and even partials 20 dB under the odd ones, and this filter leaves mostly those.
+- V1 velocity tracking of the pan: FLM pans about +0.12 at velocity 80 and +0.68 at 120 (pan knob 0.9, middle 0.833),
+  LYNX −0.11 and +0.20 (FL's desktop curve, the pan clamped at 1). FLM's law looks linear in the velocity, about
+  0.55·8(v−½)·(w − 0.56); it needs FLM's tracking code read before it is built.
+
+**The module's clock and envelope stepping (round 190ab, setting E1: volume envelope with attack 25 %, tension
++40 %, hold 10 %, decay 40 %, tension −40 %, sustain 50 %, release 35 %).** With PPQ 128 and the desktop's stepping
+LYNX was +0.32 dB against FLM and the decay started about 6 ticks early. Three things, all read in the module and
+measured on the render:
+- **Tick rate = 384 / X per beat, X = the song's steps per beat = TDIV's second byte** (PROVEN-REA: the byte the
+  module reads, song +0xa9, is filled by the song loader from the TDIV chunk and reset from the new-song defaults; the
+  note grid snaps to 1/X, 1/2X … of a beat with it and takes the bar length from the byte before). X = 4 in every
+  file, so **PPQ 96**, not 128. One tick is **round(fs·60 / (tempo·PPQ)) whole samples** (230 at 120 BPM, 44.1 kHz), on
+  a clock of the module's own; inside FL every note starts on the next boundary of that clock (all seven notes of the
+  render: start + lag ≡ 178 mod 230).
+- **The hold and the predelay last one tick more** than the desktop's (the counter must pass the tick count,
+  0x1807d9640), and
+- **the attack's position is not clamped to 1.** 58 float steps of 1/58 stop just below 1, so the attack takes a 59th
+  step to 1.0077 (through the tension curve), the hold stays there, and the decay starts from above 1: the level peaks
+  at 1.0224 fourteen ticks later and only then falls. (At PPQ 128 the same knob gives 77 steps that land on 1.)
+LYNX: `flvp::Rec::mobile` (the two counters and the clamp), the instrument's whole-sample ticks running free of the
+song position, and the importer's PPQ from TDIV. Against the FLM render (first note, low-passed at 1.2 kHz because the
+saw's edges never null, below): whole note −28.8 → **−34.6 dB**, hold and decay −27.0 → −35.3 dB, release −21.8 →
+−35.3 dB; level over the file +0.32 → **0.00 dB**, level per 125 ms 0.52 / 3.89 → 0.14 / 0.95 dB (mean / max).
+Not copied: the note start on the module's tick boundary (up to one tick, 5 ms, late), and FLM's float phase (its
+oscillators drift about 0.09 sample against LYNX's 32-bit phase, which is why shapes with edges stop at −12…−22 dB
+while the sines null at −50 dB).
+
+Quality gate: the desktop path writes the same bytes as before (the instrument built from the branch base against
+this round's, 15 states, notes at velocities 0.05…1: 15 / 15 byte-identical, same CPU time; again after round
+190ab's change: 15 / 15, 1487 → 1268 ms).
+
+Not converted (listed in the import report): a custom shape's file, Free Run (146–148), the arpeggiator's "Hold" time
+and ranges 0 / 5 / 6. Differences LYNX keeps from the desktop engine (spec §5): table lookup without FLM's linear
+interpolation, the 10 ms fade of an envelope-less release, FL's velocity tracking curve. Parameter automation lanes of a .flm on the module are still listed, not imported.
+
+**Best way?** FL: FLM's own preset importer proves the two are one instrument, so playing LYNX's FL-exact 3x Osc
+keeps the patch editable on the page the user knows. Ableton: no FLM import. Verdict: desktop engine + FLM's level and
+octave rules; the channel shows PITCH −12 semitones, which is what FLM plays.
+
+### Note pan, drum pitch, repeat, slide (round 190ab, branch `feature/flm190ab-notes`, 0.1.26)
+
+The four note bytes round 190u found (EVN2 15–19) are imported; laws in FLM_FORMAT.md §4 (clip compiler 0x18075d6b0,
+song scheduler 0x180770330, drum pad voice start 0x18074bf40; evidence /mnt/e/lynx-work/flm190ab/rea).
+
+| Byte | FLM | LYNX |
+|---|---|---|
+| 15 pan | byte / 255 to the module's note-on; drum pads: balance | the note's pan (127 = centre); the song's pan law is set to triangular (= FLM's balance, also the rack's pan) |
+| 16–17 pitch | drum pads only: speed 2^(2p − 1) | the kit sampler note's key (60 ± 12) and fine pitch |
+| 18 repeat | n more note-ons inside the note's (swung) 1/16 step, one note-off | n more notes at FLM's own ticks; on note lanes they end with the note |
+| 19 slide | glides the held note (key, velocity, pan), no note-on; note lanes only | a slide note when a plain note sounds at its start; otherwise dropped and listed |
+
+The lane's swing (TRKH `DESc` +12) is read for the repeats only: the saved step ticks already hold it.
+In FLM's shipped songs: 40 panned drum notes (Permich Uplifting), 165 pitched drum notes (Goldhands Elvira, Jasmina),
+2 repeats (Parrik Initiated, swing 0.263), no slide.
+
+Not converted: the slide's velocity and pan glide; FLM applies one slide to every sounding voice of the module (LYNX
+slides the notes its own slide rule picks). No A/B render: FLM's own player (the only reader of these bytes) cannot be
+rendered headless; FLM-inside-FL takes its notes from FL. Tests: `flm190ab_note_pan_pitch_repeat_slide`.
+
+**Best way?** FL has per-note pan, slide notes and fine pitch, so each byte lands on the note property an FL user
+already edits in the piano roll; Ableton has neither note pan nor slides. Repeats become real notes (editable), not a
+hidden per-note counter. Verdict: as built.
+

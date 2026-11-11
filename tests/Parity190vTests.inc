@@ -164,10 +164,12 @@ TEST (p190v_crest_two_way_release_and_safety)
         p[c::autoGain] = 0.0f;
         const auto y = run (EffectKind::crestCompressor, p, x);
         // the gain at ±0.9 s around the step back down, and the time to half-way between them
-        const auto gainAt = [&] (std::size_t i) { return rmsDb (y, i - 48, i + 48) - rmsDb (x, i - 48, i + 48); };
+        // (10 ms windows from 10 ms after the step: round 190al's band splits ring for a few ms on the step itself, and
+        // the quiet low and high bands are lifted, which a 2 ms window read as the gain being back)
+        const auto gainAt = [&] (std::size_t i) { return rmsDb (y, i - 240, i + 240) - rmsDb (x, i - 240, i + 240); };
         const auto from = gainAt ((std::size_t) (1.9 * sr)), to = gainAt ((std::size_t) (4.9 * sr));
         double half = 1e9;
-        for (std::size_t i = (std::size_t) (2 * sr) + 96; i < (std::size_t) (4.9 * sr); i += 48)
+        for (std::size_t i = (std::size_t) (2 * sr) + 720; i < (std::size_t) (4.9 * sr); i += 48)
             if (gainAt (i) >= 0.5 * (from + to))
             {
                 half = (double) (i - (std::size_t) (2 * sr)) / sr * 1000.0;

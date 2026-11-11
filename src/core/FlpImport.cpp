@@ -1,6 +1,7 @@
 #include "core/FlpImport.h"
 #include "core/FlpExport.h"
 
+#include "core/Fpc.h"
 #include "core/FruitySlicer.h"
 
 #include "core/Dvs.h"
@@ -41,6 +42,7 @@
 #include "core/Sawer.h"
 #include "core/Granulizer.h"
 #include "core/WaveTraveller.h"
+#include "core/SlicexInstrument.h"
 #include "core/Ogun.h"
 #include "core/Dx10.h"
 #include "core/Kepler.h"
@@ -530,16 +532,8 @@ void applyFlStretchPanel (SamplerSettings& s, int mode, int pitchCents, int mul,
         s.stretchBeats = std::clamp ((float) (sampleSeconds * std::pow (2.0, mul / 10000.0) * bpm / 60.0), 0.0f, 4096.0f);
 }
 
-void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads)
+ChannelDef drumPadChannel (const ChannelDef& original, const DrumPad& pad, int channel)
 {
-    if (channel < 0 || channel >= (int) song.channels.size() || pads.empty())
-        return;
-
-    const auto original = song.channels[(std::size_t) channel];
-    const auto inserted = (int) pads.size() - 1; // the first pad takes the original channel's place
-    std::vector<ChannelDef> padChannels;
-
-    for (const auto& pad : pads)
     {
         ChannelDef def = original;
         def.name = original.name + " - " + pad.name;
@@ -563,8 +557,21 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
         def.cutGroup = pad.cutGroup > 0 ? 1000 * (channel + 1) + pad.cutGroup : 0;
         def.cutBy = pad.cutBy > 0 ? 1000 * (channel + 1) + pad.cutBy : 0;
         def.mixerTrack = std::clamp (original.mixerTrack + pad.mixerOffset, 0, maxMixerTracks - 1);
-        padChannels.push_back (std::move (def));
+        return def;
     }
+}
+
+void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || pads.empty())
+        return;
+
+    const auto original = song.channels[(std::size_t) channel];
+    const auto inserted = (int) pads.size() - 1; // the first pad takes the original channel's place
+    std::vector<ChannelDef> padChannels;
+
+    for (const auto& pad : pads)
+        padChannels.push_back (drumPadChannel (original, pad, channel));
 
     song.channels[(std::size_t) channel] = padChannels.front();
     song.channels.insert (song.channels.begin() + channel + 1, padChannels.begin() + 1, padChannels.end());
@@ -930,8 +937,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
+    song.flPluginLevels = true; // hosted plugins at Fruity Wrapper's level and velocity law (REA_rodada190ad.md)
     // REA round 168j: PDC "Automatic" 0x1D / "Compensate automations" 0x27, Time settings 0x23, the Piano Roll's scale
     // highlighting 0xF3, the data folder 0xCA
     song.autoPdc = project.autoPdc;
@@ -1313,6 +1322,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
 
+        // Slicex: its own engine on FL's state (round 190l, core/SlicexInstrument.h); the sampler on the slices below
+        // stays as the fallback
+        const auto slicexExact = lowercase (c.pluginName) == "slicex" && slicex::importChannel (def, c.pluginState, existing, options.saveEmbedded);
+
         // Fruity Slicer / Slicex: sampler with the slices (slice i plays on key 60 + i, at the sample's pitch)
         {
             const auto name = lowercase (c.pluginName);
@@ -1320,7 +1333,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             if (name == "fruity slicer")
                 sliced = fruitySlicer (c.pluginState);
-            else if (name == "slicex")
+            else if (name == "slicex" && ! slicexExact)
                 sliced = slicexSample (c.pluginState);
 
             if (sliced)
@@ -1460,11 +1473,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     }
         }
 
+        // (a kit without a pad that plays, such as FL's "Empty" kit, still becomes an FPC channel when one is asked
+        // for: a kit preset loaded onto an FPC channel)
         if (c.pluginName == "FPC")
-            if (auto pads = fpcPads (c.pluginState))
+            if (auto pads = fpcPads (c.pluginState); pads || options.fpcAsChannel)
             {
                 std::vector<DrumPad> found;
-                for (auto pad : *pads)
+                for (auto pad : pads ? *pads : std::vector<DrumPad>())
                 {
                     std::vector<SampleZone> layers;
                     for (auto layer : pad.layers)
@@ -1475,7 +1490,19 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         found.push_back (std::move (pad));
                 }
 
-                if (! found.empty())
+                // One FPC channel (round 190q) when it plays what the pad channels play: every pad on the channel's own
+                // mixer insert (a pad with an output offset needs its own insert: those kits keep a channel per pad)
+                const auto oneInsert = std::all_of (found.begin(), found.end(), [] (const DrumPad& pad) { return pad.mixerOffset == 0; });
+                const auto kit = fpc::read (c.pluginState);
+                if (kit && ! options.fpcAsPads && (options.fpcAsChannel || (! found.empty() && oneInsert)))
+                {
+                    def.instrument = InstrumentKind::fpc;
+                    def.plugin = {};
+                    def.samplePath.clear();
+                    setFpcKit (def, *kit, existing);
+                    def.pluginState = c.pluginState; // (FL's own bytes)
+                }
+                else if (! found.empty())
                     drumKits.push_back ({ (int) song.channels.size(), std::move (found) });
             }
 
@@ -2190,7 +2217,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
                      || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
-                     || def.instrument == InstrumentKind::fruityslicer
+                     || def.instrument == InstrumentKind::fruityslicer || def.instrument == InstrumentKind::slicex
+                     || def.instrument == InstrumentKind::fpc
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
@@ -2963,6 +2991,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     made = makeEffectSlot (EffectKind::plugin);
                     made->plugin.name = foreign.name;
                     applyFlWrapperOptions (foreign, made->plugin);
+                    // Processing › Connections (round 188d): the side input (input 2) listens to the insert its
+                    // sidechain index picks in this insert's inputs list
+                    if (made->plugin.inputs.size() > 1 && made->plugin.inputs[1].offset > 0 && made->plugin.inputs[1].isActive (true))
+                        if (const auto source = sidechainSource (insert.index, made->plugin.inputs[1].offset); source > 0 && source != insert.index)
+                            made->sidechain = source;
                     made->plugin.foreign = std::move (foreign);
                     made->plugin.detached = flDetached (slot.wrapperFlags); // (0xD4 flag 0x4, issue #116)
                 }

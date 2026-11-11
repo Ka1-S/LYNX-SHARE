@@ -91,6 +91,8 @@ namespace mixeroptions
 extern std::function<void()> changed;
 // Shows or hides the unused inserts in the mixer (the main window points it at its mixer).
 extern std::function<void (bool)> setShowUsedOnly;
+// Shows or hides the loudness panel beside the Master and starts or stops its measurement (round 190am).
+extern std::function<void (bool)> setShowLoudness;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
@@ -171,7 +173,16 @@ public:
 
     // Mixer menu › "Show only used inserts" (round 163; ui-options.txt "mixerUsedOnly"): inserts nothing uses
     // (Song::insertInUse) take no room; "+" brings back the first unused insert before adding one.
+    // Round 190am: the selected inserts and any insert whose meter moves always show (mixerops::hiddenUnusedInserts).
     static inline bool showUsedOnly = false;
+    // Mixer menu › "Loudness meter beside the Master (LYNX)" (round 190am; ui-options.txt "mixerLoudness"; off = FL's
+    // mixer, and nothing is measured): a narrow panel right of the Master with the short-term and integrated loudness
+    // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
+    static inline bool showLoudness = false;
+    void setShowLoudness (bool on);
+    void resetLoudness();
+    void refreshLoudnessForSnapshot() { loudnessShown = engine.getMeters().loudness.read(); repaint(); } // (--snapshot: no frames run)
+    juce::Rectangle<int> loudnessArea() const noexcept; // the panel's plate; empty while it is off
     // Mixer menu › "Keep links to deleted inserts, greyed (LYNX)" (round 186c, pain point 1; ui-options.txt
     // "mixerKeepLostLinks"; off = FL): Delete keeps each send into a deleted insert as a greyed MixerTrack::lostSends link.
     static inline bool keepLostLinks = false;
@@ -210,7 +221,18 @@ private:
     std::vector<int> stripXs;                                    // layout x (before pinning)
     std::vector<bool> hidden;                                    // per track: not shown (unused, "Show only used inserts")
     static constexpr int hiddenX = -100000;
-    std::set<int> revealed;                                      // unused inserts shown anyway (added with "+")
+    std::set<int> revealed;                                      // unused inserts shown anyway (added with "+", selected, or receiving audio)
+    void keepSelectionShown();                                   // "Show only used inserts": the selection never hides
+    // the loudness panel (round 190am): its layout x (hiddenX while off), what it shows now and its hover state
+    static constexpr int loudnessWidth = 58;
+    int loudnessX = hiddenX;
+    MasterLoudness::Reading loudnessShown;
+    bool loudnessResetHovered = false;
+    juce::Rectangle<int> loudnessResetArea() const noexcept;
+    juce::Rectangle<int> loudnessBarArea() const noexcept;
+    void paintLoudnessPanel (juce::Graphics& g) const;  // the plate, captions and scale (kept in the picture)
+    void paintLoudnessValues (juce::Graphics& g) const; // the numbers and the bar (drawn over the picture)
+    void showLoudnessMenu();
 public:
     void setShowUsedOnly (bool on)
     {
@@ -292,6 +314,7 @@ private:
     bool cachePainting = false;    // paint() is filling the picture: wells without levels
     int pictureInvalidations = 0, pictureRefills = 0; // what --uiperf reports (see cacheCountersForPerf)
     void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
+    bool isSilenced (int track) const; // muted, or silenced by a solo / a muted VCA (issue #144)
     void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
     juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)
     void paintNameBars (juce::Graphics& g, int track) const;
@@ -406,6 +429,7 @@ public:
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
+    void groupIntoRack (int slot, bool all); // round 183c: Live's Group, the slot (or the chain) into an Audio Effect Rack
     void selectSlot (int slot)
     {
         selectedSlot = slot;

@@ -70,6 +70,11 @@ NewProjectDefaults& newProjectDefaults();
 // A new project from a built-in template (-1 = LYNX's default song) with the current defaults applied.
 Song makeNewProject (int templateIndex = -1);
 
+// Round 190ad: a new project plays hosted plugins at FL's wrapper level (Song::flPluginLevels). A song that starts a
+// new project takes it unless it already holds a hosted plugin channel made under LYNX's own law (a user's template
+// saved before: it keeps its sound). Returns whether the song has FL's levels afterwards.
+bool adoptFlPluginLevels (Song& song);
+
 // A user template's name from its file name ("Trap kit.lynx" → "Trap kit").
 std::string templateDisplayName (const std::string& fileName);
 

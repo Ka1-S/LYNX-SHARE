@@ -497,6 +497,7 @@ private:
                 ChannelDef c;
                 c.name = name;
                 c.instrument = InstrumentKind::audioClip;
+                c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
                 return c;
             };
             add (std::move (audio));

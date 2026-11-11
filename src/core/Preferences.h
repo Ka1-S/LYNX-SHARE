@@ -140,6 +140,18 @@ enum class VelocityCurve
 };
 float mapVelocity (float velocity, VelocityCurve curve) noexcept; // 0..1 -> 0..1 (0 stays 0: a note-off)
 
+// Round 190ao (pain point 12; LYNX's own: FL's wrapper has no velocity setting, its MIDI group is the ports, release
+// velocity, pitch bend range, MOD X aftertouch and All Notes Off [DATA Fruity Wrapper DFM, REA round 149 C7]): a hosted
+// instrument's own answer to the notes played into it from MIDI devices (PluginRef::velocityMode / fixedVelocity).
+// Mode 0 follows the MIDI settings' curve (the default: nothing changes); 1…4 is the plugin's own curve
+// (VelocityCurve + 1), where Fixed plays every note at `fixedVelocity` (1…127), not at full velocity.
+constexpr int pluginVelocityFollow = 0;
+constexpr int pluginVelocityFixed = (int) VelocityCurve::fixed + 1;
+constexpr int defaultFixedVelocity = 100; // (FL's default note velocity, 100 of 127)
+constexpr int clampPluginVelocityMode (int mode) noexcept { return mode < 0 || mode > pluginVelocityFixed ? pluginVelocityFollow : mode; }
+constexpr int clampFixedVelocity (int velocity) noexcept { return velocity < 1 ? 1 : velocity > 127 ? 127 : velocity; }
+float mapPluginVelocity (float velocity, int mode, int fixedVelocity, VelocityCurve global) noexcept; // (0 stays 0)
+
 struct MidiInputPrefs
 {
     std::string name;     // the device name (as the system shows it)

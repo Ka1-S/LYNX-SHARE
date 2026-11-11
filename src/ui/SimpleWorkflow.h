@@ -25,9 +25,16 @@ public:
     struct Host
     {
         std::function<void (juce::Component*)> setOverlay; // shows a component over the Playlist area (nullptr: none)
+        std::function<void()> showKeys;                    // an instrument was added from the chooser: the on-screen keyboard
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
+        // round 190t
+        std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
+        std::function<void (int format)> exportAudio;      // the Export window on one format (0 WAV, 1 MP3): the Finish dock
+        std::function<void()> exportOtherApps;             // File › Export › For other apps
+        std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"...: beside the title tools
+        std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -53,9 +60,17 @@ public:
     // Files dropped on the timeline below the tracks (slice S4): one new track each (MIDI: one per MIDI track), from `tick`.
     void dropFiles (const juce::StringArray& files, std::int64_t tick);
 
+    // The Finish dock (slice S8, ui/FinishDock.h): the Master looks, on the right of the Playlist
+    void showFinish();
+    void hideFinish();
+    bool isFinishShowing() const noexcept;
+
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
+    // round 190t: a click on the starter page's button `index` (0 = Empty grid), and the status line showing `text`
+    void clickStarterForSnapshot (int index);
+    void setStatusForSnapshot (const juce::String& text);
 
     // how many were ever made in this process (the "nothing exists in Pattern workflow" check)
     static inline std::atomic<int> instances { 0 };
@@ -63,6 +78,7 @@ public:
 private:
     class Chooser;
     void closeByHand(); // the chooser was closed (✕, Esc, a click outside): it stays closed for this project
+    void addDefaultInstrument();                   // the Instrument tile: LYNX's synth on a new track, ready to play
     void chooseInstrument (juce::Component& tile);
     void chooseSample();
     void importFiles();
@@ -75,7 +91,9 @@ private:
     bool active = false;
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
     std::unique_ptr<Chooser> chooser;
-    std::unique_ptr<juce::Component> addButton;
+    std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
+    std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };
 } // namespace lynx

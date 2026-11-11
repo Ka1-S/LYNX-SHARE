@@ -88,6 +88,22 @@
 #    `while (--it != glyphs.begin())`: on an empty vector that starts before its beginning and never stops (SIGSEGV
 #    at LYNX+0xf94c7a in 0.1.25, at start-up on NixOS, where JUCE's own font list had no monospaced family). No
 #    glyphs: nothing to walk over. LYNX also gives every font a typeface now (ui/Theme.cpp getTypefaceForFont).
+# 20. Windows only, juce_audio_devices/native/juce_WASAPI_windows.cpp (issue #134, round 190y): every new Windows Audio
+#    device object (a change of output or input device, the first open) asks the driver about each channel count from
+#    64 down to the mix format's, at every rate and in 7 sample formats: 434 IAudioClient::IsFormatSupported calls for
+#    a stereo device, each a round trip to the Windows audio service, on the message thread. In shared mode the answer
+#    can never raise the count (the engine answers with its mix format, whose channel count is the start value), so the
+#    loop only costs time: 1.1 s on this PC's USB codec, and about 85 s on the reporter's Realtek (its hang report shows
+#    the UI thread in this loop; ~0.15 s per call). Shared and low-latency shared modes now take the mix format's count;
+#    exclusive mode still asks (there the driver does answer for more channels).
+# 21. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 177b, 190an): a VST3 plugin that
+#    asks the host for a parameter's context menu (IComponentHandler3::createContextMenu with a ParamID, e.g. a
+#    right-click on a knob) gets the host's items through `lynxVst3ParamMenuHook` (LYNX: Create automation clip, Link to
+#    controller…, as on its own knobs). They are the first items of the IContextMenu, with their own target, so both
+#    kinds of plugin offer them: one that lets the host show the menu (popup) and one that copies the host's items
+#    into its own menu (getItemCount / getItem / executeMenuItem, e.g. Surge XT). JUCE's menu held the plugin's items
+#    only, and its getItem compared tags where the SDK passes an index. Without a hook, or for a menu without a
+#    parameter, it is JUCE's menu as before.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -206,6 +222,26 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("dispatch through the hook" "LYNX patch (issue #32): through the hook"
             "                TranslateMessage (&m);|NL|                DispatchMessage (&m);"
             "                TranslateMessage (&m);|NL||NL|                // LYNX patch (issue #32): through the hook when LYNX set one|NL|                if (lynxDispatchMessageHook != nullptr)|NL|                    lynxDispatchMessageHook (&m);|NL|                else|NL|                    DispatchMessage (&m);")
+    elseif(file MATCHES "juce_WASAPI_windows.cpp$")
+        lynx_juce_fix("shared mode keeps the mix format's channels" "LYNX patch (issue #134): shared mode"
+            "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"
+            "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL||NL|        // LYNX patch (issue #134): shared mode never answers with more channels than its mix format, so the|NL|        // 434+ IsFormatSupported round trips below only cost time (85 s on a Realtek), on the message thread|NL|        if (! isExclusiveMode (deviceMode))|NL|            return fallbackNumChannels;|NL|")
+    elseif(file MATCHES "juce_VST3PluginFormat.cpp$")
+        lynx_juce_fix("VST3 host menu hook" "LYNX patch (round 177b): the host's items in a parameter's menu"
+            "class VST3PluginInstance;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,"
+            "class VST3PluginInstance;|NL||NL|// LYNX patch (round 177b): the host's items in a parameter's menu (set by LYNX; null = none)|NL|void (*lynxVst3ParamMenuHook) (AudioPluginInstance&, int, PopupMenu&) = nullptr;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,")
+        lynx_juce_fix("VST3 host items in the menu" "LYNX patch (round 177b): the host's own items"
+            "        tresult PLUGIN_API popup (UCoord x, UCoord y) override;|NL|"
+            "        tresult PLUGIN_API popup (UCoord x, UCoord y) override;|NL||NL|        // LYNX patch (round 177b): the host's own items. They are the first items of the list, with a target of their|NL|        // own, so a plugin that shows this menu (popup) and a plugin that reads the items into its own menu (getItem,|NL|        // then the target's executeMenuItem) both offer them.|NL|        struct LynxHostItems final : public Vst::IContextMenuTarget|NL|        {|NL|            virtual ~LynxHostItems() {}|NL||NL|            JUCE_DECLARE_VST3_COM_REF_METHODS|NL|            JUCE_DECLARE_VST3_COM_QUERY_METHODS|NL||NL|            tresult PLUGIN_API executeMenuItem (Steinberg::int32 tag) override|NL|            {|NL|                const auto index = (int) tag - (int) firstTag;|NL||NL|                // (after the plugin's menu has closed: the action may open a window of the host)|NL|                if (isPositiveAndBelow (index, (int) actions.size()) && actions[(size_t) index] != nullptr)|NL|                    MessageManager::callAsync (actions[(size_t) index]);|NL||NL|                return kResultOk;|NL|            }|NL||NL|            enum { firstTag = 0x4c590001 };|NL|            std::vector<std::function<void()>> actions; // one per item that is not a separator (null: a caption)|NL|            Atomic<int> refCount;|NL|        };|NL||NL|        void lynxAddHostItems (const PopupMenu& menu, LynxHostItems* hostTarget)|NL|        {|NL|            for (PopupMenu::MenuItemIterator it (menu); it.next();)|NL|            {|NL|                const auto& source = it.getItem();|NL|                ItemAndTarget entry;|NL|                zerostruct (entry.item);|NL|                entry.target = addVSTComSmartPtrOwner (static_cast<IContextMenuTarget*> (hostTarget));|NL||NL|                if (source.isSeparator)|NL|                {|NL|                    entry.item.flags = Item::kIsSeparator;|NL|                    items.add (entry);|NL|                    continue;|NL|                }|NL||NL|                // a caption or a submenu's name is a disabled line; a submenu's items follow it (no groups: plugins|NL|                // that copy the items differ in how they read them)|NL|                const auto runs = source.isEnabled && ! source.isSectionHeader && source.subMenu == nullptr && source.action != nullptr;|NL|                toString128 (entry.item.name, source.text);|NL|                entry.item.tag = (Steinberg::int32) ((int) LynxHostItems::firstTag + (int) hostTarget->actions.size());|NL|                entry.item.flags = (runs ? 0 : Item::kIsDisabled) | (source.isTicked ? Item::kIsChecked : 0);|NL|                hostTarget->actions.push_back (runs ? source.action : std::function<void()>());|NL|                items.add (entry);|NL||NL|                if (source.subMenu != nullptr)|NL|                    lynxAddHostItems (*source.subMenu, hostTarget);|NL|            }|NL|        }|NL||NL|        void lynxFill (Vst::ParamID paramId); // the host's items for that parameter (lynxVst3ParamMenuHook)|NL|")
+        lynx_juce_fix("VST3 menu for a parameter" "LYNX patch (round 177b): a menu for a parameter"
+            "    Vst::IContextMenu* PLUGIN_API createContextMenu (IPlugView*, const Vst::ParamID*) override|NL|    {|NL|        if (plugin == nullptr)|NL|            return nullptr;|NL||NL|        auto* result = new ContextMenu (*plugin);|NL|"
+            "    Vst::IContextMenu* PLUGIN_API createContextMenu (IPlugView*, const Vst::ParamID* lynxParam) override|NL|    {|NL|        if (plugin == nullptr)|NL|            return nullptr;|NL||NL|        auto* result = new ContextMenu (*plugin);|NL|        // LYNX patch (round 177b): a menu for a parameter starts with the host's items|NL|        if (lynxParam != nullptr)|NL|            result->lynxFill (*lynxParam);|NL|")
+        lynx_juce_fix("VST3 host items filled" "LYNX patch (round 177b): fills the host's items"
+            "tresult VST3HostContext::ContextMenu::popup (UCoord x, UCoord y)|NL|{|NL|"
+            "// LYNX patch (round 177b): fills the host's items of a parameter's menu, then a separator|NL|void VST3HostContext::ContextMenu::lynxFill (Vst::ParamID paramId)|NL|{|NL|    if (lynxVst3ParamMenuHook == nullptr)|NL|        return;|NL||NL|    if (auto* param = owner.getParameterForID (paramId))|NL|    {|NL|        PopupMenu hostMenu;|NL|        lynxVst3ParamMenuHook (owner, static_cast<AudioProcessorParameter*> (param)->getParameterIndex(), hostMenu);|NL||NL|        if (hostMenu.getNumItems() > 0)|NL|        {|NL|            hostMenu.addSeparator();|NL|            lynxAddHostItems (hostMenu, new LynxHostItems());|NL|        }|NL|    }|NL|}|NL||NL|tresult VST3HostContext::ContextMenu::popup (UCoord x, UCoord y)|NL|{|NL|")
+        lynx_juce_fix("VST3 menu item by index" "LYNX patch (round 190an): getItem takes an index"
+            "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|"
+            "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|            // LYNX patch (round 190an): getItem takes an index (the SDK's IContextMenu::getItem (index, item, target)):|NL|            // a plugin that copies the host's items into its own menu walks 0 .. getItemCount() - 1. JUCE only|NL|            // compared tags, so such a plugin found nothing (or the wrong item).|NL|            if (isPositiveAndBelow ((int) tag, items.size()))|NL|            {|NL|                auto& indexed = items.getReference ((int) tag);|NL|                result = indexed.item;|NL||NL|                if (target != nullptr)|NL|                    *target = indexed.target.get();|NL||NL|                return kResultTrue;|NL|            }|NL||NL|")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
@@ -243,10 +279,12 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/fonts/juce_SimpleShapedText.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
     endif()
 endfunction()
 

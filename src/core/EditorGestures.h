@@ -310,6 +310,28 @@ inline double pinchZoomFactor (double scale)
 // shorter, down to 6 px.
 constexpr int minKeyHeight = 6, maxKeyHeight = 116;
 
+// The Piano roll's zoom wheel (round 190j; FL's VZoomSelect, REA round 167t: levels 1..50 = keys of 18..116 px, two
+// pixels a level). LYNX's keys go down to 6 px, so its levels start there: level 1 = 6 px ... 56 = 116 px.
+constexpr int zoomLevel (int keyHeight) noexcept
+{
+    const auto h = keyHeight < minKeyHeight ? minKeyHeight : keyHeight > maxKeyHeight ? maxKeyHeight : keyHeight;
+    return (h - minKeyHeight) / 2 + 1;
+}
+
+// The key the zoom wheel zooms around: the middle of the notes in view (their lowest and highest key), or the middle of
+// the view (`top` and `bottom`: the first and last key shown) when it shows no notes.
+template <typename Keys>
+int zoomWheelAnchor (const Keys& keysInView, int top, int bottom) noexcept
+{
+    auto lo = 128, hi = -1;
+    for (const auto key : keysInView)
+    {
+        lo = key < lo ? key : lo;
+        hi = key > hi ? key : hi;
+    }
+    return hi < 0 ? (top + bottom) / 2 : (lo + hi) / 2;
+}
+
 // The vertical zoom drag: Ctrl+middle-drag on the Piano roll's notes (or the Playlist's clips) and middle-drag on
 // the Piano roll keyboard. Like FL's zoom knob it only follows the vertical travel: up = taller, one zoom level
 // (2 px) per 4 px of travel, per 16 px while Ctrl is held (fine). The travel is not clamped at the limits.

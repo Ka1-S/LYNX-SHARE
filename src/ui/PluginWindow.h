@@ -26,6 +26,12 @@ struct WrapperContext
     // round 177b: a mixer slot's plugin (insert, slot): a plugin with a sidechain input gets the header's
     // "Sidechain from" picker; -1 = not a mixer slot
     int track = -1, slot = -1;
+    // round 190ao (reload a crashed plugin): `reload` starts the plugin again and opens its window again (the caller
+    // knows the channel / slot); with it, a window whose plugin went down (crashed inside a call, or its separate
+    // process died) shows a notice with "Reload" in place of the editor. `down`: the adapter's own crash flag (a dead
+    // separate process is seen by the window itself). Nothing reloads unless the user asks.
+    std::function<void()> reload;
+    std::function<bool()> down;
 };
 // `owner` is the adapter (PluginInstrument/PluginEffect) that holds the plugin.
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context = {});
@@ -33,9 +39,19 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
 void setDockWorkspace (Workspace* workspace);
 // FL's plugin menu › Detached for an open editor: it closes and opens again in the other host (saved in the project).
 void setDetached (juce::AudioPluginInstance& plugin, bool detached);
+// FL's Tools › Macros › "Switch all plugin editors to" › Attached / Detached (round 190i): every hosted plugin of the
+// song, and the open editors move to the other host.
+void setAllDetached (AudioEngine& engine, bool detached);
 // --plugwintest (issue #116): whether the open editor is docked, and the native window that holds it.
 bool isDocked (const juce::AudioPluginInstance& plugin);
 void* hostWindowHandle (const juce::AudioPluginInstance& plugin);
+// Round 190ao, LYNX's "Pin on top" (pain point 11; FL has no pin): a detached plugin window that stays above LYNX's
+// other secondary windows (not above other programs: like them it is owned by the main window; on Linux, where there
+// are no owner windows, the window manager's "always on top"). The header's pin and the plugin menu's item set it; it
+// is saved with the plugin in the project (PluginRef::pinned). Not for a docked window or a plugin in a separate
+// process (its editor is a window of that process).
+bool isPinnedOnTop (const juce::AudioPluginInstance& plugin);
+void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned);
 void closeAll();
 // Closes now the windows whose plugin is no longer in the song (removed, replaced, its channel deleted); a timer
 // also does it on its own while a window is open.
@@ -54,6 +70,13 @@ struct EditorCrash
 };
 int editorCrashCount();
 std::vector<EditorCrash> editorCrashes();
+// Round 190ao (Bitwig's "Reload plug-in"): closes the windows of those hosted plugins and starts them again from their
+// last captured state (AudioEngine::reloadHostedPlugins: no undo step, the project is not reopened). Says so when one
+// could not be started. Returns how many run again.
+int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& which);
+// The user asked for the window of a plugin that is down: "<name> crashed and was switched off" with Reload (and, for a
+// plugin that ran inside LYNX, "Reload in a separate process"). `reopen` runs after a reload that worked.
+void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen);
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;
@@ -61,12 +84,17 @@ extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGestu
 bool letsHostProcessKeys (juce::Component& window);
 // (round 187a's check) a PNG of a plugin window's Wrapper settings page
 bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
+// Tests / shots (round 190ao): runs the open window's periodic check now (the crash notice follows the plugin) and
+// writes a PNG of its content: the editor page (or the crash notice in its place), or the Wrapper settings page.
+bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage);
+// Opens the open window's preset menu (FL's plugin menu), as a click on the preset name does.
+bool showPresetMenu (const juce::AudioPluginInstance& plugin);
 } // namespace PluginWindows
 
 // The wrapper settings page of a hosted plugin drawn offscreen (round 188d: FL | LYNX shots of Processing ›
 // Connections, LYNX --wrappershot): `tab` 0 Settings, 1 Processing, 2 Troubleshooting; no window is opened.
 juce::Image wrapperSettingsSnapshot (AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
-                                     bool channel, int tab, float scale = 1.0f);
+                                     bool channel, int tab, float scale = 1.0f, int track = -1, int slot = -1);
 
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.
 void scanPluginsWithProgress (AudioEngine& engine, std::function<void (int)> onDone);

@@ -81,24 +81,28 @@ float fpcVolume (int v)
 }
 } // namespace
 
-std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
+namespace
 {
-    const auto kit = fpc::read (d);
+// FPC's strings as the importer always read them: up to a NUL
+std::string fpcText (std::u16string s)
+{
+    s.erase (std::find (s.begin(), s.end(), u'\0'), s.end());
+    return fpc::toUtf8 (s);
+}
 
-    if (! kit)
-        return std::nullopt;
-
-    // as the importer always read FPC's strings: up to a NUL
-    const auto text = [] (std::u16string s) {
-        s.erase (std::find (s.begin(), s.end(), u'\0'), s.end());
-        return fpc::toUtf8 (s);
-    };
-
+// The kit's pads that play: not muted, with a layer that has a file. `files` (an FPC channel's ChannelDef::zones)
+// replaces the layers' paths, one entry per layer with a path in the kit's order; without it the paths stay the
+// state's (with FL's variables). `solo`: FPC's solo switches count (a soloed pad silences the others).
+std::vector<DrumPad> fpcKitPads (const fpc::Kit& kit, const std::vector<SampleZone>* files, bool solo)
+{
     std::vector<DrumPad> pads;
+    std::vector<bool> soloed;
+    std::size_t file = 0;
 
-    for (const auto& source : kit->pads)
+    for (const auto& source : kit.pads)
     {
         DrumPad pad;
+        pad.sourcePad = (int) (&source - kit.pads.data());
         // FPC's own law, and the constant 1/(2·√2) its output carries (measured against FL's renders of
         // pad / layer volume and pan variants of FL's render test, REA_rodada170i §7)
         pad.gain = fpcVolume (std::clamp (source.volume, 0, 128)) * 0.35355339059327373f;
@@ -108,15 +112,23 @@ std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
         pad.cutGroup = source.cut >= 0 ? source.cut + 1 : 0; // −1 = none; 0 becomes group 1
         pad.cutBy = source.cutBy >= 0 ? source.cutBy + 1 : 0;
         pad.tune = std::clamp (source.tune, -128, 128) * 9.375f / 100.0f;
-        pad.name = text (source.name);
+        pad.name = fpcText (source.name);
 
         for (const auto& from : source.layers)
         {
             SampleZone layer;
-            layer.path = text (from.path);
+            layer.path = fpcText (from.path);
 
             if (layer.path.empty())
                 continue;
+
+            if (files != nullptr)
+            {
+                layer.path = file < files->size() ? (*files)[file].path : std::string();
+                ++file;
+                if (layer.path.empty())
+                    continue; // (the file was not found)
+            }
 
             layer.gain = fpcVolume (std::clamp (from.volume, 0, 127));
             layer.lowVelocity = std::clamp (from.velocityLow, 0, 127);
@@ -124,6 +136,7 @@ std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
             layer.highVelocity = high >= 127 ? 127 : std::max (layer.lowVelocity, high - 1);
             layer.tune = std::clamp (from.tune, -128, 128) * 9.375f / 100.0f;
             pad.layers.push_back (std::move (layer));
+            pad.sourceLayers.push_back ((int) (&from - source.layers.data()));
         }
 
         if (! pad.layers.empty() && ! source.muted())
@@ -131,13 +144,65 @@ std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
             if (pad.name.empty())
                 pad.name = "Pad " + std::to_string (pads.size() + 1);
             pads.push_back (std::move (pad));
+            soloed.push_back (source.soloed());
         }
     }
+
+    // "if any pad is soloed, only the soloed ones play" (FPC's TriggerVoice, REA_rodada9 §1.3)
+    if (solo && std::find (soloed.begin(), soloed.end(), true) != soloed.end())
+    {
+        std::vector<DrumPad> kept;
+        for (std::size_t i = 0; i < pads.size(); ++i)
+            if (soloed[i])
+                kept.push_back (std::move (pads[i]));
+        pads = std::move (kept);
+    }
+
+    return pads;
+}
+} // namespace
+
+std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
+{
+    const auto kit = fpc::read (d);
+
+    if (! kit)
+        return std::nullopt;
+
+    auto pads = fpcKitPads (*kit, nullptr, false);
 
     if (pads.empty())
         return std::nullopt;
 
     return pads;
+}
+
+std::vector<std::string> fpcLayerPaths (const fpc::Kit& kit)
+{
+    std::vector<std::string> paths;
+    for (const auto& pad : kit.pads)
+        for (const auto& layer : pad.layers)
+            if (auto path = fpcText (layer.path); ! path.empty())
+                paths.push_back (std::move (path));
+    return paths;
+}
+
+void setFpcKit (ChannelDef& channel, const fpc::Kit& kit, const std::function<std::string (const std::string&)>& locate)
+{
+    channel.pluginState = fpc::write (kit);
+    channel.zones.clear();
+    for (const auto& path : fpcLayerPaths (kit))
+    {
+        SampleZone zone;
+        zone.path = locate ? locate (path) : path;
+        channel.zones.push_back (std::move (zone));
+    }
+}
+
+std::vector<DrumPad> fpcChannelPads (const ChannelDef& channel)
+{
+    const auto kit = fpc::read (channel.pluginState);
+    return kit ? fpcKitPads (*kit, &channel.zones, true) : std::vector<DrumPad>();
 }
 
 std::optional<DirectWaveProgram> directWaveProgram (const std::vector<std::uint8_t>& d)

@@ -2270,8 +2270,14 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Reset | offsets back to "---", LEDs unchanged | same | same |
 | Channel volume / pan | apply to every output | same | same |
 | Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
-| Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
-| .flp import of the mapping | stored in the wrapper data | not yet | open |
+| Process inactive inputs and outputs | on: an output with its LED off still plays; an LED turned off turns it off | same | same |
+| .flp import / export of the mapping | records 0x1E / 0x1F / 0x20 and flag 0x8 | read and written | same |
+| Effects' Connections | inputs (sidechain index into [insert, inserts routed to it]) and outputs; Auto map inputs | same page; input 2's index drives the side input | same |
+| Effect input index (round 189j) | input k at index i plays entry i of [insert, inserts routed to it at any level, ascending], post-fader / pan / mute; 0 or past the list = the insert's own audio; input 1 so replaces the insert's audio | same, with the effect's Connections set (every FL-imported effect; LYNX's own once touched) | same |
+| Effect output index (round 189j) | output pairs at index 0 summed into the insert; index k = entry k of [insert, Master, inserts it routes to ascending] (past the end: the last), straight into that track, past the insert's fader | same (the first 8 pairs; with "Use fixed size buffers" output 2 only) | same |
+| Inactive effect input / output (round 189j) | silent when "Process inactive inputs and outputs" is off | same | same |
+| Effect with untouched Connections | input 2 gets the insert's own audio; every output pair summed into the insert | input 2 fed only by a picked side input (issue #109); output 1 only | differs (kept as before; decision for the user) |
+| .flp export of a picked side input (round 189j) | input 2's index | the SC picker's source written as input 2's index (an older index replaced) | same |
 
 ## Round a2m189b: Convert to MIDI (Ableton Live's Convert Melody / Harmony / Drums, LYNX extra)
 
@@ -2315,6 +2321,36 @@ FL Studio Mobile plugin is the open sound check.
 | Span, Strum (grid % + tension curve), Ornament (flam, grace notes), Recombine, Arpeggiate (18 styles), Connect, Chop | its own Piano roll tools (Strum, Arpeggiate, Chop, Articulate, Flam…) | Clip View › Transform panel | ⚠️ core only (`core/MidiTools.h`), note for note against a Live 12.4 save; the panel is the next slice. FL's tools unchanged |
 | Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
 | Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
+
+## Round 190s: the MIDI Tools panel and Clip View pieces (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Transform panel: Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum; Auto apply, Transform | tool dialogs with preview / Accept (unchanged) | Clip View › Transform | ✅ `ui/MidiToolsPanel`: the Clip View's fourth panel (Clip-launch workflow) and Piano roll › Tools › MIDI Tools…; Live's controls and defaults (`docs/analise/REA_rodada190s.md`) |
+| Glissando / LFO (MPE), the Generate section | — | Transform / Generate | ❌ not built (Time Warp and Velocity Shaper: round 190aa) |
+| Clip colour / activator square, pitch range (drag to transpose), Add interval | clip menu; transpose keys | Clip View title bar, Pitch & Time | ✅ Clip View column (Clip-launch workflow) |
+| Set Length + grid, Humanize amount, Scale / Highlight Scale buttons in the editor header | — | Pitch & Time, editor header | ❌ open (GAPMAP-0126 D5, D13) |
+
+## Round 190aa: the MIDI Transformations measured in Live (Ableton-style, LYNX extras)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Arpeggiate (18 styles, overlapping notes), Connect (chords, Tie), Recombine on Grid, Span Offset, Strum (High + Tension), Quantize (incl. 1/8 + 1/8T) | its own Piano roll tools (unchanged) | Clip View › Transform | ✅ note for note against Live 12.4.16 (60-clip set, `docs/analise/REA_rodada190aa.md`); random settings checked by range |
+| Chop in full: pattern row (plays / emphasis), Stretch, Variation | Chop (Alt+U) | Clip View › Transform › Chop | ✅ core note for note; panel page as Live's (Variation's law inferred) |
+| Time Warp (3 breakpoints, Quantize, Range Fit, Note End) | — | Transform › Time Warp | ✅ core within 1e-5 beats on 7 settings (Note End off: up to 7 ticks apart); panel page as Live's |
+| Velocity Shaper (envelope, Min / Max, Loop, Rotate, Division) | — | Transform › Velocity Shaper (Max for Live) | ✅ core note for note on 6 settings; envelope editing LYNX's own gestures |
+| Glissando, LFO (MPE) | — | Transform | ❌ need MPE notes (issue #108); requirements in REA_rodada190aa.md §5 |
+## Round 190as: Piano roll scripts (FL's `.pyscript`, `flpianoroll`)
+
+Details and proof: `docs/analise/REA_rodada190as-pyscript.md`.
+
+| FL | LYNX | | Notes |
+|---|---|---|---|
+| Piano roll › Tools, second column "Scripts": Run last script again (Ctrl+Alt+Y), Open script folder..., the scripts | same column, order and key; LYNX's own scripts, My scripts (`Documents/LYNX/Piano roll scripts`), and FL's factory / user / downloaded script folders when FL is installed | ✅ | FL's five shipped scripts run unmodified (read in place, never copied) |
+| `flpianoroll`: score, Note, Marker, ScriptDialog, Utils | LYNX's own module on the embedded Python, same names and behaviour (what a script sees, live notes, typed members, defaults, storage rounding) | ✅ | `score.loadScoreFromFile` (undocumented) is refused: scripts cannot read files |
+| Note `repeats`, Marker `scale_root` / `scale_helper` | kept for the script, not stored | ⚠️ | LYNX has no note repeats; scale markers carry no scale data yet |
+| Script form: Preview (on), Reset, Regenerate, Accept; two columns of knobs | LYNX's Configure script panel with Preview on and Accept; one column of sliders; the preview shows in the Piano roll, Accept is one undo step | ⚠️ | layout differs (review pending) |
+| No limits on a script | no files / programs / network; stopped after 20 s (5 s for a preview) | ➕ | LYNX's sandbox |
 
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
@@ -2401,3 +2437,131 @@ bit-identically (no noise reduction).
 (The gain error is dominated by windows where one gate is open and the other closed.) Open: the reference seems to
 learn — with a 200 ms hold it stops reducing repeated bursts after about 3 s, a kick after a 0.2 s gap loses 7 dB, and
 at thresholds −25 / −10 its onsets are far deeper (−30 … −40 dB); none of that is modelled.
+
+## Round 190ad: hosted plugins of an FL project at FL's level
+FL's wrapper plays a VST / VST3 / CLAP instrument through the pan kernel of (channel pan, 2 × the channel volume
+curve): √2 × the curve at the centre (−2.2 dB at the default 78 %), where LYNX's own channel law gives the curve
+(−5.2 dB). A project imported from `.flp` now follows the wrapper (level, pan in steps of 1 / 64, the project's
+panning law, note velocity `Round (128 v)`): Surge XT renders within 0.05 dB of FL's at every volume and pan tested
+(`docs/analise/REA_rodada190ad.md`; before: 3.0 dB under). The project keeps this as `"pluginLevels": "fl"`. LYNX's
+own projects, saved or new, keep LYNX's law and sound as before; their `.flp` export writes the plugin channel's
+volume that sounds the same in FL. New projects (File › New, built-in templates, user templates without a hosted
+plugin) start with FL's levels; saved projects and `.als` imports keep theirs.
+## Round 190an: Snap to scale by scale steps (LYNX's own option, off by default)
+FL's Piano roll only highlights the scale; its free drawing is LYNX's default too. With a scale chosen, **Snap notes to
+the scale** (the magnet beside the scale box, the Piano roll menu, the key action `pianoRoll.scaleSnap`, no default key)
+works as in Bitwig 6's Snap to Key, through `core/ScaleSnap.h` for every note editor:
+
+| Gesture | With Snap to scale on |
+|---|---|
+| Draw (pencil, brush, chord stamp) | the note lands on the nearest in-scale key (a tie goes down) |
+| Drag notes (also a Shift-drag clone and a chord still held after drawing) | the grabbed note follows the mouse onto the scale; every other note moves the same number of scale steps, so C E G dragged one step is D F A |
+| Drag along the time axis, resize, paste, switching the option on | pitches are left alone, also off the scale (use *Move the notes onto the scale* for that) |
+| Up / Down, Shift+Up / Down (FL: one semitone) | one scale step; an off-scale note reaches the scale with it |
+| Ctrl+Up / Down (FL: one octave) | one octave, as in FL |
+| A group at the top or bottom of the keyboard | stops as a whole, so it keeps its shape |
+
+Before this round a dragged group snapped note by note to the nearest key (a triad could lose its shape between two
+scale keys) and an off-scale note jumped onto the scale as soon as it was dragged sideways.
+
+## Round 190an: a key for "Automation for last tweaked parameter"
+FL has the menu item (Add › Automation for last tweaked parameter) and no shortcut for it: the DFM item
+`Add_AutoLastMenu` carries no `ShortCut` and FL's ShortcutsModule has no action for it (round 167j's list of 125
+default shortcuts). LYNX adds the global key action `automation.lastTweaked` ("Create automation clip for the last
+tweaked control"), with no default key as in FL; bind one in the shortcut editor. It does what the menu item does, for
+LYNX's own controls and for a hosted plugin's parameters, and the menu item shows the key once one is bound. With
+nothing tweaked yet the hint bar says so.
+## Round 190am: LYNX extras (loudness meter, used inserts only, the Settings page)
+None of these is an FL Studio feature: they are LYNX's own, all off by default, so FL's look and behaviour are
+unchanged until one is switched on. Nothing is saved in projects.
+
+- **Loudness meter beside the Master** (Mixer menu, `mixerLoudness`): a narrow panel right of the Master shows the
+  short-term (S) and integrated (I) loudness in LUFS and the true peak (TP) in dBTP of the Master's output, a
+  short-term bar with the integrated value as a line, and a Reset button. It is the meter the export and Apex Limiter
+  use (`core/Loudness.h`, ITU-R BS.1770-4), run on the audio thread by `core/MasterLoudness.h`. Off, the audio thread
+  does one atomic load per block and measures nothing. Measured (2026-11-10, `verify/results.txt` of the round):
+  integrated loudness within 0.03 LU of the EBU Tech 3341 cases 1 to 5 at 44.1, 48 and 96 kHz and equal to ffmpeg's
+  `ebur128` to its 0.1 LU read-out on four songs; true peak within +0.27 / -0.23 dB on the cases 15 to 18 and within
+  0.13 dB of ffmpeg on the songs.
+- **Show only used inserts** (Mixer menu, round 163) now has an exact rule, `mixerops::hiddenUnusedInserts`: an
+  insert hides only when it is not the Master, is not selected, was not brought back with "+", shows no level on its
+  meter and nothing uses it (`Song::insertInUse`: no channel, send, effect, input, Playlist link, sidechain or extra
+  output, default name and settings, no automation). A hidden insert that is selected from elsewhere or starts to
+  receive audio comes back and stays.
+- **Settings › LYNX extras**: one page with every LYNX improvement that is off by default (`core/LynxExtras.h`), each
+  with its switch and one line saying what it does and where its own switch is. The page stores nothing: each switch
+  reads and writes the feature's own preference.
+## Round 190ao: plugin window options (Reload, Pin on top, per-plugin velocity, note on preset load)
+All four are options that change nothing by default.
+
+| Option | FL Studio | Ableton Live | LYNX |
+|---|---|---|---|
+| Reload a crashed plugin | no separate process per plugin: a plugin crash usually takes FL down; the wrapper's Info group has a "Reload / Refresh" entry (`docs/analise/REA_rodada149.md`, not driven yet) | a crashed plugin takes Live down (no sandbox) | "Reload" in the crash message, on the crashed slot / channel menu and in the plugin window (shown in place of the editor); starts the plugin again with its last captured state, in place, with no undo step and without reopening the project. Never automatic: one reload per click. "Reload in a separate process" is offered for a plugin that ran inside LYNX |
+| Pin on top | detached plugin windows stay above FL's main window; no pin among them | plugin windows have no pin; "Auto-Hide Plug-In Windows" is the opposite idea | a pin in the wrapper header and "Pin on top" in the plugin menu: the window stays above LYNX's other secondary windows (not above other applications, like every detached LYNX window). Saved per plugin instance (`pinnedOnTop`) |
+| Per-plugin velocity | none in the wrapper's MIDI group (MIDIInPortWheel, MIDIOutPortWheel, SendNoteOffVelocityBox, SendPitchBendRangeBox, SendPolyAftertouchBox, MidiEventBusCombo, SendAllNotesOffBox; REA 149 C7); the curve is global (MIDI settings) | Velocity MIDI effect per track | LYNX extra: Wrapper settings > MIDI > Velocity: Follow MIDI settings (default) / Linear / Soft / Hard / Fixed, with the fixed value. For notes from a MIDI device; replaces the global curve for that instrument. Saved only when changed (`velocityMode`, `fixedVelocity`) |
+| Note on preset load | none | Hot-Swap previews browser presets, not plugin programs | LYNX extra: "Play a note when a preset loads" in the plugin preset menu of an instrument (off by default, a user setting): a short C5 after a load while the song is stopped |
+## Round 190al: Crest's Two-way works in three bands
+
+Black-box, from round trial190k's reference renders of LYNX's own test signals (no reference plug-in ran in this round).
+Tools and tables: `/mnt/e/lynx-work/parity190al` (`crest/fit3.py`, `crest/tw.py`, `crest/final_TTM.txt`, `hash/hash.md`);
+bank and metrics are round 190v's.
+
+What the renders show (reference style 5, our Two-way):
+
+- Pink noise comes out with three different gains: one under about 90 Hz, one up to 2.5 kHz, one above (up to 4 dB
+  apart). The step between the upper two follows a fourth-order Linkwitz-Riley split at 2.5 kHz (within 0.02 of the
+  measured transition, averaged over 162 settings).
+- The output's phase turns 360 degrees around 88 Hz and again around 2.5 kHz (−57 / −145 / −205 / −257 degrees at 30 /
+  70 / 100 / 140 Hz; −480 / −534 / −587 at 1.8 / 2.5 / 3.5 kHz): two such splits in series.
+- An 8 kHz tone is turned down from 4.6 dB lower than a 1 kHz tone and along the ratio itself (slopes 0.50 / 0.76 /
+  0.92 at ratio 2 / 4 / 10, against 0.25 / 0.62 / 0.84); a 100 Hz tone behaves like a 1 kHz tone about 4 dB quieter,
+  which is the share of it each split passes (−4.1 dB to the mid band, −8.5 dB to the low band).
+
+Model: the signal is split at 88 Hz and 2.5 kHz, each band runs round 190v's law form with its own constants (fitted
+jointly on the 1 kHz, 100 Hz and 8 kHz stairs of 162 settings: 0.064 dB rms), and the bands are added. The fixed gain
+round 190v had to give the single band is gone: it was the high band's share of the 1 kHz tone. The pink-noise stairs
+were not part of the fit: through the engine their band gains land within 0.05 / 0.14 / 0.18 dB (low / mid / high).
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 60 | 2.18 | 0.34 | 0 | 5.05 | 7.32 | 53 / 7 / 0 |
+| 190k knee grid | 72 | 1.75 | 0.14 | 0 | 4.71 | 8.03 | 72 / 0 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 1.89 | 0.25 | 0 | 3.94 | 7.46 | 345 / 25 / 0 |
+| 190k T* | 4 | 1.72 | 0.12 | 0 | 4.75 | 8.00 | 4 / 0 / 0 |
+| All | 506 | 1.91 | 0.25 | 0 | 4.19 | 7.53 | 474 / 32 / 0 |
+
+("Before" is round 190v's single-band law; against 0.1.25 the gain error was 4.29 dB and the score 2.39.)
+
+- Only new instances of the Two-way style change (Law = Measured). A project saved before round 190v keeps the classic
+  law, one band, bit-identical (`hash/hash.md`: 36 of 36 legacy renders identical; every other style identical to
+  round 190v's build).
+- Cost: the measured Two-way runs three detectors and the splits: 0.65 → 1.31 s of CPU for 72 s of audio (about 0.8 %
+  → 1.7 % of one core at 48 kHz). Latency unchanged (0). The editor's curve is that of a 1 kHz tone, as before.
+- Open: the low band's law rests on the 100 Hz tone alone (it sits on the split); ratios under 2 and over 10 are
+  extrapolated; auto gain as in round 190v.
+
+### Vari-mu at slow attacks (same round)
+
+On the reference's −40 → −6 dBFS step at attack 100 ms the reduction starts at once and closes in like a smoothed
+gain (−2.1 / −4.8 / −6.3 / −7.0 dB after 15 / 30 / 45 / 60 ms, towards −7.8); ours smoothed the level, did nothing
+for 45 ms and settled 1 dB short. Above an attack of 30 ms Vari-mu now smooths the gain in part (a share of 0.6 at
+100 ms, by the logarithm of the attack in between). The share is the most that made no capture worse: with the full
+share the 30 ms programme captures and the pink-noise stairs at 100 ms lost 0.2 … 0.3 dB.
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 61 | 0.67 | 0.67 | 0 | 6.26 | 6.26 | 0 / 61 / 0 |
+| 190k knee grid | 72 | 0.23 | 0.23 | 0 | 6.93 | 6.93 | 0 / 72 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 0.57 | 0.33 | 0 | 6.03 | 6.48 | 85 / 284 / 1 |
+| All | 507 | 0.55 | 0.38 | 0 | 6.19 | 6.52 | 85 / 421 / 1 |
+
+The 100 ms stairs go from 1.28 to about 0.55 dB. One file loses a score step (pink noise at threshold −48, ratio 2,
+attack 100 ms: gain error 0.10 → 0.14 dB, level +0.20 → −0.20 dB). CPU: unchanged up to 30 ms, 0.49 → 0.55 s for 72 s of
+audio at 100 ms. Attacks of 30 ms and under, the classic law and every other style are bit-identical. Open: the step
+is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
+## Round 190as: "Find similar samples" in the Browser (FL's is FL Cloud's; LYNX's is local)
+
+| FL Studio 2026 | LYNX | | Note |
+|---|---|---|---|
+| Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
+| FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |

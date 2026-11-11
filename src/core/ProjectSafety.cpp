@@ -146,6 +146,169 @@ std::string nextVersionName (const std::string& stem, const std::function<bool (
     }
 }
 
+// --- the Versions panel (round 190ap) -------------------------------------------------------------------------------
+namespace versions
+{
+std::string familyOf (const std::string& stem, int* number)
+{
+    if (number != nullptr)
+        *number = 1;
+    // (the same rule as nextVersionName: a trailing "_<digits>", at most 9 of them, with something before it)
+    const auto v = versionSuffix (stem);
+    if (v == std::string::npos || stem.size() - v > 10)
+        return stem;
+    if (number != nullptr)
+        *number = (int) std::min<long long> (std::stoll (stem.substr (v + 1)), 2000000000LL);
+    return stem.substr (0, v);
+}
+
+std::vector<Entry> list (const std::vector<FileInfo>& projectFolder, const std::vector<FileInfo>& backupFolder, const std::string& currentStem,
+                         bool currentIsSaved, const Labels& versionLabels, const Labels& backupLabels)
+{
+    std::vector<Entry> out;
+    const auto family = familyOf (currentStem);
+    const auto labelOf = [] (const Labels& labels, const std::string& name) {
+        const auto it = labels.find (name);
+        return it != labels.end() ? it->second : std::string();
+    };
+
+    std::set<std::string> members { currentStem }; // whose backups count
+    if (currentIsSaved)
+        for (const auto& f : projectFolder)
+        {
+            int number = 1;
+            if (familyOf (f.name, &number) != family)
+                continue;
+            members.insert (f.name);
+            out.push_back ({ f.name, Kind::version, number, f.time, f.size, f.name == currentStem, labelOf (versionLabels, f.name) });
+        }
+
+    for (const auto& f : backupFolder)
+        for (const auto& m : members)
+            if (isBackupOf (f.name, m))
+            {
+                out.push_back ({ f.name, backupKind (f.name) == BackupKind::overwritten ? Kind::overwritten : Kind::autosaved, 0, f.time, f.size, false,
+                                 labelOf (backupLabels, f.name) });
+                break;
+            }
+
+    std::sort (out.begin(), out.end(), [] (const Entry& a, const Entry& b) {
+        if (a.time != b.time)
+            return a.time > b.time;
+        if (a.kind != b.kind)
+            return (int) a.kind < (int) b.kind;
+        return a.name > b.name;
+    });
+    return out;
+}
+
+std::string labelsFileName (const std::string& family) { return family + ".version-labels.txt"; }
+
+std::string cleanLabel (const std::string& text)
+{
+    std::string s;
+    for (const auto c : text)
+        s += (c == '\t' || c == '\n' || c == '\r') ? ' ' : c;
+    const auto first = s.find_first_not_of (' ');
+    if (first == std::string::npos)
+        return {};
+    s = s.substr (first, s.find_last_not_of (' ') - first + 1);
+    if (s.size() > 80)
+    {
+        auto cut = (std::size_t) 80;
+        while (cut > 0 && ((unsigned char) s[cut] & 0xC0) == 0x80) // (not inside a UTF-8 character)
+            --cut;
+        s = s.substr (0, cut);
+    }
+    return s;
+}
+
+std::string labelsToText (const Labels& labels)
+{
+    std::string text;
+    for (const auto& [name, label] : labels)
+        if (const auto clean = cleanLabel (label); ! clean.empty() && ! name.empty() && name.find_first_of ("\t\n\r") == std::string::npos)
+            text += name + "\t" + clean + "\n";
+    return text;
+}
+
+Labels labelsFromText (const std::string& text)
+{
+    Labels labels;
+    std::size_t at = 0;
+    while (at < text.size())
+    {
+        auto end = text.find ('\n', at);
+        if (end == std::string::npos)
+            end = text.size();
+        auto line = text.substr (at, end - at);
+        at = end + 1;
+        if (! line.empty() && line.back() == '\r')
+            line.pop_back();
+        const auto tab = line.find ('\t');
+        if (tab == std::string::npos || tab == 0)
+            continue;
+        if (const auto label = cleanLabel (line.substr (tab + 1)); ! label.empty())
+            labels[line.substr (0, tab)] = label;
+    }
+    return labels;
+}
+
+Labels pruned (const Labels& labels, const std::function<bool (const std::string&)>& exists)
+{
+    Labels kept;
+    for (const auto& [name, label] : labels)
+        if (! exists || exists (name))
+            kept[name] = label;
+    return kept;
+}
+
+std::vector<BackupFile> withoutLabelled (const std::vector<BackupFile>& files, const Labels& labels)
+{
+    std::vector<BackupFile> out;
+    for (const auto& f : files)
+        if (const auto it = labels.find (f.name); it == labels.end() || cleanLabel (it->second).empty())
+            out.push_back (f);
+    return out;
+}
+
+std::string copyName (const Entry& entry, const std::string& currentStem)
+{
+    auto base = entry.name;
+    if (entry.kind != Kind::version)
+    {
+        // a backup: "<stem> (autosaved on ...)" / the older "<stem> (2026-10-16 19.50.03)" -> "<stem>"
+        // (the plain older name "<stem>" has no stamp to drop)
+        const auto at = base.rfind (" (");
+        const auto stamped = at != std::string::npos && at > 0
+                             && (base.compare (at + 2, 13, "autosaved on ") == 0 || base.compare (at + 2, 15, "overwritten on ") == 0
+                                 || (at + 2 < base.size() && std::isdigit ((unsigned char) base[at + 2]) != 0));
+        if (stamped)
+            base = base.substr (0, at);
+    }
+    if (base.empty())
+        base = currentStem;
+    return base + " (copy)";
+}
+
+int agoValue (std::int64_t seconds, int& unit) noexcept
+{
+    const auto s = std::max<std::int64_t> (0, seconds);
+    if (s < 3600)
+    {
+        unit = 0;
+        return (int) (s / 60);
+    }
+    if (s < 2 * 86400)
+    {
+        unit = 1;
+        return (int) (s / 3600);
+    }
+    unit = 2;
+    return (int) std::min<std::int64_t> (s / 86400, 100000);
+}
+} // namespace versions
+
 bool isRelativePath (const std::string& path)
 {
     if (path.empty())

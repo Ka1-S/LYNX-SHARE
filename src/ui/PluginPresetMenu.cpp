@@ -310,6 +310,8 @@ bool applyFromBrowser (AudioEngine& engine, const juce::File& file, juce::String
             if (load (*p, file, error))
             {
                 engine.markModified();
+                if (auditionOnLoad())
+                    engine.auditionPreset (*p); // (round 190ao; nothing for an effect or while the song plays)
                 return true;
             }
             message = error;
@@ -322,6 +324,8 @@ bool applyFromBrowser (AudioEngine& engine, const juce::File& file, juce::String
         if (load (*candidates.front(), file, error))
         {
             engine.markModified();
+            if (auditionOnLoad())
+                engine.auditionPreset (*candidates.front());
             return true;
         }
         message = error;
@@ -348,6 +352,29 @@ bool applyFromBrowser (AudioEngine& engine, const juce::File& file, juce::String
     message = preset ? tr ("Open {0} first (its plugin window), then double-click the preset.", { juce::String::fromUTF8 (preset->pluginName.c_str()) })
                      : tr ("Open the plugin first (its plugin window), then double-click the preset.");
     return false;
+}
+
+// --- audition on load (round 190ao) --------------------------------------------------------------------------------
+namespace
+{
+int& auditionCache()
+{
+    static int value = -1; // -1: not read yet
+    return value;
+}
+} // namespace
+
+bool auditionOnLoad()
+{
+    if (auditionCache() < 0)
+        auditionCache() = PluginHost::settingsFolder().getChildFile ("preset-audition.txt").loadFileAsString().trim() == "1" ? 1 : 0;
+    return auditionCache() == 1;
+}
+
+void setAuditionOnLoad (bool on)
+{
+    auditionCache() = on ? 1 : 0;
+    PluginHost::settingsFolder().getChildFile ("preset-audition.txt").replaceWithText (on ? "1" : "0");
 }
 
 // --- the bar ---------------------------------------------------------------------------------------------------------
@@ -439,6 +466,8 @@ void PresetBar::apply (const Entry& entry)
         currentProgram = entry.program;
         currentFile = juce::File();
         setName (entry.name);
+        if (onLoaded)
+            onLoaded();
         return;
     }
     juce::String error;
@@ -450,6 +479,8 @@ void PresetBar::apply (const Entry& entry)
     currentFile = entry.file;
     currentProgram = -1;
     setName (entry.name);
+    if (onLoaded)
+        onLoaded();
 }
 
 void PresetBar::setName (const juce::String& name)
@@ -507,6 +538,12 @@ void PresetBar::showMenu()
         folder.createDirectory();
         folder.revealToUser();
     });
+    // round 190ao (LYNX's own, off by default): hear a preset at once
+    if (onLoaded && plugin.getPluginDescription().isInstrument)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Play a note when a preset loads"), true, auditionOnLoad(), [] { setAuditionOnLoad (! auditionOnLoad()); });
+    }
     if (extendMenu)
     {
         menu.addSeparator();

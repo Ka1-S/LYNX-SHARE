@@ -188,6 +188,18 @@ public:
     // is saved with the UI options.
     bool stretchOnResize = false;
     bool createVariants = true;
+    // FL's Playlist menu › Edit options (round 189g; FLEngine ShortcutsModule actions, saved with the UI options):
+    // "Allow resizing from left" (EELeftResizingAction Ctrl+Alt+Home, the PLForm's +0xb4a; off = a clip's left edge moves
+    // it, FUN_00e8e840), "Nudge clips with mouse wheel" (EEShiftMouseWheelNudgeAction, Checked in FL's form: Shift+wheel
+    // moves clips by the snap, FUN_00e82270), "Create new clips with manual fades" (EECreateNewClipsWithManualFades, global
+    // 0x152c364) and "Snap fade handles" (EESnapFadeHandles, 0x152c365). FL's defaults.
+    bool leftResizing = true;
+    bool wheelNudging = true;
+    bool manualFades = false;
+    bool snapFadeHandles = false;
+    // FL's Playlist menu › Select › "Magic lasso" (EESelMagicAction, the PLForm's +0xb49; off in FL): circling clips with
+    // the mouse selects them (FUN_00e6ff80).
+    bool magicLasso = false;
 
     // "Follow" (FL's auto scrolling, round 162 / issue #9): the Playlist (Song mode) and the Piano Roll page along
     // with the playhead while playing; off, they stay where the user scrolled. Saved with the UI options.
