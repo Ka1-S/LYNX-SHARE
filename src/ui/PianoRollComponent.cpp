@@ -3053,6 +3053,9 @@ void PianoRollComponent::showMoreMenu()
     menu.addItem (tr ("Fold to the scale (hide the other keys and their notes)"), scaleIndex() > 0, foldToScale,
                   [this] { setFoldToScale (! foldToScale); });
     menu.addItem (tr ("Chord stamp: the clicked key is the top note"), true, chordTopDown, [this] { chordTopDown = ! chordTopDown; });
+    // the chord stamp's list (round 190j, discussion #10): the toolbar's chord box is hidden in a narrow window, so
+    // the stamp is always in this menu too
+    menu.addSubMenu (tr ("Chord stamp"), stampMenu(), true, juce::Image(), chordBox.getSelectedId() > 1);
     menu.addItem (tr ("Stamp: none (single notes)") + keyText ("pianoRoll.stampNone"), chordBox.getSelectedId() != 1, false,
                   [this] { runAction ("pianoRoll.stampNone"); });
     menu.addItem (tr ("Move the notes onto the scale"), scaleIndex() > 0, false, [this] {
@@ -4839,6 +4842,19 @@ juce::PopupMenu PianoRollComponent::editMenu()
     menu.addSeparator();
     menu.addItem (tr ("Insert current controller value") + keyText ("pianoRoll.insertControllerValue"), eventLaneTarget().has_value(), false,
                   [this] { runAction ("pianoRoll.insertControllerValue"); });
+    return menu;
+}
+
+juce::PopupMenu PianoRollComponent::stampMenu()
+{
+    // the toolbar chord box's items, the chosen one ticked ("Note" = no stamp: single notes)
+    juce::PopupMenu menu;
+    for (int i = 0; i < chordBox.getNumItems(); ++i)
+    {
+        const auto id = chordBox.getItemId (i);
+        menu.addItem (chordBox.getItemText (i) + (id == 1 ? keyText ("pianoRoll.stampNone") : juce::String()), true, chordBox.getSelectedId() == id,
+                      [this, id] { chordBox.setSelectedId (id, juce::sendNotificationSync); });
+    }
     return menu;
 }
 
