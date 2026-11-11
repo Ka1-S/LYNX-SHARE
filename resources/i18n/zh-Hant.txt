@@ -1563,6 +1563,8 @@ countries: tw hk mo
 "Controller type" = "控制器類型"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "通用控制器：透過控制項的右鍵選單 > 關聯到MIDI控制器 來關聯旋鈕或推桿。"
 "Pickup (takeover mode)" = "拾取（接管模式）"
+"Foot pedal controls note off" = "踏板控制音符釋放"
+"Disable to send sustain to plugins" = "關閉後將延音傳送給外掛"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "控制器只有在達到參數目前值後才會移動參數，因此不會跳變。"
 "Links in this project" = "此專案中的關聯"
 "ch. {0}" = "通道{0}"
@@ -8126,6 +8128,15 @@ countries: tw hk mo
 "Send the time selection to the comp" = "將時間選區送入合成軌"
 "Send the time selection of the take lane to its comp" = "將錄音軌的時間選區送入其合成軌"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "連接"
+"Auto map outputs" = "自動對應輸出"
+"Assign all outputs incrementally" = "依序指派所有輸出"
+"Set all inputs and outputs to their default values" = "將所有輸入和輸出恢復為預設值"
+"Refresh inputs and outputs (after a change in the plugin)" = "重新整理輸入和輸出（外掛變更後）"
+"Mixer track offset for output {0}" = "輸出 {0} 的混音器軌道位移"
+"Deactivate output {0}" = "停用輸出 {0}"
+"Activate output {0}" = "啟用輸出 {0}"
 # --- Game controller (round 184a, S16)
 "Game controller" = "遊戲手把"
 "Use a game controller" = "使用遊戲手把"
