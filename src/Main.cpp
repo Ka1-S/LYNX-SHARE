@@ -10487,6 +10487,17 @@ private:
         offline.dispatchPendingMessages();
         toolbarShot ("key-pattern-toolbar");
         write ("pattern-after");
+        // round 184a S17: the setup wizard with its Workflow choice — a first start (Pattern selected), then reopened in Simple
+        for (int style : { 0, 2 })
+        {
+            auto wizard = lynx::makeSetupWizardContent (offline, {}, {}, style, {});
+            juce::Image image (juce::Image::ARGB, wizard->getWidth(), wizard->getHeight(), true);
+            {
+                juce::Graphics g (image);
+                wizard->paintEntireComponent (g, false);
+            }
+            writeImage (image, style == 0 ? "wizard-pattern" : "wizard-simple");
+        }
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
                                                              + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
                                                              + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n" + keyCounts);

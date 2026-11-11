@@ -7514,6 +7514,15 @@ void MainComponent::showSetupWizard()
                 if (safe != nullptr)
                     safe->setupOverlay.reset();
             });
+        },
+        (int) layoutStyle,
+        [safe] (int style) { // round 184a S17: the workflow chosen in the wizard (Pattern stays selected unless changed)
+            juce::MessageManager::callAsync ([safe, style] {
+                if (safe == nullptr)
+                    return;
+                safe->setLayoutStyle ((layoutstyle::Style) juce::jlimit (0, layoutstyle::count - 1, style));
+                safe->saveUiSettings();
+            });
         });
     addAndMakeVisible (*setupOverlay);
     setupOverlay->setBounds (getLocalBounds());
