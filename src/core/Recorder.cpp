@@ -658,12 +658,14 @@ void NoteRecorder::add (const Song& song, const RecordedEvent& e)
         if (auto it = held.find (id); it != held.end())
             finish (song, e.channel, e.key, it->second, e.tick);
 
-        held[id] = { e.tick, e.velocity };
+        held[id] = { e.tick, e.velocity, e.expression, e.finePitch, e.modX, e.modY };
         return;
     }
 
     if (auto it = held.find (id); it != held.end())
     {
+        if (e.expression && it->second.expression) // (the note's peak pressure comes with its "off")
+            it->second.modY = e.modY;
         finish (song, e.channel, e.key, it->second, e.tick);
         held.erase (it);
     }
@@ -713,6 +715,12 @@ Note NoteRecorder::makeNote (const Song& song, int channel, int key, const Held&
     n.channel = channel;
     n.key = std::clamp (key, 0, 127);
     n.velocity = std::clamp (h.velocity, 0.0f, 1.0f);
+    if (h.expression) // issue #108: an MPE note's bend, timbre and pressure, as the piano roll's per-note values
+    {
+        n.finePitch = std::isfinite (h.finePitch) ? std::clamp (h.finePitch, -120.0f, 120.0f) : 0.0f;
+        n.modX = std::isfinite (h.modX) ? std::clamp (h.modX, 0.0f, 1.0f) : 0.5f;
+        n.modY = std::isfinite (h.modY) ? std::clamp (h.modY, 0.0f, 1.0f) : 0.5f;
+    }
     return n;
 }
 

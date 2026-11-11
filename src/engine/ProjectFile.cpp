@@ -6,6 +6,7 @@
 #include "core/SessionIds.h"
 
 #include "core/MixerOps.h"
+#include "core/PlaylistOps.h"
 
 #include <algorithm>
 #include <tuple>
@@ -343,6 +344,8 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("bendRange", p.bendRange);
     if (p.modXAftertouch)
         o->setProperty ("modXAftertouch", true);
+    if (p.mpe) // issue #108
+        o->setProperty ("mpe", true);
     if (! p.allNotesOffOnStop)
         o->setProperty ("allNotesOffOnStop", false);
     if (! p.resetOnFlush)
@@ -422,6 +425,7 @@ PluginRef pluginFromVar (const juce::var& v)
     p.sendBendRange = (bool) v.getProperty ("sendBendRange", false);
     p.bendRange = juce::jlimit (1, 48, (int) v.getProperty ("bendRange", 12));
     p.modXAftertouch = (bool) v.getProperty ("modXAftertouch", false);
+    p.mpe = (bool) v.getProperty ("mpe", false);
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
@@ -2311,6 +2315,14 @@ juce::var mixerTrackToVar (const MixerTrack& t)
             sends.add (juce::Array<juce::var> { send.target, juce::roundToInt (send.level * 10000.0f) / 10000.0 });
 
         o->setProperty ("sends", sends);
+        // LYNX's pre-fader sends (round 190aq): their targets, written only when one is used. A version from before
+        // ignores the list and plays those sends post-fader (its loader takes "sends" entries of two values only).
+        juce::Array<juce::var> pre;
+        for (const auto& send : t.sends)
+            if (send.pre)
+                pre.add (send.target);
+        if (! pre.isEmpty())
+            o->setProperty ("preSends", pre);
     }
     if (! t.lostSends.empty()) // round 186c: [name, level] of each send to a deleted insert
     {
@@ -2389,6 +2401,11 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         for (const auto& send : *sends)
             if (send.isArray() && send.size() == 2)
                 track.sends.push_back ({ (int) send[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) send[1]) });
+    if (auto* pre = t["preSends"].getArray())
+        for (const auto& target : *pre)
+            for (auto& send : track.sends)
+                if (send.target == (int) target)
+                    send.pre = true;
     if (auto* lost = t["lostSends"].getArray())
         for (const auto& l : *lost)
             if (l.isArray() && l.size() == 2)
@@ -3628,6 +3645,10 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 track.mixerTrack = mixer > 0 && mixer < (int) song.mixer.size() ? mixer : -1;
                 track.channel = audio ? -1 : channel;
             }
+
+    // audio clips that point at a Sampler channel (a file dropped on an audio clip channel's row made one before round
+    // 190ax; hand-written projects): the clip showed its waveform and played nothing
+    audioclips::repairChannels (song);
 
     // sends to tracks that don't exist are discarded
     for (auto& t : song.mixer)

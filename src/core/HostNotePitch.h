@@ -78,6 +78,12 @@ struct SentKeys
         drop (p.keys, p.count);
         return k;
     }
+    // the key the newest sounding note of `key` went out on (`key` itself if none); issue #108
+    int sentFor (int key) const noexcept
+    {
+        const auto& p = played[(std::size_t) (key & 127)];
+        return p.count == 0 ? key : (int) p.keys[(std::size_t) (p.count - 1)];
+    }
     // the VST3 host's note on for `sentKey`: its tuning (0 when none waits)
     float takeTuning (int sentKey) noexcept
     {

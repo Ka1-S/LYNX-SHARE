@@ -1,0 +1,110 @@
+# Mackie Control Universal (MCU): the motor-fader protocol most control surfaces speak, with 8 strips, V-Pots with
+# LED rings, a 2 x 56 character display and a transport section. docs/CONTROLLERS.md explains the format.
+#
+# Sources (maker documents only):
+#  - the protocol: "Logic Control" user manual (Emagic / Mackie Designs; reprinted as Apple's "Logic 7 Dedicated Control
+#    Surface Support"), Appendix B "Logic Control - MIDI Implementation" and Appendix C "Control surface layout and
+#    IDs": faders as pitch bend on channels 1-9, switches and LEDs as notes, V-Pots as CC 16-23 (bit 6 = counter-
+#    clockwise), LED rings as CC 48-55, jog wheel as CC 60, the display as SysEx "<header> 12 <offset> <text>".
+#  - the display's SysEx header: that manual gives the model byte 10h for the Logic Control. A unit in Mackie Control
+#    mode uses 14h (its extender 15h); no Mackie document read for this file states it.
+#  - port names: Mackie's manual only says the DAW entry is "Mackie Control"; the patterns below are best guesses.
+#    If your unit is not detected, choose this type by hand in Settings > MIDI.
+
+[device]
+name = Mackie Control Universal
+maker = Mackie
+source = Logic Control user manual (Emagic / Mackie Designs), Appendix B "MIDI Implementation" and Appendix C "Control surface layout and IDs"
+source = Mackie Control Universal Pro / XT Pro Owner's Manual, https://mackie.com/img/file_resources/MCU_Pro-XT_Pro_OM.pdf
+match = Mackie Control*, MCU Pro*, *Mackie Control Universal*
+exclude = *XT*, *Extender*
+group = mackie
+strips = 8
+# what the V-Pots turn: ASSIGNMENT Pan/Surround, Plug-in and Track
+layers = Pan, Plug-in, Channels
+
+[input]
+# faders (touch-sensitive, motorised) and the Master fader
+bend ch 1-8 = mixer.volume
+bend ch 9 = master.volume
+note 104-111 ch 1 = mixer.touch
+note 112 ch 1 = master.touch
+
+# V-Pots: pan, the focused plugin's parameters, or the Channel Rack's volumes
+cc 16-23 ch 1 = mixer.pan mode=sign step=0.01 layer=Pan
+cc 16-23 ch 1 = plugin.param mode=sign step=0.01 layer=Plug-in
+cc 16-23 ch 1 = channel.volume mode=sign step=0.01 layer=Channels
+# V-Pot push
+note 32-39 ch 1 = channel.select layer=Channels
+note 32-39 ch 1 = ignore
+
+# strip switches
+note 0-7 ch 1 = mixer.arm          # REC/RDY
+note 8-15 ch 1 = mixer.solo
+note 16-23 ch 1 = mixer.mute
+note 24-31 ch 1 = mixer.select
+
+# ASSIGNMENT
+note 40 ch 1 = layer Channels      # Track
+note 42 ch 1 = layer Pan           # Pan/Surround
+note 43 ch 1 = layer Plug-in
+
+# FADER BANKS
+note 46 ch 1 = mixer.bank.left
+note 47 ch 1 = mixer.bank.right
+note 48 ch 1 = mixer.strip.left    # Channel left
+note 49 ch 1 = mixer.strip.right
+
+# cursor keys: the parameter page / the channel bank, and the selected channel (whose instrument the Plug-in layer shows)
+note 96 ch 1 = channel.previous    # Up
+note 97 ch 1 = channel.next        # Down
+note 98 ch 1 = plugin.page.left layer=Plug-in
+note 99 ch 1 = plugin.page.right layer=Plug-in
+note 98 ch 1 = channel.bank.left layer=Channels
+note 99 ch 1 = channel.bank.right layer=Channels
+
+# transport
+note 81 ch 1 = edit.undo
+note 86 ch 1 = transport.loop      # Cycle
+note 89 ch 1 = transport.metronome # Click
+note 91 ch 1 = transport.rewind
+note 92 ch 1 = transport.forward
+note 93 ch 1 = transport.stop
+note 94 ch 1 = transport.play
+note 95 ch 1 = transport.record
+cc 60 ch 1 = transport.jog mode=sign
+
+# every other switch of the surface (function keys, modifiers, automation, zoom, scrub...): nothing yet
+note 0-103 ch 1 = ignore
+note 113-127 ch 1 = ignore
+
+[feedback]
+mixer.volume = bend ch 1-8
+master.volume = bend ch 9
+mixer.pan = cc 48-55 ch 1 ring=pan layer=Pan
+plugin.param = cc 48-55 ch 1 ring=wrap layer=Plug-in
+channel.volume = cc 48-55 ch 1 ring=wrap layer=Channels
+mixer.arm = note 0-7 ch 1
+mixer.solo = note 8-15 ch 1
+mixer.mute = note 16-23 ch 1
+mixer.select = note 24-31 ch 1
+layer Channels = note 40 ch 1
+layer Pan = note 42 ch 1
+layer Plug-in = note 43 ch 1
+transport.loop = note 86 ch 1
+transport.metronome = note 89 ch 1
+transport.stop = note 93 ch 1
+transport.play = note 94 ch 1
+transport.record = note 95 ch 1
+
+[display]
+# 2 rows of 56 characters, 7 per strip; offset 00h-37h is the upper row, 38h-6Fh the lower
+write = F0 00 00 66 14 12 {pos} {text} F7
+width = 7
+cells = 8
+row 1 = mixer.name layer=Pan
+row 2 = mixer.pan layer=Pan
+row 1 = plugin.param.name layer=Plug-in
+row 2 = plugin.param.value layer=Plug-in
+row 1 = channel.name layer=Channels
+row 2 = channel.volume layer=Channels

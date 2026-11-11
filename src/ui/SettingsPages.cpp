@@ -1226,14 +1226,64 @@ private:
 // ================================================================================================================
 // MIDI
 // ================================================================================================================
-// One input device: on/off, which MIDI channel it listens to and what it plays.
+// One input device: on/off, which MIDI channel it listens to, what it plays, and its controller type (FL's Options ›
+// MIDI "Controller type" of the selected input; round 190aw: the controller profiles of core/ControllerProfile.h).
 class MidiInputRow final : public juce::Component
 {
 public:
+    // What the Controller type list offers and shows for this device.
+    struct Controllers
+    {
+        std::vector<std::pair<std::string, juce::String>> profiles; // id, name as listed
+        juce::String detected;                                      // the profile its port name matches ("" = none)
+        juce::String status;                                        // where the feedback goes
+    };
+
     MidiInputRow (const juce::String& deviceName, const prefs::MidiInputPrefs& p, const std::vector<std::string>& channels,
-                  std::function<void (const prefs::MidiInputPrefs&)> changed)
+                  const Controllers& controllers, std::function<void (const prefs::MidiInputPrefs&)> changed)
         : prefsNow (p), onChange (std::move (changed))
     {
+        typeLabel.setText (tr ("Controller type"), juce::dontSendNotification);
+        typeLabel.setFont (theme::font (theme::type::small));
+        typeLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        addAndMakeVisible (typeLabel);
+        // FL's list: "(generic controller)" first, then the device scripts; LYNX adds the automatic choice on top
+        type.addItem (controllers.detected.isNotEmpty() ? tr ("Detect automatically ({0})", { controllers.detected })
+                                                        : tr ("Detect automatically ({0})", { tr ("Generic controller") }),
+                      1);
+        type.addItem (tr ("Generic controller"), 2);
+        if (! controllers.profiles.empty())
+            type.addSeparator();
+        auto chosen = p.controller.empty() ? 1 : p.controller == controller::genericChoice ? 2 : 0;
+        for (int i = 0; i < (int) controllers.profiles.size(); ++i)
+        {
+            type.addItem (controllers.profiles[(std::size_t) i].second, i + 3);
+            typeIds.push_back (controllers.profiles[(std::size_t) i].first);
+            if (p.controller == controllers.profiles[(std::size_t) i].first)
+                chosen = i + 3;
+        }
+        if (chosen == 0) // a profile that is gone (kept; the device runs as a generic controller)
+        {
+            typeIds.push_back (p.controller);
+            chosen = (int) typeIds.size() + 2;
+            type.addItem (juce::String::fromUTF8 (p.controller.c_str()), chosen);
+        }
+        type.setSelectedId (chosen, juce::dontSendNotification);
+        type.setTooltip (tr ("A controller profile sets up the device's transport buttons, faders, knobs, pads, lights and display. "
+                             "Controls you link by hand keep their links."));
+        type.onChange = [this] {
+            const auto id = type.getSelectedId();
+            prefsNow.controller = id <= 1 ? std::string() : id == 2 ? std::string (controller::genericChoice) : typeIds[(std::size_t) (id - 3)];
+            update();
+        };
+        styleCombo (type);
+        addAndMakeVisible (type);
+        status.setText (controllers.status, juce::dontSendNotification);
+        status.setFont (theme::font (theme::type::small));
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        status.setMinimumHorizontalScale (1.0f);
+        addAndMakeVisible (status);
+
         enabled.setButtonText (deviceName);
         enabled.setToggleState (p.enabled, juce::dontSendNotification);
         enabled.onClick = [this] {
@@ -1245,11 +1295,29 @@ public:
         channel.addItem (tr ("Any MIDI channel"), 1);
         for (int c = 1; c <= 16; ++c)
             channel.addItem (tr ("MIDI channel {0}", { juce::String (c) }), c + 1);
-        channel.setSelectedId (p.midiChannel + 1, juce::dontSendNotification);
+        // issue #108 (a LYNX addition; FL has no MPE input): the device is an MPE controller — every channel is
+        // taken (channel 1 = master, the member channels from 2 up carry one note each with its bend, CC 74, pressure)
+        channel.addSeparator();
+        channel.addItem (tr ("MPE controller"), mpeItem);
+        channel.setTooltip (tr ("MPE controller: each note has its own MIDI channel; its pitch bend, timbre (CC 74) and pressure are played and recorded per note (fine pitch, Mod X, Mod Y)"));
+        channel.setSelectedId (p.mpe ? mpeItem : p.midiChannel + 1, juce::dontSendNotification);
         channel.onChange = [this] {
-            prefsNow.midiChannel = channel.getSelectedId() - 1;
+            prefsNow.mpe = channel.getSelectedId() == mpeItem;
+            if (! prefsNow.mpe)
+                prefsNow.midiChannel = channel.getSelectedId() - 1;
+            update();
+            resized();
+        };
+        for (int n = 15; n >= 1; --n)
+            zone.addItem (n == 1 ? tr ("Channel 2") : tr ("Channels 2-{0}", { juce::String (n + 1) }), n);
+        zone.setTooltip (tr ("MPE member channels (lower zone): the MIDI channels that carry one note each"));
+        zone.setSelectedId (juce::jlimit (1, 15, p.mpeMembers), juce::dontSendNotification);
+        zone.onChange = [this] {
+            prefsNow.mpeMembers = zone.getSelectedId();
             update();
         };
+        styleCombo (zone);
+        addChildComponent (zone);
 
         plays.addItem (tr ("Plays the selected channels"), 1);
         for (int i = 0; i < (int) channels.size(); ++i)
@@ -1272,11 +1340,26 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced (8, 4);
-        plays.setBounds (r.removeFromRight (230));
-        r.removeFromRight (8);
-        channel.setBounds (r.removeFromRight (150));
-        r.removeFromRight (8);
-        enabled.setBounds (r);
+        auto top = r.removeFromTop (26);
+        plays.setBounds (top.removeFromRight (230));
+        top.removeFromRight (8);
+        channel.setBounds (top.removeFromRight (150));
+        top.removeFromRight (8);
+        zone.setVisible (prefsNow.mpe);
+        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice; the channel box keeps its column)
+        {
+            zone.setBounds (top.removeFromRight (124));
+            top.removeFromRight (8);
+        }
+        enabled.setBounds (top);
+        r.removeFromTop (4);
+        // the second line, as the output rows have: the controller type under the device's name
+        auto bottom = r.removeFromTop (26);
+        bottom.removeFromLeft (28); // (under the name, past the check box)
+        typeLabel.setBounds (bottom.removeFromLeft (110));
+        type.setBounds (bottom.removeFromLeft (260));
+        bottom.removeFromLeft (10);
+        status.setBounds (bottom);
     }
 
     void paint (juce::Graphics& g) override
@@ -1289,7 +1372,9 @@ private:
     void update (bool notify = true)
     {
         channel.setEnabled (prefsNow.enabled);
+        zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
+        type.setEnabled (prefsNow.enabled);
         if (notify && onChange)
             onChange (prefsNow);
     }
@@ -1297,7 +1382,10 @@ private:
     prefs::MidiInputPrefs prefsNow;
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
-    juce::ComboBox channel, plays;
+    juce::ComboBox channel, plays, type, zone;
+    juce::Label typeLabel, status;
+    std::vector<std::string> typeIds; // [item id − 3] the profile's id
+    static constexpr int mpeItem = 100;
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
@@ -1455,9 +1543,19 @@ public:
         styleLabel (noDevices, tr ("No MIDI input devices found. Connect one and refresh the list."));
         refresh.onClick = [this] {
             if (persistent)
+            {
+                engine.reloadControllerProfiles(); // (FL's "Update MIDI scripts": the user's profile files are read again)
                 engine.reconnectMidiInputs(); // also wakes a device that stopped sending
+            }
             rebuildInputs();
         };
+        profilesFolder.setTooltip (tr ("Your own controller profiles (*.lynxctl) go here; Refresh device list reads them again"));
+        profilesFolder.onClick = [] {
+            const auto folder = AudioEngine::controllerProfilesFolder();
+            folder.createDirectory();
+            folder.revealToUser();
+        };
+        add (profilesFolder);
 
         styleLabel (velocityLabel, tr ("Velocity"));
         velocityBox.addItem (tr ("As played"), 1);
@@ -1550,7 +1648,7 @@ public:
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
-            sampleDevices = { "Arturia KeyLab 49", "Akai MPD218" };
+            sampleDevices = { "Mackie Control", "Akai MPD218", sampleMpeDevice }; // (one with a built-in controller profile, one generic, one shown as an MPE controller, issue #108)
             sampleOutputs = { "Roland TR-8S", "Korg volca sample" };
             auto p = engine.getMidiPrefs();
             prefs::MidiOutputPrefs drums;
@@ -1592,8 +1690,13 @@ private:
         if (rows.empty())
             noDevices.setBounds (r.full (24));
         for (auto& row : rows)
-            row->setBounds (r.full (34).translated (0, -4));
-        refresh.setBounds (r.full().removeFromLeft (150));
+            row->setBounds (r.full (66).translated (0, -4));
+        {
+            auto buttons = r.full();
+            refresh.setBounds (buttons.removeFromLeft (150));
+            buttons.removeFromLeft (8);
+            profilesFolder.setBounds (buttons.removeFromLeft (210));
+        }
 
         r.section (outputsTitle);
         outputsNote.setBounds (r.full (32).translated (0, -4));
@@ -1617,11 +1720,8 @@ private:
         jumpNote.setBounds (r.indented (32).translated (0, -3));
 
         r.section (controllersTitle);
-        {
-            auto row = r.row (typeLabel, 0, 36);
-            typeLabel.setBounds (typeLabel.getBounds().withTrimmedTop (6));
-            typeValue.setBounds (row.withTrimmedTop (6));
-        }
+        typeLabel.setVisible (false); // (round 190aw: the Controller type is each input device's, above, as in FL)
+        typeValue.setBounds (r.full (20));
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.full (16).translated (0, -3));
         footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
@@ -1680,6 +1780,9 @@ private:
         removeAll.setEnabled (! engine.getSong().midiLinks.empty());
     }
 
+    // --snapshot: the sample devices answer on a port of their own name
+    static std::string sampleFeedback (const juce::String& input) { return input.toStdString(); }
+
     // the project's links, then the global ones (settings; FL's "Override global link...", REA round 146)
     int linkRows() const { return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size()); }
 
@@ -1697,13 +1800,39 @@ private:
         for (const auto& c : engine.getSong().channels)
             channels.push_back (c.name);
 
+        // the controller profiles (round 190aw): FL lists its device scripts with "(user)" after the user's own
+        const auto& controllers = engine.getControllers();
+        MidiInputRow::Controllers types;
+        for (const auto& profile : controllers.library().profiles)
+            types.profiles.push_back ({ profile->id, profile->user ? tr ("{0} (user)", { juce::String::fromUTF8 (profile->name.c_str()) })
+                                                                   : juce::String::fromUTF8 (profile->name.c_str()) });
+        std::sort (types.profiles.begin(), types.profiles.end(),
+                   [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
+
         for (const auto& name : names)
         {
-            auto row = std::make_unique<MidiInputRow> (name, engine.getMidiPrefs().input (name.toStdString()), channels,
+            auto settings = engine.getMidiPrefs().input (name.toStdString());
+            if (! persistent && name == sampleMpeDevice) // (the snapshot's sample row for an MPE controller)
+                settings.mpe = true;
+            const auto detected = controllers.library().detect (name.toStdString());
+            types.detected = detected != nullptr ? juce::String::fromUTF8 (detected->name.c_str()) : juce::String();
+            types.status = {};
+            if (settings.enabled && controllers.library().resolve (settings.controller, name.toStdString()) != nullptr)
+            {
+                const auto output = persistent ? controllers.outputOf (name.toStdString()) : sampleFeedback (name);
+                types.status = output.empty() ? tr ("No output port for its lights and display") : tr ("Feedback to {0}", { juce::String::fromUTF8 (output.c_str()) });
+            }
+            auto row = std::make_unique<MidiInputRow> (name, settings, channels, types,
                                                        [this] (const prefs::MidiInputPrefs& in) {
                                                            auto p = engine.getMidiPrefs();
+                                                           const auto typeChanged = p.input (in.name).controller != in.controller;
                                                            p.setInput (in);
                                                            set (p);
+                                                           if (typeChanged) // (the row's status line follows the new type)
+                                                               juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MidiPage> (this)] {
+                                                                   if (safe != nullptr)
+                                                                       safe->rebuildInputs();
+                                                               });
                                                        });
             add (*row);
             rows.push_back (std::move (row));
@@ -1816,6 +1945,7 @@ private:
     bool loading = false;
     std::size_t channelCount = 0;
     juce::StringArray sampleDevices;
+    static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;
     std::vector<std::unique_ptr<MidiOutputRow>> outputRows;
     juce::StringArray sampleOutputs, clockInputs;
@@ -1826,6 +1956,7 @@ private:
     SectionTitle inputsTitle { tr ("Input devices") }, notesTitle { tr ("Notes") }, controllersTitle { tr ("Controllers") };
     juce::Label inputsNote, noDevices, velocityLabel, velocityNote, perfLabel, perfNote, typeLabel, typeValue, pickupNote, linksLabel, jumpLabel, jumpNote;
     juce::TextButton refresh { tr ("Refresh device list") }, removeLink { tr ("Remove link") }, removeAll { tr ("Remove all") };
+    juce::TextButton profilesFolder { tr ("Controller profiles folder") };
     juce::ComboBox velocityBox, perfBox, jumpBox;
     juce::ToggleButton pickup, footPedal, gamepadToggle;
     juce::Label gamepadNote;

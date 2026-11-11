@@ -166,6 +166,7 @@ public:
     void deleteSelectedTracks() { deleteTracks (selection); }
     // The insert's right-click menu (FL's mixer track menu, REA rounds 115/134/143); public for --snapshot and tests.
     juce::PopupMenu buildMenu (int track);
+    juce::PopupMenu buildSendMenu (int track); // the route arrow / send knob menu from the selected track to `track`
     // runs the selected track's menu item whose caption (before any "\t" key text) is `caption` (translated): the
     // Mixer's menu keys (round 167k: FL's F2, S, Alt+R, Shift+Alt+R) do exactly what the menu does. False when absent
     // or disabled.
@@ -365,6 +366,7 @@ private:
     void dragSelectTo (int track);
     bool headerDragged = false;
     void showSendMenu (int track);
+    void addPreFaderItem (juce::PopupMenu& menu, int from, int track); // LYNX's pre-fader switch of a send (round 190aq)
     void routeSelection (int track, mixerops::RouteKind kind); // the selected inserts into `track` (FL's route arrow)
     void soloExclusive (int track);
     std::vector<int> selection { 0 };

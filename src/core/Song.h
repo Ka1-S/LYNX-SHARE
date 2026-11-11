@@ -242,6 +242,10 @@ struct PluginRef
     int bendRange = 12;             //   the range sent, 1…48 semitones
     bool modXAftertouch = false;    // "Send MOD X as polyphonic aftertouch": each note's Mod X follows its note on
     bool allNotesOffOnStop = true;  // "Send All Notes Off when playback stops" (off: only the held notes are released)
+    // MPE (issue #108, core/Mpe.h; a LYNX addition, FL's wrapper has no such switch): each note goes out on its own
+    // member channel (2 … 16) with its fine pitch as that channel's pitch bend (range 48), Mod X as CC 74 and Mod Y as
+    // channel pressure; a CLAP plugin that takes CLAP notes gets them as note expressions
+    bool mpe = false;
     bool resetOnFlush = true;       // Troubleshooting › "Reset plugin when FL Studio resets": before an export, on panic
     // FL's Troubleshooting box "Allow FL Studio to process keyboard presses when the keyboard focus option is on"
     // (wrapper flags2 bit 0x800, off for a new plugin): kept from and written back to FL projects (round 181c/187a);
@@ -293,7 +297,7 @@ struct PluginRef
                && hostMaxBuffer == o.hostMaxBuffer
                && midiInPort == o.midiInPort && midiOutPort == o.midiOutPort && notifyRender == o.notifyRender
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
-               && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
+               && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop && mpe == o.mpe
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
                && processInactive == o.processInactive && inputs == o.inputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
@@ -1236,8 +1240,13 @@ struct MixerSend
 {
     int target = 0;      // destination track (> 0; Master is `toMaster`)
     float level = 1.0f;  // linear gain, 0..maxFaderGain (FL's send knob: the fader curve, 0 dB at 80%, +5.6 dB at 100%)
+    // LYNX extra (round 190aq; FL's sends are post-fader only): the send leaves before the insert's fader, pan,
+    // separation, polarity and swap (after its effects and EQ), so the fader no longer moves it: headphone mixes,
+    // effects fed at a fixed level. The insert's mute and solo still silence it. Off = FL. Saved only when on; an
+    // .flp export writes the send as FL's post-fader route. Live's per-return Pre / Post toggle maps to it (.als).
+    bool pre = false;
 
-    bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level; }
+    bool operator== (const MixerSend& o) const noexcept { return target == o.target && level == o.level && pre == o.pre; }
 };
 
 // LYNX's "Keep links to deleted inserts" (round 186c, pain point 1, off by default; FL drops them): a send whose insert
@@ -2293,6 +2302,10 @@ struct Song
     float routeLevel (int from, int to) const noexcept;
     // Sets the level of an existing route (FL's route knob); does nothing if there is no such route.
     void setRouteLevel (int from, int to, float level);
+    // LYNX's pre-fader switch of the send from -> to (MixerSend::pre); false / nothing without such a send (the route
+    // to Master is always post-fader).
+    bool sendPre (int from, int to) const noexcept;
+    void setSendPre (int from, int to, bool pre);
     // Inserts (1..N) in processing order: senders come before receivers.
     std::vector<int> mixerOrder() const;
     // Tracks audible with the current solo: the soloed ones, those that feed them and the path to Master.

@@ -113,7 +113,7 @@ const natives::FlAccess& flStudioAccess()
             const auto folder = PluginHost::settingsFolder().getChildFile ("flp-embedded");
             folder.createDirectory();
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
-                juce::String::createStringFromData (wav.data(), (int) juce::jmin<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
+                juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
             if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
@@ -299,6 +299,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
         deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
+        controllerIo.loadProfiles (controllerProfilesFolder());
         recordingSettings = loadRecordingSettings();
         saveGlobalLinks = true;
 
@@ -330,6 +331,8 @@ AudioEngine::~AudioEngine()
         pluginHoldOwner.store (nullptr);
         endPluginHold();
     }
+    previewAlive->store (false); // (round 190aq: a preview still being prepared ends without touching the engine)
+    previewJobs.stop();
     stopTimer();
     rackExchange.dispose = nullptr; // (from here the racks are freed at once)
     rackDisposer.flush();
@@ -387,6 +390,7 @@ void AudioEngine::buildInitialGraph()
     }
     auto previewOwned = std::make_unique<PreviewPlayer>();
     preview = previewOwned.get();
+    preview->setTransport (&transport); // (round 190aq: "Preview in time" starts on its beats)
     preview->setVolume (controls::previewGain (previewVolume));
     preview->setEditorVolume (controls::previewGain (editorVolume));
     auto previewNode = graph.addNode (std::move (previewOwned));
@@ -743,6 +747,34 @@ void AudioEngine::stop() noexcept
     transport.playing.store (false);
 }
 
+std::vector<char> AudioEngine::lowLatencyTracksNow() const
+{
+    return recordOptions.lowLatencyRecording ? lowlatency::bypassTracks (song, armedInserts) : std::vector<char> {};
+}
+
+void AudioEngine::refreshLowLatency()
+{
+    if (lowLatencyTracksNow() != publishedLowLatency)
+        publishSong();
+}
+
+int AudioEngine::lowLatencyBypassedLatency (int track, int slot) const noexcept
+{
+    const auto& saved = lastPublishedShape.lowLatencySaved;
+    return isSlotLowLatencyBypassed (track, slot) && (std::size_t) track < saved.size() && (std::size_t) slot < saved[(std::size_t) track].size()
+               ? saved[(std::size_t) track][(std::size_t) slot]
+               : 0;
+}
+
+int AudioEngine::lowLatencyBypassedCount() const noexcept
+{
+    int count = 0;
+    for (const auto mask : lastPublishedShape.lowLatencySlots)
+        for (auto m = (unsigned) mask; m != 0; m &= m - 1)
+            ++count;
+    return count;
+}
+
 void AudioEngine::setRecordOptions (const RecordOptions& options)
 {
     recordOptions = options;
@@ -752,6 +784,7 @@ void AudioEngine::setRecordOptions (const RecordOptions& options)
     recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);
     compensatePlayed.store (options.compensateOutput);
     updateLinearSong();
+    refreshLowLatency(); // (round 190aq: the option switched while an insert is live)
     sendChangeMessage();
 }
 
@@ -854,6 +887,7 @@ void AudioEngine::setInsertArmed (int track, bool armed)
     else if (! armed && armedInserts.empty() && audioArmed)
         setAudioRecordingArmed (false);
 
+    refreshLowLatency(); // (round 190aq: "Low latency while recording" follows the arm switches)
     sendChangeMessage();
 }
 
@@ -935,8 +969,161 @@ void AudioEngine::copyScope (float* destination, int count) const noexcept
 
 void AudioEngine::previewFile (const juce::File& file)
 {
-    if (preview != nullptr)
-        preview->playBrowser (file.existsAsFile() ? samples.load (file.getFullPathName()) : nullptr);
+    ++previewSerial; // (a preview still being prepared is dropped)
+    previewTiming = {};
+    if (preview == nullptr)
+        return;
+    auto sample = file.existsAsFile() ? samples.load (file.getFullPathName()) : nullptr;
+    if (! previewInTime || sample == nullptr)
+    {
+        preview->playBrowser (std::move (sample)); // FL's preview: the file as it is, at once
+        return;
+    }
+
+    // "Preview in time" (round 190aq, core/PreviewTempo.h): the file's tempo from its ACID beats or its name (cheap,
+    // here), else from LYNX's tempo detection (on the worker); a file that can have none plays as it always did
+    const auto path = file.getFullPathName();
+    const auto name = file.getFileName().toStdString();
+    const auto external = transport.externalBpm.load (std::memory_order_relaxed);
+    const auto projectBpm = external > 0.0 ? external : transport.bpm.load (std::memory_order_relaxed);
+    auto found = previewtempo::quick (*sample, name);
+    auto known = found.bpm > 0.0;
+    if (! known)
+        if (const auto it = previewTempos.find (path); it != previewTempos.end())
+        {
+            found = it->second;
+            known = true;
+        }
+    if (! known && ! previewtempo::worthDetecting (*sample))
+    {
+        preview->playBrowser (std::move (sample));
+        return;
+    }
+
+    PreviewTiming timing;
+    timing.path = path;
+    timing.projectBpm = projectBpm;
+    timing.fileBpm = found.bpm;
+    timing.source = found.source;
+    timing.ratio = previewtempo::stretchRatio (found.bpm, projectBpm);
+    timing.inTime = found.bpm > 0.0;
+    if (known)
+    {
+        if (found.bpm <= 0.0) // (analysed before: no tempo)
+        {
+            preview->playBrowser (std::move (sample));
+            return;
+        }
+        if (timing.ratio == 1.0) // already at the project's tempo: only the start waits for the beat
+        {
+            startPreviewInTime (path, std::move (sample), timing);
+            return;
+        }
+        for (const auto& s : previewStretches)
+            if (s.path == path && s.ratio == timing.ratio && s.sample != nullptr)
+            {
+                startPreviewInTime (path, s.sample, timing);
+                return;
+            }
+    }
+
+    // the tempo detection and / or the stretch, off the message thread; what was playing stops now
+    preview->playBrowser (nullptr);
+    timing.pending = true;
+    previewTiming = timing;
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    previewJobs.post ([this, alive = previewAlive, serial = previewSerial, path, sample, timing, known, started]() mutable {
+        if (! alive->load())
+            return;
+        auto found = previewtempo::Found { timing.fileBpm, timing.source };
+        if (! known)
+            found = previewtempo::detect (*sample);
+        timing.fileBpm = found.bpm;
+        timing.source = found.source;
+        timing.inTime = found.bpm > 0.0;
+        timing.ratio = previewtempo::stretchRatio (found.bpm, timing.projectBpm);
+        std::shared_ptr<const SampleData> out = sample;
+        if (timing.inTime && timing.ratio != 1.0)
+            if (auto stretched = timeStretch (*sample, timing.ratio, StretchMethod::general); stretched != nullptr && stretched->frames() > 1)
+                out = std::move (stretched);
+        timing.prepareMs = juce::Time::getMillisecondCounterHiRes() - started;
+        {
+            const std::lock_guard<std::mutex> lock (previewResultLock);
+            previewResults.push_back ({ serial, path, sample, out, timing, found, ! known });
+        }
+        juce::MessageManager::callAsync ([this, alive] {
+            if (alive->load())
+                takePreviewResults();
+        });
+    });
+}
+
+// The prepared previews, on the message thread: the tempo and the stretch are kept for the next click on the same
+// file, and the newest one plays unless another file was clicked meanwhile.
+void AudioEngine::takePreviewResults()
+{
+    std::vector<PreviewResult> results;
+    {
+        const std::lock_guard<std::mutex> lock (previewResultLock);
+        results.swap (previewResults);
+    }
+    for (auto& r : results)
+    {
+        if (r.detected)
+        {
+            if (previewTempos.size() > 512)
+                previewTempos.clear();
+            previewTempos[r.path] = r.found;
+        }
+        if (r.out != r.sample)
+        {
+            if (previewStretches.size() >= 6)
+                previewStretches.erase (previewStretches.begin());
+            previewStretches.push_back ({ r.path, r.timing.ratio, r.out });
+        }
+        if (r.serial != previewSerial || preview == nullptr)
+            continue; // another file was clicked meanwhile (or the preview was stopped)
+        lastPreviewPrepareMs = r.timing.prepareMs;
+        if (! r.timing.inTime)
+        {
+            previewTiming = {};
+            preview->playBrowser (r.out); // no tempo found: as it is
+            continue;
+        }
+        startPreviewInTime (r.path, r.out, r.timing);
+    }
+}
+
+void AudioEngine::finishPreviewJobs()
+{
+    previewJobs.waitIdle();
+    takePreviewResults();
+}
+
+void AudioEngine::startPreviewInTime (const juce::String& path, std::shared_ptr<const SampleData> sample, const PreviewTiming& timing)
+{
+    previewTiming = timing;
+    previewTiming.path = path;
+    previewTiming.pending = false;
+    previewTiming.inTime = true;
+    previewTiming.frames = sample != nullptr ? sample->frames() : 0;
+    previewHandedAtMs = juce::Time::getMillisecondCounterHiRes();
+    preview->setSyncLatency (getLatencySamples());
+    preview->playBrowser (std::move (sample), 0.8f, true);
+}
+
+int AudioEngine::getPreviewBeatStarts() const noexcept { return preview != nullptr ? preview->beatStarts() : 0; }
+
+double AudioEngine::getPreviewInTimeProgress() const noexcept
+{
+    if (previewTiming.pending)
+        return 0.0;
+    if (! previewTiming.inTime || preview == nullptr)
+        return -1.0;
+    const auto position = preview->getPlayPosition();
+    if (position < 0.0) // (the audio thread takes the sample at its next block)
+        return juce::Time::getMillisecondCounterHiRes() - previewHandedAtMs < 200.0 ? 0.0 : -1.0;
+    return previewTiming.frames > 1 ? juce::jlimit (0.0, 1.0, position / (double) (previewTiming.frames - 1)) : 0.0;
 }
 
 void AudioEngine::setInputScale (int scale, int root) noexcept
@@ -2056,9 +2243,10 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     auto velocityCurve = prefs::VelocityCurve::linear;
     auto locked = -1; // a channel that "receives notes from" this device (FL's channel lock)
     auto jumpChannel = 0;
+    const auto deviceName = source != nullptr ? source->getName().toStdString() : std::string();
     {
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
-        const auto name = source != nullptr ? source->getName().toStdString() : std::string();
+        const auto& name = deviceName;
         device = midiPrefsShared.input (name);
         velocityCurve = midiPrefsShared.velocity;
         const auto midiChannel = m.getChannel();
@@ -2103,7 +2291,57 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
     }
 
-    if (device.midiChannel != 0 && m.getChannel() != device.midiChannel)
+    // a controller profile's buttons, knobs and faders (round 190aw): to the message thread, not into the instruments.
+    // Controllers linked by hand stay with their links.
+    if (source != nullptr && controllerIo.take (deviceName, m.getRawData(), m.getRawDataSize(), linkedCcs))
+    {
+        if (m.isController()) // (still offered to MIDI learn)
+            controllerQueue.push ({ m.getControllerNumber(), m.getChannel() - 1, m.getControllerValue() });
+        return;
+    }
+
+    // issue #108: an MPE controller (the device's MPE setting). Its member channels' pitch bend, CC 74 and pressure
+    // belong to the notes on them: a sounding note's expression goes to the channels its note on reached, a note on /
+    // off carries the note's own values (played, and recorded as the note's fine pitch, Mod X and Mod Y). Everything
+    // else (the master channel, other controllers) is handled as from any controller. No channel filter in this mode.
+    mpe::InEvent mpeEvents[mpe::Input::maxEvents];
+    const mpe::InEvent* mpeNote = nullptr;
+    if (device.mpe)
+    {
+        if (const mpe::Zone zone { true, device.mpeMembers, (float) device.mpeBendRange }; ! (zone == mpeZone))
+        {
+            mpeZone = zone;
+            mpeInput.setZone (zone);
+        }
+        const auto count = mpeInput.feed (m.getRawData(), m.getRawDataSize(), mpeEvents);
+        if (count == 0)
+            return; // (the zone's own configuration)
+        if (mpeEvents[0].type == mpe::InEvent::Type::expr)
+        {
+            for (int k = 0; k < count; ++k)
+            {
+                const auto& x = mpeEvents[k];
+                InputHeldNotes::Target to[InputHeldNotes::maxTargets];
+                const auto n = midiHeld.targetsOf (x.key, to);
+                for (int i = 0; i < n; ++i)
+                {
+                    NoteEvent e;
+                    e.type = NoteEvent::Type::voiceProp;
+                    e.expression = true;
+                    e.channel = to[i].channel;
+                    e.key = to[i].key;
+                    e.prop = (std::uint8_t) (x.expr == mpe::Expr::pitch ? vfx::Prop::pitch : x.expr == mpe::Expr::timbre ? vfx::Prop::modX : vfx::Prop::modY);
+                    e.velocity = x.expr == mpe::Expr::pressure ? mpe::modYOfPressure (x.value) : x.value;
+                    if (e.channel >= 0)
+                        midiEvents.push (e);
+                }
+            }
+            return;
+        }
+        if (mpeEvents[0].type != mpe::InEvent::Type::plain)
+            mpeNote = &mpeEvents[0];
+    }
+    else if (device.midiChannel != 0 && m.getChannel() != device.midiChannel)
         return;
 
     // the pitch wheel, the mod wheel and the other controllers play into the channels the notes go to (round 162,
@@ -2236,17 +2474,27 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
     const auto tick = recordTickFor (eventMs);
 
-    auto push = [this, taking, tick] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
+    auto push = [this, taking, tick, mpeNote] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
         NoteEvent e;
         e.type = noteOn ? NoteEvent::Type::on : NoteEvent::Type::off;
         e.channel = t.channel;
         e.key = t.key;
         e.velocity = velocity;
+        if (mpeNote != nullptr && noteOn) // issue #108: the note starts at its own bend, timbre and pressure
+        {
+            e.expression = true;
+            e.cents = mpeNote->cents;
+            e.modX = mpeNote->timbre;
+            e.modY = mpe::modYOfPressure (mpeNote->pressure);
+        }
         midiEvents.push (e);
         logPlayedNote (e.channel, e.key, e.velocity, noteOn, transport.playing.load() ? tick : -1.0, taking);
 
         // (round 170d: during the count-in too; the time is the device's, against the audio clock)
-        if (taking)
+        if (taking && mpeNote != nullptr) // (the "on": its bend and timbre; the "off": its peak pressure)
+            midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn, true, mpe::finePitchOfCents (mpeNote->cents), mpeNote->timbre,
+                                    mpe::modYOfPressure (mpeNote->pressure) });
+        else if (taking)
             midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
     };
 
@@ -2298,6 +2546,24 @@ void AudioEngine::enableAllMidiInputs()
     lastMidiInputIds.clear();
     for (const auto& port : available)
         lastMidiInputIds.push_back (port.id);
+
+    // the devices that run a controller profile (round 190aw)
+    std::vector<std::string> names;
+    for (const auto& port : available)
+        names.push_back (port.name);
+    controllerIo.configure (midiPrefs, names, true);
+}
+
+void AudioEngine::setControllerSurface (controller::Surface* surface) { controllerIo.setSurface (surface); }
+
+juce::File AudioEngine::controllerProfilesFolder() { return PluginHost::settingsFolder().getChildFile ("Controllers"); }
+
+void AudioEngine::reloadControllerProfiles()
+{
+    controllerIo.loadProfiles (controllerProfilesFolder());
+    if (prefetcher != nullptr)
+        enableAllMidiInputs();
+    sendChangeMessage();
 }
 
 void AudioEngine::reconnectMidiInputs()
@@ -3092,7 +3358,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             const auto folder = PluginHost::settingsFolder().getChildFile ("flp-embedded");
             folder.createDirectory();
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
-                juce::String::createStringFromData (wav.data(), (int) juce::jmin<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
+                juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
 
@@ -3645,6 +3911,9 @@ void AudioEngine::publishSong()
             clipLauncher = std::make_unique<launcher::Runtime>();
         factories.clipLauncher = clipLauncher.get();
     }
+    // "Low latency while recording" (round 190aq): the live inserts' paths, for this snapshot only (not the song)
+    publishedLowLatency = lowLatencyTracksNow();
+    factories.lowLatencyTracks = publishedLowLatency;
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -3663,6 +3932,8 @@ void AudioEngine::publishSong()
     lastPublishedShape.effects = state->effects;
     lastPublishedShape.sampleRate = state->sampleRate;
     lastPublishedShape.latencies = state->latencies;
+    lastPublishedShape.lowLatencySlots = state->lowLatencySlots; // (currentLatencies() reads them)
+    lastPublishedShape.lowLatencySaved = state->lowLatencySaved;
     lastPublishedShape.pdc = state->pdc;
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;
@@ -4031,6 +4302,7 @@ void AudioEngine::applyControllers()
 {
     ControllerEvent e;
     std::map<std::pair<int, int>, int> latest; // (cc, channel) -> latest value this frame
+    controllerLearnTick = learning.kind != AutomationTargetKind::none || multilink.has_value();
 
     while (controllerQueue.pop (e))
     {
@@ -4126,6 +4398,11 @@ void AudioEngine::applyControllers()
                 noteTweaked (t); // a linked controller's move is a tweak (Last tweaked, automation recording)
             }
 
+    applyTargetValues (changes);
+}
+
+void AudioEngine::applyTargetValues (const std::vector<std::pair<AutomationTarget, float>>& changes)
+{
     std::vector<std::pair<AutomationTarget, float>> pluginChanges;
 
     editSong ([&] (Song& s) {
@@ -4177,6 +4454,7 @@ void AudioEngine::timerCallback()
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     updateAudition(); // (round 190ao: the preset audition's note starts and ends here)
     applyControllers();
+    controllerIo.pump (controllerLearnTick); // (controller profiles, round 190aw)
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
         releasedTargets.clear();

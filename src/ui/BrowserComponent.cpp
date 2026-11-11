@@ -2229,7 +2229,7 @@ public:
                     peaks.assign (count, 0.0f);
                     const auto* l = sample->leftData();
                     const auto* r = sample->rightData();
-                    const auto stride = juce::jmax<std::size_t> (1, frames / (count * 64)); // look at up to 64 points per peak
+                    const auto stride = std::max<std::size_t> (1, frames / (count * 64)); // look at up to 64 points per peak
 
                     for (std::size_t i = 0; i < count; ++i)
                     {
@@ -2282,7 +2282,7 @@ public:
         g.drawText (file.getFileNameWithoutExtension(), top, juce::Justification::centredLeft, true);
         g.setFont (theme::font (theme::type::caption));
         g.setColour (textSecondary);
-        g.drawText (info, top, juce::Justification::centredRight, true);
+        g.drawText (info + tempoText(), top, juce::Justification::centredRight, true);
         area.removeFromTop (2);
 
         g.setColour (bg0);
@@ -2356,6 +2356,18 @@ public:
 
     bool isPlaying() const { return position() > 0.0 && position() < 1.0; }
 
+    // "Preview in time" (round 190aq): the tempo found in the file and the project's, after the file's details
+    juce::String tempoText() const
+    {
+        const auto& timing = browser.engine.getPreviewTiming();
+        if (! browser.engine.isPreviewInTime() || timing.path != file.getFullPathName() || ! (timing.fileBpm > 0.0))
+            return {};
+        auto bpm = [] (double v) { return juce::String (v, std::abs (v - std::round (v)) < 0.05 ? 0 : 1); };
+        // "120 BPM" at the project's tempo already, else "120 → 140 BPM" (what it is stretched to)
+        return "  " + tr ("{0} BPM", { timing.ratio == 1.0 ? bpm (timing.fileBpm)
+                                                             : bpm (timing.fileBpm) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + bpm (timing.fileBpm / timing.ratio) });
+    }
+
     void stop()
     {
         startedAt = 0.0;
@@ -2370,6 +2382,13 @@ private:
     {
         if (startedAt <= 0.0 || seconds <= 0.0)
             return 0.0;
+        // "Preview in time" (round 190aq): the stretched preview starts later (its stretch, then its beat) and lasts
+        // another time, so the engine says where it is
+        if (const auto& timing = browser.engine.getPreviewTiming(); timing.path == file.getFullPathName() && (timing.pending || timing.inTime))
+        {
+            const auto p = browser.engine.getPreviewInTimeProgress();
+            return p < 0.0 ? 1.0 : juce::jlimit (1.0e-6, 1.0 - 1.0e-6, p);
+        }
         return juce::jlimit (0.0, 1.0, (juce::Time::getMillisecondCounterHiRes() - startedAt) / 1000.0 / seconds);
     }
 
@@ -3008,9 +3027,23 @@ std::unique_ptr<juce::Component> BrowserComponent::makeFoldersPanelForSnapshot()
 
 void BrowserComponent::showViewMenu()
 {
+    buildViewMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&viewButton));
+}
+
+juce::PopupMenu BrowserComponent::buildViewMenu()
+{
     juce::PopupMenu menu;
     addViewItems (menu);
     juce::Component::SafePointer<BrowserComponent> safe (this);
+    menu.addSeparator();
+    // LYNX's own (round 190aq, off by default): loops are auditioned at the project's tempo, starting on the beat
+    menu.addItem (tr ("Preview in time (loops play at the project's tempo, on the beat)"), true, engine.isPreviewInTime(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->engine.setPreviewInTime (! safe->engine.isPreviewInTime());
+        if (safe->onPreviewVolumeChanged != nullptr)
+            safe->onPreviewVolumeChanged(); // (saved with the preview volume)
+    });
     menu.addSeparator();
     menu.addItem (tr ("Refresh"), [safe] { if (safe != nullptr) safe->rebuildRoots(); });
     menu.addItem (tr ("Refresh search index"), [safe] { if (safe != nullptr) safe->refreshSearchIndex (false); });
@@ -3020,7 +3053,7 @@ void BrowserComponent::showViewMenu()
         menu.addItem (role == Role::samples ? tr ("Close the Sample browser") : tr ("Sample browser (separate window)"),
                       [safe] { if (safe != nullptr && safe->onToggleSampleBrowser != nullptr) safe->onToggleSampleBrowser(); });
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&viewButton));
+    return menu;
 }
 
 namespace

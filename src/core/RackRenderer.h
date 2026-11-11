@@ -24,6 +24,7 @@
 #include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
+#include "core/LowLatency.h"
 #include "core/Meters.h"
 #include "core/Pdc.h"
 #include "core/ClipLauncher.h"
@@ -155,7 +156,17 @@ struct RackState
     std::vector<char> bypassWhenIdle; // [track]
     bool anyBypassWhenIdle = false;
 
-    // Current latencies of instruments and effects, in the same layout as `latencies`.
+    // "Low latency while recording" (LYNX extra, round 190aq, core/LowLatency.h): the inserts whose latency-adding
+    // slots are bypassed in this snapshot (the engine's choice; empty = none, as in every export) and, made with the PDC
+    // plan, those slots: active slots of these inserts whose latency is above 0. They are skipped by the renderer and
+    // count as 0 in the plan. The song itself is not changed.
+    std::vector<char> lowLatencyTracks;                 // [track]
+    std::vector<lowlatency::SlotMask> lowLatencySlots;  // [track] bit s = slot s is bypassed
+    // The latency of each bypassed slot when the plan was made ([track][slot], 0 elsewhere), for the UI.
+    std::vector<std::vector<int>> lowLatencySaved;
+
+    // Current latencies of instruments and effects, in the same layout as `latencies` (0 for the slots bypassed for
+    // low latency).
     std::vector<int> currentLatencies() const;
     void buildPdc (const RackState* previous);
 
@@ -186,6 +197,7 @@ struct RackState
         float level = 1.0f;
         int tap = -1;  // ≥ 0: a Fruity Send slot's signal (sendTaps[tap]) instead of the source's output
         int automation = -1; // the route's level automation (mixerSend, issue #12): its slot; -1 = none
+        bool pre = false;    // a pre-fader send (MixerSend::pre): `tap` is the source's pre-fader signal (preTap)
     };
     std::vector<std::vector<MixerInput>> mixerInputs; // [track]; [0] = Master
 
@@ -200,6 +212,10 @@ struct RackState
     std::vector<std::vector<int>> slotTap; // [track][slot · maxSlotSends + output]: index into sendTaps, or −1
     // the hosted effects' Connections (round 189j): [track][slot], only for tracks with a routed one (else empty)
     std::vector<std::vector<SlotConnections>> slotConnections;
+    // Pre-fader sends (LYNX extra, round 190aq): [track] the tap holding the insert's signal before its fader (after
+    // its effects and EQ, silenced by its mute), or −1 — one per insert with a pre-fader send, in sendTaps with slot −1.
+    // No tap left (maxSendTaps): that insert's pre-fader sends play post-fader.
+    std::vector<int> preTap;
     std::vector<std::vector<int>> mixerLayers;        // inserts with no dependencies among them, in order
     // "Allow threaded processing" off (PluginRef::threaded, REA round 134): those channels / inserts always run on the
     // calling (audio) thread, the others may go to the workers. Same layers as mixerLayers.
@@ -297,6 +313,8 @@ struct RackState
         // when it was off). A Patcher that holds such a plugin is built anew as a whole. Unset: nothing is forced.
         std::function<bool (const PluginRef&)> rebuildPlugin;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
+        // round 190aq: the inserts whose latency-adding slots are bypassed (lowlatency::bypassTracks); empty = none
+        std::vector<char> lowLatencyTracks;
     };
 
     // Builds the next state reusing the instruments from `previous` when the
@@ -580,6 +598,11 @@ private:
     std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
     std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block
+    // round 190aq: the mute ramp of each insert's pre-fader send signal (1 = heard, 0 = muted; NaN: none yet)
+    std::array<float, maxMixerTracks> lastPreGain {};
+    // round 190aq: slots skipped for low latency last block; back in the chain they start from a reset state
+    // (their look-ahead buffers hold what played before the bypass)
+    std::vector<char> lowLatencySkipped; // maxMixerTracks * maxEffectSlots
     float* tapBuffer (int tap, int side) noexcept;
     std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)

@@ -158,6 +158,15 @@ struct MidiInputPrefs
     bool enabled = true;  // new devices are on
     int midiChannel = 0;  // 0 = any (omni), 1..16 = only that channel
     int target = -1;      // -1 = the selected channels of the Channel Rack, else that Channel Rack channel (0-based)
+    // "Controller type" (round 190aw, core/ControllerProfile.h): "" = detect a profile by the port name,
+    // "generic" = a generic controller (no profile), else a profile's id
+    std::string controller;
+    // MPE (issue #108, core/Mpe.h; a LYNX addition): the device is an MPE controller — lower zone, master channel 1,
+    // `mpeMembers` member channels from 2 up, per-note pitch bend over `mpeBendRange` semitones. The MIDI channel
+    // filter above does not apply then.
+    bool mpe = false;
+    int mpeMembers = 15;
+    int mpeBendRange = 48;
 
     bool operator== (const MidiInputPrefs&) const = default;
 };

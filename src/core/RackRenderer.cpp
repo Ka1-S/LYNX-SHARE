@@ -66,7 +66,20 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
            && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
            && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
-           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition
+           && a.mpe == b.mpe;
+}
+
+// A hosted plugin's settings live in its running instance: the song only holds what was saved, and the instance is
+// given that once, when it is created. So the running instance stays with its own channel / slot whatever the song
+// says (an edit, an undo back to an older save: the instance tag is the same), but a channel / slot that merely sits
+// where another one was (another project opened over this one, a session joined, a channel replaced) keeps the
+// plugin running there only when it was saved with the same settings. Without this, a project opened over one with
+// the same plugin in the same place played, and then saved, the first project's settings (round 190az).
+template <typename T>
+bool sameHostedPlugin (const T& before, const T& now) noexcept
+{
+    return before.instance.id == now.instance.id || before.plugin.state == now.plugin.state;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
@@ -689,7 +702,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
-                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin))))
+                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin)
+                    && sameHostedPlugin (previous->song.channels[p], channel))))
         {
             state->instruments.push_back (previous->instruments[p]);
             state->instruments.back()->configure (channel, song.bpm);
@@ -800,7 +814,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
-                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)))
+                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)
+                        && sameHostedPlugin (previous->song.mixer[pt].effects[pi], slots[i])))
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
@@ -873,6 +888,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     state->buildAutomationTables();
     {
         const loadtrace::Scope timing ("pdc");
+        state->lowLatencyTracks = factories.lowLatencyTracks; // (round 190aq; empty in exports)
         state->buildPdc (previous);
     }
     state->buildMixerGraph();
@@ -967,6 +983,7 @@ void RackState::buildMixerGraph()
     mixerInputs.assign ((std::size_t) tracks, {});
     sendTaps.clear();
     slotTap.assign ((std::size_t) tracks, {});
+    preTap.assign ((std::size_t) tracks, -1);
     std::vector<int> depth ((std::size_t) tracks, 0);
 
     // the hosted effects' Connections (round 189j): an input 1 taken from another insert orders it like a sidechain
@@ -1024,7 +1041,18 @@ void RackState::buildMixerGraph()
             // (a send at 0 is left out, unless an automation brings it up)
             if (send.target > 0 && send.target < tracks && send.target != t && (send.level > 0.0f || automation >= 0))
             {
-                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, -1, automation });
+                // a pre-fader send (round 190aq) pulls the insert's pre-fader tap, made on its first such send
+                auto tap = -1;
+                if (send.pre)
+                {
+                    if (preTap[(std::size_t) t] < 0 && (int) sendTaps.size() < maxSendTaps)
+                    {
+                        preTap[(std::size_t) t] = (int) sendTaps.size();
+                        sendTaps.push_back ({ t, -1, 0 });
+                    }
+                    tap = preTap[(std::size_t) t];
+                }
+                mixerInputs[(std::size_t) send.target].push_back ({ t, (int) k + 1, send.level, tap, automation, tap >= 0 });
                 depth[(std::size_t) send.target] = std::max (depth[(std::size_t) send.target], depth[(std::size_t) t] + 1);
             }
         }
@@ -1188,6 +1216,11 @@ std::vector<int> RackState::currentLatencies() const
     for (std::size_t t = 0; t < effects.size(); ++t)
         for (std::size_t s = 0; s < effects[t].size(); ++s)
         {
+            if (lowlatency::bypassed (lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
+            {
+                out.push_back (0);
+                continue;
+            }
             const auto reported = effects[t][s]->latencySamples();
             const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
             out.push_back (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported);
@@ -1198,6 +1231,39 @@ std::vector<int> RackState::currentLatencies() const
 
 void RackState::buildPdc (const RackState* previous)
 {
+    // "Low latency while recording" (round 190aq): on the engine's live inserts, the active slots with a latency are
+    // bypassed; the plan below is made without them
+    lowLatencySlots.clear();
+    lowLatencySaved.clear();
+    if (! lowLatencyTracks.empty())
+    {
+        const auto all = currentLatencies(); // (no slot bypassed yet: the real latencies)
+        std::vector<lowlatency::SlotMask> masks (effects.size(), 0);
+        std::vector<std::vector<int>> saved (effects.size());
+        auto next = all.begin() + (std::ptrdiff_t) instruments.size();
+        auto any = false;
+        for (std::size_t t = 0; t < effects.size(); ++t)
+        {
+            saved[t].assign (effects[t].size(), 0);
+            for (std::size_t s = 0; s < effects[t].size(); ++s)
+            {
+                const auto latency = *next++;
+                if (t < lowLatencyTracks.size() && lowLatencyTracks[t] != 0 && s < 16 && latency > 0 && t < song.mixer.size()
+                    && s < song.mixer[t].effects.size() && song.slotActive (song.mixer[t].effects[s]))
+                {
+                    masks[t] = (lowlatency::SlotMask) (masks[t] | (1u << s));
+                    saved[t][s] = latency;
+                    any = true;
+                }
+            }
+        }
+        if (any)
+        {
+            lowLatencySlots = std::move (masks);
+            lowLatencySaved = std::move (saved);
+        }
+    }
+
     latencies = currentLatencies();
 
     std::vector<int> channelLatency (latencies.begin(), latencies.begin() + (std::ptrdiff_t) instruments.size());
@@ -2023,6 +2089,8 @@ void RackRenderer::resetUnitTimes() noexcept
 
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
+    lastPreGain.fill (std::numeric_limits<float>::quiet_NaN());
+    lowLatencySkipped.assign ((std::size_t) maxMixerTracks * maxEffectSlots, 0);
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
@@ -2827,6 +2895,24 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             continue;
         }
 
+        // "Low latency while recording" (round 190aq): a latency-adding slot on a live insert's path is skipped; when
+        // it comes back it starts from a reset state
+        if (const auto at = (std::size_t) track * maxEffectSlots + i; at < lowLatencySkipped.size())
+        {
+            if (lowlatency::bypassed (state.lowLatencySlots, track, (int) i))
+            {
+                lowLatencySkipped[at] = 1;
+                if (hasLiveMeters (slots[i].kind))
+                    clearMeters();
+                continue;
+            }
+            if (lowLatencySkipped[at] != 0)
+            {
+                lowLatencySkipped[at] = 0;
+                effects[i]->reset();
+            }
+        }
+
         // smart disable (like FL): an effect with silent input and output is skipped (plugins
         // after 4 s; built-ins after 1 s, which is well beyond their tail)
         const auto key = (std::size_t) track * maxEffectSlots + i;
@@ -3228,6 +3314,18 @@ void RackRenderer::process (const RackState* state,
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
 
+            if (e.type == NoteEvent::Type::voiceProp) // issue #108: a played MPE note's bend / timbre / pressure
+            {
+                auto base = instrument.wheelCents();
+                if ((std::size_t) e.channel < state->song.channels.size())
+                {
+                    const auto& c = state->song.channels[(std::size_t) e.channel];
+                    base += c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f);
+                }
+                instrument.noteExpression (e.key, e.prop, e.velocity, base);
+                continue;
+            }
+
             auto& held = heldNotes[(std::size_t) std::min (e.channel, maxChannels - 1)];
             const auto bit = std::uint64_t { 1 } << (e.key & 63);
             const auto inRange = e.key >= 0 && e.key < 128;
@@ -3279,7 +3377,9 @@ void RackRenderer::process (const RackState* state,
                 const auto& c = def[(std::size_t) e.channel];
                 // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
                 // #9: the fine tune did nothing to the keys played live)
-                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents();
+                // (issue #108: an MPE note starts at its own bend, with its timbre and pressure as Mod X / Mod Y)
+                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents()
+                                   + (e.expression ? e.cents : 0.0f);
                 // FL's channel Mono / Porta (round 168l), as for the song's notes
                 const auto mode = polyMode (c, instrument);
                 const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps));
@@ -3301,6 +3401,11 @@ void RackRenderer::process (const RackState* state,
                 if (const auto from = on.glide ? on.glideFrom : 0.0f; cents != 0.0f || from != 0.0f)
                     instrument.setNextNoteExpression (0.0f, cents + from, false);
                 HostSlide::pendingGlide() = { on.glide ? on.glideFrom : 0.0f, on.glide ? glideSamples : 0.0f, false };
+                if (e.expression)
+                {
+                    instrument.setNextNoteModulation (e.modX, e.modY);
+                    instrument.setNextNoteFinePitch (e.cents);
+                }
                 instrument.noteOn (e.key, e.velocity);
                 HostSlide::pendingGlide() = {};
             }
@@ -4372,7 +4477,7 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         const auto active = tap >= 0 ? tapActive[(std::size_t) tap] : trackActive[(std::size_t) in.source];
         const auto& delays = state.sendDelays[(std::size_t) in.source];
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
-        if (pdcBypassNow && tap < 0 && state.bypassWhenIdle[(std::size_t) in.source] != 0)
+        if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
             delay = nullptr; // FL's "When recording or not playing": no compensation now
         auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackBuffer (in.source, 0);
         auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackBuffer (in.source, 1);
@@ -4520,7 +4625,13 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     auto* l = trackBuffer (t, 0);
     auto* r = trackBuffer (t, 1);
 
-    if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
+    // pre-fader sends (round 190aq): the insert's signal before its fader goes to its tap, with the mute as a ramp
+    const auto preTap = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1;
+    auto& lastPre = lastPreGain[(std::size_t) t];
+    const auto preTarget = silent ? 0.0f : 1.0f;
+    const auto preFading = preTap >= 0 && ! std::isnan (lastPre) && lastPre > 0.0f; // (still heard: its mute ramps out)
+
+    if (silent && from == zero && taps == 0 && ! preFading) // (a muted insert being recorded still runs its effects for the take)
     {
         if (runSilenced)
             runSilencedTrack (state, t, n, level, meters, false);
@@ -4528,6 +4639,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             runSilencedTrack (state, t, n, level, meters, true);
         else
             lastMeterGain[(std::size_t) t] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f };
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
@@ -4544,6 +4656,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
         last = target;
+        lastPre = preTarget;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return;
@@ -4561,6 +4674,26 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
             lastLevel = applyMatrix (l, r, dest.first, dest.second, n, fromLevel, level);
         }
+    if (preTap >= 0 && preTap < RackState::maxSendTaps)
+    {
+        auto g = std::isnan (lastPre) ? preTarget : lastPre;
+        if (g > 0.0f || preTarget > 0.0f)
+        {
+            auto* pl = tapBuffer (preTap, 0);
+            auto* pr = tapBuffer (preTap, 1);
+            constexpr float step = 0.001f; // (the fader ramp's step, applyMatrix)
+            for (int i = 0; i < n; ++i)
+            {
+                g = preTarget > g ? std::min (preTarget, g + step) : std::max (preTarget, g - step);
+                pl[i] = l[i] * g;
+                pr[i] = r[i] * g;
+            }
+            tapActive[(std::size_t) preTap] = 1;
+        }
+        lastPre = g;
+    }
+    else
+        lastPre = preTarget;
     last = applyMatrix (l, r, l, r, n, from, target);
     tap (RecordSource::postTrack, l, r);
 

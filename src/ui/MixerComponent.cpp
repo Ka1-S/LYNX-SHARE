@@ -1666,6 +1666,19 @@ void MixerStrips::paint (juce::Graphics& g)
                                                                    faderPosition (song.routeLevel (selected, t))),
                               false,
                               dragging (Part::send) ? colour::accent : colour::accentHover, hovered (Part::send) || dragging (Part::send));
+                // a pre-fader send (LYNX's switch, round 190aq) is marked beside its knob
+                if (on && t > 0 && song.sendPre (selected, t))
+                {
+                    // (its whole text, ending at the knob's left edge: the strip's margin is narrower than "PRE")
+                    const auto area = sendArea (t);
+                    const auto mark = compactLayout ? juce::String ("P") : tr ("PRE");
+                    g.setColour (colour::accentHover);
+                    g.setFont (font (8.0f, true));
+                    const auto width = juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), mark) + 2;
+                    const auto knobLeft = area.getCentreX() - (compactLayout ? 8 : 11);
+                    textcache::drawText (g, mark, juce::Rectangle<int> (knobLeft - width - 1, area.getY(), width, area.getHeight()),
+                                         juce::Justification::centredRight, false);
+                }
             }
             else if (feedsSelected) // this insert sends into the selected one
             {
@@ -1872,6 +1885,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             menu.addSectionHeader (spec.name + ": " + spec.text (valueOf (Part::send, t)));
             ui::addValueItems (menu, *this, &engine, spec, valueOf (Part::send, t), [this, t] (double v) { setValue (Part::send, t, v); });
             menu.addSeparator();
+            addPreFaderItem (menu, from, t);
             menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
                           [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
@@ -2197,7 +2211,8 @@ ui::ValueSpec MixerStrips::specFor (Part part, int t) const
 
     if (part == Part::send)
     {
-        auto spec = sendSpec (nameOf (selected) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + name + " - " + (t == 0 ? tr ("Level to Master") : tr ("Send level")));
+        auto spec = sendSpec (nameOf (selected) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + name + " - "
+                              + (t == 0 ? tr ("Level to Master") : engine.getSong().sendPre (selected, t) ? tr ("Send level (pre-fader)") : tr ("Send level")));
         spec.target = AutomationTarget { AutomationTargetKind::mixerSend, selected, t }; // automatable (issue #12)
         return spec;
     }
@@ -2395,13 +2410,29 @@ void MixerStrips::routeSelection (int t, mixerops::RouteKind kind)
         ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
 }
 
+// LYNX's pre-fader switch of a send (round 190aq; FL's sends are post-fader, the default): a ticked item in the send
+// knob's and the route arrow's menus. The route to Master has none.
+void MixerStrips::addPreFaderItem (juce::PopupMenu& menu, int from, int t)
+{
+    const auto& song = engine.getSong();
+    if (t <= 0 || from <= 0 || ! song.routes (from, t))
+        return;
+    const auto pre = song.sendPre (from, t);
+    menu.addItem (tr ("Pre-fader send (not moved by this track's fader)"), true, pre,
+                  [this, from, t, pre] { engine.editSong ([from, t, pre] (Song& s) { s.setSendPre (from, t, ! pre); }); });
+}
+
 void MixerStrips::showSendMenu (int t)
+{
+    if (selected <= 0 || selected == t)
+        return;
+    buildSendMenu (t).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu MixerStrips::buildSendMenu (int t)
 {
     const auto& song = engine.getSong();
     const auto from = selected;
-
-    if (from <= 0 || from == t)
-        return;
 
     const auto fromName = juce::String::fromUTF8 (song.mixer[(std::size_t) from].name.c_str());
     juce::PopupMenu menu;
@@ -2422,10 +2453,11 @@ void MixerStrips::showSendMenu (int t)
     if (on)
     {
         menu.addSeparator();
+        addPreFaderItem (menu, from, t);
         menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
                       [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
@@ -3518,6 +3550,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.autoCreateClip = ! r.autoCreateClip; }); });
         disk.addItem (tr ("Disarm the inserts when recording stops"), true, ro.disarmOnStop,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.disarmOnStop = ! r.disarmOnStop; }); });
+        // LYNX's own (round 190aq): also in the record button's menu
+        disk.addItem (tr ("Low latency while recording (bypasses effects that add latency on armed or monitored inserts)"), true, ro.lowLatencyRecording,
+                      [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.lowLatencyRecording = ! r.lowLatencyRecording; }); });
         menu.addSubMenu (tr ("Disk recording"), disk);
         juce::PopupMenu pdc;
         const auto manual = std::count_if (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.latencyMs != 0.0f; });
@@ -5341,8 +5376,19 @@ void EffectsPanel::paint (juce::Graphics& g)
         if (filled)
         {
             const auto& slot = (*s)[(std::size_t) i];
-            g.setColour (muteLed (! slot.enabled));
-            g.fillEllipse (ledArea);
+            // "Low latency while recording" (round 190aq): a slot it bypasses now keeps its LED's place as an amber
+            // ring, its name dims and a badge says why; the slot's own on / off state is untouched
+            const auto lowLatency = engine.isSlotLowLatencyBypassed (track, i);
+            if (lowLatency)
+            {
+                g.setColour (colour::warning);
+                g.drawEllipse (ledArea.reduced (0.75f), 1.5f);
+            }
+            else
+            {
+                g.setColour (muteLed (! slot.enabled));
+                g.fillEllipse (ledArea);
+            }
             if (slotHovered && hoverLed)
             {
                 g.setColour (colour::textSecondary);
@@ -5368,6 +5414,19 @@ void EffectsPanel::paint (juce::Graphics& g)
                 textcache::drawText (g, "LYNX", badge, juce::Justification::centred);
                 g.setFont (keep);
                 g.setColour (slot.enabled ? colour::textPrimary : colour::textDisabled);
+            }
+            if (lowLatency)
+            {
+                const auto label = tr ("LOW LAT");
+                const auto keep = g.getCurrentFont();
+                g.setFont (font (type::caption, true));
+                const auto width = juce::jmin (text.getWidth() / 2, juce::jmax (30, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), label) + 8));
+                const auto badge = text.removeFromRight (width + 2).withSizeKeepingCentre (width, 14).toFloat();
+                theme::fillRoundRect (g, badge, 3.0f, colour::warning.withAlpha (0.22f));
+                g.setColour (colour::warning);
+                textcache::drawText (g, label, badge, juce::Justification::centred);
+                g.setFont (keep);
+                g.setColour (colour::textDisabled);
             }
             textcache::drawText (g, name, text, juce::Justification::centredLeft);
 
@@ -6107,6 +6166,14 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         if (slotBounds (i).contains (p))
         {
             const auto used = effectIn (i) >= 0;
+            if (used && engine.isSlotLowLatencyBypassed (track, effectIn (i))) // round 190aq
+            {
+                const auto ms = 1000.0 * engine.lowLatencyBypassedLatency (track, effectIn (i)) / juce::jmax (1.0, engine.getTransport().sampleRate.load());
+                h.text = tr ("Bypassed by \"Low latency while recording\": this effect adds {0} ms of latency and an armed or monitored insert plays through it. It comes back when that insert is disarmed",
+                             { juce::String (ms, ms < 10.0 ? 1 : 0) });
+                h.hasMenu = true;
+                return h;
+            }
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
                           : tr ("Empty slot: click to add an effect");

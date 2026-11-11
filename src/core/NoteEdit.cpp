@@ -373,6 +373,34 @@ std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixel
     return step;
 }
 
+std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator, double minPixels)
+{
+    numerator = std::max (1, numerator);
+    denominator = std::clamp (denominator, 1, 16);
+    const auto step = (std::int64_t) ticksPerStep;
+    const auto beat = std::max<std::int64_t> (1, 16 / denominator) * step;
+    const auto bar = numerator * beat;
+    const auto min = std::floor (std::max (1.0, minPixels)); // (FL compares against a whole number of pixels)
+    if (! (pixelsPerTick > 0.0))
+        return bar;
+
+    const auto stepPixels = (double) step * pixelsPerTick, beatPixels = (double) beat * pixelsPerTick;
+    const auto odd = (numerator & 1) != 0;
+    if (stepPixels >= min)
+        return step;
+    if (min <= stepPixels * 2.0 && ! (denominator == 16 && odd))
+        return step * 2;
+    if (beatPixels >= min)
+        return beat;
+    if (min <= beatPixels * 2.0 && ! odd)
+        return beat * 2;
+
+    auto bars = bar;
+    while ((double) bars * pixelsPerTick < min && bars <= bar * 16)
+        bars *= 2;
+    return bars;
+}
+
 std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength)
 {
     const auto bar = (std::int64_t) ppq * std::max (1, beatsPerBar);

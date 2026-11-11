@@ -1569,6 +1569,18 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         }
     }
 
+    // Live's Pre / Post toggle of each return (LiveSet/SendsPre, one SendPreBool per return, in order): "Pre" taps every
+    // track's send to that return before the track's mixer, which is LYNX's pre-fader send (round 190aq)
+    {
+        const auto toggles = set.child ("SendsPre").children ("SendPreBool");
+        for (std::size_t k = 0; k < toggles.size() && k < returns.size(); ++k)
+            if (toggles[k].attr ("Value") == "true")
+                for (auto& m : song.mixer)
+                    for (auto& send : m.sends)
+                        if (send.target == returns[k])
+                            send.pre = true;
+    }
+
     // channels, devices and arrangement clips
     std::vector<int> channelOf (tracks.size(), -1);
     std::vector<std::vector<DrumPad>> drumPads (tracks.size());
