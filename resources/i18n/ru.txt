@@ -8918,3 +8918,5 @@ countries: ru by kz
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Выравнивание: удерживает уровень на пороге ниже потолка с медленной атакой, остальное ловит потолок (по умолчанию выключено)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Порог выравнивания: уровень, удерживаемый ниже потолка (Off: без выравнивания)"
 "Levelling attack: how much of a transient passes before the level is held" = "Атака выравнивания: какая часть транзиента проходит, прежде чем уровень удерживается"
+"Show complete piano roll preview" = "Показывать полный предпросмотр Piano Roll"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: предпросмотр нот канала показывает весь паттерн, даже если он длиннее видимой части рэка; выключено: прокручивается вместе с шагами"

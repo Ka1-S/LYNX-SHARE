@@ -8918,3 +8918,5 @@ countries: tw hk mo
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "電平平衡：以較慢的起音把電平保持在上限以下的臨界值，其餘由上限攔住（預設關閉）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "電平平衡臨界值：保持在上限以下的電平（Off：不做電平平衡）"
 "Levelling attack: how much of a transient passes before the level is held" = "電平平衡起音：電平被保持之前有多少瞬態通過"
+"Show complete piano roll preview" = "顯示完整的鋼琴捲軸預覽"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道機架：即使樣式比機架顯示的範圍長，通道的音符預覽也會顯示整個樣式；關閉時，預覽會隨步進一起捲動"

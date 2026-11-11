@@ -2253,6 +2253,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::playheadColumn.store (on);
         else if (key == "rackStepsChannelColour")
             ChannelRackComponent::stepsChannelColour.store (on);
+        else if (key == "rackCompletePreview")
+            ChannelRackComponent::completePreview.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -2497,6 +2499,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
+                                      + "\nrackCompletePreview=" + juce::String (ChannelRackComponent::completePreview.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
                                       + "\nuiAnimations=" + juce::String (ui::motion::enabled() ? 1 : 0)
@@ -6540,6 +6543,7 @@ void MainComponent::openSettings (int page)
         o.noteNamesEveryKey = notenames::everyKey.load();
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
+        o.rackCompletePreview = ChannelRackComponent::completePreview.load();
         o.reducedEffects = skin::reducedEffects();
         o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
@@ -6612,8 +6616,10 @@ void MainComponent::openSettings (int page)
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
         if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load()
-            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load())
+            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load()
+            || o.rackCompletePreview != ChannelRackComponent::completePreview.load())
         {
+            ChannelRackComponent::completePreview.store (o.rackCompletePreview);
             ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
             ChannelRackComponent::stepsChannelColour.store (o.rackStepsChannelColour);
             self.rack.repaint();

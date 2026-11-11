@@ -9033,3 +9033,5 @@ countries: br
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelamento: segura o nível em um limiar abaixo do teto com ataque lento, o teto segura o resto (desligado por padrão)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Limiar do nivelamento: o nível mantido abaixo do teto (Off: sem nivelamento)"
 "Levelling attack: how much of a transient passes before the level is held" = "Ataque do nivelamento: quanto de um transiente passa antes de o nível ser segurado"
+"Show complete piano roll preview" = "Mostrar a prévia completa do Piano Roll"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: a prévia de notas de um canal mostra o pattern inteiro mesmo quando ele é mais longo do que o rack mostra; desligado, ela rola junto com os passos"

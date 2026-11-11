@@ -8918,3 +8918,5 @@ countries: tr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Seviyeleme: seviyeyi yavaş bir atakla tavanın altındaki bir eşikte tutar, gerisini tavan yakalar (varsayılan olarak kapalı)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Seviyeleme eşiği: tavanın altında tutulan seviye (Off: seviyeleme yok)"
 "Levelling attack: how much of a transient passes before the level is held" = "Seviyeleme atağı: seviye tutulmadan önce bir geçicinin ne kadarının geçtiği"
+"Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"

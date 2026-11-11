@@ -8918,3 +8918,5 @@ countries: de at ch li lu
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Pegelung: hält den Pegel mit langsamem Attack an einem Schwellwert unter der Obergrenze, die Obergrenze fängt den Rest ab (standardmäßig aus)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Pegelungs-Schwellwert: der unter der Obergrenze gehaltene Pegel (Off: keine Pegelung)"
 "Levelling attack: how much of a transient passes before the level is held" = "Pegelungs-Attack: wie viel von einer Transiente durchkommt, bevor der Pegel gehalten wird"
+"Show complete piano roll preview" = "Vollständige Piano-Roll-Vorschau anzeigen"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: Die Notenvorschau eines Kanals zeigt das ganze Pattern, auch wenn es länger ist als der sichtbare Teil des Racks; aus: sie scrollt mit den Steps"

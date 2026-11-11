@@ -49,6 +49,9 @@ public:
     // LYNX extra (on by default; Options › General "Steps use channel colour"): a lit step in its channel's colour
     // (themes::litStepColour); FL's steps stay white / pink ("Colorful channel controls" only colours the insert box)
     static inline std::atomic<bool> stepsChannelColour { true };
+    // FL's rack option "Show complete piano roll preview" (feedback 190bm): a row's miniature shows the whole pattern
+    // in the visible width when the pattern is longer than the rack shows; off: step-aligned, it scrolls with the steps
+    static inline std::atomic<bool> completePreview { true };
     explicit ChannelRackComponent (AudioEngine& engine);
     ~ChannelRackComponent() override;
     void visibilityChanged() override;
@@ -191,7 +194,7 @@ private:
     void setLoopPoint (int row, int setting);
     int loopDragRow = -1, loopDragStart = 0;
     float loopDragY = 0.0f;
-    void parentSizeChanged() override { updateSize(); }
+    void parentSizeChanged() override { updateSize(); repaint(); } // (the fitted miniatures follow the visible width)
     int nameLeft() const noexcept { return muteWidth + 2 * knobWidth + routeWidth + 2; }
     int selectLeft() const noexcept { return nameLeft() + nameWidth + 4; }
     int gridLeft() const noexcept { return selectLeft() + selectWidth + 8; }
@@ -207,6 +210,7 @@ private:
     juce::Rectangle<int> levelButtonBounds (int level) const;
     void paintLane (juce::Graphics& g);
     void paintNotePreview (juce::Graphics& g, int row, const Pattern& pattern, std::uint32_t channelColour);
+    PreviewSpan previewSpan() const; // where the miniatures are drawn (core/RackOps.h notePreviewSpan)
     void setLaneValue (int step, float value);
     void applyLane (const juce::MouseEvent& e);
     float laneValueAt (int y) const;

@@ -8918,3 +8918,5 @@ countries: jp
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "レベリング: 遅いアタックでシーリングより下のスレッショルドにレベルを保ち、残りはシーリングが抑えます（既定ではオフ）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "レベリングのスレッショルド: シーリングより下に保つレベル（Off: レベリングなし）"
 "Levelling attack: how much of a transient passes before the level is held" = "レベリングのアタック: レベルが保たれる前にトランジェントがどれだけ通るか"
+"Show complete piano roll preview" = "ピアノロールのプレビュー全体を表示"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "チャンネルラック: パターンがラックの表示幅より長くても、チャンネルのノートプレビューにパターン全体を表示します。オフの場合はステップと一緒にスクロールします"

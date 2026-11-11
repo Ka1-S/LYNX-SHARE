@@ -206,6 +206,15 @@ int ChannelRackComponent::numSteps() const
     return juce::jlimit (16, 512, steps);
 }
 
+PreviewSpan ChannelRackComponent::previewSpan() const
+{
+    auto visible = 0;
+    if (const auto* holder = getParentComponent())
+        visible = holder->getWidth() - gridLeft() - 8 - (advancedLoopShown() ? loopColumnWidth : 0);
+    // (at least 8 steps wide: a rack squeezed narrower than that scrolls its miniatures too)
+    return notePreviewSpan (numSteps() * stepWidth, juce::jmax (visible, 8 * stepWidth), stickyX, completePreview.load (std::memory_order_relaxed));
+}
+
 int ChannelRackComponent::shownSteps() const
 {
     return juce::jmin (512, numSteps() + ghostSteps);
@@ -785,10 +794,17 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         if (showsNotePreview (pattern, row, pianoRollView)) // piano-roll notes: a miniature instead of the step buttons
         {
             paintNotePreview (g, row, pattern, channel.colour);
+            const auto span = previewSpan();
+            const auto stepX = [&] (int step) { return gridLeft() + span.x + (int) ((std::int64_t) span.width * step / realSteps); };
             if (loopSteps > 0)
             {
                 g.setColour (accent.withAlpha (0.85f));
-                g.fillRect (gridLeft() + loopSteps * stepWidth - 2, y + 3, 2, rowHeight - 6);
+                g.fillRect (stepX (loopSteps) - 2, y + 3, 2, rowHeight - 6);
+            }
+            if (span.fitted && playheadStep >= 0 && playheadStep < realSteps) // (the playing column is elsewhere: a line here)
+            {
+                g.setColour (playhead.withAlpha (0.8f));
+                g.fillRect (stepX (playheadStep), y + 4, juce::jmax (2, span.width / realSteps), rowHeight - 8);
             }
             continue;
         }
@@ -1047,15 +1063,20 @@ void ChannelRackComponent::paintNotePreview (juce::Graphics& g, int row, const P
 {
     using namespace theme::colour;
     const auto steps = numSteps();
-    const auto area = juce::Rectangle<float> ((float) gridLeft() + 1.0f, (float) rowY (row) + 4.0f, (float) (steps * stepWidth) - 3.0f,
+    // (the whole pattern in the visible width when it is longer than the rack shows: FL's complete preview)
+    const auto place = previewSpan();
+    const auto area = juce::Rectangle<float> ((float) (gridLeft() + place.x) + 1.0f, (float) rowY (row) + 4.0f, (float) place.width - 3.0f,
                                               (float) rowHeight - 8.0f);
+    const auto beatWidth = (float) place.width * 4.0f / (float) steps;
     const auto hoveredHere = hoverArea == Area::grid && hoverRow == row;
     theme::fillRoundRect (g, area, theme::radius::sm, hoveredHere ? bg4 : bg1);
 
-    for (int beat = 4; beat < steps; beat += 4) // beat lines, bars a little stronger
+    for (int beat = 4; beat < steps; beat += 4) // beat lines, bars a little stronger (bars only once beats crowd)
     {
+        if (beat % 16 != 0 && beatWidth < 8.0f)
+            continue;
         g.setColour (beat % 16 == 0 ? border.brighter (0.2f) : border);
-        g.fillRect (area.getX() + (float) (beat * stepWidth) - 1.5f, area.getY() + 2.0f, 1.0f, area.getHeight() - 4.0f);
+        g.fillRect (area.getX() + beatWidth * (float) (beat / 4) - 1.5f, area.getY() + 2.0f, 1.0f, area.getHeight() - 4.0f);
     }
 
     const auto [low, high] = channelKeyRange (pattern, row);
@@ -3067,9 +3088,15 @@ bool ChannelRackComponent::playheadFrame (double)
 
     if (step != playheadStep)
     {
-        auto dirty = [this] (int s) {
-            if (s >= 0)
-                repaint (gridLeft() + s * stepWidth - 1, 0, stepWidth + 1, getHeight());
+        // (fitted miniatures draw their own playhead line, at the pattern's scale)
+        const auto span = previewSpan();
+        const auto total = numSteps();
+        auto dirty = [this, span, total] (int s) {
+            if (s < 0)
+                return;
+            repaint (gridLeft() + s * stepWidth - 1, 0, stepWidth + 1, getHeight());
+            if (span.fitted && s < total)
+                repaint (gridLeft() + span.x + (int) ((std::int64_t) span.width * s / total) - 1, 0, juce::jmax (2, span.width / total) + 3, getHeight());
         };
         dirty (playheadStep);
         playheadStep = step;

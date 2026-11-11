@@ -27,6 +27,7 @@ struct GeneralOptions
     bool noteFlats = false;     // black notes as flats
     bool noteNamesEveryKey = true; // the Piano roll names every key (LYNX, round 170a)
     bool rackPlayheadColumn = true; // the Channel Rack's playhead column + bar marks (LYNX, round 170a)
+    bool rackCompletePreview = true; // a rack miniature shows the whole pattern (FL: "Show complete piano roll preview"; feedback 190bm)
     bool rackStepsChannelColour = true; // lit Channel Rack steps in their channel's colour (LYNX, round 170a2)
     bool splash = true, startupSound = true, scanAtStart = true;
     int startupProject = 1;       // issue #123: FL's "Startup project" (StartupProject: 0 empty, 1 default template, 2 last)

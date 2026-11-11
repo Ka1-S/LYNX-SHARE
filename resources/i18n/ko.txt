@@ -8918,3 +8918,5 @@ countries: kr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "레벨링: 느린 어택으로 실링 아래의 스레숄드에 레벨을 유지하고 나머지는 실링이 잡습니다 (기본값은 꺼짐)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "레벨링 스레숄드: 실링 아래에 유지되는 레벨 (Off: 레벨링 없음)"
 "Levelling attack: how much of a transient passes before the level is held" = "레벨링 어택: 레벨이 유지되기 전에 트랜지언트가 얼마나 통과하는지"
+"Show complete piano roll preview" = "피아노 롤 미리 보기 전체 표시"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "채널 랙: 패턴이 랙에 보이는 범위보다 길어도 채널의 노트 미리 보기에 패턴 전체를 표시합니다. 끄면 스텝과 함께 스크롤됩니다"

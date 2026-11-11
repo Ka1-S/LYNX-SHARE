@@ -8918,3 +8918,5 @@ countries: nl be
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivellering: houdt het niveau met een trage attack op een drempel onder het plafond, het plafond vangt de rest op (standaard uit)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Drempel van de nivellering: het niveau dat onder het plafond wordt gehouden (Off: geen nivellering)"
 "Levelling attack: how much of a transient passes before the level is held" = "Attack van de nivellering: hoeveel van een transiënt doorkomt voordat het niveau wordt vastgehouden"
+"Show complete piano roll preview" = "Volledige Piano Roll-voorvertoning tonen"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: de nootvoorvertoning van een kanaal toont het hele pattern, ook als het langer is dan het rack laat zien; uit: ze schuift mee met de stappen"

@@ -8918,3 +8918,5 @@ countries: id
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Perataan level: menahan level pada ambang di bawah batas atas dengan attack lambat, batas atas menangkap sisanya (mati secara default)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Ambang perataan: level yang ditahan di bawah batas atas (Off: tanpa perataan)"
 "Levelling attack: how much of a transient passes before the level is held" = "Attack perataan: seberapa banyak transien yang lewat sebelum level ditahan"
+"Show complete piano roll preview" = "Tampilkan pratinjau Piano Roll lengkap"
+"Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: pratinjau not sebuah channel menampilkan seluruh pattern meskipun pattern lebih panjang daripada yang ditampilkan rack; jika mati, pratinjau bergulir bersama langkah"
