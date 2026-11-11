@@ -1,5 +1,58 @@
 [
   {
+    "version": "0.1.26-alpha",
+    "tag": "v0.1.26-alpha",
+    "date": "2026-11-11",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.26-alpha",
+    "title": "Simple workflow, racks and Clip View, Slicex and FPC, freeze, controller profiles",
+    "summary": "A third layout, the Simple workflow, joins the Pattern and Clip-launch workflows. The Clip-launch side gains a Clip View, a Device View, racks, note chance and Live's MIDI tools. Slicex and FPC are instruments with FL Studio's editors, FL Studio Mobile projects come in with instruments, effects and automation, plugin windows dock, channels can be frozen and common MIDI controllers work from profiles.",
+    "new": [
+      "**Simple workflow** (View › Layout style, and offered by the setup wizard): one window with the tracks and the timeline. The New track chooser adds a voice, an instrument, a sampler or a starter beat in one click, dropped loops keep time and the project has a key. The Finish dock gives the Master a ready-made sound and saves the song as WAV, MP3 or a package for other apps. The other windows stay one click away.",
+      "**Clip View, Device View and racks** (Clip-launch workflow): a selected clip opens with Clip, Launch and Notes panels and the Piano roll docked under the grid, and the selected track's effects show as a chain of cards. Instrument, Audio Effect and MIDI Effect Racks with chains, zones and macros open from Live sets and are written back, and a mixer slot's menu groups it into a rack.",
+      "**Note chance and MIDI tools**: every note has a Chance and a Velocity range, and Live 12's probability groups are kept in .als sets. Live 12's MIDI tools (Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp and Velocity Shaper) are in the Clip View and in the Piano roll's Tools menu.",
+      "**Warp markers**: Auto-warp locks an audio clip to the beat, and markers can be added, moved and removed in the audio editor's warp lane. The Playlist shows them as flags on the clip.",
+      "**Slicex and FPC** are instruments with FL Studio's editor layout. FL's saved settings are read and written back, and both were compared with FL Studio's own renders. Fruity Slicer has its envelope page and voice settings, and a note-off ends its slice. (#74, #129, #135)",
+      "**FL Studio Mobile (.flm)**: MiniSynth, Transistor Bass, 3x Osc and GMSynth channels play on LYNX SHARE's engines, FL Studio Mobile's effects come in as the new Pocket effects, and level, pan, mute, solo, pitch bend and send moves become automation clips. (#88)",
+      "**Freeze** (right-click a channel in the Channel rack): the channel plays audio rendered from it and its instrument is unloaded, a third-party plugin included. Volume, pan and the insert's effects stay live, and Unfreeze brings back exactly what was there.",
+      "**Docked plugin windows**, as in FL Studio: plugin editors sit inside the main window like the other panels. Settings › General has FL's \"Detach all new plugins\", and Tools › Macros › Switch all plugin editors to chooses Attached or Detached for all of them. A detached window can be pinned on top. (#116)",
+      "**MIDI controller profiles** (Settings › MIDI › Controller type): Mackie Control with its extender, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3 and nanoKONTROL2, with soft takeover and feedback to the device. **MPE**, first stage: an MPE controller plays each note with its own bend, timbre and pressure, and a third-party plugin can receive MPE. (#108)",
+      "**Online sessions**: the host can share plugins with the guests. A shared plugin runs on the host's computer and a guest changes its settings from their own window, without owning it. A guest whose LYNX SHARE restarts goes back in as the same person, and Linux can host a session.",
+      "**Projects**: File › Versions... lists a project's saved versions and backups. A project can be opened without its third-party plugins, your own default template opens at start-up and with File › New (#123), and Export can write one file per marker section and keep named presets.",
+      "**Tools**: Convert to MIDI turns the melody, harmony or drums of an audio clip into a pattern, on your own computer. Piano roll scripts run FL Studio's .pyscript files (Tools › Scripts). The Browser finds samples similar to the one you right-click. Strike Shaper is a new transient designer (#94), and a loudness meter (LUFS and true peak) can sit beside the Master."
+    ],
+    "better": [
+      "**Playlist**, as in FL Studio: Edit and Select menus, Shift+arrow keys and Alt+Left / Right move clips (#147), fade and gain handles have menus with Create crossfade and Normalize, and there are Make unique as sample, Magic lasso and optional levels and controls on track headers. Pattern Blocks have pencil, brush and eraser tools (#127).",
+      "**Mixer**: deleting mixer tracks asks first, as in FL Studio. Links to a deleted insert can be kept and shown greyed, inserts can be arranged like the Playlist and a send can be pre-fader. A muted insert keeps its meter moving and keeps running its effects, as in FL Studio (#144).",
+      "**Plugins**: Processing › Connections sends an instrument's outputs to separate mixer inserts (#114). Third-party plugins in FL Studio projects play at FL's level (they were 3 dB quieter). A crashed plugin can be reloaded without reopening the project, LYNX SHARE's keys work while a plugin window has focus (#96), and VST3 parameter menus offer LYNX SHARE's automation items.",
+      "**Piano roll**: a Keyboard style option with traditional piano keys, a Chord stamp list, FL Studio's vertical zoom wheel, and Snap to scale moves notes by scale steps.",
+      "**Recording and MIDI**: sustain and sostenuto pedals hold notes, and a Layer passes the pedal on to its channels (#141). There are Tools › Cancel recording, an optional \"Low latency while recording\" switch and 16-bit disk recording.",
+      "**Render to audio** plays at the level of the insert it replaces (it was about 5 dB louder). Pattern renders and consolidated clips do too.",
+      "**Effects**: Crest, Sentry, Ember, Nebula, Halo, Foil Plate, Atrium, Epoch Verb, Echoform and Horizon were refitted against the tools they are modelled on. LYNX Tune has Breathiness (#103). When a project uses a third-party compressor, limiter, saturator or gate that is not installed, LYNX SHARE's stand-in loads with matching settings for more of them.",
+      "**LYNX extras** (Settings): one page with LYNX SHARE's own additions that are off by default, such as Preview in time in the Browser and \"Muted inserts don't process\". The plugin database is now a folder you can arrange in the file manager (#104), and LYNX Dance loads sprite sheets made for Fruity Dance (#121).",
+      "**Compressor** has a FET voicing next to the clean one, and **Apex Limiter** has a levelling stage under the ceiling (off by default)."
+    ],
+    "fixed": [
+      "A mixer track with a Patcher that holds a Fruity Limiter played about 1000 samples late compared with FL Studio. (#113)",
+      "Recording into a looping pattern clip folded the take over itself (#126), and an automation clip took a control back from a MIDI controller while you moved it (#125).",
+      "Changing the audio device while a project played could crash LYNX SHARE, and opening a Windows Audio device could take more than a minute on some devices. (#134)",
+      "Third-party plugins in imported FL Studio projects could be silenced by FL's cut groups. Surge XT was one. (#143)",
+      "A project opened over another one could keep the first project's settings for a plugin they both use.",
+      "An audio clip on a Sampler channel was silent, and an export could start before a SoundFont had finished loading (#138).",
+      "Linux: LYNX SHARE crashed at start on systems without a monospaced font (#142), and Linux could not host a live session. Samples in FL Studio's Shared data and Downloads folders are found (#124).",
+      "Mod X and Mod Y move the Sampler's filter, and a note's fine pitch reaches third-party plugins. (#63)"
+    ],
+    "known": [
+      "Freeze works on instrument channels only, not on mixer inserts. The notes of a frozen channel cannot be edited until you Unfreeze it.",
+      "MPE is a first stage: one value of bend, timbre and pressure is recorded per note, not a curve, and of the built-in instruments only the Sampler and the built-in synth follow it. It has not been tried with a real MPE controller yet.",
+      "The controller profiles were written from each device's documentation and have not been tried on the hardware yet.",
+      "Harmless can play up to about 1.7 dB louder or quieter after a rest, depending on the audio buffer size.",
+      "LYNX Dance keeps Fruity Dance's \"On desktop\" option for FL Studio projects, but it does nothing: dancers stay in the main window.",
+      ".flm import: instruments other than MiniSynth, Transistor Bass, 3x Osc, GMSynth, DirectWave and the samplers play the built-in synth, and a .dwp missing from FL Studio's copy of the FLM resources plays a stand-in.",
+      "Live set export: LYNX SHARE's own instruments and effects are not converted (their tracks and notes are kept), and effect-parameter automation and insert-to-insert routes are dropped. On import, Live's own effects are dropped.",
+      "A plugin in a separate process, or in the 32-bit bridge, opens its editor in its own window and cannot be docked or pinned."
+    ]
+  },
+  {
     "version": "0.1.25-alpha",
     "tag": "v0.1.25-alpha",
     "date": "2026-11-09",
