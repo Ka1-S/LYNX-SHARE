@@ -192,6 +192,7 @@ add_library(lynx_core STATIC
     src/core/VocalPitch.cpp
     src/core/LynxTune.cpp
     src/core/LynxVerbs.cpp
+    src/core/NebulaCloud.cpp
     src/core/FlPatcher.cpp
     src/core/Patcher.cpp
     src/core/Rack.cpp

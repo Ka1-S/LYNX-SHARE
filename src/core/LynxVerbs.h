@@ -18,6 +18,8 @@
 // Chaigne 1991), Dattorro's input-diffuser lengths (J. Dattorro, "Effect Design Part 1", JAES 1997), a two-head
 // crossfaded delay-line pitch shifter. The parameter laws (normalised value → unit) follow the measured laws of the
 // reference plugins so their saved values translate one to one.
+// One exception (round 190ca): with its Law parameter on, six of Nebula's modes run on core/NebulaCloud — a port of
+// an MIT-licensed model of those networks (attribution and notice in that header and in THIRD_PARTY.md).
 //
 // Every parameter is 0..1 (EffectParams). Nothing allocates after prepare(); no latency.
 
@@ -152,8 +154,10 @@ namespace nebula
 {
 constexpr int paramCount = 13;
 constexpr int modeCount = 22;
+constexpr int law = 14; // round 190ca: 1 = the cloud law (core/NebulaCloud.h; new instances), 0 = the classic engine
 const char* modeName (int index) noexcept;
 double delayMs (float v) noexcept;
+bool cloudMode (int mode) noexcept; // whether the cloud law has a network for this mode (the others stay classic)
 }
 namespace halo
 {

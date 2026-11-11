@@ -7,6 +7,7 @@
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
+#include "core/NebulaCloud.h"
 
 namespace lynx::verbs
 {
@@ -1274,10 +1275,41 @@ LYNX_FIT_TABLE NebulaMode nebulaModes[nebula::modeCount] = {
 double nebulaDelayMs (float v) { return knotLaw (v, nebulaDelayKnots, nebulaDelayCount); }
 const char* const syncNames[4] = { "ms", "Note", "Dotted", "Triplet" };
 
+// Round 190ca: the cloud law (parameter 14, on for new instances). Six of the 22 networks — the ones whose structure
+// is published — run on core/NebulaCloud (a port of an MIT-licensed model, see that header); the other sixteen and
+// every project saved before the round (Law off: upgradeLoadedEffectParams) keep the classic engine below, unchanged.
+constexpr int nebulaLaw = 14;
+cloud::Topology nebulaTopology (int mode) noexcept
+{
+    switch (mode)
+    {
+        case 0: return cloud::Topology::fdn16;
+        case 2: return cloud::Topology::serialQuad;
+        case 3: return cloud::Topology::serialStereo;
+        case 4: return cloud::Topology::loopedQuad;
+        case 6: return cloud::Topology::fdn4;
+        case 19: return cloud::Topology::fdn4Filtered;
+        default: return cloud::Topology::none;
+    }
+}
+
 class NebulaFx final : public VerbEffect
 {
 public:
     NebulaFx() : VerbEffect (EffectKind::nebula, 4.2, 0.05) {}
+
+    void prepare (double sampleRate) noexcept override
+    {
+        VerbEffect::prepare (sampleRate);
+        network.prepare (sampleRate);
+    }
+    void reset() noexcept override
+    {
+        VerbEffect::reset();
+        network.reset();
+        change = Fade::none;
+        placed = false;
+    }
 
     // CLEAR (round 129): the panel's push button flips parameter 13; a flip empties the delay network at once
     void process (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept override
@@ -1288,13 +1320,104 @@ public:
                 reset();
             lastClear = p[13];
         }
-        VerbEffect::process (left, right, n, p, bpm);
+        const auto want = p[nebulaLaw] >= 0.5f ? nebulaTopology (choice (p[12], nebula::modeCount)) : cloud::Topology::none;
+        if (! placed)
+            placed = true, active = want, before = p;
+        if (want != active && change == Fade::none)
+        {
+            change = Fade::out;
+            changeLeft = fadeLength;
+            kept = before;
+        }
+        if (active == cloud::Topology::none && change == Fade::none)
+        {
+            VerbEffect::process (left, right, n, p, bpm); // the classic engine, as before the round
+            before = p;
+            return;
+        }
+        // a cloud network, or the 11 ms either side of a change between the two engines / two cloud networks (the wet
+        // part fades out on the old one with its settings held, the new one starts empty and fades in)
+        for (int done = 0; done < n;)
+        {
+            auto m = std::min (n - done, chunk);
+            if (change != Fade::none)
+                m = std::min (m, changeLeft);
+            const auto& q = change == Fade::out ? kept : p;
+            auto* l = left + done;
+            auto* r = right + done;
+            float dry, wet;
+            mixGains (q[0], dry, wet);
+            std::copy (l, l + m, inL.begin());
+            std::copy (r, r + m, inR.begin());
+            if (active == cloud::Topology::none)
+            {
+                VerbEffect::process (l, r, m, q, bpm);
+                for (int i = 0; i < m; ++i)
+                {
+                    l[i] -= dry * inL[(std::size_t) i];
+                    r[i] -= dry * inR[(std::size_t) i];
+                }
+                wet = 1.0f;
+            }
+            else
+                network.process (inL.data(), inR.data(), l, r, m, controls (q, bpm, active));
+            for (int i = 0; i < m; ++i)
+            {
+                auto w = wet;
+                if (change != Fade::none)
+                {
+                    const auto g = (float) (changeLeft - i) / (float) fadeLength; // 1 … 0 over the fade
+                    w *= change == Fade::out ? g : 1.0f - g;
+                }
+                l[i] = dry * inL[(std::size_t) i] + w * l[i];
+                r[i] = dry * inR[(std::size_t) i] + w * r[i];
+            }
+            done += m;
+            if (change != Fade::none && (changeLeft -= m) <= 0)
+            {
+                if (change == Fade::out)
+                {
+                    change = Fade::in;
+                    changeLeft = fadeLength;
+                    active = want;
+                    if (active == cloud::Topology::none)
+                        VerbEffect::reset();
+                    else
+                        network.reset();
+                }
+                else
+                    change = Fade::none;
+            }
+        }
+        before = p;
     }
 
 private:
-    float lastClear = -1.0f;
+    // the cloud law's controls: the same parameters in the reference's units (the model takes them directly)
+    cloud::Controls controls (const EffectParams& p, double bpm, cloud::Topology topology) const noexcept
+    {
+        cloud::Controls c;
+        c.topology = topology;
+        c.delayMs = syncedMs (choice (p[1], 4), choice (p[2], 7), nebulaDelayMs (p[3]), bpm);
+        c.warp = p[4];
+        c.feedback = p[5];
+        c.density = p[6];
+        c.width = -1.0 + 2.0 * p[7];
+        c.lowCutHz = 10.0 + 1990.0 * p[8];
+        c.highCutHz = 200.0 + 19800.0 * p[9];
+        c.modRateHz = skewLaw (p[10], 0.01, 10.0, 2.328);
+        c.modDepth = p[11];
+        return c;
+    }
 
-protected:
+    float lastClear = -1.0f;
+    cloud::Network network;
+    cloud::Topology active = cloud::Topology::none;
+    Fade change = Fade::none;
+    int changeLeft = 0;
+    bool placed = false;
+    EffectParams before {}, kept {};
+    std::array<float, chunk> inL {}, inR {};
 
 protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[12], nebula::modeCount); }
@@ -1784,6 +1907,7 @@ const char* foil::typeName (int i) noexcept { return foilTypes[std::clamp (i, 0,
 double foil::decaySec (float v) noexcept { return foilDecaySec (v); }
 const char* nebula::modeName (int i) noexcept { return nebulaModes[std::clamp (i, 0, nebula::modeCount - 1)].name; }
 double nebula::delayMs (float v) noexcept { return nebulaDelayMs (v); }
+bool nebula::cloudMode (int mode) noexcept { return nebulaTopology (mode) != cloud::Topology::none; }
 const char* horizon::echoModeName (int i) noexcept { return horizonEchoModes[std::clamp (i, 0, horizon::echoModeCount - 1)]; }
 const char* horizon::reverbModeName (int i) noexcept { return horizonReverbs[std::clamp (i, 0, horizon::reverbModeCount - 1)].name; }
 double horizon::decaySec (float v) noexcept { return horizonDecaySec (v); }
@@ -1820,7 +1944,10 @@ const EffectInfo& info (EffectKind kind)
         params ({ { "Mix", 0.5f }, { "Sync", 0.0f }, { "Note", 0.333333f }, { "Delay", 0.5f }, { "Warp", 0.0f },
                   { "Feedback", 0.5f }, { "Density", 0.0f }, { "Width", 1.0f }, { "Low cut", 0.0f }, { "High cut", 1.0f },
                   { "Mod rate", 0.273834f }, { "Mod depth", 0.5f }, { "Mode", 0.0f },
-                  { "Clear", 0.0f } }) }; // round 129: the reference's CLEAR button (any change of the value empties the network)
+                  { "Clear", 0.0f }, // round 129: the reference's CLEAR button (any change of the value empties the network)
+                  // round 190ca: the cloud law (core/NebulaCloud.h) for new instances; projects saved before keep the
+                  // classic engine: upgradeLoadedEffectParams
+                  { "Law", 1.0f } }) };
     static const EffectInfo haloInfo { "Halo",
         params ({ { "Mix", 0.5f }, { "Shift", 1.0f }, { "Feedback", 0.0f }, { "Diffusion", 0.919192f }, { "Size", 0.5f },
                   { "Low cut", 0.0f }, { "High cut", 0.530201f }, { "Mod rate", 0.1f }, { "Mod depth", 0.3f },
@@ -1902,6 +2029,7 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
             switch (param)
             {
                 case 13: return "Clear";
+                case 14: return v >= 0.5f ? "measured" : "classic";
                 case 1: return syncNames[choice (v, 4)];
                 case 2: return noteNames[choice (v, 7)];
                 case 3: return ms (nebulaDelayMs (v));

@@ -302,13 +302,17 @@ literature (Schroeder / Moorer all-pass diffusion, Jot's feedback delay networks
 Dattorro's input diffusers, a two-head delay-line pitch shifter). The parameter laws follow the measured ones, so a
 project's saved Valhalla settings translate one to one when LYNX SHARE stands in for a missing Valhalla plugin; the effects
 also sit on any mixer insert (*Insert*), have their own panels, no latency, and never allocate on the audio thread.
+One part is not LYNX SHARE's own design: with its **Measured** model (the default for new instances since round 190ca) six of
+Nebula's network shapes (Ripple, Fold, Drift, Abyss, Glint, Mirage) run on a C++ port of the MIT-licensed Faust
+Libraries function `re.valhallaSupermassive` by David Braun (`src/core/NebulaCloud.h`; notice in `THIRD_PARTY.md`).
+The other sixteen shapes, and every project or preset saved before, play LYNX SHARE's own network (**Classic**).
 
 | LYNX SHARE engine | Inspired by | What it is | Fit (48 kHz, impulse responses) |
 |---|---|---|---|
 | Epoch Verb | ValhallaVintageVerb | 22 algorithms (halls, plates, rooms, chambers, chorused / random spaces, gated, drifting …), 1970s / 1980s / Now colour, pre-delay, decay 0.2–70 s, size, attack, bass multiply / crossover, high shelf, early / late diffusion, modulation, high / low cut, equal-power mix | mid-band RT60 within ±8 % on 22 modes and 0.5–8 s decays; onsets within 1 ms; energy of the first 100 ms within ±2 dB on most modes |
 | Atrium | ValhallaRoom | 12 room / chamber / space types; early section (size, cross, modulation, send into the late part) and late section (size, cross, modulation); bass and high RT multipliers with crossovers; space; high / low cut | RT60 = Decay within ±10 % (0.5–8 s) per octave band 125 Hz–4 kHz |
 | Foil Plate | ValhallaPlate | 12 plate types, pre-delay, decay 0.5–30 s, size, width, modulation, low / high EQ shelves | RT60 at low / mid frequencies = Decay; the measured high-frequency damping that grows with decay |
-| Nebula | Valhalla Supermassive | delay 0–2000 ms or synced (note / dotted / triplet), feedback (√F per pass, as measured), density, warp, width, low / high cut, modulation, 22 network shapes | echo spacing and decay per shape as measured (Delay × shape multiple, decay multiple at density 0 and 100 %) |
+| Nebula | Valhalla Supermassive | delay 0–2000 ms or synced (note / dotted / triplet), feedback (√F per pass, as measured), density, warp, width, low / high cut, modulation, 22 network shapes | echo spacing and decay per shape as measured (Delay × shape multiple, decay multiple at density 0 and 100 %); Measured model: six shapes as a port of an MIT-licensed model of their networks (tail score 5.84 → 8.43) |
 | Halo | ValhallaShimmer | shimmer: −12…+12 semitone shifter in the feedback path (single / dual voices, or off), size-set decay, diffusion, colour, low / high cut, modulation | shift law and size → decay law as measured; the mode lists are partly not confirmed |
 | Horizon | ValhallaFutureVerb | echo (12 modes: clean, tape, digital, analog, detune, reverse and reverse-octave, sparkle, swarm, lo-fi; time / sync, feedback, spread, drive, detune) into or after a reverb (8 modes, decay 0.2–70 s, size, attack, early / late, density), colour, low / high EQ, width | reverb decay per mode as measured; the echo modes are our own interpretation |
 
