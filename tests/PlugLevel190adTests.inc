@@ -159,6 +159,36 @@ TEST (plug190ad_only_hosted_plugins_follow_the_wrapper_level)
     CHECK (std::any_of (out[0].begin(), out[0].end(), [] (float x) { return x != 0.0f; }));
 }
 
+TEST (plug190ad_new_projects_take_fl_plugin_levels)
+{
+    using namespace lynx;
+    // File › New and every built-in template: FL's levels (none of them holds a hosted plugin)
+    CHECK (makeNewProject().flPluginLevels);
+    for (int i = 0; i < (int) templateNames().size(); ++i)
+    {
+        const auto song = makeNewProject (i);
+        CHECK (song.flPluginLevels);
+        CHECK (std::none_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::plugin; }));
+    }
+    // what a project saved before reads as (no key): LYNX's own law
+    CHECK (! Song::makeDefault().flPluginLevels);
+    CHECK (! Song {}.flPluginLevels);
+    // a user's template: without a hosted plugin it takes FL's levels; with one made under LYNX's law it keeps them
+    auto plain = Song::makeDefault();
+    CHECK (adoptFlPluginLevels (plain) && plain.flPluginLevels);
+    auto withPlugin = Song::makeDefault();
+    ChannelDef c;
+    c.instrument = InstrumentKind::plugin;
+    c.plugin.id = "x";
+    withPlugin.channels.push_back (c);
+    CHECK (! adoptFlPluginLevels (withPlugin) && ! withPlugin.flPluginLevels);
+    auto missingPlugin = Song::makeDefault(); // (its plugin is not installed here: still a hosted plugin's channel)
+    missingPlugin.channels.emplace_back().plugin.foreign.format = ForeignPlugin::Format::vst3;
+    CHECK (! adoptFlPluginLevels (missingPlugin));
+    withPlugin.flPluginLevels = true; // (a template saved from now on: already FL's)
+    CHECK (adoptFlPluginLevels (withPlugin));
+}
+
 TEST (plug190ad_wrapper_velocity_is_round_128)
 {
     using lynx::hostpitch::flWrapperVelocity;
@@ -229,4 +259,43 @@ TEST (plug190ad_flp_import_and_export_keep_the_plugin_level)
             CHECK (std::abs (again.channels[1].volume - 0.6f) < 1.0e-4f);
         }
     }
+}
+
+TEST (plug190ad_a_patcher_channel_is_not_compensated)
+{
+    using namespace lynx;
+    // FL's levels apply to the rack's own hosted plugin channels only: what a Patcher hosts keeps the Patcher's level
+    // (the channel is a Patcher, not a wrapper; nothing inside it reads the project's flag), so it is never raised
+    // twice — the same render with the flag on and off
+    std::vector<float> out[2];
+    for (int fl = 0; fl < 2; ++fl)
+    {
+        Song song;
+        song.mixer = Song::defaultMixer (2);
+        song.flPluginLevels = fl == 1;
+        ChannelDef c;
+        c.instrument = InstrumentKind::patcher;
+        c.pan = 0.25f;
+        c.patcher.nodes = { patcher162::generatorNode (InstrumentKind::synth) };
+        c.patcher.wires = { patcher162::midi (patchFromHost, 0, 0, 0), patcher141::audio (0, patchToHost) };
+        song.channels.push_back (c);
+        auto& p = song.patterns.emplace_back();
+        p.notes = { { 0, 960, 0, 57 } };
+        const auto state = RackState::build (song, nullptr, 44100.0);
+        CHECK (state != nullptr);
+        if (state == nullptr)
+            return;
+        RackRenderer r;
+        r.prepare (44100.0, 256);
+        std::vector<float> l (256), rr (256);
+        const auto tps = ticksPerSample (song.bpm, 44100.0);
+        for (int b = 0; b < 16; ++b)
+        {
+            r.process (state.get(), true, b * 256 * tps, 256, l.data(), rr.data());
+            out[fl].insert (out[fl].end(), l.begin(), l.end());
+            out[fl].insert (out[fl].end(), rr.begin(), rr.end());
+        }
+    }
+    CHECK (out[0] == out[1]);
+    CHECK (std::any_of (out[0].begin(), out[0].end(), [] (float x) { return x != 0.0f; }));
 }

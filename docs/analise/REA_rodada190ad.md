@@ -68,7 +68,12 @@ of one render is exact (the patch is mono).
 the gain is √2·f(v) at every volume (so the event's `vol` is the curve f(v)); the pan is the kernel's, in whole steps
 of 1 / 64 **truncated** (1.5 → 1, 2.5 → 2, 0.4 → 0; negative pans assumed to truncate towards zero too); the project's
 triangular law reaches the wrapper (the louder side at the centre's level, R / L = 0.5 at half left). Surge's default
-patch does not react to velocity, so the velocity law rests on §2 alone.
+patch does not react to velocity; the velocity law was rendered separately:
+
+**Velocity [FL render].** The same patch with Surge's "Vel > VCA gain" at −36 dB (0.28 dB per velocity step),
+velocity bytes 70 / 100 / 127 (`flp/vs*.flp`): FL −40.37 / −31.86 / −24.20 dBFS; LYNX with the old law (base build, also
+3.01 dB under) −43.65 / −35.15 / −27.50, i.e. one more velocity step under FL at each (−0.27 / −0.28 / −0.29 dB beyond
+the level); LYNX after −40.36 / −31.85 / −24.21 (within 0.01 dB). FL sends the byte itself: `Round (128 v)`.
 
 **Gate** (same cloud build of origin/main e6c77291b vs a0d2ff1bd, `lx/base_gate_*` / `lx/after_gate_*`): the selftest's
 demo project (.lynx), FL's "Use Me" and "NewStuff" demo .flp (no hosted plugin) export **byte-identical**; a LYNX
@@ -82,8 +87,11 @@ project with Surge XT (`gate/s3.lynx`) keeps its level (−25.92 dBFS RMS both).
   project's panning law (`flWrapperGains`); `PluginInstrument` sends `Round (128 v)` (`hostpitch::flWrapperVelocity`;
   a note on never goes below 1).
 - **Projects saved before keep their sound**: without the property a project keeps LYNX's own law (f(v) at the centre,
-  JUCE's velocity). New LYNX projects and .als imports (Live plays a plugin at unity = volume 100 % under LYNX's own
-  law) are unchanged too. Non-plugin channels are untouched in both cases.
+  JUCE's velocity). .als imports (Live plays a plugin at unity = volume 100 % under LYNX's own law) are unchanged too.
+  Non-plugin channels are untouched in both cases.
+- **New projects** (coordinator's decision, 2026-11-10): File › New, the built-in templates and a user's template that
+  holds no hosted plugin start with FL's levels (`makeNewProject`, `adoptFlPluginLevels`, core/Templates.cpp); a user's
+  template with a hosted plugin saved under LYNX's law keeps it. Selftest `plugin_levels_new_project`.
 - `.flp` export: a project with LYNX's own law writes the plugin channel's volume that sounds the same in FL
   (f(v′) = f(v) / √2; before, FL played such an export 3 dB louder than LYNX); a project with FL's levels writes the
   knob as it is. `.als` export: a plugin track's gain is × √2 in a project with FL's levels.
@@ -97,15 +105,16 @@ project with Surge XT (`gate/s3.lynx`) keeps its level (−25.92 dBFS RMS both).
   it to channel volume 100 %).
 - **Users:** Image-Line's support calls the 78 % default "headroom"; plugin developers notice the wrapper's hidden
   level when they compare hosts (<https://forum.juce.com/t/flstudio-levels-issue/59509>).
-- **Verdict:** an FL project must play at FL's level, so the import follows the wrapper exactly. Whether **new** LYNX
-  projects should also adopt FL's wrapper level (a plugin 3 dB louder than in 0.1.25 at the same knob) is a product
-  choice: not changed here, sent to the coordinator (recommended: yes, for new projects only, as the flag already
-  keeps old ones).
+- **Verdict:** an FL project must play at FL's level, so the import follows the wrapper exactly; new LYNX projects
+  take FL's level too (a plugin 3 dB louder than in 0.1.25 at the same knob), saved ones keep theirs.
 
 ## 6. Not verified
 
-- A plugin generator inside a Patcher (FLEngine's own copy of the host): its level law was not measured; unchanged.
-- VST2 and CLAP wrapper channels: the same wrapper class and Gen_Render (inferred, only VST3 rendered).
+- A plugin generator inside a Patcher (FLEngine's own copy of the host): FL's level there was not measured. LYNX's
+  Patcher channel is not touched by the flag (test `plug190ad_a_patcher_channel_is_not_compensated`), so nothing is
+  raised twice.
+- VST2 and CLAP wrapper channels: the same wrapper class and Gen_Render (inferred, only VST3 rendered). No VST2
+  instrument is installed on the study machine (the VST2 folders hold effects only).
 - Notes played live from a MIDI keyboard into a project with FL's levels also go through `Round (128 v)` (LYNX keeps
   a played velocity as byte / 127, so byte 100 goes out as 101); what FL's wrapper gets for a played note was not
   probed.

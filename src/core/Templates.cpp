@@ -311,6 +311,18 @@ Song makeNewProject (int templateIndex)
     // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template)
     auto song = makeTemplate (templateIndex < 0 ? 0 : templateIndex);
     applyNewProjectDefaults (song, newProjectDefaults());
+    adoptFlPluginLevels (song); // (the built-in templates hold no hosted plugin: every new project gets FL's levels)
     return song;
+}
+
+bool adoptFlPluginLevels (Song& song)
+{
+    if (! song.flPluginLevels
+        && std::none_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) {
+               // (also a plugin not found on this PC: the channel becomes a hosted plugin again when it is installed)
+               return c.instrument == InstrumentKind::plugin || c.plugin.foreign.format != ForeignPlugin::Format::none;
+           }))
+        song.flPluginLevels = true;
+    return song.flPluginLevels;
 }
 } // namespace lynx
