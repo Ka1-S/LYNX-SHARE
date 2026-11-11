@@ -92,3 +92,46 @@ of them, after the ones you use) and their own Playlist tracks (16 of them).
 - Stand-ins are saved next to the project in `Stand-ins/`. A part that did not change is not rendered again.
 - The package keeps every plugin's settings (opaque, as the plugin saved them). Nothing is uploaded anywhere.
 - Both sides should use the same LYNX SHARE version (the open summary warns when they differ).
+
+## Live sessions: use a plugin only the host has
+
+In a live session (**File › Online session › Start live session...** / **Join live session...**) the host can let the
+guests use plugins that are installed only on the host's computer. The guest writes the notes and turns the knobs; the
+host's computer makes the sound with its plugin and sends it back as audio. It is for writing, arranging and mixing —
+**not for playing live**: what you hear follows your changes after a moment.
+
+### The host shares a plugin
+
+1. **File › Online session › Share plugins with guests...**
+2. Tick the plugins your guests may use. Nothing is shared until you tick it, and sharing stops when the session ends.
+3. Read the notice at the top: the plugin stays on your computer and runs under your licence; LYNX SHARE never sends the
+   plugin, its files, its presets or its licence. **Some plugin licences don't allow other people to operate the
+   plugin, even remotely — check the licence of each plugin before you share it.**
+4. The list shows who is using each plugin. Untick one to stop sharing it: the guests keep hearing the last render,
+   nothing new is rendered.
+
+While a guest uses your plugin, their channel is in your project like any other: you hear it with your own plugin,
+and you can open the plugin's window and change it — your changes reach the guest's sliders when you close the window.
+Renders are made in the background a moment after the last change, never while you play or record.
+
+### A guest uses it
+
+1. Add a channel (**Channel Rack › + › Plugin (VST/VST3/CLAP)**) or an effect (an empty slot of one of your inserts ›
+   **Plugin**): the host's shared plugins are at the top, under **On {host}'s computer**, each marked *played by
+   {host}*.
+2. Write notes for the channel as usual. A moment later the channel plays the host's render (amber **R** badge).
+3. Open the channel's plugin (click its name) for the **parameter editor**: every parameter of the plugin as a slider
+   (search at the top; double-click resets one; right-click › *Create automation clip* automates it). The line at
+   the top says **Updating...** while the host renders and **Up to date** when what you hear matches your changes.
+4. If the host goes offline or stops sharing the plugin, the last render keeps playing.
+
+### Good to know
+
+- Only people who may edit can use shared plugins ("Listen only" guests cannot), and only on their own channels and
+  inserts unless the host gave them more rights (**People and permissions...**).
+- A guest's computer sends notes and values between 0 and 100 %, nothing else: no preset, no file, no state.
+- What a shared plugin sounds like is its default sound plus its parameters. Things a plugin keeps outside its
+  parameters (a sample loaded in its window, for example) are not part of it.
+- When the session ends the guest keeps the audio renders of their part (what the host chose under "guests keep");
+  the plugin and its settings stay with the host, whose project keeps the plugin as it sounded.
+- Use these sounds for the song you are making together; don't redistribute them as samples.

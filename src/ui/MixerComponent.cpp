@@ -41,6 +41,7 @@
 #include "ui/PluginWindow.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/LiveRemoteUi.h"
 #include "core/LynxTune.h"
 #include "core/VocalPitch.h"
 #include "ui/Icons.h"
@@ -6537,6 +6538,9 @@ juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
 
 void EffectsPanel::openPluginWindow (int slot)
 {
+    // Online Sessions P5-A1: an effect the session's host plays on this insert opens its parameter editor
+    if (liveui::showHostedEditor ({ { live::Kind::insert, (std::uint64_t) juce::jmax (0, track), 0 }, slot }))
+        return;
     auto effect = engine.getEffect (track, slot);
 
     if (auto* plugin = dynamic_cast<PluginEffect*> (effect.get()))

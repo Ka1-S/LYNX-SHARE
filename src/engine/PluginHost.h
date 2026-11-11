@@ -18,6 +18,7 @@
 #include "core/FlPluginDb.h"
 #include "core/HostNotePitch.h"
 #include "core/PluginSubstitutes.h"
+#include "core/RemotePlugins.h"
 #include "core/Instruments.h"
 #include "core/MidiControls.h"
 #include "core/ModuleWarmup.h"
@@ -410,6 +411,24 @@ public:
         bool instrument = false;
     };
     std::optional<Identity> portableIdentity (const PluginRef& ref) const;
+
+    // Online Sessions P5-A1 (round 190ai, core/RemotePlugins.h). In a live session this computer is participant
+    // `tag` (0: no session): a plugin reference played by another participant is never loaded here, even when the
+    // same plugin is installed — it counts as not installed and its stand-ins play.
+    void setSessionTag (std::uint32_t tag) noexcept { sessionTag.store (tag, std::memory_order_relaxed); }
+    bool playedElsewhere (const PluginRef& ref) const noexcept
+    {
+        const auto me = sessionTag.load (std::memory_order_relaxed);
+        return me != 0 && ref.playedBy != 0 && ref.playedBy != me;
+    }
+    // What a host tells its guests about a plugin it shares: the name, the vendor and the parameter list of a fresh
+    // instance (created and released here; message thread). nullopt: not installed or it did not load (`error`).
+    std::optional<remoteplug::Shared> describeForSharing (const std::string& id, juce::String* error = nullptr);
+    // A hosted plugin's parameter values (PluginRef::values) put on a running instance (indices the plugin does not
+    // have are ignored), and read back: every automatable parameter that is not at its default.
+    static void applyValues (juce::AudioPluginInstance& plugin, const std::vector<std::pair<int, float>>& values);
+    // (`fresh`: the plugin as it was described for sharing — a value counts when it differs from a fresh instance's)
+    static std::vector<std::pair<int, float>> readValues (juce::AudioPluginInstance& plugin, const remoteplug::Shared* fresh = nullptr);
     // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
     // role (another format: its state may not carry over).
     std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);
@@ -490,6 +509,7 @@ public:
 
 private:
     std::unique_ptr<juce::AudioPluginInstance> instantiate (const PluginRef& ref, double sampleRate, juce::String* error);
+    std::unique_ptr<juce::AudioPluginInstance> instantiateOnce (const PluginRef& ref, double sampleRate, juce::String* error); // (preloaded or new)
     std::unique_ptr<juce::AudioPluginInstance> createInstance (const PluginRef& ref, double sampleRate, juce::String* error);
     static std::string preloadKey (const PluginRef& ref, double sampleRate);
     struct Preloaded
@@ -513,6 +533,7 @@ private:
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
+    std::atomic<std::uint32_t> sessionTag { 0 };
     bool persistent = true;
 
     std::mutex scanLock, saveLock, flDbLock;

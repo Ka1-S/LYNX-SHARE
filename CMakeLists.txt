@@ -79,6 +79,7 @@ add_library(lynx_core STATIC
     src/core/StandIns.cpp
     src/core/LiveSession.cpp
     src/core/LiveCrypto.cpp
+    src/core/RemotePlugins.cpp
     src/core/PluginSubstitutes.cpp
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
@@ -420,6 +421,8 @@ if(LYNX_BUILD_APP)
         src/engine/ShortExportTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
+        src/engine/LiveRemotePlugins.cpp
+        src/ui/LiveRemoteUi.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp

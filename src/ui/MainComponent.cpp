@@ -67,6 +67,7 @@
 #include "ui/SessionDialogs.h"
 #include "engine/LiveSessions.h"
 #include "ui/LiveChat.h"
+#include "ui/LiveRemoteUi.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -753,6 +754,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // Online Sessions P2 (round 169b): live sessions
     live = std::make_unique<LiveSessionManager> (engine);
     liveui::attach (*live);
+    liveui::setRemoteSession (live.get(), &engine); // (P5-A1: the shared plugins in the menus, the guest's editor)
     live->onChange = [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
         {
@@ -833,6 +835,7 @@ MainComponent::~MainComponent()
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
+    liveui::setRemoteSession (nullptr, nullptr);
     live.reset(); // (a session still on ends: the others are told)
     setPluginViewPlainKeyHandler (nullptr, nullptr, nullptr);
     setSecondaryWindowKeyHandler (nullptr);
@@ -5612,12 +5615,68 @@ void MainComponent::startLiveFromCommandLine()
                 juce::File (codeFile).replaceWithText ("ERROR " + safe->live->getStatus());
         };
         (*poll) (150);
+        // round 190ai: --live-share file.vst3 — once live, the host shares that plugin and shows its list
+        if (const auto pluginFile = value ("--live-share"); pluginFile.isNotEmpty())
+            juce::Timer::callAfterDelay (6000, [safe = juce::Component::SafePointer<MainComponent> (this), pluginFile] {
+                if (safe == nullptr || safe->live->getState() != LiveSessionManager::State::live)
+                    return;
+                auto& plugins = safe->engine.getPluginHost();
+                plugins.addPluginFile (juce::File (pluginFile));
+                juce::String why = "not found";
+                bool ok = false;
+                for (const auto& type : plugins.getKnownPlugins().getTypes())
+                    if (! ok && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginFile).getFileName())
+                        ok = safe->live->sharePlugin (type.createIdentifierString().toStdString(), true, &why);
+                platform::testModeLog ("live session: --live-share " + pluginFile + (ok ? " shared" : " NOT shared: " + why));
+                liveui::showSharePlugins (*safe->live, safe->engine);
+            });
     }
     else if (auto code = value ("--live-join"); code.isNotEmpty())
     {
         if (code.startsWith ("@"))
             code = juce::File (code.substring (1)).loadFileAsString().trim();
         live->join (code, o);
+        // round 190ai: --live-use — when the host shares a plugin, a channel of one's own with it, a riff, and its
+        // parameter editor (the GUI check of remote plugins)
+        if (cli.contains ("--live-use"))
+        {
+            auto poll = std::make_shared<std::function<void (int)>>();
+            *poll = [safe = juce::Component::SafePointer<MainComponent> (this), name = o.name, weak = std::weak_ptr<std::function<void (int)>> (poll)] (int left) {
+                if (safe == nullptr)
+                    return;
+                if (! safe->live->mayUseSharedPlugins())
+                {
+                    if (left > 0)
+                        juce::Timer::callAfterDelay (500, [poll = weak.lock(), left] {
+                            if (poll != nullptr)
+                                (*poll) (left - 1);
+                        });
+                    return;
+                }
+                std::uint64_t uid = 0;
+                const auto channelName = (name + " remote").toStdString();
+                safe->engine.editSong ([&] (Song& s) {
+                    ChannelDef c;
+                    c.name = channelName;
+                    c.instrument = InstrumentKind::plugin;
+                    c.plugin = safe->live->sharedPluginRef (safe->live->sharedPlugins().front());
+                    const auto* me = s.session.find (s.session.me);
+                    c.mixerTrack = me != nullptr ? me->insertFirst : 0;
+                    s.channels.push_back (c);
+                    Pattern p;
+                    p.name = channelName + " riff";
+                    for (int n = 0; n < 4; ++n)
+                        p.notes.push_back ({ (std::int64_t) n * ppq, ppq / 2, (int) s.channels.size() - 1, 57 + 2 * n, 0.9f });
+                    s.patterns.push_back (p);
+                });
+                for (const auto& c : safe->engine.getSong().channels)
+                    if (c.name == channelName)
+                        uid = c.uid;
+                platform::testModeLog ("live session: --live-use channel " + juce::String (channelName) + " uid " + juce::String ((juce::int64) uid));
+                liveui::showHostedEditor ({ { live::Kind::channel, uid, 0 }, -1 });
+            };
+            (*poll) (120);
+        }
         // --live-edit: once in, add a channel of one's own (the GUI check sees it arrive on the host)
         if (cli.contains ("--live-edit"))
             juce::Timer::callAfterDelay (8000, [safe = juce::Component::SafePointer<MainComponent> (this), name = o.name] {

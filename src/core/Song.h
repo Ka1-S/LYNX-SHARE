@@ -270,6 +270,13 @@ struct PluginRef
     // FL's plugin menu › "Detached" (issue #116): the editor opens in a window of its own above the main window instead
     // of docked in the workspace. LYNX's own field until the .flp bit is found (docking is behind a developer switch)
     bool detached = false;
+    // Online Sessions P5-A1 (round 190ai, core/RemotePlugins.h): a plugin of the session's host that the host shared.
+    // `playedBy` is the participant whose computer plays it (0: everyone plays their own copy); everyone else hears
+    // that computer's stand-in renders. Such a plugin has no state on the wire: its sound is its default state plus
+    // `values` — (parameter index, value 0..1) pairs, sorted by index — which the guest's parameter editor writes and
+    // the host applies. Both are cleared when the session ends.
+    std::uint32_t playedBy = 0;
+    std::vector<std::pair<int, float>> values;
 
     bool operator== (const PluginRef& o) const
     {
@@ -282,7 +289,7 @@ struct PluginRef
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
                && processInactive == o.processInactive && inputs == o.inputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
-               && detached == o.detached;
+               && detached == o.detached && playedBy == o.playedBy && values == o.values;
     }
 };
 

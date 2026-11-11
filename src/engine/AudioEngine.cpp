@@ -4619,14 +4619,16 @@ void AudioEngine::capturePluginStates()
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < song.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
-            if (auto state = p->captureState()) // (a plugin that crashed keeps the state saved before)
-                song.channels[i].plugin.state = std::move (*state);
+            if (song.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
+                if (auto state = p->captureState()) // (a plugin that crashed keeps the state saved before)
+                    song.channels[i].plugin.state = std::move (*state);
 
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
         for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
             if (auto* p = dynamic_cast<PluginEffect*> (getEffect ((int) t, (int) s).get()))
-                if (auto state = p->captureState())
-                    song.mixer[t].effects[s].plugin.state = std::move (*state);
+                if (song.mixer[t].effects[s].plugin.playedBy == 0)
+                    if (auto state = p->captureState())
+                        song.mixer[t].effects[s].plugin.state = std::move (*state);
 
     // the plugins inside Patchers (REA_rodada141), nested ones too
     std::function<void (PatcherDoc&, patcher::Graph*)> captureGraph = [&] (PatcherDoc& doc, patcher::Graph* graph) {
