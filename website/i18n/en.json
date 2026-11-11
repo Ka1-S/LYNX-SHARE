@@ -197,7 +197,7 @@
 "why.work.l": "Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.",
 "why.work.p1": "The default layout is the pattern workflow FL Studio users know: Channel rack, Piano roll, Playlist and Mixer. View › Layout style › Clip-launch workflow adds a clip grid next to the Playlist, where Playlist tracks are columns and scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a Grid / Both / Song switch chooses what plays.",
 "why.work.p2": "Live sets bring their Session clips and scenes into the grid, and exporting an .als writes the grid back as Session clips.",
-"why.work.p3": "In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, the selected track's effects show as a chain of cards, and Instrument, Audio Effect and MIDI Effect Racks from Live sets open with their chains and macros.",
+"why.work.p3": "In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, the selected track's effects show as a chain of cards, and Instrument and Audio Effect Racks from Live sets open with their chains and macros.",
 "why.work.p4": "View › Layout style › Simple workflow is for a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, and a Finish dock that saves the song as a file. The setup wizard offers the three workflows at the first start.",
 "why.work.x1": "The clip grid and the Simple workflow are optional. The pattern workflow is unchanged when they are off.",
 "why.work.x2": "It is one program with three layouts, not a copy of another DAW: Live's own devices are not there.",

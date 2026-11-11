@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE andava in crash all'avvio sui sistemi senza un font a spaziatura fissa (#142), e Linux non poteva ospitare una sessione dal vivo. I sample nelle cartelle Shared data e Downloads di FL Studio vengono trovati (#124).",
 "u.0.1.26.f7": "Mod X e Mod Y muovono il filtro del Sampler, e il fine pitch di una nota arriva ai plugin di terze parti. (#63)",
 "u.0.1.26.k0": "Blocca funziona solo sui canali di strumento, non sugli insert del mixer. Le note di un canale bloccato non si possono modificare finché non lo scongeli.",
-"u.0.1.26.k1": "MPE è una prima fase: viene registrato un valore di bend, timbro e pressione per nota, non una curva, e tra gli strumenti integrati solo il Sampler e il synth integrato lo seguono. Non è ancora stato provato con un vero controller MPE.",
+"u.0.1.26.k1": "MPE è una prima fase: viene registrato un valore di bend, timbro e pressione per nota, non una curva. Tra gli strumenti integrati lo seguono il Sampler, FPC e il synth integrato, gli altri non ancora. Non è ancora stato provato con un vero controller MPE.",
 "u.0.1.26.k2": "I profili dei controller sono stati scritti dalla documentazione di ciascun dispositivo e non sono ancora stati provati sull'hardware.",
 "u.0.1.26.k3": "Harmless può suonare fino a circa 1,7 dB più forte o più piano dopo una pausa, a seconda della dimensione del buffer audio.",
 "u.0.1.26.k4": "LYNX Dance mantiene l'opzione \"On desktop\" di Fruity Dance per i progetti FL Studio, ma non fa nulla: i ballerini restano nella finestra principale.",

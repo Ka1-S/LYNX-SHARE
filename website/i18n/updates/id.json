@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE crash saat start di sistem tanpa font monospace (#142), dan Linux tidak bisa menjadi host sesi langsung. Sample di folder Shared data dan Downloads milik FL Studio kini ditemukan (#124).",
 "u.0.1.26.f7": "Mod X dan Mod Y menggerakkan filter Sampler, dan fine pitch sebuah not sampai ke plugin pihak ketiga. (#63)",
 "u.0.1.26.k0": "Bekukan hanya berfungsi pada channel instrumen, bukan insert mixer. Not dari channel yang dibekukan tidak dapat diedit sampai kamu menekan Cairkan.",
-"u.0.1.26.k1": "MPE masih tahap pertama: satu nilai bend, timbre, dan pressure direkam per not, bukan kurva, dan dari instrumen bawaan hanya Sampler dan synth bawaan yang mengikutinya. Belum dicoba dengan kontroler MPE sungguhan.",
+"u.0.1.26.k1": "MPE masih tahap pertama: satu nilai bend, timbre, dan pressure direkam per not, bukan kurva. Dari instrumen bawaan, Sampler, FPC, dan synth bawaan mengikutinya, sedangkan yang lain belum. Belum dicoba dengan kontroler MPE sungguhan.",
 "u.0.1.26.k2": "Profil kontroler ditulis dari dokumentasi tiap perangkat dan belum dicoba pada perangkat kerasnya.",
 "u.0.1.26.k3": "Harmless dapat terdengar hingga sekitar 1,7 dB lebih keras atau lebih pelan setelah jeda, tergantung ukuran buffer audio.",
 "u.0.1.26.k4": "LYNX Dance mempertahankan opsi \"On desktop\" milik Fruity Dance untuk proyek FL Studio, tetapi tidak berfungsi: para penari tetap di jendela utama.",

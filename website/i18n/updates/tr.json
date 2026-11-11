@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE, tek aralıklı yazı tipi olmayan sistemlerde açılışta çöküyordu (#142) ve Linux canlı bir oturuma ev sahipliği yapamıyordu. FL Studio'nun Shared data ve Downloads klasörlerindeki sample'lar bulunuyor (#124).",
 "u.0.1.26.f7": "Mod X ve Mod Y Sampler'ın filtresini hareket ettirir ve bir notanın ince pitch'i üçüncü taraf plugin'lere ulaşır. (#63)",
 "u.0.1.26.k0": "Dondur yalnızca enstrüman kanallarında çalışır, mixer insert'lerinde çalışmaz. Dondurulmuş bir kanalın notaları, onu Çöz'ene kadar düzenlenemez.",
-"u.0.1.26.k1": "MPE ilk aşamadadır: nota başına bir eğri değil, bend, timbre ve basıncın tek bir değeri kaydedilir ve dahili enstrümanlardan yalnızca Sampler ve dahili synth onu izler. Gerçek bir MPE kontrolcüsüyle henüz denenmedi.",
+"u.0.1.26.k1": "MPE ilk aşamadadır: nota başına bir eğri değil, bend, timbre ve basıncın tek bir değeri kaydedilir. Dahili enstrümanlardan Sampler, FPC ve dahili synth onu izler, diğerleri henüz izlemez. Gerçek bir MPE kontrolcüsüyle henüz denenmedi.",
 "u.0.1.26.k2": "Kontrolcü profilleri her cihazın belgelerinden yazıldı ve donanım üzerinde henüz denenmedi.",
 "u.0.1.26.k3": "Harmless, bir esten sonra ses arabelleği boyutuna bağlı olarak yaklaşık 1,7 dB'ye kadar daha yüksek veya daha sessiz çalabilir.",
 "u.0.1.26.k4": "LYNX Dance, FL Studio projeleri için Fruity Dance'in &quot;On desktop&quot; seçeneğini korur, ama hiçbir şey yapmaz: dansçılar ana pencerede kalır.",

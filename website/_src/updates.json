@@ -43,7 +43,7 @@
     ],
     "known": [
       "Freeze works on instrument channels only, not on mixer inserts. The notes of a frozen channel cannot be edited until you Unfreeze it.",
-      "MPE is a first stage: one value of bend, timbre and pressure is recorded per note, not a curve, and of the built-in instruments only the Sampler and the built-in synth follow it. It has not been tried with a real MPE controller yet.",
+      "MPE is a first stage: one value of bend, timbre and pressure is recorded per note, not a curve. Of the built-in instruments, the Sampler, FPC and the built-in synth follow it, and the others do not yet. It has not been tried with a real MPE controller yet.",
       "The controller profiles were written from each device's documentation and have not been tried on the hardware yet.",
       "Harmless can play up to about 1.7 dB louder or quieter after a rest, depending on the audio buffer size.",
       "LYNX Dance keeps Fruity Dance's \"On desktop\" option for FL Studio projects, but it does nothing: dancers stay in the main window.",

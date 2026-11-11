@@ -104,7 +104,7 @@ Behaviour studied through behavioural reverse engineering and documented, then w
 </table>
 
 **The Ableton Live-style side is growing.** Today: the clip grid with scenes, a Live-style Clip View and Device View,
-instrument, audio-effect and MIDI-effect racks (also from `.als`), note chance and velocity range, Live 12's MIDI tools,
+instrument, audio-effect and MIDI-effect racks (instrument and audio-effect racks also from `.als`), note chance and velocity range, Live 12's MIDI tools,
 warp markers, and `.als` sets that go both ways (Session clips land in the clip grid). A **Simple workflow** for
 beginners (BandLab / FL Studio Mobile-style) is the third layout style. FL Studio's workflow stays the default, and
 nothing is taken away from it.
@@ -287,8 +287,8 @@ Live 11 and Live 12 sets open and save ([format notes](docs/analise/ALS_FORMAT.m
   clip's stretch; Beats, Tones, Texture and Complex as LYNX stretch methods), group and return tracks become mixer
   inserts and sends, plus tempo, time signature, locators, mixer levels and their automation. Session clips and scenes
   go to the clip grid with their launch settings and follow actions (or, as a setting, onto the Playlist). Third-party
-  VST2/VST3 plugins keep their state; Instrument, Audio Effect and MIDI Effect Racks come in as racks with their
-  chains, zones and macros; Live's Simpler, Sampler and Drum Rack become the closest LYNX instrument; other Live
+  VST2/VST3 plugins keep their state; Instrument and Audio Effect Racks come in as racks with their chains, zones and macros (Live's MIDI
+  Effect Racks are not opened yet and are listed in the report); Live's Simpler, Sampler and Drum Rack become the closest LYNX instrument; other Live
   devices are listed in the report. Note chance, velocity range, probability groups and the scale are kept.
 - **Export:** *File › Export › Ableton Live set (.als)...* writes `<name> Project/<name>.als` for Live 12 or Live 11,
   with the samples collected: tracks, clips, notes, warp markers, groups, returns, mixer, sends, automation, locators

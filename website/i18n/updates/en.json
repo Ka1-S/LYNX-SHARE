@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE crashed at start on systems without a monospaced font (#142), and Linux could not host a live session. Samples in FL Studio's Shared data and Downloads folders are found (#124).",
 "u.0.1.26.f7": "Mod X and Mod Y move the Sampler's filter, and a note's fine pitch reaches third-party plugins. (#63)",
 "u.0.1.26.k0": "Freeze works on instrument channels only, not on mixer inserts. The notes of a frozen channel cannot be edited until you Unfreeze it.",
-"u.0.1.26.k1": "MPE is a first stage: one value of bend, timbre and pressure is recorded per note, not a curve, and of the built-in instruments only the Sampler and the built-in synth follow it. It has not been tried with a real MPE controller yet.",
+"u.0.1.26.k1": "MPE is a first stage: one value of bend, timbre and pressure is recorded per note, not a curve. Of the built-in instruments, the Sampler, FPC and the built-in synth follow it, and the others do not yet. It has not been tried with a real MPE controller yet.",
 "u.0.1.26.k2": "The controller profiles were written from each device's documentation and have not been tried on the hardware yet.",
 "u.0.1.26.k3": "Harmless can play up to about 1.7 dB louder or quieter after a rest, depending on the audio buffer size.",
 "u.0.1.26.k4": "LYNX Dance keeps Fruity Dance's &quot;On desktop&quot; option for FL Studio projects, but it does nothing: dancers stay in the main window.",

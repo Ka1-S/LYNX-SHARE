@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="c94ee75b";
+window.LYNX_LANG=lang;window.LYNX_V="fa0c727b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -74,7 +74,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=c94ee75b">
+<link rel="stylesheet" href="/assets/site.css?v=fa0c727b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -160,7 +160,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <p class="lead2" data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.</p>
     <p data-i18n="why.work.p1">The default layout is the pattern workflow FL Studio users know: Channel rack, Piano roll, Playlist and Mixer. View › Layout style › Clip-launch workflow adds a clip grid next to the Playlist, where Playlist tracks are columns and scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a Grid / Both / Song switch chooses what plays.</p>
     <p data-i18n="why.work.p2">Live sets bring their Session clips and scenes into the grid, and exporting an .als writes the grid back as Session clips.</p>
-    <p data-i18n="why.work.p3">In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, the selected track's effects show as a chain of cards, and Instrument, Audio Effect and MIDI Effect Racks from Live sets open with their chains and macros.</p>
+    <p data-i18n="why.work.p3">In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, the selected track's effects show as a chain of cards, and Instrument and Audio Effect Racks from Live sets open with their chains and macros.</p>
     <p data-i18n="why.work.p4">View › Layout style › Simple workflow is for a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, and a Finish dock that saves the song as a file. The setup wizard offers the three workflows at the first start.</p>
     <h3 data-i18n="why.limits">Limits</h3>
     <ul>
@@ -215,7 +215,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=c94ee75b" defer></script>
-<script src="/assets/motion.js?v=c94ee75b" defer></script>
+<script src="/assets/site.js?v=fa0c727b" defer></script>
+<script src="/assets/motion.js?v=fa0c727b" defer></script>
 </body>
 </html>

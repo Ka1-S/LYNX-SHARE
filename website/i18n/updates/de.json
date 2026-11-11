@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE stürzte beim Start auf Systemen ohne Festbreitenschrift ab (#142), und Linux konnte keine Live-Session hosten. Samples in den Ordnern Shared data und Downloads von FL Studio werden gefunden (#124).",
 "u.0.1.26.f7": "Mod X und Mod Y bewegen den Filter des Samplers, und die Feinstimmung einer Note erreicht Plugins von Drittanbietern. (#63)",
 "u.0.1.26.k0": "Einfrieren funktioniert nur bei Instrumentenkanälen, nicht bei Mixer-Inserts. Die Noten eines eingefrorenen Kanals lassen sich nicht bearbeiten, bis du ihn auftaust.",
-"u.0.1.26.k1": "MPE ist eine erste Stufe: Pro Note wird ein Wert für Bend, Timbre und Druck aufgenommen, keine Kurve, und von den eingebauten Instrumenten folgen nur der Sampler und der eingebaute Synth. Es wurde noch nicht mit einem echten MPE-Controller ausprobiert.",
+"u.0.1.26.k1": "MPE ist eine erste Stufe: Pro Note wird ein Wert für Bend, Timbre und Druck aufgenommen, keine Kurve. Von den eingebauten Instrumenten folgen ihm der Sampler, FPC und der eingebaute Synth, die anderen noch nicht. Es wurde noch nicht mit einem echten MPE-Controller ausprobiert.",
 "u.0.1.26.k2": "Die Controller-Profile wurden nach der Dokumentation des jeweiligen Geräts geschrieben und noch nicht an der Hardware ausprobiert.",
 "u.0.1.26.k3": "Harmless kann nach einer Pause bis zu etwa 1,7 dB lauter oder leiser spielen, je nach Größe des Audiopuffers.",
 "u.0.1.26.k4": "LYNX Dance behält die Option &quot;On desktop&quot; von Fruity Dance für FL-Studio-Projekte, doch sie bewirkt nichts: Die Tänzer bleiben im Hauptfenster.",

@@ -206,7 +206,8 @@ Core Audio / ALSA + JACK (PipeWire).
 - Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler / Drum Rack import as the
   closest LYNX instrument; other Live devices are listed in the report. LYNX's own instruments and
   effects are not converted in exported sets yet (listed in the export report).
-- Since 0.1.26: Instrument, Audio Effect and MIDI Effect Racks (chains, zones, macros) both ways, note chance,
+- Since 0.1.26: Instrument and Audio Effect Racks (chains, zones, macros) both ways; MIDI Effect Racks are written
+  on export only (Live's own are listed as unsupported on import); note chance,
   velocity range and probability groups, the project key as Live's Scale Mode, and Live 12's MIDI Transformations in
   the Clip View. A Clip View and Device View are part of the Clip-launch workflow.
 

@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE crashte bij het starten op systemen zonder monospace-lettertype (#142), en Linux kon geen live sessie hosten. Samples in de mappen Shared data en Downloads van FL Studio worden gevonden (#124).",
 "u.0.1.26.f7": "Mod X en Mod Y bewegen het filter van de Sampler, en de fijne pitch van een noot bereikt plugins van derden. (#63)",
 "u.0.1.26.k0": "Bevriezen werkt alleen op instrumentkanalen, niet op mixer-inserts. De noten van een bevroren kanaal kunnen niet worden bewerkt totdat je het ontdooit.",
-"u.0.1.26.k1": "MPE is een eerste stap: per noot wordt één waarde van bend, timbre en druk opgenomen, geen curve, en van de ingebouwde instrumenten volgen alleen de Sampler en de ingebouwde synth het. Het is nog niet uitgeprobeerd met een echte MPE-controller.",
+"u.0.1.26.k1": "MPE is een eerste stap: per noot wordt één waarde van bend, timbre en druk opgenomen, geen curve. Van de ingebouwde instrumenten volgen de Sampler, FPC en de ingebouwde synth het, de andere nog niet. Het is nog niet uitgeprobeerd met een echte MPE-controller.",
 "u.0.1.26.k2": "De controllerprofielen zijn geschreven op basis van de documentatie van elk apparaat en zijn nog niet op de hardware uitgeprobeerd.",
 "u.0.1.26.k3": "Harmless kan na een rust tot ongeveer 1,7 dB luider of zachter spelen, afhankelijk van de grootte van de audiobuffer.",
 "u.0.1.26.k4": "LYNX Dance houdt de optie &quot;On desktop&quot; van Fruity Dance voor FL Studio-projecten, maar die doet niets: de dansers blijven in het hoofdvenster.",

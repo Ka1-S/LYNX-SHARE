@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: LYNX SHARE zawieszał się przy starcie w systemach bez czcionki o stałej szerokości (#142), a Linux nie mógł prowadzić sesji na żywo. Sample z folderów Shared data i Downloads FL Studio są znajdowane (#124).",
 "u.0.1.26.f7": "Mod X i Mod Y poruszają filtr Samplera, a drobna wysokość nuty dociera do pluginów zewnętrznych. (#63)",
 "u.0.1.26.k0": "Zamroź działa tylko na kanałach instrumentów, nie na insertach miksera. Nut zamrożonego kanału nie można edytować, dopóki go nie odmrozisz.",
-"u.0.1.26.k1": "MPE to pierwszy etap: dla każdej nuty zapisywana jest jedna wartość bendu, barwy i nacisku, nie krzywa, a spośród wbudowanych instrumentów podążają za nią tylko Sampler i wbudowany syntezator. Nie wypróbowano go jeszcze z prawdziwym kontrolerem MPE.",
+"u.0.1.26.k1": "MPE to pierwszy etap: dla każdej nuty zapisywana jest jedna wartość bendu, barwy i nacisku, nie krzywa. Spośród wbudowanych instrumentów podążają za nią Sampler, FPC i wbudowany syntezator, pozostałe jeszcze nie. Nie wypróbowano go jeszcze z prawdziwym kontrolerem MPE.",
 "u.0.1.26.k2": "Profile kontrolerów napisano na podstawie dokumentacji każdego urządzenia i nie wypróbowano ich jeszcze na sprzęcie.",
 "u.0.1.26.k3": "Harmless może po pauzie zagrać do ok. 1,7 dB głośniej lub ciszej, zależnie od rozmiaru bufora audio.",
 "u.0.1.26.k4": "LYNX Dance zachowuje opcję „On desktop” z Fruity Dance dla projektów FL Studio, ale nic ona nie robi: tancerze zostają w głównym oknie.",

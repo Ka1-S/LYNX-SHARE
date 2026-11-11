@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux : LYNX SHARE plantait au démarrage sur les systèmes sans police à chasse fixe (#142), et Linux ne pouvait pas héberger de session en direct. Les samples des dossiers Shared data et Downloads de FL Studio sont trouvés (#124).",
 "u.0.1.26.f7": "Mod X et Mod Y font bouger le filtre du Sampler, et le réglage fin de hauteur d'une note parvient aux plugins tiers. (#63)",
 "u.0.1.26.k0": "Figer ne fonctionne que sur les canaux d'instruments, pas sur les inserts du mixer. Les notes d'un canal figé ne peuvent pas être modifiées avant de le Dégeler.",
-"u.0.1.26.k1": "Le MPE est une première étape : une seule valeur de pitch bend, de timbre et de pression est enregistrée par note, pas une courbe, et parmi les instruments intégrés seuls le Sampler et le synthé intégré la suivent. Il n'a pas encore été essayé avec un vrai contrôleur MPE.",
+"u.0.1.26.k1": "Le MPE est une première étape : une seule valeur de pitch bend, de timbre et de pression est enregistrée par note, pas une courbe. Parmi les instruments intégrés, le Sampler, FPC et le synthé intégré la suivent, les autres pas encore. Il n'a pas encore été essayé avec un vrai contrôleur MPE.",
 "u.0.1.26.k2": "Les profils de contrôleurs ont été écrits d'après la documentation de chaque appareil et n'ont pas encore été essayés sur le matériel.",
 "u.0.1.26.k3": "Harmless peut jouer jusqu'à environ 1,7 dB plus fort ou plus faible après un silence, selon la taille du tampon audio.",
 "u.0.1.26.k4": "LYNX Dance garde l'option « On desktop » de Fruity Dance pour les projets FL Studio, mais elle ne fait rien : les danseurs restent dans la fenêtre principale.",

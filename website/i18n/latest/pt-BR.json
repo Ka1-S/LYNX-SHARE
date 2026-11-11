@@ -31,7 +31,7 @@
 "u.0.1.26.f6": "Linux: o LYNX SHARE travava ao iniciar em sistemas sem fonte monoespaçada (#142), e o Linux não conseguia hospedar uma sessão ao vivo. Os samples nas pastas Shared data e Downloads do FL Studio agora são encontrados (#124).",
 "u.0.1.26.f7": "Mod X e Mod Y movem o filtro do Sampler, e a afinação fina de uma nota chega aos plugins de terceiros. (#63)",
 "u.0.1.26.k0": "Congelar funciona só em canais de instrumento, não em inserts do mixer. As notas de um canal congelado não podem ser editadas até você usar Descongelar.",
-"u.0.1.26.k1": "O MPE é uma primeira etapa: um valor de bend, timbre e pressão é gravado por nota, não uma curva, e entre os instrumentos embutidos só o Sampler e o synth embutido o seguem. Ainda não foi testado com um controlador MPE de verdade.",
+"u.0.1.26.k1": "O MPE é uma primeira etapa: um valor de bend, timbre e pressão é gravado por nota, não uma curva. Entre os instrumentos embutidos, o Sampler, o FPC e o synth embutido o seguem, e os outros ainda não. Ainda não foi testado com um controlador MPE de verdade.",
 "u.0.1.26.k2": "Os perfis de controladores foram escritos a partir da documentação de cada dispositivo e ainda não foram testados no hardware.",
 "u.0.1.26.k3": "O Harmless pode tocar até cerca de 1,7 dB mais alto ou mais baixo depois de uma pausa, dependendo do tamanho do buffer de áudio.",
 "u.0.1.26.k4": "O LYNX Dance mantém a opção \"On desktop\" do Fruity Dance para projetos do FL Studio, mas ela não faz nada: os dançarinos ficam na janela principal.",
