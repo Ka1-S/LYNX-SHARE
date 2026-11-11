@@ -48,8 +48,6 @@ The `Found automatically` tab lists files LYNX SHARE found in another folder by 
 
 ## Missing plugins
 
-![The Plugins tab of the Missing files window: each plugin, where it is used and what replaced it](/assets/img/wiki/missing-plugins.webp)
-
 LYNX SHARE looks for each third-party plugin by its identifier, then by its file, then by its name. A project saved with the VST2 opens with the VST3 of the same product and the other way round, but then with default settings.
 
 When an effect is not installed, a LYNX SHARE effect with the same role takes the slot: a reverb for a reverb, a compressor for a compressor.

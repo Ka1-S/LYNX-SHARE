@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="2eac697c";
+window.LYNX_LANG=lang;window.LYNX_V="e60c1d69";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,7 +72,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=2eac697c">
+<link rel="stylesheet" href="/assets/site.css?v=e60c1d69">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -100,7 +100,6 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p><code>Apply</code> uses the files that were found.</p>
 <p>The <code>Found automatically</code> tab lists files LYNX SHARE found in another folder by itself. Save the project to keep the new places.</p>
 <h2 id="missing-plugins">Missing plugins</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-plugins.webp"><img src="/assets/img/wiki/missing-plugins.webp" alt="The Plugins tab of the Missing files window: each plugin, where it is used and what replaced it" loading="lazy"></a></figure>
 <p>LYNX SHARE looks for each third-party plugin by its identifier, then by its file, then by its name. A project saved with the VST2 opens with the VST3 of the same product and the other way round, but then with default settings.</p>
 <p>When an effect is not installed, a LYNX SHARE effect with the same role takes the slot: a reverb for a reverb, a compressor for a compressor.</p>
 <ul><li>The slot shows the original plugin's name with a LYNX SHARE badge.</li><li>Where the saved state can be read, the settings are translated. Otherwise the substitute starts from a default preset. The table of products, their substitutes and what is translated for each is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGIN_FALLBACK.md">PLUGIN_FALLBACK.md</a>.</li><li>Automation of the original's parameters is kept but does not drive the substitute.</li><li>The original plugin's reference and state stay in the project. Once the plugin is installed, the project opens with it again.</li><li><code>Bypass all LYNX SHARE substitutes of this project</code>, in a substitute slot's right-click menu, switches them all off at once.</li></ul>
@@ -122,8 +121,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
-<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=2eac697c" defer></script>
-<script src="/assets/wiki.js?v=2eac697c" defer></script>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=e60c1d69" defer></script>
+<script src="/assets/wiki.js?v=e60c1d69" defer></script>
 </body>
 </html>

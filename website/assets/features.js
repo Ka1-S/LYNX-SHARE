@@ -1,32 +1,7 @@
-/* Features page: plugin list filters, the step sequencer and the demo-song player. The lists are in the page already. */
+/* Features page: the step sequencer and the demo-song player. */
 (() => {
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const t = (...a) => window.LYNX_T ? window.LYNX_T(...a) : a[0];
-
-/* ---------- built-in plugins: type filter, "show all" ---------- */
-let plFilter = 'all', plOpen = false;
-const plAll = $('#plAll'), pls = $$('#plGrid .pl');
-function plShow(){
-  const seen = {}; let shown = 0, total = 0;
-  pls.forEach(p => {
-    const ok = plFilter === 'all' || p.dataset.t === plFilter;
-    if (ok) total++;
-    seen[p.dataset.t] = (seen[p.dataset.t] || 0) + (ok ? 1 : 0);
-    const vis = ok && (plOpen || seen[p.dataset.t] <= 12);   // collapsed: the first 12 of each type
-    p.hidden = !vis; if (vis) shown++;
-  });
-  if (plAll){ plAll.hidden = shown >= total; plAll.dataset.args = JSON.stringify([String(total)]); plAll.textContent = t('pl.showAll', total); }
-}
-if (plAll){
-  plAll.onclick = () => { plOpen = true; plShow(); };
-  $$('#plBar .pl-f').forEach(b => b.onclick = () => { plFilter = b.dataset.f; $$('#plBar .pl-f').forEach(x => x.classList.toggle('on', x === b)); plShow(); });
-  plShow();
-}
-/* ---------- inspired by: vendor tabs ---------- */
-$$('#clTabs .pl-f').forEach(b => b.onclick = () => {
-  $$('#clTabs .pl-f').forEach(x => x.classList.toggle('on', x === b));
-  $$('#clGroups .cl-v').forEach(v => v.hidden = b.dataset.v !== 'all' && b.dataset.v !== v.dataset.v);
-});
 
 /* ---------- step sequencer (Web Audio) ---------- */
 const seqEl = $('#seq');

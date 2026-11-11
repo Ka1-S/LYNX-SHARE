@@ -3,7 +3,7 @@ title: Third-party plugins
 summary: Plugin formats per system, scanning, the Plugin manager, separate processes and 32-bit plugins.
 status: full
 ---
-![The Plugin manager: a list of scanned plugins with vendor, type, format, status and file](/assets/img/wiki/plugin-manager.webp)
+![The lower part of the Plugin manager, with its note that each plugin file is examined in a separate process](/assets/img/wiki/plugin-manager-scan.webp)
 
 LYNX SHARE hosts instrument and effect plugins from other makers. It finds them by scanning the plugin folders, and `Options › Plugin manager...` shows what it found. LYNX SHARE's own instruments and effects are described in [Built-in instruments and effects](/wiki/built-in/).
 

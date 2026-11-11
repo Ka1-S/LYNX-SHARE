@@ -8,7 +8,7 @@ Sources (all in _src/):  pages/*.html  body of Home, Features, Why, Download  up
                          catalog.json  the built-in plugins (cards + wiki pages), catalog-img.json their picture sizes
                          wiki/*.md + wiki/index.json  the manual             faq.md        the FAQ
                          strings.json  English of strings that have no element of their own
-                         plugins.js    plugin lists (its INSPIRED block is written by scripts/gen-inspired.py)
+                         (plugins.js is not shown on the site any more; scripts/gen-inspired.py still writes it)
 Output: index.html, features/, why/, instruments-and-effects/, download/, updates/, wiki/, wiki/<page>/,
         wiki/built-in/<plugin>/, faq/ (each an index.html), wiki/search.json, i18n/catalog/en.json,
         i18n/en.json + i18n/updates/en.json (the English of every data-i18n key: what the translations are checked
@@ -290,72 +290,6 @@ def render_latest(r):
             % (r["version"], r["date"], r["date"], esc(r["url"]), T["up.gh"], k, inline(r["title"]), k, inline(r["summary"]), items, r["tag"], T["home.latestAll"]))
 
 
-# ---------------------------------------------------------------- plugin lists (Features)
-def plugin_data():
-    src = (SRC / "plugins.js").read_text(encoding="utf-8")
-    grab = lambda name: json.loads(re.search(r"const %s = (\[.*?\n\]);" % name, src, re.S).group(1))
-    ins = json.loads(re.search(r"const INSPIRED = (\{.*?\});\n", src).group(1))
-    return grab("PLUGINS"), grab("FEATURED"), ins
-
-
-def render_plugins(plugins):
-    out = []
-    for n, fl, ty, s in plugins:
-        out.append('<div class="pl" data-t="%s"><i class="st %s"></i><div class="tx"><b>%s</b>%s</div><span class="k">%s</span></div>'
-                   % (ty, s, esc(n), tr("pl.insp", esc(fl), tag="small"), "GEN" if ty == "g" else "FX"))
-    return "".join(out)
-
-
-def render_featured(featured):
-    out = []
-    for f in featured:
-        out.append('<article class="ft"><div class="top"><span class="badge"><i class="st %s"></i>%s</span><span class="k">%s</span></div><h4>%s</h4>'
-                   '<div class="by">%s · %s</div><p data-feat="%s" data-en="%s">%s</p><div class="how">%s</div></article>'
-                   % (f["s"], tr("pl." + f["s"]), "GEN" if f["t"] == "g" else "FX", esc(f["n"]), tr("pl.insp", esc(f["fl"])), esc(f["by"]),
-                      esc(f["n"]), esc(f["en"]), esc(f["en"]), tr("ft." + f["how"])))
-    return "".join(out)
-
-
-def render_classics(ins):
-    groups = ins["groups"]
-    allitems = [i for g in groups for i in g["items"]]
-    own = len({i["lynx"] for i in allitems if i["state"] == "own"})
-    auto = sum(1 for i in allitems if i["auto"])
-    wip = sum(1 for i in allitems if i["state"] == "wip")
-    stats = "".join("<span><b>%d</b>%s</span>" % (n, tr(k)) for n, k in ((own, "cl.s1"), (auto, "cl.s2"), (wip, "cl.s3")) if n)
-    tabs = '<button class="pl-f on" data-v="all" data-i18n="pl.all">%s</button>' % T["pl.all"] + "".join(
-        '<button class="pl-f" data-v="%s">%s</button>' % (esc(g["vendor"]), esc(g["vendor"])) for g in groups)
-    out = ['<div class="cl-stats">%s</div><div class="pl-bar" id="clTabs">%s</div><div id="clGroups">' % (stats, tabs)]
-    for g in groups:
-        main = [i for i in g["items"] if i["state"] != "standin"]
-        alt = [i for i in g["items"] if i["state"] == "standin"]
-        cnt = lambda s: sum(1 for i in g["items"] if i["state"] == s)
-        summ = " · ".join(tr(k, c) for c, k in ((cnt("own"), "cl.natN" if cnt("own") > 1 else "cl.nat1"), (cnt("wip"), "cl.prog"),
-                                                (cnt("standin"), "cl.subN" if cnt("standin") > 1 else "cl.sub1")) if c)
-        cards = []
-        for i in main:
-            foot = []
-            if i["state"] == "wip" and i["lynx"]:
-                foot.append(tr("cl.today", esc(i["lynx"])))
-            if i["auto"]:
-                foot.append(tr("cl.auto"))
-            key = g["vendor"] + "/" + i["short"]
-            kind = '<span class="k" data-i18n="kind.%s">%s</span>' % (esc(i["kind"]), esc(T.setdefault("kind." + i["kind"], i["kind"]))) if i.get("kind") else ""
-            cards.append('<article class="cl %s"><div class="top"><span class="badge"><i class="st %s"></i>%s</span>%s</div><div class="orig">%s</div><h4>%s</h4>'
-                         '<p data-insp="%s" data-en="%s">%s</p>%s</article>'
-                         % (i["state"], "x" if i["state"] == "own" else "w", tr("cl.own" if i["state"] == "own" else "cl.wip"), kind,
-                            tr("pl.insp", "<em>%s %s</em>" % (esc(g["label"]), esc(i["short"]))), esc(i["name"]["en"]),
-                            esc(key), esc(i["desc"]["en"]), esc(i["desc"]["en"]), '<div class="foot">%s</div>' % "".join(foot) if foot else ""))
-        alts = ""
-        if alt:
-            alts = '<div class="cl-alt">%s%s</div>' % (tr("cl.alt"), "".join(
-                '<span class="cl-chip">%s <i>→</i> <b>%s</b></span>' % (esc(i["short"]), esc(i["lynx"])) for i in alt))
-        out.append('<div class="cl-v" data-v="%s"><div class="cl-vh"><h3>%s</h3><p>%s</p></div><div class="cl-grid">%s</div>%s</div>'
-                   % (esc(g["vendor"]), esc(g["vendor"]), summ, "".join(cards), alts))
-    out.append("</div>")
-    return "".join(out)
-
-
 # ---------------------------------------------------------------- built-in plugin catalogue
 def catalog():
     """catalog.json: one entry per built-in plugin of the released version; catalog-img.json: picture sizes (import-shots.py)."""
@@ -594,15 +528,13 @@ def main():
     index, pages = wiki_pages()
     cat = catalog()
     order = wiki_order(index, cat)
-    plugins, featured, ins = plugin_data()
     collect((SRC / "pages/why.html").read_text(encoding="utf-8"), T, "why")      # Home's row reuses the Why page's headings
-    fl = [p for p in plugins if p[3] != "o"]
     sub = {"VER_UP": latest["version"].upper(), "VER_LINE": "v" + latest["version"], "LATEST": render_latest(latest),
            "IC_WIN": IC["win"], "IC_MAC": IC["mac"], "IC_LINUX": IC["linux"],
            "OS_BTNS": "".join('<a class="btn btn-ghost" data-os="%s" data-dl="%s.main" href="%s/releases/latest">%s<span>%s</span><small data-i18n="%s">%s</small><em data-yours></em></a>'
                               % (o, o, REPO, IC[o], name, k, T[k]) for o, name, k in (("win", "Windows", "dl.fInstaller"), ("mac", "macOS", "dl.fUniversal"), ("linux", "Linux", "dl.fAppImage"))),
-           "PLUGINS": render_plugins(plugins), "FEATURED": render_featured(featured), "CLASSICS": render_classics(ins), "CL_TM": ins["tm"]["en"],
-           "WHYROW": render_whyrow(cat), "N_ALL": str(len(plugins)), "N_FL": str(len(fl)), "N_EXACT": str(sum(1 for p in fl if p[3] in "xn"))}
+           "WHYROW": render_whyrow(cat), "CAT_SUB": tr("cat.sub", len(cat), latest["version"].split("-")[0], tag="p"),
+           "WHY_FL_P1": T["why.fl.p1"], "WHY_FL_X2": T["why.fl.x2"]}
 
     def page(name):
         body = (SRC / "pages" / (name + ".html")).read_text(encoding="utf-8")
@@ -634,10 +566,8 @@ def main():
     ui = {k: v for k, v in en.items() if not k.startswith(("u.", "c."))}
     upd = {k: v for k, v in en.items() if k.startswith("u.")}
     cen = {k: v for k, v in en.items() if k.startswith("c.")}
-    featured_en = {f["n"]: f["en"] for f in featured}
-    insp_en = {g["vendor"] + "/" + i["short"]: i["desc"]["en"] for g in ins["groups"] for i in g["items"] if i["desc"]["en"]}
     dump = lambda d: json.dumps(d, ensure_ascii=False, indent=0) + "\n"
-    files = {"i18n/en.json": dump({"ui": ui, "featured": featured_en, "insp": insp_en}), "i18n/updates/en.json": dump(upd), "i18n/catalog/en.json": dump(cen),
+    files = {"i18n/en.json": dump({"ui": ui, "featured": {}, "insp": {}}), "i18n/updates/en.json": dump(upd), "i18n/catalog/en.json": dump(cen),
              "wiki/search.json": json.dumps({"g": {g["key"]: g["title"] for g in index}, "p": search}, ensure_ascii=False, separators=(",", ":")) + "\n"}
     lk = vkey(latest) + "."
     for f in sorted((OUT / "i18n/updates").glob("*.json")) if (OUT / "i18n/updates").is_dir() else []:

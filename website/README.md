@@ -6,7 +6,7 @@ JavaScript; the script adds the language switch, direct download links and the s
 | Page | Address | Source |
 |---|---|---|
 | Home | `/` | `_src/pages/home.html` |
-| Features | `/features/` | `_src/pages/features.html`, `_src/plugins.js` |
+| Features | `/features/` | `_src/pages/features.html` |
 | Why LYNX | `/why/` | `_src/pages/why.html` (what only LYNX SHARE does, each with its limits) |
 | Instruments and effects | `/instruments-and-effects/` | `_src/catalog.json`, `_src/catalog-img.json` |
 | Download | `/download/` | `_src/pages/download.html` |
@@ -105,10 +105,9 @@ gets a name plate on its card, never a made-up picture.
   translatable when its element has `data-i18n="key"` (`data-i18n-alt`, `data-i18n-aria`, `data-i18n-ph` for attributes;
   `data-args='["x"]'` fills `{0}`); a new English text needs a new key. CJK pages use the system font first and
   fetch Noto Sans only when it is missing.
-- **Plugin lists** on Features come from `_src/plugins.js`: `PLUGINS` and `FEATURED` are kept by hand in step with
-  `docs/PLUGINS.md`; the `INSPIRED` block is written by `scripts/gen-inspired.py` from
-  `src/core/PluginSubstitutes.cpp` and `docs/inspired-by.json` (rerun it when an engine lands, then run the build;
-  `--check` fails when the block is stale).
+- **Features** no longer lists plugins: its two plugin sections (`#plugins`, `#classics`, ids kept) summarise and link
+  to the catalogue and to `docs/PLUGINS.md` at the release tag. `_src/plugins.js` is not read by the build any more;
+  it stays only because `scripts/gen-inspired.py` writes its `INSPIRED` block (remove both together if wanted).
 - **Screenshots** come from LYNX SHARE's own showcase project (`LYNX.exe --showcase Demo.lynx`, then
   `LYNX.exe --snapshot <prefix> Demo.lynx` with `LYNX_SNAPSHOT_SIZE=1920x1080`), never from Image-Line demo projects.
   `assets/media/demo.mp3` is `LYNX.exe --export Demo.lynx demo.wav`; `lynx-tour.mp4` is a slideshow of the

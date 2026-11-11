@@ -26,6 +26,11 @@ SRC = Path(__file__).resolve().parent
 OUT = SRC.parent / "assets/img"
 
 
+# pictures that are a part of a snapshot: name -> (snapshot, box). The Plugin manager's sample rows name other makers'
+# plugins, so the site shows only the part below them.
+CROPS = {"plugin-manager-scan": ("plugin-manager", (0, 330, 980, 600))}
+
+
 def save(im, dest, maxw):
     im = im.convert("RGB")
     if im.width > maxw:
@@ -52,9 +57,11 @@ def main():
         used |= set(re.findall(r"/assets/img/wiki/([\w.-]+)\.webp", f.read_text(encoding="utf-8")))
     nowiki = []
     for name in sorted(used):
-        f = renders / "snap" / ("s-%s.png" % name)
+        src, box = CROPS.get(name, (name, None))
+        f = renders / "snap" / ("s-%s.png" % src)
         if f.is_file():
-            save(Image.open(f), OUT / "wiki" / (name + ".webp"), 1600)
+            im = Image.open(f)
+            save(im.crop(box) if box else im, OUT / "wiki" / (name + ".webp"), 1600)
         else:
             nowiki.append(name)
     print("import-shots: %d plugin pictures (%d plugins without one: %s), %d wiki pictures (%d not found: %s)"
