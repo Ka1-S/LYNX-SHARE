@@ -18,7 +18,25 @@ device, so you can write a profile for your own controller.
 - **What a profile does not name plays as before:** keys, pads, wheels and pedals go to the selected channels.
 
 The built-in profiles are the files in `resources/controllers/`. They are compiled into the program by
-`tools/make_controllers.py`.
+`tools/make_controllers.py` (run it after changing a file; a test compares the two).
+
+## Built-in profiles
+
+Every map comes from the maker's own public document, named at the top of each file. None was tried on a
+device yet: each file lists what the document does not say and has to be checked on hardware.
+
+| Controller type | Detected on a port named | What it covers | Source |
+|---|---|---|---|
+| Mackie Control Universal | `Mackie Control*`, `MCU Pro*`, `*Mackie Control Universal*` (not `*XT*`, `*Extender*`) | 8 motor faders with touch + Master fader; V-Pots with rings in three layers (Pan / Plug-in / Track = Channel Rack volumes); REC, SOLO, MUTE, SELECT with lights; bank and channel left / right; cursor keys (pages, channels); transport, cycle, click, undo, jog; LCD (names and values) | Logic Control / Mackie Control protocol appendix of the Logic user manual (Emagic / Mackie) |
+| Mackie Control Extender (XT) | the same with `XT` or `Extender` | The same strips; takes the next 8 strips after the main unit and moves with its bank | the same |
+| Novation Launchkey MK3 (DAW mode) | `*Launchkey MK3*DAW*`, `MIDIIN2 (*Launchkey MK3*` | 8 pots (Pan / Volume / Device, following the keyboard's own pot mode), 9 faders and fader buttons (49 / 61 / 88), transport, track and scene buttons, 16 pads as steps with lights, the 2 x 16 display | Launchkey MK3 Programmer's Reference Guide (Novation) |
+| Akai APC Key 25 mk2 | the device's second port (`MIDIIN2 (APC Key 25 mk2*`, `APC Key 25 mk2 Control*`) | 8 relative knobs (Volume / Pan / Device by the Scene Launch buttons), top two pad rows as 16 steps with lights, lower rows as notes, track buttons select, bank left / right, play, stop, record | APC Key 25 mk2 Communication Protocol v1.1 (Akai Professional) |
+| Arturia KeyLab Essential mk3 (Mackie Control port) | `*KL Essential*MCU*`, `*KeyLab Essential*MCU*` | The Mackie Control map on the keyboard's MCU/HUI port (set the keyboard's DAW mode to Mackie Control) | KeyLab Essential mk3 user manual (Arturia) |
+| Korg nanoKONTROL2 (Mackie Control mode) | never: choose it by hand | The Mackie Control map. Start the device in one of its Mackie Control DAW modes (hold a button while plugging in, see its manual) | nanoKONTROL2 Owner's Manual and Parameter Guide (Korg) |
+
+Not covered, because the maker publishes no MIDI map for them: Akai MPK mini mk3 and the first APC Key 25 (use
+*Generic controller* and link by hand), and the nanoKONTROL2's own CC mode (its numbers are set in Korg's editor).
+HUI is not built.
 
 ## What a profile can drive
 
@@ -195,5 +213,7 @@ Text is sent as plain ASCII: accented Latin letters lose their accent, other cha
   main window's actions.
 - Tests: `tests/Controller190awTests.inc` feeds device bytes into the layer and checks the calls on a fake
   `Surface` and the bytes sent back.
+  `tests/ControllerProfiles190awTests.inc` does the same with each built-in profile and checks detection by
+  port name.
 
 The next phases of the plan (the local control API of issue #75, FL-style device scripts) use the same `Surface`.

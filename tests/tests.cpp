@@ -17409,3 +17409,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190vTests.inc"
 #include "Surge190xTests.inc"
 #include "Controller190awTests.inc"
+#include "ControllerProfiles190awTests.inc"

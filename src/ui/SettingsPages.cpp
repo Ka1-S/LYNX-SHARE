@@ -1584,7 +1584,7 @@ public:
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
-            sampleDevices = { "Arturia KeyLab 49", "Akai MPD218" };
+            sampleDevices = { "Mackie Control", "Akai MPD218" }; // (one with a built-in controller profile, one generic)
             sampleOutputs = { "Roland TR-8S", "Korg volca sample" };
             auto p = engine.getMidiPrefs();
             prefs::MidiOutputPrefs drums;

@@ -12,6 +12,309 @@ struct BuiltInFile
 
 // (ends with an empty entry)
 inline const BuiltInFile builtInProfiles[] = {
+    { "akai-apc-key-25-mk2", R"lynxctl(# Akai APC Key 25 mk2: the pad matrix, the buttons around it and the 8 knobs. docs/CONTROLLERS.md explains the format.
+#
+# Source (maker document only): "APC Key 25 mk2 Communication Protocol v1.1" (Akai Professional),
+# https://cdn.inmusicbrands.com/akai/attachments/APC%20Key%2025%20mk2%20-%20Communication%20Protocol%20-%20v1.1.pdf
+#  - pads: notes 00h-27h, "numbered bottom left to upper right" (so 32-39 is the top row); pad light: a note on
+#    channel 7 (96h, 100 % brightness) with a palette index (5 = FF0000, red).
+#  - Track buttons 1-8: notes 40h-47h (red LED), Scene Launch 1-5: 52h-56h (green LED), Stop All Clips 51h,
+#    Play 5Bh, Record 5Dh, Shift 62h (no LED); a single LED is lit by its note on channel 1 with velocity 1.
+#  - knobs 1-8: CC 30h-37h on channel 1, "Relative". The document does not say which relative code; two's
+#    complement is assumed here (check on a device).
+#  - the Introduction message (F0 47 7F 4E 60 00 04 00 <version> F7) "is sent before any other device-specific
+#    message".
+#  - the buttons and knobs are on the device's port 1, the keys and the sustain pedal on port 0. The document does
+#    not give the ports' names: the patterns below are the usual names of a second port.
+#
+# Use this type on the second port only. On the first port the keys send the same note numbers as the pads.
+# (The original APC Key 25 has another LED scheme and no public protocol document was found: not covered.)
+
+[device]
+name = Akai APC Key 25 mk2
+maker = Akai Professional
+source = APC Key 25 mk2 Communication Protocol v1.1, https://cdn.inmusicbrands.com/akai/attachments/APC%20Key%2025%20mk2%20-%20Communication%20Protocol%20-%20v1.1.pdf
+match = MIDIIN2 (APC Key 25 mk2*, *APC Key 25 mk2*Control*
+strips = 8
+# what the knobs turn: Scene Launch 1-3 choose
+layers = Volume, Pan, Device
+
+[init]
+send = F0 47 7F 4E 60 00 04 00 01 00 00 F7
+
+[input]
+cc 48-55 ch 1 = mixer.volume mode=twos step=0.01 layer=Volume
+cc 48-55 ch 1 = mixer.pan mode=twos step=0.01 layer=Pan
+cc 48-55 ch 1 = plugin.param mode=twos step=0.01 layer=Device
+
+# pad matrix: the two top rows are the selected channel's 16 steps, the three rows below play notes
+note 32-39 ch 1 = pad.step 1
+note 24-31 ch 1 = pad.step 9
+note 0-23 ch 1 = pad.note key=36
+
+note 64-71 ch 1 = mixer.select        # Track buttons 1-8
+note 82 ch 1 = layer Volume           # Scene Launch 1
+note 83 ch 1 = layer Pan              # Scene Launch 2
+note 84 ch 1 = layer Device           # Scene Launch 3
+note 85 ch 1 = mixer.bank.left        # Scene Launch 4
+note 86 ch 1 = mixer.bank.right       # Scene Launch 5
+note 81 ch 1 = transport.stop         # Stop All Clips
+note 91 ch 1 = transport.play
+note 93 ch 1 = transport.record
+note 98 ch 1 = ignore                 # Shift
+
+[feedback]
+pad.step 1 = note 32-39 ch 7 on=5 off=0
+pad.step 9 = note 24-31 ch 7 on=5 off=0
+mixer.select = note 64-71 ch 1 on=1 off=0
+layer Volume = note 82 ch 1 on=1 off=0
+layer Pan = note 83 ch 1 on=1 off=0
+layer Device = note 84 ch 1 on=1 off=0
+)lynxctl" },
+    { "mackie-control", R"lynxctl(# Mackie Control Universal (MCU): the motor-fader protocol most control surfaces speak, with 8 strips, V-Pots with
+# LED rings, a 2 x 56 character display and a transport section. docs/CONTROLLERS.md explains the format.
+#
+# Sources (maker documents only):
+#  - the protocol: "Logic Control" user manual (Emagic / Mackie Designs; reprinted as Apple's "Logic 7 Dedicated Control
+#    Surface Support"), Appendix B "Logic Control - MIDI Implementation" and Appendix C "Control surface layout and
+#    IDs": faders as pitch bend on channels 1-9, switches and LEDs as notes, V-Pots as CC 16-23 (bit 6 = counter-
+#    clockwise), LED rings as CC 48-55, jog wheel as CC 60, the display as SysEx "<header> 12 <offset> <text>".
+#  - the display's SysEx header: that manual gives the model byte 10h for the Logic Control. A unit in Mackie Control
+#    mode uses 14h (its extender 15h); no Mackie document read for this file states it.
+#  - port names: Mackie's manual only says the DAW entry is "Mackie Control"; the patterns below are best guesses.
+#    If your unit is not detected, choose this type by hand in Settings > MIDI.
+
+[device]
+name = Mackie Control Universal
+maker = Mackie
+source = Logic Control user manual (Emagic / Mackie Designs), Appendix B "MIDI Implementation" and Appendix C "Control surface layout and IDs"
+source = Mackie Control Universal Pro / XT Pro Owner's Manual, https://mackie.com/img/file_resources/MCU_Pro-XT_Pro_OM.pdf
+match = Mackie Control*, MCU Pro*, *Mackie Control Universal*
+exclude = *XT*, *Extender*
+group = mackie
+strips = 8
+# what the V-Pots turn: ASSIGNMENT Pan/Surround, Plug-in and Track
+layers = Pan, Plug-in, Channels
+
+[input]
+# faders (touch-sensitive, motorised) and the Master fader
+bend ch 1-8 = mixer.volume
+bend ch 9 = master.volume
+note 104-111 ch 1 = mixer.touch
+note 112 ch 1 = master.touch
+
+# V-Pots: pan, the focused plugin's parameters, or the Channel Rack's volumes
+cc 16-23 ch 1 = mixer.pan mode=sign step=0.01 layer=Pan
+cc 16-23 ch 1 = plugin.param mode=sign step=0.01 layer=Plug-in
+cc 16-23 ch 1 = channel.volume mode=sign step=0.01 layer=Channels
+# V-Pot push
+note 32-39 ch 1 = channel.select layer=Channels
+note 32-39 ch 1 = ignore
+
+# strip switches
+note 0-7 ch 1 = mixer.arm          # REC/RDY
+note 8-15 ch 1 = mixer.solo
+note 16-23 ch 1 = mixer.mute
+note 24-31 ch 1 = mixer.select
+
+# ASSIGNMENT
+note 40 ch 1 = layer Channels      # Track
+note 42 ch 1 = layer Pan           # Pan/Surround
+note 43 ch 1 = layer Plug-in
+
+# FADER BANKS
+note 46 ch 1 = mixer.bank.left
+note 47 ch 1 = mixer.bank.right
+note 48 ch 1 = mixer.strip.left    # Channel left
+note 49 ch 1 = mixer.strip.right
+
+# cursor keys: the parameter page / the channel bank, and the selected channel (whose instrument the Plug-in layer shows)
+note 96 ch 1 = channel.previous    # Up
+note 97 ch 1 = channel.next        # Down
+note 98 ch 1 = plugin.page.left layer=Plug-in
+note 99 ch 1 = plugin.page.right layer=Plug-in
+note 98 ch 1 = channel.bank.left layer=Channels
+note 99 ch 1 = channel.bank.right layer=Channels
+
+# transport
+note 81 ch 1 = edit.undo
+note 86 ch 1 = transport.loop      # Cycle
+note 89 ch 1 = transport.metronome # Click
+note 91 ch 1 = transport.rewind
+note 92 ch 1 = transport.forward
+note 93 ch 1 = transport.stop
+note 94 ch 1 = transport.play
+note 95 ch 1 = transport.record
+cc 60 ch 1 = transport.jog mode=sign
+
+# every other switch of the surface (function keys, modifiers, automation, zoom, scrub...): nothing yet
+note 0-103 ch 1 = ignore
+note 113-127 ch 1 = ignore
+
+[feedback]
+mixer.volume = bend ch 1-8
+master.volume = bend ch 9
+mixer.pan = cc 48-55 ch 1 ring=pan layer=Pan
+plugin.param = cc 48-55 ch 1 ring=wrap layer=Plug-in
+channel.volume = cc 48-55 ch 1 ring=wrap layer=Channels
+mixer.arm = note 0-7 ch 1
+mixer.solo = note 8-15 ch 1
+mixer.mute = note 16-23 ch 1
+mixer.select = note 24-31 ch 1
+layer Channels = note 40 ch 1
+layer Pan = note 42 ch 1
+layer Plug-in = note 43 ch 1
+transport.loop = note 86 ch 1
+transport.metronome = note 89 ch 1
+transport.stop = note 93 ch 1
+transport.play = note 94 ch 1
+transport.record = note 95 ch 1
+
+[display]
+# 2 rows of 56 characters, 7 per strip; offset 00h-37h is the upper row, 38h-6Fh the lower
+write = F0 00 00 66 14 12 {pos} {text} F7
+width = 7
+cells = 8
+row 1 = mixer.name layer=Pan
+row 2 = mixer.pan layer=Pan
+row 1 = plugin.param.name layer=Plug-in
+row 2 = plugin.param.value layer=Plug-in
+row 1 = channel.name layer=Channels
+row 2 = channel.volume layer=Channels
+)lynxctl" },
+    { "arturia-keylab-essential-mk3", R"lynxctl(# Arturia KeyLab Essential mk3 (49 / 61 / 88) through its Mackie Control port. docs/CONTROLLERS.md explains the format.
+#
+# Source (maker document only): "KeyLab Essential mk3 User Manual" (Arturia): the keyboard's DAW buttons, faders and
+# knobs can speak Mackie Control Universal on a port of their own, named "KL Essential 49 mk3 MCU/HUI" (61, 88 alike).
+# That port is off by default: turn it on in Arturia's MIDI Control Center, with the DAW mode set to Mackie Control,
+# and put the keyboard in its DAW mode (Prog button). The manual does not list which control sends which Mackie
+# message; this profile is the plain Mackie Control map (resources/controllers/mackie-control.lynxctl).
+#
+# The keyboard's other ports (keys, pads) stay a generic controller.
+
+[device]
+extends = mackie-control
+name = Arturia KeyLab Essential mk3 (Mackie Control port)
+maker = Arturia
+source = KeyLab Essential mk3 User Manual (Arturia), chapters on the DAW mode and the MIDI ports
+match = *KL Essential*MCU*, *KeyLab Essential*MCU*
+group = keylab-essential
+)lynxctl" },
+    { "korg-nanokontrol2", R"lynxctl(# Korg nanoKONTROL2 in one of its Mackie Control modes. docs/CONTROLLERS.md explains the format.
+#
+# Sources (maker documents only): "nanoKONTROL2 Owner's Manual" and "nanoKONTROL2 MIDI Implementation" (Korg),
+# https://www.korg.com/us/support/download/manual/0/159/1912/ and .../0/159/2710/ : the unit starts in a DAW mode when
+# it is connected while SET MARKER and a transport button are held: REW (Cubase), FF (Digital Performer), STOP (Live)
+# and REC (SONAR) are Mackie Control modes, in which the sliders send pitch bend and the buttons notes. (PLAY is the
+# HUI mode for Pro Tools, CYCLE the plain CC mode: not for this profile.) Korg's documents do not list the Mackie
+# messages of each control; this profile is the plain Mackie Control map (resources/controllers/mackie-control.lynxctl).
+#
+# Not detected automatically: the port name is the same in every mode, and in the CC mode (the factory setting) the
+# knobs and buttons mean something else. Choose this type by hand in Settings > MIDI after starting the unit in a
+# Mackie Control mode. In the CC mode, leave it a generic controller and link its controls by hand: Korg publishes no
+# list of the factory CC numbers, so there is no profile for that mode.
+
+[device]
+extends = mackie-control
+name = Korg nanoKONTROL2 (Mackie Control mode)
+maker = Korg
+source = nanoKONTROL2 Owner's Manual (Korg), "DAW modes", https://www.korg.com/us/support/download/manual/0/159/1912/
+source = nanoKONTROL2 MIDI Implementation, Rev 1.00 (Korg), https://www.korg.com/us/support/download/manual/0/159/2710/
+group = nanokontrol2
+)lynxctl" },
+    { "mackie-control-xt", R"lynxctl(# Mackie Control Extender (XT): 8 more strips next to a Mackie Control Universal. Same protocol as the main unit
+# (resources/controllers/mackie-control.lynxctl has the sources); its display answers to the model byte 15h.
+# The units of the group share one bank: each takes the next 8 strips, in the order of the Input devices list.
+
+[device]
+extends = mackie-control
+name = Mackie Control Extender (XT)
+maker = Mackie
+match = *Mackie Control*XT*, *MCU*XT*, *Mackie Control Extender*
+
+[display]
+write = F0 00 00 66 15 12 {pos} {text} F7
+)lynxctl" },
+    { "novation-launchkey-mk3", R"lynxctl(# Novation Launchkey MK3 (25 / 37 / 49 / 61) in its DAW mode. docs/CONTROLLERS.md explains the format.
+#
+# Source (maker document only): "Launchkey [MK3] Programmer's Reference Guide, Version 1" (Novation / Focusrite),
+# https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launchkey_mk3_programmer_s_reference_guide_v1_en.pdf
+#  - DAW mode on / off: note 0Ch on channel 16 (9F 0C 7F / 9F 0C 00), on the DAW port only.
+#  - pots CC 21-28, faders CC 53-60 and 61 (49 / 61 keys), fader buttons CC 37-44, pot mode report CC 9
+#    (1 Volume, 2 Device, 3 Pan), all on channel 16; Session pads: notes 96-103 (top) and 112-119 on channel 1.
+#  - pad colour: a note on channel 1 with a palette index (5 = red in the guide's example); the fader buttons' white
+#    LEDs: the button's CC on channel 16.
+#  - display: F0 00 20 29 02 0F 04 <row> <text> F7, 16 characters per row.
+#
+# Read from the guide's figures by position, not from printed names (check on a device): which of CC 102 / 103 is
+# Track left, the button numbers 74-77 and 115-118, and the value of <row> for the two display rows (0 and 1 here).
+#
+# Use this type on the keyboard's second port (the guide's "DAW In/Out", "second interface on Windows"); the first
+# port carries the keys, wheels and the Drum pads and stays a generic controller. The Launchkey 88 has another
+# display header (12h instead of 0Fh): everything works but its display stays empty.
+
+[device]
+name = Novation Launchkey MK3 (DAW mode)
+maker = Novation
+source = Launchkey [MK3] Programmer's Reference Guide, Version 1, https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launchkey_mk3_programmer_s_reference_guide_v1_en.pdf
+match = *Launchkey MK3*DAW*, MIDIIN2 (*Launchkey MK3*
+strips = 8
+# the keyboard's own pot modes (Shift + pad): it reports the one chosen and starts in Pan
+layers = Pan, Volume, Device
+
+[init]
+send = 9F 0C 7F
+
+[exit]
+send = 9F 0C 00
+
+[input]
+cc 9 ch 16 value 1 = layer Volume
+cc 9 ch 16 value 2 = layer Device
+cc 9 ch 16 value 3 = layer Pan
+cc 21-28 ch 16 = mixer.pan layer=Pan
+cc 21-28 ch 16 = mixer.volume layer=Volume
+cc 21-28 ch 16 = plugin.param layer=Device
+
+# faders and their buttons (49 / 61 keys)
+cc 53-60 ch 16 = mixer.volume
+cc 61 ch 16 = master.volume
+cc 37-44 ch 16 = mixer.select
+
+# buttons
+cc 102 ch 16 = mixer.bank.left        # Track left
+cc 103 ch 16 = mixer.bank.right       # Track right
+cc 106 ch 16 = channel.previous       # Scene up
+cc 107 ch 16 = channel.next           # Scene down
+cc 76 ch 16 = transport.metronome     # Click
+cc 77 ch 16 = edit.undo
+cc 115 ch 16 = transport.play
+cc 116 ch 16 = transport.stop
+cc 117 ch 16 = transport.record
+cc 118 ch 16 = transport.loop
+cc 104 ch 1 = pattern.next            # > (scene launch)
+cc 105 ch 1 = pattern.previous        # Stop / Solo / Mute
+
+# Session pads: the selected channel's 16 steps
+note 96-103 ch 1 = pad.step 1
+note 112-119 ch 1 = pad.step 9
+
+# the rest of the DAW port (Shift, Capture MIDI, Quantise, Device select / lock, mode reports): nothing yet
+cc 0-127 ch 16 = ignore
+cc 108 ch 1 = ignore
+
+[feedback]
+pad.step 1 = note 96-103 ch 1 on=5 off=0
+pad.step 9 = note 112-119 ch 1 on=5 off=0
+mixer.select = cc 37-44 ch 16
+
+[display]
+write = F0 00 20 29 02 0F 04 {row} {text} F7
+width = 16
+cells = 1
+row 1 = channel.selected.name
+row 2 = layer.name
+)lynxctl" },
     { nullptr, nullptr },
 };
 } // namespace lynx::controller
