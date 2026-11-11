@@ -1563,6 +1563,8 @@ countries: nl be
 "Controller type" = "Type controller"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Generieke controller: koppel een knop of fader via het rechtsklikmenu van een regelaar > Koppelen aan MIDI-controller."
 "Pickup (takeover mode)" = "Pickup (takeover-modus)"
+"Foot pedal controls note off" = "Voetpedaal bepaalt het einde van noten"
+"Disable to send sustain to plugins" = "Uitschakelen om sustain naar de plug-ins te sturen"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Een controller beweegt een parameter pas nadat hij de huidige waarde bereikt, zodat er niets verspringt."
 "Links in this project" = "Koppelingen in dit project"
 "ch. {0}" = "kan. {0}"
@@ -8126,6 +8128,15 @@ countries: nl be
 "Send the time selection to the comp" = "Tijdselectie naar de comp sturen"
 "Send the time selection of the take lane to its comp" = "Tijdselectie van de take-baan naar de comp sturen"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Verbindingen"
+"Auto map outputs" = "Uitgangen automatisch toewijzen"
+"Assign all outputs incrementally" = "Alle uitgangen opeenvolgend toewijzen"
+"Set all inputs and outputs to their default values" = "Alle in- en uitgangen terugzetten naar hun standaardwaarden"
+"Refresh inputs and outputs (after a change in the plugin)" = "In- en uitgangen vernieuwen (na een wijziging in de plugin)"
+"Mixer track offset for output {0}" = "Mixerspoor-verschuiving voor uitgang {0}"
+"Deactivate output {0}" = "Uitgang {0} uitschakelen"
+"Activate output {0}" = "Uitgang {0} inschakelen"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Gamecontroller"
 "Use a game controller" = "Een gamecontroller gebruiken"

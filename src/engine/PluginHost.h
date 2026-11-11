@@ -49,6 +49,17 @@ struct PluginCrash
 int pluginCrashCount() noexcept;
 std::vector<PluginCrash> pluginCrashes();
 
+// A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
+// one per output bus (bus 0 = the main output); a plugin with one bus of more than two channels (a bridged plugin)
+// in stereo pairs. `channel` = its first channel in the plugin's buffer.
+struct PluginOutputInfo
+{
+    juce::String name;
+    int channel = 0, channels = 2;
+    bool activeByDefault = true; // what the plugin declares (VST3 bus kDefaultActive, VST2 pin kVstPinIsActive)
+};
+std::vector<PluginOutputInfo> pluginOutputs (const juce::AudioPluginInstance& plugin);
+
 // FL's wrapper options a hosted plugin follows while it runs (REA round 151; PluginRef has them, saved per plugin)
 struct HostedOptions
 {
@@ -114,7 +125,27 @@ public:
     bool followsChannelPorta() const noexcept override { return true; }
     int sentPitchBend() const noexcept { return sentBend; } // the last 14-bit bend sent (8192 = centre), for the tests
 
+    // FL's wrapper Processing › Connections (round 188d, issue #114): each output of the plugin plays on the channel's
+    // insert + its offset (offset 0: the channel's own audio), an inactive one is silent; the channel's volume and
+    // pan apply to all of them, as FL [EXEC]. configure() takes the routes (UI thread; the audio thread reads atomics).
+    const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
+    void configure (const ChannelDef& channel, double bpm) noexcept override;
+    void beginChunk (int n) noexcept override;
+    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_relaxed) ? (int) outs.size() : 0; }
+    int auxOutputTrack (int k) const noexcept override;
+    const float* auxOutputData (int k, int side) const noexcept override;
+
 private:
+    void mixOutputs (const float* const* channels, int numChannels, int at, int count, float gl, float gr, float* left, float* right) noexcept;
+    std::vector<PluginOutputInfo> outs;
+    std::unique_ptr<std::atomic<int>[]> routeOffset;   // [output]
+    std::unique_ptr<std::atomic<bool>[]> routeActive;  // [output]
+    std::atomic<int> channelTrack { 0 };
+    std::atomic<bool> anyAux { false };                // an output plays somewhere else than the channel's insert
+    static constexpr int auxCapacity = 16384;
+    std::vector<std::array<std::vector<float>, 2>> aux; // [output] this chunk's audio for its insert
+    int auxCursor = 0, chunkBase = 0;
+
     void failed (std::uint32_t code) noexcept;
     void addBend (int offset) noexcept;         // the bend the pitch asks for now, if it changed
     void bendBlock (juce::MidiBuffer& into, int base, int count) noexcept; // advances a slide over `count` samples
