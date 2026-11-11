@@ -96,8 +96,11 @@ rms (max 11 dB at one harmonic).
 
 ## 4. Not verified
 
-- The editor was not rendered: no screenshot of the new knob (the layout compiles and the three knobs / the stepper
-  do not overlap by their rectangles; the existing test `lynx_tune_editor_layout_round95` was not run here).
+- The editor was rendered once, headless (cloud Windows round build of 9d83544fe, run 42974468158, `round build:
+  success`; `LYNX.exe --parityshot` with Breathiness at 60 %: /mnt/e/lynx-work/iss190bb/tune/shots/lynx-tune-breath.png):
+  SHIFT · THROAT · BREATH sit side by side, the Transpose column beside them, nothing overlaps. Only at 100 % scale
+  and the default theme; not driven by hand (no drag / automation / preset round trip in the app); the existing test
+  `lynx_tune_editor_layout_round95` was not run here.
 - Only the round's own tests ran (mini harness). The full suite — in particular FxAudit173d / CtlAudit (every control
   must change the render) and the Windows build — is left to the rollup.
 - Nothing was judged by ear; real singing was not used (synthetic vowels only).
