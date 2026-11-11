@@ -61,6 +61,9 @@ public:
     std::shared_ptr<Program> setProgram (std::shared_ptr<Program> program) noexcept;
     void setRate (int sampleRate, bool rendering) noexcept; // FL's sample-rate message (with the host's rendering flag)
     void setTempo (float bpm) noexcept;
+    // where the song is (beats from its start, and seconds), before the notes of a block: the LFOs with a global phase
+    // and the "song time" layering read it
+    void setSongPosition (double beats, double seconds) noexcept;
     void setInterpolation (int quality) noexcept;            // FL's interpolation index (core/FlResampler.h)
 
     int trigger (const Note& note) noexcept;                 // → the note's id (−1: nothing mapped to the key)
