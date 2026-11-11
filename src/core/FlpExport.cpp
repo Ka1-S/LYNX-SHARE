@@ -83,6 +83,7 @@ constexpr FlGenerator flGenerators[] = {
     { InstrumentKind::dashboard, "Dashboard", false },     { InstrumentKind::videoplayer, "Fruity Video Player", false },
     { InstrumentKind::keplerExo, "Kepler Exo", false },    { InstrumentKind::wavetraveller, "Wave Traveller", true },
     { InstrumentKind::fruityslicer, "Fruity Slicer", false },
+    { InstrumentKind::slicex, "Slicex", false },
 };
 
 const FlGenerator* generatorFor (InstrumentKind kind) noexcept

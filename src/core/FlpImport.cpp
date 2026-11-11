@@ -41,6 +41,7 @@
 #include "core/Sawer.h"
 #include "core/Granulizer.h"
 #include "core/WaveTraveller.h"
+#include "core/SlicexInstrument.h"
 #include "core/Ogun.h"
 #include "core/Dx10.h"
 #include "core/Kepler.h"
@@ -1313,6 +1314,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
 
+        // Slicex: its own engine on FL's state (round 190l, core/SlicexInstrument.h); the sampler on the slices below
+        // stays as the fallback
+        const auto slicexExact = lowercase (c.pluginName) == "slicex" && slicex::importChannel (def, c.pluginState, existing, options.saveEmbedded);
+
         // Fruity Slicer / Slicex: sampler with the slices (slice i plays on key 60 + i, at the sample's pitch)
         {
             const auto name = lowercase (c.pluginName);
@@ -1320,7 +1325,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             if (name == "fruity slicer")
                 sliced = fruitySlicer (c.pluginState);
-            else if (name == "slicex")
+            else if (name == "slicex" && ! slicexExact)
                 sliced = slicexSample (c.pluginState);
 
             if (sliced)
@@ -2190,7 +2195,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
                      || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
-                     || def.instrument == InstrumentKind::fruityslicer
+                     || def.instrument == InstrumentKind::fruityslicer || def.instrument == InstrumentKind::slicex
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
