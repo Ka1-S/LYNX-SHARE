@@ -1,0 +1,53 @@
+<p>Setiap judul di bawah adalah satu masalah. Jika masalahmu tidak ada di sini, laporkan seperti dijelaskan di bagian akhir.</p>
+<h2 id="starting-the-program">Memulai program</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: SmartScreen memperingatkan pada peluncuran pertama</h3>
+<p>File eksekusinya belum ditandatangani kodenya, jadi SmartScreen mungkin memperingatkan saat pertama kali kamu menjalankannya.</p>
+<ol><li>Klik <code>More info</code>.</li><li>Klik <code>Run anyway</code>.</li></ol>
+<p>Installer tidak membutuhkan hak admin.</p>
+<h3 id="macos-cannot-be-opened">macOS: &quot;tidak dapat dibuka&quot;</h3>
+<p>Aplikasi ini tidak dinotarisasi oleh Apple dan tidak punya tanda tangan Developer ID, jadi peluncuran pertama butuh satu langkah tambahan.</p>
+<ol><li>Seret LYNX SHARE ke <code>Applications</code>.</li><li>Klik kanan (Control-klik) dan pilih <code>Buka</code>.</li><li>Klik <code>Buka</code> sekali lagi.</li></ol>
+<p>Di macOS 15 Sequoia atau lebih baru, coba buka sekali, lalu masuk ke <code>System Settings › Privacy &amp; Security</code> dan klik <code>Open Anyway</code>. Atau, di Terminal:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS meminta akses mikrofon saat pertama kali kamu merekam.</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: AppImage tidak mau jalan</h3>
+<p>LYNX SHARE membutuhkan sistem x86_64 dengan glibc 2.35 atau lebih baru (Ubuntu 22.04, Debian 12, Fedora 36, Arch atau Manjaro terbaru) dan X11 atau XWayland.</p>
+<ol><li>Buat file itu bisa dieksekusi dan jalankan, dengan dua perintah di bawah.</li><li>Jika masih belum jalan, instal libfuse2. Paketnya <code>libfuse2</code> di Ubuntu 22.04, <code>libfuse2t64</code> di Ubuntu 24.04, <code>fuse2</code> di Arch, dan <code>fuse-libs</code> di Fedora.</li><li>Jika kamu lebih suka tidak memasangnya, unduh <code>.tar.gz</code>, ekstrak, lalu jalankan <code>./install.sh</code>.</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> menginstal LYNX SHARE untuk penggunamu di bawah <code>~/.local</code> beserta entri menu. <code>./install.sh --uninstall</code> menghapusnya.</p>
+<h2 id="sound">Suara</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">Tidak ada suara, atau perangkat audio salah</h3>
+<ol><li>Buka <code>Opsi › Pengaturan audio...</code>.</li><li>Pilih driver.</li><li>Pilih perangkat output.</li></ol>
+<div class="tablewrap"><table><thead><tr><th>Sistem</th><th>Driver</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO, dan driver LYNX ASIO bawaan</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (native), JACK, dan ALSA. Pada awal pertama LYNX SHARE membuka yang pertama di antaranya yang punya perangkat</td></tr></tbody></table></div>
+<p>ASIO adalah model driver Windows dan hanya ada di Windows. <code>Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...</code> juga menguji perangkat audio. Lihat <a href="/wiki/audio-setup/">Pengaturan audio</a>.</p>
+<h3 id="linux-the-sound-breaks-up">Linux: suara terputus-putus</h3>
+<p>Thread audio sebaiknya berjalan dengan prioritas real-time.</p>
+<ol><li>Buka <code>Opsi › Pengaturan audio...</code> dan baca <code>Status</code>. Di situ terlihat apakah thread mendapat prioritas real-time.</li><li>Jika tidak, instal rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code>, atau <code>sudo pacman -S rtkit</code>), atau tambahkan dirimu ke grup <code>audio</code> dengan batas real-time, seperti pada setup JACK.</li><li>Keluar dan masuk lagi.</li></ol>
+<p>Detailnya ada di <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h2 id="plugins">Plugin</h2>
+<h3 id="a-plugin-crashes">Plugin crash</h3>
+<p>Jalankan di prosesnya sendiri, supaya hanya plugin itu yang berhenti.</p>
+<ol><li>Buka <code>Opsi › Pengaturan umum...</code>.</li><li>Nyalakan <code>Jalankan plugin di proses terpisah (melindungi LYNX SHARE dari crash)</code>.</li><li>Buka ulang proyek.</li></ol>
+<p>Plugin yang crash atau berhenti merespons di prosesnya sendiri dibisukan. Simpan proyek dan buka ulang untuk memuat plugin itu lagi. Lihat <a href="/wiki/plugins/">Plugin pihak ketiga</a>.</p>
+<h3 id="a-plugin-is-not-in-the-list">Plugin tidak ada di daftar</h3>
+<ol><li>Pilih <code>Opsi › Pindai plugin</code>.</li><li>Jika masih belum muncul, buka <code>Opsi › Pengelola plugin...</code>, klik <code>Folder plugin...</code>, dan tambahkan folder plugin itu.</li><li>Lihat tab <code>Gagal</code>. File plugin yang gagal dipindai dilewati. Di Windows alasannya ada di <code>%APPDATA%\LYNX\scan-failures.log</code>.</li><li>Klik <code>Pindai ulang semua...</code> untuk mencoba lagi file yang gagal.</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">Proyek memakai plugin yang tidak terinstal</h3>
+<p>Efek diganti dengan efek LYNX SHARE yang berperan sama, dan pengaturannya tetap disimpan di proyek. <code>Bantuan › File hilang...</code> mencantumkan apa yang hilang. Lihat <a href="/wiki/built-in/">Instrumen dan efek bawaan</a>.</p>
+<h3 id="video-does-not-work-on-linux">Video tidak bekerja di Linux</h3>
+<p>Track video dan <code>Export with video</code> membutuhkan FFmpeg. LYNX SHARE menjelaskan cara menginstalnya.</p>
+<h2 id="crash-reports">Laporan crash</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="Pertanyaan laporan crash yang tampil pada awal berikutnya, dengan Send, Show what will be sent, dan Don't send" loading="lazy"></a></figure>
+<p>Laporan crash bersifat opt-in. Setelah crash atau freeze, awal berikutnya menanyakan apakah laporan akan dikirim.</p>
+<div class="tablewrap"><table><thead><tr><th>Perintah</th><th>Fungsinya</th></tr></thead><tbody><tr><td><code>Tampilkan yang akan dikirim</code></td><td>Menampilkan teks persisnya</td></tr><tr><td><code>Laporkan di GitHub saja</code></td><td>Membuka formulir issue GitHub, sudah terisi. Kamu melampirkan filenya sendiri</td></tr><tr><td><code>Buka folder berisi laporan</code></td><td>Menampilkan file laporan di komputermu</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>Jika mati, hanya ekstensi setiap file yang dikirim</td></tr><tr><td><code>Selalu kirim tanpa bertanya</code></td><td>Mengirim laporan berikutnya tanpa bertanya</td></tr></tbody></table></div>
+<p><code>Laporan crash</code> di <code>Opsi › Pengaturan umum...</code> mengatur <code>Ask</code> (default), <code>Selalu kirim</code>, atau <code>Jangan pernah kirim</code>.</p>
+<p>Laporan berisi versi LYNX SHARE, sistem operasi, CPU, kartu grafis beserta drivernya, ukuran layar, driver dan perangkat audio, file crash atau freeze, 60 langkah terakhir sesi, serta nama dan versi plugin pihak ketiga yang dimuat.</p>
+<p>Laporan tidak berisi audio, proyek, sample, nama komputermu, atau nama penggunamu. Server tidak menyimpan alamat IP. Id yang terkirim dicantumkan di <code>crash-reports\sent.log</code> di folder pengaturan. Agar laporan dihapus, buka issue dengan id-nya. Teks lengkapnya ada di <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">kebijakan privasi</a>.</p>
+<h2 id="report-a-problem">Melaporkan masalah</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="Jendela Report a problem: kotak deskripsi, alamat e-mail opsional, dan tombol Send" loading="lazy"></a></figure>
+<ol><li>Pilih <code>Bantuan › Laporkan masalah...</code>.</li><li>Jelaskan apa yang terjadi. Alamat e-mail bersifat opsional, untuk jika kamu ingin mendapat jawaban.</li><li>Biarkan <code>Lampirkan file crash / freeze terbaru dan langkah sesi ini</code> tetap tercentang jika masalahnya berupa crash.</li><li>Klik <code>Tampilkan yang akan dikirim</code> untuk memeriksa teksnya.</li><li>Klik <code>Kirim</code>. Tidak ada yang dikirim sebelum itu.</li></ol>
+<p>Kamu juga bisa membuka issue di <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>.</p>
+<h2 id="good-to-know">Perlu diketahui</h2>
+<ul><li>Setelah crash, salinan cadangan proyekmu ada di folder autosave LYNX SHARE.</li><li>Jika sebuah plugin terlibat dalam crash, pertanyaan itu menawarkan untuk mulai sekarang menjalankan plugin tersebut di proses terpisah.</li><li>Folder pengaturan adalah <code>%APPDATA%\LYNX</code> di Windows, <code>~/Library/Application Support/LYNX</code> di macOS, dan <code>~/.config/LYNX</code> di Linux.</li></ul>
+<h2 id="related">Terkait</h2>
+<ul><li><a href="/wiki/audio-setup/">Pengaturan audio</a></li><li><a href="/wiki/plugins/">Plugin pihak ketiga</a></li><li><a href="/wiki/install/">Instalasi</a></li><li><a href="/faq/">FAQ</a></li><li><a href="/why/#crash">Perlindungan crash</a></li></ul>
