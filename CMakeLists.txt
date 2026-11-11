@@ -248,6 +248,7 @@ target_sources(lynx_core PRIVATE
 # workflow P2 (note tools, mixer operations, history labels, browser search)
 target_sources(lynx_core PRIVATE
     src/core/NoteTools.cpp
+    src/core/MidiTools.cpp
     src/core/PianoRollTools.cpp
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp

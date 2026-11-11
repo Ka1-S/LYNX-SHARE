@@ -11,6 +11,7 @@
 #include "core/ClipLauncher.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
+#include "core/LiveScales.h"
 #include "core/MissingFiles.h"
 #include "core/TimeStretch.h"
 #include "core/XmlLite.h"
@@ -100,6 +101,10 @@ struct Ctx
     std::map<std::string, int> audioChannels;        // resolved sample path (+ stretch mode) → audioClip channel
     int nextRow = 0;
     std::set<std::string> missingSeen;
+
+    // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
+    std::optional<projectkey::Key> clipKey;
+    bool clipKeySeen = false;
 
     explicit Ctx (const AlsImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -495,8 +500,27 @@ std::vector<Pass> passesOf (const ClipLoop& loop, double length)
     return passes;
 }
 
+// A set's or a clip's ScaleInformation as a project key (round 190o) [LIVE 12.4 save: Root 0…11, Name = the index into
+// Live's scale chooser; Live 11: RootNote and the name as text]; nullopt when FL's list (which holds the project key)
+// has no scale with the same degrees.
+std::optional<projectkey::Key> liveScaleOf (const Element& owner)
+{
+    const auto info = owner.child ("ScaleInformation");
+    if (! info)
+        return std::nullopt;
+    const auto name = info.value ("Name");
+    const auto numeric = ! name.empty() && std::all_of (name.begin(), name.end(), [] (char ch) { return ch >= '0' && ch <= '9'; });
+    const auto index = numeric ? std::atoi (name.c_str()) : livescales::indexOfName (name);
+    return livescales::keyFor ((int) info.number ("Root", info.number ("RootNote", 0)), index);
+}
+
 int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double length, const ClipLoop* loopOverride = nullptr)
 {
+    if (! ctx.clipKeySeen && clip.boolean ("IsInKey", false))
+    {
+        ctx.clipKeySeen = true;
+        ctx.clipKey = liveScaleOf (clip);
+    }
     Pattern p;
     p.name = clip.value ("Name");
     p.colour = alsColour ((int) clip.number ("Color", -1));
@@ -1392,6 +1416,12 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         song.patterns.push_back (std::move (first));
     }
     song.currentPattern = 0;
+    // Live's Scale Mode → the project key (round 190o): the set's own scale when it is on (Live 12), else the scale of
+    // the first clip that has one on (Live 11 has clip scales only). LYNX has one key per project.
+    if (set.boolean ("InKey", false))
+        projectkey::set (song, liveScaleOf (set));
+    else if (ctx.clipKeySeen)
+        projectkey::set (song, ctx.clipKey);
     return std::move (ctx.song);
 }
 } // namespace lynx

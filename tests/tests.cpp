@@ -17397,6 +17397,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MultiOut188dTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
+#include "MidiTools190oTests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
 #include "Undo190bTests.inc"
