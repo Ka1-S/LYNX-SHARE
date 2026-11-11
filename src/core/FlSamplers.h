@@ -37,7 +37,7 @@ struct SlicedSample
     float gain = 1.0f; // Slicex master volume: (11^(v/12800) − 1)/10 (REA_rodada69 §5)
 };
 std::optional<SlicedSample> fruitySlicer (const std::vector<std::uint8_t>& state);
-std::optional<SlicedSample> slicex (const std::vector<std::uint8_t>& state);
+std::optional<SlicedSample> slicexSample (const std::vector<std::uint8_t>& state); // (the whole state: core/Slicex.h)
 
 // FL Keys: the name of the sample set (the .wti in Plugins\Fruity\Generators\FL Keys\Wavtables).
 std::optional<std::string> flKeysSet (const std::vector<std::uint8_t>& state);
