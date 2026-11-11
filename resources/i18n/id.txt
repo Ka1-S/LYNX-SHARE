@@ -8913,3 +8913,8 @@ countries: id
 "24Bit int" = "Integer 24 bit"
 "32Bit float" = "Float 32 bit"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 bit (laju sampel perangkat)"
+"Clean|FET" = "Bersih|FET"
+"Levelling" = "Perataan level"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Perataan level: menahan level pada ambang di bawah batas atas dengan attack lambat, batas atas menangkap sisanya (mati secara default)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Ambang perataan: level yang ditahan di bawah batas atas (Off: tanpa perataan)"
+"Levelling attack: how much of a transient passes before the level is held" = "Attack perataan: seberapa banyak transien yang lewat sebelum level ditahan"

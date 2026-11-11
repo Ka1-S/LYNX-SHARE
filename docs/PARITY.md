@@ -2168,6 +2168,37 @@ Sources (web): [Decapitator guide (B&H copy)](https://static.bhphoto.com/lit_fil
 
 ---
 
+## Round 190ar, part 2: Compressor, the classic voicing's FET law
+
+Measured black-box (public parameters only) on four FET-style compressor references' probe renders (round trial190k:
+1 kHz stairs, tone bursts of 10 ms … 2 s and the recovery after them). What the classic voicing could not do:
+
+- the recovery is not one time constant. Read off the gain after a 2 s burst, the reduction G (dB) falls per second by
+  about a · G + b · G²: a = 0.35 … 0.8 / s (a tail of 1.3 … 2.7 s whatever the release control says), b = 0 … 0.08 / (dB s)
+  growing with the release control. Deep reduction comes back fast, the last decibels slowly;
+- the knee is about 5 dB wide (0.6 dB of reduction at the threshold).
+
+`Classic law` (new parameter, **off by default**: every existing project and new instance sounds as before; the panel
+shows `Clean | FET` under the voicing tabs) adds that law to the classic voicing: a 5 dB knee, and per second the
+reduction falls by G / tail + G² / (10 dB · release), tail = the release time, at most 2.7 s. For small reductions that
+is the classic exponential release; at 10 dB it is twice as fast, at 20 dB three times. No latency, same CPU (render
+time of a 35 s file 0.16 … 0.18 s with the law off or on, as before). The vintage voicing and the upward expansion
+(ratio under 1) do not have it.
+
+Scores with matched settings (the setting maps of round 190ar fitted again on the probes, with the law on and the wide
+ranges; programme bank of round 182, 5 settings × 5 signals; before = the classic law's own best map):
+
+| Reference kind | Before → after | Null | Level error | Files up / same / down |
+|---|---|---|---|---|
+| FET compressor | 2.76 → 4.80 | −6.5 → −15.8 dB | 3.9 → 1.5 dB | 20 / 4 / 1 |
+| FET compressor, modern revision | 3.52 → 4.08 | −11.8 → −12.5 dB | 2.1 → 1.9 dB | 10 / 15 / 0 |
+| FET compressor, vintage revision | 3.08 → 5.00 | −8.2 → −16.4 dB | 3.2 → 1.3 dB | 17 / 7 / 1 |
+| FET compressor, all-buttons style | 3.60 → 4.28 | −10.3 → −13.2 dB | 1.9 → 1.2 dB | 14 / 7 / 4 |
+
+Not modelled: the faster recovery after bursts shorter than about 50 ms at the fastest release, the modern revision's
+two-stage attack (5 … 20 ms), the all-buttons style's overshoot in the first 100 ms. The law is not yet selected by the
+plugin substitutes (a project that used such a compressor still loads the classic law).
+
 ## Round tp172c: SSL Native Channel Strip 2 (Ridge Strip's Modern voicing)
 Sources: the official SSL trial (Native Channel Strip 2 v2.10, black-box only): its parameter table and read-outs, 30
 programme renders (defaults + 5 settings × drums / music / vocal / sweep / stair), 224 + 224 impulse renders on a dense
@@ -2193,6 +2224,39 @@ tables), Ridge's appended **Modern voicing**, **Peak detect** and **Gate hold**.
 voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8, compressor 6…8, gate + peak 5…8). The
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
+
+## Round 190ar, part 2: Apex Limiter, the levelling stage
+
+Measured black-box (public parameters only) on a limiter that has a threshold under its ceiling (round trial190k's
+probes: 1 kHz stairs, tone bursts and the recovery after them). Apex could only be a brickwall: with the threshold
+matched by its ceiling it clamped every transient, and came out 8 … 11 dB lower in peak and 2 … 4 dB lower in level
+on programme. What the reference does:
+
+- above the threshold (default −12 dB) the steady level is held at the threshold, with a slow attack — about 9 ms in
+  its transparent style, under 1 ms in the other — and an exponential release that is the release control;
+- the ceiling only catches what the slow attack lets through.
+
+`Level threshold` and `Level attack` (new parameters; the threshold is **off by default**: every existing project and
+new instance sounds as before) add that stage in front of the limiter: the linked peak after the input gain, over the
+threshold (0 … −36 dB), ∞ : 1 with a 6 dB knee, one-pole attack (0.1 … 100 ms, default 9 ms), released with the
+limiter's Release. No extra latency; the gain reduction meter shows both. Render time of a 35 s file 0.52 … 0.57 s
+before, 0.52 … 0.55 s with the stage off, 0.55 … 0.62 s with it on.
+
+Scores with matched settings (the setting map of round 190ar fitted again on the probes with the two new parameters;
+before = the brickwall's own best map):
+
+| Reference kind | Bank | Files | Before → after | Null | Level error | Up / same / down |
+|---|---|---|---|---|---|---|
+| Limiter with threshold and ceiling | tp172c | 16 | 3.25 → 4.94 | −11.8 → −17.0 dB | 2.4 → 0.9 dB | 14 / 1 / 1 |
+| | programme 182 | 20 | 3.35 → 5.65 | −11.3 → −21.5 dB | 2.5 → 0.5 dB | 17 / 3 / 0 |
+
+One file went down (the fast style on tone bursts, 5 → 3). With the stage off, 28 of 28 renders of the round's Apex
+maps are byte-identical to before.
+
+In the editor the stage sits in the Advanced panel under the four switches: a `Levelling` switch (off by default; it
+remembers the threshold, -12 dB the first time) and the `Threshold` / `Attack` value rows. The fit's first run stayed in the
+brickwall solution (ceiling = threshold, stage off: 3.12 / 3.35); the map above starts from ceiling near 0 dB and the
+threshold at −12 dB. Not modelled: the reference's fast style shapes bursts differently in the first milliseconds.
 
 ## Round 180c: Merge similar pattern clips, Merge automation clips (issue #74)
 
@@ -2252,8 +2316,23 @@ one vocal setting, 6 → 5).
 Limits: values between the captured settings are interpolated, and a few fitted transfers are not monotonic (they
 are carried as measured); beyond the captured range the first-to-last trend continues. The second (A/B) slot of the
 FG-X 2 state is not read. The EQ modules have no translator: their fitted per-setting maps are not smooth enough to
-interpolate (a translation in physical units is needed). The FET compressors and X-Limit need the new laws of this
-round and get their translators once those are in.
+interpolate (a translation in physical units is needed).
+
+With the two new laws of this round in (the Compressor's `Classic law` and Apex's levelling stage), the same route
+covers five more plugins, each rendered from the C++ translator's own output on the captured states:
+
+| Missing plugin (kind) | Stand-in | Bank | Files | Before → after | Null | Level error | Up / same / down |
+|---|---|---|---|---|---|---|---|
+| Limiter with threshold (SSL X-Limit) | Apex Limiter | tp172c | 16 | 2.38 → 4.94 | −3.9 → −17.1 dB | 3.5 → 0.9 dB | 14 / 1 / 1 |
+| | | programme 182 | 20 | 3.05 → 5.65 | −7.5 → −21.5 dB | 2.5 → 0.5 dB | 19 / 1 / 0 |
+| FET compressor (VM FG-116) | Compressor | programme 182 | 25 | 3.08 → 4.80 | −8.8 → −15.8 dB | 2.8 → 1.5 dB | 19 / 6 / 0 |
+| FET compressor, modern revision | Compressor | programme 182 | 25 | 3.04 → 4.08 | −9.1 → −12.5 dB | 2.5 → 1.9 dB | 13 / 12 / 0 |
+| FET compressor, vintage revision | Compressor | programme 182 | 25 | 3.48 → 5.00 | −10.5 → −16.4 dB | 2.1 → 1.3 dB | 14 / 10 / 1 |
+| FET compressor, all-buttons style (VM The Monster) | Compressor | programme 182 | 25 | 3.28 → 4.28 | −8.4 → −13.2 dB | 2.1 → 1.2 dB | 15 / 9 / 1 |
+
+Three files went down by one step (a limiter burst setting, one vocal and one drum file). The FET compressors'
+ratio transfer is not monotonic between its four positions (carried as measured). The other names of the vintage
+compressor role (no captured state) still load the stand-in at its defaults.
 
 ## Round 177b: workflow extras beyond FL (FL's own way stays unchanged)
 

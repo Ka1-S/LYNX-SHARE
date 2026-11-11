@@ -389,3 +389,684 @@
     { "Harrison_LookaheadCompressor D", "Harrison_LookaheadCompressor", "Crest Compressor",
       R"x190(<HarrisonLookaheadCompressor plugin_size="1.0" plugin_theme="Modern" version="65792"><PARAM id="bypass" value="0.0"/><PARAM id="knee" value="6.0"/><PARAM id="makeup" value="0.0"/><PARAM id="ratio" value="2.0"/><PARAM id="reduction_meter" value="0.0"/><PARAM id="threshold" value="-12.0"/></HarrisonLookaheadCompressor>)x190",
       { { 0, 0.45000f }, { 1, 0.87400f }, { 2, 0.32295f }, { 3, 0.04133f }, { 5, 0.00000f }, { 6, 0.90628f }, { 9, 0.00000f }, { 34, 0.00000f }, { 37, 0.50000f } } },
+    { "SSL_X_Limit S1", "SSL X-Limit", "Apex Limiter",
+      R"x190(<SSL_PLUGIN_STATE PluginName="SSL X-Limit" Version="1.3.2" StateASelected="1"><A LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="6.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="0.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="300.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></A><B LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="0.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="0.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="300.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></B></SSL_PLUGIN_STATE>)x190",
+      { { 0, 0.19237f }, { 1, 0.96813f }, { 2, 0.00000f }, { 3, 0.74968f }, { 4, 0.37500f }, { 5, 1.00000f }, { 22, 0.34693f }, { 23, 0.53715f } } },
+    { "SSL_X_Limit S2", "SSL X-Limit", "Apex Limiter",
+      R"x190(<SSL_PLUGIN_STATE PluginName="SSL X-Limit" Version="1.3.2" StateASelected="1"><A LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="10.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="1.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="100.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></A><B LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="0.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="0.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="300.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></B></SSL_PLUGIN_STATE>)x190",
+      { { 0, 0.33262f }, { 1, 0.96813f }, { 2, 0.50000f }, { 3, 0.67364f }, { 4, 0.37500f }, { 5, 1.00000f }, { 22, 0.34693f }, { 23, 0.53715f } } },
+    { "SSL_X_Limit D", "SSL X-Limit", "Apex Limiter",
+      R"x190(<SSL_PLUGIN_STATE PluginName="SSL X-Limit" Version="1.3.2" StateASelected="1"><A LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="0.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="0.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="300.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></A><B LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XLimit\Default Preset.xml"><PROCESSOR_STATE><PARAM id="AutoRelease" value="0.0"/><PARAM id="Bypass" value="0.0"/><PARAM id="Ceiling" value="-0.09999847412109375"/><PARAM id="ChanLink" value="100.0"/><PARAM id="Gain" value="0.0"/><PARAM id="GainMatch" value="0.0"/><PARAM id="Lookahead" value="0.0"/><PARAM id="Mix" value="100.0"/><PARAM id="Release" value="300.0"/><PARAM id="Style" value="0.0"/><PARAM id="Threshold" value="-12.0"/><PARAM id="TruePeakMode" value="1.0"/></PROCESSOR_STATE></B></SSL_PLUGIN_STATE>)x190",
+      { { 0, 0.00000f }, { 1, 0.96813f }, { 2, 0.00000f }, { 3, 0.74968f }, { 4, 0.37500f }, { 5, 1.00000f }, { 22, 0.34693f }, { 23, 0.53715f } } },
+    { "VM_FG_116 X1", "VM FG-116", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6P-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6P-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="6.6666698455810547e-01"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="3.3333298563957214e-01"/>
+				<entry id="Input" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.64973f }, { 6, 1.00000f }, { 7, 0.50000f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.32510f }, { 15, 0.60623f }, { 16, 0.00000f }, { 17, 1.00000f }, { 19, 1.00000f } } },
+    { "VM_FG_116 X2", "VM FG-116", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6P-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6P-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="1.7179700732231140e-01"/>
+				<entry id="Input" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="3.7500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.61139f }, { 6, 1.00000f }, { 7, 0.47049f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.26630f }, { 15, 0.63361f }, { 16, 0.00418f }, { 17, 0.85177f }, { 19, 1.00000f } } },
+    { "VM_FG_116 D", "VM FG-116", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6P-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6P-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="NoiseReduction" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.71530f }, { 6, 1.00000f }, { 7, 0.59262f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.32510f }, { 15, 0.53984f }, { 16, 0.00864f }, { 17, 0.85177f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Modern X1", "VM FG-116 Modern", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6M-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6M-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="6.6666698455810547e-01"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="3.3333298563957214e-01"/>
+				<entry id="Input" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.60574f }, { 6, 0.95424f }, { 7, 0.48607f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.45445f }, { 15, 0.60464f }, { 16, 0.04120f }, { 17, 1.00000f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Modern X2", "VM FG-116 Modern", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6M-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6M-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="1.7179700732231140e-01"/>
+				<entry id="Input" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="3.7500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.58644f }, { 6, 0.95424f }, { 7, 0.45888f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.43165f }, { 15, 0.63632f }, { 16, 0.26420f }, { 17, 0.85904f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Modern D", "VM FG-116 Modern", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6M-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6M-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.83099f }, { 6, 0.95424f }, { 7, 0.46175f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.45445f }, { 15, 0.53924f }, { 16, 0.50186f }, { 17, 0.85904f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Vintage X1", "VM FG-116 Vintage", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6V-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6V-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="6.6666698455810547e-01"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="3.3333298563957214e-01"/>
+				<entry id="Input" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.65437f }, { 6, 1.00000f }, { 7, 0.50000f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.35618f }, { 15, 0.61010f }, { 16, 0.00000f }, { 17, 1.00000f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Vintage X2", "VM FG-116 Vintage", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6V-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6V-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="1.7179700732231140e-01"/>
+				<entry id="Input" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="3.7500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.62978f }, { 6, 1.00000f }, { 7, 0.46352f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.25399f }, { 15, 0.63247f }, { 16, 0.00000f }, { 17, 0.83150f }, { 19, 1.00000f } } },
+    { "VM_FG_116_Vintage D", "VM FG-116 Vintage", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="FG6V-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="FG6V-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Circuit" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Compression" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="Ratio" type="float64" value="1.2500000000000000e-01"/>
+				<entry id="SidechainHp" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.71704f }, { 6, 1.00000f }, { 7, 0.59262f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.35618f }, { 15, 0.54129f }, { 16, 0.00000f }, { 17, 0.83150f }, { 19, 1.00000f } } },
+    { "VM_The_Monster X1", "VM The Monster", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="MNST-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="MNST-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000298023224e-01"/>
+				<entry id="Release" type="float64" value="6.6666698455810547e-01"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="3.3333298563957214e-01"/>
+				<entry id="Input" type="float64" value="4.2708298563957214e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.1458301544189453e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000000000001e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="3.0208333333333331e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.9791666666666663e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.54973f }, { 6, 1.00000f }, { 7, 0.49960f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.00000f }, { 15, 0.71161f }, { 16, 0.00000f }, { 17, 0.85177f }, { 19, 1.00000f } } },
+    { "VM_The_Monster X2", "VM The Monster", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="MNST-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="MNST-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000298023224e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="6.2500000000000000e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="7.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="3.7500000000000000e-01"/>
+				<entry id="Output" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000000000001e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="3.0208333333333331e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.9791666666666663e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.51793f }, { 6, 0.26858f }, { 7, 0.45027f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.00000f }, { 15, 0.77371f }, { 16, 0.00000f }, { 17, 0.72459f }, { 19, 1.00000f } } },
+    { "VM_The_Monster D", "VM The Monster", "Compressor",
+      R"x190(<package version="1.0">
+	<manifest>
+		<client id="MNST-state"/>
+	</manifest>
+	<archives>
+		<archive client_id="MNST-state" version="1">
+			<section id="Common">
+				<entry id="Current slot" type="uint32" value="0"/>
+				<entry id="UIScale" type="float64" value="2.8571428571428564e-01"/>
+			</section>
+			<section id="Slot0">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000298023224e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="3.0208334326744080e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.9791668653488159e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+			<section id="Slot1">
+				<entry id="Preset notes" type="string" value=""/>
+				<entry id="Preset project" type="string" value=""/>
+				<entry id="Sidechain" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="HFDet" type="float64" value="2.0000000000000001e-01"/>
+				<entry id="Release" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Preset name" type="string" value="./Default"/>
+				<entry id="Attack" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Input" type="float64" value="3.0208333333333331e-01"/>
+				<entry id="HPF" type="float64" value="0.0000000000000000e+00"/>
+				<entry id="Punch" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="Preset author" type="string" value=""/>
+				<entry id="Mix" type="float64" value="1.0000000000000000e+00"/>
+				<entry id="Output" type="float64" value="6.9791666666666663e-01"/>
+				<entry id="Bypass" type="float64" value="2.5000000000000000e-01"/>
+				<entry id="StandaloneInputGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="SidechainExtGain" type="float64" value="5.0000000000000000e-01"/>
+				<entry id="QualitySelector" type="uint32" value="0"/>
+				<entry id="StandaloneOutputGain" type="float64" value="5.0000000000000000e-01"/>
+			</section>
+		</archive>
+	</archives>
+</package>)x190",
+      { { 0, 0.70206f }, { 6, 1.00000f }, { 7, 0.49645f }, { 8, 0.00000f }, { 13, 1.00000f }, { 14, 0.00000f }, { 15, 0.65188f }, { 16, 0.00000f }, { 17, 0.72459f }, { 19, 1.00000f } } },

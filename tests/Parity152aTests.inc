@@ -43,7 +43,7 @@ TEST (compressor_measured_vintage_curve_round152a)
 {
     using namespace lynx;
     const auto& info = effectInfo (EffectKind::compressor);
-    CHECK (info.params.size() == 19 && std::string (info.params[18].name) == "Vintage curve" && info.params[18].defaultValue == 1.0f);
+    CHECK (info.params.size() >= 19 && std::string (info.params[18].name) == "Vintage curve" && info.params[18].defaultValue == 1.0f);
     CHECK (formatEffectParam (EffectKind::compressor, 18, 1.0f, 120.0) == "measured" && formatEffectParam (EffectKind::compressor, 18, 0.0f, 120.0) == "round 150");
     // a project saved before round 152 (18 parameters) keeps the round-150 curve
     auto old = makeEffectSlot (EffectKind::compressor);

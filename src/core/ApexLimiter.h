@@ -34,10 +34,12 @@
 
 namespace lynx::apex
 {
-constexpr int paramCount = 22;
+constexpr int paramCount = 24;
 enum Param { pGain, pCeiling, pLookahead, pRelease, pStyle, pTruePeak, pLink, pAttack, pLinkRelease, pDither, pShaping,
              pUnity, pAudition, pDcFilter, pMeterScale,
-             pOversampling, pPeakMeter, pDisplayMode, pLoudnessReset, pSidechain, pLoudnessShown, pLoudnessTarget };
+             pOversampling, pPeakMeter, pDisplayMode, pLoudnessReset, pSidechain, pLoudnessShown, pLoudnessTarget,
+             // round 190ar: the levelling stage before the limiter (off at 0 dB: nothing changes for existing projects)
+             pLevelThreshold, pLevelAttack };
 constexpr double maxLookaheadMs = 5.0;
 
 // Round 128: 8 styles. The four original styles keep the positions their saved values round to (0, 1/3, 2/3, 1 of
@@ -51,6 +53,8 @@ double lookaheadMs (float v) noexcept;
 double releaseMs (float v) noexcept;
 float releaseValue (double ms) noexcept;
 double attackMs (float v) noexcept;   // 0 .. 10 000 ms (v^4)
+double levelThresholdDb (float v) noexcept; // round 190ar: 0 (off) .. -36 dB
+double levelAttackMs (float v) noexcept;    // 0.1 .. 100 ms
 int ditherBits (float v) noexcept;    // 0 = off, else 16 .. 24
 int noiseShaping (float v) noexcept;  // 0 none, 1 basic, 2 optimized, 3 weighted
 int meterScale (float v) noexcept;    // 0 −16 dB, 1 −32 dB, 2 −48 dB, 3 K-12, 4 K-14, 5 K-20

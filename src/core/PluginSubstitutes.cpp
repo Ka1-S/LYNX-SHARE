@@ -563,6 +563,7 @@ names = SSL Native Bus Compressor 2; SSL G3 MultiBusComp; SSL 360 Link Bus Compr
 product = vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp)
 vendor = Complete Access (role)
 lynx = Compressor
+translate = fitted-map
 names = VM FG-116; VM FG-116 Modern; VM FG-116 Vintage; VM FG-76; VM FG-401; VM FG-A; VM FG-Dynamics; VM The Monster; SSL Native X-ValveComp v6; MO-TT
 
 [complete-access-optos]

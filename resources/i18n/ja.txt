@@ -8913,3 +8913,8 @@ countries: jp
 "24Bit int" = "24ビット整数"
 "32Bit float" = "32ビット浮動小数点"
 "WAV 16-bit (the device's sample rate)" = "WAV 16ビット（デバイスのサンプルレート）"
+"Clean|FET" = "クリーン|FET"
+"Levelling" = "レベリング"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "レベリング: 遅いアタックでシーリングより下のスレッショルドにレベルを保ち、残りはシーリングが抑えます（既定ではオフ）"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "レベリングのスレッショルド: シーリングより下に保つレベル（Off: レベリングなし）"
+"Levelling attack: how much of a transient passes before the level is held" = "レベリングのアタック: レベルが保たれる前にトランジェントがどれだけ通るか"
