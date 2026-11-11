@@ -148,6 +148,51 @@ TEST (transport162_follow_and_stop)
     CHECK (followViewStart (1000.0, 4000.0, 50.0, 100.0) == 0.0);
     CHECK (followViewStart (1000.0, 4000.0, -1.0, 100.0) == 1000.0); // no playhead
 
+    // feedback 190bm: inside a loop (the Piano Roll in Pattern mode) the view holds still at the loop's end
+    {
+        using lynx::transportedit::followViewStartInLoop;
+        const auto lead = 20.0, margin = 20.0;
+        // a pattern that fits the view (zoom to fit: its end is the view's right edge): the view never moves, not in
+        // the right margin (the plain rule paged forward there, then back at the wrap) and not at the wrap
+        for (double tick = 0.0; tick < 1536.0; tick += 0.5)
+            CHECK (followViewStartInLoop (0.0, 1536.0, tick, lead, margin, 1536.0) == 0.0);
+        CHECK (followViewStart (0.0, 1536.0, 1530.0, lead, margin) != 0.0); // (what it did before)
+        CHECK (followViewStartInLoop (0.0, 4000.0, 1535.9, lead, margin, 1536.0) == 0.0);
+        CHECK (followViewStartInLoop (0.0, 4000.0, 0.0, lead, margin, 1536.0) == 0.0);
+
+        // a pattern longer than the view, played twice round: pages forward, the last page ends at the pattern's end,
+        // and the wrap is ONE change straight to the start (no page past the end, no stop in between)
+        auto view = 0.0;
+        std::vector<double> starts;
+        const auto length = 3000.0, width = 1300.0;
+        for (int lap = 0; lap < 2; ++lap)
+            for (double tick = 0.0; tick < length; tick += 0.25)
+                if (const auto next = followViewStartInLoop (view, width, tick, lead, margin, length); next != view)
+                {
+                    starts.push_back (next);
+                    view = next;
+                }
+        // lap 1: two pages forward; the wrap; lap 2: the same two pages
+        CHECK (starts.size() == 5);
+        if (starts.size() == 5)
+        {
+            CHECK (starts[0] > 0.0);
+            CHECK (starts[0] < starts[1]);
+            CHECK (starts[1] == length - width); // the pattern's end at the right edge, never past it
+            CHECK (starts[2] == 0.0); // the wrap: straight back
+            CHECK (starts[3] == starts[0]);
+            CHECK (starts[4] == starts[1]);
+        }
+        for (auto s : starts)
+            CHECK (s + width <= length);
+
+        // the user scrolled into the middle of a pattern that would fit: the wrap brings the start back once
+        CHECK (followViewStartInLoop (500.0, 1536.0, 3.0, lead, margin, 1536.0) == 0.0);
+        // no loop known (Song mode, a linear take): the plain rule
+        CHECK (followViewStartInLoop (1000.0, 4000.0, 4990.0, 100.0, 100.0, 0.0) == followViewStart (1000.0, 4000.0, 4990.0, 100.0, 100.0));
+        CHECK (followViewStartInLoop (1000.0, 4000.0, -1.0, 100.0, 100.0, 8000.0) == 1000.0);
+    }
+
     using lynx::transportedit::stopTarget;
     CHECK (stopTarget (false, false, 5000) == 0);
     CHECK (stopTarget (false, true, 5000) == 5000);
