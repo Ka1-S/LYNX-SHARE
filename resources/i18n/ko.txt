@@ -8370,3 +8370,4 @@ countries: kr
 "Follow the MIDI settings" = "MIDI 설정 따르기"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "MIDI 장치에서 이 플러그인으로 연주한 노트의 벨로시티: MIDI 설정의 커브, 또는 이 플러그인만의 커브나 고정 벨로시티"
 "The velocity every played note gets (1 to 127)" = "연주한 모든 노트에 적용되는 벨로시티(1~127)"
+"Play a note when a preset loads" = "프리셋을 불러올 때 노트 재생"

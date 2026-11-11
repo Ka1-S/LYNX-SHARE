@@ -17405,3 +17405,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Reload190aoTests.inc"
 #include "Pin190aoTests.inc"
 #include "Velocity190aoTests.inc"
+#include "Audition190aoTests.inc"

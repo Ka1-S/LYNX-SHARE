@@ -138,6 +138,12 @@ public:
     // changed (close the plugins' windows first: a window keeps the old instance alive). Returns how many run again.
     // Plugins inside a Patcher are not covered.
     int reloadHostedPlugins (const std::vector<HostedSlot>& which);
+    // Round 190ao (pain point 13): a short C5 on the channel that hosts `plugin`, a moment from now (a preset was just
+    // loaded into it; the preset menu's "Play a note when a preset loads"). Only while the song is stopped; a note
+    // still sounding from the last call ends first. False when nothing will play (an effect, a plugin outside the
+    // Channel rack, the song playing or recording). auditionState: 0 idle, 1 waiting to start, 2 sounding (tests).
+    bool auditionPreset (const juce::AudioPluginInstance& plugin);
+    int auditionState() const noexcept { return auditionChannel < 0 ? 0 : auditionSounding ? 2 : 1; }
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
     void stampWorkTime();
@@ -993,6 +999,11 @@ private:
     // low byte, and fixedVelocity, high byte; 0 = follow the MIDI settings), rebuilt on every publish; guarded by
     // midiPrefsLock too
     std::vector<std::uint16_t> channelVelocity;
+    // round 190ao: the preset audition's note (message thread: auditionPreset and the timer)
+    int auditionChannel = -1;
+    bool auditionSounding = false;
+    double auditionAtMs = 0.0;
+    void updateAudition();
     void logPlayedNote (int channel, int key, float velocity, bool on, double tick = -1.0, bool recorded = false);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;

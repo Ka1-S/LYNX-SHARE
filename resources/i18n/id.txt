@@ -8370,3 +8370,4 @@ countries: id
 "Follow the MIDI settings" = "Ikuti pengaturan MIDI"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity not yang dimainkan ke plugin ini dari perangkat MIDI: kurva pengaturan MIDI, atau kurva atau velocity tetap milik plugin ini"
 "The velocity every played note gets (1 to 127)" = "Velocity yang diberikan pada setiap not yang dimainkan (1 sampai 127)"
+"Play a note when a preset loads" = "Mainkan satu not saat preset dimuat"

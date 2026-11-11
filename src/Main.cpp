@@ -4071,6 +4071,48 @@ private:
                     shot ("wrapper-velocity-fixed", true);
                     engine->undo();
                     expect ("velocity_undo", refNow().velocityMode == lynx::prefs::pluginVelocityFollow && find() == instance);
+                    // the preset menu's "Play a note when a preset loads": off by default, a user setting
+                    expect ("audition_off_by_default", ! lynx::pluginpresetui::auditionOnLoad());
+                    lynx::pluginpresetui::setAuditionOnLoad (true);
+                    expect ("audition_menu_opened", lynx::PluginWindows::showPresetMenu (*instance));
+                    next (6);
+                    return;
+                }
+                if (phase == 6 && elapsed() >= 500) // the menu, as drawn
+                {
+                    auto found = false;
+                    auto& desktop = juce::Desktop::getInstance();
+                    for (int c = desktop.getNumComponents(); --c >= 0 && ! found;)
+                        if (auto* menu = desktop.getComponent (c); dynamic_cast<juce::TopLevelWindow*> (menu) == nullptr && menu->isVisible()
+                                                                    && menu->getHeight() > 60 && shots != juce::File())
+                        {
+                            const auto image = menu->createComponentSnapshot (menu->getLocalBounds(), true, 1.0f);
+                            juce::FileOutputStream out (shots.getChildFile ("preset-menu-audition.png"));
+                            found = out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+                        }
+                    step ("shot_preset-menu-audition=" + juce::String ((int) found));
+                    juce::PopupMenu::dismissAllActiveMenus();
+                    // a preset loaded while the song is stopped: the note waits a moment, sounds, ends
+                    const auto asked = engine->auditionPreset (*instance);
+                    expect ("audition_only_for_channel_instruments", asked == instrument);
+                    expect ("audition_waits_first", ! instrument || engine->auditionState() == 1);
+                    next (7);
+                    return;
+                }
+                if (phase == 7 && elapsed() >= 300)
+                {
+                    expect ("audition_sounds", ! instrument || engine->auditionState() == 2);
+                    next (8);
+                    return;
+                }
+                if (phase == 8 && elapsed() >= 700)
+                {
+                    expect ("audition_ends", engine->auditionState() == 0);
+                    engine->getTransport().playing.store (true); // the song plays: no audition
+                    expect ("no_audition_while_playing", ! engine->auditionPreset (*instance) && engine->auditionState() == 0);
+                    engine->getTransport().playing.store (false);
+                    lynx::pluginpresetui::setAuditionOnLoad (false);
+                    expect ("audition_setting_off_again", ! lynx::pluginpresetui::auditionOnLoad());
                     finish ({});
                 }
             }

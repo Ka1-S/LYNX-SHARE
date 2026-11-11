@@ -8370,3 +8370,4 @@ countries: ru by kz
 "Follow the MIDI settings" = "Как в настройках MIDI"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Velocity нот, сыгранных в этот плагин с MIDI-устройств: кривая из настроек MIDI либо собственная кривая или фиксированная velocity этого плагина"
 "The velocity every played note gets (1 to 127)" = "Velocity, которую получает каждая сыгранная нота (от 1 до 127)"
+"Play a note when a preset loads" = "Проигрывать ноту при загрузке пресета"

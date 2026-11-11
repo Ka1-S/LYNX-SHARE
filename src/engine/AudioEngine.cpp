@@ -44,6 +44,7 @@
 #include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
 #include "engine/PluginSandbox.h"
+#include "core/PluginPresets.h"
 #include "flp/Flp.h"
 
 #if JUCE_WINDOWS
@@ -4088,6 +4089,7 @@ void AudioEngine::timerCallback()
         applyHardwareInsertPings();
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
+    updateAudition(); // (round 190ao: the preset audition's note starts and ends here)
     applyControllers();
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
@@ -4668,6 +4670,44 @@ void AudioEngine::capturePluginStates()
 
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+}
+
+bool AudioEngine::auditionPreset (const juce::AudioPluginInstance& plugin)
+{
+    auto channel = -1;
+    for (std::size_t i = 0; i < song.channels.size() && channel < 0; ++i)
+        if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()); p != nullptr && &p->getInstance() == &plugin && ! p->hasCrashed())
+            channel = (int) i;
+    if (! pluginpresets::auditionPlays (true, channel >= 0, transport.playing.load(), transport.recording.load()))
+        return false;
+    if (auditionChannel >= 0 && auditionSounding) // the last one still sounds: it ends now
+        sendLiveNote (auditionChannel, pluginpresets::auditionKey, 0.0f, false);
+    auditionChannel = channel;
+    auditionSounding = false;
+    auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionDelayMs;
+    return true;
+}
+
+void AudioEngine::updateAudition()
+{
+    if (auditionChannel < 0 || juce::Time::getMillisecondCounterHiRes() < auditionAtMs)
+        return;
+    if (auditionSounding)
+    {
+        sendLiveNote (auditionChannel, pluginpresets::auditionKey, 0.0f, false);
+        auditionChannel = -1;
+        auditionSounding = false;
+        return;
+    }
+    // (the song started in between, or the channel went: nothing plays)
+    if (transport.playing.load() || auditionChannel >= (int) song.channels.size())
+    {
+        auditionChannel = -1;
+        return;
+    }
+    sendLiveNote (auditionChannel, pluginpresets::auditionKey, pluginpresets::auditionVelocity, true);
+    auditionSounding = true;
+    auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionLengthMs;
 }
 
 namespace

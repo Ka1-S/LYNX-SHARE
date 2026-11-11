@@ -84,6 +84,8 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
 // Tests / shots (round 190ao): runs the open window's periodic check now (the crash notice follows the plugin) and
 // writes a PNG of its content: the editor page (or the crash notice in its place), or the Wrapper settings page.
 bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage);
+// Opens the open window's preset menu (FL's plugin menu), as a click on the preset name does.
+bool showPresetMenu (const juce::AudioPluginInstance& plugin);
 } // namespace PluginWindows
 
 // Scans the VST3 folders with a progress window. `onDone(newCount)` runs on the UI thread.

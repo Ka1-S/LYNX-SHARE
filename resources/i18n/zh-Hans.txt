@@ -8370,3 +8370,4 @@ countries: cn sg
 "Follow the MIDI settings" = "跟随 MIDI 设置"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "从 MIDI 设备弹入此插件的音符力度：使用 MIDI 设置中的曲线，或此插件自己的曲线或固定力度"
 "The velocity every played note gets (1 to 127)" = "每个弹奏音符得到的力度（1 到 127）"
+"Play a note when a preset loads" = "加载预设时播放一个音符"

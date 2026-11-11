@@ -580,6 +580,12 @@ public:
             refreshSidechain();
         }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
+        // round 190ao: the preset menu's "Play a note when a preset loads" (instruments of the Channel rack)
+        if (channel)
+            presets.onLoaded = [&engine, &plugin] {
+                if (pluginpresetui::auditionOnLoad())
+                    engine.auditionPreset (plugin);
+            };
         // FL's Typing keyboard priority, left of the presets (issue #96 slice 2). A plugin in another process has its
         // own keyboard (FL: bridged plugins always take it), so there it stays greyed.
         addAndMakeVisible (keyboardPriority);
@@ -620,6 +626,7 @@ public:
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
     bool hostProcessesKeys() const { return page.hostProcessesKeys(); }
     void showPage (bool showSettings) { show (showSettings); }
+    void openPresetMenu() { presets.openMenu(); } // (tests / shots)
 
     // round 190ao: the pin of a detached window. `available` false: shown greyed (a plugin in a separate process: its
     // editor is a window of that process)
@@ -1673,6 +1680,15 @@ void* hostWindowHandle (const juce::AudioPluginInstance& plugin)
 {
     const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
     return it != windows().end() ? it->second->nativeHandle() : nullptr;
+}
+
+bool showPresetMenu (const juce::AudioPluginInstance& plugin)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    auto* wrapped = it != windows().end() ? dynamic_cast<WrappedEditor*> (it->second->contentForShot()) : nullptr;
+    if (wrapped != nullptr)
+        wrapped->openPresetMenu();
+    return wrapped != nullptr;
 }
 
 bool isPinnedOnTop (const juce::AudioPluginInstance& plugin)

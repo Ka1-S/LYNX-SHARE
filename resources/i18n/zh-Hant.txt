@@ -8370,3 +8370,4 @@ countries: tw hk mo
 "Follow the MIDI settings" = "跟隨 MIDI 設定"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "從 MIDI 裝置彈入此外掛的音符力度：使用 MIDI 設定中的曲線，或此外掛自己的曲線或固定力度"
 "The velocity every played note gets (1 to 127)" = "每個彈奏音符得到的力度（1 到 127）"
+"Play a note when a preset loads" = "載入預設時播放一個音符"

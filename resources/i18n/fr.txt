@@ -8370,3 +8370,4 @@ countries: fr be ch ca lu
 "Follow the MIDI settings" = "Suivre les réglages MIDI"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "Vélocité des notes jouées dans ce plugin depuis des périphériques MIDI : la courbe des réglages MIDI, ou une courbe ou une vélocité fixe propre à ce plugin"
 "The velocity every played note gets (1 to 127)" = "La vélocité donnée à chaque note jouée (1 à 127)"
+"Play a note when a preset loads" = "Jouer une note au chargement d'un preset"

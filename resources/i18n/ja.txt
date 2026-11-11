@@ -8370,3 +8370,4 @@ countries: jp
 "Follow the MIDI settings" = "MIDI 設定に従う"
 "Velocity of the notes played into this plugin from MIDI devices: the curve of the MIDI settings, or this plugin's own curve or fixed velocity" = "MIDI デバイスからこのプラグインに演奏されたノートのベロシティ：MIDI 設定のカーブ、またはこのプラグイン専用のカーブか固定ベロシティ"
 "The velocity every played note gets (1 to 127)" = "演奏したすべてのノートに与えるベロシティ（1～127）"
+"Play a note when a preset loads" = "プリセットの読み込み時にノートを鳴らす"
