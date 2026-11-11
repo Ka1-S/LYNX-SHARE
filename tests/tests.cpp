@@ -17329,6 +17329,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
+#include "TypingPlace190bmTests.inc"
 #include "GrossBeat168mTests.inc"
 #include "Maximus168xTests.inc"
 #include "Rec168xTests.inc"

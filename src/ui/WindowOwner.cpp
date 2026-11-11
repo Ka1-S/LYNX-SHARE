@@ -23,6 +23,12 @@
 #if JUCE_WINDOWS
  #include <windows.h>
 #endif
+#if JUCE_LINUX || JUCE_BSD || JUCE_MAC
+ #include <dlfcn.h>
+#endif
+#if JUCE_MAC
+ #include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace lynx
 {
@@ -309,6 +315,186 @@ bool isAboveMainWindow (juce::Component& window)
     return isOwnedByMainWindow (window);
    #endif
 }
+
+// Where a character key is on the keyboard, for the typing keyboard (FL's table goes by scan code)
+#if JUCE_WINDOWS
+namespace
+{
+// The scan code of the key that types `ch` in `layout` without Shift / AltGr; 0 for none
+int scanCodeOfCharacter (int ch, HKL layout)
+{
+    for (const auto c : { (WCHAR) towlower ((wint_t) ch), (WCHAR) ch })
+    {
+        const auto vk = VkKeyScanExW (c, layout);
+        if (vk == -1 || HIBYTE (vk) != 0) // (no such key, or only with Shift / Ctrl / Alt held)
+            continue;
+        const auto scanCode = (int) MapVirtualKeyExW ((UINT) LOBYTE (vk), MAPVK_VK_TO_VSC, layout);
+        return scanCode > 0 && scanCode < 0x80 ? scanCode : 0;
+    }
+    return 0;
+}
+} // namespace
+
+int scanCodeOfKeyCode (int juceKeyCode)
+{
+    // JUCE's code is MapVirtualKey (vk, MAPVK_VK_TO_CHAR) of the pressed key (upper case for letters). Back to the
+    // key: the layout's virtual key for that character, then that key's scan code.
+    if (juceKeyCode <= ' ' || juceKeyCode > 0xffff)
+        return 0; // (Space, F-keys, arrows, the numpad: not character keys)
+    return scanCodeOfCharacter (juceKeyCode, GetKeyboardLayout (0));
+}
+#elif JUCE_LINUX || JUCE_BSD
+namespace
+{
+// Xlib, looked up at run time (JUCE loads it the same way and keeps its own headers to itself). A connection of its
+// own, used for keyboard questions only and renewed every few seconds, so a keyboard map changed meanwhile is seen.
+struct XKeyboard
+{
+    using OpenDisplay = void* (*) (const char*);
+    using CloseDisplay = int (*) (void*);
+    using DisplayKeycodes = int (*) (void*, int*, int*);
+    using GetState = int (*) (void*, unsigned int, void*);
+    using KeycodeToKeysym = unsigned long (*) (void*, unsigned char, int, int);
+
+    XKeyboard()
+    {
+        if (auto* xlib = dlopen ("libX11.so.6", RTLD_LAZY | RTLD_LOCAL))
+        {
+            openDisplay = (OpenDisplay) dlsym (xlib, "XOpenDisplay");
+            closeDisplay = (CloseDisplay) dlsym (xlib, "XCloseDisplay");
+            displayKeycodes = (DisplayKeycodes) dlsym (xlib, "XDisplayKeycodes");
+            getState = (GetState) dlsym (xlib, "XkbGetState");
+            keycodeToKeysym = (KeycodeToKeysym) dlsym (xlib, "XkbKeycodeToKeysym");
+        }
+    }
+    ~XKeyboard() { close(); }
+
+    void close()
+    {
+        if (display != nullptr)
+            closeDisplay (display);
+        display = nullptr;
+    }
+
+    // The scan code (evdev's key code = Xlib's - 8; the typing block's are the PC scan codes) of the key whose
+    // unshifted keysym in the layout in use (the active XKB group) is `keysym` or `otherKeysym`; 0 for none
+    int scanCodeOf (unsigned long keysym, unsigned long otherKeysym)
+    {
+        if (openDisplay == nullptr || closeDisplay == nullptr || displayKeycodes == nullptr || getState == nullptr || keycodeToKeysym == nullptr)
+            return 0;
+        const auto now = std::time (nullptr);
+        if (display != nullptr && now - opened > 2)
+            close();
+        if (display == nullptr)
+        {
+            display = openDisplay (nullptr);
+            opened = now;
+        }
+        if (display == nullptr)
+            return 0;
+        alignas (16) unsigned char state[64] = {}; // XkbStateRec (18 bytes); its first field is the active group
+        const auto group = getState (display, 0x100 /* XkbUseCoreKbd */, state) == 0 ? (int) state[0] : 0;
+        int first = 8, last = 255;
+        displayKeycodes (display, &first, &last);
+        for (int keycode = std::max (first, 9); keycode <= std::min (last, 8 + 0x7f); ++keycode)
+            if (const auto sym = keycodeToKeysym (display, (unsigned char) keycode, group, 0); sym != 0 && (sym == keysym || sym == otherKeysym))
+                return keycode - 8;
+        return 0;
+    }
+
+    OpenDisplay openDisplay = nullptr;
+    CloseDisplay closeDisplay = nullptr;
+    DisplayKeycodes displayKeycodes = nullptr;
+    GetState getState = nullptr;
+    KeycodeToKeysym keycodeToKeysym = nullptr;
+    void* display = nullptr;
+    std::time_t opened = 0;
+};
+} // namespace
+
+int scanCodeOfKeyCode (int juceKeyCode)
+{
+    // JUCE's code is the character the key types. Back to the key: the key whose keysym is that character (Latin-1
+    // keysyms are the characters; the others' are 0x01000000 + the code point, which leaves out alphabets that have
+    // older keysyms of their own: those keys stay by character)
+    if (juceKeyCode <= ' ' || juceKeyCode > 0x10ffff)
+        return 0;
+    static XKeyboard keyboard;
+    const auto keysymOf = [] (int ch) { return (unsigned long) (ch < 0x100 ? ch : 0x01000000 + ch); };
+    return keyboard.scanCodeOf (keysymOf ((int) juce::CharacterFunctions::toLowerCase ((juce::juce_wchar) juceKeyCode)), keysymOf (juceKeyCode));
+}
+#elif JUCE_MAC
+int scanCodeOfKeyCode (int juceKeyCode)
+{
+    // JUCE's code is the key's character without modifiers. Back to the key: the virtual key code (a place on the
+    // keyboard: kVK_ANSI_*) whose character in the current layout is that one, asked from the Text Input Sources /
+    // UCKeyTranslate. Those live in Carbon's HIToolbox, which LYNX does not link: looked up at run time, and when
+    // anything is missing the answer is 0 (the typing keyboard then goes by character, as before).
+    if (juceKeyCode <= ' ' || juceKeyCode > 0xffff)
+        return 0;
+    struct Api
+    {
+        using CopyLayout = void* (*)();
+        using GetProperty = void* (*) (void*, CFStringRef);
+        using KbdType = std::uint8_t (*)();
+        using Translate = std::int32_t (*) (const void*, std::uint16_t, std::uint16_t, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t*,
+                                            unsigned long, unsigned long*, std::uint16_t*);
+        CopyLayout copyLayout = nullptr;
+        GetProperty getProperty = nullptr;
+        KbdType kbdType = nullptr;
+        Translate translate = nullptr;
+        CFStringRef* layoutDataKey = nullptr;
+        Api()
+        {
+            if (auto* carbon = dlopen ("/System/Library/Frameworks/Carbon.framework/Carbon", RTLD_LAZY | RTLD_LOCAL))
+            {
+                copyLayout = (CopyLayout) dlsym (carbon, "TISCopyCurrentKeyboardLayoutInputSource");
+                getProperty = (GetProperty) dlsym (carbon, "TISGetInputSourceProperty");
+                kbdType = (KbdType) dlsym (carbon, "LMGetKbdType");
+                translate = (Translate) dlsym (carbon, "UCKeyTranslate");
+                layoutDataKey = (CFStringRef*) dlsym (carbon, "kTISPropertyUnicodeKeyLayoutData");
+            }
+        }
+        bool ok() const { return copyLayout != nullptr && getProperty != nullptr && kbdType != nullptr && translate != nullptr && layoutDataKey != nullptr; }
+    };
+    static const Api api;
+    if (! api.ok())
+        return 0;
+    // kVK_ANSI_* (0x00..0x32) -> PC scan code; 0: not a key of the typing block
+    static const std::uint8_t scanOfVirtualKey[] = {
+        0x1E, 0x1F, 0x20, 0x21, 0x23, 0x22, 0x2C, 0x2D, 0x2E, 0x2F, 0x00, 0x30, 0x10, 0x11, 0x12, 0x13, // A S D F H G Z X C V - B Q W E R
+        0x15, 0x14, 0x02, 0x03, 0x04, 0x05, 0x07, 0x06, 0x0D, 0x0A, 0x08, 0x0C, 0x09, 0x0B, 0x1B, 0x18, // Y T 1 2 3 4 6 5 = 9 7 - 8 0 ] O
+        0x16, 0x1A, 0x17, 0x19, 0x00, 0x26, 0x24, 0x28, 0x25, 0x27, 0x2B, 0x33, 0x35, 0x31, 0x32, 0x34, // U [ I P Ret L J ' K ; \ , / N M .
+        0x00, 0x00, 0x29                                                                                // Tab Space `
+    };
+    auto* source = api.copyLayout();
+    if (source == nullptr)
+        return 0;
+    int found = 0;
+    if (const auto data = (CFDataRef) api.getProperty (source, *api.layoutDataKey); data != nullptr)
+    {
+        const auto wanted = juce::CharacterFunctions::toLowerCase ((juce::juce_wchar) juceKeyCode);
+        for (std::uint16_t vk = 0; vk < (std::uint16_t) std::size (scanOfVirtualKey) && found == 0; ++vk)
+        {
+            std::uint32_t deadKeys = 0;
+            unsigned long length = 0;
+            std::uint16_t chars[4] = {};
+            if (scanOfVirtualKey[vk] != 0
+                && api.translate (CFDataGetBytePtr (data), vk, 0 /* kUCKeyActionDown */, 0, api.kbdType(), 1 /* kUCKeyTranslateNoDeadKeysMask */, &deadKeys,
+                                  4, &length, chars) == 0
+                && length == 1 && juce::CharacterFunctions::toLowerCase ((juce::juce_wchar) chars[0]) == wanted)
+                found = scanOfVirtualKey[vk];
+        }
+    }
+    CFRelease ((CFTypeRef) source);
+    return found;
+}
+#else
+int scanCodeOfKeyCode (int)
+{
+    return 0;
+}
+#endif
 
 void forceForegroundForTest (juce::Component& window)
 {

@@ -710,6 +710,35 @@ std::vector<int> typingPianoNotes (int key, int octave, int root, int layout)
     return typingPianoKey (key, octave, root, layout).notes;
 }
 
+namespace
+{
+// layoutKeys by PC scan code (set 1): 0x02..0x0D the number row, 0x10..0x1B the Q row, 0x1E..0x28 the A row, 0x29 `,
+// 0x2B \, 0x2C..0x35 the Z row (the gaps are Backspace / Tab, Enter / Ctrl and the left Shift)
+constexpr int firstTypingScanCode = 0x02, lastTypingScanCode = 0x35;
+constexpr char usKeyByScanCode[] = "1234567890-=\0\0QWERTYUIOP[]\0\0ASDFGHJKL;'`\0\\ZXCVBNM,./";
+static_assert (sizeof (usKeyByScanCode) - 1 == lastTypingScanCode - firstTypingScanCode + 1);
+} // namespace
+
+int typingpiano::usKeyOfScanCode (int scanCode) noexcept
+{
+    return scanCode >= firstTypingScanCode && scanCode <= lastTypingScanCode ? (int) (unsigned char) usKeyByScanCode[scanCode - firstTypingScanCode] : 0;
+}
+
+int typingpiano::scanCodeOfUsKey (int key) noexcept
+{
+    const auto c = key >= 'a' && key <= 'z' ? key - 'a' + 'A' : key;
+    for (int scan = firstTypingScanCode; scan <= lastTypingScanCode; ++scan)
+        if (c > 0 && usKeyOfScanCode (scan) == c)
+            return scan;
+    return 0;
+}
+
+int typingpiano::physicalKey (int keyCode, const ScanCodeLookup& scanCodeOf)
+{
+    const auto scanCode = scanCodeOf != nullptr ? scanCodeOf (keyCode) : 0;
+    return scanCode > 0 ? usKeyOfScanCode (scanCode) : keyCode;
+}
+
 KeyMap::KeyMap()
 {
     resetToDefaults();

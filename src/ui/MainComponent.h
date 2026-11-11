@@ -226,7 +226,9 @@ private:
     perf::MidiMapping typingPerformance;
     std::map<int, std::vector<int>> typingLaunches;
     static bool isPlainKey (const keys::Chord& chord) noexcept; // no Ctrl / Alt / Shift
-    keys::TypingKey typingKey (const keys::Chord& chord) const; // what the typing keyboard does with it (nothing when off)
+    // what the typing keyboard does with a key (nothing when off): by the key's place on the keyboard, not its letter
+    // (QWERTZ, AZERTY, Dvorak... play as a US keyboard does, as FL)
+    keys::TypingKey typingKey (const juce::KeyPress& key) const;
     void releaseTypingLaunches (bool all); // the released keys' launches (all: every one)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     int lastLinkedChannel = -1;  // (Auto select linked modules, round 187a)

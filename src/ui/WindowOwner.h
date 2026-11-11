@@ -67,6 +67,12 @@ void fitAllWindowsOnScreen();
 // reachable; a content that fits is returned as it is. The viewport follows the content's later size changes.
 std::unique_ptr<juce::Component> fitContentToScreen (std::unique_ptr<juce::Component> content);
 
+// The PC scan code (set 1, core/KeyMap.h typingpiano::usKeyOfScanCode) of the key that gives JUCE's key code
+// `juceKeyCode` in the keyboard layout in use now; 0 when it is not a character key or the place can't be told. JUCE's
+// key codes are the key's unshifted character ('Y' for the key left of X on a German keyboard): the typing keyboard
+// asks for the key's place with this (FL goes by scan code).
+int scanCodeOfKeyCode (int juceKeyCode);
+
 // --windowtest only: makes `window` the foreground window even when LYNX was started in the background.
 void forceForegroundForTest (juce::Component& window);
 
