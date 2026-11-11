@@ -513,19 +513,21 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
                 cues.push_back (c);
             }
         }
+        else if (std::memcmp (w.data() + p, "tlst", 4) == 0 && have >= 4)
+        {
+            // FL's trigger list, a chunk of its own after LIST/adtl (round 190r: a project FL saved after "Assign
+            // current region to this key"; a "tlst" inside a LIST is ignored by FL): i32 count, then 24-byte entries
+            // {'cue ', cue id − 1, 1, 0xFF, key, 0x90, 0, 0, 0}
+            const std::size_t n = std::min<std::size_t> (le32 (body), (have - 4) / 24);
+            for (std::size_t k = 0; k < n; ++k)
+            {
+                const auto* e = body + 4 + 24 * k;
+                extras.push_back ({ le32 (e + 4) + 1, 2, {}, (std::int64_t) e[13] });
+            }
+        }
         else if (std::memcmp (w.data() + p, "LIST", 4) == 0 && have >= 4)
         {
-            if (std::memcmp (body, "tlst", 4) == 0 && have >= 8)
-            {
-                // FL's trigger list: 24-byte entries {'cue ', cue id − 1, 1, 0xFF, key, 0x90, …}
-                const std::size_t n = std::min<std::size_t> (le32 (body + 4), (have - 8) / 24);
-                for (std::size_t k = 0; k < n; ++k)
-                {
-                    const auto* e = body + 8 + 24 * k;
-                    extras.push_back ({ le32 (e + 4) + 1, 2, {}, (std::int64_t) e[13] });
-                }
-            }
-            else if (std::memcmp (body, "adtl", 4) == 0)
+            if (std::memcmp (body, "adtl", 4) == 0)
             {
                 for (std::size_t q = 4; q + 8 <= have;)
                 {
@@ -586,6 +588,68 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
                 }
         }
     return regions;
+}
+
+std::vector<std::uint8_t> withRegionKeys (const std::vector<std::uint8_t>& w, const std::vector<int>& keys)
+{
+    if (w.size() < 12 || std::memcmp (w.data(), "RIFF", 4) != 0 || std::memcmp (w.data() + 8, "WAVE", 4) != 0)
+        return {};
+    // the cue points in the order wavRegions() lists the regions (by start, file order kept), and where the list goes:
+    // after LIST/adtl, else after the cue chunk (FL's order: … cue, LIST/adtl, tlst, LIST/INFO)
+    std::vector<std::pair<std::int64_t, std::uint32_t>> cues; // start, id
+    std::vector<std::uint8_t> out (w.begin(), w.begin() + 12);
+    std::size_t at = 0;
+    for (std::size_t p = 12; p + 8 <= w.size();)
+    {
+        const std::size_t size = le32 (w.data() + p + 4);
+        const std::size_t have = std::min (size, w.size() - (p + 8));
+        const auto* body = w.data() + p + 8;
+        const std::size_t next = std::min (w.size(), p + 8 + size + (size & 1));
+        const bool list = std::memcmp (w.data() + p, "tlst", 4) == 0;
+        if (std::memcmp (w.data() + p, "cue ", 4) == 0 && have >= 4)
+        {
+            const std::size_t n = std::min<std::size_t> (le32 (body), (have - 4) / 24);
+            for (std::size_t k = 0; k < n; ++k)
+                cues.push_back ({ (std::int64_t) le32 (body + 4 + 24 * k + 20), le32 (body + 4 + 24 * k) });
+        }
+        if (! list) // (the old list is dropped)
+            out.insert (out.end(), w.begin() + (std::ptrdiff_t) p, w.begin() + (std::ptrdiff_t) next);
+        if (std::memcmp (w.data() + p, "cue ", 4) == 0 || (std::memcmp (w.data() + p, "LIST", 4) == 0 && have >= 4 && std::memcmp (body, "adtl", 4) == 0))
+            at = out.size();
+        p = next;
+    }
+    if (cues.empty() || at == 0)
+        return {};
+    std::stable_sort (cues.begin(), cues.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+    std::vector<std::uint8_t> list;
+    auto put32 = [] (std::vector<std::uint8_t>& o, std::uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            o.push_back ((std::uint8_t) (v >> (8 * i)));
+    };
+    std::uint32_t count = 0;
+    for (std::size_t i = 0; i < cues.size() && i < keys.size(); ++i)
+        count += keys[i] >= 0 && keys[i] <= 127 ? 1u : 0u;
+    if (count > 0)
+    {
+        list.insert (list.end(), { 't', 'l', 's', 't' });
+        put32 (list, 4 + 24 * count);
+        put32 (list, count);
+        for (std::size_t i = 0; i < cues.size() && i < keys.size(); ++i)
+            if (keys[i] >= 0 && keys[i] <= 127)
+            {
+                list.insert (list.end(), { 'c', 'u', 'e', ' ' });
+                put32 (list, cues[i].second - 1);
+                put32 (list, 1);
+                list.insert (list.end(), { 0xff, (std::uint8_t) keys[i], 0x90, 0 });
+                put32 (list, 0);
+                put32 (list, 0);
+            }
+    }
+    out.insert (out.begin() + (std::ptrdiff_t) at, list.begin(), list.end());
+    const auto riff = (std::uint32_t) (out.size() - 8);
+    for (int i = 0; i < 4; ++i)
+        out[4 + (std::size_t) i] = (std::uint8_t) (riff >> (8 * i));
+    return out;
 }
 
 std::string regionName (const WavRegion& r, int index)

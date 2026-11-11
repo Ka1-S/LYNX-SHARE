@@ -17419,3 +17419,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicex190lTests.inc"
 #include "Surge190xTests.inc"
 #include "Issue114Tests.inc"
+#include "Slicex190rTests.inc"

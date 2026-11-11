@@ -34,7 +34,6 @@ std::vector<std::uint8_t> wavWith (std::uint32_t frames, const std::vector<Cue>&
         put32 (fmt, v);
     put32 (cue, (std::uint32_t) cues.size());
     tag (adtl, "adtl");
-    tag (tlst, "tlst");
     std::uint32_t keyed = 0;
     for (const auto& c : cues)
         keyed += c.key >= 0 ? 1u : 0u;
@@ -86,7 +85,7 @@ std::vector<std::uint8_t> wavWith (std::uint32_t frames, const std::vector<Cue>&
     chunk (body, "cue ", cue);
     chunk (body, "LIST", adtl);
     if (keyed > 0)
-        chunk (body, "LIST", tlst);
+        chunk (body, "tlst", tlst); // (a chunk of its own, as FL writes it: round 190r)
     std::vector<std::uint8_t> out;
     tag (out, "RIFF");
     put32 (out, (std::uint32_t) body.size());
