@@ -1,0 +1,53 @@
+<p>Aşağıdaki her başlık bir sorundur. Sizinki burada yoksa sondaki anlatıma göre bildirin.</p>
+<h2 id="starting-the-program">Programı başlatma</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows: SmartScreen ilk açılışta uyarıyor</h3>
+<p>Çalıştırılabilir dosya henüz kod imzalı değil; bu yüzden SmartScreen ilk çalıştırışınızda uyarabilir.</p>
+<ol><li><code>More info</code> düğmesine tıklayın.</li><li><code>Run anyway</code> düğmesine tıklayın.</li></ol>
+<p>Kurulum programı yönetici hakkı gerektirmez.</p>
+<h3 id="macos-cannot-be-opened">macOS: &quot;açılamıyor&quot;</h3>
+<p>Uygulama Apple tarafından notarize edilmemiştir ve Developer ID imzası yoktur; bu yüzden ilk açılış için bir ek adım gerekir.</p>
+<ol><li>LYNX SHARE'i <code>Applications</code> klasörüne sürükleyin.</li><li>Ona sağ tıklayın (Control+tık) ve <code>Aç</code> seçin.</li><li>Yeniden <code>Aç</code> düğmesine tıklayın.</li></ol>
+<p>macOS 15 Sequoia veya daha yenisinde, bir kez açmayı deneyin, sonra <code>System Settings › Privacy &amp; Security</code> bölümüne gidip <code>Open Anyway</code> düğmesine tıklayın. Ya da Terminal'de:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS, ilk kayıt yapışınızda mikrofon erişimi ister.</p>
+<h3 id="linux-the-appimage-does-not-start">Linux: AppImage başlamıyor</h3>
+<p>LYNX SHARE, glibc 2.35 veya daha yenisi olan bir x86_64 sistem (Ubuntu 22.04, Debian 12, Fedora 36, güncel Arch veya Manjaro) ve X11 veya XWayland ister.</p>
+<ol><li>Dosyayı çalıştırılabilir yapın ve aşağıdaki iki komutla çalıştırın.</li><li>Hâlâ başlamıyorsa libfuse2'yi kurun. Paket Ubuntu 22.04'te <code>libfuse2</code>, Ubuntu 24.04'te <code>libfuse2t64</code>, Arch'ta <code>fuse2</code> ve Fedora'da <code>fuse-libs</code> adını taşır.</li><li>Kurmak istemezseniz bunun yerine <code>.tar.gz</code> dosyasını indirin, çıkarın ve <code>./install.sh</code> komutunu çalıştırın.</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code>, LYNX SHARE'i kullanıcınız için <code>~/.local</code> altına bir menü girdisiyle kurar. <code>./install.sh --uninstall</code> onu kaldırır.</p>
+<h2 id="sound">Ses</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">Ses yok ya da yanlış ses aygıtı</h3>
+<ol><li><code>Seçenekler › Ses ayarları...</code> seçeneğini açın.</li><li>Bir sürücü seçin.</li><li>Bir çıkış aygıtı seçin.</li></ol>
+<div class="tablewrap"><table><thead><tr><th>Sistem</th><th>Sürücüler</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI), DirectSound, ASIO ve dahili LYNX ASIO sürücüsü</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire (yerel), JACK ve ALSA. İlk açılışta LYNX SHARE, bunlardan aygıtı olan ilkini açar</td></tr></tbody></table></div>
+<p>ASIO bir Windows sürücü modelidir ve yalnızca Windows'ta bulunur. <code>Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...</code> da ses aygıtını sınar. Bkz. <a href="/wiki/audio-setup/">Ses ayarı</a>.</p>
+<h3 id="linux-the-sound-breaks-up">Linux: ses bozuluyor</h3>
+<p>Ses thread'inin gerçek zamanlı öncelikle çalışması gerekir.</p>
+<ol><li><code>Seçenekler › Ses ayarları...</code> seçeneğini açın ve <code>Durum</code> değerini okuyun. Thread'in gerçek zamanlı öncelik alıp almadığını gösterir.</li><li>Almadıysa rtkit'i kurun (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> veya <code>sudo pacman -S rtkit</code>) ya da JACK kurulumlarında olduğu gibi kendinizi gerçek zamanlı sınırı olan <code>ses</code> grubuna ekleyin.</li><li>Oturumu kapatıp yeniden açın.</li></ol>
+<p>Ayrıntılar <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a> içindedir.</p>
+<h2 id="plugins">Plugin'ler</h2>
+<h3 id="a-plugin-crashes">Bir plugin çöküyor</h3>
+<p>Yalnızca plugin durması için onu kendi sürecinde çalıştırın.</p>
+<ol><li><code>Seçenekler › Genel ayarlar...</code> seçeneğini açın.</li><li><code>Plugin'leri ayrı süreçte çalıştır (LYNX SHARE'i çökmelere karşı korur)</code> seçeneğini açın.</li><li>Projeyi yeniden açın.</li></ol>
+<p>Kendi sürecinde çöken veya yanıt vermeyi bırakan bir plugin susturulur. Plugin'i yeniden yüklemek için projeyi kaydedip yeniden açın. Bkz. <a href="/wiki/plugins/">Üçüncü taraf plugin'ler</a>.</p>
+<h3 id="a-plugin-is-not-in-the-list">Bir plugin listede yok</h3>
+<ol><li><code>Seçenekler › Plugin tara</code> seçeneğini seçin.</li><li>Hâlâ yoksa <code>Seçenekler › Plugin yöneticisi...</code> seçeneğini açın, <code>Plugin klasörleri...</code> düğmesine tıklayın ve plugin'in klasörünü ekleyin.</li><li><code>Başarısız</code> sekmesine bakın. Taramada başarısız olan bir plugin dosyası atlanır. Windows'ta nedeni <code>%APPDATA%\LYNX\scan-failures.log</code> içindedir.</li><li>Başarısız dosyaları yeniden denemek için <code>Yeniden tara...</code> düğmesine tıklayın.</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">Bir proje kurulu olmayan bir plugin kullanıyor</h3>
+<p>Bir efektin yerini aynı işi gören bir LYNX SHARE efekti alır ve ayarları projede korunur. <code>Yardım › Eksik dosyalar...</code> eksik olanları listeler. Bkz. <a href="/wiki/built-in/">Dahili enstrümanlar ve efektler</a>.</p>
+<h3 id="video-does-not-work-on-linux">Linux'ta video çalışmıyor</h3>
+<p>Video izleri ve <code>Export with video</code> için FFmpeg gerekir. LYNX SHARE onu nasıl kuracağınızı söyler.</p>
+<h2 id="crash-reports">Çökme raporları</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="Bir sonraki açılışta gösterilen çökme raporu sorusu; Gönder, Gönderilecekleri göster ve Gönderme ile" loading="lazy"></a></figure>
+<p>Çökme raporları isteğe bağlıdır. Bir çökme veya donmadan sonra, sonraki açılışta rapor gönderilip gönderilmeyeceği sorulur.</p>
+<div class="tablewrap"><table><thead><tr><th>Komut</th><th>Ne yapar</th></tr></thead><tbody><tr><td><code>Gönderilecekleri göster</code></td><td>Tam metni gösterir</td></tr><tr><td><code>Bunun yerine GitHub'da bildir</code></td><td>GitHub'ın önceden doldurulmuş sorun formunu açar. Dosyaları kendiniz eklersiniz</td></tr><tr><td><code>Raporun bulunduğu klasörü aç</code></td><td>Rapor dosyalarını bilgisayarınızda gösterir</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>Kapalıyken her dosyanın yalnızca uzantısı gönderilir</td></tr><tr><td><code>Sormadan her zaman gönder</code></td><td>Sonraki raporları soru sormadan gönderir</td></tr></tbody></table></div>
+<p><code>Seçenekler › Genel ayarlar...</code> içindeki <code>Çökme raporları</code>, <code>Ask</code> (varsayılan), <code>Her zaman gönder</code> veya <code>Asla gönderme</code> ayarını yapar.</p>
+<p>Bir rapor şunları içerir: LYNX SHARE sürümü, işletim sistemi, CPU, ekran kartları ve sürücüleri, ekran boyutu, ses sürücüsü ve aygıtı, çökme veya donma dosyası, oturumun son 60 adımı ve yüklenmiş üçüncü taraf plugin'lerin adları ve sürümleri.</p>
+<p>Ses, proje, sample, bilgisayarınızın adı veya kullanıcı adınızı içermez. Sunucu hiçbir IP adresi saklamaz. Gönderilen kimlikler ayarlar klasöründeki <code>crash-reports\sent.log</code> içinde listelenir. Bir raporun silinmesini istemek için kimliğiyle bir sorun açın. Tam metin <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">gizlilik politikasındadır</a>.</p>
+<h2 id="report-a-problem">Sorun bildirme</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="Sorun bildir penceresi: bir açıklama kutusu, isteğe bağlı bir e-posta adresi ve Gönder düğmesi" loading="lazy"></a></figure>
+<ol><li><code>Yardım › Sorun bildir...</code> komutunu seçin.</li><li>Ne olduğunu anlatın. E-posta adresi isteğe bağlıdır; cevap istiyorsanız yazın.</li><li>Sorun bir çökmeyse <code>En yeni çökme / donma dosyalarını ve bu oturumun adımlarını ekle</code> kutusunu işaretli bırakın.</li><li>Metni denetlemek için <code>Gönderilecekleri göster</code> düğmesine tıklayın.</li><li><code>Gönder</code> düğmesine tıklayın. Ondan önce hiçbir şey gönderilmez.</li></ol>
+<p><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a> adresinde de bir sorun açabilirsiniz.</p>
+<h2 id="good-to-know">Bilmekte fayda var</h2>
+<ul><li>Bir çökmeden sonra projenizin yedek kopyaları LYNX SHARE'in otomatik kayıt klasöründedir.</li><li>Çökmede bir plugin rol oynadıysa soru, o plugin'i bundan sonra ayrı bir süreçte çalıştırmayı önerir.</li><li>Ayarlar klasörü Windows'ta <code>%APPDATA%\LYNX</code>, macOS'ta <code>~/Library/Application Support/LYNX</code> ve Linux'ta <code>~/.config/LYNX</code> yoludur.</li></ul>
+<h2 id="related">İlgili sayfalar</h2>
+<ul><li><a href="/wiki/audio-setup/">Ses ayarı</a></li><li><a href="/wiki/plugins/">Üçüncü taraf plugin'ler</a></li><li><a href="/wiki/install/">Kurulum</a></li><li><a href="/faq/">SSS</a></li><li><a href="/why/#crash">Çökme koruması</a></li></ul>
