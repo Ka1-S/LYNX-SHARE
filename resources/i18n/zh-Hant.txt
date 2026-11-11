@@ -8900,3 +8900,7 @@ countries: tw hk mo
 "Bitmap size is incorrect." = "點陣圖尺寸不正確。"
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance 格式的圖片 (PNG)：橫向 8 格，每個動作一列，另有一個同名文字檔，每行一個動作名稱"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "圖片寬度必須為 8 格，高度為名稱檔 ({0}) 每行一格。"
+"Levelling" = "電平平衡"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "電平平衡：以較慢的起音把電平保持在上限以下的臨界值，其餘由上限攔住（預設關閉）"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "電平平衡臨界值：保持在上限以下的電平（Off：不做電平平衡）"
+"Levelling attack: how much of a transient passes before the level is held" = "電平平衡起音：電平被保持之前有多少瞬態通過"

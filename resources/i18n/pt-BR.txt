@@ -8983,3 +8983,7 @@ countries: br
 "Bitmap size is incorrect." = "O tamanho do bitmap está incorreto."
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Uma imagem (PNG) no formato do Fruity Dance: 8 quadros na horizontal, uma linha por movimento e um arquivo de texto de mesmo nome com um nome de movimento por linha"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "A largura da imagem deve ter 8 quadros e a altura um quadro para cada linha do arquivo de nomes ({0})."
+"Levelling" = "Nivelamento"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelamento: segura o nível em um limiar abaixo do teto com ataque lento, o teto segura o resto (desligado por padrão)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Limiar do nivelamento: o nível mantido abaixo do teto (Off: sem nivelamento)"
+"Levelling attack: how much of a transient passes before the level is held" = "Ataque do nivelamento: quanto de um transiente passa antes de o nível ser segurado"

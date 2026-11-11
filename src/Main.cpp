@@ -10333,10 +10333,13 @@ private:
             parityShow->window = std::move (window);
             return;
         }
-        juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
+        // round 190ar: LYNX_PARITYSHOT_SCALE=2 draws the same editor at twice the pixel density (as on a 200 % display)
+        const auto shotScale = juce::jlimit (1.0f, 4.0f, juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_SCALE", "1").getFloatValue());
+        juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) editor->getWidth() * shotScale), juce::roundToInt ((float) editor->getHeight() * shotScale), true);
         {
             juce::Graphics g (image);
             g.fillAll (lynx::theme::panel);
+            g.addTransform (juce::AffineTransform::scale (shotScale));
             editor->paintEntireComponent (g, false);
         }
         const juce::File file (path);

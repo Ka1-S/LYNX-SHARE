@@ -429,7 +429,12 @@ protected:
             }
             switch (c.type)
             {
-                case K::toggle: set ({ { c.param, v (c.param) >= 0.5f ? 0.0f : 1.0f } }); return;
+                case K::toggle:
+                    if (c.id != 0) // (round 190ar: a toggle the editor answers itself: its state is `lit`)
+                        buttonPressed (c, e);
+                    else
+                        set ({ { c.param, v (c.param) >= 0.5f ? 0.0f : 1.0f } });
+                    return;
                 case K::menu: case K::barMenu: showOptions (c); return;
                 case K::tabs:
                 {
@@ -749,7 +754,7 @@ protected:
             }
             case K::toggle:
             {
-                const auto lit = v (c.param) >= 0.5f;
+                const auto lit = c.id != 0 ? c.lit : v (c.param) >= 0.5f;
                 skin::button (g, c.r, false, hover, ac);
                 skin::powerLed (g, { c.r.getX() + 11.0f, c.r.getCentreY() }, 6.0f, false);
                 if (lit)
