@@ -69,6 +69,18 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
            && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
 }
 
+// A hosted plugin's settings live in its running instance: the song only holds what was saved, and the instance is
+// given that once, when it is created. So the running instance stays with its own channel / slot whatever the song
+// says (an edit, an undo back to an older save: the instance tag is the same), but a channel / slot that merely sits
+// where another one was (another project opened over this one, a session joined, a channel replaced) keeps the
+// plugin running there only when it was saved with the same settings. Without this, a project opened over one with
+// the same plugin in the same place played, and then saved, the first project's settings (round 190az).
+template <typename T>
+bool sameHostedPlugin (const T& before, const T& now) noexcept
+{
+    return before.instance.id == now.instance.id || before.plugin.state == now.plugin.state;
+}
+
 // Silent instrument: plugin channel that could not be loaded.
 class SilentInstrument final : public Instrument
 {
@@ -689,7 +701,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
-                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin))))
+                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin) && ! rebuilds (factories, channel.plugin)
+                    && sameHostedPlugin (previous->song.channels[p], channel))))
         {
             state->instruments.push_back (previous->instruments[p]);
             state->instruments.back()->configure (channel, song.bpm);
@@ -800,7 +813,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
-                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)))
+                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)
+                        && sameHostedPlugin (previous->song.mixer[pt].effects[pi], slots[i])))
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
