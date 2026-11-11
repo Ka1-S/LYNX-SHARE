@@ -1563,6 +1563,8 @@ countries: jp
 "Controller type" = "コントローラータイプ"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "汎用コントローラー: コントロールの右クリックメニュー > MIDIコントローラーにリンク でノブやフェーダーをリンクします。"
 "Pickup (takeover mode)" = "ピックアップ (テイクオーバーモード)"
+"Foot pedal controls note off" = "フットペダルでノートオフを制御"
+"Disable to send sustain to plugins" = "オフにするとサステインをプラグインに送ります"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "コントローラーが現在の値に達してから初めてパラメーターを動かすため、値が飛びません。"
 "Links in this project" = "このプロジェクトのリンク"
 "ch. {0}" = "Ch {0}"
@@ -8126,6 +8128,15 @@ countries: jp
 "Send the time selection to the comp" = "時間選択をコンプへ送る"
 "Send the time selection of the take lane to its comp" = "テイクレーンの時間選択をそのコンプへ送る"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "接続"
+"Auto map outputs" = "出力を自動マップ"
+"Assign all outputs incrementally" = "すべての出力を順番に割り当て"
+"Set all inputs and outputs to their default values" = "すべての入力と出力を既定値に戻す"
+"Refresh inputs and outputs (after a change in the plugin)" = "入力と出力を更新（プラグインの変更後）"
+"Mixer track offset for output {0}" = "出力 {0} のミキサートラックオフセット"
+"Deactivate output {0}" = "出力 {0} を無効にする"
+"Activate output {0}" = "出力 {0} を有効にする"
 # --- Game controller (round 184a, S16)
 "Game controller" = "ゲームコントローラー"
 "Use a game controller" = "ゲームコントローラーを使う"

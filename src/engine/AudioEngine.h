@@ -21,6 +21,7 @@
 #include "core/HardwareOutput.h"
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
+#include "core/PedalHold.h"
 #include "core/TakeRecording.h"
 #include "core/WorkerPool.h"
 #include "core/SerialJobs.h"
@@ -865,6 +866,8 @@ private:
     LiveEventQueue liveEvents;   // UI -> audio
     LiveEventQueue midiEvents;   // MIDI thread -> audio
     InputHeldNotes midiHeld;     // MIDI thread: what each held MIDI key started
+    PedalHold pedalHold;         // MIDI thread: FL's foot pedal hold per channel (round 187a)
+    std::atomic<bool> footPedalNoteOff { true }; // FL's Settings › MIDI "Foot pedal controls note off" (on)
     std::atomic<std::uint64_t> heldKeyBits[16][2] {}; // keys held per MIDI channel on inputs / the typing piano (chord readout)
     std::atomic<std::uint8_t> heldKeyCount[16][128] {};
     void markHeldKey (int midiChannel, int key, bool on) noexcept;
