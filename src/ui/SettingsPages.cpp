@@ -1558,7 +1558,7 @@ public:
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
-            sampleDevices = { "Arturia KeyLab 49", "Akai MPD218" };
+            sampleDevices = { "Arturia KeyLab 49", "Akai MPD218", sampleMpeDevice }; // (the last one shown as an MPE controller, issue #108)
             sampleOutputs = { "Roland TR-8S", "Korg volca sample" };
             auto p = engine.getMidiPrefs();
             prefs::MidiOutputPrefs drums;
@@ -1700,7 +1700,10 @@ private:
 
         for (const auto& name : names)
         {
-            auto row = std::make_unique<MidiInputRow> (name, engine.getMidiPrefs().input (name.toStdString()), channels,
+            auto shown = engine.getMidiPrefs().input (name.toStdString());
+            if (! persistent && name == sampleMpeDevice) // (the snapshot's sample row for an MPE controller)
+                shown.mpe = true;
+            auto row = std::make_unique<MidiInputRow> (name, shown, channels,
                                                        [this] (const prefs::MidiInputPrefs& in) {
                                                            auto p = engine.getMidiPrefs();
                                                            p.setInput (in);
@@ -1817,6 +1820,7 @@ private:
     bool loading = false;
     std::size_t channelCount = 0;
     juce::StringArray sampleDevices;
+    static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;
     std::vector<std::unique_ptr<MidiOutputRow>> outputRows;
     juce::StringArray sampleOutputs, clockInputs;
