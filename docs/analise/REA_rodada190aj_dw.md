@@ -41,7 +41,27 @@ is skipped again. FL runs them always.
 
 ## 3. Numbers
 
-See `/mnt/e/lynx-work/slicex190aj/out/before.txt` and `after.txt` (table in the round's HANDOFF).
+Error against FL's render (`scripts/flref_compare.py pair`, esr dB; lower is closer), and the render thread's CPU
+(renderwav: mean % of real time, and the time to render the 3 s song):
+
+| program | before | after | CPU before | CPU after |
+|---|---|---|---|---|
+| tests/Directwave.flp | −76.71 | −76.71 | 1 %, 58 ms | 2 %, 56 ms |
+| piezo | −76.21 | −76.21 | 1 %, 49 ms | 1 %, 40 ms |
+| strat | −73.13 | −73.13 | 1 %, 41 ms | 1 %, 30 ms |
+| closegrand | −76.23 | −76.23 | 1 %, 58 ms | 1 %, 48 ms |
+| guitar | −75.88 | −75.88 | 1 %, 36 ms | 1 %, 45 ms |
+| flpiano | −74.74 | −74.74 | 1 %, 34 ms | 1 %, 46 ms |
+| **grand** | −52.82 | **−76.40** | 2 %, 58 ms | 2 %, 88 ms |
+| **strings** | −27.88 | **−63.94** | 1 %, 41 ms | 2 %, 57 ms |
+| **choir** | −33.42 | **−73.54** | 1 %, 35 ms | 1 %, 59 ms |
+
+Nothing is worse; the six programs without effects are unchanged to the last digit. The three reverb programs cost
+more render time because their tail is now rendered (it was skipped), still 1–2 % of real time. Strings: the residual
+is −101 dB in every 100 ms window from start to end (the 16-bit floor of FL's file, `p/win.py`); its −63.9 is that
+floor against a quiet program. "Before" is 190l's renderwav (out/before.txt), "after" a renderwav of this commit's
+tree (out/after.txt; worktree dw190aj-rw, `p/rw.sh`); the machine was under build load during both, so the
+milliseconds are rough.
 
 ## 4. Best way?
 
