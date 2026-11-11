@@ -21,6 +21,7 @@
 #include "ui/Updater.h"
 
 #include <algorithm>
+#include <array>
 
 namespace lynx
 {
@@ -95,6 +96,21 @@ struct Rows
     }
 
     int bottom() const { return y + 14; }
+
+    // round 190bj (QA: Settings › MIDI's game-controller line was drawn squeezed sideways): a note label as tall as its
+    // text needs at the page's width (never less than `minHeight`), wrapped, never squeezed
+    juce::Rectangle<int> note (juce::Label& label, int minHeight, int lift = 3)
+    {
+        label.setMinimumHorizontalScale (1.0f);
+        const auto border = label.getBorderSize();
+        juce::AttributedString text;
+        text.append (label.getText(), label.getFont());
+        text.setWordWrap (juce::AttributedString::byWord);
+        juce::TextLayout layout;
+        layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - border.getLeftAndRight()));
+        const auto height = juce::jmax (minHeight, (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
+        return full (height).translated (0, -lift);
+    }
 };
 
 // ================================================================================================================
@@ -1342,14 +1358,22 @@ public:
     {
         auto r = getLocalBounds().reduced (8, 4);
         auto top = r.removeFromTop (26);
-        plays.setBounds (top.removeFromRight (230));
+        // round 190bj (QA: at ~390 px the switch and the device's name were squeezed out): the boxes give way first,
+        // down to about two thirds of their width, so the name keeps room (the page scrolls sideways below that)
+        auto widths = std::array<float, 3> { 230.0f, 150.0f, prefsNow.mpe ? 124.0f : 0.0f };
+        const auto boxes = widths[0] + widths[1] + widths[2];
+        const auto room = (float) (top.getWidth() - nameRoom - (prefsNow.mpe ? 24 : 16));
+        if (room < boxes)
+            for (auto& w : widths)
+                w *= juce::jmax (0.65f, room / boxes);
+        plays.setBounds (top.removeFromRight (juce::roundToInt (widths[0])));
         top.removeFromRight (8);
-        channel.setBounds (top.removeFromRight (150));
+        channel.setBounds (top.removeFromRight (juce::roundToInt (widths[1])));
         top.removeFromRight (8);
         zone.setVisible (prefsNow.mpe);
         if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice; the channel box keeps its column)
         {
-            zone.setBounds (top.removeFromRight (124));
+            zone.setBounds (top.removeFromRight (juce::roundToInt (widths[2])));
             top.removeFromRight (8);
         }
         enabled.setBounds (top);
@@ -1358,7 +1382,7 @@ public:
         auto bottom = r.removeFromTop (26);
         bottom.removeFromLeft (28); // (under the name, past the check box)
         typeLabel.setBounds (bottom.removeFromLeft (110));
-        type.setBounds (bottom.removeFromLeft (260));
+        type.setBounds (bottom.removeFromLeft (juce::jmin (260, bottom.getWidth())));
         bottom.removeFromLeft (10);
         status.setBounds (bottom);
     }
@@ -1387,6 +1411,12 @@ private:
     juce::Label typeLabel, status;
     std::vector<std::string> typeIds; // [item id − 3] the profile's id
     static constexpr int mpeItem = 100;
+
+public:
+    // the switch and the device's name keep at least this much of the first line (round 190bj)
+    static constexpr int nameRoom = 150;
+    // the narrowest row that keeps everything readable: the name's room and the boxes at two thirds
+    static constexpr int minimumWidth = 16 + nameRoom + 24 + (230 + 150 + 124) * 65 / 100;
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
@@ -1683,11 +1713,14 @@ public:
     }
 
 private:
+    // the input and output rows' narrowest readable width, plus the page's margins (round 190bj)
+    int minimumWidth() const override { return juce::jmax (MidiInputRow::minimumWidth, 16 + 150 + 8 + 190 + 12 + 76 + 110) + 40; }
+
     int layout (int width) override
     {
         Rows r (width);
         r.section (inputsTitle, true);
-        inputsNote.setBounds (r.full (32).translated (0, -4));
+        inputsNote.setBounds (r.note (inputsNote, 32, 4));
         if (rows.empty())
             noDevices.setBounds (r.full (24));
         for (auto& row : rows)
@@ -1700,7 +1733,7 @@ private:
         }
 
         r.section (outputsTitle);
-        outputsNote.setBounds (r.full (32).translated (0, -4));
+        outputsNote.setBounds (r.note (outputsNote, 32, 4));
         if (outputRows.empty())
             noOutputs.setBounds (r.full (24));
         for (auto& row : outputRows)
@@ -1724,10 +1757,10 @@ private:
         typeLabel.setVisible (false); // (round 190aw: the Controller type is each input device's, above, as in FL)
         typeValue.setBounds (r.full (20));
         pickup.setBounds (r.full (24));
-        pickupNote.setBounds (r.full (16).translated (0, -3));
+        pickupNote.setBounds (r.note (pickupNote, 16));
         footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
         gamepadToggle.setBounds (r.full (24));
-        gamepadNote.setBounds (r.full (32).translated (0, -3));
+        gamepadNote.setBounds (r.note (gamepadNote, 32));
         {
             auto row = r.row (linksLabel, 0, 110);
             linksLabel.setBounds (linksLabel.getBounds().withTrimmedTop (4));

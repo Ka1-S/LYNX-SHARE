@@ -29,7 +29,10 @@ namespace lynx::ui
 {
 // Shows `hint` in the bar until `holdMs` after the last call (call it on every drag step).
 void postHint (const Hint& hint, int holdMs = 1200);
-void clearPostedHint();
+void clearPostedHint(); // (a gesture's own posted hint; a notice stays)
+// A message the user must be able to read (an edit refused: "... is frozen: Unfreeze to edit"): it stays in the bar for
+// `holdMs` over the hover hints and the gestures' posted hints, and clearPostedHint (a mouse-up) leaves it (round 190bj).
+void postNotice (const Hint& hint, int holdMs = 3000);
 std::optional<Hint> postedHint(); // the posted hint while it is fresh (the main window polls it)
 
 // The standard gesture line of a value control (knob, fader, number): drag, fine, wheel, reset, menu.

@@ -1416,7 +1416,7 @@ struct FreezePlan
 };
 
 // what stops a freeze before any render, as a sentence for the user; empty = go
-juce::String freezeRefusal (AudioEngine& engine, int channel)
+juce::String whyNoFreeze (AudioEngine& engine, int channel)
 {
     const auto& song = engine.getSong();
     if (const auto* why = freeze::whyNot (song, channel))
@@ -1519,19 +1519,40 @@ private:
 
 void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done)
 {
-    if (const auto refusal = freezeRefusal (engine, channel); refusal.isNotEmpty())
+    if (const auto refusal = whyNoFreeze (engine, channel); refusal.isNotEmpty())
     {
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't freeze this channel"), refusal);
+        // (round 190bj: the title names the channel)
+        const auto& song = engine.getSong();
+        const auto name = channel >= 0 && channel < (int) song.channels.size() ? juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) : juce::String();
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon,
+                                                name.isNotEmpty() ? tr ("Can't freeze {0}", { name }) : tr ("Can't freeze this channel"), refusal);
         if (done)
             done (false);
         return;
     }
-    (new FreezeThread (engine, planFreeze (engine, channel), std::move (done)))->launchThread();
+    auto* thread = new FreezeThread (engine, planFreeze (engine, channel), std::move (done));
+    // round 190bj (QA: the progress window's first frame was a blank white box): the window is shown and painted once,
+    // here on the message thread, before the render starts (launchThread starts the thread first and shows it after)
+    if (auto* window = thread->getAlertWindow())
+    {
+        window->setVisible (true);
+        if (auto* peer = window->getPeer())
+        {
+            window->repaint();
+            peer->performAnyPendingRepaintsNow();
+        }
+    }
+    thread->launchThread();
+}
+
+juce::String freezeRefusal (AudioEngine& engine, int channel)
+{
+    return whyNoFreeze (engine, channel);
 }
 
 juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress)
 {
-    if (const auto refusal = freezeRefusal (engine, channel); refusal.isNotEmpty())
+    if (const auto refusal = whyNoFreeze (engine, channel); refusal.isNotEmpty())
         return refusal;
     const auto plan = planFreeze (engine, channel);
     std::vector<StandIn> stems;

@@ -1420,7 +1420,7 @@ juce::String ChannelRackComponent::frozenHint (int channel)
     if (engine.frozenAudioMissing (channel))
         return tr ("Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze");
     if (engine.freezeOutOfDate (channel))
-        return tr ("Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it");
+        return tr ("Frozen, out of date (changed since the freeze): the old audio plays.  [RMB] Re-freeze"); // (round 190bj: shorter, the action fits the bar)
     return tr ("Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit");
 }
 
@@ -1429,12 +1429,36 @@ bool ChannelRackComponent::refuseFrozenEdit (int channel)
     const auto& song = engine.getSong();
     if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
         return false;
-    ui::postHint ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { channelName (song, channel) }), {} }, 4000);
+    ui::postNotice ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { channelName (song, channel) }), {} }, 3000);
     return true;
 }
 
 void ChannelRackComponent::freezeChannels (std::vector<std::uint64_t> uids)
 {
+    // round 190bj (QA: "Freeze selected channels" stopped at the first channel that can't be frozen with "Can't freeze
+    // this channel", not saying which): with several, the ones that can't are named with their reason and the others
+    // are frozen, as the selection's Unfreeze treats each channel on its own
+    if (uids.size() > 1)
+    {
+        const auto& song = engine.getSong();
+        juce::StringArray refused;
+        std::vector<std::uint64_t> go;
+        for (const auto uid : uids)
+        {
+            const auto it = std::find_if (song.channels.begin(), song.channels.end(), [uid] (const ChannelDef& c) { return c.uid == uid && uid != 0; });
+            if (it == song.channels.end())
+                continue;
+            if (const auto why = freezeRefusal (engine, (int) (it - song.channels.begin())); why.isNotEmpty())
+                refused.add (juce::String::fromUTF8 (it->name.c_str()) + ": " + why);
+            else
+                go.push_back (uid);
+        }
+        if (! refused.isEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Some selected channels can't be frozen"),
+                                                    refused.joinIntoString ("\n\n")
+                                                        + (go.empty() ? juce::String() : "\n\n" + tr ("The other selected channels are frozen.")));
+        uids = std::move (go);
+    }
     while (! uids.empty())
     {
         const auto uid = uids.front();
@@ -2491,7 +2515,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             targets.push_back (c.uid);
         const auto several = targets.size() > 1;
         if (! c.freeze.on())
-            menu.addItem (several ? tr ("Freeze selected channels") : tr ("Freeze"), [this, targets] { freezeChannels (targets); });
+            menu.addItem (several ? tr ("Freeze selected channels") : trc ("@channel: Freeze"), [this, targets] { freezeChannels (targets); });
         else
         {
             menu.addItem (several ? tr ("Unfreeze selected channels") : tr ("Unfreeze"), [this, targets] {

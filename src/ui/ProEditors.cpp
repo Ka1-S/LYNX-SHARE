@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/WindowFit.h"
 #include "core/MixerOps.h"
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
@@ -4167,6 +4168,36 @@ public:
     int baseW = 1, baseH = 1;
 };
 
+// round 190bj (QA: the Apex Limiter's bottom status row was cut off by the window edge at its default size): JUCE's
+// setFixedAspectRatio applies the ratio to the whole window, native title bar and borders included, so the content was
+// about 30 px shorter than the editor; and the open animation then reset the holder's scale, so the editor was cut
+// instead of scaled. The ratio now applies to the content (core/WindowFit.h aspectContent).
+class ContentAspectConstrainer final : public juce::ComponentBoundsConstrainer
+{
+public:
+    ContentAspectConstrainer (juce::Component& w, int bw, int bh) : window (w), baseW (bw), baseH (bh) {}
+
+    void checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>&, const juce::Rectangle<int>&,
+                      bool top, bool left, bool bottom, bool right) override
+    {
+        // (JUCE passes the outer bounds: the content plus the native frame)
+        juce::BorderSize<int> frame;
+        if (auto* peer = window.getPeer())
+            if (const auto size = peer->getFrameSizeIfPresent())
+                frame = *size;
+        const auto out = windowfit::aspectContent ({ bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight() },
+                                                   { frame.getLeft(), frame.getTop(), frame.getRight(), frame.getBottom() },
+                                                   baseW, baseH, minScale, maxScale, top, left, bottom, right);
+        bounds = { out.x, out.y, out.w, out.h };
+    }
+
+    static constexpr double minScale = 0.7, maxScale = 2.0;
+
+private:
+    juce::Component& window;
+    int baseW, baseH;
+};
+
 class ProEditorWindow final : public juce::DocumentWindow
 {
 public:
@@ -4179,23 +4210,24 @@ public:
         auto holder = std::make_unique<ScaledHolder> (std::move (editor));
         const auto w = holder->baseW, h = holder->baseH;
         setContentOwned (holder.release(), true);
+        aspect = std::make_unique<ContentAspectConstrainer> (*this, w, h);
+        setConstrainer (aspect.get());
         setResizable (true, false);
-        if (auto* c = getConstrainer())
-        {
-            c->setFixedAspectRatio ((double) w / (double) h);
-            c->setMinimumSize (juce::roundToInt (w * 0.7), juce::roundToInt (h * 0.7));
-            c->setMaximumSize (w * 2, h * 2);
-        }
-        centreWithSize (getWidth(), getHeight());
+        centreWithSize (w, h);
         setVisible (true);
         keepAboveMainWindow (*this);
-        if (content != nullptr) skin::playOpenAnimation (*content, content->editorStyle()); // round 126: fade / scale in
+        // round 126: fade / scale in — on the holder: the editor's own transform is the holder's scale (round 190bj)
+        if (content != nullptr)
+            if (auto* holder = getContentComponent())
+                skin::playOpenAnimation (*holder, content->editorStyle());
     }
+    ~ProEditorWindow() override { setConstrainer (nullptr); }
     void closeButtonPressed() override;
     ProEditor* content = nullptr;
 
 private:
     ui::SlotGoneWatcher gone;
+    std::unique_ptr<ContentAspectConstrainer> aspect;
 };
 
 std::map<std::pair<int, int>, std::unique_ptr<ProEditorWindow>>& windows()
@@ -4248,6 +4280,39 @@ void open (AudioEngine& engine, int track, int slot)
     const auto title = utf8 (effectInfo (mixer[(std::size_t) track].effects[(std::size_t) slot].kind).name) + " - "
                        + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " (" + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<ProEditorWindow> (std::move (editor), title, engine, track, slot);
+}
+
+juce::Image windowContentForSnapshot (AudioEngine& engine, int track, int slot, bool juceAspect)
+{
+    auto editor = make (engine, track, slot, true);
+    if (editor == nullptr)
+        return {};
+    ScaledHolder holder (std::move (editor));
+    const auto w = holder.baseW, h = holder.baseH;
+    const windowfit::Frame frame { 8, 31, 8, 8 }; // a native Windows 10/11 frame at 100 % (title bar, borders)
+    windowfit::Box outer { 100, 100, w + frame.left + frame.right, h + frame.top + frame.bottom };
+    if (juceAspect) // before round 190bj: JUCE's fixed ratio on the whole window, then the open animation's end
+    {
+        juce::ComponentBoundsConstrainer c;
+        c.setFixedAspectRatio ((double) w / (double) h);
+        c.setMinimumSize (juce::roundToInt (w * 0.7), juce::roundToInt (h * 0.7));
+        c.setMaximumSize (w * 2, h * 2);
+        juce::Rectangle<int> b (outer.x, outer.y, outer.w, outer.h);
+        c.checkBounds (b, b, { 0, 0, 10000, 10000 }, false, false, false, false);
+        outer = { b.getX(), b.getY(), b.getWidth(), b.getHeight() };
+    }
+    else
+        outer = windowfit::aspectContent (outer, frame, w, h, ContentAspectConstrainer::minScale, ContentAspectConstrainer::maxScale);
+    holder.setSize (outer.w - frame.left - frame.right, outer.h - frame.top - frame.bottom);
+    if (juceAspect)
+        holder.editor->setTransform ({}); // (the animation reset the editor's transform: the holder's scale was lost)
+    juce::Image image (juce::Image::ARGB, holder.getWidth(), holder.getHeight(), true);
+    {
+        juce::Graphics g (image);
+        g.fillAll (colour::bg1);
+        holder.paintEntireComponent (g, false);
+    }
+    return image;
 }
 
 void close (int track, int slot) { windows().erase ({ track, slot }); }

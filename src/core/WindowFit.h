@@ -53,3 +53,36 @@ inline ScrollFit scrollFit (int contentW, int contentH, int areaW, int areaH, in
     return fit;
 }
 } // namespace lynx::windowfit
+
+namespace lynx::windowfit
+{
+// Round 190bj (QA: the Apex Limiter's status row cut off by the window's bottom edge): a resizable window whose CONTENT
+// keeps a fixed aspect ratio (a scaled plugin editor of `baseW` x `baseH`). JUCE's own fixed-aspect constrainer applies
+// the ratio to the whole window, title bar and borders included, so with a native title bar the content came out about
+// 30 px shorter than the editor at every size. This applies it to the content: `proposed` is the window's outer box,
+// `frameL/T/R/B` its frame; the result is the outer box whose content is the editor scaled by a factor in
+// [minScale, maxScale]. A drag on the top or bottom edge alone sizes by the height, any other by the width; the edge
+// being dragged moves, the opposite one stays.
+struct Frame
+{
+    int left = 0, top = 0, right = 0, bottom = 0;
+};
+
+inline Box aspectContent (Box proposed, Frame frame, int baseW, int baseH, double minScale, double maxScale,
+                          bool top = false, bool left = false, bool bottom = false, bool right = false)
+{
+    baseW = std::max (1, baseW);
+    baseH = std::max (1, baseH);
+    const auto contentW = proposed.w - frame.left - frame.right, contentH = proposed.h - frame.top - frame.bottom;
+    const auto byHeight = (top || bottom) && ! (left || right);
+    auto scale = byHeight ? (double) contentH / (double) baseH : (double) contentW / (double) baseW;
+    scale = std::clamp (scale, minScale, maxScale);
+    const auto w = (int) (baseW * scale + 0.5), h = (int) (baseH * scale + 0.5);
+    Box out { proposed.x, proposed.y, w + frame.left + frame.right, h + frame.top + frame.bottom };
+    if (left)
+        out.x = proposed.x + proposed.w - out.w;
+    if (top)
+        out.y = proposed.y + proposed.h - out.h;
+    return out;
+}
+} // namespace lynx::windowfit
