@@ -2375,3 +2375,43 @@ bit-identically (no noise reduction).
 (The gain error is dominated by windows where one gate is open and the other closed.) Open: the reference seems to
 learn — with a 200 ms hold it stops reducing repeated bursts after about 3 s, a kick after a 0.2 s gap loses 7 dB, and
 at thresholds −25 / −10 its onsets are far deeper (−30 … −40 dB); none of that is modelled.
+
+## Round 190al: Crest's Two-way works in three bands
+
+Black-box, from round trial190k's reference renders of LYNX's own test signals (no reference plug-in ran in this round).
+Tools and tables: `/mnt/e/lynx-work/parity190al` (`crest/fit3.py`, `crest/tw.py`, `crest/final_TTM.txt`, `hash/hash.md`);
+bank and metrics are round 190v's.
+
+What the renders show (reference style 5, our Two-way):
+
+- Pink noise comes out with three different gains: one under about 90 Hz, one up to 2.5 kHz, one above (up to 4 dB
+  apart). The step between the upper two follows a fourth-order Linkwitz-Riley split at 2.5 kHz (within 0.02 of the
+  measured transition, averaged over 162 settings).
+- The output's phase turns 360 degrees around 88 Hz and again around 2.5 kHz (−57 / −145 / −205 / −257 degrees at 30 /
+  70 / 100 / 140 Hz; −480 / −534 / −587 at 1.8 / 2.5 / 3.5 kHz): two such splits in series.
+- An 8 kHz tone is turned down from 4.6 dB lower than a 1 kHz tone and along the ratio itself (slopes 0.50 / 0.76 /
+  0.92 at ratio 2 / 4 / 10, against 0.25 / 0.62 / 0.84); a 100 Hz tone behaves like a 1 kHz tone about 4 dB quieter,
+  which is the share of it each split passes (−4.1 dB to the mid band, −8.5 dB to the low band).
+
+Model: the signal is split at 88 Hz and 2.5 kHz, each band runs round 190v's law form with its own constants (fitted
+jointly on the 1 kHz, 100 Hz and 8 kHz stairs of 162 settings: 0.064 dB rms), and the bands are added. The fixed gain
+round 190v had to give the single band is gone: it was the high band's share of the 1 kHz tone. The pink-noise stairs
+were not part of the fit: through the engine their band gains land within 0.05 / 0.14 / 0.18 dB (low / mid / high).
+
+| Bank | Files | Gain error before | After | Worse (> 0.15 dB) | Score before | After | Score up / same / down |
+|---|---|---|---|---|---|---|---|
+| trial187b + tp172b programme | 60 | 2.18 | 0.34 | 0 | 5.05 | 7.32 | 53 / 7 / 0 |
+| 190k knee grid | 72 | 1.75 | 0.14 | 0 | 4.71 | 8.03 | 72 / 0 / 0 |
+| 190k threshold × ratio × knee × attack grid | 370 | 1.89 | 0.25 | 0 | 3.94 | 7.46 | 345 / 25 / 0 |
+| 190k T* | 4 | 1.72 | 0.12 | 0 | 4.75 | 8.00 | 4 / 0 / 0 |
+| All | 506 | 1.91 | 0.25 | 0 | 4.19 | 7.53 | 474 / 32 / 0 |
+
+("Before" is round 190v's single-band law; against 0.1.25 the gain error was 4.29 dB and the score 2.39.)
+
+- Only new instances of the Two-way style change (Law = Measured). A project saved before round 190v keeps the classic
+  law, one band, bit-identical (`hash/hash.md`: 36 of 36 legacy renders identical; every other style identical to
+  round 190v's build).
+- Cost: the measured Two-way runs three detectors and the splits: 0.65 → 1.31 s of CPU for 72 s of audio (about 0.8 %
+  → 1.7 % of one core at 48 kHz). Latency unchanged (0). The editor's curve is that of a 1 kHz tone, as before.
+- Open: the low band's law rests on the 100 Hz tone alone (it sits on the split); ratios under 2 and over 10 are
+  extrapolated; auto gain as in round 190v.

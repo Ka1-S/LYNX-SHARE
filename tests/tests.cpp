@@ -17401,4 +17401,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Undo190bTests.inc"
 #include "Bugs190cTests.inc"
 #include "Parity190vTests.inc"
+#include "Parity190alTests.inc"
 #include "Surge190xTests.inc"
